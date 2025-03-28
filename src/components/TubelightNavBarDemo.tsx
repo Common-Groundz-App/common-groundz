@@ -10,6 +10,9 @@ export function TubelightNavBarDemo() {
     { name: 'Favorites', url: '/favorites', icon: Heart }
   ];
 
-  // Using demoMode=true to avoid Router context requirement
-  return <TubelightNavBar items={navItems} demoMode={true} />;
+  return (
+    <div className="relative z-50">
+      <TubelightNavBar items={navItems} demoMode={true} className="mb-20 sm:mb-0" />
+    </div>
+  );
 }
