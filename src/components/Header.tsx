@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { CircleDot } from 'lucide-react';
+import { Star, Heart } from 'lucide-react';
 
 const Header = () => {
   return (
@@ -10,9 +10,9 @@ const Header = () => {
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center">
           <Link to="/" className="flex items-center gap-2 text-xl font-bold text-primary">
-            <div className="relative h-6 w-10">
-              <CircleDot className="h-6 w-6 text-primary absolute left-0 opacity-80" />
-              <CircleDot className="h-6 w-6 text-primary absolute left-2 opacity-80" />
+            <div className="relative">
+              <Star className="h-6 w-6 text-primary" />
+              <Heart className="h-3 w-3 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
             </div>
             <span>Common Groundz</span>
           </Link>
