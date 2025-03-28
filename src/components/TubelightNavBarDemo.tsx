@@ -8,7 +8,8 @@ export function TubelightNavBarDemo() {
     { name: 'Books', url: '/books', icon: Book },
     { name: 'Movies', url: '/movies', icon: Film },
     { name: 'Favorites', url: '/favorites', icon: Heart }
-  ]
+  ];
 
-  return <TubelightNavBar items={navItems} />
+  // Using demoMode=true to avoid Router context requirement
+  return <TubelightNavBar items={navItems} demoMode={true} />;
 }
