@@ -1,12 +1,10 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Star, Book, Film, Sun, Heart } from 'lucide-react';
-
 const HeroSection = () => {
-  return (
-    <section className="pt-28 pb-16 md:pt-32 md:pb-24">
+  return <section className="pt-28 pb-16 md:pt-32 md:pb-24">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col items-center text-center mb-16">
+        <div className="flex flex-col items-center text-center mb-16 my-[49px]">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl">
             Recommendations from <span className="text-primary">people you trust</span>
           </h1>
@@ -19,55 +17,36 @@ const HeroSection = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in" style={{animationDelay: '0.2s'}}>
-          <CategoryCard 
-            icon={<Book className="h-10 w-10 text-brand-orange" />}
-            title="Books"
-            description="Find your next great read"
-            className="bg-brand-orange/10"
-          />
-          <CategoryCard 
-            icon={<Film className="h-10 w-10 text-brand-blue" />}
-            title="Movies"
-            description="What to watch next"
-            className="bg-brand-blue/10"
-          />
-          <CategoryCard 
-            icon={<Sun className="h-10 w-10 text-brand-teal" />}
-            title="Products"
-            description="Genuine product reviews"
-            className="bg-brand-teal/10"
-          />
-          <CategoryCard 
-            icon={<div className="relative">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in" style={{
+        animationDelay: '0.2s'
+      }}>
+          <CategoryCard icon={<Book className="h-10 w-10 text-brand-orange" />} title="Books" description="Find your next great read" className="bg-brand-orange/10" />
+          <CategoryCard icon={<Film className="h-10 w-10 text-brand-blue" />} title="Movies" description="What to watch next" className="bg-brand-blue/10" />
+          <CategoryCard icon={<Sun className="h-10 w-10 text-brand-teal" />} title="Products" description="Genuine product reviews" className="bg-brand-teal/10" />
+          <CategoryCard icon={<div className="relative">
               <Star className="h-10 w-10 text-primary" />
               <Heart className="h-5 w-5 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-            </div>}
-            title="And More"
-            description="Any recommendation"
-            className="bg-primary/10"
-          />
+            </div>} title="And More" description="Any recommendation" className="bg-primary/10" />
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 interface CategoryCardProps {
   icon: React.ReactNode;
   title: string;
   description: string;
   className?: string;
 }
-
-const CategoryCard = ({ icon, title, description, className }: CategoryCardProps) => {
-  return (
-    <div className={`p-6 rounded-lg card-hover ${className}`}>
+const CategoryCard = ({
+  icon,
+  title,
+  description,
+  className
+}: CategoryCardProps) => {
+  return <div className={`p-6 rounded-lg card-hover ${className}`}>
       <div className="mb-4">{icon}</div>
       <h3 className="font-bold text-lg mb-1">{title}</h3>
       <p className="text-sm text-muted-foreground">{description}</p>
-    </div>
-  );
+    </div>;
 };
-
 export default HeroSection;
