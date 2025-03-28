@@ -4,7 +4,7 @@ import { Star, Book, Film, Sun, Heart } from 'lucide-react';
 const HeroSection = () => {
   return <section className="pt-28 pb-16 md:pt-32 md:pb-24">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col items-center text-center mb-16 my-[49px]">
+        <div className="flex flex-col items-center text-center mb-16 my-[50px]">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl">
             Recommendations from <span className="text-primary">people you trust</span>
           </h1>
