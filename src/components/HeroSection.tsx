@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Star, Book, Film, Sun, Heart } from 'lucide-react';
@@ -7,50 +6,47 @@ const HeroSection = () => {
   return (
     <section className="pt-28 pb-16 md:pt-32 md:pb-24">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row items-center">
-          <div className="md:w-1/2 mb-10 md:mb-0 md:pr-10 animate-fade-in">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-              Recommendations from <span className="text-primary">people you trust</span>
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-lg">
-              Discover the best books, movies, products, and more - recommended by your friends, family, and trusted circle.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="px-8">Get Started</Button>
-              <Button size="lg" variant="outline" className="px-8">Learn More</Button>
-            </div>
+        <div className="flex flex-col items-center text-center mb-16">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl">
+            Recommendations from <span className="text-primary">people you trust</span>
+          </h1>
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl">
+            Discover the best books, movies, products, and more - recommended by your friends, family, and trusted circle.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button size="lg" className="px-8">Get Started</Button>
+            <Button size="lg" variant="outline" className="px-8">Learn More</Button>
           </div>
-          <div className="md:w-1/2 relative animate-fade-in" style={{animationDelay: '0.2s'}}>
-            <div className="grid grid-cols-2 gap-4">
-              <CategoryCard 
-                icon={<Book className="h-10 w-10 text-brand-orange" />}
-                title="Books"
-                description="Find your next great read"
-                className="bg-brand-orange/10"
-              />
-              <CategoryCard 
-                icon={<Film className="h-10 w-10 text-brand-blue" />}
-                title="Movies"
-                description="What to watch next"
-                className="bg-brand-blue/10"
-              />
-              <CategoryCard 
-                icon={<Sun className="h-10 w-10 text-brand-teal" />}
-                title="Products"
-                description="Genuine product reviews"
-                className="bg-brand-teal/10"
-              />
-              <CategoryCard 
-                icon={<div className="relative">
-                  <Star className="h-10 w-10 text-primary" />
-                  <Heart className="h-5 w-5 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-                </div>}
-                title="And More"
-                description="Any recommendation"
-                className="bg-primary/10"
-              />
-            </div>
-          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in" style={{animationDelay: '0.2s'}}>
+          <CategoryCard 
+            icon={<Book className="h-10 w-10 text-brand-orange" />}
+            title="Books"
+            description="Find your next great read"
+            className="bg-brand-orange/10"
+          />
+          <CategoryCard 
+            icon={<Film className="h-10 w-10 text-brand-blue" />}
+            title="Movies"
+            description="What to watch next"
+            className="bg-brand-blue/10"
+          />
+          <CategoryCard 
+            icon={<Sun className="h-10 w-10 text-brand-teal" />}
+            title="Products"
+            description="Genuine product reviews"
+            className="bg-brand-teal/10"
+          />
+          <CategoryCard 
+            icon={<div className="relative">
+              <Star className="h-10 w-10 text-primary" />
+              <Heart className="h-5 w-5 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+            </div>}
+            title="And More"
+            description="Any recommendation"
+            className="bg-primary/10"
+          />
         </div>
       </div>
     </section>
