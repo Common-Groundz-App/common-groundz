@@ -11,8 +11,11 @@ export function TubelightNavBarDemo() {
   ];
 
   return (
-    <div className="relative z-50">
-      <TubelightNavBar items={navItems} demoMode={true} className="mb-20 sm:mb-0" />
+    <div className="flex flex-col items-center justify-center w-full py-8">
+      <h3 className="text-xl font-semibold mb-4">Tubelight Navigation</h3>
+      <div className="w-full max-w-md mx-auto">
+        <TubelightNavBar items={navItems} demoMode={true} />
+      </div>
     </div>
   );
 }

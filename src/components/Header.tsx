@@ -40,9 +40,9 @@ const Header = () => {
         </div>
       </header>
       
-      {/* Tubelight navbar for mobile - move it outside the header for better positioning */}
-      <div className="block md:hidden">
-        <TubelightNavBar items={navItems} className="fixed bottom-0 left-0 right-0 z-50 mb-4" />
+      {/* Mobile navigation - fixed at the bottom */}
+      <div className="md:hidden fixed bottom-4 left-0 right-0 z-50">
+        <TubelightNavBar items={navItems} className="mx-auto" />
       </div>
     </>
   );

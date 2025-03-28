@@ -30,15 +30,18 @@ export function TubelightNavBar({ items, className, demoMode = false }: NavBarPr
     // Set active tab based on current route (if not in demo mode)
     if (!demoMode && location) {
       const currentPath = location.pathname;
-      const activeItem = items.find(item => item.url === currentPath || 
-                                    (item.url === '/' && currentPath === ''));
+      const activeItem = items.find(item => 
+        item.url === currentPath || 
+        (item.url === '/' && currentPath === '')
+      );
+      
       if (activeItem) {
         setActiveTab(activeItem.name);
       } else {
         // Default to first item if no match found
         setActiveTab(items[0].name);
       }
-    } else {
+    } else if (demoMode) {
       // In demo mode, just set the first item as active
       setActiveTab(items[0].name);
     }
@@ -59,8 +62,8 @@ export function TubelightNavBar({ items, className, demoMode = false }: NavBarPr
     const Icon = item.icon;
     const linkContent = (
       <>
-        <span className="hidden md:inline">{item.name}</span>
-        <span className="md:hidden">
+        <span className="hidden sm:inline">{item.name}</span>
+        <span className="sm:hidden">
           <Icon size={20} strokeWidth={2.5} />
         </span>
         {isActive && (
@@ -92,7 +95,7 @@ export function TubelightNavBar({ items, className, demoMode = false }: NavBarPr
           className={cn(
             "relative cursor-pointer text-sm font-semibold px-4 py-2 rounded-full transition-colors",
             "text-foreground/80 hover:text-primary",
-            isActive && "bg-muted text-primary",
+            isActive && "text-primary",
           )}
         >
           {linkContent}
@@ -108,7 +111,7 @@ export function TubelightNavBar({ items, className, demoMode = false }: NavBarPr
         className={cn(
           "relative cursor-pointer text-sm font-semibold px-4 py-2 rounded-full transition-colors",
           "text-foreground/80 hover:text-primary",
-          isActive && "bg-muted text-primary",
+          isActive && "text-primary",
         )}
       >
         {linkContent}
@@ -119,8 +122,7 @@ export function TubelightNavBar({ items, className, demoMode = false }: NavBarPr
   return (
     <div
       className={cn(
-        "z-50 mx-auto",
-        isMobile ? "w-[90%] max-w-md" : "left-1/2 -translate-x-1/2",
+        "z-50 w-[90%] max-w-md mx-auto",
         className,
       )}
     >
