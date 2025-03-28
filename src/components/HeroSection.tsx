@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Star, Book, Film, Sun } from 'lucide-react';
+import { Star, Book, Film, Sun, Coffee } from 'lucide-react';
 
 const HeroSection = () => {
   return (
@@ -41,7 +41,7 @@ const HeroSection = () => {
                 className="bg-brand-teal/10"
               />
               <CategoryCard 
-                icon={<Star className="h-10 w-10 text-primary" />}
+                icon={<Coffee className="h-10 w-10 text-primary" />}
                 title="And More"
                 description="Any recommendation"
                 className="bg-primary/10"

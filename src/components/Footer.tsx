@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Coffee } from 'lucide-react';
 
 const Footer = () => {
   return (
@@ -8,7 +9,10 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <Link to="/" className="text-xl font-bold text-primary mb-4 inline-block">RecommendIO</Link>
+            <Link to="/" className="flex items-center gap-2 text-xl font-bold text-primary mb-4 inline-block">
+              <Coffee className="h-6 w-6" />
+              <span>Common Groundz</span>
+            </Link>
             <p className="text-muted-foreground">
               Recommendations from people you actually trust.
             </p>
@@ -43,7 +47,7 @@ const Footer = () => {
         </div>
         
         <div className="border-t mt-8 pt-8 flex flex-col md:flex-row items-center justify-between text-muted-foreground">
-          <p>© 2023 RecommendIO. All rights reserved.</p>
+          <p>© 2023 Common Groundz. All rights reserved.</p>
           <div className="flex space-x-4 mt-4 md:mt-0">
             <a href="#" className="hover:text-primary transition-colors">Twitter</a>
             <a href="#" className="hover:text-primary transition-colors">Instagram</a>
