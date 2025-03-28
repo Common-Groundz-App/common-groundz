@@ -30,16 +30,15 @@ export function NavBar({
 
   return (
     <div className={cn(
-      "fixed sm:top-0 left-0 right-0 z-50 sm:pt-4 px-4", 
-      isMobile ? "bottom-0 mb-4" : "", 
+      "fixed top-0 left-0 right-0 z-50 pt-4 px-4", 
       className
     )}>
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo Section */}
         <div className="flex-shrink-0">
           <Link to="/" className="flex items-center">
-            <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
-              <span className="font-bold text-xl text-brand-orange">Common Groundz</span>
+            <div className="p-2 rounded-md flex items-center justify-center bg-brand-orange">
+              <span className="font-bold text-xl text-white">Common Groundz</span>
             </div>
           </Link>
         </div>
