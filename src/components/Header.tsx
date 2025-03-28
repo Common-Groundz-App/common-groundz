@@ -17,10 +17,6 @@ const Header = () => {
             <span>Common Groundz</span>
           </Link>
         </div>
-        <nav className="hidden md:flex space-x-6">
-          <a href="#features" className="text-foreground/80 hover:text-primary transition-colors">Features</a>
-          <a href="#testimonials" className="text-foreground/80 hover:text-primary transition-colors">Testimonials</a>
-        </nav>
         <div className="flex items-center space-x-3">
           <Button variant="outline" size="sm" className="hidden md:inline-flex">Log In</Button>
           <Button size="sm">Sign Up</Button>
