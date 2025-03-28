@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Coffee } from 'lucide-react';
+import { CircleDot } from 'lucide-react';
 
 const Footer = () => {
   return (
@@ -10,7 +9,10 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <Link to="/" className="flex items-center gap-2 text-xl font-bold text-primary mb-4 inline-block">
-              <Coffee className="h-6 w-6" />
+              <div className="relative h-6 w-10">
+                <CircleDot className="h-6 w-6 text-primary absolute left-0 opacity-80" />
+                <CircleDot className="h-6 w-6 text-primary absolute left-2 opacity-80" />
+              </div>
               <span>Common Groundz</span>
             </Link>
             <p className="text-muted-foreground">
