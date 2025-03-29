@@ -6,10 +6,12 @@ import TestimonialsSection from '@/components/TestimonialsSection';
 import CTASection from '@/components/CTASection';
 import Footer from '@/components/Footer';
 import NavBarComponent from '@/components/NavBarComponent';
+import FloatingElements from '@/components/FloatingElements';
 
 const Index = () => {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
+      <FloatingElements />
       <NavBarComponent />
       <main>
         <HeroSection />
