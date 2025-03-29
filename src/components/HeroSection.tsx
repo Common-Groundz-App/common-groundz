@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 const HeroSection = () => {
   const [titleNumber, setTitleNumber] = useState(0);
   const titles = useMemo(
-    () => ["you trust", "in your circle", "like you"],
+    () => ["you trust", "like you"],
     []
   );
 
@@ -30,7 +30,7 @@ const HeroSection = () => {
           <GlowElements />
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl relative z-10">
             Recommendations from{" "}
-            <span className="relative inline-block overflow-hidden">
+            <span className="relative inline-block overflow-hidden pb-2">
               <span className="invisible">people you trust</span>
               {titles.map((title, index) => (
                 <motion.span
