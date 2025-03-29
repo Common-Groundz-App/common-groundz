@@ -7,23 +7,23 @@ const GlowElements = () => {
   
   return (
     <>
-      {/* Left glow circle */}
+      {/* Left glow circle - positioned bottom left */}
       <div 
         className="absolute w-32 h-32 md:w-48 md:h-48 rounded-full bg-brand-orange/20 animate-pulse"
         style={{
-          bottom: isMobile ? '15%' : '25%',
-          left: isMobile ? '-10%' : '-10%',
+          bottom: isMobile ? '0' : '-5%',
+          left: isMobile ? '-5%' : '-5%',
           filter: 'blur(25px)',
           zIndex: 0
         }}
       />
       
-      {/* Right glow circle */}
+      {/* Right glow circle - positioned top right */}
       <div 
         className="absolute w-32 h-32 md:w-48 md:h-48 rounded-full bg-brand-orange/20 animate-pulse"
         style={{
-          top: isMobile ? '5%' : '5%',
-          right: isMobile ? '-10%' : '-10%',
+          top: isMobile ? '0' : '-5%',
+          right: isMobile ? '-5%' : '-5%',
           filter: 'blur(25px)',
           zIndex: 0
         }}

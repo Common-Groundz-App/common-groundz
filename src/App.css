@@ -64,22 +64,22 @@ body, html {
   animation: fadeIn 0.5s ease-out forwards;
 }
 
-/* Add glow pulse animation */
+/* Enhanced glow pulse animation */
 @keyframes glow-pulse {
   0% {
-    opacity: 0.5;
-    transform: scale(0.95);
+    opacity: 0.4;
+    transform: scale(0.9);
   }
   50% {
     opacity: 0.8;
-    transform: scale(1.05);
+    transform: scale(1.1);
   }
   100% {
-    opacity: 0.5;
-    transform: scale(0.95);
+    opacity: 0.4;
+    transform: scale(0.9);
   }
 }
 
 .animate-pulse {
-  animation: glow-pulse 3s ease-in-out infinite;
+  animation: glow-pulse 4s ease-in-out infinite;
 }
