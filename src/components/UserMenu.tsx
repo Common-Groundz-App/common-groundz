@@ -20,7 +20,7 @@ export function UserMenu() {
 
   if (!user) {
     return (
-      <Button asChild variant="outline" size="sm">
+      <Button asChild size="sm" className="bg-brand-orange hover:bg-brand-orange/90 text-white">
         <Link to="/auth">Sign In</Link>
       </Button>
     );
