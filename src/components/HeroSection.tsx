@@ -1,17 +1,59 @@
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Star, Book, Film, Sun, Heart } from 'lucide-react';
 import GlowElements from './GlowElements';
+import { motion } from "framer-motion";
 
 const HeroSection = () => {
+  const [titleNumber, setTitleNumber] = useState(0);
+  const titles = useMemo(
+    () => ["you trust", "in your circle", "like you"],
+    []
+  );
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (titleNumber === titles.length - 1) {
+        setTitleNumber(0);
+      } else {
+        setTitleNumber(titleNumber + 1);
+      }
+    }, 2500);
+    return () => clearTimeout(timeoutId);
+  }, [titleNumber, titles]);
+
   return (
     <section className="pt-28 pb-16 md:pt-32 md:pb-24">
       <div className="container mx-auto px-4">
         <div className="flex flex-col items-center text-center mb-16 mt-[50px] relative">
           <GlowElements />
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl relative z-10">
-            Recommendations from <span className="text-primary">people you trust</span>
+            Recommendations from{" "}
+            <span className="relative inline-block overflow-hidden">
+              <span className="invisible">people you trust</span>
+              {titles.map((title, index) => (
+                <motion.span
+                  key={index}
+                  className="absolute inset-0 text-primary whitespace-nowrap"
+                  initial={{ opacity: 0, y: "50px" }}
+                  transition={{ type: "spring", stiffness: 50 }}
+                  animate={
+                    titleNumber === index
+                      ? {
+                          y: 0,
+                          opacity: 1,
+                        }
+                      : {
+                          y: titleNumber > index ? -80 : 80,
+                          opacity: 0,
+                        }
+                  }
+                >
+                  people {title}
+                </motion.span>
+              ))}
+            </span>
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl relative z-10">
             Discover the best books, movies, products, and more - recommended by your friends, family, and trusted circle.
