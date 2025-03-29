@@ -1,7 +1,6 @@
 
 import React from 'react';
-import { Button as DefaultButton } from '@/components/ui/button';
-import { Button as NeonButton } from '@/components/ui/neon-button';
+import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Star, Heart } from 'lucide-react';
 
@@ -19,23 +18,8 @@ const Header = () => {
           </Link>
         </div>
         <div className="flex items-center space-x-3">
-          <Link to="/auth" className="hidden md:inline-flex">
-            <DefaultButton 
-              variant="outline" 
-              size="sm"
-              className="border-primary/30 hover:bg-primary/5 text-primary"
-            >
-              Sign In
-            </DefaultButton>
-          </Link>
-          <Link to="/auth?tab=signup">
-            <DefaultButton 
-              size="sm" 
-              className="bg-primary hover:bg-primary/90"
-            >
-              Sign Up
-            </DefaultButton>
-          </Link>
+          <Button variant="outline" size="sm" className="hidden md:inline-flex">Log In</Button>
+          <Button size="sm">Sign Up</Button>
         </div>
       </div>
     </header>
