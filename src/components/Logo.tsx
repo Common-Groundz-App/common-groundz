@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 interface LogoProps {
   className?: string;
@@ -14,11 +15,13 @@ const Logo: React.FC<LogoProps> = ({ className, size = 'md' }) => {
   };
 
   return (
-    <img 
-      src="/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png" 
-      alt="Common Groundz Logo" 
-      className={`${sizeClasses[size]} ${className || ''}`} 
-    />
+    <Link to="/">
+      <img 
+        src="/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png" 
+        alt="Common Groundz Logo" 
+        className={`${sizeClasses[size]} ${className || ''} cursor-pointer`} 
+      />
+    </Link>
   );
 };
 
