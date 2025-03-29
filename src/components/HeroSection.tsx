@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Star, Book, Film, Sun, Heart } from 'lucide-react';
@@ -81,7 +80,6 @@ const HeroSection = () => {
         </div>
       </div>
       
-      {/* Brand color orange glow at the bottom */}
       <Glow variant="bottom" className="opacity-80" />
     </section>
   );

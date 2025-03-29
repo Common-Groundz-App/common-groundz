@@ -18,8 +18,8 @@ const Header = () => {
           </Link>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm" className="hidden md:inline-flex hover:bg-primary/10 hover:text-primary border-primary/30 text-primary">
-            <Link to="/auth">Log In</Link>
+          <Button size="sm" className="hidden md:inline-flex bg-secondary hover:bg-secondary/90 text-secondary-foreground">
+            <Link to="/auth">Sign In</Link>
           </Button>
           <Button size="sm" className="bg-primary hover:bg-primary/90">
             <Link to="/auth?tab=signup">Sign Up</Link>
