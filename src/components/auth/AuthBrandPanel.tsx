@@ -1,10 +1,15 @@
 
 import React from 'react';
 import AuthFeatures from './AuthFeatures';
+import Logo from '@/components/Logo';
 
 const AuthBrandPanel = () => {
   return (
     <div className="w-full lg:w-1/2 bg-gradient-to-br from-brand-orange/10 via-brand-blue/10 to-brand-teal/10 flex-col items-center justify-center p-12 relative hidden lg:flex">
+      <div className="absolute top-8 left-8">
+        <Logo size="md" />
+      </div>
+      
       <div className="max-w-md text-center mb-12">
         <h2 className="text-4xl font-bold mb-6 text-brand-orange">Find Common Ground</h2>
         <p className="text-lg mb-8">

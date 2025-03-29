@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Glow } from '@/components/ui/glow';
-import Logo from '@/components/Logo';
 import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel';
+import Logo from '@/components/Logo';
 
 const Auth = () => {
   const [activeTab, setActiveTab] = useState('signin');
@@ -28,7 +28,7 @@ const Auth = () => {
       
       {/* Right side - Auth forms */}
       <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-12 relative z-10">
-        <div className="absolute top-8 left-8 lg:left-auto lg:right-8">
+        <div className="lg:hidden absolute top-8 left-8">
           <Logo size="md" />
         </div>
         
