@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Star, Book, Film, Sun, Heart } from 'lucide-react';
 import GlowElements from './GlowElements';
 import { motion } from "framer-motion";
-import { AuroraBackground } from '@/components/ui/aurora-background';
 
 const HeroSection = () => {
   const [titleNumber, setTitleNumber] = useState(0);
@@ -25,8 +24,8 @@ const HeroSection = () => {
   }, [titleNumber, titles]);
 
   return (
-    <AuroraBackground className="pt-36 pb-16 md:pt-44 md:pb-24 min-h-screen h-auto">
-      <div className="container mx-auto px-4 relative z-10">
+    <section className="pt-36 pb-16 md:pt-44 md:pb-24">
+      <div className="container mx-auto px-4">
         <div className="flex flex-col items-center text-center mb-16 relative">
           <GlowElements />
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl relative z-10">
@@ -77,7 +76,7 @@ const HeroSection = () => {
             </div>} title="And More" description="Any recommendation" className="bg-primary/10" />
         </div>
       </div>
-    </AuroraBackground>
+    </section>
   );
 };
 
