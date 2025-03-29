@@ -7,22 +7,27 @@ const GlowElements = () => {
   
   return (
     <div className="glow-container">
-      {/* Glow circle near the top right of heading */}
+      {/* Black circle to the left of the heading */}
       <div 
-        className="absolute w-[180px] h-[180px] rounded-full bg-orange-500/30 blur-[40px] -z-10 animate-pulse-slow"
+        className="absolute border-2 border-black rounded-full -z-10"
         style={{ 
-          top: isMobile ? '15%' : '25%', 
-          right: isMobile ? '5%' : '15%'
+          top: isMobile ? '10%' : '15%', 
+          left: isMobile ? '5%' : '10%',
+          width: isMobile ? '100px' : '120px',
+          height: isMobile ? '100px' : '120px',
+          transform: 'rotate(5deg)'
         }}
       />
       
-      {/* Glow circle near learn more button */}
+      {/* Black circle to the bottom right by the "Learn More" button */}
       <div 
-        className="absolute w-[150px] h-[150px] rounded-full bg-orange-500/25 blur-[35px] -z-10 animate-pulse-slow"
+        className="absolute border-2 border-black rounded-full -z-10"
         style={{ 
-          top: isMobile ? '40%' : '50%', 
-          left: isMobile ? '5%' : '15%',
-          animationDelay: '1.5s' 
+          bottom: isMobile ? '30%' : '25%', 
+          right: isMobile ? '5%' : '15%',
+          width: isMobile ? '120px' : '150px',
+          height: isMobile ? '110px' : '130px',
+          transform: 'rotate(-10deg)'
         }}
       />
     </div>
