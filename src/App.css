@@ -83,3 +83,13 @@ body, html {
 .animate-pulse {
   animation: glow-pulse 4s ease-in-out infinite;
 }
+
+/* Alternating pulse animations with different delays */
+.animate-pulse-delay-0 {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+.animate-pulse-delay-2 {
+  animation: glow-pulse 4s ease-in-out infinite;
+  animation-delay: 2s; /* This creates the alternating effect */
+}

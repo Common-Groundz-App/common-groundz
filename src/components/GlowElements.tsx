@@ -9,7 +9,7 @@ const GlowElements = () => {
     <>
       {/* Top left glow circle */}
       <div 
-        className="absolute w-32 h-32 md:w-48 md:h-48 rounded-full bg-brand-orange/20 animate-pulse"
+        className="absolute w-40 h-40 md:w-64 md:h-64 rounded-full bg-brand-orange/20 animate-pulse-delay-0"
         style={{
           top: isMobile ? '0' : '-5%',
           left: isMobile ? '-5%' : '-5%',
@@ -20,7 +20,7 @@ const GlowElements = () => {
       
       {/* Bottom right glow circle */}
       <div 
-        className="absolute w-32 h-32 md:w-48 md:h-48 rounded-full bg-brand-orange/20 animate-pulse"
+        className="absolute w-40 h-40 md:w-64 md:h-64 rounded-full bg-brand-orange/20 animate-pulse-delay-2"
         style={{
           bottom: isMobile ? '0' : '-5%',
           right: isMobile ? '-5%' : '-5%',
