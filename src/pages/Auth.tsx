@@ -90,9 +90,36 @@ const Auth = () => {
 
   return (
     <div className="flex min-h-screen relative overflow-hidden">
-      {/* Left side - Auth forms */}
+      {/* Left side - Brand visuals and value proposition */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-brand-orange/10 via-brand-blue/10 to-brand-teal/10 flex-col items-center justify-center p-12 relative">
+        <div className="max-w-md text-center mb-12">
+          <h2 className="text-4xl font-bold mb-6 text-brand-orange">Find Common Ground</h2>
+          <p className="text-lg mb-8">
+            Discover recommendations from people who share your interests and tastes.
+          </p>
+          
+          <div className="space-y-6">
+            {features.map((feature, index) => (
+              <div key={index} className="flex items-start p-4 rounded-lg bg-white/50 backdrop-blur-sm shadow-sm">
+                <div className="mr-4 mt-1">{feature.icon}</div>
+                <div className="text-left">
+                  <h3 className="font-medium">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground">{feature.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Decorative elements */}
+        <div className="absolute bottom-10 right-10 h-32 w-32 rounded-full bg-brand-orange/20 animate-pulse-delay-0 filter blur-xl"></div>
+        <div className="absolute top-20 left-10 h-24 w-24 rounded-full bg-brand-blue/20 animate-pulse-delay-2 filter blur-xl"></div>
+        <div className="absolute bottom-40 left-20 h-16 w-16 rounded-full bg-brand-teal/20 animate-pulse-delay-0 filter blur-xl"></div>
+      </div>
+      
+      {/* Right side - Auth forms */}
       <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-12 relative z-10">
-        <div className="absolute top-8 left-8">
+        <div className="absolute top-8 left-8 lg:left-auto lg:right-8">
           <Logo size="md" />
         </div>
         
@@ -200,33 +227,6 @@ const Auth = () => {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
-      
-      {/* Right side - Brand visuals and value proposition */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-brand-orange/10 via-brand-blue/10 to-brand-teal/10 flex-col items-center justify-center p-12 relative">
-        <div className="max-w-md text-center mb-12">
-          <h2 className="text-4xl font-bold mb-6 text-brand-orange">Find Common Ground</h2>
-          <p className="text-lg mb-8">
-            Discover recommendations from people who share your interests and tastes.
-          </p>
-          
-          <div className="space-y-6">
-            {features.map((feature, index) => (
-              <div key={index} className="flex items-start p-4 rounded-lg bg-white/50 backdrop-blur-sm shadow-sm">
-                <div className="mr-4 mt-1">{feature.icon}</div>
-                <div className="text-left">
-                  <h3 className="font-medium">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground">{feature.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Decorative elements */}
-        <div className="absolute bottom-10 right-10 h-32 w-32 rounded-full bg-brand-orange/20 animate-pulse-delay-0 filter blur-xl"></div>
-        <div className="absolute top-20 left-10 h-24 w-24 rounded-full bg-brand-blue/20 animate-pulse-delay-2 filter blur-xl"></div>
-        <div className="absolute bottom-40 left-20 h-16 w-16 rounded-full bg-brand-teal/20 animate-pulse-delay-0 filter blur-xl"></div>
       </div>
       
       <Glow variant="bottom" className="opacity-70" />
