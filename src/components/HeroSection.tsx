@@ -5,6 +5,7 @@ import { Star, Book, Film, Sun, Heart } from 'lucide-react';
 import GlowElements from './GlowElements';
 import { motion } from "framer-motion";
 import { Glow } from '@/components/ui/glow';
+import { Link } from 'react-router-dom';
 
 const HeroSection = () => {
   const [titleNumber, setTitleNumber] = useState(0);
@@ -60,7 +61,9 @@ const HeroSection = () => {
             Discover the best books, movies, products, and more - recommended by your friends, family, and trusted circle.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 relative z-10">
-            <Button size="lg" className="px-8">Get Started</Button>
+            <Button size="lg" className="px-8">
+              <Link to="/auth">Get Started</Link>
+            </Button>
             <Button size="lg" variant="outline" className="px-8">Learn More</Button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 const CTASection = () => {
   return (
@@ -10,7 +11,9 @@ const CTASection = () => {
         <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
           Join thousands of users who have transformed how they discover new favorites on Common Groundz.
         </p>
-        <Button size="lg" className="px-8">Get Started for Free</Button>
+        <Button size="lg" className="px-8">
+          <Link to="/auth">Get Started for Free</Link>
+        </Button>
       </div>
     </section>
   );
