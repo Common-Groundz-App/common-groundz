@@ -63,3 +63,23 @@ body, html {
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out forwards;
 }
+
+/* Add glow pulse animation */
+@keyframes glow-pulse {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0.5;
+    transform: scale(0.95);
+  }
+}
+
+.animate-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}

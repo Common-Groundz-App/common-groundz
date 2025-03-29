@@ -2,19 +2,21 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Star, Book, Film, Sun, Heart } from 'lucide-react';
+import GlowElements from './GlowElements';
 
 const HeroSection = () => {
   return (
     <section className="pt-28 pb-16 md:pt-32 md:pb-24">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col items-center text-center mb-16 mt-[50px]">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl">
+        <div className="flex flex-col items-center text-center mb-16 mt-[50px] relative">
+          <GlowElements />
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl relative z-10">
             Recommendations from <span className="text-primary">people you trust</span>
           </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl">
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl relative z-10">
             Discover the best books, movies, products, and more - recommended by your friends, family, and trusted circle.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 relative z-10">
             <Button size="lg" className="px-8">Get Started</Button>
             <Button size="lg" variant="outline" className="px-8">Learn More</Button>
           </div>
