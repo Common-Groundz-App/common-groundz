@@ -18,10 +18,12 @@ interface NavItem {
 interface NavBarProps {
   items: NavItem[];
   className?: string;
+  rightSection?: React.ReactNode;
 }
 export function NavBar({
   items,
-  className
+  className,
+  rightSection
 }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(items[0].name);
   const [scrolled, setScrolled] = useState(false);
@@ -116,8 +118,10 @@ export function NavBar({
             </Sheet>
           </div>}
         
-        {/* Empty div for balance */}
-        {!isSmallMobile && <div className="flex-shrink-0 w-[150px]"></div>}
+        {/* Right section for user menu */}
+        {!isSmallMobile && <div className="flex-shrink-0 w-[150px] flex justify-end">
+          {rightSection}
+        </div>}
       </div>
     </div>;
 }

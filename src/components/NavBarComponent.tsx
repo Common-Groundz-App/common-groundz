@@ -2,6 +2,7 @@
 import { Home, Star, Heart, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import Logo from './Logo'
+import { UserMenu } from './UserMenu'
 
 export function NavBarComponent() {
   const navItems = [
@@ -11,7 +12,12 @@ export function NavBarComponent() {
     { name: 'About', url: '#about', icon: User }
   ]
 
-  return <NavBar items={navItems} />
+  return (
+    <NavBar 
+      items={navItems} 
+      rightSection={<UserMenu />}
+    />
+  )
 }
 
 export default NavBarComponent;
