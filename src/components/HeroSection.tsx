@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Star, Book, Film, Sun, Heart } from 'lucide-react';
 import GlowElements from './GlowElements';
 import { motion } from "framer-motion";
+import { Glow } from '@/components/ui/glow';
 
 const HeroSection = () => {
   const [titleNumber, setTitleNumber] = useState(0);
@@ -24,7 +25,7 @@ const HeroSection = () => {
   }, [titleNumber, titles]);
 
   return (
-    <section className="pt-36 pb-16 md:pt-44 md:pb-24">
+    <section className="pt-36 pb-16 md:pt-44 md:pb-24 relative overflow-hidden">
       <div className="container mx-auto px-4">
         <div className="flex flex-col items-center text-center mb-16 relative">
           <GlowElements />
@@ -64,7 +65,7 @@ const HeroSection = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in" style={{
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in relative z-10" style={{
           animationDelay: '0.2s'
         }}>
           <CategoryCard icon={<Book className="h-10 w-10 text-brand-orange" />} title="Books" description="Find your next great read" className="bg-brand-orange/10" />
@@ -76,6 +77,9 @@ const HeroSection = () => {
             </div>} title="And More" description="Any recommendation" className="bg-primary/10" />
         </div>
       </div>
+      
+      {/* Brand color orange glow at the bottom */}
+      <Glow variant="bottom" className="opacity-80" />
     </section>
   );
 };

@@ -98,3 +98,66 @@
     @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
   }
 }
+
+/* Add animation for fade-in effect */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Enhanced glow pulse animation */
+@keyframes glow-pulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+}
+
+.animate-pulse {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+/* Alternating pulse animations with different delays */
+.animate-pulse-delay-0 {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+.animate-pulse-delay-2 {
+  animation: glow-pulse 4s ease-in-out infinite;
+  animation-delay: 2s; /* This creates the alternating effect */
+}
+
+/* Subtle glow shimmer animation */
+@keyframes shimmer {
+  0% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.7;
+  }
+}
+
+.glow-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
+}
