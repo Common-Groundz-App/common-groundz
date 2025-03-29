@@ -11,7 +11,7 @@ const GlowElements = () => {
       <div 
         className="absolute w-40 h-40 md:w-64 md:h-64 rounded-full bg-brand-orange/20 animate-pulse-delay-0"
         style={{
-          top: isMobile ? '0' : '-5%',
+          top: isMobile ? '-5%' : '-10%', // Moved higher
           left: isMobile ? '-5%' : '-5%',
           filter: 'blur(25px)',
           zIndex: 0
@@ -22,7 +22,7 @@ const GlowElements = () => {
       <div 
         className="absolute w-40 h-40 md:w-64 md:h-64 rounded-full bg-brand-orange/20 animate-pulse-delay-2"
         style={{
-          bottom: isMobile ? '0' : '-5%',
+          bottom: isMobile ? '-5%' : '-10%', // Moved lower
           right: isMobile ? '-5%' : '-5%',
           filter: 'blur(25px)',
           zIndex: 0
