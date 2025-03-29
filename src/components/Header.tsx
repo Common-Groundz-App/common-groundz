@@ -19,12 +19,23 @@ const Header = () => {
           </Link>
         </div>
         <div className="flex items-center space-x-3">
-          <NeonButton variant="default" size="sm" className="hidden md:inline-flex">
-            <Link to="/auth" className="flex items-center h-full w-full">Log In</Link>
-          </NeonButton>
-          <DefaultButton size="sm">
-            <Link to="/auth?tab=signup">Sign Up</Link>
-          </DefaultButton>
+          <Link to="/auth" className="hidden md:inline-flex">
+            <DefaultButton 
+              variant="outline" 
+              size="sm"
+              className="border-primary/30 hover:bg-primary/5 text-primary"
+            >
+              Sign In
+            </DefaultButton>
+          </Link>
+          <Link to="/auth?tab=signup">
+            <DefaultButton 
+              size="sm" 
+              className="bg-primary hover:bg-primary/90"
+            >
+              Sign Up
+            </DefaultButton>
+          </Link>
         </div>
       </div>
     </header>
