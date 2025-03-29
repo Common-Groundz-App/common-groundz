@@ -24,7 +24,7 @@ export function NavBar({
   const [activeTab, setActiveTab] = useState(items[0].name);
   const isMobile = useIsMobile();
   const isSmallMobile = useIsMobile(650);
-  return <div className={cn("fixed top-0 left-0 right-0 z-50 pt-4 px-4", className)}>
+  return <div className={cn("fixed top-0 left-0 right-0 z-50 pt-4 px-4 bg-background/90 backdrop-blur-md shadow-sm", className)}>
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo Section */}
         <div className="flex-shrink-0">

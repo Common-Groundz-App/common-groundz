@@ -24,9 +24,9 @@ const HeroSection = () => {
   }, [titleNumber, titles]);
 
   return (
-    <section className="pt-28 pb-16 md:pt-32 md:pb-24">
+    <section className="pt-36 pb-16 md:pt-44 md:pb-24">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col items-center text-center mb-16 mt-[50px] relative">
+        <div className="flex flex-col items-center text-center mb-16 relative">
           <GlowElements />
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl relative z-10">
             Recommendations from{" "}
