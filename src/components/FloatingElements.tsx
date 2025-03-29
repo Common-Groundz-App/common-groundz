@@ -10,15 +10,20 @@ interface FloatingElement {
   speed: number;
   element: 'circle' | 'circle-dot' | 'sparkles' | 'sun';
   delay: number;
+  pulseSpeed: number;
 }
 
 export const FloatingElements = () => {
   const elementsRef = useRef<FloatingElement[]>([
-    { x: 15, y: 20, size: 40, opacity: 0.2, speed: 0.4, element: 'circle', delay: 0 },
-    { x: 80, y: 15, size: 25, opacity: 0.15, speed: 0.5, element: 'circle-dot', delay: 2 },
-    { x: 45, y: 60, size: 35, opacity: 0.12, speed: 0.3, element: 'sparkles', delay: 1 },
-    { x: 75, y: 70, size: 30, opacity: 0.18, speed: 0.6, element: 'sun', delay: 3 },
-    { x: 25, y: 80, size: 20, opacity: 0.25, speed: 0.45, element: 'circle', delay: 0.5 },
+    // Background glowing elements (similar to the provided image)
+    { x: 50, y: 10, size: 180, opacity: 0.15, speed: 0.2, element: 'circle', delay: 0, pulseSpeed: 4 },
+    { x: 20, y: 30, size: 120, opacity: 0.1, speed: 0.3, element: 'circle', delay: 1, pulseSpeed: 5 },
+    
+    // Smaller decorative elements
+    { x: 85, y: 15, size: 40, opacity: 0.25, speed: 0.5, element: 'circle-dot', delay: 2, pulseSpeed: 3 },
+    { x: 15, y: 60, size: 35, opacity: 0.2, speed: 0.4, element: 'sparkles', delay: 0.5, pulseSpeed: 4.5 },
+    { x: 75, y: 70, size: 30, opacity: 0.3, speed: 0.6, element: 'sun', delay: 1.5, pulseSpeed: 3 },
+    { x: 30, y: 80, size: 25, opacity: 0.35, speed: 0.45, element: 'circle', delay: 0, pulseSpeed: 2.5 },
   ]);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,7 +45,7 @@ export const FloatingElements = () => {
         
         // Calculate new position based on time
         const time = (elapsedSeconds - element.delay) * element.speed;
-        const newY = element.y + Math.sin(time) * 5;
+        const newY = element.y + Math.sin(time) * 3;
         
         return {
           ...element,
@@ -61,6 +66,10 @@ export const FloatingElements = () => {
   }, []);
 
   const getElementComponent = (element: FloatingElement) => {
+    const pulseClass = `animate-[pulse_${element.pulseSpeed}s_ease-in-out_infinite]`;
+    const floatClass = "float-element";
+    const glowClass = "orange-glow";
+    
     const style = {
       left: `${element.x}%`,
       top: `${element.y}%`,
@@ -72,15 +81,35 @@ export const FloatingElements = () => {
 
     switch (element.element) {
       case 'circle':
-        return <Circle style={style} />;
+        return (
+          <div className={`${floatClass} ${pulseClass} ${glowClass}`}>
+            <Circle style={style} />
+          </div>
+        );
       case 'circle-dot':
-        return <CircleDot style={style} />;
+        return (
+          <div className={`${floatClass} ${pulseClass} ${glowClass}`}>
+            <CircleDot style={style} />
+          </div>
+        );
       case 'sparkles':
-        return <Sparkles style={style} />;
+        return (
+          <div className={`${floatClass} ${pulseClass} ${glowClass}`}>
+            <Sparkles style={style} />
+          </div>
+        );
       case 'sun':
-        return <Sun style={style} />;
+        return (
+          <div className={`${floatClass} ${pulseClass} ${glowClass}`}>
+            <Sun style={style} />
+          </div>
+        );
       default:
-        return <Circle style={style} />;
+        return (
+          <div className={`${floatClass} ${pulseClass} ${glowClass}`}>
+            <Circle style={style} />
+          </div>
+        );
     }
   };
 
@@ -90,10 +119,16 @@ export const FloatingElements = () => {
       className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0"
     >
       {elementsRef.current.map((element, index) => (
-        <div key={index} className="absolute transition-all duration-1000 ease-in-out">
+        <div key={index} className="absolute">
           {getElementComponent(element)}
         </div>
       ))}
+
+      {/* Add a large glowing blob behind navbar similar to the example image */}
+      <div 
+        className="absolute top-[47px] left-1/2 -translate-x-1/2 w-[220px] h-[50px] rounded-full opacity-15 blur-2xl bg-orange-500 pointer-events-none"
+        style={{ filter: 'drop-shadow(0 0 35px rgba(249, 115, 22, 0.8))' }}
+      />
     </div>
   );
 };
