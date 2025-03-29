@@ -1,0 +1,25 @@
+
+import React from 'react';
+
+interface LogoProps {
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+const Logo: React.FC<LogoProps> = ({ className, size = 'md' }) => {
+  const sizeClasses = {
+    sm: "h-6",
+    md: "h-8",
+    lg: "h-10"
+  };
+
+  return (
+    <img 
+      src="/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png" 
+      alt="Common Groundz Logo" 
+      className={`${sizeClasses[size]} ${className || ''}`} 
+    />
+  );
+};
+
+export default Logo;

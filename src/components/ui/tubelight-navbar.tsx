@@ -8,6 +8,8 @@ import { LucideIcon, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import Logo from "@/components/Logo";
+
 interface NavItem {
   name: string;
   url: string;
@@ -30,7 +32,7 @@ export function NavBar({
         <div className="flex-shrink-0">
           <Link to="/" className="flex items-center">
             <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
-              <span className="font-bold text-xl text-brand-orange">Common Groundz</span>
+              <Logo size="md" />
             </div>
           </Link>
         </div>
@@ -69,7 +71,9 @@ export function NavBar({
               </SheetTrigger>
               <SheetContent className="w-[250px] sm:w-[300px]">
                 <div className="py-6">
-                  <div className="font-bold text-xl text-brand-orange mb-6">Common Groundz</div>
+                  <div className="mb-6">
+                    <Logo size="lg" />
+                  </div>
                   <nav className="flex flex-col space-y-4">
                     {items.map(item => {
                   const Icon = item.icon;

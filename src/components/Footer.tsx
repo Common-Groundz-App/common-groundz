@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, Heart } from 'lucide-react';
+import Logo from './Logo';
 
 const Footer = () => {
   return (
@@ -8,12 +10,8 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <Link to="/" className="flex items-center gap-2 text-xl font-bold text-primary mb-4 inline-block">
-              <div className="relative">
-                <Star className="h-6 w-6 text-primary" />
-                <Heart className="h-3 w-3 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-              </div>
-              <span>Common Groundz</span>
+            <Link to="/" className="flex items-center gap-2 mb-4 inline-block">
+              <Logo size="lg" />
             </Link>
             <p className="text-muted-foreground">
               Recommendations from people you actually trust.
