@@ -2,7 +2,7 @@
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { MapPin, Calendar, Globe, Twitter, Instagram } from 'lucide-react';
+import { MapPin, Calendar, Users, Globe, Twitter, Instagram } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 
 interface ProfileSidebarProps {
@@ -34,7 +34,7 @@ const ProfileSidebar = ({
       {/* Profile card */}
       <div className="flex flex-col items-center p-6 pt-12">
         <Avatar className="h-32 w-32 border-4 border-white shadow-lg mb-4">
-          <AvatarImage src="/lovable-uploads/a9d5589a-01ed-4fc1-84ba-67233d6d9412.png" alt={name} />
+          <AvatarImage src="/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png" alt={name} />
           <AvatarFallback>{name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
         </Avatar>
         
@@ -42,7 +42,7 @@ const ProfileSidebar = ({
         {title && <p className="text-muted-foreground text-sm mt-1">{title}</p>}
         
         <div className="flex items-center mt-2">
-          <span className="text-amber-500 flex items-center">★</span>
+          <span className="text-brand-orange flex items-center">★</span>
           <span className="font-bold ml-1">{stats.groundzScore}</span>
           <span className="text-muted-foreground text-xs ml-1">({stats.totalRecommendations})</span>
         </div>
@@ -50,7 +50,7 @@ const ProfileSidebar = ({
         {bio && <p className="text-sm text-center mt-4">{bio}</p>}
         
         <div className="mt-6 w-full">
-          <Button variant="default" className="w-full">
+          <Button variant="default" className="w-full bg-brand-orange hover:bg-brand-orange/90">
             Contact
           </Button>
         </div>
@@ -94,7 +94,8 @@ const ProfileSidebar = ({
         
         {followers && (
           <div className="flex items-center text-sm mb-3">
-            <span className="text-muted-foreground">Followed by {followers} people</span>
+            <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+            <span>Followed by {followers} people</span>
           </div>
         )}
       </div>
