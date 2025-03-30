@@ -37,7 +37,7 @@ const ProfileContent = () => {
           </div>
           
           {/* Content Column - takes remaining space */}
-          <div className="flex-1 flex flex-col w-full pt-4 px-[16px]">
+          <div className="flex-1 flex flex-col w-full py-0 px-[16px]">
             <ProfileTabs />
           </div>
         </div>
