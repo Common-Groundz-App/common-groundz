@@ -18,9 +18,11 @@ interface ProfileCardProps {
   followingCount: number;
   profileImage: string;
   isLoading: boolean;
-  onProfileImageChange: (url: string) => void;
+  onProfileImageChange?: (url: string) => void;
   hasChanges: boolean;
-  onSaveChanges: () => void;
+  onSaveChanges?: () => void;
+  isOwnProfile: boolean;
+  profileUserId?: string;
 }
 
 const ProfileCard = ({ 
@@ -33,7 +35,9 @@ const ProfileCard = ({
   isLoading,
   onProfileImageChange,
   hasChanges,
-  onSaveChanges
+  onSaveChanges,
+  isOwnProfile,
+  profileUserId
 }: ProfileCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -84,7 +88,7 @@ const ProfileCard = ({
       }
       
       // Forward to parent's save handler for any other changes (like cover image)
-      if (hasChanges) {
+      if (hasChanges && onSaveChanges) {
         onSaveChanges();
       }
       
@@ -120,11 +124,12 @@ const ProfileCard = ({
             isLoading={isLoading}
             onProfileImageChange={onProfileImageChange}
             onImageSelected={setTempProfileImage}
+            isEditable={isOwnProfile}
           />
           
           <div className="flex items-center mb-2">
             <h2 className="text-xl font-bold text-gray-900">{currentUsername}</h2>
-            {user && (
+            {isOwnProfile && (
               <button 
                 onClick={() => setIsEditModalOpen(true)}
                 className="ml-2 text-gray-500 hover:text-brand-orange"
@@ -140,6 +145,8 @@ const ProfileCard = ({
             isLoading={isLoading}
             uploading={uploading}
             onSaveChanges={handleSaveChanges}
+            profileUserId={profileUserId}
+            isOwnProfile={isOwnProfile}
           />
           
           <ProfileInfo 
@@ -150,13 +157,15 @@ const ProfileCard = ({
         </div>
       </Card>
 
-      <ProfileEditForm 
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        username={currentUsername}
-        bio={currentBio}
-        onProfileUpdate={handleProfileUpdate}
-      />
+      {isOwnProfile && (
+        <ProfileEditForm 
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          username={currentUsername}
+          bio={currentBio}
+          onProfileUpdate={handleProfileUpdate}
+        />
+      )}
     </>
   );
 };

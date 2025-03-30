@@ -8,8 +8,9 @@ interface ProfileAvatarProps {
   username: string;
   profileImage: string;
   isLoading: boolean;
-  onProfileImageChange: (url: string) => void;
-  onImageSelected: (url: string | null) => void;
+  onProfileImageChange?: (url: string) => void;
+  onImageSelected?: (url: string | null) => void;
+  isEditable?: boolean;
 }
 
 const ProfileAvatar = ({ 
@@ -17,7 +18,8 @@ const ProfileAvatar = ({
   profileImage, 
   isLoading, 
   onProfileImageChange,
-  onImageSelected
+  onImageSelected,
+  isEditable = true
 }: ProfileAvatarProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -37,7 +39,7 @@ const ProfileAvatar = ({
 
   const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user || !onProfileImageChange) return;
     
     try {
       setUploading(true);
@@ -68,7 +70,9 @@ const ProfileAvatar = ({
       const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
       
       // Store the image URL in temporary state
-      onImageSelected(publicUrl);
+      if (onImageSelected) {
+        onImageSelected(publicUrl);
+      }
       
       // Update the visual display
       onProfileImageChange(urlWithTimestamp);
@@ -104,22 +108,27 @@ const ProfileAvatar = ({
           />
         )}
       </div>
-      <label 
-        htmlFor="profile-upload" 
-        className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
-      >
-        <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
-          {uploading || isLoading ? '...' : '+'}
-        </div>
-      </label>
-      <input 
-        id="profile-upload" 
-        type="file" 
-        accept="image/*" 
-        className="hidden" 
-        onChange={handleProfileUpload}
-        disabled={uploading || isLoading}
-      />
+      
+      {isEditable && onProfileImageChange && (
+        <>
+          <label 
+            htmlFor="profile-upload" 
+            className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
+          >
+            <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
+              {uploading || isLoading ? '...' : '+'}
+            </div>
+          </label>
+          <input 
+            id="profile-upload" 
+            type="file" 
+            accept="image/*" 
+            className="hidden" 
+            onChange={handleProfileUpload}
+            disabled={uploading || isLoading}
+          />
+        </>
+      )}
     </div>
   );
 };

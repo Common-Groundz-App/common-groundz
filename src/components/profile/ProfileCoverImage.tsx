@@ -1,30 +1,40 @@
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Camera, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 interface ProfileCoverImageProps {
   coverImage: string;
   isLoading: boolean;
-  onCoverImageChange: (url: string) => void;
-  onCoverImageUpdated: (url: string | null) => void;
+  onCoverImageChange?: (url: string) => void;
+  onCoverImageUpdated?: (url: string | null) => void;
+  isEditable?: boolean;
 }
 
 const ProfileCoverImage = ({ 
   coverImage, 
-  isLoading, 
+  isLoading,
   onCoverImageChange,
-  onCoverImageUpdated
+  onCoverImageUpdated,
+  isEditable = true
 }: ProfileCoverImageProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [showRemoveButton, setShowRemoveButton] = useState(false);
 
-  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverImageClick = () => {
+    if (isEditable && onCoverImageChange && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleCoverImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user || !onCoverImageChange) return;
     
     try {
       setUploading(true);
@@ -33,7 +43,7 @@ const ProfileCoverImage = ({
       const fileExt = file.name.split('.').pop();
       const filePath = `${user.id}/cover.${fileExt}`;
       
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('profile_images')
         .upload(filePath, file, { upsert: true });
       
@@ -54,15 +64,17 @@ const ProfileCoverImage = ({
       // Add a timestamp to force refresh
       const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
       
-      // Update local state via callback with a timestamp to force refresh
+      // Update the visual display
       onCoverImageChange(urlWithTimestamp);
       
-      // Pass the URL to parent for temporary state (without timestamp)
-      onCoverImageUpdated(publicUrl);
+      // Store the image URL to be saved later
+      if (onCoverImageUpdated) {
+        onCoverImageUpdated(publicUrl);
+      }
       
       toast({
-        title: 'Cover image selected',
-        description: 'Press "Save Changes" to update your profile.',
+        title: 'Cover image uploaded',
+        description: 'Remember to save your changes.',
       });
     } catch (error) {
       console.error('Error uploading cover image:', error);
@@ -76,41 +88,74 @@ const ProfileCoverImage = ({
     }
   };
 
+  const handleRemoveCoverImage = () => {
+    if (!onCoverImageChange || !onCoverImageUpdated) return;
+    
+    // Default cover image
+    const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80';
+    
+    // Update the visual display
+    onCoverImageChange(defaultCoverImage);
+    
+    // Store null to indicate that the cover image should be removed
+    onCoverImageUpdated(null);
+    
+    setShowRemoveButton(false);
+    
+    toast({
+      title: 'Cover image removed',
+      description: 'Remember to save your changes.',
+    });
+  };
+
   return (
-    <div className="w-full relative mt-2 md:mt-0 bg-gray-100 shadow-inner">
-      <div className="w-full h-[180px] sm:h-[200px] md:h-[250px] overflow-hidden relative">
-        {coverImage ? (
-          <div 
-            className="w-full h-full"
-            style={{ 
-              backgroundImage: `url(${coverImage})`, 
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat'
-            }}
-            aria-label="Profile cover image"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-50 to-indigo-100 text-gray-400">
-            <span className="text-lg">Cover Image</span>
+    <div 
+      className="w-full h-48 md:h-64 bg-cover bg-center relative group"
+      style={{ 
+        backgroundImage: `url(${coverImage || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80'})`,
+        cursor: isEditable ? 'pointer' : 'default'
+      }}
+      onClick={handleCoverImageClick}
+      onMouseEnter={() => setShowRemoveButton(true)}
+      onMouseLeave={() => setShowRemoveButton(false)}
+    >
+      {isEditable && onCoverImageChange && (
+        <>
+          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
+            {!uploading && !isLoading && (
+              <div className="bg-black bg-opacity-70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300">
+                <Camera size={24} />
+              </div>
+            )}
+            {(uploading || isLoading) && (
+              <div className="bg-black bg-opacity-70 text-white p-3 rounded-lg">
+                Loading...
+              </div>
+            )}
           </div>
-        )}
-        
-        <label 
-          htmlFor="cover-upload" 
-          className="absolute bottom-4 right-4 bg-white/80 hover:bg-white backdrop-blur-sm px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors z-10"
-        >
-          {uploading || isLoading ? 'Uploading...' : 'Change Cover'}
-        </label>
-        <input 
-          id="cover-upload" 
-          type="file" 
-          accept="image/*" 
-          className="hidden" 
-          onChange={handleCoverUpload}
-          disabled={uploading || isLoading}
-        />
-      </div>
+          
+          <input 
+            ref={fileInputRef}
+            type="file" 
+            className="hidden" 
+            accept="image/*"
+            onChange={handleCoverImageChange}
+            disabled={uploading || isLoading}
+          />
+          
+          {coverImage && coverImage !== 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80' && showRemoveButton && !uploading && !isLoading && (
+            <button 
+              className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-2 rounded-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemoveCoverImage();
+              }}
+            >
+              <X size={16} />
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 };

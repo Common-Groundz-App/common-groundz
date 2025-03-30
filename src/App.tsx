@@ -33,6 +33,11 @@ function App() {
                     <Profile />
                   </ProtectedRoute>
                 } />
+                <Route path="/profile/:userId" element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

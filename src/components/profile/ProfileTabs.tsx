@@ -2,9 +2,15 @@
 import React from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ProfileRecommendations from './ProfileRecommendations';
+import ProfileCircles from './ProfileCircles';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-const ProfileTabs = () => {
+interface ProfileTabsProps {
+  profileUserId: string;
+  isOwnProfile: boolean;
+}
+
+const ProfileTabs = ({ profileUserId, isOwnProfile }: ProfileTabsProps) => {
   const isMobile = useIsMobile(768);
   
   return <Tabs defaultValue="recommendations" className={`w-full ${isMobile ? 'my-6' : 'my-[112px]'} px-0`}>
@@ -27,9 +33,7 @@ const ProfileTabs = () => {
       </TabsContent>
       
       <TabsContent value="circles" className="mt-4">
-        <div className="p-4 text-center text-gray-500">
-          Circles content will go here
-        </div>
+        <ProfileCircles profileUserId={profileUserId} isOwnProfile={isOwnProfile} />
       </TabsContent>
       
       <TabsContent value="about" className="mt-4">
@@ -39,4 +43,5 @@ const ProfileTabs = () => {
       </TabsContent>
     </Tabs>;
 };
+
 export default ProfileTabs;
