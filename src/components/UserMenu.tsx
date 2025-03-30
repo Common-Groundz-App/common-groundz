@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -40,8 +41,9 @@ export function UserMenu() {
         return;
       }
       
+      // Add timestamp to force image refresh
       if (data?.avatar_url) {
-        setAvatarUrl(data.avatar_url);
+        setAvatarUrl(data.avatar_url + '?t=' + new Date().getTime());
       }
     } catch (error) {
       console.error("Error:", error);
@@ -68,7 +70,11 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={avatarUrl || ""} alt={user.email || "User"} />
+            <AvatarImage 
+              src={avatarUrl || ""} 
+              alt={user.email || "User"} 
+              key={avatarUrl} // Add key to force re-render when image changes
+            />
             <AvatarFallback>{getInitials()}</AvatarFallback>
           </Avatar>
         </Button>

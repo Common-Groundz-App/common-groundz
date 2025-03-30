@@ -72,13 +72,23 @@ const ProfileContent = () => {
     fetchProfile();
   }, [user]);
 
+  // Handler for profile image update
+  const handleProfileImageChange = (url: string) => {
+    setProfileImage(url);
+  };
+
+  // Handler for cover image update
+  const handleCoverImageChange = (url: string) => {
+    setCoverImage(url);
+  };
+
   return (
     <div className="w-full bg-background pt-16 md:pt-20">
       {/* Cover Photo Section */}
       <ProfileCoverImage 
         coverImage={coverImage} 
         isLoading={isLoading} 
-        onCoverImageChange={setCoverImage}
+        onCoverImageChange={handleCoverImageChange}
       />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
@@ -92,7 +102,7 @@ const ProfileContent = () => {
             followingCount={followingCount}
             profileImage={profileImage}
             isLoading={isLoading}
-            onProfileImageChange={setProfileImage}
+            onProfileImageChange={handleProfileImageChange}
           />
           
           {/* Content Area */}

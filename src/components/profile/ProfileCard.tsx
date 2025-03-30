@@ -82,8 +82,8 @@ const ProfileCard = ({
         return;
       }
       
-      // Update local state via callback
-      onProfileImageChange(publicUrl);
+      // Update local state via callback with a timestamp to force refresh
+      onProfileImageChange(publicUrl + '?t=' + new Date().getTime());
       
       toast({
         title: 'Profile image updated',
@@ -116,6 +116,7 @@ const ProfileCard = ({
                 src={profileImage} 
                 alt="Profile" 
                 className="w-full h-full object-cover"
+                key={profileImage} // Add key to force re-render when image changes
               />
             </div>
             <label 

@@ -59,8 +59,8 @@ const ProfileCoverImage = ({ coverImage, isLoading, onCoverImageChange }: Profil
         return;
       }
       
-      // Update local state via callback
-      onCoverImageChange(publicUrl);
+      // Update local state via callback with a timestamp to force refresh
+      onCoverImageChange(publicUrl + '?t=' + new Date().getTime());
       
       toast({
         title: 'Cover image updated',
