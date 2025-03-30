@@ -40,7 +40,7 @@ const ProfileHeader = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
         <div className="flex flex-col md:flex-row gap-8 items-start">
           {/* Profile Card - fixed width */}
-          <div className="md:w-[300px]">
+          <div className="md:w-[300px] flex-shrink-0">
             <ProfileCard 
               username={username} 
               bio={bio} 

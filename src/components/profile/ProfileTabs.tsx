@@ -6,26 +6,28 @@ import ProfileRecommendations from './ProfileRecommendations';
 const ProfileTabs = () => {
   return (
     <Tabs defaultValue="recommendations" className="w-full">
-      <TabsList className="border-b w-full rounded-none bg-transparent p-0 h-auto overflow-x-auto">
-        <TabsTrigger 
-          value="recommendations"
-          className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
-        >
-          Recommendations
-        </TabsTrigger>
-        <TabsTrigger 
-          value="circles"
-          className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
-        >
-          Circles
-        </TabsTrigger>
-        <TabsTrigger 
-          value="about"
-          className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
-        >
-          About
-        </TabsTrigger>
-      </TabsList>
+      <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-1">
+        <TabsList className="border-b w-full rounded-none bg-transparent p-0 h-auto overflow-x-auto">
+          <TabsTrigger 
+            value="recommendations"
+            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
+          >
+            Recommendations
+          </TabsTrigger>
+          <TabsTrigger 
+            value="circles"
+            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
+          >
+            Circles
+          </TabsTrigger>
+          <TabsTrigger 
+            value="about"
+            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
+          >
+            About
+          </TabsTrigger>
+        </TabsList>
+      </div>
       
       <TabsContent value="recommendations" className="mt-6">
         <ProfileRecommendations />
