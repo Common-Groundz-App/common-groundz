@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileCard from './ProfileCard';
@@ -9,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { mockSearchResults } from '@/components/SearchDialogContent';
+import { mockSearchResults } from '@/utils/searchUtils';
 
 const ProfileContent = () => {
   const { user } = useAuth();
