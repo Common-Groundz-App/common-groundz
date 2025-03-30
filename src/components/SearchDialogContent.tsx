@@ -1,11 +1,12 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CommandInput,
   CommandList,
   CommandEmpty,
   CommandGroup,
+  CommandItem,
 } from "@/components/ui/command";
 import { useSearch } from "@/hooks/useSearch";
 import { SearchResult } from "@/utils/searchUtils";
@@ -13,6 +14,7 @@ import { UserSearchResult } from "@/components/search/UserSearchResult";
 import { ProductSearchResult } from "@/components/search/ProductSearchResult";
 import { FoodSearchResult } from "@/components/search/FoodSearchResult";
 import { GenericSearchResult } from "@/components/search/GenericSearchResult";
+import { Loader2 } from "lucide-react";
 
 interface SearchDialogContentProps {
   setOpen: (open: boolean) => void;
@@ -53,10 +55,14 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
         placeholder="Search for people, products, food..." 
         value={query}
         onValueChange={setQuery}
+        autoFocus
       />
       <CommandList>
         {isLoading ? (
-          <div className="py-6 text-center text-sm">Searching...</div>
+          <div className="py-6 text-center text-sm flex items-center justify-center">
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Searching...
+          </div>
         ) : (
           <>
             <CommandEmpty>No results found. Try a different search term.</CommandEmpty>

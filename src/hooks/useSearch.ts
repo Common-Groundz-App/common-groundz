@@ -9,21 +9,58 @@ export function useSearch(query: string) {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (query.length < 2) {
-        // Don't search until at least 2 characters are entered
-        setAllResults([]);
+      // Show all results when query is empty
+      if (query === '') {
+        try {
+          // Get some initial profiles when search is empty
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, username, bio, avatar_url')
+            .limit(10);
+          
+          if (profilesError) {
+            console.error('Error fetching profiles:', profilesError);
+            // Fall back to mock data
+            setAllResults(mockSearchResults);
+            return;
+          }
+
+          // Transform profiles data into SearchResult format
+          const profileResults: SearchResult[] = (profilesData || []).map(profile => ({
+            id: profile.id,
+            type: "user" as const,
+            title: profile.username || 'Anonymous User',
+            subtitle: profile.bio || 'No bio available',
+            imageUrl: profile.avatar_url || '',
+            location: 'No location available',
+            memberSince: 'January 2023',
+            followingCount: 0
+          }));
+
+          setAllResults([
+            ...profileResults,
+            ...mockSearchResults,
+            ...sampleProducts,
+            ...sampleFoods
+          ]);
+        } catch (error) {
+          console.error('Error fetching initial results:', error);
+          setAllResults(mockSearchResults);
+        } finally {
+          setIsLoading(false);
+        }
         return;
       }
 
       setIsLoading(true);
 
       try {
-        // Search for profiles (real users) - removed location field from query
+        // Search for profiles (real users)
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username, bio, avatar_url')
           .or(`username.ilike.%${query}%, bio.ilike.%${query}%`)
-          .limit(5);
+          .limit(10);
         
         if (profilesError) {
           console.error('Error searching profiles:', profilesError);
@@ -86,10 +123,10 @@ export function useSearch(query: string) {
       }
     };
 
-    // Add debounce for search
+    // Add debounce for search with a shorter timeout
     const timeoutId = setTimeout(() => {
       fetchData();
-    }, 300);
+    }, 200);
 
     return () => clearTimeout(timeoutId);
   }, [query]);
