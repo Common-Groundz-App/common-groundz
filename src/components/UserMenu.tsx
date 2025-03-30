@@ -16,15 +16,28 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 export function UserMenu() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string>('');
 
-  // Function to fetch the avatar
-  const fetchAvatar = async () => {
+  // Function to fetch the avatar and user data
+  const fetchUserData = async () => {
     if (!user) return;
     
     try {
+      // Get user metadata
+      const userMetadata = user.user_metadata;
+      const firstName = userMetadata?.first_name || '';
+      const lastName = userMetadata?.last_name || '';
+      
+      if (firstName || lastName) {
+        setDisplayName(`${firstName} ${lastName}`.trim());
+      } else {
+        setDisplayName(user.email?.split('@')[0] || 'User');
+      }
+      
+      // Get avatar
       const { data, error } = await supabase
         .from('profiles')
         .select('avatar_url')
@@ -39,6 +52,8 @@ export function UserMenu() {
       // Add timestamp to force image refresh
       if (data?.avatar_url) {
         setAvatarUrl(data.avatar_url + '?t=' + new Date().getTime());
+      } else {
+        setAvatarUrl(null);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -48,14 +63,14 @@ export function UserMenu() {
   // Initial fetch when component mounts or user changes
   useEffect(() => {
     if (user) {
-      fetchAvatar();
+      fetchUserData();
     }
   }, [user]);
 
   // Listen for profile update events
   useEffect(() => {
     const handleProfileUpdate = () => {
-      fetchAvatar();
+      fetchUserData();
     };
 
     window.addEventListener('profile-updated', handleProfileUpdate);
@@ -74,9 +89,18 @@ export function UserMenu() {
   }
 
   const getInitials = () => {
+    if (displayName) {
+      const words = displayName.trim().split(' ');
+      if (words.length === 1) {
+        return words[0].substring(0, 2).toUpperCase();
+      }
+      return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    }
+    
     if (user.email) {
       return user.email.substring(0, 2).toUpperCase();
     }
+    
     return "U";
   };
 
@@ -87,17 +111,19 @@ export function UserMenu() {
           <Avatar className="h-8 w-8">
             <AvatarImage 
               src={avatarUrl || ""} 
-              alt={user.email || "User"} 
+              alt={displayName || user.email || "User"} 
               key={avatarUrl} // Add key to force re-render when image changes
             />
-            <AvatarFallback>{getInitials()}</AvatarFallback>
+            <AvatarFallback className="bg-brand-orange text-white">
+              {getInitials()}
+            </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.email}</p>
+            <p className="text-sm font-medium leading-none">{displayName}</p>
             <p className="text-xs leading-none text-muted-foreground">
               {user.email}
             </p>

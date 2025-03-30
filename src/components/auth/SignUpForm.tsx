@@ -7,11 +7,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { UserIcon, KeyIcon } from 'lucide-react';
+import { UserIcon, KeyIcon, User, UserCircle } from 'lucide-react';
 
 const SignUpForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
@@ -21,7 +23,15 @@ const SignUpForm = () => {
     setIsLoading(true);
     
     try {
-      const { error, user } = await signUp(email, password);
+      // Capitalize first letter of names
+      const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+      const formattedLastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
+      
+      const { error, user } = await signUp(email, password, {
+        firstName: formattedFirstName,
+        lastName: formattedLastName
+      });
+      
       if (error) throw error;
       
       if (user) {
@@ -48,6 +58,36 @@ const SignUpForm = () => {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="space-y-2 flex-1">
+              <Label htmlFor="signup-firstname">First Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  id="signup-firstname" 
+                  placeholder="John" 
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="space-y-2 flex-1">
+              <Label htmlFor="signup-lastname">Last Name</Label>
+              <div className="relative">
+                <UserCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  id="signup-lastname" 
+                  placeholder="Doe" 
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  className="pl-10"
+                />
+              </div>
+            </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="signup-email">Email</Label>
             <div className="relative">

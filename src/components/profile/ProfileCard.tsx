@@ -51,6 +51,18 @@ const ProfileCard = ({
     setHasChanges(!!tempProfileImage);
   }, [tempProfileImage]);
 
+  // Get initials from username
+  const getInitials = () => {
+    if (!username) return 'U';
+    
+    const words = username.trim().split(' ');
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase();
+    }
+    
+    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  };
+
   const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -151,18 +163,27 @@ const ProfileCard = ({
     setCurrentBio(newBio);
   };
 
+  // Determine if we should show the initials placeholder
+  const showInitials = !profileImage || profileImage.trim() === '';
+
   return (
     <>
       <Card className="relative md:w-[350px] bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="p-6 flex flex-col items-center">
           <div className="relative mb-4">
             <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white">
-              <img 
-                src={profileImage} 
-                alt="Profile" 
-                className="w-full h-full object-cover"
-                key={profileImage} // Add key to force re-render when image changes
-              />
+              {showInitials ? (
+                <div className="w-full h-full flex items-center justify-center bg-brand-orange text-white text-2xl md:text-3xl font-bold">
+                  {getInitials()}
+                </div>
+              ) : (
+                <img 
+                  src={profileImage} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover"
+                  key={profileImage} // Add key to force re-render when image changes
+                />
+              )}
             </div>
             <label 
               htmlFor="profile-upload" 

@@ -11,8 +11,8 @@ const ProfileContent = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [coverImage, setCoverImage] = useState<string>('/lovable-uploads/972742c1-8d73-43ee-9508-7a56b2bc2573.png');
-  const [profileImage, setProfileImage] = useState<string>('https://images.unsplash.com/photo-1472396961693-142e6e269027');
+  const [coverImage, setCoverImage] = useState<string>('');
+  const [profileImage, setProfileImage] = useState<string>('');
   const [username, setUsername] = useState<string>('');
   const [bio, setBio] = useState<string>('Food Enthusiast');
   const [location, setLocation] = useState<string>('New York, NY');
@@ -20,6 +20,7 @@ const ProfileContent = () => {
   const [followingCount, setFollowingCount] = useState<number>(120);
   const [tempCoverImage, setTempCoverImage] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const defaultCoverImage = '/lovable-uploads/1b4df64f-ea57-4b28-b5fa-40bd0f74d182.png';
   
   // Fetch user profile data
   useEffect(() => {
@@ -44,8 +45,15 @@ const ProfileContent = () => {
         if (data) {
           console.log('Profile data loaded:', data);
           
-          // Set username if available
-          if (data.username) {
+          // Get user metadata from auth
+          const userMetadata = user.user_metadata;
+          const firstName = userMetadata?.first_name || '';
+          const lastName = userMetadata?.last_name || '';
+          
+          // Set username using first and last name if available
+          if (firstName || lastName) {
+            setUsername(`${firstName} ${lastName}`.trim());
+          } else if (data.username) {
             setUsername(data.username);
           } else {
             // Fallback to email name if no username
@@ -61,11 +69,15 @@ const ProfileContent = () => {
           if (data.avatar_url) {
             // Add timestamp to force browser to reload the image
             setProfileImage(data.avatar_url + '?t=' + new Date().getTime());
+          } else {
+            setProfileImage(''); // Empty string to trigger initials avatar
           }
           
           if (data.cover_url) {
             // Add timestamp to force browser to reload the image
             setCoverImage(data.cover_url + '?t=' + new Date().getTime());
+          } else {
+            setCoverImage(defaultCoverImage);
           }
         }
       } catch (error) {
@@ -76,7 +88,7 @@ const ProfileContent = () => {
     };
     
     fetchProfile();
-  }, [user]);
+  }, [user, defaultCoverImage]);
 
   // Check for changes that need to be saved
   useEffect(() => {
