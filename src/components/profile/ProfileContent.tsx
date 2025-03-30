@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { MapPin, Calendar, Users } from 'lucide-react';
@@ -38,7 +39,7 @@ const ProfileContent = () => {
   };
 
   return (
-    <div className="w-full bg-background">
+    <div className="w-full bg-background pt-16"> {/* Added pt-16 to create space for navbar */}
       {/* Cover Photo Section */}
       <div className="w-full h-[250px] relative overflow-hidden">
         <div 
