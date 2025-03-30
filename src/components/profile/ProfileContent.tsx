@@ -40,6 +40,8 @@ const ProfileContent = () => {
         }
         
         if (data) {
+          console.log('Profile data loaded:', data);
+          
           // Set username if available
           if (data.username) {
             setUsername(data.username);
@@ -55,11 +57,13 @@ const ProfileContent = () => {
           
           // Set profile and cover images if available
           if (data.avatar_url) {
-            setProfileImage(data.avatar_url);
+            // Add timestamp to force browser to reload the image
+            setProfileImage(data.avatar_url + '?t=' + new Date().getTime());
           }
           
           if (data.cover_url) {
-            setCoverImage(data.cover_url);
+            // Add timestamp to force browser to reload the image
+            setCoverImage(data.cover_url + '?t=' + new Date().getTime());
           }
         }
       } catch (error) {

@@ -67,10 +67,13 @@ const ProfileCard = ({
         .from('profile_images')
         .getPublicUrl(filePath);
       
+      // Add a timestamp to force refresh
+      const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
+      
       // Update the avatar_url in profiles table
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: publicUrl })
+        .update({ avatar_url: publicUrl }) // Store the URL without timestamp in the database
         .eq('id', user.id);
       
       if (updateError) {
@@ -83,7 +86,7 @@ const ProfileCard = ({
       }
       
       // Update local state via callback with a timestamp to force refresh
-      onProfileImageChange(publicUrl + '?t=' + new Date().getTime());
+      onProfileImageChange(urlWithTimestamp);
       
       toast({
         title: 'Profile image updated',

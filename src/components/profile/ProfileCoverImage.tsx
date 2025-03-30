@@ -44,10 +44,13 @@ const ProfileCoverImage = ({ coverImage, isLoading, onCoverImageChange }: Profil
         .from('profile_images')
         .getPublicUrl(filePath);
       
+      // Add a timestamp to force refresh
+      const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
+      
       // Update the cover_url in profiles table
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ cover_url: publicUrl })
+        .update({ cover_url: publicUrl }) // Store the URL without timestamp in the database
         .eq('id', user.id);
       
       if (updateError) {
@@ -60,7 +63,7 @@ const ProfileCoverImage = ({ coverImage, isLoading, onCoverImageChange }: Profil
       }
       
       // Update local state via callback with a timestamp to force refresh
-      onCoverImageChange(publicUrl + '?t=' + new Date().getTime());
+      onCoverImageChange(urlWithTimestamp);
       
       toast({
         title: 'Cover image updated',
