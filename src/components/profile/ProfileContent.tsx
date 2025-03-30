@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { mockSearchResults } from '@/components/SearchDialogContent';
 
 const ProfileContent = () => {
   const { user } = useAuth();
@@ -17,6 +18,7 @@ const ProfileContent = () => {
   const [profileUserId, setProfileUserId] = useState<string>('');
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
   const [loadingOtherProfile, setLoadingOtherProfile] = useState<boolean>(false);
+  const [isMockUser, setIsMockUser] = useState<boolean>(false);
 
   // Use the hook to get current user's profile data
   const {
@@ -39,11 +41,34 @@ const ProfileContent = () => {
   useEffect(() => {
     if (!user) return;
     
-    if (userId && userId !== user.id) {
+    // Check if the userId is for a mock user (e.g., "user1", "user2")
+    if (userId && userId.startsWith('user')) {
       setViewingOwnProfile(false);
       setProfileUserId(userId);
+      setIsMockUser(true);
       
-      // Fetch the other user's profile
+      // Find the mock user in our mock data
+      const mockUser = mockSearchResults.find(result => result.id === userId);
+      if (mockUser) {
+        setOtherUserProfile({
+          username: mockUser.title,
+          bio: mockUser.subtitle || 'No bio available',
+          avatar_url: mockUser.imageUrl || '',
+          cover_url: '',
+          location: mockUser.location || 'No location available',
+          memberSince: mockUser.memberSince || 'January 2021',
+          followingCount: mockUser.followingCount || 0
+        });
+      }
+      setLoadingOtherProfile(false);
+    } 
+    // Check if we're viewing another real user's profile (with UUID)
+    else if (userId && userId !== user.id) {
+      setViewingOwnProfile(false);
+      setProfileUserId(userId);
+      setIsMockUser(false);
+      
+      // Fetch the other user's profile from Supabase
       const fetchOtherUserProfile = async () => {
         setLoadingOtherProfile(true);
         try {
@@ -64,9 +89,12 @@ const ProfileContent = () => {
       };
       
       fetchOtherUserProfile();
-    } else {
+    } 
+    // We're viewing our own profile
+    else {
       setViewingOwnProfile(true);
       setProfileUserId(user.id);
+      setIsMockUser(false);
     }
   }, [user, userId]);
 
@@ -83,9 +111,22 @@ const ProfileContent = () => {
         followingCount,
         isLoading,
       };
-    } else {
+    } else if (isMockUser) {
+      // For mock users, use the data from the mock profile
       return {
-        coverImage: otherUserProfile?.cover_url || '',
+        coverImage: otherUserProfile?.cover_url || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80',
+        profileImage: otherUserProfile?.avatar_url || '',
+        username: otherUserProfile?.username || 'User',
+        bio: otherUserProfile?.bio || 'No bio available',
+        location: otherUserProfile?.location || 'No location available',
+        memberSince: otherUserProfile?.memberSince || 'January 2021',
+        followingCount: otherUserProfile?.followingCount || 0,
+        isLoading: false,
+      };
+    } else {
+      // For real Supabase users
+      return {
+        coverImage: otherUserProfile?.cover_url || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80',
         profileImage: otherUserProfile?.avatar_url || '',
         username: otherUserProfile?.username || 'User',
         bio: otherUserProfile?.bio || 'No bio available',

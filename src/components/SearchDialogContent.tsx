@@ -12,28 +12,38 @@ import { User, Hash, Star } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 
-type SearchResult = {
+// Export mock data so it can be used elsewhere
+export type SearchResult = {
   id: string;
   type: "user" | "recommendation" | "feature";
   title: string;
   subtitle?: string;
   imageUrl?: string;
+  location?: string;
+  memberSince?: string;
+  followingCount?: number;
 };
 
 // Mock data - in a real app, this would come from an API
-const mockSearchResults: SearchResult[] = [
+export const mockSearchResults: SearchResult[] = [
   {
     id: "user1",
     type: "user",
     title: "Hana Li",
     subtitle: "Food Enthusiast",
     imageUrl: "https://uyjtgybbktgapspodajy.supabase.co/storage/v1/object/public/profile_images/abfcbf43-b985-40dc-933c-201e5448b794/avatar.png",
+    location: "New York, NY",
+    memberSince: "January 2021",
+    followingCount: 120
   },
   {
     id: "user2",
     type: "user",
     title: "Sam Johnson",
     subtitle: "Photographer",
+    location: "Brooklyn, NY",
+    memberSince: "March 2022",
+    followingCount: 85
   },
   {
     id: "rec1",
