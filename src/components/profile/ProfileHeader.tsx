@@ -1,8 +1,6 @@
-
 import React from 'react';
 import ProfileCoverImage from './ProfileCoverImage';
 import ProfileCard from './ProfileCard';
-
 interface ProfileHeaderProps {
   coverImage: string;
   isLoading: boolean;
@@ -18,7 +16,6 @@ interface ProfileHeaderProps {
   hasChanges: boolean;
   onSaveChanges: () => void;
 }
-
 const ProfileHeader = ({
   coverImage,
   isLoading,
@@ -34,39 +31,18 @@ const ProfileHeader = ({
   hasChanges,
   onSaveChanges
 }: ProfileHeaderProps) => {
-  return (
-    <>
-      <ProfileCoverImage 
-        coverImage={coverImage} 
-        isLoading={isLoading} 
-        onCoverImageChange={onCoverImageChange}
-        onCoverImageUpdated={onCoverImageUpdated}
-      />
+  return <>
+      <ProfileCoverImage coverImage={coverImage} isLoading={isLoading} onCoverImageChange={onCoverImageChange} onCoverImageUpdated={onCoverImageUpdated} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
         <div className="flex flex-col md:flex-row gap-6">
           {/* Profile Card */}
-          <ProfileCard 
-            username={username}
-            bio={bio}
-            location={location}
-            memberSince={memberSince}
-            followingCount={followingCount}
-            profileImage={profileImage}
-            isLoading={isLoading}
-            onProfileImageChange={onProfileImageChange}
-            hasChanges={hasChanges}
-            onSaveChanges={onSaveChanges}
-          />
+          <ProfileCard username={username} bio={bio} location={location} memberSince={memberSince} followingCount={followingCount} profileImage={profileImage} isLoading={isLoading} onProfileImageChange={onProfileImageChange} hasChanges={hasChanges} onSaveChanges={onSaveChanges} />
           
           {/* Content Area - This is the empty div that needs to stay */}
-          <div className="flex-1">
-            {/* This empty div reserves space for content rendered by parent */}
-          </div>
+          
         </div>
       </div>
-    </>
-  );
+    </>;
 };
-
 export default ProfileHeader;
