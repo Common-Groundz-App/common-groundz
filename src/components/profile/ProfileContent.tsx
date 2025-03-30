@@ -16,7 +16,7 @@ const mockRecommendations = [
     score: 4.9,
     circleCertified: true,
     reason: "Breathtaking views and peaceful atmosphere",
-    image: "/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png"
+    image: "/lovable-uploads/d2dd59cc-afbe-4df1-9fd7-ed038c630c79.png"
   },
   {
     id: 2,
@@ -25,7 +25,7 @@ const mockRecommendations = [
     score: 4.7,
     circleCertified: true,
     reason: "Crystal clear water and amazing marine life",
-    image: "/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png"
+    image: "/lovable-uploads/d2dd59cc-afbe-4df1-9fd7-ed038c630c79.png"
   },
   {
     id: 3,
@@ -34,7 +34,7 @@ const mockRecommendations = [
     score: 4.8,
     circleCertified: false,
     reason: "Majestic views and great hiking trails",
-    image: "/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png"
+    image: "/lovable-uploads/d2dd59cc-afbe-4df1-9fd7-ed038c630c79.png"
   },
   {
     id: 4,
@@ -43,7 +43,7 @@ const mockRecommendations = [
     score: 4.6,
     circleCertified: false,
     reason: "Perfect lighting and composition",
-    image: "/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png"
+    image: "/lovable-uploads/d2dd59cc-afbe-4df1-9fd7-ed038c630c79.png"
   },
 ];
 
@@ -63,30 +63,42 @@ const ProfileContent = () => {
   return (
     <div>
       <Tabs defaultValue="recommendations" className="w-full">
-        <TabsList className="grid grid-cols-3 mb-6 bg-muted/80">
-          <TabsTrigger value="recommendations" className="data-[state=active]:bg-brand-orange data-[state=active]:text-white">
+        <TabsList className="w-full border-b space-x-10 rounded-none bg-transparent justify-start p-0">
+          <TabsTrigger 
+            value="recommendations" 
+            className="py-2 px-4 border-b-2 border-transparent data-[state=active]:border-brand-orange data-[state=active]:text-brand-orange data-[state=active]:bg-transparent rounded-none"
+          >
             Recommendations
           </TabsTrigger>
-          <TabsTrigger value="updates" className="data-[state=active]:bg-brand-orange data-[state=active]:text-white">
+          <TabsTrigger 
+            value="updates" 
+            className="py-2 px-4 border-b-2 border-transparent data-[state=active]:border-brand-orange data-[state=active]:text-brand-orange data-[state=active]:bg-transparent rounded-none"
+          >
             Updates
           </TabsTrigger>
-          <TabsTrigger value="liked" className="data-[state=active]:bg-brand-orange data-[state=active]:text-white">
+          <TabsTrigger 
+            value="liked" 
+            className="py-2 px-4 border-b-2 border-transparent data-[state=active]:border-brand-orange data-[state=active]:text-brand-orange data-[state=active]:bg-transparent rounded-none"
+          >
             Liked Items
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="recommendations">
+        <TabsContent value="recommendations" className="pt-6">
           {mockRecommendations.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {mockRecommendations.map((item) => (
-                <Card key={item.id} className="overflow-hidden card-hover border-border shadow-sm">
+                <Card key={item.id} className="overflow-hidden card-hover border shadow-sm">
                   <div className="relative">
-                    <AspectRatio ratio={16/9}>
-                      <img
-                        src={item.image}
-                        alt={item.title}
-                        className="object-cover w-full h-full"
-                      />
+                    <AspectRatio ratio={1/1}>
+                      <div className="absolute inset-0 bg-black flex items-center justify-center overflow-hidden">
+                        <div className="text-8xl text-white font-bold opacity-10">COMM<br/>GROUNDZ</div>
+                        <img
+                          src={item.image}
+                          alt={item.title}
+                          className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-overlay"
+                        />
+                      </div>
                     </AspectRatio>
                     {item.circleCertified && (
                       <div className="absolute top-3 right-3">

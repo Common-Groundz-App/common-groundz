@@ -3,9 +3,8 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NavBarComponent from '@/components/NavBarComponent';
 import Footer from '@/components/Footer';
-import ProfileHeader from '@/components/profile/ProfileHeader';
-import ProfileSidebar from '@/components/profile/ProfileSidebar';
 import ProfileContent from '@/components/profile/ProfileContent';
+import ProfileSidebar from '@/components/profile/ProfileSidebar';
 
 const Profile = () => {
   const { user } = useAuth();
@@ -14,10 +13,10 @@ const Profile = () => {
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
       
-      {/* Hero banner with gradient and image */}
+      {/* Hero banner with gradient */}
       <div className="w-full h-64 bg-gradient-to-r from-brand-blue/90 via-brand-teal/80 to-brand-orange/70 relative overflow-hidden">
         <img 
-          src="/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png" 
+          src="/lovable-uploads/d2dd59cc-afbe-4df1-9fd7-ed038c630c79.png" 
           alt="Cover" 
           className="w-full h-full object-cover opacity-30 absolute inset-0 mix-blend-overlay"
         />

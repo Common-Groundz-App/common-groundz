@@ -3,7 +3,6 @@ import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Users, Globe, Twitter, Instagram } from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
 
 interface ProfileSidebarProps {
   name: string;
@@ -34,7 +33,7 @@ const ProfileSidebar = ({
       {/* Profile card */}
       <div className="flex flex-col items-center p-6 pt-12">
         <Avatar className="h-32 w-32 border-4 border-white shadow-lg mb-4">
-          <AvatarImage src="/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png" alt={name} />
+          <AvatarImage src="/lovable-uploads/d2dd59cc-afbe-4df1-9fd7-ed038c630c79.png" alt={name} />
           <AvatarFallback>{name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
         </Avatar>
         
