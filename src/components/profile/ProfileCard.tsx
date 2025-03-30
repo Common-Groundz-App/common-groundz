@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Edit, Save } from 'lucide-react';
+import { Edit } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,8 @@ interface ProfileCardProps {
   profileImage: string;
   isLoading: boolean;
   onProfileImageChange: (url: string) => void;
+  hasChanges: boolean;
+  onSaveChanges: () => void;
 }
 
 const ProfileCard = ({ 
@@ -29,7 +31,9 @@ const ProfileCard = ({
   followingCount, 
   profileImage,
   isLoading,
-  onProfileImageChange
+  onProfileImageChange,
+  hasChanges,
+  onSaveChanges
 }: ProfileCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -38,7 +42,7 @@ const ProfileCard = ({
   const [currentBio, setCurrentBio] = useState(bio);
   const [uploading, setUploading] = useState(false);
   const [tempProfileImage, setTempProfileImage] = useState<string | null>(null);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [localHasChanges, setLocalHasChanges] = useState(false);
 
   // Update states when props change
   useEffect(() => {
@@ -48,14 +52,14 @@ const ProfileCard = ({
 
   // Check if there are changes to save
   useEffect(() => {
-    setHasChanges(!!tempProfileImage);
+    setLocalHasChanges(!!tempProfileImage);
   }, [tempProfileImage]);
 
   const handleSaveChanges = async () => {
-    if (!user || !hasChanges) return;
+    if (!user) return;
     
     try {
-      // Save the profile image URL to the database
+      // If we have local profile image changes
       if (tempProfileImage) {
         const { error: updateError } = await supabase
           .from('profiles')
@@ -73,18 +77,21 @@ const ProfileCard = ({
         
         // Clear the temporary state
         setTempProfileImage(null);
-        
-        // Notify user of success
-        toast({
-          title: 'Profile saved',
-          description: 'Your profile has been updated successfully.',
-        });
+        setLocalHasChanges(false);
         
         // Refresh the UserMenu component by triggering a global event
         window.dispatchEvent(new CustomEvent('profile-updated'));
-        
-        setHasChanges(false);
       }
+      
+      // Forward to parent's save handler for any other changes (like cover image)
+      if (hasChanges) {
+        onSaveChanges();
+      }
+      
+      toast({
+        title: 'Profile saved',
+        description: 'Your profile has been updated successfully.',
+      });
     } catch (error) {
       console.error('Error saving profile:', error);
       toast({
@@ -99,6 +106,9 @@ const ProfileCard = ({
     setCurrentUsername(newUsername);
     setCurrentBio(newBio);
   };
+
+  // Combine local changes with parent component changes
+  const combinedHasChanges = hasChanges || localHasChanges;
 
   return (
     <>
@@ -126,7 +136,7 @@ const ProfileCard = ({
           <p className="text-gray-600 mb-4">{currentBio}</p>
           
           <ProfileActions 
-            hasChanges={hasChanges}
+            hasChanges={combinedHasChanges}
             isLoading={isLoading}
             uploading={uploading}
             onSaveChanges={handleSaveChanges}

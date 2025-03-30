@@ -14,6 +14,7 @@ const ProfileContent = () => {
     location,
     memberSince,
     followingCount,
+    hasChanges,
     handleProfileImageChange,
     handleCoverImageChange,
     handleCoverImageUpdated,
@@ -35,6 +36,8 @@ const ProfileContent = () => {
         followingCount={followingCount}
         profileImage={profileImage}
         onProfileImageChange={handleProfileImageChange}
+        hasChanges={hasChanges}
+        onSaveChanges={handleSaveChanges}
       />
       
       {/* Content Area (the tabs) */}

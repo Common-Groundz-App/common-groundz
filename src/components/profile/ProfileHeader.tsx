@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import ProfileCoverImage from './ProfileCoverImage';
 import ProfileCard from './ProfileCard';
 
@@ -15,6 +15,8 @@ interface ProfileHeaderProps {
   followingCount: number;
   profileImage: string;
   onProfileImageChange: (url: string) => void;
+  hasChanges: boolean;
+  onSaveChanges: () => void;
 }
 
 const ProfileHeader = ({
@@ -28,7 +30,9 @@ const ProfileHeader = ({
   memberSince,
   followingCount,
   profileImage,
-  onProfileImageChange
+  onProfileImageChange,
+  hasChanges,
+  onSaveChanges
 }: ProfileHeaderProps) => {
   return (
     <>
@@ -51,6 +55,8 @@ const ProfileHeader = ({
             profileImage={profileImage}
             isLoading={isLoading}
             onProfileImageChange={onProfileImageChange}
+            hasChanges={hasChanges}
+            onSaveChanges={onSaveChanges}
           />
           
           {/* Content Area - This will be passed as children */}

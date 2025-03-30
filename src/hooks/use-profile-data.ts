@@ -106,6 +106,7 @@ export const useProfileData = () => {
 
   // Handler for temporary cover image (before saving)
   const handleCoverImageUpdated = (url: string | null) => {
+    console.log("Setting tempCoverImage to:", url);
     setTempCoverImage(url);
     setHasChanges(true);
   };
