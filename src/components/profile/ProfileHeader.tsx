@@ -59,9 +59,9 @@ const ProfileHeader = ({
             onSaveChanges={onSaveChanges}
           />
           
-          {/* Content Area - This will be passed as children */}
+          {/* Content Area - This is the empty div that needs to stay */}
           <div className="flex-1">
-            {/* ProfileTabs will be rendered by the parent component */}
+            {/* This empty div reserves space for content rendered by parent */}
           </div>
         </div>
       </div>
