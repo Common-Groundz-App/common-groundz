@@ -4,6 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { CircleBadge } from "@/components/profile/CircleBadge";
+import { Badge } from "@/components/ui/badge";
 
 // Mock data for recommendations
 const mockRecommendations = [
