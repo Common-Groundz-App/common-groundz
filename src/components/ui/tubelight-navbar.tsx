@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -9,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Logo from "@/components/Logo";
-
 interface NavItem {
   name: string;
   url: string;
@@ -31,13 +29,11 @@ export function NavBar({
   const [scrolled, setScrolled] = useState(false);
   const isMobile = useIsMobile();
   const isSmallMobile = useIsMobile(650);
-
   useEffect(() => {
     if (initialActiveTab) {
       setActiveTab(initialActiveTab);
     }
   }, [initialActiveTab]);
-
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 50) {
@@ -46,18 +42,12 @@ export function NavBar({
         setScrolled(false);
       }
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
-
-  return <div className={cn(
-    "fixed top-0 left-0 right-0 z-50 pt-4 px-4 transition-all duration-300", 
-    scrolled ? "bg-background/90 backdrop-blur-md shadow-sm" : "bg-transparent", 
-    className
-  )}>
+  return <div className="my-0 mx-0">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo Section */}
         <div className="flex-shrink-0">
@@ -70,10 +60,7 @@ export function NavBar({
 
         {/* Navigation Items - Centered for Desktop */}
         {!isSmallMobile ? <div className="flex-grow flex justify-center">
-            <div className={cn(
-              "flex items-center gap-2 py-1 px-1 rounded-full shadow-lg transition-all duration-300",
-              scrolled ? "bg-background/5 border border-border backdrop-blur-lg" : "bg-background/30 border border-white/10 backdrop-blur-md"
-            )}>
+            <div className={cn("flex items-center gap-2 py-1 px-1 rounded-full shadow-lg transition-all duration-300", scrolled ? "bg-background/5 border border-border backdrop-blur-lg" : "bg-background/30 border border-white/10 backdrop-blur-md")}>
               {items.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.name;
@@ -99,10 +86,7 @@ export function NavBar({
           </div> : <div className="flex-grow flex justify-end">
             <Sheet>
               <SheetTrigger asChild>
-                <button className={cn(
-                  "p-2 rounded-md transition-colors",
-                  scrolled ? "hover:bg-gray-100 dark:hover:bg-gray-800" : "hover:bg-white/10"
-                )}>
+                <button className={cn("p-2 rounded-md transition-colors", scrolled ? "hover:bg-gray-100 dark:hover:bg-gray-800" : "hover:bg-white/10")}>
                   <Menu size={24} className="text-foreground" />
                 </button>
               </SheetTrigger>

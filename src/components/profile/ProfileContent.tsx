@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { MapPin, Calendar, Users } from 'lucide-react';
@@ -6,17 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ProfileRecommendations from './ProfileRecommendations';
 import { Card } from '@/components/ui/card';
-
 const ProfileContent = () => {
-  const { user } = useAuth();
+  const {
+    user
+  } = useAuth();
   const [coverImage, setCoverImage] = useState<string>('/lovable-uploads/972742c1-8d73-43ee-9508-7a56b2bc2573.png');
   const [profileImage, setProfileImage] = useState<string>('https://images.unsplash.com/photo-1472396961693-142e6e269027');
-  
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = event => {
         if (event.target?.result) {
           setCoverImage(event.target.result as string);
         }
@@ -24,12 +23,11 @@ const ProfileContent = () => {
       reader.readAsDataURL(file);
     }
   };
-  
   const handleProfileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = event => {
         if (event.target?.result) {
           setProfileImage(event.target.result as string);
         }
@@ -37,33 +35,19 @@ const ProfileContent = () => {
       reader.readAsDataURL(file);
     }
   };
-
-  return (
-    <div className="w-full bg-background pt-16"> {/* Added pt-16 to create space for the navbar */}
+  return <div className="w-full bg-background pt-16"> {/* Added pt-16 to create space for the navbar */}
       {/* Cover Photo Section */}
       <div className="w-full h-[250px] relative overflow-hidden">
-        <div 
-          className="w-full h-full bg-brand-orange"
-          style={{ 
-            backgroundImage: `url(${coverImage})`, 
-            backgroundSize: 'cover',
-            backgroundPosition: 'center'
-          }}
-        >
+        <div style={{
+        backgroundImage: `url(${coverImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }} className="w-full h-full bg-brand-orange mx-0 my-[12px]">
         </div>
-        <label 
-          htmlFor="cover-upload" 
-          className="absolute bottom-4 right-4 bg-white/80 hover:bg-white backdrop-blur-sm px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors"
-        >
+        <label htmlFor="cover-upload" className="absolute bottom-4 right-4 bg-white/80 hover:bg-white backdrop-blur-sm px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors">
           Change Cover
         </label>
-        <input 
-          id="cover-upload" 
-          type="file" 
-          accept="image/*" 
-          className="hidden" 
-          onChange={handleCoverUpload}
-        />
+        <input id="cover-upload" type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
       </div>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24">
@@ -73,27 +57,14 @@ const ProfileContent = () => {
             <div className="p-6 flex flex-col items-center">
               <div className="relative mb-4">
                 <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white">
-                  <img 
-                    src={profileImage} 
-                    alt="Profile" 
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
                 </div>
-                <label 
-                  htmlFor="profile-upload" 
-                  className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
-                >
+                <label htmlFor="profile-upload" className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer">
                   <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
                     +
                   </div>
                 </label>
-                <input 
-                  id="profile-upload" 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleProfileUpload}
-                />
+                <input id="profile-upload" type="file" accept="image/*" className="hidden" onChange={handleProfileUpload} />
               </div>
               
               <h2 className="text-2xl font-bold text-gray-900">Ethan Smith</h2>
@@ -127,22 +98,13 @@ const ProfileContent = () => {
           <div className="flex-1">
             <Tabs defaultValue="recommendations" className="mt-24">
               <TabsList className="border-b w-full rounded-none bg-transparent p-0 h-auto">
-                <TabsTrigger 
-                  value="recommendations"
-                  className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
-                >
+                <TabsTrigger value="recommendations" className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
                   Recommendations
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="circles"
-                  className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
-                >
+                <TabsTrigger value="circles" className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
                   Circles
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="about"
-                  className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
-                >
+                <TabsTrigger value="about" className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
                   About
                 </TabsTrigger>
               </TabsList>
@@ -166,8 +128,6 @@ const ProfileContent = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default ProfileContent;
