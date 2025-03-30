@@ -27,7 +27,7 @@ const ProfileContent = () => {
       try {
         setIsLoading(true);
         
-        // Get profile data directly without checking the bucket
+        // Get profile data from profiles table
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
