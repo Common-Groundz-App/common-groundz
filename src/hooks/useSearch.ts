@@ -18,10 +18,10 @@ export function useSearch(query: string) {
       setIsLoading(true);
 
       try {
-        // Search for profiles (real users) - IMPROVED SEARCH QUERY
+        // Search for profiles (real users) - removed location field from query
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, username, bio, avatar_url, location')
+          .select('id, username, bio, avatar_url')
           .or(`username.ilike.%${query}%, bio.ilike.%${query}%`)
           .limit(5);
         
@@ -36,7 +36,7 @@ export function useSearch(query: string) {
           title: profile.username || 'Anonymous User',
           subtitle: profile.bio || 'No bio available',
           imageUrl: profile.avatar_url || '',
-          location: profile.location || 'No location available',
+          location: 'No location available', // Default value since location doesn't exist in DB
           memberSince: 'January 2023', // Default value
           followingCount: 0
         }));
