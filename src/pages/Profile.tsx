@@ -1,27 +1,22 @@
-
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import ProfileContent from '@/components/profile/ProfileContent';
 import Footer from '@/components/Footer';
-
 const Profile = () => {
-  const { user } = useAuth();
-
+  const {
+    user
+  } = useAuth();
   if (!user) {
     return <Navigate to="/auth" />;
   }
-
-  return (
-    <div className="min-h-screen flex flex-col">
+  return <div className="min-h-screen flex flex-col">
       <NavBarComponent />
-      <div className="flex-1 pt-24"> {/* Added more padding to prevent overlap */}
+      <div className="flex-1 pt-24 py-0"> {/* Added more padding to prevent overlap */}
         <ProfileContent />
       </div>
       <Footer />
-    </div>
-  );
+    </div>;
 };
-
 export default Profile;
