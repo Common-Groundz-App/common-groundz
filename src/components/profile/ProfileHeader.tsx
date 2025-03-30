@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ProfileCoverImage from './ProfileCoverImage';
 import ProfileCard from './ProfileCard';
@@ -37,9 +38,9 @@ const ProfileHeader = ({
       <ProfileCoverImage coverImage={coverImage} isLoading={isLoading} onCoverImageChange={onCoverImageChange} onCoverImageUpdated={onCoverImageUpdated} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Profile Card - keep on the left side */}
-          <div className="md:w-[280px]">
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          {/* Profile Card - fixed width */}
+          <div className="md:w-[300px]">
             <ProfileCard 
               username={username} 
               bio={bio} 

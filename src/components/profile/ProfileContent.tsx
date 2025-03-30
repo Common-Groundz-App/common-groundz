@@ -1,6 +1,7 @@
 
 import React from 'react';
-import ProfileHeader from './ProfileHeader';
+import ProfileCard from './ProfileCard';
+import ProfileCoverImage from './ProfileCoverImage';
 import ProfileTabs from './ProfileTabs';
 import { useProfileData } from '@/hooks/use-profile-data';
 
@@ -24,25 +25,37 @@ const ProfileContent = () => {
   return (
     <div className="w-full bg-background pt-16 md:pt-20">
       {/* Cover Image */}
-      <ProfileHeader 
-        coverImage={coverImage}
-        isLoading={isLoading}
-        onCoverImageChange={handleCoverImageChange}
-        onCoverImageUpdated={handleCoverImageUpdated}
-        username={username}
-        bio={bio}
-        location={location}
-        memberSince={memberSince}
-        followingCount={followingCount}
-        profileImage={profileImage}
-        onProfileImageChange={handleProfileImageChange}
-        hasChanges={hasChanges}
-        onSaveChanges={handleSaveChanges}
+      <ProfileCoverImage 
+        coverImage={coverImage} 
+        isLoading={isLoading} 
+        onCoverImageChange={handleCoverImageChange} 
+        onCoverImageUpdated={handleCoverImageUpdated} 
       />
       
-      {/* Tabs directly below cover image */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-        <ProfileTabs />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
+        {/* Flex container for profile card and content */}
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          {/* Profile Card - fixed width */}
+          <div className="md:w-[300px]">
+            <ProfileCard 
+              username={username} 
+              bio={bio} 
+              location={location} 
+              memberSince={memberSince} 
+              followingCount={followingCount} 
+              profileImage={profileImage} 
+              isLoading={isLoading} 
+              onProfileImageChange={handleProfileImageChange} 
+              hasChanges={hasChanges} 
+              onSaveChanges={handleSaveChanges} 
+            />
+          </div>
+          
+          {/* Content Area - takes remaining space */}
+          <div className="flex-1">
+            <ProfileTabs />
+          </div>
+        </div>
       </div>
     </div>
   );
