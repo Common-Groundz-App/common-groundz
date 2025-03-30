@@ -76,7 +76,7 @@ const ProfileCoverImage = ({
   };
 
   return (
-    <div className="w-full relative">
+    <div className="w-full relative mt-4 md:mt-0">
       <div className="w-full h-[180px] sm:h-[200px] md:h-[250px] overflow-hidden relative">
         <div 
           className="w-full h-full"
