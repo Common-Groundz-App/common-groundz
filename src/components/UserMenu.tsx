@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -57,7 +56,6 @@ export function UserMenu() {
     );
   }
 
-  // Get user initials for the avatar fallback
   const getInitials = () => {
     if (user.email) {
       return user.email.substring(0, 2).toUpperCase();
