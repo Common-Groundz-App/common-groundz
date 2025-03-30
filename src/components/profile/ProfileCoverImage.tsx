@@ -13,12 +13,15 @@ interface ProfileCoverImageProps {
 const ProfileCoverImage = ({ coverImage, isLoading, onCoverImageChange }: ProfileCoverImageProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     
     try {
+      setUploading(true);
+      
       // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const filePath = `${user.id}/cover.${fileExt}`;
@@ -70,6 +73,8 @@ const ProfileCoverImage = ({ coverImage, isLoading, onCoverImageChange }: Profil
         description: 'Please try again later.',
         variant: 'destructive'
       });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -91,7 +96,7 @@ const ProfileCoverImage = ({ coverImage, isLoading, onCoverImageChange }: Profil
           htmlFor="cover-upload" 
           className="absolute bottom-4 right-4 bg-white/80 hover:bg-white backdrop-blur-sm px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors z-10"
         >
-          {isLoading ? 'Uploading...' : 'Change Cover'}
+          {uploading || isLoading ? 'Uploading...' : 'Change Cover'}
         </label>
         <input 
           id="cover-upload" 
@@ -99,7 +104,7 @@ const ProfileCoverImage = ({ coverImage, isLoading, onCoverImageChange }: Profil
           accept="image/*" 
           className="hidden" 
           onChange={handleCoverUpload}
-          disabled={isLoading}
+          disabled={uploading || isLoading}
         />
       </div>
     </div>

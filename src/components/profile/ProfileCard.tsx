@@ -36,12 +36,15 @@ const ProfileCard = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentUsername, setCurrentUsername] = useState(username);
   const [currentBio, setCurrentBio] = useState(bio);
+  const [uploading, setUploading] = useState(false);
 
   const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     
     try {
+      setUploading(true);
+      
       // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const filePath = `${user.id}/avatar.${fileExt}`;
@@ -93,6 +96,8 @@ const ProfileCard = ({
         description: 'Please try again later.',
         variant: 'destructive'
       });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -118,7 +123,7 @@ const ProfileCard = ({
               className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
             >
               <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
-                {isLoading ? '...' : '+'}
+                {uploading || isLoading ? '...' : '+'}
               </div>
             </label>
             <input 
@@ -127,7 +132,7 @@ const ProfileCard = ({
               accept="image/*" 
               className="hidden" 
               onChange={handleProfileUpload}
-              disabled={isLoading}
+              disabled={uploading || isLoading}
             />
           </div>
           

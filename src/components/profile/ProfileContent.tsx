@@ -26,6 +26,18 @@ const ProfileContent = () => {
       
       try {
         setIsLoading(true);
+        
+        // Ensure profile_images bucket exists
+        const { data: bucketData, error: bucketError } = await supabase
+          .from('storage')
+          .select('name')
+          .eq('name', 'profile_images')
+          .single();
+        
+        if (bucketError) {
+          console.log('Storage bucket might not exist, continuing anyway');
+        }
+        
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
