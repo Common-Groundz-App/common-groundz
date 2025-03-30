@@ -16,7 +16,7 @@ const Profile = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
-      <div className="flex-1 pt-4 md:pt-0">
+      <div className="flex-1 pt-2 md:pt-0">
         <ProfileContent />
       </div>
       <Footer />
