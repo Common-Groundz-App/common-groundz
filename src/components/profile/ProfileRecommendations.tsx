@@ -80,7 +80,7 @@ const RatingStars = ({
     </div>;
 };
 const ProfileRecommendations = () => {
-  return <div className="space-y-6 mx-0 my-[81px]">
+  return <div className="space-y-6 mx-0 my-0">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">My Recommendations</h2>
         <Button variant="outline" size="sm">Filter</Button>
