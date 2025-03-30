@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { MapPin, Calendar, Users, Edit } from 'lucide-react';
+import { MapPin, Calendar, Users, Edit, Save } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +37,19 @@ const ProfileCard = ({
   const [currentUsername, setCurrentUsername] = useState(username);
   const [currentBio, setCurrentBio] = useState(bio);
   const [uploading, setUploading] = useState(false);
+  const [tempProfileImage, setTempProfileImage] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Update states when props change
+  useEffect(() => {
+    setCurrentUsername(username);
+    setCurrentBio(bio);
+  }, [username, bio]);
+
+  // Check if there are changes to save
+  useEffect(() => {
+    setHasChanges(!!tempProfileImage);
+  }, [tempProfileImage]);
 
   const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -70,28 +83,13 @@ const ProfileCard = ({
       // Add a timestamp to force refresh
       const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
       
-      // Update the avatar_url in profiles table
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl }) // Store the URL without timestamp in the database
-        .eq('id', user.id);
+      // Store the image URL in temporary state
+      setTempProfileImage(publicUrl);
       
-      if (updateError) {
-        toast({
-          title: 'Failed to update profile',
-          description: updateError.message,
-          variant: 'destructive'
-        });
-        return;
-      }
-      
-      // Update local state via callback with a timestamp to force refresh
+      // Just update the visual display for now
       onProfileImageChange(urlWithTimestamp);
       
-      toast({
-        title: 'Profile image updated',
-        description: 'Your new profile image has been saved.',
-      });
+      setHasChanges(true);
     } catch (error) {
       console.error('Error uploading profile image:', error);
       toast({
@@ -101,6 +99,50 @@ const ProfileCard = ({
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!user || !hasChanges) return;
+    
+    try {
+      // Save the profile image URL to the database
+      if (tempProfileImage) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ avatar_url: tempProfileImage })
+          .eq('id', user.id);
+        
+        if (updateError) {
+          toast({
+            title: 'Failed to update profile',
+            description: updateError.message,
+            variant: 'destructive'
+          });
+          return;
+        }
+        
+        // Clear the temporary state
+        setTempProfileImage(null);
+        
+        // Notify user of success
+        toast({
+          title: 'Profile saved',
+          description: 'Your profile has been updated successfully.',
+        });
+        
+        // Refresh the UserMenu component by triggering a global event
+        window.dispatchEvent(new CustomEvent('profile-updated'));
+        
+        setHasChanges(false);
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      toast({
+        title: 'Something went wrong',
+        description: 'Please try again later.',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -154,8 +196,21 @@ const ProfileCard = ({
           <p className="text-gray-600 mb-4">{currentBio}</p>
           
           <div className="flex space-x-3 mb-6">
-            <Button size={isMobile ? "sm" : "default"} className="bg-brand-orange hover:bg-brand-orange/90">Follow</Button>
-            <Button size={isMobile ? "sm" : "default"} variant="outline">Message</Button>
+            {hasChanges ? (
+              <Button 
+                size={isMobile ? "sm" : "default"} 
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleSaveChanges}
+                disabled={!hasChanges || isLoading || uploading}
+              >
+                <Save size={16} className="mr-1" /> Save Changes
+              </Button>
+            ) : (
+              <>
+                <Button size={isMobile ? "sm" : "default"} className="bg-brand-orange hover:bg-brand-orange/90">Follow</Button>
+                <Button size={isMobile ? "sm" : "default"} variant="outline">Message</Button>
+              </>
+            )}
           </div>
           
           <div className="w-full space-y-3 text-left">

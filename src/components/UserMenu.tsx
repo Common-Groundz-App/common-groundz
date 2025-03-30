@@ -20,12 +20,7 @@ export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchAvatar();
-    }
-  }, [user]);
-
+  // Function to fetch the avatar
   const fetchAvatar = async () => {
     if (!user) return;
     
@@ -49,6 +44,26 @@ export function UserMenu() {
       console.error("Error:", error);
     }
   };
+
+  // Initial fetch when component mounts or user changes
+  useEffect(() => {
+    if (user) {
+      fetchAvatar();
+    }
+  }, [user]);
+
+  // Listen for profile update events
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      fetchAvatar();
+    };
+
+    window.addEventListener('profile-updated', handleProfileUpdate);
+    
+    return () => {
+      window.removeEventListener('profile-updated', handleProfileUpdate);
+    };
+  }, []);
 
   if (!user) {
     return (

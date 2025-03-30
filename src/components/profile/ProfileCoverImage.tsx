@@ -8,9 +8,15 @@ interface ProfileCoverImageProps {
   coverImage: string;
   isLoading: boolean;
   onCoverImageChange: (url: string) => void;
+  onCoverImageUpdated: (url: string | null) => void;
 }
 
-const ProfileCoverImage = ({ coverImage, isLoading, onCoverImageChange }: ProfileCoverImageProps) => {
+const ProfileCoverImage = ({ 
+  coverImage, 
+  isLoading, 
+  onCoverImageChange,
+  onCoverImageUpdated
+}: ProfileCoverImageProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -47,27 +53,15 @@ const ProfileCoverImage = ({ coverImage, isLoading, onCoverImageChange }: Profil
       // Add a timestamp to force refresh
       const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
       
-      // Update the cover_url in profiles table
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ cover_url: publicUrl }) // Store the URL without timestamp in the database
-        .eq('id', user.id);
-      
-      if (updateError) {
-        toast({
-          title: 'Failed to update profile',
-          description: updateError.message,
-          variant: 'destructive'
-        });
-        return;
-      }
+      // Pass the URL to parent for temporary state
+      onCoverImageUpdated(publicUrl);
       
       // Update local state via callback with a timestamp to force refresh
       onCoverImageChange(urlWithTimestamp);
       
       toast({
-        title: 'Cover image updated',
-        description: 'Your new cover image has been saved.',
+        title: 'Cover image selected',
+        description: 'Press "Save Changes" to update your profile.',
       });
     } catch (error) {
       console.error('Error uploading cover image:', error);

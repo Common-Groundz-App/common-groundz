@@ -18,6 +18,8 @@ const ProfileContent = () => {
   const [location, setLocation] = useState<string>('New York, NY');
   const [memberSince, setMemberSince] = useState<string>('January 2021');
   const [followingCount, setFollowingCount] = useState<number>(120);
+  const [tempCoverImage, setTempCoverImage] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
   
   // Fetch user profile data
   useEffect(() => {
@@ -76,6 +78,11 @@ const ProfileContent = () => {
     fetchProfile();
   }, [user]);
 
+  // Check for changes that need to be saved
+  useEffect(() => {
+    setHasChanges(!!tempCoverImage);
+  }, [tempCoverImage]);
+
   // Handler for profile image update
   const handleProfileImageChange = (url: string) => {
     setProfileImage(url);
@@ -86,6 +93,65 @@ const ProfileContent = () => {
     setCoverImage(url);
   };
 
+  // Handler for temporary cover image (before saving)
+  const handleCoverImageUpdated = (url: string | null) => {
+    setTempCoverImage(url);
+    setHasChanges(true);
+  };
+
+  // Save all profile changes
+  const handleSaveChanges = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Prepare update object
+      const updates: any = {};
+      
+      // Add cover image if it was changed
+      if (tempCoverImage) {
+        updates.cover_url = tempCoverImage;
+      }
+      
+      // Only update if we have changes
+      if (Object.keys(updates).length > 0) {
+        const { error } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id);
+        
+        if (error) {
+          throw error;
+        }
+        
+        // Clear temporary state
+        setTempCoverImage(null);
+        
+        // Reset changes flag
+        setHasChanges(false);
+        
+        // Notify user
+        toast({
+          title: 'Profile updated',
+          description: 'Your profile has been successfully updated.'
+        });
+        
+        // Refresh the UserMenu
+        window.dispatchEvent(new CustomEvent('profile-updated'));
+      }
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      toast({
+        title: 'Update failed',
+        description: error.message || 'There was a problem updating your profile',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="w-full bg-background pt-16 md:pt-20">
       {/* Cover Photo Section */}
@@ -93,6 +159,7 @@ const ProfileContent = () => {
         coverImage={coverImage} 
         isLoading={isLoading} 
         onCoverImageChange={handleCoverImageChange}
+        onCoverImageUpdated={handleCoverImageUpdated}
       />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
