@@ -21,11 +21,14 @@ export function NavBarComponent() {
   )?.name || navItems[0].name;
 
   return (
-    <NavBar 
-      items={navItems} 
-      rightSection={<UserMenu />}
-      initialActiveTab={activeTab}
-    />
+    <div className="py-2 bg-white border-b border-orange-500">
+      <NavBar 
+        items={navItems} 
+        rightSection={<UserMenu />}
+        initialActiveTab={activeTab}
+        className="!pt-6 !pb-6" // Increase vertical padding to make navbar taller
+      />
+    </div>
   )
 }
 
