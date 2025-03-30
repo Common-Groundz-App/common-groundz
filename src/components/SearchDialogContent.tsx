@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/command";
 import { User, Hash, Star } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { supabase } from "@/integrations/supabase/client";
 
 type SearchResult = {
   id: string;
@@ -73,7 +74,14 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
     
     // Navigate based on result type
     if (result.type === "user") {
-      navigate(`/profile/${result.id}`);
+      // For mock users, don't try to treat their ID as a UUID
+      if (result.id.startsWith("user")) {
+        console.log("Navigating to mock user profile:", result.id);
+        navigate(`/profile/${result.id}`);
+      } else {
+        // For real database users with UUID, navigate normally
+        navigate(`/profile/${result.id}`);
+      }
     } else if (result.type === "recommendation") {
       navigate(`/recommendations/${result.id}`);
     } else if (result.type === "feature") {

@@ -30,11 +30,24 @@ export function NavBarComponent() {
     { name: 'Profile', url: '/profile', icon: User }
   ];
 
-  // Find the active tab based on the current location
-  const activeTab = navItems.find(item => 
-    item.url === location.pathname || 
-    (location.pathname !== '/' && item.url.startsWith(location.pathname))
-  )?.name || navItems[0].name;
+  // Improved active tab detection that works with dynamic routes
+  const getActiveTab = () => {
+    const path = location.pathname;
+    
+    // Handle exact matches first
+    const exactMatch = navItems.find(item => item.url === path);
+    if (exactMatch) return exactMatch.name;
+    
+    // Handle profile routes
+    if (path.startsWith('/profile')) {
+      return 'Profile';
+    }
+    
+    // Default to Home if no match
+    return 'Home';
+  };
+
+  const activeTab = getActiveTab();
 
   const handleSearchClick = () => {
     setOpen(true);
