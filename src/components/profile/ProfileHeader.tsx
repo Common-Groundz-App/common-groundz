@@ -17,6 +17,8 @@ interface ProfileHeaderProps {
   onProfileImageChange: (url: string) => void;
   hasChanges: boolean;
   onSaveChanges: () => void;
+  isOwnProfile: boolean;
+  profileUserId?: string;
 }
 
 const ProfileHeader = ({
@@ -32,7 +34,9 @@ const ProfileHeader = ({
   profileImage,
   onProfileImageChange,
   hasChanges,
-  onSaveChanges
+  onSaveChanges,
+  isOwnProfile,
+  profileUserId
 }: ProfileHeaderProps) => {
   return <>
       <ProfileCoverImage coverImage={coverImage} isLoading={isLoading} onCoverImageChange={onCoverImageChange} onCoverImageUpdated={onCoverImageUpdated} />
@@ -52,6 +56,8 @@ const ProfileHeader = ({
               onProfileImageChange={onProfileImageChange} 
               hasChanges={hasChanges} 
               onSaveChanges={onSaveChanges} 
+              isOwnProfile={isOwnProfile}
+              profileUserId={profileUserId}
             />
           </div>
         </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,68 +40,99 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
         // Fetch followers (people who follow the profile user)
         const { data: followersData, error: followersError } = await supabase
           .from('follows')
-          .select(`
-            follower_id,
-            profiles!follows_follower_id_fkey (
-              id,
-              username,
-              avatar_url
-            )
-          `)
+          .select('follower_id')
           .eq('following_id', profileUserId);
         
         if (followersError) throw followersError;
         
+        // Fetch the profile data for each follower
+        const followerProfiles: UserProfile[] = [];
+        
+        if (followersData && followersData.length > 0) {
+          const followerIds = followersData.map(item => item.follower_id);
+          
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .in('id', followerIds);
+          
+          if (profilesError) throw profilesError;
+          
+          if (profilesData) {
+            // If the current user is viewing the profile, check which users they follow
+            let userFollowingIds: string[] = [];
+            if (user && !isOwnProfile) {
+              const { data: userFollowing, error: userFollowingError } = await supabase
+                .from('follows')
+                .select('following_id')
+                .eq('follower_id', user.id);
+              
+              if (!userFollowingError && userFollowing) {
+                userFollowingIds = userFollowing.map(f => f.following_id);
+              }
+            }
+            
+            // Process the profiles
+            profilesData.forEach(profile => {
+              followerProfiles.push({
+                id: profile.id,
+                username: profile.username || 'User',
+                avatar_url: profile.avatar_url,
+                isFollowing: userFollowingIds.includes(profile.id)
+              });
+            });
+          }
+        }
+        
         // Fetch following (people the profile user follows)
         const { data: followingData, error: followingError } = await supabase
           .from('follows')
-          .select(`
-            following_id,
-            profiles!follows_following_id_fkey (
-              id,
-              username,
-              avatar_url
-            )
-          `)
+          .select('following_id')
           .eq('follower_id', profileUserId);
         
         if (followingError) throw followingError;
         
-        // If the current user is viewing the profile, check which users they follow
-        let userFollowingIds: string[] = [];
-        if (user && !isOwnProfile) {
-          const { data: userFollowing, error: userFollowingError } = await supabase
-            .from('follows')
-            .select('following_id')
-            .eq('follower_id', user.id);
+        // Fetch the profile data for each following
+        const followingProfiles: UserProfile[] = [];
+        
+        if (followingData && followingData.length > 0) {
+          const followingIds = followingData.map(item => item.following_id);
           
-          if (!userFollowingError && userFollowing) {
-            userFollowingIds = userFollowing.map(f => f.following_id);
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .in('id', followingIds);
+          
+          if (profilesError) throw profilesError;
+          
+          if (profilesData) {
+            // If the current user is viewing the profile, check which users they follow
+            let userFollowingIds: string[] = [];
+            if (user && !isOwnProfile) {
+              const { data: userFollowing, error: userFollowingError } = await supabase
+                .from('follows')
+                .select('following_id')
+                .eq('follower_id', user.id);
+              
+              if (!userFollowingError && userFollowing) {
+                userFollowingIds = userFollowing.map(f => f.following_id);
+              }
+            }
+            
+            // Process the profiles
+            profilesData.forEach(profile => {
+              followingProfiles.push({
+                id: profile.id,
+                username: profile.username || 'User',
+                avatar_url: profile.avatar_url,
+                isFollowing: userFollowingIds.includes(profile.id)
+              });
+            });
           }
         }
         
-        // Process followers
-        const processedFollowers: UserProfile[] = followersData
-          .filter(item => item.profiles) // Filter out any null profiles
-          .map(item => ({
-            id: item.profiles.id,
-            username: item.profiles.username || 'User',
-            avatar_url: item.profiles.avatar_url,
-            isFollowing: userFollowingIds.includes(item.profiles.id)
-          }));
-        
-        // Process following
-        const processedFollowing: UserProfile[] = followingData
-          .filter(item => item.profiles) // Filter out any null profiles
-          .map(item => ({
-            id: item.profiles.id,
-            username: item.profiles.username || 'User',
-            avatar_url: item.profiles.avatar_url,
-            isFollowing: userFollowingIds.includes(item.profiles.id)
-          }));
-        
-        setFollowers(processedFollowers);
-        setFollowing(processedFollowing);
+        setFollowers(followerProfiles);
+        setFollowing(followingProfiles);
       } catch (error) {
         console.error('Error fetching circles:', error);
       } finally {
