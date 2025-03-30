@@ -19,16 +19,24 @@ interface NavBarProps {
   items: NavItem[];
   className?: string;
   rightSection?: React.ReactNode;
+  initialActiveTab?: string;
 }
 export function NavBar({
   items,
   className,
-  rightSection
+  rightSection,
+  initialActiveTab
 }: NavBarProps) {
-  const [activeTab, setActiveTab] = useState(items[0].name);
+  const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const [scrolled, setScrolled] = useState(false);
   const isMobile = useIsMobile();
   const isSmallMobile = useIsMobile(650);
+
+  useEffect(() => {
+    if (initialActiveTab) {
+      setActiveTab(initialActiveTab);
+    }
+  }, [initialActiveTab]);
 
   useEffect(() => {
     const handleScroll = () => {
