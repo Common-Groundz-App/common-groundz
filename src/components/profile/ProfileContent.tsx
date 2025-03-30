@@ -34,7 +34,7 @@ const ProfileContent = () => {
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
         {/* Flex container for profile card and content */}
-        <div className="flex flex-col md:flex-row gap-8 items-start">
+        <div className="flex flex-col md:flex-row gap-6 items-start">
           {/* Profile Card - fixed width */}
           <div className="md:w-[300px] flex-shrink-0">
             <ProfileCard 
@@ -51,8 +51,8 @@ const ProfileContent = () => {
             />
           </div>
           
-          {/* Content Area - takes remaining space */}
-          <div className="flex-1 sticky top-20">
+          {/* Content Column - takes remaining space */}
+          <div className="flex-1 flex flex-col w-full">
             <ProfileTabs />
           </div>
         </div>
