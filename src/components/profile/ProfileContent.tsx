@@ -39,7 +39,7 @@ const ProfileContent = () => {
   };
 
   return (
-    <div className="w-full bg-background">
+    <div className="w-full bg-background pt-16"> {/* Added pt-16 to create space for the navbar */}
       {/* Cover Photo Section */}
       <div className="w-full h-[250px] relative overflow-hidden">
         <div 
