@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,10 +13,41 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      fetchAvatar();
+    }
+  }, [user]);
+
+  const fetchAvatar = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) {
+        console.error("Error fetching avatar:", error);
+        return;
+      }
+      
+      if (data?.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
 
   if (!user) {
     return (
@@ -39,7 +70,7 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src="" alt={user.email || "User"} />
+            <AvatarImage src={avatarUrl || ""} alt={user.email || "User"} />
             <AvatarFallback>{getInitials()}</AvatarFallback>
           </Avatar>
         </Button>
