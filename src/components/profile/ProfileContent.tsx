@@ -23,7 +23,7 @@ const ProfileContent = () => {
 
   return (
     <div className="w-full bg-background pt-16 md:pt-20">
-      {/* Profile Header Section with Tabs inside */}
+      {/* Cover Image */}
       <ProfileHeader 
         coverImage={coverImage}
         isLoading={isLoading}
@@ -38,9 +38,12 @@ const ProfileContent = () => {
         onProfileImageChange={handleProfileImageChange}
         hasChanges={hasChanges}
         onSaveChanges={handleSaveChanges}
-      >
+      />
+      
+      {/* Tabs directly below cover image */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
         <ProfileTabs />
-      </ProfileHeader>
+      </div>
     </div>
   );
 };

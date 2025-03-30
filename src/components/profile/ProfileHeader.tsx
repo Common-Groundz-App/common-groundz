@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ProfileCoverImage from './ProfileCoverImage';
 import ProfileCard from './ProfileCard';
@@ -17,7 +16,6 @@ interface ProfileHeaderProps {
   onProfileImageChange: (url: string) => void;
   hasChanges: boolean;
   onSaveChanges: () => void;
-  children?: React.ReactNode;
 }
 
 const ProfileHeader = ({
@@ -33,15 +31,14 @@ const ProfileHeader = ({
   profileImage,
   onProfileImageChange,
   hasChanges,
-  onSaveChanges,
-  children
+  onSaveChanges
 }: ProfileHeaderProps) => {
   return <>
       <ProfileCoverImage coverImage={coverImage} isLoading={isLoading} onCoverImageChange={onCoverImageChange} onCoverImageUpdated={onCoverImageUpdated} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
         <div className="flex flex-col md:flex-row gap-6">
-          {/* Profile Card - make it narrower */}
+          {/* Profile Card - keep on the left side */}
           <div className="md:w-[280px]">
             <ProfileCard 
               username={username} 
@@ -55,11 +52,6 @@ const ProfileHeader = ({
               hasChanges={hasChanges} 
               onSaveChanges={onSaveChanges} 
             />
-          </div>
-          
-          {/* Content Area - This div will now contain the tabs */}
-          <div className="flex-1">
-            {children}
           </div>
         </div>
       </div>
