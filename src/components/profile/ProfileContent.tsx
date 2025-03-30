@@ -39,7 +39,7 @@ const ProfileContent = () => {
   };
 
   return (
-    <div className="w-full bg-background pt-20"> {/* Increased pt-16 to pt-20 to accommodate the taller navbar */}
+    <div className="w-full bg-background pt-24"> {/* Adjusted padding top to accommodate the fixed navbar height */}
       {/* Cover Photo Section */}
       <div className="w-full h-[250px] relative overflow-hidden">
         <div 
