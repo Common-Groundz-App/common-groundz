@@ -46,6 +46,11 @@ const ProfileContent = () => {
             setUsername(user.email?.split('@')[0] || 'User');
           }
           
+          // Set bio if available
+          if (data.bio) {
+            setBio(data.bio);
+          }
+          
           // Set profile and cover images if available
           if (data.avatar_url) {
             setProfileImage(data.avatar_url);
