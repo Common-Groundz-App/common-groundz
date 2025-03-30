@@ -18,10 +18,10 @@ export function useSearch(query: string) {
       setIsLoading(true);
 
       try {
-        // Search for profiles (real users)
+        // Search for profiles (real users) - IMPROVED SEARCH QUERY
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, username, bio, avatar_url')
+          .select('id, username, bio, avatar_url, location')
           .or(`username.ilike.%${query}%, bio.ilike.%${query}%`)
           .limit(5);
         
@@ -36,7 +36,19 @@ export function useSearch(query: string) {
           title: profile.username || 'Anonymous User',
           subtitle: profile.bio || 'No bio available',
           imageUrl: profile.avatar_url || '',
+          location: profile.location || 'No location available',
+          memberSince: 'January 2023', // Default value
+          followingCount: 0
         }));
+
+        console.log("Profile search results:", profileResults);
+
+        // Also search in mock data in case the user is looking for a mock user
+        const filteredMockResults = mockSearchResults.filter(
+          result =>
+            result.title.toLowerCase().includes(query.toLowerCase()) ||
+            (result.subtitle && result.subtitle.toLowerCase().includes(query.toLowerCase()))
+        );
 
         // Filter sample data by query
         const filteredProducts = sampleProducts.filter(
@@ -51,24 +63,15 @@ export function useSearch(query: string) {
             (food.subtitle && food.subtitle.toLowerCase().includes(query.toLowerCase()))
         );
 
-        // Combine all results
+        // Combine all results with profiles first for better visibility
         const combinedResults: SearchResult[] = [
           ...profileResults,
+          ...filteredMockResults,
           ...filteredProducts,
           ...filteredFoods
         ];
 
-        // If no database results, use mock data as fallback
-        if (combinedResults.length === 0) {
-          const filteredMockResults = mockSearchResults.filter(
-            result =>
-              result.title.toLowerCase().includes(query.toLowerCase()) ||
-              (result.subtitle && result.subtitle.toLowerCase().includes(query.toLowerCase()))
-          );
-          setAllResults(filteredMockResults);
-        } else {
-          setAllResults(combinedResults);
-        }
+        setAllResults(combinedResults);
       } catch (error) {
         console.error('Search error:', error);
         // Fall back to mock data on error
