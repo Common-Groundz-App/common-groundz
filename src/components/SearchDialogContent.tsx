@@ -60,7 +60,7 @@ export const mockSearchResults: SearchResult[] = [
 ];
 
 // Sample data for products and foods
-const sampleProducts = [
+const sampleProducts: SearchResult[] = [
   {
     id: "prod1",
     type: "product",
@@ -77,7 +77,7 @@ const sampleProducts = [
   }
 ];
 
-const sampleFoods = [
+const sampleFoods: SearchResult[] = [
   {
     id: "food1",
     type: "food",
@@ -130,13 +130,13 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
         // Transform profiles data into SearchResult format
         const profileResults: SearchResult[] = (profilesData || []).map(profile => ({
           id: profile.id,
-          type: 'user',
+          type: "user" as const,
           title: profile.username || 'Anonymous User',
           subtitle: profile.bio || 'No bio available',
           imageUrl: profile.avatar_url || '',
         }));
 
-        // Combine with sample data (filtered by query)
+        // Filter sample data by query
         const filteredProducts = sampleProducts.filter(
           product => 
             product.title.toLowerCase().includes(query.toLowerCase()) || 
@@ -150,7 +150,7 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
         );
 
         // Combine all results
-        const combinedResults = [
+        const combinedResults: SearchResult[] = [
           ...profileResults,
           ...filteredProducts,
           ...filteredFoods
@@ -221,12 +221,14 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
   };
 
   // Function to get the appropriate icon for a result type
-  const getIconForType = (type: string) => {
+  const getIconForType = (type: SearchResult["type"], title: string) => {
     switch (type) {
       case "product":
         return <Star className="mr-2 h-4 w-4" />;
       case "food":
-        type === "Margherita Pizza" ? <Pizza className="mr-2 h-4 w-4" /> : <Coffee className="mr-2 h-4 w-4" />;
+        return title.includes("Pizza") ? 
+          <Pizza className="mr-2 h-4 w-4" /> : 
+          <Coffee className="mr-2 h-4 w-4" />;
       default:
         return <Hash className="mr-2 h-4 w-4" />;
     }
@@ -319,9 +321,7 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
                           className="h-6 w-6 rounded object-cover"
                         />
                       ) : (
-                        food.title.includes("Pizza") ? 
-                          <Pizza className="mr-2 h-4 w-4" /> : 
-                          <Coffee className="mr-2 h-4 w-4" />
+                        getIconForType(food.type, food.title)
                       )}
                       <div className="flex flex-col">
                         <span>{food.title}</span>
