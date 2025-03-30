@@ -8,10 +8,13 @@ import ProfileRecommendations from './ProfileRecommendations';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const ProfileContent = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [isLoading, setIsLoading] = useState(false);
   const [coverImage, setCoverImage] = useState<string>('/lovable-uploads/972742c1-8d73-43ee-9508-7a56b2bc2573.png');
   const [profileImage, setProfileImage] = useState<string>('https://images.unsplash.com/photo-1472396961693-142e6e269027');
@@ -194,41 +197,46 @@ const ProfileContent = () => {
   };
 
   return (
-    <div className="w-full bg-background pt-20">
-      {/* Cover Photo Section */}
-      <div className="w-full h-[250px] relative overflow-hidden">
-        <div 
-          className="w-full h-full bg-brand-orange"
-          style={{ 
-            backgroundImage: `url(${coverImage})`, 
-            backgroundSize: 'cover',
-            backgroundPosition: 'center'
-          }}
-        >
+    <div className="w-full bg-background pt-16 md:pt-20">
+      {/* Cover Photo Section - Updated for better responsiveness */}
+      <div className="w-full relative">
+        {/* Using AspectRatio for a responsive cover image container that maintains proportions */}
+        <div className="w-full h-[180px] sm:h-[200px] md:h-[250px] overflow-hidden relative">
+          <div 
+            className="w-full h-full"
+            style={{ 
+              backgroundImage: `url(${coverImage})`, 
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat'
+            }}
+            aria-label="Profile cover image"
+          >
+          </div>
+          <label 
+            htmlFor="cover-upload" 
+            className="absolute bottom-4 right-4 bg-white/80 hover:bg-white backdrop-blur-sm px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors z-10"
+          >
+            {isLoading ? 'Uploading...' : 'Change Cover'}
+          </label>
+          <input 
+            id="cover-upload" 
+            type="file" 
+            accept="image/*" 
+            className="hidden" 
+            onChange={handleCoverUpload}
+            disabled={isLoading}
+          />
         </div>
-        <label 
-          htmlFor="cover-upload" 
-          className="absolute bottom-4 right-4 bg-white/80 hover:bg-white backdrop-blur-sm px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors"
-        >
-          {isLoading ? 'Uploading...' : 'Change Cover'}
-        </label>
-        <input 
-          id="cover-upload" 
-          type="file" 
-          accept="image/*" 
-          className="hidden" 
-          onChange={handleCoverUpload}
-          disabled={isLoading}
-        />
       </div>
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
         <div className="flex flex-col md:flex-row gap-6">
           {/* Profile Card */}
           <Card className="relative md:w-[350px] bg-white shadow-lg rounded-lg overflow-hidden">
             <div className="p-6 flex flex-col items-center">
               <div className="relative mb-4">
-                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white">
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white">
                   <img 
                     src={profileImage} 
                     alt="Profile" 
@@ -253,12 +261,12 @@ const ProfileContent = () => {
                 />
               </div>
               
-              <h2 className="text-2xl font-bold text-gray-900">{username}</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">{username}</h2>
               <p className="text-gray-600 mb-4">{bio}</p>
               
               <div className="flex space-x-3 mb-6">
-                <Button className="bg-brand-orange hover:bg-brand-orange/90">Follow</Button>
-                <Button variant="outline">Message</Button>
+                <Button size={isMobile ? "sm" : "default"} className="bg-brand-orange hover:bg-brand-orange/90">Follow</Button>
+                <Button size={isMobile ? "sm" : "default"} variant="outline">Message</Button>
               </div>
               
               <div className="w-full space-y-3 text-left">
@@ -282,23 +290,23 @@ const ProfileContent = () => {
           
           {/* Content Area */}
           <div className="flex-1">
-            <Tabs defaultValue="recommendations" className="mt-24">
-              <TabsList className="border-b w-full rounded-none bg-transparent p-0 h-auto">
+            <Tabs defaultValue="recommendations" className="mt-16 md:mt-24">
+              <TabsList className="border-b w-full rounded-none bg-transparent p-0 h-auto overflow-x-auto">
                 <TabsTrigger 
                   value="recommendations"
-                  className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
+                  className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
                 >
                   Recommendations
                 </TabsTrigger>
                 <TabsTrigger 
                   value="circles"
-                  className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
+                  className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
                 >
                   Circles
                 </TabsTrigger>
                 <TabsTrigger 
                   value="about"
-                  className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
+                  className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black"
                 >
                   About
                 </TabsTrigger>
