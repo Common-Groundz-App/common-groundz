@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 interface ProfileCoverImageProps {
   coverImage: string;
@@ -76,19 +77,25 @@ const ProfileCoverImage = ({
   };
 
   return (
-    <div className="w-full relative mt-2 md:mt-0">
+    <div className="w-full relative mt-2 md:mt-0 bg-gray-100 shadow-inner">
       <div className="w-full h-[180px] sm:h-[200px] md:h-[250px] overflow-hidden relative">
-        <div 
-          className="w-full h-full"
-          style={{ 
-            backgroundImage: `url(${coverImage})`, 
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat'
-          }}
-          aria-label="Profile cover image"
-        >
-        </div>
+        {coverImage ? (
+          <div 
+            className="w-full h-full"
+            style={{ 
+              backgroundImage: `url(${coverImage})`, 
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat'
+            }}
+            aria-label="Profile cover image"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-50 to-indigo-100 text-gray-400">
+            <span className="text-lg">Cover Image</span>
+          </div>
+        )}
+        
         <label 
           htmlFor="cover-upload" 
           className="absolute bottom-4 right-4 bg-white/80 hover:bg-white backdrop-blur-sm px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors z-10"

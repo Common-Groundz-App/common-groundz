@@ -20,7 +20,9 @@ const ProfileContent = () => {
   const [followingCount, setFollowingCount] = useState<number>(120);
   const [tempCoverImage, setTempCoverImage] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const defaultCoverImage = '/lovable-uploads/1b4df64f-ea57-4b28-b5fa-40bd0f74d182.png';
+  
+  // Default cover image with a nice pattern - using a public URL
+  const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80';
   
   // Fetch user profile data
   useEffect(() => {
