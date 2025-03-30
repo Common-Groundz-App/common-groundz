@@ -54,11 +54,11 @@ const ProfileCoverImage = ({
       // Add a timestamp to force refresh
       const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
       
-      // Pass the URL to parent for temporary state
-      onCoverImageUpdated(publicUrl);
-      
       // Update local state via callback with a timestamp to force refresh
       onCoverImageChange(urlWithTimestamp);
+      
+      // Pass the URL to parent for temporary state (without timestamp)
+      onCoverImageUpdated(publicUrl);
       
       toast({
         title: 'Cover image selected',
