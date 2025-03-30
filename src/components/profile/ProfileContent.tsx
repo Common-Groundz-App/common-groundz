@@ -46,9 +46,9 @@ const ProfileContent = () => {
             setUsername(user.email?.split('@')[0] || 'User');
           }
           
-          // Set bio if available (check for bio property existence)
-          if (data.bio !== undefined) {
-            setBio(data.bio || 'Food Enthusiast');
+          // Set bio if available
+          if (data.bio !== undefined && data.bio !== null) {
+            setBio(data.bio);
           }
           
           // Set profile and cover images if available
