@@ -5,7 +5,7 @@ import ProfileRecommendations from './ProfileRecommendations';
 
 const ProfileTabs = () => {
   return (
-    <Tabs defaultValue="recommendations" className="mt-16 md:mt-24">
+    <Tabs defaultValue="recommendations" className="w-full">
       <TabsList className="border-b w-full rounded-none bg-transparent p-0 h-auto overflow-x-auto">
         <TabsTrigger 
           value="recommendations"

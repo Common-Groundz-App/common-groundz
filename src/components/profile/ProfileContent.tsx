@@ -23,7 +23,7 @@ const ProfileContent = () => {
 
   return (
     <div className="w-full bg-background pt-16 md:pt-20">
-      {/* Profile Header Section (includes Cover Photo and Profile Card) */}
+      {/* Profile Header Section with Tabs inside */}
       <ProfileHeader 
         coverImage={coverImage}
         isLoading={isLoading}
@@ -38,20 +38,9 @@ const ProfileContent = () => {
         onProfileImageChange={handleProfileImageChange}
         hasChanges={hasChanges}
         onSaveChanges={handleSaveChanges}
-      />
-      
-      {/* Content Area (the tabs) */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Profile Card (invisible placeholder to maintain layout) */}
-          <div className="md:w-[350px] hidden md:block"></div>
-          
-          {/* Content Area with Tabs */}
-          <div className="flex-1">
-            <ProfileTabs />
-          </div>
-        </div>
-      </div>
+      >
+        <ProfileTabs />
+      </ProfileHeader>
     </div>
   );
 };

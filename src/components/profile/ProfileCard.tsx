@@ -112,7 +112,7 @@ const ProfileCard = ({
 
   return (
     <>
-      <Card className="relative md:w-[350px] bg-white shadow-lg rounded-lg overflow-hidden">
+      <Card className="relative bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="p-6 flex flex-col items-center">
           <ProfileAvatar 
             username={currentUsername}
@@ -123,7 +123,7 @@ const ProfileCard = ({
           />
           
           <div className="flex items-center mb-2">
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900">{currentUsername}</h2>
+            <h2 className="text-xl font-bold text-gray-900">{currentUsername}</h2>
             {user && (
               <button 
                 onClick={() => setIsEditModalOpen(true)}
@@ -133,7 +133,7 @@ const ProfileCard = ({
               </button>
             )}
           </div>
-          <p className="text-gray-600 mb-4">{currentBio}</p>
+          <p className="text-gray-600 mb-4 text-sm text-center">{currentBio}</p>
           
           <ProfileActions 
             hasChanges={combinedHasChanges}
