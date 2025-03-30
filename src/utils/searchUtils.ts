@@ -1,5 +1,6 @@
 
 import { User, Hash, Star, Coffee, Pizza } from "lucide-react";
+import React from "react";
 
 // Export type for search results so it can be used elsewhere
 export type SearchResult = {
@@ -84,7 +85,7 @@ export const sampleFoods: SearchResult[] = [
 ];
 
 // Utility function to get the appropriate icon for a result type
-export const getIconForType = (type: SearchResult["type"], title: string) => {
+export const getIconForType = (type: SearchResult["type"], title: string): React.ReactNode => {
   switch (type) {
     case "product":
       return <Star className="mr-2 h-4 w-4" />;
@@ -92,6 +93,8 @@ export const getIconForType = (type: SearchResult["type"], title: string) => {
       return title.includes("Pizza") ? 
         <Pizza className="mr-2 h-4 w-4" /> : 
         <Coffee className="mr-2 h-4 w-4" />;
+    case "user":
+      return <User className="mr-2 h-4 w-4" />;
     default:
       return <Hash className="mr-2 h-4 w-4" />;
   }
