@@ -1,217 +1,50 @@
-import React, { useState, useEffect } from 'react';
+
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import ProfileCard from './ProfileCard';
-import ProfileCoverImage from './ProfileCoverImage';
-import ProfileTabs from './ProfileTabs';
-import { useProfileData } from '@/hooks/use-profile-data';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Card } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { mockSearchResults } from '@/utils/searchUtils';
+import ProfileHeader from './ProfileHeader';
+import ProfileTabs from './ProfileTabs';
+import ProfileSkeleton from './ProfileSkeleton';
+import { useProfileDisplayData } from '@/hooks/use-profile-display-data';
 
 const ProfileContent = () => {
   const { user } = useAuth();
   const { userId } = useParams(); // Get userId from URL if available
-  const [viewingOwnProfile, setViewingOwnProfile] = useState<boolean>(true);
-  const [profileUserId, setProfileUserId] = useState<string>('');
-  const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
-  const [loadingOtherProfile, setLoadingOtherProfile] = useState<boolean>(false);
-  const [isMockUser, setIsMockUser] = useState<boolean>(false);
-
-  // Use the hook to get current user's profile data
-  const {
-    isLoading,
-    coverImage,
-    profileImage,
-    username,
-    bio,
-    location,
-    memberSince,
-    followingCount,
-    hasChanges,
-    handleProfileImageChange,
-    handleCoverImageChange,
-    handleCoverImageUpdated,
-    handleSaveChanges
-  } = useProfileData();
-
-  // Determine if we're viewing own profile or someone else's
-  useEffect(() => {
-    if (!user) return;
-    
-    // Check if the userId is for a mock user (e.g., "user1", "user2")
-    if (userId && userId.startsWith('user')) {
-      setViewingOwnProfile(false);
-      setProfileUserId(userId);
-      setIsMockUser(true);
-      
-      // Find the mock user in our mock data
-      const mockUser = mockSearchResults.find(result => result.id === userId);
-      if (mockUser) {
-        setOtherUserProfile({
-          username: mockUser.title,
-          bio: mockUser.subtitle || 'No bio available',
-          avatar_url: mockUser.imageUrl || '',
-          cover_url: '',
-          location: mockUser.location || 'No location available',
-          memberSince: mockUser.memberSince || 'January 2021',
-          followingCount: mockUser.followingCount || 0
-        });
-      }
-      setLoadingOtherProfile(false);
-    } 
-    // Check if we're viewing another real user's profile (with UUID)
-    else if (userId && userId !== user.id) {
-      setViewingOwnProfile(false);
-      setProfileUserId(userId);
-      setIsMockUser(false);
-      
-      // Fetch the other user's profile from Supabase
-      const fetchOtherUserProfile = async () => {
-        setLoadingOtherProfile(true);
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
-          
-          if (error) throw error;
-          
-          setOtherUserProfile(data);
-        } catch (error) {
-          console.error('Error fetching profile:', error);
-        } finally {
-          setLoadingOtherProfile(false);
-        }
-      };
-      
-      fetchOtherUserProfile();
-    } 
-    // We're viewing our own profile
-    else {
-      setViewingOwnProfile(true);
-      setProfileUserId(user.id);
-      setIsMockUser(false);
-    }
-  }, [user, userId]);
-
-  // Get display data based on whether viewing own or other profile
-  const getDisplayData = () => {
-    if (viewingOwnProfile) {
-      return {
-        coverImage,
-        profileImage,
-        username,
-        bio,
-        location,
-        memberSince,
-        followingCount,
-        isLoading,
-      };
-    } else if (isMockUser) {
-      // For mock users, use the data from the mock profile
-      return {
-        coverImage: otherUserProfile?.cover_url || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80',
-        profileImage: otherUserProfile?.avatar_url || '',
-        username: otherUserProfile?.username || 'User',
-        bio: otherUserProfile?.bio || 'No bio available',
-        location: otherUserProfile?.location || 'No location available',
-        memberSince: otherUserProfile?.memberSince || 'January 2021',
-        followingCount: otherUserProfile?.followingCount || 0,
-        isLoading: false,
-      };
-    } else {
-      // For real Supabase users
-      return {
-        coverImage: otherUserProfile?.cover_url || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80',
-        profileImage: otherUserProfile?.avatar_url || '',
-        username: otherUserProfile?.username || 'User',
-        bio: otherUserProfile?.bio || 'No bio available',
-        location,
-        memberSince,
-        followingCount,
-        isLoading: loadingOtherProfile,
-      };
-    }
-  };
-
-  const displayData = getDisplayData();
+  
+  // Custom hook to handle profile data display
+  const { displayData, profileUserId, viewingOwnProfile, isLoading } = useProfileDisplayData(userId, user?.id);
 
   // Show loading state while determining profile
-  if ((!user || isLoading) && !otherUserProfile) {
-    return (
-      <div className="w-full bg-background pt-16 md:pt-20">
-        <div className="w-full h-48 md:h-64 bg-gray-200 animate-pulse"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
-          <div className="flex flex-col md:flex-row gap-6 items-start">
-            <div className="w-full flex justify-center md:justify-start md:w-[300px] flex-shrink-0">
-              <Card className="w-full max-w-[300px] md:w-full p-6">
-                <div className="flex flex-col items-center">
-                  <Skeleton className="w-24 h-24 md:w-32 md:h-32 rounded-full mb-4" />
-                  <Skeleton className="h-6 w-40 mb-2" />
-                  <Skeleton className="h-4 w-32 mb-4" />
-                  <Skeleton className="h-10 w-full mb-6" />
-                  <div className="space-y-2 w-full">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                  </div>
-                </div>
-              </Card>
-            </div>
-            <div className="flex-1 flex flex-col w-full">
-              <div className="h-24 md:h-32"></div>
-              <div className="bg-background pb-1 mb-2 border-b mt-4 md:mt-0">
-                <div className="flex space-x-4">
-                  <Skeleton className="h-10 w-32" />
-                  <Skeleton className="h-10 w-32" />
-                  <Skeleton className="h-10 w-32" />
-                </div>
-              </div>
-              <div className="mt-4 space-y-4">
-                <Skeleton className="h-64 w-full" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  if (isLoading) {
+    return <ProfileSkeleton />;
   }
 
-  return <div className="w-full bg-background pt-16 md:pt-20">
-      {/* Cover Image */}
-      <ProfileCoverImage 
-        coverImage={displayData.coverImage} 
-        isLoading={displayData.isLoading} 
-        onCoverImageChange={viewingOwnProfile ? handleCoverImageChange : undefined} 
-        onCoverImageUpdated={viewingOwnProfile ? handleCoverImageUpdated : undefined} 
-        isEditable={viewingOwnProfile}
+  return (
+    <div className="w-full bg-background pt-16 md:pt-20">
+      {/* Profile Header with Cover Image and Profile Card */}
+      <ProfileHeader 
+        coverImage={displayData.coverImage}
+        isLoading={displayData.isLoading}
+        onCoverImageChange={displayData.handleCoverImageChange}
+        onCoverImageUpdated={displayData.handleCoverImageUpdated}
+        username={displayData.username}
+        bio={displayData.bio}
+        location={displayData.location}
+        memberSince={displayData.memberSince}
+        followingCount={displayData.followingCount}
+        profileImage={displayData.profileImage}
+        onProfileImageChange={displayData.handleProfileImageChange}
+        hasChanges={displayData.hasChanges}
+        onSaveChanges={displayData.handleSaveChanges}
+        isOwnProfile={viewingOwnProfile}
+        profileUserId={profileUserId}
       />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
-        {/* Flex container for profile card and content */}
+      {/* Profile Content Column */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row gap-6 items-start">
-          {/* Profile Card - center on mobile, fixed width on desktop */}
-          <div className="w-full flex justify-center md:justify-start md:w-[300px] flex-shrink-0">
-            <div className="w-full max-w-[300px] md:w-full">
-              <ProfileCard 
-                username={displayData.username} 
-                bio={displayData.bio} 
-                location={displayData.location} 
-                memberSince={displayData.memberSince} 
-                followingCount={displayData.followingCount} 
-                profileImage={displayData.profileImage} 
-                isLoading={displayData.isLoading} 
-                onProfileImageChange={viewingOwnProfile ? handleProfileImageChange : undefined} 
-                hasChanges={viewingOwnProfile ? hasChanges : false} 
-                onSaveChanges={viewingOwnProfile ? handleSaveChanges : undefined} 
-                isOwnProfile={viewingOwnProfile}
-                profileUserId={profileUserId}
-              />
-            </div>
-          </div>
+          {/* Empty div for spacing to align with profile card */}
+          <div className="w-full md:w-[300px] flex-shrink-0 hidden md:block"></div>
           
           {/* Content Column - takes remaining space */}
           <div className="flex-1 flex flex-col w-full py-0 px-[16px]">
@@ -219,7 +52,8 @@ const ProfileContent = () => {
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
 
 export default ProfileContent;
