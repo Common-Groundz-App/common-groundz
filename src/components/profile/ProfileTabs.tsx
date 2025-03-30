@@ -1,8 +1,13 @@
+
 import React from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ProfileRecommendations from './ProfileRecommendations';
+import { useIsMobile } from '@/hooks/use-mobile';
+
 const ProfileTabs = () => {
-  return <Tabs defaultValue="recommendations" className="w-full my-[112px] px-0">
+  const isMobile = useIsMobile(768);
+  
+  return <Tabs defaultValue="recommendations" className={`w-full ${isMobile ? 'my-6' : 'my-[112px]'} px-0`}>
       <div className="bg-background pb-1 mb-2 border-b">
         <TabsList className="w-full rounded-none bg-transparent p-0 h-auto overflow-x-auto border-0">
           <TabsTrigger value="recommendations" className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
