@@ -36,6 +36,7 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
         navigate(`/profile/${result.id}`);
       } else {
         // For real database users with UUID, navigate normally
+        console.log("Navigating to real user profile:", result.id);
         navigate(`/profile/${result.id}`);
       }
     } else if (result.type === "recommendation") {
@@ -65,7 +66,9 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
           </div>
         ) : (
           <>
-            <CommandEmpty>No results found. Try a different search term.</CommandEmpty>
+            {query.length > 0 && !hasResults && (
+              <CommandEmpty>No results found. Try a different search term.</CommandEmpty>
+            )}
             
             {users.length > 0 && (
               <CommandGroup heading="People">
@@ -105,6 +108,12 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
                   <GenericSearchResult key={feature.id} result={feature} onSelect={handleSelect} />
                 ))}
               </CommandGroup>
+            )}
+
+            {query.length === 0 && !hasResults && (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                Type to search users, products, and more...
+              </div>
             )}
           </>
         )}

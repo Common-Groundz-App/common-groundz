@@ -8,10 +8,17 @@ export function useSearch(query: string) {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    // Don't trigger search until we have at least 2 characters
+    if (query.length === 1) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       // Show all results when query is empty
       if (query === '') {
         try {
+          setIsLoading(true);
           // Get some initial profiles when search is empty
           const { data: profilesData, error: profilesError } = await supabase
             .from('profiles')
@@ -25,6 +32,8 @@ export function useSearch(query: string) {
             return;
           }
 
+          console.log('Initial profiles data:', profilesData);
+
           // Transform profiles data into SearchResult format
           const profileResults: SearchResult[] = (profilesData || []).map(profile => ({
             id: profile.id,
@@ -32,8 +41,8 @@ export function useSearch(query: string) {
             title: profile.username || 'Anonymous User',
             subtitle: profile.bio || 'No bio available',
             imageUrl: profile.avatar_url || '',
-            location: 'No location available',
-            memberSince: 'January 2023',
+            location: 'No location available', // Default since location doesn't exist in DB
+            memberSince: 'January 2023', // Default value
             followingCount: 0
           }));
 
@@ -55,16 +64,19 @@ export function useSearch(query: string) {
       setIsLoading(true);
 
       try {
-        // Search for profiles (real users)
+        // Search for profiles (real users) - Making sure the .or() is correctly structured
+        console.log('Searching with query:', query);
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username, bio, avatar_url')
-          .or(`username.ilike.%${query}%, bio.ilike.%${query}%`)
+          .or(`username.ilike.%${query}%,bio.ilike.%${query}%`)
           .limit(10);
         
         if (profilesError) {
           console.error('Error searching profiles:', profilesError);
         }
+
+        console.log('Search results from DB:', profilesData);
 
         // Transform profiles data into SearchResult format
         const profileResults: SearchResult[] = (profilesData || []).map(profile => ({
@@ -77,8 +89,6 @@ export function useSearch(query: string) {
           memberSince: 'January 2023', // Default value
           followingCount: 0
         }));
-
-        console.log("Profile search results:", profileResults);
 
         // Also search in mock data in case the user is looking for a mock user
         const filteredMockResults = mockSearchResults.filter(
@@ -108,6 +118,7 @@ export function useSearch(query: string) {
           ...filteredFoods
         ];
 
+        console.log('Combined search results:', combinedResults.length);
         setAllResults(combinedResults);
       } catch (error) {
         console.error('Search error:', error);
@@ -123,10 +134,10 @@ export function useSearch(query: string) {
       }
     };
 
-    // Add debounce for search with a shorter timeout
+    // Add debounce for search with a longer timeout
     const timeoutId = setTimeout(() => {
       fetchData();
-    }, 200);
+    }, query.length > 1 ? 300 : 200); // Longer debounce for search queries, shorter for empty state
 
     return () => clearTimeout(timeoutId);
   }, [query]);
