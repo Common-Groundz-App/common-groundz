@@ -31,47 +31,45 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md md:max-w-xl p-0 gap-0 overflow-hidden border-0 shadow-lg">
-        <div className="flex items-center px-4 py-3 border-b">
-          <div className="flex items-center w-full gap-2">
-            <Search className="w-5 h-5 text-muted-foreground shrink-0 ml-2" />
-            <Input
-              type="text"
-              placeholder="Search for people, products, food..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70 placeholder:font-normal"
-              autoFocus
-            />
-            {query && (
-              <button
-                onClick={() => setQuery('')}
-                className="p-1 rounded-full hover:bg-transparent mr-4"
-              >
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            )}
-          </div>
+      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden shadow-lg border-0">
+        <div className="flex items-center py-3 px-4">
+          <Search className="w-4 h-4 text-muted-foreground shrink-0 mr-2" />
+          <Input
+            type="text"
+            placeholder="Search for people, products, food..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70 text-sm h-8 px-0"
+            autoFocus
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="p-1 rounded-full hover:bg-transparent"
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          )}
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto p-0">
+        <div className="max-h-[60vh] overflow-y-auto">
           {error && (
-            <div className="p-4 text-center text-sm text-muted-foreground">
+            <div className="px-4 py-2 text-center text-xs text-muted-foreground">
               {error}
             </div>
           )}
 
           {isLoadingUsers && (
-            <div className="p-4">
-              <div className="px-4 py-2 text-sm font-medium text-muted-foreground">
+            <div className="px-2">
+              <div className="px-2 py-2 text-xs font-medium text-muted-foreground">
                 People
               </div>
               {Array(3).fill(0).map((_, index) => (
-                <div key={index} className="flex items-center gap-3 px-4 py-2">
-                  <Skeleton className="h-10 w-10 rounded-full" />
+                <div key={index} className="flex items-center gap-2 px-2 py-1.5">
+                  <Skeleton className="h-8 w-8 rounded-full" />
                   <div className="flex-1">
-                    <Skeleton className="h-4 w-24 mb-2" />
-                    <Skeleton className="h-3 w-40" />
+                    <Skeleton className="h-3 w-20 mb-1" />
+                    <Skeleton className="h-2 w-32" />
                   </div>
                 </div>
               ))}
@@ -79,14 +77,14 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
           )}
 
           {!isLoadingUsers && query && usersToDisplay.length === 0 && (
-            <div className="p-8 text-center">
-              <p className="mt-2 text-muted-foreground">No users found</p>
+            <div className="p-6 text-center">
+              <p className="text-xs text-muted-foreground">No users found</p>
             </div>
           )}
 
           {usersToDisplay.length > 0 && (
             <div className="flex flex-col">
-              <div className="px-4 py-2 text-sm font-medium text-muted-foreground">
+              <div className="px-4 py-1 text-xs font-medium text-muted-foreground">
                 People
               </div>
               <div className="flex flex-col">
@@ -94,18 +92,18 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                   <Link
                     key={user.id}
                     to={`/profile/${user.id}`}
-                    className="flex items-center gap-3 px-4 py-2 hover:bg-muted/30 transition-colors"
+                    className="flex items-center gap-2 px-4 py-1.5 hover:bg-muted/30 transition-colors"
                     onClick={handleUserClick}
                   >
-                    <Avatar className="h-10 w-10">
+                    <Avatar className="h-8 w-8">
                       <AvatarImage src={user.avatar_url || undefined} alt={user.username || 'User'} />
                       <AvatarFallback>
                         {user.username?.[0]?.toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium">{user.username || 'Unknown User'}</p>
-                      <p className="text-sm text-muted-foreground truncate">
+                      <p className="text-sm font-medium">{user.username || 'Unknown User'}</p>
+                      <p className="text-xs text-muted-foreground truncate">
                         {user.bio || 'No bio available'}
                       </p>
                     </div>
