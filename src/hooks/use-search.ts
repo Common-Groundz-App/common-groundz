@@ -7,6 +7,7 @@ interface SearchResult {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  bio: string | null;
 }
 
 export function useSearch(query: string) {
@@ -25,7 +26,7 @@ export function useSearch(query: string) {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, username, avatar_url')
+          .select('id, username, avatar_url, bio')
           .ilike('username', `%${debouncedQuery}%`)
           .order('username')
           .limit(10);

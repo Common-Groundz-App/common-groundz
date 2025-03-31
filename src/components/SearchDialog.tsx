@@ -1,12 +1,10 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, User } from 'lucide-react';
+import { Search, User, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useSearch } from '@/hooks/use-search';
@@ -32,49 +30,70 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Search users</DialogTitle>
-        </DialogHeader>
-        <div className="flex items-center border rounded-md px-3 py-2 mb-4">
-          <Search className="h-4 w-4 mr-2 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search by username..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-          />
+      <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden">
+        <div className="p-4 border-b">
+          <div className="flex items-center gap-2 bg-muted/50 rounded-full px-4 py-2">
+            <Search className="h-5 w-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search for people, products, food..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent placeholder:text-muted-foreground/70"
+            />
+            {query && (
+              <button 
+                onClick={() => setQuery('')}
+                className="rounded-full p-1 hover:bg-muted"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
         </div>
-        <div className="max-h-[300px] overflow-y-auto">
+        
+        <div className="max-h-[400px] overflow-y-auto p-2">
+          {query && (
+            <div className="px-3 py-2 text-sm font-medium text-muted-foreground">
+              People
+            </div>
+          )}
+          
           {isLoading ? (
-            <div className="flex justify-center py-4">
+            <div className="flex justify-center py-8">
               <Spinner />
             </div>
           ) : results.length > 0 ? (
-            <div className="space-y-2">
+            <div>
               {results.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center gap-3 p-2 rounded-md hover:bg-accent cursor-pointer"
+                  className="flex items-center gap-3 p-3 rounded-md hover:bg-accent cursor-pointer"
                   onClick={() => handleUserSelect(user.id)}
                 >
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-10 w-10 border">
                     <AvatarImage src={user.avatar_url || ''} />
                     <AvatarFallback>
                       <User className="h-5 w-5" />
                     </AvatarFallback>
                   </Avatar>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm">{user.username || 'Anonymous'}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {user.bio || 'No bio available'}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
           ) : query ? (
-            <p className="text-center text-muted-foreground py-4">No users found</p>
+            <div className="text-center text-muted-foreground py-8">
+              No users found
+            </div>
           ) : (
-            <p className="text-center text-muted-foreground py-4">Type to search users</p>
+            <div className="text-center text-muted-foreground py-8">
+              Type to search users
+            </div>
           )}
         </div>
       </DialogContent>
