@@ -75,13 +75,16 @@ export function useSearch(query: string) {
       setIsLoading(true);
 
       try {
-        // Search for profiles (real users) - Making sure the .or() is correctly structured
+        // Search for profiles (real users) with CORRECTED .or() format
         console.log('Executing Supabase query with:', query);
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username, bio, avatar_url')
           .or(`username.ilike.%${query}%,bio.ilike.%${query}%`)
           .limit(10);
+        
+        console.log('Supabase query:', `username.ilike.%${query}%,bio.ilike.%${query}%`);
+        console.log('Supabase Results:', profilesData);
         
         if (profilesError) {
           console.error('Error searching profiles:', profilesError);
