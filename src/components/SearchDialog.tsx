@@ -9,7 +9,7 @@ import { Search, X } from 'lucide-react';
 import { useSearch, SearchResult } from '@/hooks/use-search';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Link } from 'react-router-dom';
-import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface SearchDialogProps {
   open: boolean;
@@ -18,12 +18,16 @@ interface SearchDialogProps {
 
 export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState('');
-  const { results, isLoading, error } = useSearch(query);
+  const { results, isLoading, error, defaultUsers, loadingDefaultUsers } = useSearch(query);
 
   const handleUserClick = () => {
     onOpenChange(false);
     setQuery('');
   };
+
+  // Determine which users to display
+  const usersToDisplay = query ? results : defaultUsers;
+  const isLoadingUsers = query ? isLoading : loadingDefaultUsers;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,31 +61,36 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             </div>
           )}
 
-          {isLoading && (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              Searching...
+          {isLoadingUsers && (
+            <div className="p-4">
+              <div className="px-4 py-2 text-sm font-medium text-muted-foreground">
+                People
+              </div>
+              {Array(3).fill(0).map((_, index) => (
+                <div key={index} className="flex items-center gap-3 px-4 py-2">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1">
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <Skeleton className="h-3 w-40" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
-          {!isLoading && query && results.length === 0 && (
+          {!isLoadingUsers && query && usersToDisplay.length === 0 && (
             <div className="p-8 text-center">
               <p className="mt-2 text-muted-foreground">No users found</p>
             </div>
           )}
 
-          {!query && (
-            <div className="p-6 text-center">
-              <p className="text-muted-foreground text-sm">Type to search</p>
-            </div>
-          )}
-
-          {results.length > 0 && (
+          {usersToDisplay.length > 0 && (
             <div className="flex flex-col">
               <div className="px-4 py-2 text-sm font-medium text-muted-foreground">
                 People
               </div>
               <div className="flex flex-col">
-                {results.map((user) => (
+                {usersToDisplay.map((user) => (
                   <Link
                     key={user.id}
                     to={`/profile/${user.id}`}

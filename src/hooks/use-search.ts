@@ -13,6 +13,34 @@ export function useSearch(query: string) {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [defaultUsers, setDefaultUsers] = useState<SearchResult[]>([]);
+  const [loadingDefaultUsers, setLoadingDefaultUsers] = useState(false);
+
+  // Fetch default users when the hook is initialized
+  useEffect(() => {
+    const fetchDefaultUsers = async () => {
+      setLoadingDefaultUsers(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url, bio')
+          .limit(10);
+
+        if (error) {
+          console.error('Error fetching default users:', error);
+          return;
+        }
+
+        setDefaultUsers(data as SearchResult[]);
+      } catch (err) {
+        console.error('Error fetching default users:', err);
+      } finally {
+        setLoadingDefaultUsers(false);
+      }
+    };
+
+    fetchDefaultUsers();
+  }, []);
 
   useEffect(() => {
     const searchUsers = async () => {
@@ -52,5 +80,11 @@ export function useSearch(query: string) {
     return () => clearTimeout(timer);
   }, [query]);
 
-  return { results, isLoading, error };
+  return { 
+    results, 
+    isLoading, 
+    error, 
+    defaultUsers, 
+    loadingDefaultUsers 
+  };
 }
