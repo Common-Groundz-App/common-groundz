@@ -20,14 +20,12 @@ interface NavBarProps {
   className?: string;
   rightSection?: React.ReactNode;
   initialActiveTab?: string;
-  onItemClick?: (name: string) => boolean;
 }
 export function NavBar({
   items,
   className,
   rightSection,
-  initialActiveTab,
-  onItemClick
+  initialActiveTab
 }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const [scrolled, setScrolled] = useState(false);
@@ -55,13 +53,6 @@ export function NavBar({
     };
   }, []);
 
-  const handleNavItemClick = (name: string) => {
-    if (onItemClick && !onItemClick(name)) {
-      return;
-    }
-    setActiveTab(name);
-  };
-
   return <div className={cn(
     "fixed top-0 left-0 right-0 z-50 py-4 px-4 transition-all duration-300", 
     scrolled ? "bg-background/90 backdrop-blur-md shadow-sm" : "bg-transparent", 
@@ -86,18 +77,7 @@ export function NavBar({
               {items.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.name;
-            return <Link 
-                    key={item.name} 
-                    to={item.url} 
-                    onClick={(e) => {
-                      const shouldNavigate = onItemClick ? onItemClick(item.name) : true;
-                      if (!shouldNavigate) {
-                        e.preventDefault();
-                      } else {
-                        handleNavItemClick(item.name);
-                      }
-                    }} 
-                    className={cn("relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors", "text-foreground/80 hover:text-primary", isActive && "bg-muted text-primary")}>
+            return <Link key={item.name} to={item.url} onClick={() => setActiveTab(item.name)} className={cn("relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors", "text-foreground/80 hover:text-primary", isActive && "bg-muted text-primary")}>
                   <span className="hidden md:inline">{item.name}</span>
                   <span className="md:hidden">
                     <Icon size={18} strokeWidth={2.5} />
@@ -135,18 +115,7 @@ export function NavBar({
                     {items.map(item => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.name;
-                  return <Link 
-                          key={item.name} 
-                          to={item.url} 
-                          onClick={(e) => {
-                            const shouldNavigate = onItemClick ? onItemClick(item.name) : true;
-                            if (!shouldNavigate) {
-                              e.preventDefault();
-                            } else {
-                              handleNavItemClick(item.name);
-                            }
-                          }}
-                          className={cn("flex items-center space-x-2 px-3 py-2 rounded-md transition-colors", isActive ? "bg-primary/10 text-primary" : "hover:bg-accent text-foreground/80 hover:text-primary")}>
+                  return <Link key={item.name} to={item.url} onClick={() => setActiveTab(item.name)} className={cn("flex items-center space-x-2 px-3 py-2 rounded-md transition-colors", isActive ? "bg-primary/10 text-primary" : "hover:bg-accent text-foreground/80 hover:text-primary")}>
                           <Icon size={20} strokeWidth={2} />
                           <span>{item.name}</span>
                         </Link>;
