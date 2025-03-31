@@ -10,7 +10,6 @@ export function useSearch(query: string) {
   useEffect(() => {
     console.log('Current query:', query, 'Length:', query.length);
     
-    // Remove the condition that was preventing searches with 2+ characters
     // We'll run the search regardless of query length
 
     const fetchData = async () => {
@@ -71,14 +70,14 @@ export function useSearch(query: string) {
       setIsLoading(true);
 
       try {
-        // Search for profiles with correct .or() syntax
+        // Fix the Supabase query for searching - key issue causing search to fail
         console.log('Executing Supabase query with:', query);
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username, bio, avatar_url')
-          .or(`username.ilike.%${query}%,bio.ilike.%${query}%`)
-          .limit(10);
+          .or(`username.ilike.%${query}%,bio.ilike.%${query}%`);
         
+        // Add logging to inspect the query and results
         console.log('Supabase query:', `username.ilike.%${query}%,bio.ilike.%${query}%`);
         console.log('Supabase Results:', profilesData);
         
@@ -155,7 +154,7 @@ export function useSearch(query: string) {
       }
     };
 
-    // Debounce the search regardless of query length
+    // Use debounce with a single consistent timeout
     console.log('Setting up debounced search with timeout');
     const timeoutId = setTimeout(() => {
       console.log('Debounce timeout finished, executing fetchData()');
