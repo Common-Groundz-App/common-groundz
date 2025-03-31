@@ -25,7 +25,21 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
   const navigate = useNavigate();
   const { isLoading, users, products, foods, recommendations, features, hasResults } = useSearch(query);
 
+  useEffect(() => {
+    console.log('SearchDialogContent received:', { 
+      query, 
+      isLoading, 
+      usersCount: users.length,
+      productsCount: products.length,
+      foodsCount: foods.length,
+      recommendationsCount: recommendations.length,
+      featuresCount: features.length,
+      hasResults
+    });
+  }, [query, isLoading, users, products, foods, recommendations, features, hasResults]);
+
   const handleSelect = (result: SearchResult) => {
+    console.log('Selected result:', result);
     setOpen(false);
     
     // Navigate based on result type
@@ -40,14 +54,23 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
         navigate(`/profile/${result.id}`);
       }
     } else if (result.type === "recommendation") {
+      console.log("Navigating to recommendation:", result.id);
       navigate(`/recommendations/${result.id}`);
     } else if (result.type === "feature") {
+      console.log("Navigating to features section");
       navigate(`/#features`);
     } else if (result.type === "product") {
+      console.log("Navigating to product:", result.id);
       navigate(`/products/${result.id}`);
     } else if (result.type === "food") {
+      console.log("Navigating to food:", result.id);
       navigate(`/foods/${result.id}`);
     }
+  };
+
+  const handleQueryChange = (value: string) => {
+    console.log('Search query changed to:', value);
+    setQuery(value);
   };
 
   return (
@@ -55,7 +78,7 @@ export function SearchDialogContent({ setOpen }: SearchDialogContentProps) {
       <CommandInput 
         placeholder="Search for people, products, food..." 
         value={query}
-        onValueChange={setQuery}
+        onValueChange={handleQueryChange}
         autoFocus
       />
       <CommandList>
