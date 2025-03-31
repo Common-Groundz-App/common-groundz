@@ -10,12 +10,8 @@ export function useSearch(query: string) {
   useEffect(() => {
     console.log('Current query:', query, 'Length:', query.length);
     
-    // Don't trigger search until we have at least 2 characters
-    if (query.length === 1) {
-      console.log('Query too short, skipping search');
-      setIsLoading(false);
-      return;
-    }
+    // Remove the condition that was preventing searches with 2+ characters
+    // We'll run the search regardless of query length
 
     const fetchData = async () => {
       // Show all results when query is empty
@@ -75,7 +71,7 @@ export function useSearch(query: string) {
       setIsLoading(true);
 
       try {
-        // Search for profiles with correct .or() syntax - using template string properly
+        // Search for profiles with correct .or() syntax
         console.log('Executing Supabase query with:', query);
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
@@ -159,12 +155,12 @@ export function useSearch(query: string) {
       }
     };
 
-    // Add debounce for search with a longer timeout
-    console.log('Setting up debounced search with timeout:', query.length > 1 ? 300 : 200, 'ms');
+    // Debounce the search regardless of query length
+    console.log('Setting up debounced search with timeout');
     const timeoutId = setTimeout(() => {
       console.log('Debounce timeout finished, executing fetchData()');
       fetchData();
-    }, query.length > 1 ? 300 : 200); // Longer debounce for search queries, shorter for empty state
+    }, 300); // Use consistent debounce time
 
     return () => {
       console.log('Clearing previous timeout');
