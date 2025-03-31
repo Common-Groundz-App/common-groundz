@@ -14,6 +14,7 @@ interface NavItem {
   name: string;
   url: string;
   icon: LucideIcon;
+  onClick?: () => void;
 }
 interface NavBarProps {
   items: NavItem[];
@@ -77,7 +78,26 @@ export function NavBar({
               {items.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.name;
-            return <Link key={item.name} to={item.url} onClick={() => setActiveTab(item.name)} className={cn("relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors", "text-foreground/80 hover:text-primary", isActive && "bg-muted text-primary")}>
+            
+            // If item has onClick, use it instead of Link
+            const handleClick = (e: React.MouseEvent) => {
+              if (item.onClick) {
+                e.preventDefault();
+                item.onClick();
+              }
+              setActiveTab(item.name);
+            };
+            
+            return <Link 
+                  key={item.name} 
+                  to={item.url} 
+                  onClick={handleClick}
+                  className={cn(
+                    "relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors", 
+                    "text-foreground/80 hover:text-primary", 
+                    isActive && "bg-muted text-primary"
+                  )}
+                >
                   <span className="hidden md:inline">{item.name}</span>
                   <span className="md:hidden">
                     <Icon size={18} strokeWidth={2.5} />
@@ -115,7 +135,25 @@ export function NavBar({
                     {items.map(item => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.name;
-                  return <Link key={item.name} to={item.url} onClick={() => setActiveTab(item.name)} className={cn("flex items-center space-x-2 px-3 py-2 rounded-md transition-colors", isActive ? "bg-primary/10 text-primary" : "hover:bg-accent text-foreground/80 hover:text-primary")}>
+                  
+                  // If item has onClick, use it instead of Link
+                  const handleClick = (e: React.MouseEvent) => {
+                    if (item.onClick) {
+                      e.preventDefault();
+                      item.onClick();
+                    }
+                    setActiveTab(item.name);
+                  };
+                  
+                  return <Link 
+                          key={item.name} 
+                          to={item.url} 
+                          onClick={handleClick} 
+                          className={cn(
+                            "flex items-center space-x-2 px-3 py-2 rounded-md transition-colors", 
+                            isActive ? "bg-primary/10 text-primary" : "hover:bg-accent text-foreground/80 hover:text-primary"
+                          )}
+                        >
                           <Icon size={20} strokeWidth={2} />
                           <span>{item.name}</span>
                         </Link>;
