@@ -1,19 +1,16 @@
 
-import { Home, Star, Search, User } from 'lucide-react'
+import { Home, Star, Heart, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
 import { useLocation } from 'react-router-dom'
-import { useState } from 'react'
-import { SearchDialog } from './SearchDialog'
 
 export function NavBarComponent() {
   const location = useLocation();
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   
   const navItems = [
     { name: 'Home', url: '/', icon: Home },
     { name: 'Features', url: '#features', icon: Star },
-    { name: 'Search', url: '#', icon: Search },
+    { name: 'Testimonials', url: '#testimonials', icon: Heart },
     { name: 'Profile', url: '/profile', icon: User }
   ];
 
@@ -23,25 +20,12 @@ export function NavBarComponent() {
     (location.pathname !== '/' && item.url.startsWith(location.pathname))
   )?.name || navItems[0].name;
 
-  const handleNavItemClick = (name: string) => {
-    if (name === 'Search') {
-      setIsSearchOpen(true);
-      return;
-    }
-  };
-
   return (
-    <>
-      <NavBar 
-        items={navItems.map(item => ({
-          ...item,
-          onClick: () => handleNavItemClick(item.name)
-        }))} 
-        rightSection={<UserMenu />}
-        initialActiveTab={activeTab}
-      />
-      <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
-    </>
+    <NavBar 
+      items={navItems} 
+      rightSection={<UserMenu />}
+      initialActiveTab={activeTab}
+    />
   )
 }
 
