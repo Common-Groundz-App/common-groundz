@@ -30,9 +30,9 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden">
-        <div className="p-4 border-b">
-          <div className="flex items-center gap-2 bg-muted/50 rounded-full px-4 py-2">
+      <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden bg-white dark:bg-gray-950 shadow-xl border-0">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-900 rounded-full px-4 py-2 transition-all duration-200 focus-within:ring-2 focus-within:ring-primary/20">
             <Search className="h-5 w-5 text-muted-foreground" />
             <Input
               type="text"
@@ -40,11 +40,12 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent placeholder:text-muted-foreground/70"
+              autoFocus
             />
             {query && (
               <button 
                 onClick={() => setQuery('')}
-                className="rounded-full p-1 hover:bg-muted"
+                className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
               >
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
@@ -64,11 +65,11 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               <Spinner />
             </div>
           ) : results.length > 0 ? (
-            <div>
+            <div className="space-y-1">
               {results.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center gap-3 p-3 rounded-md hover:bg-accent cursor-pointer"
+                  className="flex items-center gap-3 p-3 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900 cursor-pointer transition-colors"
                   onClick={() => handleUserSelect(user.id)}
                 >
                   <Avatar className="h-10 w-10 border">
