@@ -49,7 +49,7 @@ const ProfileCard = ({
   const [localHasChanges, setLocalHasChanges] = useState(false);
 
   // Format username for display (remove spaces and add @ symbol)
-  const formattedUsername = username ? `@${username.toLowerCase().replace(/\s+/g, '')}` : '';
+  const formattedUsername = currentUsername ? `@${currentUsername.toLowerCase().replace(/\s+/g, '')}` : '';
 
   // Update states when props change
   useEffect(() => {
