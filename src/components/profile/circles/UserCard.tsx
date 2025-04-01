@@ -54,7 +54,8 @@ const UserCard = ({
           </Avatar>
           <div className="ml-4">
             <div className="font-medium">{username || 'User'}</div>
-            <div className="text-sm text-gray-500">{relationshipType === 'follower' ? 'Follower' : 'Following'}</div>
+            <div className="text-sm text-gray-500 mb-1">@{username?.toLowerCase().replace(/\s+/g, '') || 'user'}</div>
+            <div className="text-xs text-gray-400">{relationshipType === 'follower' ? 'Follower' : 'Following'}</div>
           </div>
         </div>
         
