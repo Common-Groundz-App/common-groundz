@@ -47,9 +47,40 @@ const ProfileCard = ({
   const [uploading, setUploading] = useState(false);
   const [tempProfileImage, setTempProfileImage] = useState<string | null>(null);
   const [localHasChanges, setLocalHasChanges] = useState(false);
+  const [databaseUsername, setDatabaseUsername] = useState<string>('');
 
-  // Format username for display (remove spaces and add @ symbol)
-  const formattedUsername = currentUsername ? `@${currentUsername.toLowerCase().replace(/\s+/g, '')}` : '';
+  // Get the actual username from the database
+  useEffect(() => {
+    const fetchUsername = async () => {
+      if (!profileUserId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', profileUserId)
+          .single();
+
+        if (error) {
+          console.error('Error fetching username:', error);
+          return;
+        }
+
+        if (data && data.username) {
+          setDatabaseUsername(data.username);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    };
+
+    fetchUsername();
+  }, [profileUserId]);
+
+  // Format username for display (use database username if available)
+  const formattedUsername = databaseUsername 
+    ? `@${databaseUsername}` 
+    : '';
 
   // Update states when props change
   useEffect(() => {

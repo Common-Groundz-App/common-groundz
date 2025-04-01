@@ -49,10 +49,13 @@ export const useProfileData = () => {
           const firstName = userMetadata?.first_name || '';
           const lastName = userMetadata?.last_name || '';
           
-          // Set username using first and last name if available
+          // Set display name using first and last name if available
+          let displayName = '';
           if (firstName || lastName) {
-            setUsername(`${firstName} ${lastName}`.trim());
+            displayName = `${firstName} ${lastName}`.trim();
+            setUsername(displayName);
           } else if (data.username) {
+            // Use username as display name if no first/last name
             setUsername(data.username);
           } else {
             // Fallback to email name if no username
