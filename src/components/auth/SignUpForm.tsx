@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -7,20 +7,88 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { UserIcon, KeyIcon, User, UserCircle } from 'lucide-react';
+import { UserIcon, KeyIcon, User, UserCircle, AtSign } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const SignUpForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
+  const validateUsername = (value: string) => {
+    // Check format: 3-20 characters, letters, numbers, dots, underscores, lowercase only
+    if (!value) return 'Username is required';
+    if (value !== value.toLowerCase()) return 'Username must be lowercase';
+    if (value.length < 3) return 'Username must be at least 3 characters';
+    if (value.length > 20) return 'Username must be less than 20 characters';
+    if (!/^[a-z0-9._]+$/.test(value)) return 'Username can only contain letters, numbers, dots, and underscores';
+    return '';
+  };
+
+  const checkUsernameUniqueness = async (value: string) => {
+    setIsCheckingUsername(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', value)
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setUsernameError('Username is already taken');
+        return false;
+      } else {
+        setUsernameError('');
+        return true;
+      }
+    } catch (error) {
+      console.error('Error checking username:', error);
+      setUsernameError('Error checking username availability');
+      return false;
+    } finally {
+      setIsCheckingUsername(false);
+    }
+  };
+
+  const handleUsernameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toLowerCase();
+    setUsername(value);
+    
+    const formatError = validateUsername(value);
+    setUsernameError(formatError);
+    
+    if (!formatError && value.length >= 3) {
+      await checkUsernameUniqueness(value);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Final username validation
+    const formatError = validateUsername(username);
+    if (formatError) {
+      setUsernameError(formatError);
+      return;
+    }
+    
     setIsLoading(true);
+    
+    // Check username uniqueness one last time before submitting
+    const isUnique = await checkUsernameUniqueness(username);
+    if (!isUnique) {
+      setIsLoading(false);
+      return;
+    }
     
     try {
       // Capitalize first letter of names
@@ -29,7 +97,8 @@ const SignUpForm = () => {
       
       const { error, user } = await signUp(email, password, {
         firstName: formattedFirstName,
-        lastName: formattedLastName
+        lastName: formattedLastName,
+        username: username.toLowerCase()
       });
       
       if (error) throw error;
@@ -58,6 +127,27 @@ const SignUpForm = () => {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="signup-username">Username</Label>
+            <div className="relative">
+              <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                id="signup-username" 
+                placeholder="username" 
+                value={username}
+                onChange={handleUsernameChange}
+                required
+                className={`pl-10 ${usernameError ? 'border-red-500' : ''}`}
+              />
+            </div>
+            {usernameError && (
+              <p className="text-red-500 text-xs mt-1">{usernameError}</p>
+            )}
+            {isCheckingUsername && (
+              <p className="text-gray-500 text-xs mt-1">Checking username availability...</p>
+            )}
+          </div>
+          
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="space-y-2 flex-1">
               <Label htmlFor="signup-firstname">First Name</Label>
@@ -119,7 +209,7 @@ const SignUpForm = () => {
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" disabled={isLoading}>
+          <Button type="submit" className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" disabled={isLoading || !!usernameError || isCheckingUsername}>
             {isLoading ? 'Creating Account...' : 'Create Account'}
           </Button>
         </CardFooter>
