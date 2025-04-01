@@ -48,6 +48,9 @@ const ProfileCard = ({
   const [tempProfileImage, setTempProfileImage] = useState<string | null>(null);
   const [localHasChanges, setLocalHasChanges] = useState(false);
 
+  // Format username for display (remove spaces and add @ symbol)
+  const formattedUsername = username ? `@${username.toLowerCase().replace(/\s+/g, '')}` : '';
+
   // Update states when props change
   useEffect(() => {
     setCurrentUsername(username);
@@ -111,7 +114,7 @@ const ProfileCard = ({
     setCurrentBio(newBio);
   };
 
-  // Combine local changes with parent component changes
+  // Combine local changes with Parent Component Changes
   const combinedHasChanges = hasChanges || localHasChanges;
 
   return (
@@ -138,6 +141,10 @@ const ProfileCard = ({
               </button>
             )}
           </div>
+          
+          {/* Username display with @ symbol */}
+          <div className="text-sm text-gray-500 mb-2">{formattedUsername}</div>
+          
           <p className="text-gray-600 mb-4 text-sm text-center">{currentBio}</p>
           
           <ProfileActions 
