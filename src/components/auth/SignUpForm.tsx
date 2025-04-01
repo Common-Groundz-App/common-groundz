@@ -7,14 +7,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { UserIcon, KeyIcon, User, UserCircle, AtSign } from 'lucide-react';
+import { UserIcon, KeyIcon, User, UserCircle } from 'lucide-react';
 
 const SignUpForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
@@ -30,8 +29,7 @@ const SignUpForm = () => {
       
       const { error, user } = await signUp(email, password, {
         firstName: formattedFirstName,
-        lastName: formattedLastName,
-        username: username.toLowerCase().trim() // Store username in lowercase without spaces
+        lastName: formattedLastName
       });
       
       if (error) throw error;
@@ -88,20 +86,6 @@ const SignUpForm = () => {
                   className="pl-10 border-input"
                 />
               </div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="signup-username">Username</Label>
-            <div className="relative">
-              <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                id="signup-username" 
-                placeholder="johndoe" 
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                className="pl-10 border-input"
-              />
             </div>
           </div>
           <div className="space-y-2">
