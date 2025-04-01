@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,7 +22,6 @@ const SignUpForm = () => {
   const navigate = useNavigate();
 
   const validateUsername = (value: string) => {
-    // Check format: 3-20 characters, letters, numbers, dots, underscores, lowercase only
     if (!value) return 'Username is required';
     if (value !== value.toLowerCase()) return 'Username must be lowercase';
     if (value.length < 3) return 'Username must be at least 3 characters';
@@ -74,7 +72,6 @@ const SignUpForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Final username validation
     const formatError = validateUsername(username);
     if (formatError) {
       setUsernameError(formatError);
@@ -83,7 +80,6 @@ const SignUpForm = () => {
     
     setIsLoading(true);
     
-    // Check username uniqueness one last time before submitting
     const isUnique = await checkUsernameUniqueness(username);
     if (!isUnique) {
       setIsLoading(false);
@@ -91,7 +87,6 @@ const SignUpForm = () => {
     }
     
     try {
-      // Capitalize first letter of names
       const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
       const formattedLastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
       
@@ -127,27 +122,6 @@ const SignUpForm = () => {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="signup-username">Username</Label>
-            <div className="relative">
-              <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                id="signup-username" 
-                placeholder="username" 
-                value={username}
-                onChange={handleUsernameChange}
-                required
-                className={`pl-10 ${usernameError ? 'border-red-500' : ''}`}
-              />
-            </div>
-            {usernameError && (
-              <p className="text-red-500 text-xs mt-1">{usernameError}</p>
-            )}
-            {isCheckingUsername && (
-              <p className="text-gray-500 text-xs mt-1">Checking username availability...</p>
-            )}
-          </div>
-          
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="space-y-2 flex-1">
               <Label htmlFor="signup-firstname">First Name</Label>
@@ -206,6 +180,26 @@ const SignUpForm = () => {
                 className="pl-10"
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="signup-username">Username</Label>
+            <div className="relative">
+              <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                id="signup-username" 
+                placeholder="username" 
+                value={username}
+                onChange={handleUsernameChange}
+                required
+                className={`pl-10 ${usernameError ? 'border-red-500' : ''}`}
+              />
+            </div>
+            {usernameError && (
+              <p className="text-red-500 text-xs mt-1">{usernameError}</p>
+            )}
+            {isCheckingUsername && (
+              <p className="text-gray-500 text-xs mt-1">Checking username availability...</p>
+            )}
           </div>
         </CardContent>
         <CardFooter>
