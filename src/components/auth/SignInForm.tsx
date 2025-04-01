@@ -54,7 +54,7 @@ const SignInForm = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="pl-10 border-input"
+                className="pl-10"
               />
             </div>
           </div>
@@ -68,7 +68,7 @@ const SignInForm = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="pl-10 border-input"
+                className="pl-10"
               />
             </div>
           </div>

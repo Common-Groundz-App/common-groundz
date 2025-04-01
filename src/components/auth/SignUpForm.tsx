@@ -69,7 +69,7 @@ const SignUpForm = () => {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
-                  className="pl-10 border-input"
+                  className="pl-10"
                 />
               </div>
             </div>
@@ -83,7 +83,7 @@ const SignUpForm = () => {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   required
-                  className="pl-10 border-input"
+                  className="pl-10"
                 />
               </div>
             </div>
@@ -99,7 +99,7 @@ const SignUpForm = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="pl-10 border-input"
+                className="pl-10"
               />
             </div>
           </div>
@@ -113,7 +113,7 @@ const SignUpForm = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="pl-10 border-input"
+                className="pl-10"
               />
             </div>
           </div>
