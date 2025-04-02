@@ -58,6 +58,7 @@ const UsernameField = ({
       {isCheckingUsername && (
         <p className="text-gray-500 text-xs mt-1">Checking username availability...</p>
       )}
+      <p className="text-xs text-gray-500">Username must be lowercase, contain only letters, numbers, dots, and underscores.</p>
     </div>
   );
 };

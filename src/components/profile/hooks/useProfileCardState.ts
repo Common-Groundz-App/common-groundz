@@ -33,7 +33,9 @@ export const useProfileCardState = ({
     setCurrentUsername(username);
     setCurrentBio(bio);
     setCurrentLocation(location);
-  }, [username, bio, location]);
+    setFirstName(firstName);
+    setLastName(lastName);
+  }, [username, bio, location, firstName, lastName]);
 
   // Check if there are changes to save
   useEffect(() => {
@@ -47,12 +49,15 @@ export const useProfileCardState = ({
     newFirstName: string,
     newLastName: string
   ) => {
-    setCurrentUsername(newUsername);
+    // Ensure username is lowercase
+    const lowercaseUsername = newUsername.toLowerCase();
+    
+    setCurrentUsername(lowercaseUsername);
     setCurrentBio(newBio);
     setCurrentLocation(newLocation);
     setFirstName(newFirstName);
     setLastName(newLastName);
-    setDatabaseUsername(newUsername);
+    setDatabaseUsername(lowercaseUsername);
   };
 
   return {

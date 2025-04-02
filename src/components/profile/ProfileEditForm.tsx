@@ -56,15 +56,23 @@ const ProfileEditForm = ({
     }
   });
 
-  // Store the initial username to check if it was changed
+  // Reset form values when props change or dialog opens
   useEffect(() => {
     if (isOpen) {
+      form.reset({
+        username: username || '',
+        bio: bio || '',
+        location: location || '',
+        firstName: firstName || '',
+        lastName: lastName || ''
+      });
       setInitialUsername(username);
       setUsernameError('');
     }
-  }, [isOpen, username]);
+  }, [isOpen, username, bio, location, firstName, lastName, form]);
 
   const handleUsernameChange = async (value: string) => {
+    // Force lowercase
     const newValue = value.toLowerCase();
     
     // Only validate if username has changed from initial value
@@ -88,6 +96,9 @@ const ProfileEditForm = ({
   };
 
   const onSubmit = async (data: FormValues) => {
+    // Ensure username is lowercase
+    data.username = data.username.toLowerCase();
+    
     if (usernameError) {
       toast({
         title: 'Invalid username',
@@ -199,9 +210,11 @@ const ProfileEditForm = ({
                     <Input 
                       placeholder="Username" 
                       {...field} 
+                      value={field.value.toLowerCase()}
                       onChange={(e) => {
-                        field.onChange(e);
-                        handleUsernameChange(e.target.value);
+                        const lowercaseValue = e.target.value.toLowerCase();
+                        field.onChange(lowercaseValue);
+                        handleUsernameChange(lowercaseValue);
                       }}
                       className={usernameError ? 'border-red-500' : ''}
                     />
