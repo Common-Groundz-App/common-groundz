@@ -11,8 +11,8 @@ export const useProfileMetadata = () => {
 
   // Set profile metadata from user and profile data
   const setProfileMetadata = (userMetadata: any, profileData: any) => {
-    // Set location from metadata or use default
-    setLocation(userMetadata?.location || 'Add your location');
+    // Set location from profile data or metadata or use default
+    setLocation(profileData?.location || userMetadata?.location || '');
     
     // Set bio if available
     if (profileData?.bio !== undefined && profileData?.bio !== null) {
@@ -43,6 +43,7 @@ export const useProfileMetadata = () => {
     bio,
     setBio,
     location,
+    setLocation,
     memberSince,
     followingCount,
     followerCount,

@@ -48,13 +48,16 @@ const ProfileCard = (props: ProfileCardProps) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentUsername, setCurrentUsername] = useState(username);
   const [currentBio, setCurrentBio] = useState(bio);
+  const [currentLocation, setCurrentLocation] = useState(location);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [tempProfileImage, setTempProfileImage] = useState<string | null>(null);
   const [localHasChanges, setLocalHasChanges] = useState(false);
   const [databaseUsername, setDatabaseUsername] = useState<string>('');
 
-  // Get the actual username from the database
+  // Get the actual username from the database and user metadata
   useEffect(() => {
-    const fetchUsername = async () => {
+    const fetchUserData = async () => {
       if (!profileUserId) return;
 
       try {
@@ -72,13 +75,20 @@ const ProfileCard = (props: ProfileCardProps) => {
         if (data && data.username) {
           setDatabaseUsername(data.username);
         }
+        
+        // Get user metadata for first/last name
+        if (user && isOwnProfile) {
+          const userMetadata = user.user_metadata;
+          setFirstName(userMetadata?.first_name || '');
+          setLastName(userMetadata?.last_name || '');
+        }
       } catch (error) {
         console.error('Error:', error);
       }
     };
 
-    fetchUsername();
-  }, [profileUserId]);
+    fetchUserData();
+  }, [profileUserId, user, isOwnProfile]);
 
   // Format username for display (use database username if available)
   const formattedUsername = databaseUsername 
@@ -89,7 +99,8 @@ const ProfileCard = (props: ProfileCardProps) => {
   useEffect(() => {
     setCurrentUsername(username);
     setCurrentBio(bio);
-  }, [username, bio]);
+    setCurrentLocation(location);
+  }, [username, bio, location]);
 
   // Check if there are changes to save
   useEffect(() => {
@@ -143,20 +154,35 @@ const ProfileCard = (props: ProfileCardProps) => {
     }
   };
 
-  const handleProfileUpdate = (newUsername: string, newBio: string) => {
+  const handleProfileUpdate = (
+    newUsername: string, 
+    newBio: string, 
+    newLocation: string, 
+    newFirstName: string, 
+    newLastName: string
+  ) => {
     setCurrentUsername(newUsername);
     setCurrentBio(newBio);
+    setCurrentLocation(newLocation);
+    setFirstName(newFirstName);
+    setLastName(newLastName);
+    setDatabaseUsername(newUsername);
   };
 
   // Combine local changes with Parent Component Changes
   const combinedHasChanges = hasChanges || localHasChanges;
+
+  // Build display name from first/last name or username
+  const displayName = firstName || lastName 
+    ? `${firstName} ${lastName}`.trim() 
+    : currentUsername;
 
   return (
     <>
       <Card className="relative bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="p-6 flex flex-col items-center">
           <ProfileAvatar 
-            username={currentUsername}
+            username={displayName}
             profileImage={profileImage}
             isLoading={isLoading}
             onProfileImageChange={onProfileImageChange}
@@ -165,7 +191,7 @@ const ProfileCard = (props: ProfileCardProps) => {
           />
           
           <ProfileUserInfo 
-            username={currentUsername}
+            username={displayName}
             bio={currentBio}
             isOwnProfile={isOwnProfile}
             formattedUsername={formattedUsername}
@@ -182,7 +208,7 @@ const ProfileCard = (props: ProfileCardProps) => {
           />
           
           <ProfileInfo 
-            location={location}
+            location={currentLocation}
             memberSince={memberSince}
             followingCount={followingCount}
             followerCount={followerCount}
@@ -194,8 +220,11 @@ const ProfileCard = (props: ProfileCardProps) => {
         <ProfileEditForm 
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          username={currentUsername}
+          username={databaseUsername || currentUsername}
           bio={currentBio}
+          location={currentLocation}
+          firstName={firstName}
+          lastName={lastName}
           onProfileUpdate={handleProfileUpdate}
         />
       )}
