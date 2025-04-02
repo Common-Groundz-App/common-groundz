@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Button } from "@/components/ui/button";
 import { Edit } from 'lucide-react';
 
 interface ProfileUserInfoProps {
@@ -7,37 +8,38 @@ interface ProfileUserInfoProps {
   bio: string;
   isOwnProfile: boolean;
   formattedUsername?: string;
-  onEditClick: () => void;
+  onEditClick?: () => void;
 }
 
 const ProfileUserInfo = ({ 
   username, 
   bio, 
   isOwnProfile, 
-  formattedUsername, 
-  onEditClick 
+  formattedUsername,
+  onEditClick
 }: ProfileUserInfoProps) => {
   return (
-    <>
-      <div className="flex items-center mb-2">
-        <h2 className="text-xl font-bold text-gray-900">{username}</h2>
-        {isOwnProfile && (
-          <button 
+    <div className="w-full text-center mb-6">
+      <div className="flex items-center justify-center">
+        <h2 className="text-xl md:text-2xl font-bold">{username}</h2>
+        {isOwnProfile && onEditClick && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 ml-1" 
             onClick={onEditClick}
-            className="ml-2 text-gray-500 hover:text-brand-orange"
           >
-            <Edit size={18} />
-          </button>
+            <Edit size={16} />
+          </Button>
         )}
       </div>
       
-      {/* Username display with @ symbol */}
       {formattedUsername && (
-        <div className="text-sm text-gray-500 mb-2">{formattedUsername}</div>
+        <p className="text-sm text-gray-500 mb-2">{formattedUsername}</p>
       )}
       
-      <p className="text-gray-600 mb-4 text-sm text-center">{bio}</p>
-    </>
+      <p className="text-gray-600">{bio || 'No bio yet'}</p>
+    </div>
   );
 };
 
