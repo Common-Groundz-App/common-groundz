@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserPlus, UserMinus, UserCheck } from 'lucide-react';
+import { UserPlus, UserMinus, UserCheck, MessageSquare } from 'lucide-react';
 
 interface UserCardProps {
   id: string;
@@ -42,9 +42,15 @@ const UserCard = ({
   
   // Determine if this user follows the current user (for "Follow Back" logic)
   const isFollower = relationshipType === 'follower';
+  const isViewingOwnUser = currentUserId === id;
   
-  // Get the follow button text and style based on relationship
+  // Get the follow button props based on relationship
   const getFollowButtonProps = () => {
+    // Don't show any follow button if viewing your own card
+    if (isViewingOwnUser) {
+      return null;
+    }
+    
     // User is already following this person
     if (isFollowing) {
       return {
@@ -74,7 +80,22 @@ const UserCard = ({
     };
   };
   
+  // Get message button for following cards on own profile
+  const getMessageButton = () => {
+    // Show message button when viewing people you follow on your own profile
+    if (isOwnProfile && relationshipType === 'following' && !isViewingOwnUser) {
+      return {
+        variant: "outline",
+        text: "Message",
+        icon: <MessageSquare size={14} className="mr-1" />,
+        className: "min-w-20"
+      };
+    }
+    return null;
+  };
+  
   const followButtonProps = getFollowButtonProps();
+  const messageButtonProps = getMessageButton();
 
   return (
     <div className="py-3 px-4 flex items-center justify-between">
@@ -94,19 +115,35 @@ const UserCard = ({
         </div>
       </div>
       
-      {currentUserId && currentUserId !== id && !isOwnProfile && (
-        <Button 
-          variant={followButtonProps.variant as any}
-          size="sm"
-          onClick={() => onFollowToggle(id, !!isFollowing)}
-          disabled={isLoading}
-          className={followButtonProps.className}
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => setIsHovering(false)}
-        >
-          {followButtonProps.icon}
-          {followButtonProps.text}
-        </Button>
+      {/* Action buttons */}
+      {currentUserId && (
+        <>
+          {messageButtonProps && (
+            <Button 
+              variant={messageButtonProps.variant as any}
+              size="sm"
+              className={messageButtonProps.className}
+            >
+              {messageButtonProps.icon}
+              {messageButtonProps.text}
+            </Button>
+          )}
+          
+          {followButtonProps && (
+            <Button 
+              variant={followButtonProps.variant as any}
+              size="sm"
+              onClick={() => onFollowToggle(id, !!isFollowing)}
+              disabled={isLoading}
+              className={followButtonProps.className}
+              onMouseEnter={() => setIsHovering(true)}
+              onMouseLeave={() => setIsHovering(false)}
+            >
+              {followButtonProps.icon}
+              {followButtonProps.text}
+            </Button>
+          )}
+        </>
       )}
     </div>
   );
