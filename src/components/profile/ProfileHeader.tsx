@@ -13,6 +13,7 @@ interface ProfileHeaderProps {
   location: string;
   memberSince: string;
   followingCount: number;
+  followerCount?: number;
   profileImage: string;
   onProfileImageChange: (url: string) => void;
   hasChanges: boolean;
@@ -31,6 +32,7 @@ const ProfileHeader = ({
   location,
   memberSince,
   followingCount,
+  followerCount = 0,
   profileImage,
   onProfileImageChange,
   hasChanges,
@@ -50,7 +52,8 @@ const ProfileHeader = ({
               bio={bio} 
               location={location} 
               memberSince={memberSince} 
-              followingCount={followingCount} 
+              followingCount={followingCount}
+              followerCount={followerCount}
               profileImage={profileImage} 
               isLoading={isLoading} 
               onProfileImageChange={onProfileImageChange} 

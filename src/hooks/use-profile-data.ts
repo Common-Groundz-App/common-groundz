@@ -12,9 +12,10 @@ export const useProfileData = () => {
   const [profileImage, setProfileImage] = useState<string>('');
   const [username, setUsername] = useState<string>('');
   const [bio, setBio] = useState<string>('Food Enthusiast');
-  const [location, setLocation] = useState<string>('New York, NY');
-  const [memberSince, setMemberSince] = useState<string>('January 2021');
-  const [followingCount, setFollowingCount] = useState<number>(120);
+  const [location, setLocation] = useState<string>('');
+  const [memberSince, setMemberSince] = useState<string>('');
+  const [followingCount, setFollowingCount] = useState<number>(0);
+  const [followerCount, setFollowerCount] = useState<number>(0);
   const [tempCoverImage, setTempCoverImage] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   
@@ -67,6 +68,20 @@ export const useProfileData = () => {
             setBio(data.bio);
           }
           
+          // Set location from metadata or use default
+          setLocation(userMetadata?.location || 'Add your location');
+          
+          // Format the created_at date for member since
+          if (data.created_at) {
+            const createdDate = new Date(data.created_at);
+            setMemberSince(createdDate.toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: 'long'
+            }));
+          } else {
+            setMemberSince('Recently joined');
+          }
+          
           // Set profile and cover images if available
           if (data.avatar_url) {
             // Add timestamp to force browser to reload the image
@@ -80,6 +95,26 @@ export const useProfileData = () => {
             setCoverImage(data.cover_url + '?t=' + new Date().getTime());
           } else {
             setCoverImage(defaultCoverImage);
+          }
+          
+          // Fetch following count
+          const { data: followingData, error: followingError } = await supabase
+            .from('follows')
+            .select('*', { count: 'exact' })
+            .eq('follower_id', user.id);
+            
+          if (!followingError) {
+            setFollowingCount(followingData?.length || 0);
+          }
+          
+          // Fetch followers count
+          const { data: followerData, error: followerError } = await supabase
+            .from('follows')
+            .select('*', { count: 'exact' })
+            .eq('following_id', user.id);
+            
+          if (!followerError) {
+            setFollowerCount(followerData?.length || 0);
           }
         }
       } catch (error) {
@@ -176,6 +211,7 @@ export const useProfileData = () => {
     location,
     memberSince,
     followingCount,
+    followerCount,
     hasChanges,
     handleProfileImageChange,
     handleCoverImageChange,

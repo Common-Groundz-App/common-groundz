@@ -16,6 +16,7 @@ interface ProfileCardProps {
   location: string;
   memberSince: string;
   followingCount: number;
+  followerCount?: number;
   profileImage: string;
   isLoading: boolean;
   onProfileImageChange?: (url: string) => void;
@@ -30,7 +31,8 @@ const ProfileCard = ({
   bio, 
   location, 
   memberSince, 
-  followingCount, 
+  followingCount,
+  followerCount = 0, 
   profileImage,
   isLoading,
   onProfileImageChange,
@@ -191,6 +193,7 @@ const ProfileCard = ({
             location={location}
             memberSince={memberSince}
             followingCount={followingCount}
+            followerCount={followerCount}
           />
         </div>
       </Card>
