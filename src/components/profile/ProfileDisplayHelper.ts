@@ -1,22 +1,21 @@
 
-import { User } from '@supabase/supabase-js';
-
 export const getFormattedDisplayName = (
-  isOwnProfile: boolean, 
-  firstName: string, 
-  lastName: string, 
+  isOwnProfile: boolean,
+  firstName: string,
+  lastName: string,
   username: string,
   otherUserProfile: any
 ): string => {
-  if (!isOwnProfile && otherUserProfile) {
-    return otherUserProfile.username || 'User';
+  // For own profile, use first/last name if available
+  if (isOwnProfile) {
+    return firstName || lastName 
+      ? `${firstName} ${lastName}`.trim() 
+      : username;
+  }
+  // For other user's profile, prioritize their username from the database
+  else if (otherUserProfile) {
+    return otherUserProfile.username || username;
   }
   
-  if (firstName || lastName) {
-    return `${firstName} ${lastName}`.trim();
-  } else if (username) {
-    return username;
-  } else {
-    return 'User';
-  }
+  return username;
 };

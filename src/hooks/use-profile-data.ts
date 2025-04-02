@@ -4,13 +4,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useProfileImages } from '@/hooks/use-profile-images';
 import { useProfileMetadata } from '@/hooks/use-profile-metadata';
-import { useProfileCounts } from '@/hooks/use-profile-counts';
-import { useProfileSave } from '@/hooks/use-profile-save';
-import { fetchUserProfile, getDisplayName } from '@/services/profileService';
+import { 
+  fetchUserProfile, 
+  fetchFollowingCount, 
+  fetchFollowerCount, 
+  updateUserProfile,
+  getDisplayName
+} from '@/services/profileService';
 
 export const useProfileData = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [followerCount, setFollowerCount] = useState<number>(0);
   
   // Default cover image with a nice pattern
   const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80';
@@ -20,12 +26,12 @@ export const useProfileData = () => {
     coverImage,
     profileImage,
     tempCoverImage,
-    hasChanges: imageHasChanges,
+    hasChanges,
     handleProfileImageChange,
     handleCoverImageChange,
     handleCoverImageUpdated,
     setInitialImages,
-    setHasChanges: setImageHasChanges
+    setHasChanges
   } = useProfileImages({ defaultCoverImage });
 
   const {
@@ -34,25 +40,11 @@ export const useProfileData = () => {
     bio,
     location,
     memberSince,
-    setProfileMetadata
-  } = useProfileMetadata();
-
-  const {
-    followerCount,
     followingCount,
-    fetchCounts
-  } = useProfileCounts(user?.id);
-
-  const {
-    hasChanges: saveHasChanges,
-    setHasChanges: setSaveHasChanges,
-    handleSaveChanges
-  } = useProfileSave(user?.id);
-  
-  // Check for changes that need to be saved
-  useEffect(() => {
-    setSaveHasChanges(!!tempCoverImage);
-  }, [tempCoverImage, setSaveHasChanges]);
+    setFollowingCount,
+    setProfileMetadata,
+    updateCounts
+  } = useProfileMetadata();
   
   // Fetch user profile data
   useEffect(() => {
@@ -82,7 +74,12 @@ export const useProfileData = () => {
           setInitialImages(profileData);
           
           // Fetch following and follower counts
-          await fetchCounts(user.id);
+          const followingData = await fetchFollowingCount(user.id);
+          const followerData = await fetchFollowerCount(user.id);
+          
+          // Update counts
+          setFollowingCount(followingData);
+          setFollowerCount(followerData);
         }
       } catch (error) {
         console.error('Error:', error);
@@ -92,26 +89,107 @@ export const useProfileData = () => {
     };
     
     fetchProfile();
-  }, [user, setInitialImages, setProfileMetadata, setUsername, fetchCounts]);
+  }, [user]);
+
+  // Listen for follow status changes
+  useEffect(() => {
+    const handleFollowStatusChange = async (event: CustomEvent) => {
+      if (!user) return;
+      
+      const { follower, following, action } = event.detail;
+      
+      // If this is the current user's profile and someone followed/unfollowed them
+      if (user.id === following) {
+        // Update follower count
+        const updatedFollowerCount = action === 'follow' 
+          ? followerCount + 1 
+          : Math.max(0, followerCount - 1);
+        
+        setFollowerCount(updatedFollowerCount);
+      }
+      
+      // If this is the current user and they followed/unfollowed someone else
+      if (user.id === follower) {
+        // Fetch latest following count for accuracy
+        const followingData = await fetchFollowingCount(user.id);
+        setFollowingCount(followingData);
+      }
+    };
+
+    // Listen for specific follower count update events
+    const handleFollowerCountChanged = (event: CustomEvent) => {
+      if (event.detail && typeof event.detail.count === 'number') {
+        setFollowerCount(event.detail.count);
+      }
+    };
+
+    // Listen for specific following count update events
+    const handleFollowingCountChanged = (event: CustomEvent) => {
+      if (event.detail && typeof event.detail.count === 'number') {
+        setFollowingCount(event.detail.count);
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+    window.addEventListener('profile-follower-count-changed', handleFollowerCountChanged as EventListener);
+    window.addEventListener('profile-following-count-changed', handleFollowingCountChanged as EventListener);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+      window.removeEventListener('profile-follower-count-changed', handleFollowerCountChanged as EventListener);
+      window.removeEventListener('profile-following-count-changed', handleFollowingCountChanged as EventListener);
+    };
+  }, [user, followerCount]);
+
+  // Check for changes that need to be saved
+  useEffect(() => {
+    setHasChanges(!!tempCoverImage);
+  }, [tempCoverImage]);
 
   // Save all profile changes
-  const saveChanges = async () => {
+  const handleSaveChanges = async () => {
     if (!user) return;
     
-    // Prepare update object
-    const updates: any = {};
-    
-    // Add cover image if it was changed
-    if (tempCoverImage) {
-      updates.cover_url = tempCoverImage;
+    try {
+      setIsLoading(true);
+      
+      // Prepare update object
+      const updates: any = {};
+      
+      // Add cover image if it was changed
+      if (tempCoverImage) {
+        updates.cover_url = tempCoverImage;
+      }
+      
+      // Only update if we have changes
+      if (Object.keys(updates).length > 0) {
+        await updateUserProfile(user.id, updates);
+        
+        // Clear temporary state
+        setHasChanges(false);
+        
+        // Notify user
+        toast({
+          title: 'Profile updated',
+          description: 'Your profile has been successfully updated.'
+        });
+        
+        // Refresh the UserMenu
+        window.dispatchEvent(new CustomEvent('profile-updated'));
+      }
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      toast({
+        title: 'Update failed',
+        description: error.message || 'There was a problem updating your profile',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Only update if we have changes
-    await handleSaveChanges(updates);
   };
-
-  // Combined hasChanges from both image changes and other changes
-  const hasChanges = imageHasChanges || saveHasChanges;
 
   return {
     isLoading,
@@ -127,6 +205,6 @@ export const useProfileData = () => {
     handleProfileImageChange,
     handleCoverImageChange,
     handleCoverImageUpdated,
-    handleSaveChanges: saveChanges
+    handleSaveChanges
   };
 };

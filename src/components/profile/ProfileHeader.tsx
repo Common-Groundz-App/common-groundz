@@ -20,7 +20,6 @@ interface ProfileHeaderProps {
   onSaveChanges: () => void;
   isOwnProfile: boolean;
   profileUserId?: string;
-  otherUserProfile?: any;
 }
 
 const ProfileHeader = ({
@@ -39,45 +38,34 @@ const ProfileHeader = ({
   hasChanges,
   onSaveChanges,
   isOwnProfile,
-  profileUserId,
-  otherUserProfile
+  profileUserId
 }: ProfileHeaderProps) => {
-  return (
-    <>
-      <ProfileCoverImage 
-        coverImage={coverImage} 
-        isLoading={isLoading} 
-        onCoverImageChange={isOwnProfile ? onCoverImageChange : undefined} 
-        onCoverImageUpdated={isOwnProfile ? onCoverImageUpdated : undefined} 
-        isEditable={isOwnProfile}
-      />
+  return <>
+      <ProfileCoverImage coverImage={coverImage} isLoading={isLoading} onCoverImageChange={onCoverImageChange} onCoverImageUpdated={onCoverImageUpdated} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24">
         <div className="flex flex-col md:flex-row gap-6 items-start">
-          <div className="w-full flex justify-center md:justify-start md:w-[300px] flex-shrink-0">
-            <div className="w-full max-w-[300px] md:w-full">
-              <ProfileCard 
-                username={username} 
-                bio={bio} 
-                location={location} 
-                memberSince={memberSince} 
-                followingCount={followingCount} 
-                followerCount={followerCount} 
-                profileImage={profileImage} 
-                isLoading={isLoading} 
-                onProfileImageChange={isOwnProfile ? onProfileImageChange : undefined} 
-                hasChanges={isOwnProfile ? hasChanges : false} 
-                onSaveChanges={isOwnProfile ? onSaveChanges : undefined} 
-                isOwnProfile={isOwnProfile}
-                profileUserId={profileUserId}
-                otherUserProfile={!isOwnProfile ? otherUserProfile : null}
-              />
-            </div>
+          {/* Profile Card - fixed width */}
+          <div className="md:w-[300px] flex-shrink-0">
+            <ProfileCard 
+              username={username} 
+              bio={bio} 
+              location={location} 
+              memberSince={memberSince} 
+              followingCount={followingCount}
+              followerCount={followerCount}
+              profileImage={profileImage} 
+              isLoading={isLoading} 
+              onProfileImageChange={onProfileImageChange} 
+              hasChanges={hasChanges} 
+              onSaveChanges={onSaveChanges} 
+              isOwnProfile={isOwnProfile}
+              profileUserId={profileUserId}
+            />
           </div>
         </div>
       </div>
-    </>
-  );
+    </>;
 };
 
 export default ProfileHeader;
