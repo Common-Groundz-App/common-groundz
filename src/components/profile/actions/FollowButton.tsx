@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { UserPlus, UserMinus } from 'lucide-react';
+import { UserPlus, UserMinus, UserCheck } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface FollowButtonProps {
@@ -16,17 +16,29 @@ const FollowButton = ({
   onFollowToggle 
 }: FollowButtonProps) => {
   const isMobile = useIsMobile();
+  const [isHovering, setIsHovering] = useState(false);
   
   return (
     <Button 
       size={isMobile ? "sm" : "default"} 
-      className={isFollowing ? "bg-gray-600 hover:bg-gray-700" : "bg-brand-orange hover:bg-brand-orange/90"}
+      className={
+        isFollowing 
+          ? `${isHovering ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'} transition-colors duration-200` 
+          : "bg-brand-orange hover:bg-brand-orange/90 transition-all transform hover:scale-105"
+      }
       onClick={onFollowToggle}
       disabled={isLoading}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
       {isFollowing ? (
         <>
-          <UserMinus size={16} className="mr-1" /> Unfollow
+          {isHovering ? (
+            <UserMinus size={16} className="mr-1" />
+          ) : (
+            <UserCheck size={16} className="mr-1" />
+          )}
+          {isHovering ? 'Unfollow' : 'Following'}
         </>
       ) : (
         <>

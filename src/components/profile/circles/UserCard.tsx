@@ -70,7 +70,7 @@ const UserCard = ({
         variant: "default",
         text: "Follow Back",
         icon: <UserPlus size={14} className="mr-1" />,
-        className: "min-w-22 bg-brand-orange hover:bg-brand-orange/90"
+        className: "min-w-22 bg-brand-orange hover:bg-brand-orange/90 transition-all transform hover:scale-105"
       };
     }
     
@@ -79,7 +79,7 @@ const UserCard = ({
       variant: "default",
       text: "Follow",
       icon: <UserPlus size={14} className="mr-1" />,
-      className: "min-w-20"
+      className: "min-w-20 transition-all transform hover:scale-105"
     };
   };
   
@@ -100,6 +100,8 @@ const UserCard = ({
     }
   };
 
+  const formattedUsername = username ? `@${username.toLowerCase().replace(/\s+/g, '')}` : '@user';
+
   return (
     <Link to={`/profile/${id}`} className="block" onClick={handleCardClick}>
       <div className="py-3 px-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
@@ -115,7 +117,7 @@ const UserCard = ({
           </Avatar>
           <div className="ml-3">
             <div className="font-medium">{username || 'User'}</div>
-            <div className="text-xs text-gray-500">@{username?.toLowerCase().replace(/\s+/g, '') || 'user'}</div>
+            <div className="text-xs text-gray-500">{formattedUsername}</div>
           </div>
         </div>
         

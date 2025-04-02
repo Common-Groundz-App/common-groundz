@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
@@ -51,6 +52,10 @@ const ProfileCard = (props: ProfileCardProps) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [mutualFollowers, setMutualFollowers] = useState<{count: number, examples: string[]}>({
+    count: 0,
+    examples: []
+  });
 
   const {
     currentUsername,
@@ -119,6 +124,53 @@ const ProfileCard = (props: ProfileCardProps) => {
     fetchUserData();
   }, [profileUserId, user, isOwnProfile, otherUserProfile]);
 
+  // Fetch mutual followers when viewing someone else's profile
+  useEffect(() => {
+    const fetchMutualFollows = async () => {
+      if (isOwnProfile || !user || !profileUserId || !user.id) return;
+      
+      try {
+        // Get users that the current user follows
+        const { data: following, error: followingError } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+        
+        if (followingError) throw followingError;
+        
+        if (!following || following.length === 0) return;
+        
+        const followingIds = following.map(f => f.following_id);
+        
+        // Get users that follow the profile user and are also followed by current user
+        const { data: mutuals, error: mutualsError } = await supabase
+          .from('follows')
+          .select('follower_id, profiles:follower_id(username)')
+          .eq('following_id', profileUserId)
+          .in('follower_id', followingIds);
+        
+        if (mutualsError) throw mutualsError;
+        
+        if (mutuals && mutuals.length > 0) {
+          // Extract usernames of up to 3 mutual followers
+          const exampleUsernames = mutuals
+            .slice(0, 3)
+            .map(m => (m.profiles as any)?.username || '')
+            .filter(Boolean);
+          
+          setMutualFollowers({
+            count: mutuals.length,
+            examples: exampleUsernames
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching mutual followers:', error);
+      }
+    };
+    
+    fetchMutualFollows();
+  }, [isOwnProfile, profileUserId, user]);
+
   const formattedUsername = databaseUsername 
     ? `@${databaseUsername}` 
     : '';
@@ -152,6 +204,7 @@ const ProfileCard = (props: ProfileCardProps) => {
             isOwnProfile={isOwnProfile}
             formattedUsername={formattedUsername}
             onEditClick={isOwnProfile ? () => setIsEditModalOpen(true) : undefined}
+            mutualFollows={!isOwnProfile ? mutualFollowers : undefined}
           />
           
           <ProfileBadges isOwnProfile={isOwnProfile} />
