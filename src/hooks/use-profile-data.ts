@@ -1,26 +1,49 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useProfileImages } from '@/hooks/use-profile-images';
+import { useProfileMetadata } from '@/hooks/use-profile-metadata';
+import { 
+  fetchUserProfile, 
+  fetchFollowingCount, 
+  fetchFollowerCount, 
+  updateUserProfile,
+  getDisplayName
+} from '@/services/profileService';
 
 export const useProfileData = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [coverImage, setCoverImage] = useState<string>('');
-  const [profileImage, setProfileImage] = useState<string>('');
-  const [username, setUsername] = useState<string>('');
-  const [bio, setBio] = useState<string>('Food Enthusiast');
-  const [location, setLocation] = useState<string>('');
-  const [memberSince, setMemberSince] = useState<string>('');
-  const [followingCount, setFollowingCount] = useState<number>(0);
-  const [followerCount, setFollowerCount] = useState<number>(0);
-  const [tempCoverImage, setTempCoverImage] = useState<string | null>(null);
-  const [hasChanges, setHasChanges] = useState(false);
   
   // Default cover image with a nice pattern
   const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80';
+  
+  // Use the extracted hooks
+  const {
+    coverImage,
+    profileImage,
+    tempCoverImage,
+    hasChanges,
+    handleProfileImageChange,
+    handleCoverImageChange,
+    handleCoverImageUpdated,
+    setInitialImages,
+    setHasChanges
+  } = useProfileImages({ defaultCoverImage });
+
+  const {
+    username,
+    setUsername,
+    bio,
+    location,
+    memberSince,
+    followingCount,
+    followerCount,
+    setProfileMetadata,
+    updateCounts
+  } = useProfileMetadata();
   
   // Fetch user profile data
   useEffect(() => {
@@ -31,91 +54,30 @@ export const useProfileData = () => {
         setIsLoading(true);
         
         // Get profile data from profiles table
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+        const profileData = await fetchUserProfile(user.id);
         
-        if (error) {
-          console.error('Error fetching profile:', error);
-          return;
-        }
-        
-        if (data) {
-          console.log('Profile data loaded:', data);
+        if (profileData) {
+          console.log('Profile data loaded:', profileData);
           
           // Get user metadata from auth
           const userMetadata = user.user_metadata;
-          const firstName = userMetadata?.first_name || '';
-          const lastName = userMetadata?.last_name || '';
           
-          // Set display name using first and last name if available
-          let displayName = '';
-          if (firstName || lastName) {
-            displayName = `${firstName} ${lastName}`.trim();
-            setUsername(displayName);
-          } else if (data.username) {
-            // Use username as display name if no first/last name
-            setUsername(data.username);
-          } else {
-            // Fallback to email name if no username
-            setUsername(user.email?.split('@')[0] || 'User');
-          }
+          // Set display name
+          const displayName = getDisplayName(user, profileData);
+          setUsername(displayName);
           
-          // Set bio if available
-          if (data.bio !== undefined && data.bio !== null) {
-            setBio(data.bio);
-          }
+          // Set profile metadata
+          setProfileMetadata(userMetadata, profileData);
           
-          // Set location from metadata or use default
-          setLocation(userMetadata?.location || 'Add your location');
+          // Set profile and cover images
+          setInitialImages(profileData);
           
-          // Format the created_at date for member since
-          if (data.created_at) {
-            const createdDate = new Date(data.created_at);
-            setMemberSince(createdDate.toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'long'
-            }));
-          } else {
-            setMemberSince('Recently joined');
-          }
+          // Fetch following and follower counts
+          const followingData = await fetchFollowingCount(user.id);
+          const followerData = await fetchFollowerCount(user.id);
           
-          // Set profile and cover images if available
-          if (data.avatar_url) {
-            // Add timestamp to force browser to reload the image
-            setProfileImage(data.avatar_url + '?t=' + new Date().getTime());
-          } else {
-            setProfileImage(''); // Empty string to trigger initials avatar
-          }
-          
-          if (data.cover_url) {
-            // Add timestamp to force browser to reload the image
-            setCoverImage(data.cover_url + '?t=' + new Date().getTime());
-          } else {
-            setCoverImage(defaultCoverImage);
-          }
-          
-          // Fetch following count
-          const { data: followingData, error: followingError } = await supabase
-            .from('follows')
-            .select('*', { count: 'exact' })
-            .eq('follower_id', user.id);
-            
-          if (!followingError) {
-            setFollowingCount(followingData?.length || 0);
-          }
-          
-          // Fetch followers count
-          const { data: followerData, error: followerError } = await supabase
-            .from('follows')
-            .select('*', { count: 'exact' })
-            .eq('following_id', user.id);
-            
-          if (!followerError) {
-            setFollowerCount(followerData?.length || 0);
-          }
+          // Update counts
+          updateCounts(followingData, followerData);
         }
       } catch (error) {
         console.error('Error:', error);
@@ -125,29 +87,12 @@ export const useProfileData = () => {
     };
     
     fetchProfile();
-  }, [user, defaultCoverImage]);
+  }, [user]);
 
   // Check for changes that need to be saved
   useEffect(() => {
     setHasChanges(!!tempCoverImage);
   }, [tempCoverImage]);
-
-  // Handler for profile image update
-  const handleProfileImageChange = (url: string) => {
-    setProfileImage(url);
-  };
-
-  // Handler for cover image update
-  const handleCoverImageChange = (url: string) => {
-    setCoverImage(url);
-  };
-
-  // Handler for temporary cover image (before saving)
-  const handleCoverImageUpdated = (url: string | null) => {
-    console.log("Setting tempCoverImage to:", url);
-    setTempCoverImage(url);
-    setHasChanges(true);
-  };
 
   // Save all profile changes
   const handleSaveChanges = async () => {
@@ -166,19 +111,9 @@ export const useProfileData = () => {
       
       // Only update if we have changes
       if (Object.keys(updates).length > 0) {
-        const { error } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', user.id);
-        
-        if (error) {
-          throw error;
-        }
+        await updateUserProfile(user.id, updates);
         
         // Clear temporary state
-        setTempCoverImage(null);
-        
-        // Reset changes flag
         setHasChanges(false);
         
         // Notify user
