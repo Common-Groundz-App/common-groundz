@@ -9,6 +9,7 @@ interface UserCardProps {
   username: string | null;
   avatarUrl: string | null;
   isFollowing?: boolean;
+  relationshipType?: 'follower' | 'following'; // Add this property
   onFollowToggle: (userId: string, isFollowing: boolean) => void;
   isLoading: boolean;
   isOwnProfile: boolean;
@@ -31,6 +32,7 @@ const UserCard = ({
   username, 
   avatarUrl, 
   isFollowing, 
+  relationshipType, // Add this parameter
   onFollowToggle, 
   isLoading,
   isOwnProfile,
