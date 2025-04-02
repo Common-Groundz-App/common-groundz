@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { fetchUserProfile, fetchFollowerCount, fetchFollowingCount } from '@/services/profileService';
 
 const ProfileContent = () => {
   const { user } = useAuth();
@@ -17,6 +18,8 @@ const ProfileContent = () => {
   const [profileUserId, setProfileUserId] = useState<string>('');
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
   const [loadingOtherProfile, setLoadingOtherProfile] = useState<boolean>(false);
+  const [otherUserFollowing, setOtherUserFollowing] = useState<number>(0);
+  const [otherUserFollowers, setOtherUserFollowers] = useState<number>(0);
 
   // Use the hook to get current user's profile data
   const {
@@ -47,15 +50,17 @@ const ProfileContent = () => {
       const fetchOtherUserProfile = async () => {
         setLoadingOtherProfile(true);
         try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
+          // Get profile data
+          const profileData = await fetchUserProfile(userId);
+          setOtherUserProfile(profileData);
           
-          if (error) throw error;
+          // Get follower and following counts
+          const followingData = await fetchFollowingCount(userId);
+          const followerData = await fetchFollowerCount(userId);
           
-          setOtherUserProfile(data);
+          setOtherUserFollowing(followingData);
+          setOtherUserFollowers(followerData);
+          
         } catch (error) {
           console.error('Error fetching profile:', error);
         } finally {
@@ -89,9 +94,10 @@ const ProfileContent = () => {
         profileImage: otherUserProfile?.avatar_url || '',
         username: otherUserProfile?.username || 'User',
         bio: otherUserProfile?.bio || 'No bio available',
-        location,
+        location: otherUserProfile?.location || '',
         memberSince,
-        followingCount,
+        followingCount: otherUserFollowing,
+        followerCount: otherUserFollowers,
         isLoading: loadingOtherProfile,
       };
     }
@@ -162,6 +168,7 @@ const ProfileContent = () => {
                 location={displayData.location} 
                 memberSince={displayData.memberSince} 
                 followingCount={displayData.followingCount} 
+                followerCount={displayData.followerCount} 
                 profileImage={displayData.profileImage} 
                 isLoading={displayData.isLoading} 
                 onProfileImageChange={viewingOwnProfile ? handleProfileImageChange : undefined} 
@@ -169,6 +176,7 @@ const ProfileContent = () => {
                 onSaveChanges={viewingOwnProfile ? handleSaveChanges : undefined} 
                 isOwnProfile={viewingOwnProfile}
                 profileUserId={profileUserId}
+                otherUserProfile={!viewingOwnProfile ? otherUserProfile : null}
               />
             </div>
           </div>

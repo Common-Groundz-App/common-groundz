@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
@@ -24,6 +23,7 @@ interface ProfileCardProps {
   onSaveChanges?: () => void;
   isOwnProfile: boolean;
   profileUserId?: string;
+  otherUserProfile?: any;
 }
 
 const ProfileCard = (props: ProfileCardProps) => {
@@ -40,7 +40,8 @@ const ProfileCard = (props: ProfileCardProps) => {
     hasChanges,
     onSaveChanges,
     isOwnProfile,
-    profileUserId
+    profileUserId,
+    otherUserProfile
   } = props;
 
   const { user } = useAuth();
@@ -61,6 +62,13 @@ const ProfileCard = (props: ProfileCardProps) => {
       if (!profileUserId) return;
 
       try {
+        // If we're viewing another user's profile and already have their data, use it
+        if (!isOwnProfile && otherUserProfile) {
+          setDatabaseUsername(otherUserProfile.username || '');
+          return;
+        }
+
+        // Otherwise fetch from the database
         const { data, error } = await supabase
           .from('profiles')
           .select('username')
@@ -76,7 +84,7 @@ const ProfileCard = (props: ProfileCardProps) => {
           setDatabaseUsername(data.username);
         }
         
-        // Get user metadata for first/last name
+        // Get user metadata for first/last name (only for own profile)
         if (user && isOwnProfile) {
           const userMetadata = user.user_metadata;
           setFirstName(userMetadata?.first_name || '');
@@ -88,7 +96,7 @@ const ProfileCard = (props: ProfileCardProps) => {
     };
 
     fetchUserData();
-  }, [profileUserId, user, isOwnProfile]);
+  }, [profileUserId, user, isOwnProfile, otherUserProfile]);
 
   // Format username for display (use database username if available)
   const formattedUsername = databaseUsername 
@@ -172,10 +180,19 @@ const ProfileCard = (props: ProfileCardProps) => {
   // Combine local changes with Parent Component Changes
   const combinedHasChanges = hasChanges || localHasChanges;
 
-  // Build display name from first/last name or username
-  const displayName = firstName || lastName 
-    ? `${firstName} ${lastName}`.trim() 
-    : currentUsername;
+  // Build display name
+  let displayName = currentUsername;
+  
+  // For own profile, use first/last name if available
+  if (isOwnProfile) {
+    displayName = firstName || lastName 
+      ? `${firstName} ${lastName}`.trim() 
+      : currentUsername;
+  }
+  // For other user's profile, prioritize their username from the database
+  else if (otherUserProfile) {
+    displayName = otherUserProfile.username || currentUsername;
+  }
 
   return (
     <>
@@ -195,7 +212,7 @@ const ProfileCard = (props: ProfileCardProps) => {
             bio={currentBio}
             isOwnProfile={isOwnProfile}
             formattedUsername={formattedUsername}
-            onEditClick={() => setIsEditModalOpen(true)}
+            onEditClick={isOwnProfile ? () => setIsEditModalOpen(true) : undefined}
           />
           
           <ProfileActions 
