@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Edit } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -9,6 +8,7 @@ import ProfileEditForm from './ProfileEditForm';
 import ProfileAvatar from './ProfileAvatar';
 import ProfileActions from './ProfileActions';
 import ProfileInfo from './ProfileInfo';
+import ProfileUserInfo from './ProfileUserInfo';
 
 interface ProfileCardProps {
   username: string;
@@ -26,27 +26,28 @@ interface ProfileCardProps {
   profileUserId?: string;
 }
 
-const ProfileCard = ({ 
-  username, 
-  bio, 
-  location, 
-  memberSince, 
-  followingCount,
-  followerCount = 0, 
-  profileImage,
-  isLoading,
-  onProfileImageChange,
-  hasChanges,
-  onSaveChanges,
-  isOwnProfile,
-  profileUserId
-}: ProfileCardProps) => {
+const ProfileCard = (props: ProfileCardProps) => {
+  const { 
+    username, 
+    bio, 
+    location, 
+    memberSince, 
+    followingCount,
+    followerCount = 0, 
+    profileImage,
+    isLoading,
+    onProfileImageChange,
+    hasChanges,
+    onSaveChanges,
+    isOwnProfile,
+    profileUserId
+  } = props;
+
   const { user } = useAuth();
   const { toast } = useToast();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentUsername, setCurrentUsername] = useState(username);
   const [currentBio, setCurrentBio] = useState(bio);
-  const [uploading, setUploading] = useState(false);
   const [tempProfileImage, setTempProfileImage] = useState<string | null>(null);
   const [localHasChanges, setLocalHasChanges] = useState(false);
   const [databaseUsername, setDatabaseUsername] = useState<string>('');
@@ -163,27 +164,18 @@ const ProfileCard = ({
             isEditable={isOwnProfile}
           />
           
-          <div className="flex items-center mb-2">
-            <h2 className="text-xl font-bold text-gray-900">{currentUsername}</h2>
-            {isOwnProfile && (
-              <button 
-                onClick={() => setIsEditModalOpen(true)}
-                className="ml-2 text-gray-500 hover:text-brand-orange"
-              >
-                <Edit size={18} />
-              </button>
-            )}
-          </div>
-          
-          {/* Username display with @ symbol */}
-          <div className="text-sm text-gray-500 mb-2">{formattedUsername}</div>
-          
-          <p className="text-gray-600 mb-4 text-sm text-center">{currentBio}</p>
+          <ProfileUserInfo 
+            username={currentUsername}
+            bio={currentBio}
+            isOwnProfile={isOwnProfile}
+            formattedUsername={formattedUsername}
+            onEditClick={() => setIsEditModalOpen(true)}
+          />
           
           <ProfileActions 
             hasChanges={combinedHasChanges}
             isLoading={isLoading}
-            uploading={uploading}
+            uploading={false}
             onSaveChanges={handleSaveChanges}
             profileUserId={profileUserId}
             isOwnProfile={isOwnProfile}
