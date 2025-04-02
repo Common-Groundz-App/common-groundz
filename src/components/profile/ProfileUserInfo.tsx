@@ -9,10 +9,6 @@ interface ProfileUserInfoProps {
   isOwnProfile: boolean;
   formattedUsername?: string;
   onEditClick?: () => void;
-  mutualFollows?: {
-    count: number;
-    examples: string[];
-  };
 }
 
 const ProfileUserInfo = ({ 
@@ -20,8 +16,7 @@ const ProfileUserInfo = ({
   bio, 
   isOwnProfile, 
   formattedUsername,
-  onEditClick,
-  mutualFollows
+  onEditClick
 }: ProfileUserInfoProps) => {
   return (
     <div className="w-full text-center mb-6">
@@ -43,20 +38,7 @@ const ProfileUserInfo = ({
         <p className="text-sm text-gray-500 mb-2">{formattedUsername}</p>
       )}
       
-      {mutualFollows && mutualFollows.count > 0 && (
-        <p className="text-xs text-gray-600 mb-3">
-          {mutualFollows.examples.length > 0 ? (
-            <>
-              Followed by <span className="font-medium">{mutualFollows.examples[0]}</span>
-              {mutualFollows.count > 1 && <> and <span className="font-medium">{mutualFollows.count - 1} {mutualFollows.count === 2 ? 'other' : 'others'}</span> you follow</>}
-            </>
-          ) : (
-            <>Followed by {mutualFollows.count} {mutualFollows.count === 1 ? 'person' : 'people'} you follow</>
-          )}
-        </p>
-      )}
-      
-      <p className="text-gray-600 mt-3 px-4">{bio || 'No bio yet'}</p>
+      <p className="text-gray-600 mt-4 px-4">{bio || 'No bio yet'}</p>
     </div>
   );
 };
