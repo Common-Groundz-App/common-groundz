@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserPlus, UserMinus, UserCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface UserCardProps {
   id: string;
@@ -81,41 +82,50 @@ const UserCard = ({
   };
   
   const followButtonProps = getFollowButtonProps();
+  
+  // Handle follow button click without triggering navigation
+  const handleFollowButtonClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onFollowToggle(id, !!isFollowing);
+  };
 
   return (
-    <div className="py-3 px-4 flex items-center justify-between">
-      <div className="flex items-center">
-        <Avatar className="h-9 w-9">
-          {avatarUrl ? (
-            <AvatarImage src={avatarUrl} alt={username || 'User'} />
-          ) : (
-            <AvatarFallback className="bg-brand-orange text-white text-xs">
-              {getUserInitials(username)}
-            </AvatarFallback>
-          )}
-        </Avatar>
-        <div className="ml-3">
-          <div className="font-medium">{username || 'User'}</div>
-          <div className="text-xs text-gray-500">@{username?.toLowerCase().replace(/\s+/g, '') || 'user'}</div>
+    <Link to={`/profile/${id}`} className="block">
+      <div className="py-3 px-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
+        <div className="flex items-center">
+          <Avatar className="h-9 w-9">
+            {avatarUrl ? (
+              <AvatarImage src={avatarUrl} alt={username || 'User'} />
+            ) : (
+              <AvatarFallback className="bg-brand-orange text-white text-xs">
+                {getUserInitials(username)}
+              </AvatarFallback>
+            )}
+          </Avatar>
+          <div className="ml-3">
+            <div className="font-medium">{username || 'User'}</div>
+            <div className="text-xs text-gray-500">@{username?.toLowerCase().replace(/\s+/g, '') || 'user'}</div>
+          </div>
         </div>
+        
+        {/* Action buttons */}
+        {currentUserId && followButtonProps && (
+          <Button 
+            variant={followButtonProps.variant as any}
+            size="sm"
+            onClick={handleFollowButtonClick}
+            disabled={isLoading}
+            className={followButtonProps.className}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+          >
+            {followButtonProps.icon}
+            {followButtonProps.text}
+          </Button>
+        )}
       </div>
-      
-      {/* Action buttons */}
-      {currentUserId && followButtonProps && (
-        <Button 
-          variant={followButtonProps.variant as any}
-          size="sm"
-          onClick={() => onFollowToggle(id, !!isFollowing)}
-          disabled={isLoading}
-          className={followButtonProps.className}
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => setIsHovering(false)}
-        >
-          {followButtonProps.icon}
-          {followButtonProps.text}
-        </Button>
-      )}
-    </div>
+    </Link>
   );
 };
 

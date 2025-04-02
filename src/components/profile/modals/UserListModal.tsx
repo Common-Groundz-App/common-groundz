@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { 
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ const UserListModal = ({
   isOwnProfile
 }: UserListModalProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { actionLoading, handleFollowToggle: toggleFollow } = useFollowActions(user?.id);
@@ -125,6 +127,11 @@ const UserListModal = ({
     }
   };
 
+  const handleUserClick = (userId: string) => {
+    onOpenChange(false); // Close the modal
+    navigate(`/profile/${userId}`); // Navigate to user profile
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md rounded-lg shadow-lg">
@@ -152,7 +159,7 @@ const UserListModal = ({
               {users.map((userProfile, index) => (
                 <div 
                   key={userProfile.id}
-                  className="transition-all duration-200 hover:bg-gray-50"
+                  className="transition-all duration-200"
                 >
                   <UserCard
                     id={userProfile.id}
