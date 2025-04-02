@@ -49,11 +49,23 @@ export const useFollow = (profileUserId?: string) => {
         
         if (error) throw error;
         
+        // Update local state
         setIsFollowing(false);
+        
+        // Notify the user
         toast({
           title: 'Unfollowed',
           description: 'You are no longer following this user.',
         });
+        
+        // Trigger an event to update counts in real-time
+        window.dispatchEvent(new CustomEvent('follow-status-changed', { 
+          detail: { 
+            follower: user.id,
+            following: profileUserId,
+            action: 'unfollow'
+          } 
+        }));
       } else {
         // Follow
         const { error } = await supabase
@@ -65,11 +77,23 @@ export const useFollow = (profileUserId?: string) => {
         
         if (error) throw error;
         
+        // Update local state
         setIsFollowing(true);
+        
+        // Notify the user
         toast({
           title: 'Following',
           description: 'You are now following this user.',
         });
+        
+        // Trigger an event to update counts in real-time
+        window.dispatchEvent(new CustomEvent('follow-status-changed', { 
+          detail: { 
+            follower: user.id,
+            following: profileUserId,
+            action: 'follow'
+          } 
+        }));
       }
     } catch (error: any) {
       console.error('Error toggling follow:', error);

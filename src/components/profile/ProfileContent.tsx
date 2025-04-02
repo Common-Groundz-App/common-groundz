@@ -31,6 +31,7 @@ const ProfileContent = () => {
     location,
     memberSince,
     followingCount,
+    followerCount,
     hasChanges,
     handleProfileImageChange,
     handleCoverImageChange,
@@ -75,6 +76,36 @@ const ProfileContent = () => {
     }
   }, [user, userId]);
 
+  // Listen for follow status changes to update counts in real-time
+  useEffect(() => {
+    const handleFollowStatusChange = async (event: CustomEvent) => {
+      const { follower, following, action } = event.detail;
+      
+      // If this is the profile being viewed (as the followed user)
+      if (profileUserId === following && !viewingOwnProfile) {
+        // Update this profile's followers count
+        const newCount = action === 'follow' 
+          ? otherUserFollowers + 1 
+          : Math.max(0, otherUserFollowers - 1);
+        
+        setOtherUserFollowers(newCount);
+      }
+      
+      // If this is the current user's profile and they followed/unfollowed someone
+      if (viewingOwnProfile && follower === user?.id) {
+        // No need to update here as useProfileData already handles this
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+    };
+  }, [profileUserId, viewingOwnProfile, otherUserFollowers, user?.id]);
+
   // Get display data based on whether viewing own or other profile
   const getDisplayData = () => {
     if (viewingOwnProfile) {
@@ -86,6 +117,7 @@ const ProfileContent = () => {
         location,
         memberSince,
         followingCount,
+        followerCount,
         isLoading,
       };
     } else {
@@ -146,7 +178,8 @@ const ProfileContent = () => {
     );
   }
 
-  return <div className="w-full bg-background pt-16 md:pt-20">
+  return (
+    <div className="w-full bg-background pt-16 md:pt-20">
       {/* Cover Image */}
       <ProfileCoverImage 
         coverImage={displayData.coverImage} 
@@ -187,7 +220,8 @@ const ProfileContent = () => {
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
 
 export default ProfileContent;

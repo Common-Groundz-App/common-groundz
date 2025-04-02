@@ -16,6 +16,7 @@ export const useProfileData = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [followerCount, setFollowerCount] = useState<number>(0);
   
   // Default cover image with a nice pattern
   const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80';
@@ -40,7 +41,6 @@ export const useProfileData = () => {
     location,
     memberSince,
     followingCount,
-    followerCount,
     setProfileMetadata,
     updateCounts
   } = useProfileMetadata();
@@ -78,6 +78,7 @@ export const useProfileData = () => {
           
           // Update counts
           updateCounts(followingData, followerData);
+          setFollowerCount(followerData);
         }
       } catch (error) {
         console.error('Error:', error);
@@ -88,6 +89,40 @@ export const useProfileData = () => {
     
     fetchProfile();
   }, [user]);
+
+  // Listen for follow status changes
+  useEffect(() => {
+    const handleFollowStatusChange = async (event: CustomEvent) => {
+      if (!user) return;
+      
+      const { follower, following, action } = event.detail;
+      
+      // If this is the current user's profile and someone followed/unfollowed them
+      if (user.id === following) {
+        // Update follower count
+        const updatedFollowerCount = action === 'follow' 
+          ? followerCount + 1 
+          : Math.max(0, followerCount - 1);
+        
+        setFollowerCount(updatedFollowerCount);
+      }
+      
+      // If this is the current user and they followed/unfollowed someone else
+      if (user.id === follower) {
+        // This will be handled by the updateCounts method which gets the latest following count
+        const followingData = await fetchFollowingCount(user.id);
+        updateCounts(followingData, followerCount);
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+    };
+  }, [user, followerCount]);
 
   // Check for changes that need to be saved
   useEffect(() => {
