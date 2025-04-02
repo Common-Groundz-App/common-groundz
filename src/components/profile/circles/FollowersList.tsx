@@ -4,6 +4,7 @@ import UserCard from './UserCard';
 import UserCardSkeleton from './UserCardSkeleton';
 import EmptyState from './EmptyState';
 import { UserProfile } from './types';
+import { Separator } from '@/components/ui/separator';
 
 interface FollowersListProps {
   followers: UserProfile[];
@@ -37,20 +38,21 @@ const FollowersList = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="divide-y divide-gray-100">
       {followers.map(follower => (
-        <UserCard
-          key={follower.id}
-          id={follower.id}
-          username={follower.username}
-          avatarUrl={follower.avatar_url}
-          isFollowing={follower.isFollowing}
-          relationshipType="follower"
-          onFollowToggle={onFollowToggle}
-          isLoading={actionLoading === follower.id}
-          isOwnProfile={isOwnProfile}
-          currentUserId={currentUserId}
-        />
+        <div key={follower.id} className="transition-all duration-200 hover:bg-gray-50">
+          <UserCard
+            id={follower.id}
+            username={follower.username}
+            avatarUrl={follower.avatar_url}
+            isFollowing={follower.isFollowing}
+            relationshipType="follower"
+            onFollowToggle={onFollowToggle}
+            isLoading={actionLoading === follower.id}
+            isOwnProfile={isOwnProfile}
+            currentUserId={currentUserId}
+          />
+        </div>
       ))}
     </div>
   );

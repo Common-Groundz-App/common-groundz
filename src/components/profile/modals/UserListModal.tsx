@@ -101,21 +101,24 @@ const UserListModal = ({
           ) : users.length === 0 ? (
             <EmptyState type={listType} />
           ) : (
-            <div>
+            <div className="divide-y divide-gray-100">
               {users.map((userProfile, index) => (
-                <React.Fragment key={userProfile.id}>
+                <div 
+                  key={userProfile.id}
+                  className="transition-all duration-200 hover:bg-gray-50"
+                >
                   <UserCard
                     id={userProfile.id}
                     username={userProfile.username}
                     avatarUrl={userProfile.avatar_url}
                     isFollowing={userProfile.isFollowing}
+                    relationshipType={listType === 'followers' ? 'follower' : 'following'}
                     onFollowToggle={handleFollowToggle}
                     isLoading={actionLoading === userProfile.id}
                     isOwnProfile={isOwnProfile}
                     currentUserId={user?.id}
                   />
-                  {index < users.length - 1 && <Separator className="my-1" />}
-                </React.Fragment>
+                </div>
               ))}
             </div>
           )}

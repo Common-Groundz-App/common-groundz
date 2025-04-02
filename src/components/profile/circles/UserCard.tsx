@@ -1,15 +1,15 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserPlus, UserMinus } from 'lucide-react';
+import { UserPlus, UserMinus, UserCheck } from 'lucide-react';
 
 interface UserCardProps {
   id: string;
   username: string | null;
   avatarUrl: string | null;
   isFollowing?: boolean;
-  relationshipType?: 'follower' | 'following'; // Add this property
+  relationshipType?: 'follower' | 'following';
   onFollowToggle: (userId: string, isFollowing: boolean) => void;
   isLoading: boolean;
   isOwnProfile: boolean;
@@ -32,12 +32,50 @@ const UserCard = ({
   username, 
   avatarUrl, 
   isFollowing, 
-  relationshipType, // Add this parameter
+  relationshipType,
   onFollowToggle, 
   isLoading,
   isOwnProfile,
   currentUserId
 }: UserCardProps) => {
+  const [isHovering, setIsHovering] = useState(false);
+  
+  // Determine if this user follows the current user (for "Follow Back" logic)
+  const isFollower = relationshipType === 'follower';
+  
+  // Get the follow button text and style based on relationship
+  const getFollowButtonProps = () => {
+    // User is already following this person
+    if (isFollowing) {
+      return {
+        variant: isHovering ? "destructive" : "outline",
+        text: isHovering ? "Unfollow" : "Following",
+        icon: isHovering ? <UserMinus size={14} className="mr-1" /> : <UserCheck size={14} className="mr-1" />,
+        className: "min-w-20 transition-all"
+      };
+    }
+    
+    // This person follows the user but user doesn't follow back
+    if (isFollower && !isFollowing) {
+      return {
+        variant: "default",
+        text: "Follow Back",
+        icon: <UserPlus size={14} className="mr-1" />,
+        className: "min-w-22 bg-brand-orange hover:bg-brand-orange/90"
+      };
+    }
+    
+    // Default case: user doesn't follow this person
+    return {
+      variant: "default",
+      text: "Follow",
+      icon: <UserPlus size={14} className="mr-1" />,
+      className: "min-w-20"
+    };
+  };
+  
+  const followButtonProps = getFollowButtonProps();
+
   return (
     <div className="py-3 px-4 flex items-center justify-between">
       <div className="flex items-center">
@@ -58,21 +96,16 @@ const UserCard = ({
       
       {currentUserId && currentUserId !== id && !isOwnProfile && (
         <Button 
-          variant={isFollowing ? "outline" : "default"}
+          variant={followButtonProps.variant as any}
           size="sm"
           onClick={() => onFollowToggle(id, !!isFollowing)}
           disabled={isLoading}
-          className="min-w-20"
+          className={followButtonProps.className}
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
         >
-          {isFollowing ? (
-            <>
-              <UserMinus size={14} className="mr-1" /> Unfollow
-            </>
-          ) : (
-            <>
-              <UserPlus size={14} className="mr-1" /> Follow
-            </>
-          )}
+          {followButtonProps.icon}
+          {followButtonProps.text}
         </Button>
       )}
     </div>
