@@ -2,7 +2,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
 import { UserPlus, UserMinus } from 'lucide-react';
 
 interface UserCardProps {
@@ -10,7 +9,6 @@ interface UserCardProps {
   username: string | null;
   avatarUrl: string | null;
   isFollowing?: boolean;
-  relationshipType: 'follower' | 'following';
   onFollowToggle: (userId: string, isFollowing: boolean) => void;
   isLoading: boolean;
   isOwnProfile: boolean;
@@ -33,52 +31,49 @@ const UserCard = ({
   username, 
   avatarUrl, 
   isFollowing, 
-  relationshipType,
   onFollowToggle, 
   isLoading,
   isOwnProfile,
   currentUserId
 }: UserCardProps) => {
   return (
-    <Card key={id}>
-      <CardContent className="p-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <Avatar>
-            {avatarUrl ? (
-              <AvatarImage src={avatarUrl} alt={username || 'User'} />
-            ) : (
-              <AvatarFallback className="bg-brand-orange text-white">
-                {getUserInitials(username)}
-              </AvatarFallback>
-            )}
-          </Avatar>
-          <div className="ml-4">
-            <div className="font-medium">{username || 'User'}</div>
-            <div className="text-sm text-gray-500 mb-1">@{username?.toLowerCase().replace(/\s+/g, '') || 'user'}</div>
-            <div className="text-xs text-gray-400">{relationshipType === 'follower' ? 'Follower' : 'Following'}</div>
-          </div>
+    <div className="py-3 px-4 flex items-center justify-between">
+      <div className="flex items-center">
+        <Avatar className="h-9 w-9">
+          {avatarUrl ? (
+            <AvatarImage src={avatarUrl} alt={username || 'User'} />
+          ) : (
+            <AvatarFallback className="bg-brand-orange text-white text-xs">
+              {getUserInitials(username)}
+            </AvatarFallback>
+          )}
+        </Avatar>
+        <div className="ml-3">
+          <div className="font-medium">{username || 'User'}</div>
+          <div className="text-xs text-gray-500">@{username?.toLowerCase().replace(/\s+/g, '') || 'user'}</div>
         </div>
-        
-        {currentUserId && currentUserId !== id && !isOwnProfile && (
-          <Button 
-            variant={isFollowing ? "outline" : "default"}
-            size="sm"
-            onClick={() => onFollowToggle(id, !!isFollowing)}
-            disabled={isLoading}
-          >
-            {isFollowing ? (
-              <>
-                <UserMinus size={14} className="mr-1" /> Unfollow
-              </>
-            ) : (
-              <>
-                <UserPlus size={14} className="mr-1" /> Follow
-              </>
-            )}
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+      
+      {currentUserId && currentUserId !== id && !isOwnProfile && (
+        <Button 
+          variant={isFollowing ? "outline" : "default"}
+          size="sm"
+          onClick={() => onFollowToggle(id, !!isFollowing)}
+          disabled={isLoading}
+          className="min-w-20"
+        >
+          {isFollowing ? (
+            <>
+              <UserMinus size={14} className="mr-1" /> Unfollow
+            </>
+          ) : (
+            <>
+              <UserPlus size={14} className="mr-1" /> Follow
+            </>
+          )}
+        </Button>
+      )}
+    </div>
   );
 };
 

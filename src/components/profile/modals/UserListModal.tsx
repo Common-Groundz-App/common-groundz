@@ -8,6 +8,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { fetchFollowers, fetchFollowing } from '@/components/profile/circles/api/circleService';
 import { useFollowActions } from '@/components/profile/circles/hooks/useFollowActions';
 import { UserProfile } from '@/components/profile/circles/types';
@@ -83,16 +84,16 @@ const UserListModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md rounded-lg shadow-lg">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-xl font-semibold">
             {listType === 'followers' ? 'Followers' : 'Following'}
           </DialogTitle>
         </DialogHeader>
         
         <ScrollArea className="h-[400px] px-1">
           {isLoading ? (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {[1, 2, 3].map(i => (
                 <UserCardSkeleton key={i} />
               ))}
@@ -100,20 +101,21 @@ const UserListModal = ({
           ) : users.length === 0 ? (
             <EmptyState type={listType} />
           ) : (
-            <div className="space-y-4">
-              {users.map(userProfile => (
-                <UserCard
-                  key={userProfile.id}
-                  id={userProfile.id}
-                  username={userProfile.username}
-                  avatarUrl={userProfile.avatar_url}
-                  isFollowing={userProfile.isFollowing}
-                  relationshipType={listType === 'followers' ? 'follower' : 'following'}
-                  onFollowToggle={handleFollowToggle}
-                  isLoading={actionLoading === userProfile.id}
-                  isOwnProfile={isOwnProfile}
-                  currentUserId={user?.id}
-                />
+            <div>
+              {users.map((userProfile, index) => (
+                <React.Fragment key={userProfile.id}>
+                  <UserCard
+                    id={userProfile.id}
+                    username={userProfile.username}
+                    avatarUrl={userProfile.avatar_url}
+                    isFollowing={userProfile.isFollowing}
+                    onFollowToggle={handleFollowToggle}
+                    isLoading={actionLoading === userProfile.id}
+                    isOwnProfile={isOwnProfile}
+                    currentUserId={user?.id}
+                  />
+                  {index < users.length - 1 && <Separator className="my-1" />}
+                </React.Fragment>
               ))}
             </div>
           )}
