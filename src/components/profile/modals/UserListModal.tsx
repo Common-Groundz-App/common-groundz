@@ -1,0 +1,126 @@
+
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { fetchFollowers, fetchFollowing } from '@/components/profile/circles/api/circleService';
+import { useFollowActions } from '@/components/profile/circles/hooks/useFollowActions';
+import { UserProfile } from '@/components/profile/circles/types';
+import UserCard from '@/components/profile/circles/UserCard';
+import UserCardSkeleton from '@/components/profile/circles/UserCardSkeleton';
+import EmptyState from '@/components/profile/circles/EmptyState';
+
+interface UserListModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  profileUserId: string;
+  listType: 'followers' | 'following';
+  isOwnProfile: boolean;
+}
+
+const UserListModal = ({ 
+  open, 
+  onOpenChange, 
+  profileUserId, 
+  listType,
+  isOwnProfile
+}: UserListModalProps) => {
+  const { user } = useAuth();
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { actionLoading, handleFollowToggle: toggleFollow } = useFollowActions(user?.id);
+
+  useEffect(() => {
+    if (!open || !profileUserId) return;
+    
+    const fetchUsers = async () => {
+      setIsLoading(true);
+      try {
+        const userData = listType === 'followers' 
+          ? await fetchFollowers(profileUserId, user?.id)
+          : await fetchFollowing(profileUserId, user?.id);
+        
+        setUsers(userData);
+      } catch (error) {
+        console.error(`Error fetching ${listType}:`, error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUsers();
+  }, [open, profileUserId, listType, user?.id]);
+
+  const handleFollowToggle = async (userId: string, isFollowing: boolean) => {
+    await toggleFollow(userId, isFollowing, 
+      // Update followers state
+      (targetUserId, newFollowStatus) => {
+        setUsers(prev => 
+          prev.map(user => 
+            user.id === targetUserId 
+              ? {...user, isFollowing: newFollowStatus} 
+              : user
+          )
+        );
+      },
+      // Update following state (same function since we're managing a single list)
+      (targetUserId, newFollowStatus) => {
+        setUsers(prev => 
+          prev.map(user => 
+            user.id === targetUserId 
+              ? {...user, isFollowing: newFollowStatus} 
+              : user
+          )
+        );
+      }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {listType === 'followers' ? 'Followers' : 'Following'}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <ScrollArea className="h-[400px] px-1">
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <UserCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : users.length === 0 ? (
+            <EmptyState type={listType} />
+          ) : (
+            <div className="space-y-4">
+              {users.map(userProfile => (
+                <UserCard
+                  key={userProfile.id}
+                  id={userProfile.id}
+                  username={userProfile.username}
+                  avatarUrl={userProfile.avatar_url}
+                  isFollowing={userProfile.isFollowing}
+                  relationshipType={listType === 'followers' ? 'follower' : 'following'}
+                  onFollowToggle={handleFollowToggle}
+                  isLoading={actionLoading === userProfile.id}
+                  isOwnProfile={isOwnProfile}
+                  currentUserId={user?.id}
+                />
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default UserListModal;

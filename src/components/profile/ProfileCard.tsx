@@ -170,6 +170,8 @@ const ProfileCard = (props: ProfileCardProps) => {
             memberSince={memberSince}
             followingCount={followingCount}
             followerCount={followerCount}
+            profileUserId={profileUserId}
+            isOwnProfile={isOwnProfile}
           />
         </div>
       </Card>
