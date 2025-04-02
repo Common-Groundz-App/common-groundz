@@ -14,7 +14,7 @@ export const useFollowActions = (currentUserId?: string) => {
     updateFollowers: (userId: string, isFollowing: boolean) => void,
     updateFollowing: (userId: string, isFollowing: boolean) => void
   ) => {
-    if (!currentUserId) return;
+    if (!currentUserId) return false;
     
     setActionLoading(targetUserId);
     
@@ -37,6 +37,7 @@ export const useFollowActions = (currentUserId?: string) => {
       updateFollowers(targetUserId, isNowFollowing);
       updateFollowing(targetUserId, isNowFollowing);
       
+      return true; // Indicate success
     } catch (error: any) {
       console.error('Error toggling follow:', error);
       toast({
@@ -44,6 +45,7 @@ export const useFollowActions = (currentUserId?: string) => {
         description: error.message || 'Failed to update follow status',
         variant: 'destructive',
       });
+      return false; // Indicate failure
     } finally {
       setActionLoading(null);
     }

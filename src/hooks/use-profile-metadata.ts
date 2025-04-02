@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export const useProfileMetadata = () => {
   const [username, setUsername] = useState<string>('');
@@ -36,6 +36,43 @@ export const useProfileMetadata = () => {
     setFollowingCount(followingData);
     setFollowerCount(followerData);
   };
+
+  // Listen for immediate count updates from modal actions
+  useEffect(() => {
+    const handleFollowingCountChanged = (event: CustomEvent) => {
+      if (event.detail) {
+        if (event.detail.immediate && event.detail.countChange) {
+          // Apply the change directly to current count
+          setFollowingCount(prevCount => Math.max(0, prevCount + event.detail.countChange));
+        } else if (typeof event.detail.count === 'number') {
+          // Set to a specific value (existing behavior)
+          setFollowingCount(event.detail.count);
+        }
+      }
+    };
+
+    const handleFollowerCountChanged = (event: CustomEvent) => {
+      if (event.detail) {
+        if (event.detail.immediate && event.detail.countChange) {
+          // Apply the change directly to current count
+          setFollowerCount(prevCount => Math.max(0, prevCount + event.detail.countChange));
+        } else if (typeof event.detail.count === 'number') {
+          // Set to a specific value (existing behavior)
+          setFollowerCount(event.detail.count);
+        }
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('profile-following-count-changed', handleFollowingCountChanged as EventListener);
+    window.addEventListener('profile-follower-count-changed', handleFollowerCountChanged as EventListener);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('profile-following-count-changed', handleFollowingCountChanged as EventListener);
+      window.removeEventListener('profile-follower-count-changed', handleFollowerCountChanged as EventListener);
+    };
+  }, []);
 
   return {
     username,

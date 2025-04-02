@@ -60,7 +60,8 @@ const UserListModal = ({
   }, [open, profileUserId, listType, user?.id]);
 
   const handleFollowToggle = async (userId: string, isFollowing: boolean) => {
-    await toggleFollow(userId, isFollowing, 
+    const isActionUnfollow = isFollowing;
+    const wasSuccessful = await toggleFollow(userId, isFollowing, 
       // Update followers state
       (targetUserId, newFollowStatus) => {
         setUsers(prev => 
@@ -82,6 +83,19 @@ const UserListModal = ({
         );
       }
     );
+    
+    // If this is the user's own profile and they're unfollowing someone from their following list,
+    // dispatch a custom event to update the following count
+    if (wasSuccessful && isOwnProfile && listType === 'following' && isActionUnfollow) {
+      const countChange = -1; // Decreasing the count by 1 for unfollow
+      
+      window.dispatchEvent(new CustomEvent('profile-following-count-changed', { 
+        detail: { 
+          countChange,
+          immediate: true  // Flag to indicate this should be applied immediately
+        } 
+      }));
+    }
   };
 
   return (
