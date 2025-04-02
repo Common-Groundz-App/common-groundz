@@ -46,7 +46,9 @@ export const useProfileMetadata = () => {
     setLocation,
     memberSince,
     followingCount,
+    setFollowingCount,
     followerCount,
+    setFollowerCount,
     setProfileMetadata,
     updateCounts
   };

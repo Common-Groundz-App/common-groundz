@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileCard from './ProfileCard';
@@ -81,19 +80,43 @@ const ProfileContent = () => {
     const handleFollowStatusChange = async (event: CustomEvent) => {
       const { follower, following, action } = event.detail;
       
-      // If this is the profile being viewed (as the followed user)
-      if (profileUserId === following && !viewingOwnProfile) {
-        // Update this profile's followers count
-        const newCount = action === 'follow' 
-          ? otherUserFollowers + 1 
-          : Math.max(0, otherUserFollowers - 1);
+      console.log("Follow status changed:", { follower, following, action });
+      console.log("Current profile userId:", profileUserId);
+      console.log("Current user:", user?.id);
+      
+      // If the current profile is being followed/unfollowed
+      if (profileUserId === following) {
+        console.log("Updating follower count for profile:", profileUserId);
+        // Refetch the current profile's follower count to ensure accuracy
+        const updatedFollowerCount = await fetchFollowerCount(profileUserId);
         
-        setOtherUserFollowers(newCount);
+        if (viewingOwnProfile) {
+          // Update own profile follower count via the useProfileData hook's event
+          window.dispatchEvent(new CustomEvent('profile-follower-count-changed', { 
+            detail: { count: updatedFollowerCount } 
+          }));
+        } else {
+          // Update other user's follower count directly
+          console.log("Setting other user followers to:", updatedFollowerCount);
+          setOtherUserFollowers(updatedFollowerCount);
+        }
       }
       
-      // If this is the current user's profile and they followed/unfollowed someone
-      if (viewingOwnProfile && follower === user?.id) {
-        // No need to update here as useProfileData already handles this
+      // If we're viewing the profile of the user who followed/unfollowed someone
+      if (profileUserId === follower) {
+        console.log("Updating following count for user:", follower);
+        // Refetch following count for accuracy
+        const updatedFollowingCount = await fetchFollowingCount(follower);
+        
+        if (viewingOwnProfile) {
+          // Update own profile following count via the useProfileData hook's event
+          window.dispatchEvent(new CustomEvent('profile-following-count-changed', { 
+            detail: { count: updatedFollowingCount } 
+          }));
+        } else {
+          // Update other user's following count directly
+          setOtherUserFollowing(updatedFollowingCount);
+        }
       }
     };
 
@@ -104,7 +127,7 @@ const ProfileContent = () => {
     return () => {
       window.removeEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
     };
-  }, [profileUserId, viewingOwnProfile, otherUserFollowers, user?.id]);
+  }, [profileUserId, viewingOwnProfile, user?.id]);
 
   // Get display data based on whether viewing own or other profile
   const getDisplayData = () => {

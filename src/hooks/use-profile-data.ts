@@ -41,6 +41,7 @@ export const useProfileData = () => {
     location,
     memberSince,
     followingCount,
+    setFollowingCount,
     setProfileMetadata,
     updateCounts
   } = useProfileMetadata();
@@ -77,7 +78,7 @@ export const useProfileData = () => {
           const followerData = await fetchFollowerCount(user.id);
           
           // Update counts
-          updateCounts(followingData, followerData);
+          setFollowingCount(followingData);
           setFollowerCount(followerData);
         }
       } catch (error) {
@@ -109,18 +110,36 @@ export const useProfileData = () => {
       
       // If this is the current user and they followed/unfollowed someone else
       if (user.id === follower) {
-        // This will be handled by the updateCounts method which gets the latest following count
+        // Fetch latest following count for accuracy
         const followingData = await fetchFollowingCount(user.id);
-        updateCounts(followingData, followerCount);
+        setFollowingCount(followingData);
       }
     };
 
-    // Add event listener
+    // Listen for specific follower count update events
+    const handleFollowerCountChanged = (event: CustomEvent) => {
+      if (event.detail && typeof event.detail.count === 'number') {
+        setFollowerCount(event.detail.count);
+      }
+    };
+
+    // Listen for specific following count update events
+    const handleFollowingCountChanged = (event: CustomEvent) => {
+      if (event.detail && typeof event.detail.count === 'number') {
+        setFollowingCount(event.detail.count);
+      }
+    };
+
+    // Add event listeners
     window.addEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+    window.addEventListener('profile-follower-count-changed', handleFollowerCountChanged as EventListener);
+    window.addEventListener('profile-following-count-changed', handleFollowingCountChanged as EventListener);
     
     // Clean up
     return () => {
       window.removeEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+      window.removeEventListener('profile-follower-count-changed', handleFollowerCountChanged as EventListener);
+      window.removeEventListener('profile-following-count-changed', handleFollowingCountChanged as EventListener);
     };
   }, [user, followerCount]);
 

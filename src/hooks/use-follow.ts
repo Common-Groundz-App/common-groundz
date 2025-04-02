@@ -58,7 +58,7 @@ export const useFollow = (profileUserId?: string) => {
           description: 'You are no longer following this user.',
         });
         
-        // Trigger an event to update counts in real-time
+        // Dispatch a global event for real-time follower count updates
         window.dispatchEvent(new CustomEvent('follow-status-changed', { 
           detail: { 
             follower: user.id,
@@ -86,7 +86,7 @@ export const useFollow = (profileUserId?: string) => {
           description: 'You are now following this user.',
         });
         
-        // Trigger an event to update counts in real-time
+        // Dispatch a global event for real-time follower count updates
         window.dispatchEvent(new CustomEvent('follow-status-changed', { 
           detail: { 
             follower: user.id,
