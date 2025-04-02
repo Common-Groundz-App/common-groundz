@@ -44,9 +44,11 @@ export const useProfileMetadata = () => {
         if (event.detail.immediate && event.detail.countChange) {
           // Apply the change directly to current count
           setFollowingCount(prevCount => Math.max(0, prevCount + event.detail.countChange));
+          console.log('Following count updated via event:', event.detail.countChange);
         } else if (typeof event.detail.count === 'number') {
           // Set to a specific value (existing behavior)
           setFollowingCount(event.detail.count);
+          console.log('Following count set to specific value:', event.detail.count);
         }
       }
     };
@@ -56,9 +58,11 @@ export const useProfileMetadata = () => {
         if (event.detail.immediate && event.detail.countChange) {
           // Apply the change directly to current count
           setFollowerCount(prevCount => Math.max(0, prevCount + event.detail.countChange));
+          console.log('Follower count updated via event:', event.detail.countChange);
         } else if (typeof event.detail.count === 'number') {
           // Set to a specific value (existing behavior)
           setFollowerCount(event.detail.count);
+          console.log('Follower count set to specific value:', event.detail.count);
         }
       }
     };

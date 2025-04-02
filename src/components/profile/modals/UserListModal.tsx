@@ -60,7 +60,9 @@ const UserListModal = ({
   }, [open, profileUserId, listType, user?.id]);
 
   const handleFollowToggle = async (userId: string, isFollowing: boolean) => {
+    const isActionFollow = !isFollowing;
     const isActionUnfollow = isFollowing;
+    
     const wasSuccessful = await toggleFollow(userId, isFollowing, 
       // Update followers state
       (targetUserId, newFollowStatus) => {
@@ -84,17 +86,42 @@ const UserListModal = ({
       }
     );
     
-    // If this is the user's own profile and they're unfollowing someone from their following list,
-    // dispatch a custom event to update the following count
-    if (wasSuccessful && isOwnProfile && listType === 'following' && isActionUnfollow) {
-      const countChange = -1; // Decreasing the count by 1 for unfollow
+    // If the action was successful, update the count in the profile card
+    if (wasSuccessful) {
+      // If this is viewing own profile and follows someone from modal
+      if (user?.id === profileUserId && isActionFollow) {
+        // Increment following count for own profile
+        window.dispatchEvent(new CustomEvent('profile-following-count-changed', { 
+          detail: { 
+            countChange: 1,
+            immediate: true
+          } 
+        }));
+      }
       
-      window.dispatchEvent(new CustomEvent('profile-following-count-changed', { 
-        detail: { 
-          countChange,
-          immediate: true  // Flag to indicate this should be applied immediately
-        } 
-      }));
+      // If this is viewing own profile and unfollows someone from modal
+      if (user?.id === profileUserId && isActionUnfollow) {
+        // Decrement following count for own profile
+        window.dispatchEvent(new CustomEvent('profile-following-count-changed', { 
+          detail: { 
+            countChange: -1,
+            immediate: true
+          } 
+        }));
+      }
+      
+      // If another user's profile, update the following count
+      if (!isOwnProfile && user?.id !== profileUserId) {
+        // Only update if the user is following/unfollowing the profile owner
+        if (userId === profileUserId) {
+          window.dispatchEvent(new CustomEvent('profile-follower-count-changed', { 
+            detail: { 
+              countChange: isActionFollow ? 1 : -1,
+              immediate: true
+            } 
+          }));
+        }
+      }
     }
   };
 
