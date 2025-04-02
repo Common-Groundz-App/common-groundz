@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import FollowersList from './circles/FollowersList';
 import FollowingList from './circles/FollowingList';
@@ -13,6 +14,7 @@ interface ProfileCirclesProps {
 
 const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'followers' | 'following'>('followers');
   
   const {
@@ -22,6 +24,10 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
     actionLoading,
     handleFollowToggle
   } = useCircleData(profileUserId, user?.id);
+
+  const handleNavigateToProfile = (userId: string) => {
+    navigate(`/profile/${userId}`);
+  };
 
   return (
     <div className="space-y-6">
@@ -39,6 +45,7 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
             actionLoading={actionLoading}
             isOwnProfile={isOwnProfile}
             currentUserId={user?.id}
+            onNavigate={handleNavigateToProfile}
           />
         </TabsContent>
         
@@ -50,6 +57,7 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
             actionLoading={actionLoading}
             isOwnProfile={isOwnProfile}
             currentUserId={user?.id}
+            onNavigate={handleNavigateToProfile}
           />
         </TabsContent>
       </Tabs>

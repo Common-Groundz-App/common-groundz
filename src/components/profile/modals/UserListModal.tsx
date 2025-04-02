@@ -171,6 +171,7 @@ const UserListModal = ({
                     isLoading={actionLoading === userProfile.id}
                     isOwnProfile={isOwnProfile}
                     currentUserId={user?.id}
+                    onNavigate={handleUserClick}
                   />
                 </div>
               ))}

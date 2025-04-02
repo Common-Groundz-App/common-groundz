@@ -15,6 +15,7 @@ interface UserCardProps {
   isLoading: boolean;
   isOwnProfile: boolean;
   currentUserId?: string;
+  onNavigate?: (userId: string) => void;
 }
 
 export const getUserInitials = (username: string | null) => {
@@ -37,7 +38,8 @@ const UserCard = ({
   onFollowToggle, 
   isLoading,
   isOwnProfile,
-  currentUserId
+  currentUserId,
+  onNavigate
 }: UserCardProps) => {
   const [isHovering, setIsHovering] = useState(false);
   
@@ -90,8 +92,16 @@ const UserCard = ({
     onFollowToggle(id, !!isFollowing);
   };
 
+  // Handle card click to navigate to profile
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (onNavigate) {
+      e.preventDefault();
+      onNavigate(id);
+    }
+  };
+
   return (
-    <Link to={`/profile/${id}`} className="block">
+    <Link to={`/profile/${id}`} className="block" onClick={handleCardClick}>
       <div className="py-3 px-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
         <div className="flex items-center">
           <Avatar className="h-9 w-9">

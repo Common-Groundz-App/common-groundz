@@ -13,6 +13,7 @@ interface FollowersListProps {
   actionLoading: string | null;
   isOwnProfile: boolean;
   currentUserId?: string;
+  onNavigate?: (userId: string) => void;
 }
 
 const FollowersList = ({ 
@@ -21,7 +22,8 @@ const FollowersList = ({
   onFollowToggle, 
   actionLoading,
   isOwnProfile,
-  currentUserId
+  currentUserId,
+  onNavigate
 }: FollowersListProps) => {
   if (isLoading) {
     return (
@@ -51,6 +53,7 @@ const FollowersList = ({
             isLoading={actionLoading === follower.id}
             isOwnProfile={isOwnProfile}
             currentUserId={currentUserId}
+            onNavigate={onNavigate}
           />
         </div>
       ))}

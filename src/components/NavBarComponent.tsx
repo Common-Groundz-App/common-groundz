@@ -3,12 +3,13 @@ import { Home, Star, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
 import { useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { SearchDialog } from '@/components/SearchDialog'
 
 export function NavBarComponent() {
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState('Home');
   
   const navItems = [
     { name: 'Home', url: '/', icon: Home },
@@ -17,11 +18,16 @@ export function NavBarComponent() {
     { name: 'Profile', url: '/profile', icon: User }
   ];
 
-  // Find the active tab based on the current location
-  const activeTab = navItems.find(item => 
-    item.url === location.pathname || 
-    (location.pathname !== '/' && item.url.startsWith(location.pathname))
-  )?.name || navItems[0].name;
+  // Update the active tab based on the current URL path
+  useEffect(() => {
+    if (location.pathname === '/') {
+      setActiveTab('Home');
+    } else if (location.pathname.startsWith('/profile')) {
+      setActiveTab('Profile');
+    } else if (location.pathname.includes('features')) {
+      setActiveTab('Features');
+    }
+  }, [location.pathname]);
 
   return (
     <>
