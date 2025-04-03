@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { Heart, Star, Award, Bookmark, Filter, ChevronDown } from 'lucide-react';
+import { Heart, Star, Award, Bookmark, Filter, ChevronDown, Plus, Eye } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { useRecommendations } from '@/hooks/use-recommendations';
+import RecommendationForm from '@/components/recommendations/RecommendationForm';
+import { Recommendation } from '@/services/recommendationService';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,86 +18,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type RecommendationItem = {
-  id: string;
-  title: string;
-  venue: string;
-  rating: number;
-  image: string;
-  isCertified: boolean;
-  category?: string;
-  likes?: number;
-  isLiked?: boolean;
-  isSaved?: boolean;
+const getCategoryLabel = (category: string): string => {
+  const labels: Record<string, string> = {
+    food: 'Food',
+    movie: 'Movie',
+    product: 'Product',
+    book: 'Book',
+    place: 'Place'
+  };
+  return labels[category] || category;
 };
-
-const dummyRecommendations: RecommendationItem[] = [{
-  id: '1',
-  title: 'Truffle Fries',
-  venue: 'Smoke House Deli',
-  rating: 4.6,
-  image: 'https://images.unsplash.com/photo-1630384060421-cb20d0e0649d',
-  isCertified: true,
-  category: 'Food',
-  likes: 43,
-  isLiked: false,
-  isSaved: false
-}, {
-  id: '2',
-  title: 'Margherita Pizza',
-  venue: 'Pizzeria Locale',
-  rating: 4.2,
-  image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591',
-  isCertified: true,
-  category: 'Food',
-  likes: 29,
-  isLiked: true,
-  isSaved: true
-}, {
-  id: '3',
-  title: 'French Press Coffee',
-  venue: 'Artisan Cafe',
-  rating: 4.5,
-  image: 'https://images.unsplash.com/photo-1557142046-c704a3adf364',
-  isCertified: true,
-  category: 'Drinks',
-  likes: 37,
-  isLiked: false,
-  isSaved: true
-}, {
-  id: '4',
-  title: 'Wireless Headphones',
-  venue: 'Tech Emporium',
-  rating: 4.3,
-  image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e',
-  isCertified: true,
-  category: 'Gadgets',
-  likes: 21,
-  isLiked: false,
-  isSaved: false
-}, {
-  id: '5',
-  title: 'Bluetooth Speakers',
-  venue: 'Sound Studio',
-  rating: 4.3,
-  image: 'https://images.unsplash.com/photo-1563330232-57114bb0823c',
-  isCertified: true,
-  category: 'Gadgets',
-  likes: 18,
-  isLiked: true,
-  isSaved: false
-}, {
-  id: '6',
-  title: 'Handcrafted Leather Wallet',
-  venue: 'Artisan Market',
-  rating: 4.7,
-  image: 'https://images.unsplash.com/photo-1627123423521-013e47bffe3c',
-  isCertified: true,
-  category: 'Accessories',
-  likes: 32,
-  isLiked: false,
-  isSaved: false
-}];
 
 const RatingStars = ({
   rating
@@ -104,74 +40,76 @@ const RatingStars = ({
     </div>;
 };
 
-const ProfileRecommendations = () => {
-  const [recommendations, setRecommendations] = useState<RecommendationItem[]>(dummyRecommendations);
-  const [filteredRecommendations, setFilteredRecommendations] = useState<RecommendationItem[]>(dummyRecommendations);
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'latest' | 'highestRated' | 'mostLiked'>('latest');
+type ProfileRecommendationsProps = {
+  profileUserId?: string;
+};
+
+const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isFormOpen, setIsFormOpen] = useState(false);
   
-  const categories = [...new Set(recommendations.map(item => item.category))].filter(Boolean) as string[];
+  const {
+    recommendations,
+    isLoading,
+    activeFilter,
+    setActiveFilter,
+    sortBy,
+    setSortBy,
+    handleLike,
+    handleSave,
+    handleImageUpload,
+    addRecommendation,
+    clearFilters
+  } = useRecommendations({ 
+    profileUserId: profileUserId || (user?.id || '') 
+  });
   
-  useEffect(() => {
-    let result = [...recommendations];
+  const categories = [...new Set(recommendations.map(item => item.category))];
+  const isOwnProfile = user?.id === profileUserId || (!profileUserId && !!user);
+  
+  const handleFormSubmit = async (values: any) => {
+    const result = await addRecommendation({
+      title: values.title,
+      venue: values.venue || null,
+      description: values.description || null,
+      rating: values.rating,
+      image_url: values.image_url,
+      category: values.category,
+      visibility: values.visibility,
+      is_certified: false,
+      view_count: 0
+    });
     
-    if (activeFilter) {
-      result = result.filter(item => item.category === activeFilter);
+    if (result) {
+      toast({
+        title: "Recommendation added",
+        description: "Your recommendation has been added successfully"
+      });
     }
-    
-    if (sortBy === 'highestRated') {
-      result = result.sort((a, b) => b.rating - a.rating);
-    } else if (sortBy === 'mostLiked') {
-      result = result.sort((a, b) => (b.likes || 0) - (a.likes || 0));
-    }
-    
-    setFilteredRecommendations(result);
-  }, [recommendations, activeFilter, sortBy]);
-  
-  const handleLike = (id: string) => {
-    setRecommendations(prev => 
-      prev.map(item => {
-        if (item.id === id) {
-          const isLiked = !item.isLiked;
-          return {
-            ...item,
-            isLiked,
-            likes: (item.likes || 0) + (isLiked ? 1 : -1)
-          };
-        }
-        return item;
-      })
-    );
-  };
-  
-  const handleSave = (id: string) => {
-    setRecommendations(prev => 
-      prev.map(item => {
-        if (item.id === id) {
-          return {
-            ...item,
-            isSaved: !item.isSaved
-          };
-        }
-        return item;
-      })
-    );
-  };
-  
-  const clearFilters = () => {
-    setActiveFilter(null);
-    setSortBy('latest');
   };
 
   return (
     <div className="space-y-6 mx-0 my-0">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">My Recommendations</h2>
+        <h2 className="text-xl font-semibold">
+          {isOwnProfile ? 'My Recommendations' : 'Recommendations'}
+        </h2>
         
         <div className="flex items-center gap-2">
+          {isOwnProfile && (
+            <Button 
+              onClick={() => setIsFormOpen(true)}
+              size="sm" 
+              className="bg-brand-orange hover:bg-brand-orange/90 text-white"
+            >
+              <Plus size={16} className="mr-1" /> Add New
+            </Button>
+          )}
+          
           {activeFilter && (
             <Badge variant="outline" className="flex items-center gap-1 px-3 py-1">
-              {activeFilter}
+              {getCategoryLabel(activeFilter)}
               <button 
                 onClick={clearFilters}
                 className="ml-1 text-gray-500 hover:text-gray-700"
@@ -206,7 +144,7 @@ const ProfileRecommendations = () => {
                       activeFilter === category ? "bg-gray-100" : ""
                     )}
                   >
-                    {category}
+                    {getCategoryLabel(category)}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuItem 
@@ -239,21 +177,52 @@ const ProfileRecommendations = () => {
         </div>
       </div>
       
-      {filteredRecommendations.length === 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map(item => (
+            <Card key={item} className="overflow-hidden animate-pulse">
+              <div className="h-48 bg-gray-200"></div>
+              <CardContent className="p-4">
+                <div className="h-6 bg-gray-200 rounded mb-2"></div>
+                <div className="h-4 bg-gray-100 rounded mb-3"></div>
+                <div className="h-4 bg-gray-100 rounded w-2/3 mb-4"></div>
+                <div className="h-8 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : recommendations.length === 0 ? (
         <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-lg">
           <p className="text-lg mb-2">No recommendations found</p>
-          <p className="text-sm">Try clearing your filters or add new recommendations</p>
-          <Button 
-            variant="outline" 
-            className="mt-4"
-            onClick={clearFilters}
-          >
-            Clear Filters
-          </Button>
+          <p className="text-sm">
+            {activeFilter 
+              ? 'Try clearing your filters or add new recommendations'
+              : isOwnProfile 
+                ? 'Share your first recommendation to get started'
+                : 'This user has not added any recommendations yet'}
+          </p>
+          {activeFilter && (
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={clearFilters}
+            >
+              Clear Filters
+            </Button>
+          )}
+          {isOwnProfile && !activeFilter && (
+            <Button 
+              variant="outline" 
+              className="mt-4 bg-brand-orange text-white hover:bg-brand-orange/90"
+              onClick={() => setIsFormOpen(true)}
+            >
+              <Plus size={16} className="mr-1" /> Add Recommendation
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredRecommendations.map(item => (
+          {recommendations.map(item => (
             <Card 
               key={item.id} 
               className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border border-gray-200"
@@ -261,10 +230,10 @@ const ProfileRecommendations = () => {
               <div className="relative">
                 <div className="absolute top-3 left-3 z-10">
                   <Badge variant="secondary" className="bg-black/70 hover:bg-black/80 text-white">
-                    {item.category}
+                    {getCategoryLabel(item.category)}
                   </Badge>
                 </div>
-                {item.isCertified && (
+                {item.is_certified && (
                   <div className="absolute top-3 right-3 z-10">
                     <Badge variant="secondary" className="bg-brand-orange hover:bg-brand-orange/90 text-white flex items-center gap-1">
                       <Award size={12} />
@@ -274,11 +243,29 @@ const ProfileRecommendations = () => {
                 )}
                 <div className="h-48 relative overflow-hidden group">
                   <img 
-                    src={item.image} 
+                    src={item.image_url || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07'} 
                     alt={item.title} 
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
+                    <div className="p-3 w-full flex justify-between items-center">
+                      <div className="flex items-center gap-1 text-white">
+                        <Eye size={14} />
+                        <span className="text-xs">{item.view_count}</span>
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-xs border-0 text-white",
+                          item.visibility === 'private' ? "bg-red-500/70" : 
+                          item.visibility === 'circle_only' ? "bg-blue-500/70" : "bg-green-500/70"
+                        )}
+                      >
+                        {item.visibility === 'public' ? 'Public' : 
+                         item.visibility === 'private' ? 'Private' : 'Circle Only'}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -304,7 +291,7 @@ const ProfileRecommendations = () => {
                   </Button>
                 </div>
                 
-                <p className="text-gray-600 mb-3 text-sm">{item.venue}</p>
+                <p className="text-gray-600 mb-3 text-sm">{item.venue || 'Unknown venue'}</p>
                 
                 <RatingStars rating={item.rating} />
                 
@@ -338,6 +325,15 @@ const ProfileRecommendations = () => {
             </Card>
           ))}
         </div>
+      )}
+      
+      {user && (
+        <RecommendationForm
+          isOpen={isFormOpen}
+          onClose={() => setIsFormOpen(false)}
+          onSubmit={handleFormSubmit}
+          onImageUpload={handleImageUpload}
+        />
       )}
     </div>
   );

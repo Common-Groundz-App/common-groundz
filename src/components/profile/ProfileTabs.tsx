@@ -4,6 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileCircles from './ProfileCircles';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProfileTabsProps {
   profileUserId: string;
@@ -12,6 +13,7 @@ interface ProfileTabsProps {
 
 const ProfileTabs = ({ profileUserId, isOwnProfile }: ProfileTabsProps) => {
   const isMobile = useIsMobile(768);
+  const { user } = useAuth();
   
   return <Tabs defaultValue="recommendations" className={`w-full ${isMobile ? 'my-6' : 'my-[112px]'} px-0`}>
       <div className="bg-background pb-1 mb-2 border-b">
@@ -29,7 +31,7 @@ const ProfileTabs = ({ profileUserId, isOwnProfile }: ProfileTabsProps) => {
       </div>
       
       <TabsContent value="recommendations" className="mt-4">
-        <ProfileRecommendations />
+        <ProfileRecommendations profileUserId={profileUserId} />
       </TabsContent>
       
       <TabsContent value="circles" className="mt-4">

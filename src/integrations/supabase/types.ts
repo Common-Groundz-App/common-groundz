@@ -63,15 +63,128 @@ export type Database = {
         }
         Relationships: []
       }
+      recommendation_likes: {
+        Row: {
+          created_at: string
+          id: string
+          recommendation_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          recommendation_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          recommendation_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendation_likes_recommendation_id_fkey"
+            columns: ["recommendation_id"]
+            isOneToOne: false
+            referencedRelation: "recommendations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recommendation_saves: {
+        Row: {
+          created_at: string
+          id: string
+          recommendation_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          recommendation_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          recommendation_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendation_saves_recommendation_id_fkey"
+            columns: ["recommendation_id"]
+            isOneToOne: false
+            referencedRelation: "recommendations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recommendations: {
+        Row: {
+          category: Database["public"]["Enums"]["recommendation_category"]
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          is_certified: boolean
+          rating: number
+          title: string
+          updated_at: string
+          user_id: string
+          venue: string | null
+          view_count: number
+          visibility: Database["public"]["Enums"]["recommendation_visibility"]
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["recommendation_category"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_certified?: boolean
+          rating: number
+          title: string
+          updated_at?: string
+          user_id: string
+          venue?: string | null
+          view_count?: number
+          visibility?: Database["public"]["Enums"]["recommendation_visibility"]
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["recommendation_category"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_certified?: boolean
+          rating?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+          venue?: string | null
+          view_count?: number
+          visibility?: Database["public"]["Enums"]["recommendation_visibility"]
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_recommendation_view: {
+        Args: {
+          rec_id: string
+          viewer_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      recommendation_category: "food" | "movie" | "product" | "book" | "place"
+      recommendation_visibility: "public" | "private" | "circle_only"
     }
     CompositeTypes: {
       [_ in never]: never
