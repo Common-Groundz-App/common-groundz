@@ -7,6 +7,8 @@ import FeedFollowing from '@/components/feed/FeedFollowing';
 import { SidebarNavigation } from '@/components/navigation/SidebarNavigation';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const Feed = () => {
   const isMobile = useIsMobile();
@@ -16,9 +18,13 @@ const Feed = () => {
       <NavBarComponent />
       
       <div className="flex flex-1 pt-16">
-        {!isMobile && <SidebarNavigation />}
+        {!isMobile && (
+          <div className="w-64 fixed left-0 top-16 bottom-0 border-r border-border">
+            <SidebarNavigation />
+          </div>
+        )}
         
-        <div className="flex-1 max-w-4xl mx-auto px-4 py-6 md:px-6 md:ml-16">
+        <div className={`flex-1 ${!isMobile ? 'ml-64' : ''} max-w-4xl mx-auto px-4 py-6 md:px-6`}>
           <div className="mb-6">
             <h1 className="text-2xl font-bold">Feed</h1>
             <p className="text-muted-foreground">Discover recommendations from the community</p>
@@ -42,7 +48,6 @@ const Feed = () => {
       </div>
       
       {isMobile && <BottomNavigation />}
-      {/* Footer removed from Feed page */}
     </div>
   );
 };

@@ -42,13 +42,14 @@ export function NavBarComponent() {
     }
   }, [location.pathname]);
 
+  // Always hide the logo in the navbar, it will be in the sidebar
   return (
     <>
       <NavBar 
         items={navItems} 
         rightSection={<UserMenu />}
         initialActiveTab={activeTab}
-        hideLogo={location.pathname === '/feed'}
+        hideLogo={true} 
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>
