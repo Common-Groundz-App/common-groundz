@@ -37,7 +37,11 @@ export const SidebarNavigation = () => {
   ];
 
   return (
-    <div className="h-screen w-16 md:w-64 fixed left-0 top-0 pt-16 bg-background border-r hidden md:flex flex-col">
+    <div className="h-screen w-16 md:w-64 fixed left-0 top-0 pt-16 bg-background/95 backdrop-blur-sm border-r hidden md:flex flex-col shadow-sm z-10">
+      <div className="px-4 py-3 mb-4 hidden md:block">
+        <Logo />
+      </div>
+      
       <div className="p-4 flex-1">
         <nav className="space-y-2">
           {navItems.map((item) => {
