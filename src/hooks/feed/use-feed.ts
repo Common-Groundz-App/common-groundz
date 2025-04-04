@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -35,8 +34,7 @@ export const useFeed = (feedType: FeedVisibility) => {
       const offset = page * ITEMS_PER_PAGE;
       const functionName = feedType === 'for_you' ? 'get_for_you_feed' : 'get_following_feed';
       
-      // Fix: Use .rpc() with explicit typing instead of the method that enforces known function names
-      const { data, error } = await supabase.rpc(
+      const { data, error } = await (supabase.rpc as any)(
         functionName,
         { 
           p_user_id: user.id,
@@ -86,7 +84,6 @@ export const useFeed = (feedType: FeedVisibility) => {
     fetchFeed(0, true);
   }, [fetchFeed]);
 
-  // Handle like action
   const handleLike = async (id: string) => {
     if (!user) {
       toast({
@@ -101,7 +98,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       const item = state.items.find(r => r.id === id);
       if (!item) return;
 
-      // Optimistic update
       setState(prev => ({
         ...prev,
         items: prev.items.map(item => {
@@ -117,11 +113,9 @@ export const useFeed = (feedType: FeedVisibility) => {
         })
       }));
 
-      // Server update
       await toggleLike(id, user.id, !!item.is_liked);
     } catch (err) {
       console.error('Error toggling like:', err);
-      // Revert on failure
       refreshFeed();
       toast({
         title: 'Error',
@@ -131,7 +125,6 @@ export const useFeed = (feedType: FeedVisibility) => {
     }
   };
 
-  // Handle save action
   const handleSave = async (id: string) => {
     if (!user) {
       toast({
@@ -146,7 +139,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       const item = state.items.find(r => r.id === id);
       if (!item) return;
 
-      // Optimistic update
       setState(prev => ({
         ...prev,
         items: prev.items.map(item => {
@@ -160,11 +152,9 @@ export const useFeed = (feedType: FeedVisibility) => {
         })
       }));
 
-      // Server update
       await toggleSave(id, user.id, !!item.is_saved);
     } catch (err) {
       console.error('Error toggling save:', err);
-      // Revert on failure
       refreshFeed();
       toast({
         title: 'Error',
