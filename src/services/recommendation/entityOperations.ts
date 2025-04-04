@@ -16,7 +16,7 @@ export const fetchEntityById = async (entityId: string): Promise<Entity | null> 
     return null;
   }
 
-  return data;
+  return data as Entity;
 };
 
 // Find an entity by api_source and api_ref
@@ -38,7 +38,7 @@ export const findEntityByApiRef = async (apiSource: string, apiRef: string): Pro
     return null;
   }
 
-  return data;
+  return data as Entity;
 };
 
 // Create a new entity
@@ -54,7 +54,7 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     return null;
   }
 
-  return data;
+  return data as Entity;
 };
 
 // Find or create an entity based on external API data
@@ -110,5 +110,5 @@ export const getEntitiesByType = async (type: EntityType, searchTerm: string = '
     return [];
   }
 
-  return data || [];
+  return data as Entity[];
 };

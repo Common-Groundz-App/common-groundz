@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -46,7 +47,8 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
       category: values.category,
       visibility: values.visibility,
       is_certified: false,
-      view_count: 0
+      view_count: 0,
+      entity_id: values.entity_id || null
     });
     
     if (result) {

@@ -3,7 +3,7 @@ import { Database } from '@/integrations/supabase/types';
 
 export type RecommendationCategory = Database['public']['Enums']['recommendation_category'];
 export type RecommendationVisibility = Database['public']['Enums']['recommendation_visibility'];
-export type EntityType = Database['public']['Enums']['entity_type'];
+export type EntityType = 'book' | 'movie' | 'place' | 'product' | 'food';
 
 export interface Entity {
   id: string;

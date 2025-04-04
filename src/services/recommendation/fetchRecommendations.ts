@@ -21,7 +21,7 @@ export const fetchUserRecommendations = async (userId: string) => {
     ...rec,
     entity: rec.entities,
     entities: undefined
-  }));
+  })) as Recommendation[];
 };
 
 export const fetchRecommendationWithLikesAndSaves = async (userId: string, profileId: string) => {
@@ -79,7 +79,7 @@ export const fetchRecommendationWithLikesAndSaves = async (userId: string, profi
         recommendation_likes: undefined,
         recommendation_saves: undefined,
         entities: undefined
-      };
+      } as Recommendation;
     });
   }
 
@@ -93,5 +93,5 @@ export const fetchRecommendationWithLikesAndSaves = async (userId: string, profi
     recommendation_likes: undefined,
     recommendation_saves: undefined,
     entities: undefined
-  }));
+  })) as Recommendation[];
 };
