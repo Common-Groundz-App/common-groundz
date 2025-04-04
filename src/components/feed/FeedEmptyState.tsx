@@ -8,19 +8,15 @@ const FeedEmptyState = () => {
   const navigate = useNavigate();
   
   return (
-    <div className="text-center py-16 px-4 bg-muted/30 rounded-lg">
-      <div className="mb-6 flex justify-center">
-        <div className="p-6 rounded-full bg-muted flex items-center justify-center">
-          <Search size={48} className="text-muted-foreground" />
-        </div>
+    <div className="text-center py-12 px-4">
+      <div className="mb-4 flex justify-center">
+        <Search size={48} className="text-gray-400" />
       </div>
-      <h3 className="text-xl font-medium mb-3">No recommendations yet</h3>
-      <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+      <h3 className="text-lg font-medium mb-2">No recommendations yet</h3>
+      <p className="text-muted-foreground mb-6">
         Recommendations will appear here as people share their experiences
       </p>
       <Button 
-        size="lg"
-        className="bg-brand-orange hover:bg-brand-orange/90"
         onClick={() => {
           // Open recommendation form
           const event = new CustomEvent('open-recommendation-form');
