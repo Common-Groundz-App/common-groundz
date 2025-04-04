@@ -1,1 +1,8 @@
+
 project_id = "uyjtgybbktgapspodajy"
+
+[functions.search-places]
+verify_jwt = false
+
+[functions.search-movies]
+verify_jwt = false

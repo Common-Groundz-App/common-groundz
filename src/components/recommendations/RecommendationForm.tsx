@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RecommendationCategory, RecommendationVisibility } from '@/services/recommendationService';
+import { RecommendationCategory, RecommendationVisibility, Entity } from '@/services/recommendationService';
 import { useToast } from '@/hooks/use-toast';
-import { Image, Upload, Star } from 'lucide-react';
+import { Image, Upload, Star, X } from 'lucide-react';
+import EntitySearch from './EntitySearch';
 
 // Define form schema
 const formSchema = z.object({
@@ -21,6 +22,7 @@ const formSchema = z.object({
   rating: z.number().min(0).max(5),
   category: z.enum(['food', 'movie', 'product', 'book', 'place']),
   visibility: z.enum(['public', 'private', 'circle_only']),
+  entity_id: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -56,6 +58,7 @@ export const RecommendationForm = ({
   const [selectedRating, setSelectedRating] = useState<number>(4);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -66,8 +69,11 @@ export const RecommendationForm = ({
       rating: 4,
       category: 'food' as RecommendationCategory,
       visibility: 'public' as RecommendationVisibility,
+      entity_id: undefined,
     },
   });
+
+  const selectedCategory = form.watch('category');
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,11 +90,28 @@ export const RecommendationForm = ({
     }
   };
 
+  const handleEntitySelect = (entity: Entity) => {
+    setSelectedEntity(entity);
+    form.setValue('entity_id', entity.id);
+    
+    // Auto-populate form with entity data
+    form.setValue('title', entity.name || form.getValues('title'));
+    if (entity.venue) form.setValue('venue', entity.venue);
+    if (entity.description) form.setValue('description', entity.description);
+    if (entity.image_url && !imageUrl) setImageUrl(entity.image_url);
+  };
+
+  const handleClearEntity = () => {
+    setSelectedEntity(null);
+    form.setValue('entity_id', undefined);
+  };
+
   const handleFormSubmit = async (values: FormValues) => {
     try {
       await onSubmit({ ...values, image_url: imageUrl });
       form.reset();
       setImageUrl(null);
+      setSelectedEntity(null);
       onClose();
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -109,6 +132,67 @@ export const RecommendationForm = ({
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      // Reset entity when changing category
+                      setSelectedEntity(null);
+                      form.setValue('entity_id', undefined);
+                    }}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.value} value={category.value}>
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Entity Search */}
+            <div className="space-y-2">
+              <FormLabel>Search for {selectedCategory}</FormLabel>
+              {selectedEntity ? (
+                <div className="p-3 border rounded-md flex justify-between items-center">
+                  <div>
+                    <div className="font-medium">{selectedEntity.name}</div>
+                    {selectedEntity.venue && (
+                      <div className="text-xs text-gray-500">{selectedEntity.venue}</div>
+                    )}
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleClearEntity}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <EntitySearch 
+                  type={selectedCategory} 
+                  onSelect={handleEntitySelect} 
+                />
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="title"
@@ -132,34 +216,6 @@ export const RecommendationForm = ({
                   <FormControl>
                     <Input placeholder="Where can this be found?" {...field} value={field.value || ''} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.value} value={category.value}>
-                          {category.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
