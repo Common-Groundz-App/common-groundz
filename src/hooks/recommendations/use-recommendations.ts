@@ -3,6 +3,7 @@ import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useRecommendationFilters } from './use-recommendation-filters';
 import { useRecommendationActions } from './use-recommendation-actions';
 import { useRecommendationUploads } from './use-recommendation-uploads';
+import { useEntityOperations } from './use-entity-operations';
 
 interface UseRecommendationsProps {
   profileUserId: string;
@@ -35,12 +36,20 @@ export const useRecommendations = ({ profileUserId }: UseRecommendationsProps) =
   
   const { handleImageUpload } = useRecommendationUploads();
 
+  const {
+    entities,
+    isLoading: isLoadingEntities,
+    handleEntityCreation,
+    searchEntities
+  } = useEntityOperations();
+
   return {
     // Data state
     recommendations: filteredRecommendations,
-    isLoading,
+    isLoading: isLoading || isLoadingEntities,
     error,
     categories,
+    entities,
     
     // Filter state
     activeFilter,
@@ -54,6 +63,10 @@ export const useRecommendations = ({ profileUserId }: UseRecommendationsProps) =
     handleSave,
     handleImageUpload,
     addRecommendation,
-    refreshRecommendations
+    refreshRecommendations,
+    
+    // Entity operations
+    handleEntityCreation,
+    searchEntities
   };
 };

@@ -9,6 +9,62 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      entities: {
+        Row: {
+          api_ref: string | null
+          api_source: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          is_deleted: boolean
+          metadata: Json | null
+          name: string
+          type: Database["public"]["Enums"]["entity_type"]
+          updated_at: string
+          venue: string | null
+        }
+        Insert: {
+          api_ref?: string | null
+          api_source?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_deleted?: boolean
+          metadata?: Json | null
+          name: string
+          type: Database["public"]["Enums"]["entity_type"]
+          updated_at?: string
+          venue?: string | null
+        }
+        Update: {
+          api_ref?: string | null
+          api_source?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_deleted?: boolean
+          metadata?: Json | null
+          name?: string
+          type?: Database["public"]["Enums"]["entity_type"]
+          updated_at?: string
+          venue?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follows: {
         Row: {
           created_at: string
@@ -126,6 +182,7 @@ export type Database = {
           category: Database["public"]["Enums"]["recommendation_category"]
           created_at: string
           description: string | null
+          entity_id: string | null
           id: string
           image_url: string | null
           is_certified: boolean
@@ -141,6 +198,7 @@ export type Database = {
           category: Database["public"]["Enums"]["recommendation_category"]
           created_at?: string
           description?: string | null
+          entity_id?: string | null
           id?: string
           image_url?: string | null
           is_certified?: boolean
@@ -156,6 +214,7 @@ export type Database = {
           category?: Database["public"]["Enums"]["recommendation_category"]
           created_at?: string
           description?: string | null
+          entity_id?: string | null
           id?: string
           image_url?: string | null
           is_certified?: boolean
@@ -167,7 +226,15 @@ export type Database = {
           view_count?: number
           visibility?: Database["public"]["Enums"]["recommendation_visibility"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "recommendations_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -183,6 +250,7 @@ export type Database = {
       }
     }
     Enums: {
+      entity_type: "book" | "movie" | "place" | "product" | "food"
       recommendation_category: "food" | "movie" | "product" | "book" | "place"
       recommendation_visibility: "public" | "private" | "circle_only"
     }

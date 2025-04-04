@@ -5,7 +5,10 @@ import { Recommendation } from './types';
 export const fetchUserRecommendations = async (userId: string) => {
   const { data, error } = await supabase
     .from('recommendations')
-    .select('*')
+    .select(`
+      *,
+      entities(*)
+    `)
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -14,7 +17,11 @@ export const fetchUserRecommendations = async (userId: string) => {
     throw error;
   }
 
-  return data;
+  return data.map(rec => ({
+    ...rec,
+    entity: rec.entities,
+    entities: undefined
+  }));
 };
 
 export const fetchRecommendationWithLikesAndSaves = async (userId: string, profileId: string) => {
@@ -24,7 +31,8 @@ export const fetchRecommendationWithLikesAndSaves = async (userId: string, profi
     .select(`
       *,
       recommendation_likes(count),
-      recommendation_saves(count)
+      recommendation_saves(count),
+      entities(*)
     `)
     .eq('user_id', profileId)
     .order('created_at', { ascending: false });
@@ -67,8 +75,10 @@ export const fetchRecommendationWithLikesAndSaves = async (userId: string, profi
         likes: likesCount,
         isLiked,
         isSaved,
+        entity: rec.entities,
         recommendation_likes: undefined,
-        recommendation_saves: undefined
+        recommendation_saves: undefined,
+        entities: undefined
       };
     });
   }
@@ -79,7 +89,9 @@ export const fetchRecommendationWithLikesAndSaves = async (userId: string, profi
     likes: rec.recommendation_likes?.[0]?.count || 0,
     isLiked: false,
     isSaved: false,
+    entity: rec.entities,
     recommendation_likes: undefined,
-    recommendation_saves: undefined
+    recommendation_saves: undefined,
+    entities: undefined
   }));
 };
