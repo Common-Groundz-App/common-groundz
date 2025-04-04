@@ -5,15 +5,28 @@ import { UserMenu } from './UserMenu'
 import { useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { SearchDialog } from '@/components/SearchDialog'
+import { supabase } from '@/integrations/supabase/client'
 
 export function NavBarComponent() {
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
   
+  // Listen for custom event to open search dialog
+  useEffect(() => {
+    const handleOpenSearch = () => {
+      setShowSearchDialog(true);
+    };
+    
+    window.addEventListener('open-search-dialog', handleOpenSearch);
+    return () => {
+      window.removeEventListener('open-search-dialog', handleOpenSearch);
+    };
+  }, []);
+  
   const navItems = [
     { name: 'Home', url: '/', icon: Home },
-    { name: 'Features', url: '#features', icon: Star },
+    { name: 'Feed', url: '/feed', icon: Star },
     { name: 'Search', url: '#', icon: Search, onClick: () => setShowSearchDialog(true) },
     { name: 'Profile', url: '/profile', icon: User }
   ];
@@ -24,8 +37,8 @@ export function NavBarComponent() {
       setActiveTab('Home');
     } else if (location.pathname.startsWith('/profile')) {
       setActiveTab('Profile');
-    } else if (location.pathname.includes('features')) {
-      setActiveTab('Features');
+    } else if (location.pathname === '/feed') {
+      setActiveTab('Feed');
     }
   }, [location.pathname]);
 

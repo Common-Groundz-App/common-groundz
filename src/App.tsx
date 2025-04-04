@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
+import Feed from "./pages/Feed";
 
 // Create a new QueryClient instance outside of the component
 const queryClient = new QueryClient();
@@ -28,6 +29,11 @@ function App() {
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/feed" element={
+                  <ProtectedRoute>
+                    <Feed />
+                  </ProtectedRoute>
+                } />
                 <Route path="/profile" element={
                   <ProtectedRoute>
                     <Profile />

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useRecommendations } from '@/hooks/recommendations/use-recommendations';
@@ -36,6 +36,18 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
   
   const categories = [...new Set(recommendations.map(item => item.category))];
   const isOwnProfile = user?.id === profileUserId || (!profileUserId && !!user);
+
+  // Listen for custom event to open recommendation form
+  useEffect(() => {
+    const handleOpenForm = () => {
+      setIsFormOpen(true);
+    };
+    
+    window.addEventListener('open-recommendation-form', handleOpenForm);
+    return () => {
+      window.removeEventListener('open-recommendation-form', handleOpenForm);
+    };
+  }, []);
   
   const handleFormSubmit = async (values: any) => {
     const result = await addRecommendation({
