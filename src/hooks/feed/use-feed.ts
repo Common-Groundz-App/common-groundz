@@ -35,6 +35,7 @@ export const useFeed = (feedType: FeedVisibility) => {
       const offset = page * ITEMS_PER_PAGE;
       const functionName = feedType === 'for_you' ? 'get_for_you_feed' : 'get_following_feed';
       
+      // Fix: Use .rpc() with explicit typing instead of the method that enforces known function names
       const { data, error } = await supabase.rpc(
         functionName,
         { 

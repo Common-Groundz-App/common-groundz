@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Logo from '@/components/Logo';
+import { supabase } from '@/integrations/supabase/client';
 
 export const SidebarNavigation = () => {
   const location = useLocation();
