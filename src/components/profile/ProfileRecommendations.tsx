@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useRecommendations } from '@/hooks/use-recommendations';
+import { useRecommendations } from '@/hooks/recommendations/use-recommendations';
 import RecommendationForm from '@/components/recommendations/RecommendationForm';
 import RecommendationFilters from '@/components/recommendations/RecommendationFilters';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
@@ -105,6 +105,6 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
       )}
     </div>
   );
-};
+}
 
 export default ProfileRecommendations;
