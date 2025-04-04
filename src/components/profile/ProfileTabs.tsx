@@ -3,6 +3,7 @@ import React from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileCircles from './ProfileCircles';
+import ProfileAbout from './ProfileAbout';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -39,9 +40,7 @@ const ProfileTabs = ({ profileUserId, isOwnProfile }: ProfileTabsProps) => {
       </TabsContent>
       
       <TabsContent value="about" className="mt-4">
-        <div className="p-4 text-center text-gray-500">
-          About content will go here
-        </div>
+        <ProfileAbout profileUserId={profileUserId} isOwnProfile={isOwnProfile} />
       </TabsContent>
     </Tabs>;
 };
