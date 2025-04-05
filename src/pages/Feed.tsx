@@ -16,7 +16,7 @@ const Feed = () => {
   
   return (
     <div className="min-h-screen flex flex-col">
-      <NavBarComponent hideLogo={!isMobile} />
+      <NavBarComponent />
       
       <div className="flex flex-1 pt-16">
         {!isMobile && <SidebarNavigation />}

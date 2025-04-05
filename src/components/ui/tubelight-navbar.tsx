@@ -21,14 +21,12 @@ interface NavBarProps {
   className?: string;
   rightSection?: React.ReactNode;
   initialActiveTab?: string;
-  hideLogo?: boolean; // Added the hideLogo prop
 }
 export function NavBar({
   items,
   className,
   rightSection,
-  initialActiveTab,
-  hideLogo = false // Set default value
+  initialActiveTab
 }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const [scrolled, setScrolled] = useState(false);
@@ -69,16 +67,14 @@ export function NavBar({
     className
   )}>
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Logo Section - Only show if hideLogo is false */}
-        {!hideLogo && (
-          <div className="flex-shrink-0">
-            <Link to="/" className="flex items-center">
-              <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
-                <Logo size="md" />
-              </div>
-            </Link>
-          </div>
-        )}
+        {/* Logo Section */}
+        <div className="flex-shrink-0">
+          <Link to="/" className="flex items-center">
+            <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
+              <Logo size="md" />
+            </div>
+          </Link>
+        </div>
 
         {/* Navigation Items - Centered for Desktop */}
         {!isSmallMobile ? <div className="flex-grow flex justify-center">
