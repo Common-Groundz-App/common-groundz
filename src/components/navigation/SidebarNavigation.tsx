@@ -40,13 +40,13 @@ export const SidebarNavigation = () => {
   const isFeedPage = location.pathname === '/feed';
 
   return (
-    <div className="h-screen w-16 md:w-64 fixed left-0 top-0 pt-16 bg-background border-r hidden md:flex flex-col">
-      {isFeedPage && (
-        <div className="px-4 py-4 flex justify-center md:justify-start border-b">
-          <Logo responsive={true} size="md" className="max-h-10" />
-        </div>
-      )}
-      <div className={cn("p-4 flex-1", isFeedPage ? "pt-2" : "")}>
+    <div className="h-screen w-16 md:w-64 fixed left-0 top-0 bg-background border-r hidden md:flex flex-col">
+      {/* Logo section */}
+      <div className="px-4 py-4 flex justify-center md:justify-start border-b">
+        <Logo responsive={true} size="md" className="max-h-10" />
+      </div>
+      
+      <div className="p-4 flex-1 overflow-y-auto">
         <nav className="space-y-2">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path || 

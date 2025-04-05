@@ -52,6 +52,7 @@ export function NavBarComponent() {
         rightSection={<UserMenu />}
         initialActiveTab={activeTab}
         hideLogo={isFeedPage}
+        onFeedPage={isFeedPage}
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>

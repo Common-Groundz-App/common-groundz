@@ -22,13 +22,15 @@ interface NavBarProps {
   rightSection?: React.ReactNode;
   initialActiveTab?: string;
   hideLogo?: boolean;
+  onFeedPage?: boolean;
 }
 export function NavBar({
   items,
   className,
   rightSection,
   initialActiveTab,
-  hideLogo = false
+  hideLogo = false,
+  onFeedPage = false
 }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const [scrolled, setScrolled] = useState(false);
@@ -64,14 +66,15 @@ export function NavBar({
   };
 
   return <div className={cn(
-    "fixed top-0 left-0 right-0 z-50 py-4 px-4 transition-all duration-300", 
-    scrolled ? "bg-background/90 backdrop-blur-md shadow-sm" : "bg-transparent", 
+    "fixed top-0 right-0 z-50 py-4 px-4 transition-all duration-300", 
+    scrolled ? "bg-background/90 backdrop-blur-md shadow-sm" : "bg-transparent",
+    onFeedPage ? "left-16 md:left-64" : "left-0",
     className
   )}>
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Logo Section */}
+        {/* Logo Section - Hidden on Feed page */}
         <div className="flex-shrink-0">
-          {!hideLogo && (
+          {!hideLogo && !onFeedPage && (
             <Link to="/" className="flex items-center">
               <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
                 <Logo size="md" responsive={true} />
