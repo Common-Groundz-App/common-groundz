@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -32,30 +33,149 @@ export const useFeed = (feedType: FeedVisibility) => {
 
     try {
       const offset = page * ITEMS_PER_PAGE;
-      const functionName = feedType === 'for_you' ? 'get_for_you_feed' : 'get_following_feed';
+      let query;
       
-      const { data, error } = await (supabase.rpc as any)(
-        functionName,
-        { 
-          p_user_id: user.id,
-          p_limit: ITEMS_PER_PAGE,
-          p_offset: offset
+      // Instead of using RPC functions that don't exist yet, we'll use direct database queries
+      if (feedType === 'for_you') {
+        // For "For You" feed, we'll get all public recommendations ordered by created_at
+        query = supabase
+          .from('recommendations')
+          .select(`
+            id, 
+            title, 
+            venue, 
+            description, 
+            rating, 
+            image_url, 
+            category, 
+            visibility, 
+            is_certified, 
+            view_count, 
+            user_id, 
+            created_at, 
+            updated_at,
+            entities!entity_id (id, name, type, venue, description, image_url),
+            profiles!user_id (username, avatar_url)
+          `)
+          .eq('visibility', 'public')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + ITEMS_PER_PAGE - 1);
+      } else {
+        // For "Following" feed, get recommendations from users the current user follows
+        const { data: followingIds } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+        
+        const followingUserIds = followingIds?.map(follow => follow.following_id) || [];
+        
+        // If user isn't following anyone, return empty array
+        if (followingUserIds.length === 0) {
+          setState(prev => ({
+            ...prev,
+            items: [],
+            hasMore: false,
+            page,
+            isLoading: false,
+            isLoadingMore: false,
+            error: null
+          }));
+          return;
         }
-      );
+        
+        query = supabase
+          .from('recommendations')
+          .select(`
+            id, 
+            title, 
+            venue, 
+            description, 
+            rating, 
+            image_url, 
+            category, 
+            visibility, 
+            is_certified, 
+            view_count, 
+            user_id, 
+            created_at, 
+            updated_at,
+            entities!entity_id (id, name, type, venue, description, image_url),
+            profiles!user_id (username, avatar_url)
+          `)
+          .in('user_id', followingUserIds)
+          .eq('visibility', 'public')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + ITEMS_PER_PAGE - 1);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
-
-      const items = data as FeedItem[];
       
-      setState(prev => ({
-        ...prev,
-        items: reset ? items : [...prev.items, ...items],
-        hasMore: items.length === ITEMS_PER_PAGE,
-        page,
-        isLoading: false,
-        isLoadingMore: false,
-        error: null
-      }));
+      // Get likes and saves for each recommendation
+      if (data && data.length > 0) {
+        // Get recommendation IDs
+        const recommendationIds = data.map(item => item.id);
+        
+        // Get likes for the current user
+        const { data: userLikes } = await supabase
+          .from('recommendation_likes')
+          .select('recommendation_id')
+          .eq('user_id', user.id)
+          .in('recommendation_id', recommendationIds);
+          
+        // Get saves for the current user
+        const { data: userSaves } = await supabase
+          .from('recommendation_saves')
+          .select('recommendation_id')
+          .eq('user_id', user.id)
+          .in('recommendation_id', recommendationIds);
+          
+        // Get like counts for each recommendation
+        const { data: likeCounts } = await supabase
+          .from('recommendation_likes')
+          .select('recommendation_id, count')
+          .in('recommendation_id', recommendationIds)
+          .group('recommendation_id');
+          
+        // Map the data to FeedItem format
+        const items = data.map(item => {
+          const likes = likeCounts?.find(l => l.recommendation_id === item.id)?.count || 0;
+          const is_liked = userLikes?.some(like => like.recommendation_id === item.id) || false;
+          const is_saved = userSaves?.some(save => save.recommendation_id === item.id) || false;
+          
+          return {
+            ...item,
+            likes: Number(likes),
+            is_liked,
+            is_saved,
+            username: item.profiles?.username || null,
+            avatar_url: item.profiles?.avatar_url || null,
+            entity: item.entities
+          } as FeedItem;
+        });
+        
+        setState(prev => ({
+          ...prev,
+          items: reset ? items : [...prev.items, ...items],
+          hasMore: items.length === ITEMS_PER_PAGE,
+          page,
+          isLoading: false,
+          isLoadingMore: false,
+          error: null
+        }));
+      } else {
+        // No data returned
+        setState(prev => ({
+          ...prev,
+          items: reset ? [] : prev.items,
+          hasMore: false,
+          page,
+          isLoading: false,
+          isLoadingMore: false,
+          error: null
+        }));
+      }
     } catch (error) {
       console.error(`Error fetching ${feedType} feed:`, error);
       setState(prev => ({

@@ -7,6 +7,8 @@ import FeedSkeleton from './FeedSkeleton';
 import FeedEmptyState from './FeedEmptyState';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const FeedForYou = () => {
   const { toast } = useToast();
@@ -48,7 +50,23 @@ const FeedForYou = () => {
         </Button>
       </div>
       
-      {isLoading ? (
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            There was a problem loading the feed.
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={refreshFeed}
+              className="ml-2"
+            >
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : isLoading ? (
         <FeedSkeleton />
       ) : items.length === 0 ? (
         <FeedEmptyState />

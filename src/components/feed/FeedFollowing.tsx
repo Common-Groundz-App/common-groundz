@@ -4,11 +4,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/feed/use-feed';
 import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
-import FeedEmptyState from './FeedEmptyState';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, UserPlus } from 'lucide-react';
+import { RefreshCw, UserPlus, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const FeedFollowing = () => {
   const { user } = useAuth();
@@ -51,21 +52,43 @@ const FeedFollowing = () => {
         </Button>
       </div>
       
-      {isLoading ? (
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            There was a problem loading the feed.
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={refreshFeed}
+              className="ml-2"
+            >
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : isLoading ? (
         <FeedSkeleton />
       ) : items.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="mb-4 flex justify-center">
-            <UserPlus size={48} className="text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium mb-2">No recommendations yet</h3>
-          <p className="text-muted-foreground mb-6">
-            Follow people to see their recommendations in your feed
-          </p>
-          <Button asChild>
-            <Link to={`/profile/${user?.id}`}>Find people to follow</Link>
-          </Button>
-        </div>
+        <Card className="border-dashed">
+          <CardContent className="text-center py-12 flex flex-col items-center">
+            <div className="mb-4 p-4 bg-muted rounded-full">
+              <UserPlus size={40} className="text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No recommendations yet</h3>
+            <p className="text-muted-foreground mb-6 max-w-sm">
+              Follow people to see their recommendations in your feed
+            </p>
+            <Button 
+              size="lg"
+              asChild
+              className="px-6"
+            >
+              <Link to={`/profile/${user?.id}`}>Find people to follow</Link>
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <>
           <div className="space-y-6">
