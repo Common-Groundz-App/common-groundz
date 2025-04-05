@@ -40,132 +40,140 @@ export const SidebarNavigation = () => {
   const isFeedPage = location.pathname === '/feed';
 
   return (
-    <div className="h-screen w-16 md:w-64 fixed left-0 top-0 bg-background border-r hidden md:flex flex-col">
-      {/* Logo section */}
-      <div className="px-4 py-4 flex justify-center md:justify-start border-b">
-        <Logo responsive={true} size="md" className="max-h-10" />
-      </div>
-      
-      <div className="p-4 flex-1 overflow-y-auto">
-        <nav className="space-y-2">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path || 
-                            (item.path === '/profile' && location.pathname.startsWith('/profile'));
-            
-            return (
-              <Tooltip key={item.name} delayDuration={300}>
-                <TooltipTrigger asChild>
-                  {item.path.startsWith('#') ? (
-                    <button
-                      onClick={item.onClick}
-                      className={cn(
-                        "flex items-center w-full p-3 rounded-md text-sm font-medium transition-colors",
-                        isActive 
-                          ? "bg-accent text-accent-foreground" 
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <item.icon className="h-5 w-5 md:mr-2" />
-                      <span className="hidden md:inline">{item.name}</span>
-                    </button>
-                  ) : (
-                    <Link
-                      to={item.path}
-                      className={cn(
-                        "flex items-center p-3 rounded-md text-sm font-medium transition-colors",
-                        isActive 
-                          ? "bg-accent text-accent-foreground" 
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <item.icon className="h-5 w-5 md:mr-2" />
-                      <span className="hidden md:inline">{item.name}</span>
-                    </Link>
-                  )}
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:hidden">
-                  {item.name}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
-          
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <Link
-                to="/profile"
-                className={cn(
-                  "flex items-center p-3 rounded-md text-sm font-medium transition-colors mt-6",
-                  "text-brand-orange hover:bg-brand-orange/10"
-                )}
-                onClick={(e) => {
-                  e.preventDefault();
-                  // Open recommendation form
-                  const event = new CustomEvent('open-recommendation-form');
-                  window.dispatchEvent(event);
-                }}
-              >
-                <PlusCircle className="h-5 w-5 md:mr-2" />
-                <span className="hidden md:inline">Add Recommendation</span>
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="md:hidden">
-              Add Recommendation
-            </TooltipContent>
-          </Tooltip>
-        </nav>
-      </div>
-      
-      {user && (
-        <div className="p-4 border-t">
-          <div className="flex items-center justify-between">
-            <Link to="/profile" className="flex items-center space-x-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user.user_metadata?.avatar_url} />
-                <AvatarFallback>{getInitials(user.user_metadata?.username)}</AvatarFallback>
-              </Avatar>
-              <div className="hidden md:block flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {user.user_metadata?.username || 'User'}
-                </p>
-              </div>
-            </Link>
-            
-            <div className="flex items-center gap-1">
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Link
-                    to="/settings"
-                    className="p-2 rounded-full hover:bg-accent text-muted-foreground"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:hidden">
-                  Settings
-                </TooltipContent>
-              </Tooltip>
+    <>
+      {/* Desktop Sidebar */}
+      <div className="h-screen w-16 md:w-64 fixed left-0 top-0 bg-background border-r hidden md:flex flex-col">
+        {/* Logo section */}
+        <div className="px-4 py-4 flex justify-center md:justify-start border-b">
+          <Logo responsive={true} size="md" className="max-h-10" />
+        </div>
+        
+        <div className="p-4 flex-1 overflow-y-auto">
+          <nav className="space-y-2">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.path || 
+                              (item.path === '/profile' && location.pathname.startsWith('/profile'));
               
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => {
-                      // Sign out
-                      supabase.auth.signOut();
-                    }}
-                    className="p-2 rounded-full hover:bg-accent text-muted-foreground"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:hidden">
-                  Sign out
-                </TooltipContent>
-              </Tooltip>
+              return (
+                <Tooltip key={item.name} delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    {item.path.startsWith('#') ? (
+                      <button
+                        onClick={item.onClick}
+                        className={cn(
+                          "flex items-center w-full p-3 rounded-md text-sm font-medium transition-colors",
+                          isActive 
+                            ? "bg-accent text-accent-foreground" 
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5 md:mr-2" />
+                        <span className="hidden md:inline">{item.name}</span>
+                      </button>
+                    ) : (
+                      <Link
+                        to={item.path}
+                        className={cn(
+                          "flex items-center p-3 rounded-md text-sm font-medium transition-colors",
+                          isActive 
+                            ? "bg-accent text-accent-foreground" 
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5 md:mr-2" />
+                        <span className="hidden md:inline">{item.name}</span>
+                      </Link>
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="md:hidden">
+                    {item.name}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+            
+            <Tooltip delayDuration={300}>
+              <TooltipTrigger asChild>
+                <Link
+                  to="/profile"
+                  className={cn(
+                    "flex items-center p-3 rounded-md text-sm font-medium transition-colors mt-6",
+                    "text-brand-orange hover:bg-brand-orange/10"
+                  )}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Open recommendation form
+                    const event = new CustomEvent('open-recommendation-form');
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  <PlusCircle className="h-5 w-5 md:mr-2" />
+                  <span className="hidden md:inline">Add Recommendation</span>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="md:hidden">
+                Add Recommendation
+              </TooltipContent>
+            </Tooltip>
+          </nav>
+        </div>
+        
+        {user && (
+          <div className="p-4 border-t">
+            <div className="flex items-center justify-between">
+              <Link to="/profile" className="flex items-center space-x-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user.user_metadata?.avatar_url} />
+                  <AvatarFallback>{getInitials(user.user_metadata?.username)}</AvatarFallback>
+                </Avatar>
+                <div className="hidden md:block flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {user.user_metadata?.username || 'User'}
+                  </p>
+                </div>
+              </Link>
+              
+              <div className="flex items-center gap-1">
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <Link
+                      to="/settings"
+                      className="p-2 rounded-full hover:bg-accent text-muted-foreground"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="md:hidden">
+                    Settings
+                  </TooltipContent>
+                </Tooltip>
+                
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => {
+                        // Sign out
+                        supabase.auth.signOut();
+                      }}
+                      className="p-2 rounded-full hover:bg-accent text-muted-foreground"
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="md:hidden">
+                    Sign out
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+      
+      {/* Mobile Temporary Logo Bar (only visible on small screens when sidebar is hidden) */}
+      <div className="h-16 fixed top-0 left-0 right-0 z-40 md:hidden flex items-center px-4 border-b bg-background">
+        <Logo size="sm" className="h-8" />
+      </div>
+    </>
   );
 };

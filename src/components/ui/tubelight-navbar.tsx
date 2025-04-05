@@ -81,6 +81,15 @@ export function NavBar({
               </div>
             </Link>
           )}
+          
+          {/* Small mobile - always show logo if not on feed page */}
+          {isSmallMobile && !onFeedPage && (
+            <Link to="/" className="flex items-center">
+              <div className="p-1 rounded-md flex items-center justify-center bg-transparent">
+                <Logo size="sm" />
+              </div>
+            </Link>
+          )}
         </div>
 
         {/* Navigation Items - Centered for Desktop */}
