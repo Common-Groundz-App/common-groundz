@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -130,25 +131,29 @@ export const useFeed = (feedType: FeedVisibility) => {
           .eq('user_id', user.id)
           .in('recommendation_id', recommendationIds);
           
-        // Get like counts for each recommendation - Fixed query structure
-        const { data: likeCounts } = await supabase
+        // Instead of using groupBy, fetch all likes and count them in JS
+        const { data: allLikes } = await supabase
           .from('recommendation_likes')
-          .select('recommendation_id, count', { count: 'exact', head: false })
-          .in('recommendation_id', recommendationIds)
-          .groupBy('recommendation_id');
+          .select('recommendation_id')
+          .in('recommendation_id', recommendationIds);
+          
+        // Count likes for each recommendation
+        const likesCount: Record<string, number> = {};
+        allLikes?.forEach(like => {
+          if (like.recommendation_id) {
+            likesCount[like.recommendation_id] = (likesCount[like.recommendation_id] || 0) + 1;
+          }
+        });
         
         // Map the data to FeedItem format
         const items = data.map(item => {
-          // Find like count for this recommendation
-          const likeCount = likeCounts?.find(l => l.recommendation_id === item.id);
-          const likes = likeCount ? parseInt(likeCount.count as unknown as string) : 0;
-          
+          const likes = likesCount[item.id] || 0;
           const is_liked = userLikes?.some(like => like.recommendation_id === item.id) || false;
           const is_saved = userSaves?.some(save => save.recommendation_id === item.id) || false;
           
           return {
             ...item,
-            likes: likes,
+            likes,
             is_liked,
             is_saved,
             username: item.profiles?.username || null,
