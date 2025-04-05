@@ -48,7 +48,6 @@ export function NavBarComponent() {
         items={navItems} 
         rightSection={<UserMenu />}
         initialActiveTab={activeTab}
-        hideLogo={location.pathname === '/feed'}
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>

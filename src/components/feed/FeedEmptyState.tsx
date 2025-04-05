@@ -8,7 +8,7 @@ const FeedEmptyState = () => {
   const navigate = useNavigate();
   
   return (
-    <div className="text-center py-12 px-4">
+    <div className="text-center py-12">
       <div className="mb-4 flex justify-center">
         <Search size={48} className="text-gray-400" />
       </div>
@@ -16,13 +16,7 @@ const FeedEmptyState = () => {
       <p className="text-muted-foreground mb-6">
         Recommendations will appear here as people share their experiences
       </p>
-      <Button 
-        onClick={() => {
-          // Open recommendation form
-          const event = new CustomEvent('open-recommendation-form');
-          window.dispatchEvent(event);
-        }}
-      >
+      <Button onClick={() => navigate('/profile')}>
         Add your first recommendation
       </Button>
     </div>
