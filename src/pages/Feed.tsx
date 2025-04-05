@@ -11,6 +11,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Info, Home, Star, Search, User, PlusCircle } from "lucide-react";
 import { useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
+import Logo from '@/components/Logo';
 
 const Feed = () => {
   const isMobile = useIsMobile();
@@ -37,6 +38,15 @@ const Feed = () => {
   
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Mobile header - only shown when width < 768px */}
+      {isMobile && (
+        <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+          <div className="container p-3 mx-auto flex justify-center">
+            <Logo size="sm" />
+          </div>
+        </div>
+      )}
+      
       {/* Only show the vertical navbar on non-mobile screens */}
       <div className="flex flex-1">
         {!isMobile && (
@@ -49,7 +59,8 @@ const Feed = () => {
         
         <div className={cn(
           "flex-1 px-4 py-6 md:py-8", 
-          !isMobile && "md:ml-64" // Add margin when sidebar is visible
+          !isMobile && "md:ml-64", // Add margin when sidebar is visible
+          isMobile && "pt-16" // Add padding when mobile header is visible
         )}>
           <div className="max-w-4xl mx-auto">
             <div className="mb-6">
