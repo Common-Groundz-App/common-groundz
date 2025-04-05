@@ -41,7 +41,7 @@ const Feed = () => {
       {/* Mobile header - only shown when width < 768px */}
       {isMobile && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
-          <div className="container p-3 mx-auto flex justify-center">
+          <div className="container p-3 mx-auto flex justify-start">
             <Logo size="sm" />
           </div>
         </div>
