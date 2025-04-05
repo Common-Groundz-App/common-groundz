@@ -23,3 +23,9 @@ export interface FeedState {
   page: number;
   isLoadingMore: boolean;
 }
+
+export interface FeedQueryParams {
+  userId: string;
+  page: number;
+  itemsPerPage: number;
+}
