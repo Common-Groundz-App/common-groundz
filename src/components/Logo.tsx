@@ -16,11 +16,11 @@ const Logo: React.FC<LogoProps> = ({ className, size = 'md', responsive = false 
   };
 
   return (
-    <Link to="/">
+    <Link to="/" className="inline-flex items-center">
       <img 
         src="/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png" 
         alt="Common Groundz Logo" 
-        className={`${sizeClasses[size]} ${className || ''} cursor-pointer`} 
+        className={`${sizeClasses[size]} ${className || ''} object-contain cursor-pointer`} 
       />
     </Link>
   );

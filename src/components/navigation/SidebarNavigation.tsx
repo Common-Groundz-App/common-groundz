@@ -42,11 +42,11 @@ export const SidebarNavigation = () => {
   return (
     <div className="h-screen w-16 md:w-64 fixed left-0 top-0 pt-16 bg-background border-r hidden md:flex flex-col">
       {isFeedPage && (
-        <div className="px-4 pt-2 pb-4 flex justify-center md:justify-start">
-          <Logo responsive={true} size="md" className="max-w-[80%]" />
+        <div className="px-4 py-4 flex justify-center md:justify-start border-b">
+          <Logo responsive={true} size="md" className="max-h-10" />
         </div>
       )}
-      <div className="p-4 flex-1">
+      <div className={cn("p-4 flex-1", isFeedPage ? "pt-2" : "")}>
         <nav className="space-y-2">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path || 
