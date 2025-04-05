@@ -12,6 +12,9 @@ export function NavBarComponent() {
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
   
+  // Check if current page is feed
+  const isFeedPage = location.pathname === '/feed';
+  
   // Listen for custom event to open search dialog
   useEffect(() => {
     const handleOpenSearch = () => {
@@ -48,6 +51,7 @@ export function NavBarComponent() {
         items={navItems} 
         rightSection={<UserMenu />}
         initialActiveTab={activeTab}
+        hideLogo={isFeedPage}
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>

@@ -5,13 +5,14 @@ import { Link } from 'react-router-dom';
 interface LogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
+  responsive?: boolean;
 }
 
-const Logo: React.FC<LogoProps> = ({ className, size = 'md' }) => {
+const Logo: React.FC<LogoProps> = ({ className, size = 'md', responsive = false }) => {
   const sizeClasses = {
-    sm: "h-8",
-    md: "h-10",
-    lg: "h-12"
+    sm: responsive ? "h-6 md:h-8" : "h-8",
+    md: responsive ? "h-8 md:h-10" : "h-10",
+    lg: responsive ? "h-10 md:h-12" : "h-12"
   };
 
   return (

@@ -36,8 +36,16 @@ export const SidebarNavigation = () => {
     { name: 'Profile', path: '/profile', icon: User }
   ];
 
+  // Check if we're on the Feed page
+  const isFeedPage = location.pathname === '/feed';
+
   return (
     <div className="h-screen w-16 md:w-64 fixed left-0 top-0 pt-16 bg-background border-r hidden md:flex flex-col">
+      {isFeedPage && (
+        <div className="px-4 pt-2 pb-4 flex justify-center md:justify-start">
+          <Logo responsive={true} size="md" className="max-w-[80%]" />
+        </div>
+      )}
       <div className="p-4 flex-1">
         <nav className="space-y-2">
           {navItems.map((item) => {

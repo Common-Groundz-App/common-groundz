@@ -21,12 +21,14 @@ interface NavBarProps {
   className?: string;
   rightSection?: React.ReactNode;
   initialActiveTab?: string;
+  hideLogo?: boolean;
 }
 export function NavBar({
   items,
   className,
   rightSection,
-  initialActiveTab
+  initialActiveTab,
+  hideLogo = false
 }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const [scrolled, setScrolled] = useState(false);
@@ -69,11 +71,13 @@ export function NavBar({
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo Section */}
         <div className="flex-shrink-0">
-          <Link to="/" className="flex items-center">
-            <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
-              <Logo size="md" />
-            </div>
-          </Link>
+          {!hideLogo && (
+            <Link to="/" className="flex items-center">
+              <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
+                <Logo size="md" responsive={true} />
+              </div>
+            </Link>
+          )}
         </div>
 
         {/* Navigation Items - Centered for Desktop */}
