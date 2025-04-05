@@ -7,7 +7,11 @@ import { useState, useEffect } from 'react'
 import { SearchDialog } from '@/components/SearchDialog'
 import { supabase } from '@/integrations/supabase/client'
 
-export function NavBarComponent() {
+interface NavBarComponentProps {
+  hideLogo?: boolean;
+}
+
+export function NavBarComponent({ hideLogo = false }: NavBarComponentProps) {
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
@@ -48,6 +52,7 @@ export function NavBarComponent() {
         items={navItems} 
         rightSection={<UserMenu />}
         initialActiveTab={activeTab}
+        hideLogo={hideLogo}
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>

@@ -36,8 +36,16 @@ export const SidebarNavigation = () => {
     { name: 'Profile', path: '/profile', icon: User }
   ];
 
+  const isOnFeedPage = location.pathname === '/feed';
+
   return (
     <div className="h-screen w-16 md:w-64 fixed left-0 top-0 pt-16 bg-background border-r hidden md:flex flex-col">
+      {isOnFeedPage && (
+        <div className="px-4 py-6 flex justify-center md:justify-start">
+          <Logo size="md" />
+        </div>
+      )}
+      
       <div className="p-4 flex-1">
         <nav className="space-y-2">
           {navItems.map((item) => {
