@@ -23,6 +23,7 @@ interface NavBarProps {
   initialActiveTab?: string;
   hideLogo?: boolean;
   onFeedPage?: boolean;
+  showMobileLogo?: boolean;
 }
 export function NavBar({
   items,
@@ -30,7 +31,8 @@ export function NavBar({
   rightSection,
   initialActiveTab,
   hideLogo = false,
-  onFeedPage = false
+  onFeedPage = false,
+  showMobileLogo = true
 }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const [scrolled, setScrolled] = useState(false);
@@ -72,9 +74,9 @@ export function NavBar({
     className
   )}>
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Logo Section - Hidden on Feed page */}
+        {/* Logo Section - Only hidden when explicitly set */}
         <div className="flex-shrink-0">
-          {!hideLogo && !onFeedPage && (
+          {!hideLogo && (
             <Link to="/" className="flex items-center">
               <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
                 <Logo size="md" responsive={true} />
@@ -82,8 +84,8 @@ export function NavBar({
             </Link>
           )}
           
-          {/* Small mobile - always show logo if not on feed page */}
-          {isSmallMobile && !onFeedPage && (
+          {/* Small mobile - show logo if not hidden and showMobileLogo is true */}
+          {isSmallMobile && !hideLogo && showMobileLogo && (
             <Link to="/" className="flex items-center">
               <div className="p-1 rounded-md flex items-center justify-center bg-transparent">
                 <Logo size="sm" />

@@ -170,10 +170,7 @@ export const SidebarNavigation = () => {
         )}
       </div>
       
-      {/* Mobile Temporary Logo Bar (only visible on small screens when sidebar is hidden) */}
-      <div className="h-16 fixed top-0 left-0 right-0 z-40 md:hidden flex items-center px-4 border-b bg-background">
-        <Logo size="sm" className="h-8" />
-      </div>
+      {/* Removed the mobile logo bar since it will be handled by NavBarComponent */}
     </>
   );
 };
