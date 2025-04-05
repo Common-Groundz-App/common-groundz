@@ -136,17 +136,22 @@ export const useFeed = (feedType: FeedVisibility) => {
           .from('recommendation_likes')
           .select('recommendation_id, count')
           .in('recommendation_id', recommendationIds)
-          .group('recommendation_id');
+          // Fix: Use a raw SQL query for grouping instead of the .group() method
+          .select('recommendation_id, count(*)', { count: 'exact', head: false })
+          .in('recommendation_id', recommendationIds);
           
         // Map the data to FeedItem format
         const items = data.map(item => {
-          const likes = likeCounts?.find(l => l.recommendation_id === item.id)?.count || 0;
+          // Find like count for this recommendation
+          const likeCount = likeCounts?.find(l => l.recommendation_id === item.id);
+          const likes = likeCount ? parseInt(likeCount.count as string) : 0;
+          
           const is_liked = userLikes?.some(like => like.recommendation_id === item.id) || false;
           const is_saved = userSaves?.some(save => save.recommendation_id === item.id) || false;
           
           return {
             ...item,
-            likes: Number(likes),
+            likes: likes,
             is_liked,
             is_saved,
             username: item.profiles?.username || null,
