@@ -1,171 +1,57 @@
-
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { 
-  Home, 
-  Search, 
-  User, 
-  Star, 
-  PlusCircle,
-  Settings,
-  LogOut
-} from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { Home, Star, Search, User, Settings, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Logo from '@/components/Logo';
-import { supabase } from '@/integrations/supabase/client';
 
-export const SidebarNavigation = () => {
-  const location = useLocation();
-  const { user } = useAuth();
-  
-  const getInitials = (username?: string) => {
-    return username ? username.substring(0, 2).toUpperCase() : 'UN';
-  };
-  
+export function SidebarNavigation() {
   const navItems = [
-    { name: 'Home', path: '/', icon: Home },
-    { name: 'Feed', path: '/feed', icon: Star },
-    { name: 'Search', path: '#', icon: Search, onClick: () => {
-      // Open the search dialog
-      const event = new CustomEvent('open-search-dialog');
-      window.dispatchEvent(event);
-    }},
-    { name: 'Profile', path: '/profile', icon: User }
+    { icon: Home, label: 'Home', href: '/' },
+    { icon: Star, label: 'Feed', href: '/feed' },
+    { icon: Search, label: 'Search', href: '#', onClick: () => window.dispatchEvent(new Event('open-search-dialog')) },
+    { icon: User, label: 'Profile', href: '/profile' },
+    { icon: Bell, label: 'Notifications', href: '/notifications' },
+    { icon: Settings, label: 'Settings', href: '/settings' },
   ];
 
-  const isOnFeedPage = location.pathname === '/feed';
-
   return (
-    <div className="h-screen w-16 md:w-64 fixed left-0 top-0 pt-16 bg-background border-r hidden md:flex flex-col">
-      {isOnFeedPage && (
-        <div className="px-4 py-6 flex justify-center md:justify-start">
-          <Logo size="md" />
-        </div>
-      )}
-      
-      <div className="p-4 flex-1">
-        <nav className="space-y-2">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path || 
-                            (item.path === '/profile' && location.pathname.startsWith('/profile'));
-            
-            return (
-              <Tooltip key={item.name} delayDuration={300}>
-                <TooltipTrigger asChild>
-                  {item.path.startsWith('#') ? (
-                    <button
-                      onClick={item.onClick}
-                      className={cn(
-                        "flex items-center w-full p-3 rounded-md text-sm font-medium transition-colors",
-                        isActive 
-                          ? "bg-accent text-accent-foreground" 
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <item.icon className="h-5 w-5 md:mr-2" />
-                      <span className="hidden md:inline">{item.name}</span>
-                    </button>
-                  ) : (
-                    <Link
-                      to={item.path}
-                      className={cn(
-                        "flex items-center p-3 rounded-md text-sm font-medium transition-colors",
-                        isActive 
-                          ? "bg-accent text-accent-foreground" 
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <item.icon className="h-5 w-5 md:mr-2" />
-                      <span className="hidden md:inline">{item.name}</span>
-                    </Link>
-                  )}
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:hidden">
-                  {item.name}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
-          
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <Link
-                to="/profile"
-                className={cn(
-                  "flex items-center p-3 rounded-md text-sm font-medium transition-colors mt-6",
-                  "text-brand-orange hover:bg-brand-orange/10"
-                )}
-                onClick={(e) => {
-                  e.preventDefault();
-                  // Open recommendation form
-                  const event = new CustomEvent('open-recommendation-form');
-                  window.dispatchEvent(event);
-                }}
-              >
-                <PlusCircle className="h-5 w-5 md:mr-2" />
-                <span className="hidden md:inline">Add Recommendation</span>
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="md:hidden">
-              Add Recommendation
-            </TooltipContent>
-          </Tooltip>
-        </nav>
+    <aside className="fixed inset-y-0 left-0 w-16 md:w-64 bg-sidebar border-r border-sidebar-border pb-12 pt-16 overflow-y-auto flex flex-col z-10">
+      {/* Logo at the top */}
+      <div className="flex justify-center md:justify-start px-4 mb-6">
+        <Logo size="md" />
       </div>
       
-      {user && (
-        <div className="p-4 border-t">
-          <div className="flex items-center justify-between">
-            <Link to="/profile" className="flex items-center space-x-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user.user_metadata?.avatar_url} />
-                <AvatarFallback>{getInitials(user.user_metadata?.username)}</AvatarFallback>
-              </Avatar>
-              <div className="hidden md:block flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {user.user_metadata?.username || 'User'}
-                </p>
-              </div>
-            </Link>
-            
-            <div className="flex items-center gap-1">
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Link
-                    to="/settings"
-                    className="p-2 rounded-full hover:bg-accent text-muted-foreground"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:hidden">
-                  Settings
-                </TooltipContent>
-              </Tooltip>
-              
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => {
-                      // Sign out
-                      supabase.auth.signOut();
-                    }}
-                    className="p-2 rounded-full hover:bg-accent text-muted-foreground"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:hidden">
-                  Sign out
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <nav className="px-2 space-y-1">
+        {navItems.map((item) => (
+          <NavItem key={item.label} icon={item.icon} label={item.label} href={item.href} onClick={item.onClick} />
+        ))}
+      </nav>
+      
+    </aside>
   );
-};
+}
+
+function NavItem({ icon: Icon, label, href, onClick }) {
+  return (
+    <NavLink
+      to={href.startsWith('#') ? '' : href}
+      className={({ isActive }) =>
+        cn(
+          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+        )
+      }
+      onClick={(e) => {
+        if (href.startsWith('#') && onClick) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
+      <Icon className="h-5 w-5" />
+      <span className="hidden md:inline-block">{label}</span>
+    </NavLink>
+  );
+}

@@ -11,7 +11,7 @@ interface NavBarComponentProps {
   hideLogo?: boolean;
 }
 
-export function NavBarComponent({ hideLogo = false }: NavBarComponentProps) {
+export function NavBarComponent({ hideLogo = true }: NavBarComponentProps) {
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
