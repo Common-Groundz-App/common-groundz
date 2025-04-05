@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -131,20 +130,18 @@ export const useFeed = (feedType: FeedVisibility) => {
           .eq('user_id', user.id)
           .in('recommendation_id', recommendationIds);
           
-        // Get like counts for each recommendation
+        // Get like counts for each recommendation - Fixed query structure
         const { data: likeCounts } = await supabase
           .from('recommendation_likes')
-          .select('recommendation_id, count')
+          .select('recommendation_id, count', { count: 'exact', head: false })
           .in('recommendation_id', recommendationIds)
-          // Fix: Use a raw SQL query for grouping instead of the .group() method
-          .select('recommendation_id, count(*)', { count: 'exact', head: false })
-          .in('recommendation_id', recommendationIds);
-          
+          .groupBy('recommendation_id');
+        
         // Map the data to FeedItem format
         const items = data.map(item => {
           // Find like count for this recommendation
           const likeCount = likeCounts?.find(l => l.recommendation_id === item.id);
-          const likes = likeCount ? parseInt(likeCount.count as string) : 0;
+          const likes = likeCount ? parseInt(likeCount.count as unknown as string) : 0;
           
           const is_liked = userLikes?.some(like => like.recommendation_id === item.id) || false;
           const is_saved = userSaves?.some(save => save.recommendation_id === item.id) || false;
