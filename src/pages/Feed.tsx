@@ -2,6 +2,7 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NavBarComponent from '@/components/NavBarComponent';
+import Footer from '@/components/Footer';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { SidebarNavigation } from '@/components/navigation/SidebarNavigation';
@@ -9,7 +10,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const Feed = () => {
   const isMobile = useIsMobile();
@@ -18,13 +18,10 @@ const Feed = () => {
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
       
-      <div className="flex flex-1">
+      <div className="flex flex-1 pt-16">
         {!isMobile && <SidebarNavigation />}
         
-        <div className={cn(
-          "flex-1 max-w-4xl mx-auto px-4 py-6 md:px-6", 
-          isMobile ? "pt-20" : "pt-16 md:ml-64"
-        )}>
+        <div className="flex-1 max-w-4xl mx-auto px-4 py-6 md:px-6 md:ml-64">
           <div className="mb-6">
             <h1 className="text-2xl font-bold">Feed</h1>
             <p className="text-muted-foreground">Discover recommendations from the community</p>
