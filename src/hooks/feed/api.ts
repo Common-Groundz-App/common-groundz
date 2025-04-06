@@ -254,24 +254,20 @@ async function enrichPostsData(posts: any[], userId: string): Promise<PostFeedIt
     };
   });
   
-  // Fetch entities for each post
+  // Fetch entities for each post - using our custom function
   const postIds = posts.map(post => post.id);
-  const { data: postEntities } = await supabase
-    .from('post_entities')
-    .select(`
-      post_id,
-      entities!entity_id (id, name, type, venue, description, image_url)
-    `)
-    .in('post_id', postIds);
+  const { data: entitiesData } = await supabase.rpc('get_post_entities', { post_ids: postIds });
   
   // Group entities by post ID
   const entitiesByPostId: Record<string, any[]> = {};
-  postEntities?.forEach(item => {
-    if (!entitiesByPostId[item.post_id]) {
-      entitiesByPostId[item.post_id] = [];
-    }
-    entitiesByPostId[item.post_id].push(item.entities);
-  });
+  if (entitiesData) {
+    (entitiesData as any[]).forEach(item => {
+      if (!entitiesByPostId[item.post_id]) {
+        entitiesByPostId[item.post_id] = [];
+      }
+      entitiesByPostId[item.post_id].push(item.entity);
+    });
+  }
   
   // Map the posts data
   return posts.map(post => {

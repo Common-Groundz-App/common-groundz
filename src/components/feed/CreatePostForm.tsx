@@ -70,19 +70,16 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
       
       // If entities are selected, associate them with the post
       if (selectedEntities.length > 0 && postData) {
-        const entityRelations = selectedEntities.map(entity => ({
-          post_id: postData.id,
-          entity_id: entity.id
-        }));
+        // Use the generic 'rpc' method to insert into post_entities table to avoid TypeScript errors
+        // because Supabase types don't know about our new post_entities table
+        const entityPromises = selectedEntities.map(entity => 
+          supabase.rpc('insert_post_entity', {
+            p_post_id: postData.id,
+            p_entity_id: entity.id
+          })
+        );
         
-        const { error: entityError } = await supabase
-          .from('post_entities')
-          .insert(entityRelations);
-          
-        if (entityError) {
-          console.error('Error adding entity relations:', entityError);
-          // Continue even if entity relations fail, we still created the post
-        }
+        await Promise.all(entityPromises);
       }
 
       toast({

@@ -52,26 +52,26 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
 
       if (error) throw error;
       
-      // Fetch entities for all posts
+      // Fetch entities for all posts using a different approach
       const postIds = (postsData || []).map(post => post.id);
       
       if (postIds.length > 0) {
-        const { data: postEntities } = await supabase
-          .from('post_entities')
-          .select(`
-            post_id,
-            entities!entity_id (id, name, type, venue, description, image_url)
-          `)
-          .in('post_id', postIds);
-        
-        // Group entities by post ID
         const entitiesByPostId: Record<string, Entity[]> = {};
-        postEntities?.forEach(item => {
-          if (!entitiesByPostId[item.post_id]) {
-            entitiesByPostId[item.post_id] = [];
-          }
-          entitiesByPostId[item.post_id].push(item.entities);
+        
+        // Get all post-entity relationships
+        const { data: relationships } = await supabase.rpc('get_post_entities', {
+          post_ids: postIds
         });
+        
+        if (relationships) {
+          // Process the relationships
+          relationships.forEach((item: any) => {
+            if (!entitiesByPostId[item.post_id]) {
+              entitiesByPostId[item.post_id] = [];
+            }
+            entitiesByPostId[item.post_id].push(item.entity);
+          });
+        }
         
         // Add entities to posts
         const enrichedPosts = (postsData || []).map(post => ({
