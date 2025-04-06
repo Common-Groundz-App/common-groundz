@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -11,6 +10,7 @@ import Footer from '@/components/Footer';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
+import { CreatePostButton } from '@/components/feed/CreatePostButton';
 
 const Feed = () => {
   const isMobile = useIsMobile();
@@ -21,14 +21,12 @@ const Feed = () => {
     { name: 'Home', url: '/', icon: Home },
     { name: 'Feed', url: '/feed', icon: Star },
     { name: 'Search', url: '#', icon: Search, onClick: () => {
-      // Open the search dialog
       const event = new CustomEvent('open-search-dialog');
       window.dispatchEvent(event);
     }},
     { name: 'Profile', url: '/profile', icon: User }
   ];
   
-  // Determine active tab based on current route
   const getInitialActiveTab = () => {
     if (location.pathname === '/feed') {
       return 'Feed';
@@ -38,7 +36,6 @@ const Feed = () => {
   
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Mobile header - only shown when width < 768px */}
       {isMobile && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
           <div className="container p-3 mx-auto flex justify-start">
@@ -47,7 +44,6 @@ const Feed = () => {
         </div>
       )}
       
-      {/* Only show the vertical navbar on non-mobile screens */}
       <div className="flex flex-1">
         {!isMobile && (
           <VerticalTubelightNavbar 
@@ -59,19 +55,33 @@ const Feed = () => {
         
         <div className={cn(
           "flex-1 flex flex-col", 
-          !isMobile && "md:ml-64", // Add margin when sidebar is visible
-          isMobile && "pt-16" // Add padding when mobile header is visible
+          !isMobile && "md:ml-64",
+          isMobile && "pt-16"
         )}>
           <div className="max-w-4xl mx-auto w-full">
             <div className="px-4 py-6 md:py-8 mb-2">
-              <h1 className="text-2xl font-bold">Feed</h1>
-              <p className="text-muted-foreground">Discover recommendations from the community</p>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h1 className="text-2xl font-bold">Feed</h1>
+                  <p className="text-muted-foreground">Discover recommendations from the community</p>
+                </div>
+                
+                <CreatePostButton 
+                  onPostCreated={() => {
+                    if (activeTab === "for-you") {
+                      const event = new CustomEvent('refresh-for-you-feed');
+                      window.dispatchEvent(event);
+                    } else {
+                      const event = new CustomEvent('refresh-following-feed');
+                      window.dispatchEvent(event);
+                    }
+                  }} 
+                />
+              </div>
             </div>
             
-            {/* Edge-to-edge tabs with tubelight glow effect */}
             <div className="w-full">
               <div className="flex items-center w-full text-muted-foreground bg-background border-b">
-                {/* For You Tab */}
                 <div 
                   onClick={() => setActiveTab("for-you")} 
                   className={cn(
@@ -100,7 +110,6 @@ const Feed = () => {
                   )}
                 </div>
                 
-                {/* Following Tab */}
                 <div 
                   onClick={() => setActiveTab("following")} 
                   className={cn(
@@ -130,7 +139,6 @@ const Feed = () => {
                 </div>
               </div>
               
-              {/* Content based on active tab */}
               <div className="px-4 mt-6">
                 {activeTab === "for-you" ? (
                   <FeedForYou />

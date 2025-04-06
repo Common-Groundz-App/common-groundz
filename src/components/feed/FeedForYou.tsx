@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/feed/use-feed';
@@ -33,6 +32,15 @@ const FeedForYou = () => {
       });
     }
   }, [error, toast]);
+
+  useEffect(() => {
+    const handleRefresh = () => refreshFeed();
+    window.addEventListener('refresh-for-you-feed', handleRefresh);
+    
+    return () => {
+      window.removeEventListener('refresh-for-you-feed', handleRefresh);
+    };
+  }, [refreshFeed]);
 
   return (
     <div className="space-y-6">

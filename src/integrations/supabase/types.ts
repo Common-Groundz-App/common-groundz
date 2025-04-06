@@ -86,6 +86,93 @@ export type Database = {
         }
         Relationships: []
       }
+      post_recommendations: {
+        Row: {
+          created_at: string
+          created_by: string
+          display_order: number
+          entity_id: string
+          id: string
+          post_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          display_order?: number
+          entity_id: string
+          id?: string
+          post_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          display_order?: number
+          entity_id?: string
+          id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_recommendations_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_recommendations_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          is_deleted: boolean
+          media: Json | null
+          post_type: Database["public"]["Enums"]["post_type"]
+          tags: string[] | null
+          title: string | null
+          updated_at: string
+          user_id: string
+          view_count: number
+          visibility: Database["public"]["Enums"]["recommendation_visibility"]
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          media?: Json | null
+          post_type?: Database["public"]["Enums"]["post_type"]
+          tags?: string[] | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+          view_count?: number
+          visibility?: Database["public"]["Enums"]["recommendation_visibility"]
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          media?: Json | null
+          post_type?: Database["public"]["Enums"]["post_type"]
+          tags?: string[] | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+          view_count?: number
+          visibility?: Database["public"]["Enums"]["recommendation_visibility"]
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -251,6 +338,7 @@ export type Database = {
     }
     Enums: {
       entity_type: "book" | "movie" | "place" | "product" | "food"
+      post_type: "story" | "routine" | "project" | "note"
       recommendation_category: "food" | "movie" | "product" | "book" | "place"
       recommendation_visibility: "public" | "private" | "circle_only"
     }
