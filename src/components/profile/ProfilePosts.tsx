@@ -58,15 +58,17 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
       if (postIds.length > 0) {
         const entitiesByPostId: Record<string, Entity[]> = {};
         
-        // Use a type assertion to work around TypeScript limitation
-        const { data: entityData } = await supabase
+        // Cast supabase to any to bypass TypeScript's type checking
+        const supabaseAny = supabase as any;
+        
+        const { data: entityData } = await supabaseAny
           .rpc('get_post_entities', {
             post_ids: postIds
-          } as any);
+          });
         
         if (entityData) {
           // Process the relationships
-          (entityData as any[]).forEach((item) => {
+          entityData.forEach((item: any) => {
             if (!entitiesByPostId[item.post_id]) {
               entitiesByPostId[item.post_id] = [];
             }

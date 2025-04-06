@@ -70,13 +70,15 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
       
       // If entities are selected, associate them with the post
       if (selectedEntities.length > 0 && postData) {
-        // Use a different approach to call our custom SQL function
+        // Use type casting with any to bypass TypeScript's type checking
+        const supabaseAny = supabase as any;
+        
         const entityPromises = selectedEntities.map(entity => 
-          supabase
+          supabaseAny
             .rpc('insert_post_entity', {
               p_post_id: postData.id,
               p_entity_id: entity.id
-            } as any)
+            })
         );
         
         await Promise.all(entityPromises);

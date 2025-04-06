@@ -256,15 +256,19 @@ async function enrichPostsData(posts: any[], userId: string): Promise<PostFeedIt
   
   // Fetch entities for each post - using our custom function with a type assertion
   const postIds = posts.map(post => post.id);
-  const { data: entitiesData } = await supabase
+  
+  // Cast supabase to any to bypass TypeScript's type checking
+  const supabaseAny = supabase as any;
+  
+  const { data: entitiesData } = await supabaseAny
     .rpc('get_post_entities', { 
       post_ids: postIds 
-    } as any);
+    });
   
   // Group entities by post ID
   const entitiesByPostId: Record<string, any[]> = {};
   if (entitiesData) {
-    (entitiesData as any[]).forEach(item => {
+    entitiesData.forEach((item: any) => {
       if (!entitiesByPostId[item.post_id]) {
         entitiesByPostId[item.post_id] = [];
       }
