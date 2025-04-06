@@ -11,6 +11,7 @@ import RatingStars from '@/components/recommendations/RatingStars';
 import { FeedItem } from '@/hooks/feed/types';
 import { getCategoryLabel } from '@/components/recommendations/RecommendationFilters';
 import { formatDistanceToNow } from 'date-fns';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 interface FeedItemProps {
   item: FeedItem;
@@ -24,8 +25,8 @@ const FeedItemCard = ({ item, onLike, onSave }: FeedItemProps) => {
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="p-4 pb-0">
+    <Card className="overflow-hidden hover:shadow-md transition-all duration-300">
+      <CardHeader className="p-5 pb-0">
         <div className="flex items-center gap-3">
           <Link to={`/profile/${item.user_id}`}>
             <Avatar>
@@ -53,7 +54,7 @@ const FeedItemCard = ({ item, onLike, onSave }: FeedItemProps) => {
         </div>
       </CardHeader>
       
-      <CardContent className="p-4">
+      <CardContent className="p-5">
         <h3 className="text-lg font-medium mb-1">{item.title}</h3>
         {item.venue && <p className="text-sm text-muted-foreground mb-2">{item.venue}</p>}
         
@@ -63,27 +64,29 @@ const FeedItemCard = ({ item, onLike, onSave }: FeedItemProps) => {
         </div>
         
         {item.description && (
-          <p className="text-sm line-clamp-3 mb-3">{item.description}</p>
+          <p className="text-sm line-clamp-3 mb-4">{item.description}</p>
         )}
         
         {item.image_url && (
-          <div className="relative h-48 rounded-md overflow-hidden mb-2">
-            <img 
-              src={item.image_url} 
-              alt={item.title} 
-              className="w-full h-full object-cover" 
-            />
-            
-            {item.is_certified && (
-              <Badge className="absolute top-2 right-2 bg-brand-orange text-white">
-                <Star className="mr-1 h-3 w-3" /> Certified
-              </Badge>
-            )}
+          <div className="rounded-md overflow-hidden mb-3">
+            <AspectRatio ratio={16/9} className="bg-muted">
+              <img 
+                src={item.image_url} 
+                alt={item.title} 
+                className="w-full h-full object-cover" 
+              />
+              
+              {item.is_certified && (
+                <Badge className="absolute top-2 right-2 bg-brand-orange text-white">
+                  <Star className="mr-1 h-3 w-3" /> Certified
+                </Badge>
+              )}
+            </AspectRatio>
           </div>
         )}
       </CardContent>
       
-      <CardFooter className="p-4 pt-0 flex justify-between">
+      <CardFooter className="p-5 pt-0 flex justify-between">
         <div className="flex items-center gap-4">
           <Button 
             variant="ghost" 

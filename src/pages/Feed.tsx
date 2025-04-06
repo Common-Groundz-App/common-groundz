@@ -7,8 +7,7 @@ import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Info, Home, Star, Search, User, PlusCircle } from "lucide-react";
+import { Home, Star, Search, User } from "lucide-react";
 import { useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
@@ -68,17 +67,8 @@ const Feed = () => {
               <p className="text-muted-foreground">Discover recommendations from the community</p>
             </div>
             
-            <Alert className="mb-4">
-              <Info className="h-4 w-4" />
-              <AlertTitle>Development Mode</AlertTitle>
-              <AlertDescription>
-                This feed is displaying recommendations using a fallback approach. 
-                Some features might be limited.
-              </AlertDescription>
-            </Alert>
-            
             <Tabs defaultValue="for-you" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-2 mb-8">
                 <TabsTrigger value="for-you">For You</TabsTrigger>
                 <TabsTrigger value="following">Following</TabsTrigger>
               </TabsList>

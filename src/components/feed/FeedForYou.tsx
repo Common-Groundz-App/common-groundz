@@ -36,8 +36,7 @@ const FeedForYou = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-medium">Recommended for you</h2>
+      <div className="flex justify-end">
         <Button 
           variant="outline" 
           size="sm" 
@@ -72,7 +71,7 @@ const FeedForYou = () => {
         <FeedEmptyState />
       ) : (
         <>
-          <div className="space-y-6">
+          <div className="space-y-8">
             {items.map(item => (
               <FeedItem 
                 key={item.id} 
@@ -84,7 +83,7 @@ const FeedForYou = () => {
           </div>
           
           {hasMore && (
-            <div className="pt-4 flex justify-center">
+            <div className="pt-6 flex justify-center">
               <Button 
                 variant="outline" 
                 onClick={loadMore} 
