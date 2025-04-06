@@ -254,9 +254,12 @@ async function enrichPostsData(posts: any[], userId: string): Promise<PostFeedIt
     };
   });
   
-  // Fetch entities for each post - using our custom function
+  // Fetch entities for each post - using our custom function with a type assertion
   const postIds = posts.map(post => post.id);
-  const { data: entitiesData } = await supabase.rpc('get_post_entities', { post_ids: postIds });
+  const { data: entitiesData } = await supabase
+    .rpc('get_post_entities', { 
+      post_ids: postIds 
+    } as any);
   
   // Group entities by post ID
   const entitiesByPostId: Record<string, any[]> = {};

@@ -52,20 +52,21 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
 
       if (error) throw error;
       
-      // Fetch entities for all posts using a different approach
+      // Fetch entities for all posts using our custom function
       const postIds = (postsData || []).map(post => post.id);
       
       if (postIds.length > 0) {
         const entitiesByPostId: Record<string, Entity[]> = {};
         
-        // Get all post-entity relationships
-        const { data: relationships } = await supabase.rpc('get_post_entities', {
-          post_ids: postIds
-        });
+        // Use a type assertion to work around TypeScript limitation
+        const { data: entityData } = await supabase
+          .rpc('get_post_entities', {
+            post_ids: postIds
+          } as any);
         
-        if (relationships) {
+        if (entityData) {
           // Process the relationships
-          relationships.forEach((item: any) => {
+          (entityData as any[]).forEach((item) => {
             if (!entitiesByPostId[item.post_id]) {
               entitiesByPostId[item.post_id] = [];
             }
