@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
@@ -33,6 +33,16 @@ const Feed = () => {
     }
     return 'Home';
   };
+
+  const handlePostCreated = () => {
+    if (activeTab === "for-you") {
+      const event = new CustomEvent('refresh-for-you-feed');
+      window.dispatchEvent(event);
+    } else {
+      const event = new CustomEvent('refresh-following-feed');
+      window.dispatchEvent(event);
+    }
+  };
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -66,17 +76,7 @@ const Feed = () => {
                   <p className="text-muted-foreground">Discover recommendations from the community</p>
                 </div>
                 
-                <CreatePostButton 
-                  onPostCreated={() => {
-                    if (activeTab === "for-you") {
-                      const event = new CustomEvent('refresh-for-you-feed');
-                      window.dispatchEvent(event);
-                    } else {
-                      const event = new CustomEvent('refresh-following-feed');
-                      window.dispatchEvent(event);
-                    }
-                  }} 
-                />
+                <CreatePostButton onPostCreated={handlePostCreated} />
               </div>
             </div>
             

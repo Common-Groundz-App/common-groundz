@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -11,6 +11,16 @@ interface CreatePostButtonProps {
 
 export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Listen for the "open-create-post-dialog" event
+  useEffect(() => {
+    const handleOpenDialog = () => setIsDialogOpen(true);
+    window.addEventListener('open-create-post-dialog', handleOpenDialog);
+    
+    return () => {
+      window.removeEventListener('open-create-post-dialog', handleOpenDialog);
+    };
+  }, []);
 
   return (
     <>
@@ -34,6 +44,12 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
           <CreatePostForm 
             onSuccess={() => {
               setIsDialogOpen(false);
+              
+              // Dispatch events to refresh both feeds and profile posts
+              window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
+              window.dispatchEvent(new CustomEvent('refresh-following-feed'));
+              window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+              
               if (onPostCreated) onPostCreated();
             }}
             onCancel={() => setIsDialogOpen(false)} 

@@ -4,6 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileCircles from './ProfileCircles';
 import ProfileAbout from './ProfileAbout';
+import ProfilePosts from './ProfilePosts';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -22,6 +23,9 @@ const ProfileTabs = ({ profileUserId, isOwnProfile }: ProfileTabsProps) => {
           <TabsTrigger value="recommendations" className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
             Recommendations
           </TabsTrigger>
+          <TabsTrigger value="posts" className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
+            My Posts
+          </TabsTrigger>
           <TabsTrigger value="circles" className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
             Circles
           </TabsTrigger>
@@ -33,6 +37,10 @@ const ProfileTabs = ({ profileUserId, isOwnProfile }: ProfileTabsProps) => {
       
       <TabsContent value="recommendations" className="mt-4">
         <ProfileRecommendations profileUserId={profileUserId} />
+      </TabsContent>
+      
+      <TabsContent value="posts" className="mt-4">
+        <ProfilePosts profileUserId={profileUserId} isOwnProfile={isOwnProfile} />
       </TabsContent>
       
       <TabsContent value="circles" className="mt-4">
