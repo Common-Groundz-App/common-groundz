@@ -1,130 +1,180 @@
 
 import React from 'react';
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, Star, MessageCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { cn } from "@/lib/utils";
-import RatingStars from '@/components/recommendations/RatingStars';
-import { FeedItem } from '@/hooks/feed/types';
-import { getCategoryLabel } from '@/components/recommendations/RecommendationFilters';
-import { formatDistanceToNow } from 'date-fns';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Bookmark, Heart, Star } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { CombinedFeedItem } from '@/hooks/feed/types';
 
 interface FeedItemProps {
-  item: FeedItem;
-  onLike: (id: string) => void;
-  onSave: (id: string) => void;
+  item: CombinedFeedItem;
+  onLike?: (id: string) => void;
+  onSave?: (id: string) => void;
 }
 
-const FeedItemCard = ({ item, onLike, onSave }: FeedItemProps) => {
-  const getInitials = (username: string) => {
-    return username ? username.substring(0, 2).toUpperCase() : 'UN';
+const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
+  // Check if the item is a post
+  const isPost = 'is_post' in item && item.is_post === true;
+  
+  // Get initials for avatar fallback
+  const getInitials = (name: string | null) => {
+    if (!name) return 'U';
+    return name.charAt(0).toUpperCase();
   };
 
-  return (
-    <Card className="overflow-hidden hover:shadow-md transition-all duration-300">
-      <CardHeader className="p-5 pb-0">
-        <div className="flex items-center gap-3">
-          <Link to={`/profile/${item.user_id}`}>
-            <Avatar>
-              <AvatarImage src={item.avatar_url || undefined} alt={item.username || 'User'} />
-              <AvatarFallback>{getInitials(item.username || '')}</AvatarFallback>
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) {
+      return 'Today';
+    } else if (diffInDays === 1) {
+      return 'Yesterday';
+    } else if (diffInDays < 7) {
+      return `${diffInDays} days ago`;
+    } else {
+      return format(date, 'MMM d, yyyy');
+    }
+  };
+
+  // Get the post type label
+  const getPostTypeLabel = (type: string) => {
+    switch(type) {
+      case 'story': return 'Story';
+      case 'routine': return 'Routine';
+      case 'project': return 'Project';
+      case 'note': return 'Note';
+      default: return type;
+    }
+  };
+  
+  // Render different content based on whether it's a post or recommendation
+  if (isPost) {
+    const post = item as any; // TypeScript workaround
+    
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="pt-6">
+          <div className="flex items-center space-x-4 mb-4">
+            <Avatar className="h-10 w-10 border">
+              <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
+              <AvatarFallback>{getInitials(post.username)}</AvatarFallback>
             </Avatar>
-          </Link>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-start">
-              <div>
-                <Link to={`/profile/${item.user_id}`} className="font-medium hover:underline">
-                  {item.username || 'Anonymous'}
-                </Link>
-                <p className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                </p>
-              </div>
-              
-              <Badge variant="outline" className="text-xs">
-                {getCategoryLabel(item.category)}
-              </Badge>
+            <div>
+              <div className="font-medium">{post.username || 'Anonymous'}</div>
+              <div className="text-sm text-muted-foreground">{formatDate(post.created_at)}</div>
+            </div>
+            <div className="ml-auto">
+              <Badge variant="outline">{getPostTypeLabel(post.post_type)}</Badge>
             </div>
           </div>
+          
+          <h3 className="text-xl font-semibold mb-2">{post.title}</h3>
+          <p className="text-muted-foreground whitespace-pre-wrap">{post.content}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  // It's a recommendation
+  const recommendation = item as any;
+  
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="pt-6">
+        <div className="flex items-center space-x-4 mb-4">
+          <Avatar className="h-10 w-10 border">
+            <AvatarImage src={recommendation.avatar_url || undefined} alt={recommendation.username || 'User'} />
+            <AvatarFallback>{getInitials(recommendation.username)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <div className="font-medium">{recommendation.username || 'Anonymous'}</div>
+            <div className="text-sm text-muted-foreground">{formatDate(recommendation.created_at)}</div>
+          </div>
+          <div className="ml-auto">
+            <Badge>{recommendation.category}</Badge>
+          </div>
         </div>
-      </CardHeader>
-      
-      <CardContent className="p-5">
-        <h3 className="text-lg font-medium mb-1">{item.title}</h3>
-        {item.venue && <p className="text-sm text-muted-foreground mb-2">{item.venue}</p>}
         
-        <div className="flex items-center gap-2 mb-3">
-          <RatingStars rating={item.rating} />
-          <span className="text-sm">{item.rating.toFixed(1)}</span>
-        </div>
+        <h3 className="text-xl font-semibold mb-2">{recommendation.title}</h3>
         
-        {item.description && (
-          <p className="text-sm line-clamp-3 mb-4">{item.description}</p>
+        {recommendation.venue && (
+          <div className="mb-2 text-sm text-muted-foreground">
+            Venue: {recommendation.venue}
+          </div>
         )}
         
-        {item.image_url && (
-          <div className="rounded-md overflow-hidden mb-3">
-            <AspectRatio ratio={16/9} className="bg-muted">
-              <img 
-                src={item.image_url} 
-                alt={item.title} 
-                className="w-full h-full object-cover" 
-              />
-              
-              {item.is_certified && (
-                <Badge className="absolute top-2 right-2 bg-brand-orange text-white">
-                  <Star className="mr-1 h-3 w-3" /> Certified
-                </Badge>
+        <div className="flex items-center mb-4">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Star
+              key={star}
+              size={18}
+              className={cn(
+                "mr-1",
+                star <= recommendation.rating ? "fill-brand-orange text-brand-orange" : "text-gray-300"
               )}
-            </AspectRatio>
+            />
+          ))}
+          <span className="ml-1 text-sm font-medium">{recommendation.rating.toFixed(1)}</span>
+        </div>
+        
+        {recommendation.description && (
+          <p className="text-muted-foreground">{recommendation.description}</p>
+        )}
+        
+        {recommendation.image_url && (
+          <div className="mt-4 rounded-md overflow-hidden">
+            <img 
+              src={recommendation.image_url} 
+              alt={recommendation.title}
+              className="w-full h-48 object-cover" 
+            />
           </div>
         )}
       </CardContent>
       
-      <CardFooter className="p-5 pt-0 flex justify-between">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => onLike(item.id)}
-            className={cn(
-              "flex items-center gap-1", 
-              item.is_liked ? "text-red-500" : "text-muted-foreground"
-            )}
-          >
-            <Heart className={cn("h-4 w-4", item.is_liked && "fill-red-500")} />
-            <span>{item.likes}</span>
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            disabled
-            className="text-muted-foreground flex items-center gap-1"
-          >
-            <MessageCircle className="h-4 w-4" />
-            <span>0</span>
-          </Button>
-        </div>
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => onSave(item.id)}
+      <CardFooter className="flex justify-between pt-2 pb-4">
+        <Button
+          variant="ghost"
+          size="sm"
           className={cn(
-            item.is_saved ? "text-brand-orange" : "text-muted-foreground"
+            "flex items-center gap-1",
+            recommendation.is_liked && "text-red-500"
           )}
+          onClick={() => onLike && onLike(recommendation.id)}
         >
-          <Bookmark className={cn("h-4 w-4", item.is_saved && "fill-brand-orange")} />
+          <Heart 
+            size={18} 
+            className={cn(recommendation.is_liked && "fill-red-500")} 
+          />
+          {recommendation.likes > 0 && (
+            <span>{recommendation.likes}</span>
+          )}
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "flex items-center gap-1",
+            recommendation.is_saved && "text-brand-orange"
+          )}
+          onClick={() => onSave && onSave(recommendation.id)}
+        >
+          <Bookmark 
+            size={18} 
+            className={cn(recommendation.is_saved && "fill-brand-orange")} 
+          />
+          Save
         </Button>
       </CardFooter>
     </Card>
   );
 };
 
-export default FeedItemCard;
+export default FeedItem;

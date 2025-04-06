@@ -15,8 +15,24 @@ export interface FeedItem extends Recommendation {
   avatar_url: string | null;
 }
 
+export interface PostFeedItem {
+  id: string;
+  title: string;
+  content: string;
+  post_type: 'story' | 'routine' | 'project' | 'note';
+  visibility: 'public' | 'circle_only' | 'private';
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  username: string | null;
+  avatar_url: string | null;
+  is_post: boolean;
+}
+
+export type CombinedFeedItem = FeedItem | PostFeedItem;
+
 export interface FeedState {
-  items: FeedItem[];
+  items: CombinedFeedItem[];
   isLoading: boolean;
   error: Error | null;
   hasMore: boolean;

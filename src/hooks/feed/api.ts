@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { FeedItem, FeedQueryParams } from './types';
+import { FeedItem, FeedQueryParams, PostFeedItem, CombinedFeedItem } from './types';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -8,7 +8,7 @@ export async function fetchForYouFeed({ userId, page, itemsPerPage = ITEMS_PER_P
   const offset = page * itemsPerPage;
   
   // Fetch recommendations
-  const { data, error } = await supabase
+  const { data: recommendationsData, error: recommendationsError } = await supabase
     .from('recommendations')
     .select(`
       id, 
@@ -30,9 +30,47 @@ export async function fetchForYouFeed({ userId, page, itemsPerPage = ITEMS_PER_P
     .order('created_at', { ascending: false })
     .range(offset, offset + itemsPerPage - 1);
     
-  if (error) throw error;
+  if (recommendationsError) throw recommendationsError;
   
-  return await enrichRecommendationsData(data || [], userId);
+  // Fetch posts
+  const { data: postsData, error: postsError } = await supabase
+    .from('posts')
+    .select(`
+      id,
+      title,
+      content,
+      post_type,
+      visibility,
+      user_id,
+      created_at,
+      updated_at
+    `)
+    .eq('visibility', 'public')
+    .eq('is_deleted', false)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + itemsPerPage - 1);
+    
+  if (postsError) throw postsError;
+  
+  // Enrich recommendations with user interaction data and profile info
+  const enrichedRecommendations = await enrichRecommendationsData(recommendationsData || [], userId);
+  
+  // Enrich posts with user profile information
+  const enrichedPosts = await enrichPostsData(postsData || [], userId);
+  
+  // Combine and sort by created_at
+  const combinedItems = [
+    ...enrichedRecommendations.items,
+    ...enrichedPosts
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  
+  // Take only itemsPerPage items
+  const finalItems = combinedItems.slice(0, itemsPerPage);
+  
+  return { 
+    items: finalItems, 
+    hasMore: combinedItems.length >= itemsPerPage 
+  };
 }
 
 export async function fetchFollowingFeed({ userId, page, itemsPerPage = ITEMS_PER_PAGE }: FeedQueryParams) {
@@ -54,7 +92,7 @@ export async function fetchFollowingFeed({ userId, page, itemsPerPage = ITEMS_PE
   }
   
   // Fetch recommendations from followed users
-  const { data, error } = await supabase
+  const { data: recommendationsData, error: recommendationsError } = await supabase
     .from('recommendations')
     .select(`
       id, 
@@ -77,9 +115,48 @@ export async function fetchFollowingFeed({ userId, page, itemsPerPage = ITEMS_PE
     .order('created_at', { ascending: false })
     .range(offset, offset + itemsPerPage - 1);
     
-  if (error) throw error;
+  if (recommendationsError) throw recommendationsError;
   
-  return await enrichRecommendationsData(data || [], userId);
+  // Fetch posts from followed users
+  const { data: postsData, error: postsError } = await supabase
+    .from('posts')
+    .select(`
+      id,
+      title,
+      content,
+      post_type,
+      visibility,
+      user_id,
+      created_at,
+      updated_at
+    `)
+    .in('user_id', followingUserIds)
+    .eq('visibility', 'public')
+    .eq('is_deleted', false)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + itemsPerPage - 1);
+    
+  if (postsError) throw postsError;
+  
+  // Enrich recommendations with user interaction data
+  const enrichedRecommendations = await enrichRecommendationsData(recommendationsData || [], userId);
+  
+  // Enrich posts with user profile information
+  const enrichedPosts = await enrichPostsData(postsData || [], userId);
+  
+  // Combine and sort by created_at
+  const combinedItems = [
+    ...enrichedRecommendations.items,
+    ...enrichedPosts
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  
+  // Take only itemsPerPage items
+  const finalItems = combinedItems.slice(0, itemsPerPage);
+  
+  return { 
+    items: finalItems, 
+    hasMore: combinedItems.length >= itemsPerPage 
+  };
 }
 
 async function enrichRecommendationsData(data: any[], userId: string) {
@@ -148,9 +225,44 @@ async function enrichRecommendationsData(data: any[], userId: string) {
       is_saved,
       username: profile.username,
       avatar_url: profile.avatar_url,
-      entity: item.entities
+      entity: item.entities,
+      is_post: false
     } as FeedItem;
   });
   
   return { items, hasMore: items.length === ITEMS_PER_PAGE };
+}
+
+async function enrichPostsData(posts: any[], userId: string): Promise<PostFeedItem[]> {
+  if (!posts.length) {
+    return [];
+  }
+  
+  // Fetch user profiles
+  const userIds = Array.from(new Set(posts.map(post => post.user_id)));
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .in('id', userIds);
+  
+  // Create profile lookup map
+  const profilesMap: Record<string, { username: string | null, avatar_url: string | null }> = {};
+  profiles?.forEach(profile => {
+    profilesMap[profile.id] = {
+      username: profile.username,
+      avatar_url: profile.avatar_url
+    };
+  });
+  
+  // Map the posts data
+  return posts.map(post => {
+    const profile = profilesMap[post.user_id] || { username: null, avatar_url: null };
+    
+    return {
+      ...post,
+      username: profile.username,
+      avatar_url: profile.avatar_url,
+      is_post: true
+    } as PostFeedItem;
+  });
 }
