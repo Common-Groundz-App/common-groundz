@@ -262,7 +262,11 @@ async function enrichPostsData(posts: any[], userId: string): Promise<PostFeedIt
       ...post,
       username: profile.username,
       avatar_url: profile.avatar_url,
-      is_post: true
+      is_post: true,
+      // Initialize the new properties
+      likes: 0,          // Posts don't have likes yet
+      is_liked: false,   // Posts don't have likes yet  
+      is_saved: false    // Posts don't have saves yet
     } as PostFeedItem;
   });
 }

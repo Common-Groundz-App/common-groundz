@@ -27,6 +27,10 @@ export interface PostFeedItem {
   username: string | null;
   avatar_url: string | null;
   is_post: boolean;
+  // Add these properties to match FeedItem interface for consistent handling
+  likes: number;
+  is_liked: boolean;
+  is_saved: boolean;
 }
 
 export type CombinedFeedItem = FeedItem | PostFeedItem;
