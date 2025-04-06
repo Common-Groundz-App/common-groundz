@@ -4,10 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
-import { FileText, Clock } from 'lucide-react';
-import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { FileText, Clock, Tag } from 'lucide-react';
+import { format } from 'date-fns';
+import { Entity } from '@/services/recommendation/types';
+import { cn } from '@/lib/utils';
 
 interface Post {
   id: string;
@@ -17,6 +19,7 @@ interface Post {
   visibility: 'public' | 'circle_only' | 'private';
   created_at: string;
   updated_at: string;
+  tagged_entities?: Entity[];
 }
 
 interface ProfilePostsProps {
@@ -45,10 +48,41 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
         query = query.eq('visibility', 'public');
       }
 
-      const { data, error } = await query;
+      const { data: postsData, error } = await query;
 
       if (error) throw error;
-      setPosts(data as Post[]);
+      
+      // Fetch entities for all posts
+      const postIds = (postsData || []).map(post => post.id);
+      
+      if (postIds.length > 0) {
+        const { data: postEntities } = await supabase
+          .from('post_entities')
+          .select(`
+            post_id,
+            entities!entity_id (id, name, type, venue, description, image_url)
+          `)
+          .in('post_id', postIds);
+        
+        // Group entities by post ID
+        const entitiesByPostId: Record<string, Entity[]> = {};
+        postEntities?.forEach(item => {
+          if (!entitiesByPostId[item.post_id]) {
+            entitiesByPostId[item.post_id] = [];
+          }
+          entitiesByPostId[item.post_id].push(item.entities);
+        });
+        
+        // Add entities to posts
+        const enrichedPosts = (postsData || []).map(post => ({
+          ...post,
+          tagged_entities: entitiesByPostId[post.id] || []
+        }));
+        
+        setPosts(enrichedPosts);
+      } else {
+        setPosts(postsData || []);
+      }
     } catch (error) {
       console.error('Error fetching posts:', error);
       toast({
@@ -74,6 +108,18 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
       window.removeEventListener('refresh-profile-posts', handleRefreshPosts);
     };
   }, []);
+
+  // Get the entity type color
+  const getEntityTypeColor = (type: string): string => {
+    switch(type) {
+      case 'book': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'movie': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+      case 'place': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'product': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'food': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default: return '';
+    }
+  };
 
   const getPostTypeLabel = (type: string) => {
     switch(type) {
@@ -162,6 +208,27 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
             <p className="text-muted-foreground whitespace-pre-wrap">
               {post.content}
             </p>
+            
+            {/* Display tagged entities */}
+            {post.tagged_entities && post.tagged_entities.length > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
+                  <Tag size={14} />
+                  <span>Tagged:</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {post.tagged_entities.map(entity => (
+                    <Badge
+                      key={entity.id}
+                      className={cn("font-normal", getEntityTypeColor(entity.type))}
+                      variant="outline"
+                    >
+                      {entity.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}

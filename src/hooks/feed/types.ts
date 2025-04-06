@@ -2,7 +2,8 @@
 import { 
   Recommendation,
   RecommendationCategory, 
-  RecommendationVisibility 
+  RecommendationVisibility,
+  Entity
 } from '@/services/recommendationService';
 
 export type FeedVisibility = 'for_you' | 'following';
@@ -31,6 +32,8 @@ export interface PostFeedItem {
   likes: number;
   is_liked: boolean;
   is_saved: boolean;
+  // Add property for tagged entities
+  tagged_entities?: Entity[];
 }
 
 export type CombinedFeedItem = FeedItem | PostFeedItem;

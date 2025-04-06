@@ -86,6 +86,42 @@ export type Database = {
         }
         Relationships: []
       }
+      post_entities: {
+        Row: {
+          created_at: string
+          entity_id: string
+          id: string
+          post_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          id?: string
+          post_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_entities_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_entities_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_recommendations: {
         Row: {
           created_at: string

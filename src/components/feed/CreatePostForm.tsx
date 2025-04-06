@@ -10,6 +10,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { Entity } from '@/services/recommendation/types';
+import { EntityTagSelector } from './EntityTagSelector';
 
 interface CreatePostFormProps {
   onSuccess: () => void;
@@ -27,6 +29,7 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedEntities, setSelectedEntities] = useState<Entity[]>([]);
   
   const form = useForm<PostFormValues>({
     defaultValues: {
@@ -50,9 +53,8 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
     try {
       setIsSubmitting(true);
 
-      // Use a more generic approach to bypass TypeScript issues with table definitions
-      // The Supabase client doesn't recognize our newly created 'posts' table in the types
-      const { error } = await supabase
+      // Insert the post
+      const { data: postData, error: postError } = await supabase
         .from('posts')
         .insert({
           title: values.title,
@@ -60,9 +62,28 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
           post_type: values.postType,
           visibility: values.visibility,
           user_id: user.id,
-        } as any); // Use 'as any' to bypass type checking
+        } as any)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (postError) throw postError;
+      
+      // If entities are selected, associate them with the post
+      if (selectedEntities.length > 0 && postData) {
+        const entityRelations = selectedEntities.map(entity => ({
+          post_id: postData.id,
+          entity_id: entity.id
+        }));
+        
+        const { error: entityError } = await supabase
+          .from('post_entities')
+          .insert(entityRelations);
+          
+        if (entityError) {
+          console.error('Error adding entity relations:', entityError);
+          // Continue even if entity relations fail, we still created the post
+        }
+      }
 
       toast({
         title: 'Success!',
@@ -145,6 +166,13 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
             </FormItem>
           )}
         />
+
+        {/* Entity Selector */}
+        <div className="pt-2 pb-1">
+          <EntityTagSelector 
+            onEntitiesChange={setSelectedEntities}
+          />
+        </div>
 
         <FormField
           control={form.control}

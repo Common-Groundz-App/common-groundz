@@ -4,10 +4,11 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, Star } from 'lucide-react';
+import { Bookmark, Heart, Star, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CombinedFeedItem } from '@/hooks/feed/types';
+import { Entity } from '@/services/recommendation/types';
 
 interface FeedItemProps {
   item: CombinedFeedItem;
@@ -52,6 +53,43 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
       default: return type;
     }
   };
+
+  // Get the entity type label and color
+  const getEntityTypeColor = (type: string): string => {
+    switch(type) {
+      case 'book': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'movie': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+      case 'place': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'product': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'food': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default: return '';
+    }
+  };
+  
+  // Render tagged entities
+  const renderTaggedEntities = (entities: Entity[]) => {
+    if (!entities || entities.length === 0) return null;
+    
+    return (
+      <div className="mt-3">
+        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
+          <Tag size={14} />
+          <span>Tagged:</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {entities.map(entity => (
+            <Badge
+              key={entity.id}
+              className={cn("font-normal", getEntityTypeColor(entity.type))}
+              variant="outline"
+            >
+              {entity.name}
+            </Badge>
+          ))}
+        </div>
+      </div>
+    );
+  };
   
   // Render different content based on whether it's a post or recommendation
   if (isPost) {
@@ -76,7 +114,46 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
           
           <h3 className="text-xl font-semibold mb-2">{post.title}</h3>
           <p className="text-muted-foreground whitespace-pre-wrap">{post.content}</p>
+          
+          {/* Display tagged entities */}
+          {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
         </CardContent>
+        
+        <CardFooter className="flex justify-between pt-2 pb-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "flex items-center gap-1",
+              post.is_liked && "text-red-500"
+            )}
+            onClick={() => onLike && onLike(post.id)}
+          >
+            <Heart 
+              size={18} 
+              className={cn(post.is_liked && "fill-red-500")} 
+            />
+            {post.likes > 0 && (
+              <span>{post.likes}</span>
+            )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "flex items-center gap-1",
+              post.is_saved && "text-brand-orange"
+            )}
+            onClick={() => onSave && onSave(post.id)}
+          >
+            <Bookmark 
+              size={18} 
+              className={cn(post.is_saved && "fill-brand-orange")} 
+            />
+            Save
+          </Button>
+        </CardFooter>
       </Card>
     );
   }

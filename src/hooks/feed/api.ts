@@ -254,6 +254,25 @@ async function enrichPostsData(posts: any[], userId: string): Promise<PostFeedIt
     };
   });
   
+  // Fetch entities for each post
+  const postIds = posts.map(post => post.id);
+  const { data: postEntities } = await supabase
+    .from('post_entities')
+    .select(`
+      post_id,
+      entities!entity_id (id, name, type, venue, description, image_url)
+    `)
+    .in('post_id', postIds);
+  
+  // Group entities by post ID
+  const entitiesByPostId: Record<string, any[]> = {};
+  postEntities?.forEach(item => {
+    if (!entitiesByPostId[item.post_id]) {
+      entitiesByPostId[item.post_id] = [];
+    }
+    entitiesByPostId[item.post_id].push(item.entities);
+  });
+  
   // Map the posts data
   return posts.map(post => {
     const profile = profilesMap[post.user_id] || { username: null, avatar_url: null };
@@ -263,10 +282,12 @@ async function enrichPostsData(posts: any[], userId: string): Promise<PostFeedIt
       username: profile.username,
       avatar_url: profile.avatar_url,
       is_post: true,
-      // Initialize the new properties
-      likes: 0,          // Posts don't have likes yet
-      is_liked: false,   // Posts don't have likes yet  
-      is_saved: false    // Posts don't have saves yet
+      // Initialize the properties required by CombinedFeedItem
+      likes: 0,
+      is_liked: false,
+      is_saved: false,
+      // Add tagged entities
+      tagged_entities: entitiesByPostId[post.id] || []
     } as PostFeedItem;
   });
 }
