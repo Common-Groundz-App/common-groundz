@@ -58,33 +58,32 @@ const Feed = () => {
         )}
         
         <div className={cn(
-          "flex-1 px-4 py-6 md:py-8", 
+          "flex-1 flex flex-col", 
           !isMobile && "md:ml-64", // Add margin when sidebar is visible
           isMobile && "pt-16" // Add padding when mobile header is visible
         )}>
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-6">
+          <div className="max-w-4xl mx-auto w-full">
+            <div className="px-4 py-6 md:py-8 mb-2">
               <h1 className="text-2xl font-bold">Feed</h1>
               <p className="text-muted-foreground">Discover recommendations from the community</p>
             </div>
             
-            {/* Custom tabs with glow effect similar to sidebar */}
+            {/* Edge-to-edge tabs with glow effect */}
             <div className="w-full mb-8">
-              <div className="inline-flex items-center justify-center gap-2 py-1 px-1 rounded-full bg-muted p-1 text-muted-foreground">
+              <div className="flex items-center justify-center w-full text-muted-foreground bg-background border-b">
                 {/* For You Tab */}
                 <div 
                   onClick={() => setActiveTab("for-you")} 
                   className={cn(
-                    "relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors w-1/2 text-center",
-                    "text-foreground/80 hover:text-primary", 
-                    activeTab === "for-you" && "bg-muted text-primary"
+                    "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
+                    activeTab === "for-you" ? "bg-muted text-primary" : "hover:text-primary"
                   )}
                 >
-                  <span>For You</span>
+                  <span className="text-lg">For You</span>
                   {activeTab === "for-you" && (
                     <motion.div
                       layoutId="feed-tab-indicator"
-                      className="absolute inset-0 w-full bg-primary/10 rounded-full -z-10"
+                      className="absolute inset-0 w-full bg-primary/5 -z-10"
                       initial={false}
                       transition={{
                         type: "spring",
@@ -92,7 +91,7 @@ const Feed = () => {
                         damping: 30
                       }}
                     >
-                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-orange rounded-t-full">
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-orange rounded-t-full">
                         <div className="absolute w-12 h-6 bg-brand-orange/20 rounded-full blur-md -top-2 -left-2" />
                         <div className="absolute w-8 h-6 bg-brand-orange/20 rounded-full blur-md -top-1" />
                         <div className="absolute w-4 h-4 bg-brand-orange/20 rounded-full blur-sm top-0 left-2" />
@@ -105,16 +104,15 @@ const Feed = () => {
                 <div 
                   onClick={() => setActiveTab("following")} 
                   className={cn(
-                    "relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors w-1/2 text-center",
-                    "text-foreground/80 hover:text-primary", 
-                    activeTab === "following" && "bg-muted text-primary"
+                    "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
+                    activeTab === "following" ? "bg-muted text-primary" : "hover:text-primary"
                   )}
                 >
-                  <span>Following</span>
+                  <span className="text-lg">Following</span>
                   {activeTab === "following" && (
                     <motion.div
                       layoutId="feed-tab-indicator"
-                      className="absolute inset-0 w-full bg-primary/10 rounded-full -z-10"
+                      className="absolute inset-0 w-full bg-primary/5 -z-10"
                       initial={false}
                       transition={{
                         type: "spring",
@@ -122,7 +120,7 @@ const Feed = () => {
                         damping: 30
                       }}
                     >
-                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-orange rounded-t-full">
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-orange rounded-t-full">
                         <div className="absolute w-12 h-6 bg-brand-orange/20 rounded-full blur-md -top-2 -left-2" />
                         <div className="absolute w-8 h-6 bg-brand-orange/20 rounded-full blur-md -top-1" />
                         <div className="absolute w-4 h-4 bg-brand-orange/20 rounded-full blur-sm top-0 left-2" />
@@ -133,7 +131,7 @@ const Feed = () => {
               </div>
               
               {/* Content based on active tab */}
-              <div className="mt-6">
+              <div className="px-4 mt-6">
                 {activeTab === "for-you" ? (
                   <FeedForYou />
                 ) : (
