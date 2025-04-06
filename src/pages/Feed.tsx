@@ -68,22 +68,22 @@ const Feed = () => {
               <p className="text-muted-foreground">Discover recommendations from the community</p>
             </div>
             
-            {/* Edge-to-edge tabs with glow effect */}
-            <div className="w-full mb-8">
-              <div className="flex items-center justify-center w-full text-muted-foreground bg-background border-b">
+            {/* Edge-to-edge tabs with tubelight glow effect */}
+            <div className="w-full">
+              <div className="flex items-center w-full text-muted-foreground bg-background border-b">
                 {/* For You Tab */}
                 <div 
                   onClick={() => setActiveTab("for-you")} 
                   className={cn(
                     "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
-                    activeTab === "for-you" ? "bg-muted text-primary" : "hover:text-primary"
+                    activeTab === "for-you" ? "text-primary" : "hover:text-primary"
                   )}
                 >
                   <span className="text-lg">For You</span>
                   {activeTab === "for-you" && (
                     <motion.div
                       layoutId="feed-tab-indicator"
-                      className="absolute inset-0 w-full bg-primary/5 -z-10"
+                      className="absolute inset-0 -z-10"
                       initial={false}
                       transition={{
                         type: "spring",
@@ -105,14 +105,14 @@ const Feed = () => {
                   onClick={() => setActiveTab("following")} 
                   className={cn(
                     "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
-                    activeTab === "following" ? "bg-muted text-primary" : "hover:text-primary"
+                    activeTab === "following" ? "text-primary" : "hover:text-primary"
                   )}
                 >
                   <span className="text-lg">Following</span>
                   {activeTab === "following" && (
                     <motion.div
                       layoutId="feed-tab-indicator"
-                      className="absolute inset-0 w-full bg-primary/5 -z-10"
+                      className="absolute inset-0 -z-10"
                       initial={false}
                       transition={{
                         type: "spring",
