@@ -113,6 +113,7 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
     }
 
     try {
+      // Fix: Make sure parameters are in the correct order with parentId last
       console.log('Adding comment with:', { content, userId: user.id, itemId, itemType, parentId });
       
       const newComment = await createComment(

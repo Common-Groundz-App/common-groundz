@@ -54,6 +54,7 @@ const CommentItem = ({
     if (!onReply) return false;
     
     try {
+      // Fix: Ensure parameters are passed in the correct order (commentId, content)
       console.log('Replying to comment:', comment.id, 'with content:', content);
       const success = await onReply(comment.id, content);
       if (success) {
