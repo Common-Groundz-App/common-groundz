@@ -1,296 +1,392 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { FeedItem, FeedQueryParams, PostFeedItem, CombinedFeedItem } from './types';
+import { FeedQueryParams, FeedItem, PostFeedItem } from './types';
+import { MediaItem } from '@/types/media';
 
-const ITEMS_PER_PAGE = 10;
-
-export async function fetchForYouFeed({ userId, page, itemsPerPage = ITEMS_PER_PAGE }: FeedQueryParams) {
-  const offset = page * itemsPerPage;
-  
-  // Fetch recommendations
-  const { data: recommendationsData, error: recommendationsError } = await supabase
-    .from('recommendations')
-    .select(`
-      id, 
-      title, 
-      venue, 
-      description, 
-      rating, 
-      image_url, 
-      category, 
-      visibility, 
-      is_certified, 
-      view_count, 
-      user_id, 
-      created_at, 
-      updated_at,
-      entities!entity_id (id, name, type, venue, description, image_url)
-    `)
-    .eq('visibility', 'public')
-    .order('created_at', { ascending: false })
-    .range(offset, offset + itemsPerPage - 1);
+export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryParams) => {
+  try {
+    // Fetch recommendations
+    const recFrom = page * itemsPerPage;
+    const recTo = recFrom + itemsPerPage - 1;
     
-  if (recommendationsError) throw recommendationsError;
-  
-  // Fetch posts
-  const { data: postsData, error: postsError } = await supabase
-    .from('posts')
-    .select(`
-      id,
-      title,
-      content,
-      post_type,
-      visibility,
-      user_id,
-      created_at,
-      updated_at
-    `)
-    .eq('visibility', 'public')
-    .eq('is_deleted', false)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + itemsPerPage - 1);
+    const { data: recsData, error: recsError } = await supabase
+      .from('recommendations')
+      .select(`
+        *,
+        profiles(username, avatar_url),
+        recommendation_likes!inner(user_id)
+      `)
+      .eq('visibility', 'public')
+      .order('created_at', { ascending: false })
+      .range(recFrom, recTo);
+      
+    if (recsError) throw recsError;
     
-  if (postsError) throw postsError;
-  
-  // Enrich recommendations with user interaction data and profile info
-  const enrichedRecommendations = await enrichRecommendationsData(recommendationsData || [], userId);
-  
-  // Enrich posts with user profile information
-  const enrichedPosts = await enrichPostsData(postsData || [], userId);
-  
-  // Combine and sort by created_at
-  const combinedItems = [
-    ...enrichedRecommendations.items,
-    ...enrichedPosts
-  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  
-  // Take only itemsPerPage items
-  const finalItems = combinedItems.slice(0, itemsPerPage);
-  
-  return { 
-    items: finalItems, 
-    hasMore: combinedItems.length >= itemsPerPage 
-  };
-}
-
-export async function fetchFollowingFeed({ userId, page, itemsPerPage = ITEMS_PER_PAGE }: FeedQueryParams) {
-  const offset = page * itemsPerPage;
-  
-  // Get users the current user follows
-  const { data: followingIds, error: followsError } = await supabase
-    .from('follows')
-    .select('following_id')
-    .eq('follower_id', userId);
+    // Fetch posts for the feed
+    const { data: postsData, error: postsError } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles(username, avatar_url)
+      `)
+      .eq('visibility', 'public')
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false })
+      .range(recFrom, recTo);
+      
+    if (postsError) throw postsError;
     
-  if (followsError) throw followsError;
-  
-  const followingUserIds = followingIds?.map(follow => follow.following_id) || [];
-  
-  // If user isn't following anyone, return empty array
-  if (followingUserIds.length === 0) {
-    return { items: [], hasMore: false };
-  }
-  
-  // Fetch recommendations from followed users
-  const { data: recommendationsData, error: recommendationsError } = await supabase
-    .from('recommendations')
-    .select(`
-      id, 
-      title, 
-      venue, 
-      description, 
-      rating, 
-      image_url, 
-      category, 
-      visibility, 
-      is_certified, 
-      view_count, 
-      user_id, 
-      created_at, 
-      updated_at,
-      entities!entity_id (id, name, type, venue, description, image_url)
-    `)
-    .in('user_id', followingUserIds)
-    .eq('visibility', 'public')
-    .order('created_at', { ascending: false })
-    .range(offset, offset + itemsPerPage - 1);
-    
-  if (recommendationsError) throw recommendationsError;
-  
-  // Fetch posts from followed users
-  const { data: postsData, error: postsError } = await supabase
-    .from('posts')
-    .select(`
-      id,
-      title,
-      content,
-      post_type,
-      visibility,
-      user_id,
-      created_at,
-      updated_at
-    `)
-    .in('user_id', followingUserIds)
-    .eq('visibility', 'public')
-    .eq('is_deleted', false)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + itemsPerPage - 1);
-    
-  if (postsError) throw postsError;
-  
-  // Enrich recommendations with user interaction data
-  const enrichedRecommendations = await enrichRecommendationsData(recommendationsData || [], userId);
-  
-  // Enrich posts with user profile information
-  const enrichedPosts = await enrichPostsData(postsData || [], userId);
-  
-  // Combine and sort by created_at
-  const combinedItems = [
-    ...enrichedRecommendations.items,
-    ...enrichedPosts
-  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  
-  // Take only itemsPerPage items
-  const finalItems = combinedItems.slice(0, itemsPerPage);
-  
-  return { 
-    items: finalItems, 
-    hasMore: combinedItems.length >= itemsPerPage 
-  };
-}
-
-async function enrichRecommendationsData(data: any[], userId: string) {
-  if (!data.length) {
-    return { items: [], hasMore: false };
-  }
-  
-  // Get recommendation IDs
-  const recommendationIds = data.map(item => item.id);
-  
-  // Get likes for the current user
-  const { data: userLikes } = await supabase
-    .from('recommendation_likes')
-    .select('recommendation_id')
-    .eq('user_id', userId)
-    .in('recommendation_id', recommendationIds);
-    
-  // Get saves for the current user
-  const { data: userSaves } = await supabase
-    .from('recommendation_saves')
-    .select('recommendation_id')
-    .eq('user_id', userId)
-    .in('recommendation_id', recommendationIds);
-    
-  // Fetch all likes and count them
-  const { data: allLikes } = await supabase
-    .from('recommendation_likes')
-    .select('recommendation_id')
-    .in('recommendation_id', recommendationIds);
-    
-  // Count likes for each recommendation
-  const likesCount: Record<string, number> = {};
-  allLikes?.forEach(like => {
-    if (like.recommendation_id) {
-      likesCount[like.recommendation_id] = (likesCount[like.recommendation_id] || 0) + 1;
-    }
-  });
-  
-  // Fetch user profiles
-  const userIds = Array.from(new Set(data.map(item => item.user_id as string)));
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, username, avatar_url')
-    .in('id', userIds);
-  
-  // Create profile lookup map
-  const profilesMap: Record<string, { username: string | null, avatar_url: string | null }> = {};
-  profiles?.forEach(profile => {
-    profilesMap[profile.id] = {
-      username: profile.username,
-      avatar_url: profile.avatar_url
-    };
-  });
-  
-  // Map the data to FeedItem format
-  const items = data.map(item => {
-    const likes = likesCount[item.id] || 0;
-    const is_liked = userLikes?.some(like => like.recommendation_id === item.id) || false;
-    const is_saved = userSaves?.some(save => save.recommendation_id === item.id) || false;
-    const profile = profilesMap[item.user_id] || { username: null, avatar_url: null };
-    
-    return {
-      ...item,
-      likes,
-      is_liked,
-      is_saved,
-      username: profile.username,
-      avatar_url: profile.avatar_url,
-      entity: item.entities,
-      is_post: false
-    } as FeedItem;
-  });
-  
-  return { items, hasMore: items.length === ITEMS_PER_PAGE };
-}
-
-async function enrichPostsData(posts: any[], userId: string): Promise<PostFeedItem[]> {
-  if (!posts.length) {
-    return [];
-  }
-  
-  // Fetch user profiles
-  const userIds = Array.from(new Set(posts.map(post => post.user_id)));
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, username, avatar_url')
-    .in('id', userIds);
-  
-  // Create profile lookup map
-  const profilesMap: Record<string, { username: string | null, avatar_url: string | null }> = {};
-  profiles?.forEach(profile => {
-    profilesMap[profile.id] = {
-      username: profile.username,
-      avatar_url: profile.avatar_url
-    };
-  });
-  
-  // Fetch entities for each post - using our custom function with a type assertion
-  const postIds = posts.map(post => post.id);
-  
-  // Cast supabase to any to bypass TypeScript's type checking
-  const supabaseAny = supabase as any;
-  
-  const { data: entitiesData } = await supabaseAny
-    .rpc('get_post_entities', { 
-      post_ids: postIds 
+    // Process recommendations
+    const processedRecs = recsData.map(rec => {
+      return {
+        ...rec,
+        username: rec.profiles?.username,
+        avatar_url: rec.profiles?.avatar_url,
+        likes: 0, // We'll update this with a count query
+        is_liked: false,
+        is_saved: false
+      };
     });
-  
-  // Group entities by post ID
-  const entitiesByPostId: Record<string, any[]> = {};
-  if (entitiesData) {
-    entitiesData.forEach((item: any) => {
-      if (!entitiesByPostId[item.post_id]) {
-        entitiesByPostId[item.post_id] = [];
+    
+    // Get likes and saves for recommendations
+    const recIds = processedRecs.map(rec => rec.id);
+    
+    if (recIds.length > 0) {
+      // Get likes
+      const { data: likesData } = await supabase
+        .from('recommendation_likes')
+        .select('recommendation_id, count')
+        .in('recommendation_id', recIds)
+        .eq('user_id', userId);
+        
+      // Get saves  
+      const { data: savesData } = await supabase
+        .from('recommendation_saves')
+        .select('recommendation_id')
+        .in('recommendation_id', recIds)
+        .eq('user_id', userId);
+        
+      // Update recommendations with like and save status
+      if (likesData) {
+        likesData.forEach((like: any) => {
+          const rec = processedRecs.find(r => r.id === like.recommendation_id);
+          if (rec) {
+            rec.is_liked = true;
+            rec.likes = like.count || 1;
+          }
+        });
       }
-      entitiesByPostId[item.post_id].push(item.entity);
+      
+      if (savesData) {
+        savesData.forEach((save: any) => {
+          const rec = processedRecs.find(r => r.id === save.recommendation_id);
+          if (rec) rec.is_saved = true;
+        });
+      }
+    }
+    
+    // Process posts
+    let processedPosts: PostFeedItem[] = [];
+    
+    if (postsData && postsData.length > 0) {
+      // Get post IDs for fetching entities
+      const postIds = postsData.map(post => post.id);
+      
+      // Fetch post entities
+      const supabaseAny = supabase as any;
+      const { data: entityData } = await supabaseAny.rpc('get_post_entities', {
+        post_ids: postIds
+      });
+      
+      // Organize entities by post
+      const entitiesByPostId: Record<string, any[]> = {};
+      if (entityData) {
+        entityData.forEach((item: any) => {
+          if (!entitiesByPostId[item.post_id]) {
+            entitiesByPostId[item.post_id] = [];
+          }
+          entitiesByPostId[item.post_id].push(item.entity);
+        });
+      }
+      
+      // Get likes for posts (using a custom likes table or count of likes)
+      const { data: postLikes } = await supabase
+        .from('post_likes')
+        .select('post_id, count')
+        .in('post_id', postIds);
+      
+      // Get saves for posts
+      const { data: postSaves } = await supabase
+        .from('post_saves')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
+      
+      // Format the posts as feed items
+      processedPosts = postsData.map(post => {
+        // Process media properly with type safety
+        let mediaItems: MediaItem[] | undefined;
+        
+        if (post.media && Array.isArray(post.media)) {
+          // Map each item in the media array to ensure it conforms to MediaItem structure
+          mediaItems = post.media.map((item: any): MediaItem => ({
+            url: item.url || '',
+            type: item.type || 'image',
+            caption: item.caption,
+            alt: item.alt,
+            order: item.order || 0,
+            thumbnail_url: item.thumbnail_url,
+            is_deleted: item.is_deleted || false,
+            session_id: item.session_id,
+            id: item.id
+          }));
+        }
+        
+        // Find likes for this post
+        const likeRecord = postLikes?.find((like: any) => like.post_id === post.id);
+        const isLiked = Boolean(likeRecord);
+        const likes = likeRecord?.count || 0;
+        
+        // Find if post is saved
+        const isSaved = Boolean(postSaves?.find((save: any) => save.post_id === post.id));
+        
+        return {
+          ...post,
+          username: post.profiles?.username,
+          avatar_url: post.profiles?.avatar_url,
+          is_post: true,
+          likes: likes,
+          is_liked: isLiked,
+          is_saved: isSaved,
+          tagged_entities: entitiesByPostId[post.id] || [],
+          media: mediaItems
+        };
+      });
+    }
+    
+    // Combine and sort all feed items
+    const allItems = [...processedRecs, ...processedPosts];
+    allItems.sort((a, b) => {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }
-  
-  // Map the posts data
-  return posts.map(post => {
-    const profile = profilesMap[post.user_id] || { username: null, avatar_url: null };
+    
+    // Pagination calculation
+    const hasMore = allItems.length >= itemsPerPage;
     
     return {
-      ...post,
-      username: profile.username,
-      avatar_url: profile.avatar_url,
-      is_post: true,
-      // Initialize the properties required by CombinedFeedItem
-      likes: 0,
-      is_liked: false,
-      is_saved: false,
-      // Add tagged entities
-      tagged_entities: entitiesByPostId[post.id] || []
-    } as PostFeedItem;
-  });
-}
+      items: allItems,
+      hasMore
+    };
+  } catch (error) {
+    console.error('Error fetching for you feed:', error);
+    throw error;
+  }
+};
+
+export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQueryParams) => {
+  try {
+    // Get user's following list
+    const { data: followingData, error: followingError } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', userId);
+      
+    if (followingError) throw followingError;
+    
+    // If not following anyone, return empty feed
+    if (!followingData || followingData.length === 0) {
+      return { items: [], hasMore: false };
+    }
+    
+    const followingIds = followingData.map(f => f.following_id);
+    
+    // Fetch recommendations from followed users
+    const recFrom = page * itemsPerPage;
+    const recTo = recFrom + itemsPerPage - 1;
+    
+    const { data: recsData, error: recsError } = await supabase
+      .from('recommendations')
+      .select(`
+        *,
+        profiles(username, avatar_url)
+      `)
+      .in('user_id', followingIds)
+      .eq('visibility', 'public')
+      .order('created_at', { ascending: false })
+      .range(recFrom, recTo);
+      
+    if (recsError) throw recsError;
+    
+    // Fetch posts from followed users
+    const { data: postsData, error: postsError } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles(username, avatar_url)
+      `)
+      .in('user_id', followingIds)
+      .eq('visibility', 'public')
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false })
+      .range(recFrom, recTo);
+      
+    if (postsError) throw postsError;
+    
+    // Process recommendations
+    const processedRecs = recsData.map(rec => {
+      return {
+        ...rec,
+        username: rec.profiles?.username,
+        avatar_url: rec.profiles?.avatar_url,
+        likes: 0,
+        is_liked: false,
+        is_saved: false
+      };
+    });
+    
+    // Get likes and saves for recommendations
+    const recIds = processedRecs.map(rec => rec.id);
+    
+    if (recIds.length > 0) {
+      // Get likes
+      const { data: likesData } = await supabase
+        .from('recommendation_likes')
+        .select('recommendation_id, count')
+        .in('recommendation_id', recIds);
+        
+      // Get user's likes  
+      const { data: userLikes } = await supabase
+        .from('recommendation_likes')
+        .select('recommendation_id')
+        .in('recommendation_id', recIds)
+        .eq('user_id', userId);
+        
+      // Get saves  
+      const { data: savesData } = await supabase
+        .from('recommendation_saves')
+        .select('recommendation_id')
+        .in('recommendation_id', recIds)
+        .eq('user_id', userId);
+        
+      // Update recommendations with like and save status
+      if (likesData) {
+        likesData.forEach((like: any) => {
+          const rec = processedRecs.find(r => r.id === like.recommendation_id);
+          if (rec) {
+            rec.likes = like.count || 0;
+          }
+        });
+      }
+      
+      if (userLikes) {
+        userLikes.forEach((like: any) => {
+          const rec = processedRecs.find(r => r.id === like.recommendation_id);
+          if (rec) rec.is_liked = true;
+        });
+      }
+      
+      if (savesData) {
+        savesData.forEach((save: any) => {
+          const rec = processedRecs.find(r => r.id === save.recommendation_id);
+          if (rec) rec.is_saved = true;
+        });
+      }
+    }
+    
+    // Process posts
+    let processedPosts: PostFeedItem[] = [];
+    
+    if (postsData && postsData.length > 0) {
+      // Get post IDs for fetching entities
+      const postIds = postsData.map(post => post.id);
+      
+      // Fetch post entities
+      const supabaseAny = supabase as any;
+      const { data: entityData } = await supabaseAny.rpc('get_post_entities', {
+        post_ids: postIds
+      });
+      
+      // Organize entities by post
+      const entitiesByPostId: Record<string, any[]> = {};
+      if (entityData) {
+        entityData.forEach((item: any) => {
+          if (!entitiesByPostId[item.post_id]) {
+            entitiesByPostId[item.post_id] = [];
+          }
+          entitiesByPostId[item.post_id].push(item.entity);
+        });
+      }
+      
+      // Get likes for posts (using a custom likes table or count of likes)
+      const { data: postLikes } = await supabase
+        .from('post_likes')
+        .select('post_id, count')
+        .in('post_id', postIds);
+      
+      // Get saves for posts
+      const { data: postSaves } = await supabase
+        .from('post_saves')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
+      
+      // Format the posts as feed items
+      processedPosts = postsData.map(post => {
+        // Process media properly with type safety
+        let mediaItems: MediaItem[] | undefined;
+        
+        if (post.media && Array.isArray(post.media)) {
+          // Map each item in the media array to ensure it conforms to MediaItem structure
+          mediaItems = post.media.map((item: any): MediaItem => ({
+            url: item.url || '',
+            type: item.type || 'image',
+            caption: item.caption,
+            alt: item.alt,
+            order: item.order || 0,
+            thumbnail_url: item.thumbnail_url,
+            is_deleted: item.is_deleted || false,
+            session_id: item.session_id,
+            id: item.id
+          }));
+        }
+        
+        // Find likes for this post
+        const likeRecord = postLikes?.find((like: any) => like.post_id === post.id);
+        const isLiked = Boolean(likeRecord);
+        const likes = likeRecord?.count || 0;
+        
+        // Find if post is saved
+        const isSaved = Boolean(postSaves?.find((save: any) => save.post_id === post.id));
+        
+        return {
+          ...post,
+          username: post.profiles?.username,
+          avatar_url: post.profiles?.avatar_url,
+          is_post: true,
+          likes: likes,
+          is_liked: isLiked,
+          is_saved: isSaved,
+          tagged_entities: entitiesByPostId[post.id] || [],
+          media: mediaItems
+        };
+      });
+    }
+    
+    // Combine and sort all feed items
+    const allItems = [...processedRecs, ...processedPosts];
+    allItems.sort((a, b) => {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    
+    // Pagination calculation
+    const hasMore = allItems.length >= itemsPerPage;
+    
+    return {
+      items: allItems,
+      hasMore
+    };
+  } catch (error) {
+    console.error('Error fetching following feed:', error);
+    throw error;
+  }
+};
