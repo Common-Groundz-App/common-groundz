@@ -50,7 +50,7 @@ export const useInteractions = (onSuccess?: () => void) => {
   
   const togglePostLike = async (postId: string, userId: string) => {
     try {
-      // Check if like exists - using raw SQL query to avoid type issues
+      // Check if like exists - using stored procedure to avoid type issues
       const { data: existingLike } = await supabase.rpc('check_post_like', {
         p_post_id: postId,
         p_user_id: userId
@@ -76,7 +76,7 @@ export const useInteractions = (onSuccess?: () => void) => {
   
   const togglePostSave = async (postId: string, userId: string) => {
     try {
-      // Check if save exists - using raw SQL query to avoid type issues
+      // Check if save exists - using stored procedure to avoid type issues
       const { data: existingSave } = await supabase.rpc('check_post_save', {
         p_post_id: postId,
         p_user_id: userId

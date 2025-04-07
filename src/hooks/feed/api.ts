@@ -92,9 +92,14 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       const postIds = postsData.map(post => post.id);
       
       // Fetch post entities
-      const { data: entityData } = await supabase.rpc('get_post_entities', {
-        post_ids: postIds
-      });
+      const { data: entityData, error: entityError } = await supabase.rpc(
+        'get_post_entities',
+        { post_ids: postIds }
+      );
+      
+      if (entityError) {
+        console.error('Error fetching post entities:', entityError);
+      }
       
       // Organize entities by post
       const entitiesByPostId: Record<string, any[]> = {};
@@ -107,39 +112,52 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
         });
       }
       
-      // Get likes for posts - using stored procedure to avoid type issues
-      const { data: postLikesData } = await supabase.rpc('get_post_likes_by_posts', {
-        p_post_ids: postIds
-      });
+      // Get likes for posts - using stored procedure
+      const { data: postLikesData, error: likesError } = await supabase.rpc(
+        'get_post_likes_by_posts',
+        { p_post_ids: postIds }
+      );
+      
+      if (likesError) {
+        console.error('Error fetching post likes:', likesError);
+      }
       
       // Get user likes for posts
-      const { data: userLikesData } = await supabase.rpc('get_user_post_likes', {
-        p_post_ids: postIds,
-        p_user_id: userId
-      });
+      const { data: userLikesData, error: userLikesError } = await supabase.rpc(
+        'get_user_post_likes',
+        { p_post_ids: postIds, p_user_id: userId }
+      );
+      
+      if (userLikesError) {
+        console.error('Error fetching user likes:', userLikesError);
+      }
       
       // Get saves for posts
-      const { data: userSavesData } = await supabase.rpc('get_user_post_saves', {
-        p_post_ids: postIds,
-        p_user_id: userId
-      });
+      const { data: userSavesData, error: userSavesError } = await supabase.rpc(
+        'get_user_post_saves',
+        { p_post_ids: postIds, p_user_id: userId }
+      );
+      
+      if (userSavesError) {
+        console.error('Error fetching user saves:', userSavesError);
+      }
       
       // Create lookup maps for efficient access
-      const postLikes = new Map();
+      const postLikes = new Map<string, number>();
       if (postLikesData) {
         postLikesData.forEach((item: any) => {
           postLikes.set(item.post_id, item.like_count || 0);
         });
       }
       
-      const userLikedPosts = new Set();
+      const userLikedPosts = new Set<string>();
       if (userLikesData) {
         userLikesData.forEach((item: any) => {
           userLikedPosts.add(item.post_id);
         });
       }
       
-      const userSavedPosts = new Set();
+      const userSavedPosts = new Set<string>();
       if (userSavesData) {
         userSavesData.forEach((item: any) => {
           userSavedPosts.add(item.post_id);
@@ -171,6 +189,12 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
         const isLiked = userLikedPosts.has(post.id);
         const isSaved = userSavedPosts.has(post.id);
         
+        // Ensure status is one of the allowed values
+        let postStatus: 'draft' | 'published' | 'failed' = 'published';
+        if (post.status === 'draft' || post.status === 'failed') {
+          postStatus = post.status;
+        }
+        
         return {
           ...post,
           username: post.profiles?.username || null,
@@ -181,7 +205,7 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
           is_saved: isSaved,
           tagged_entities: entitiesByPostId[post.id] || [],
           media: mediaItems,
-          status: (post.status || 'published') as 'draft' | 'published' | 'failed'
+          status: postStatus
         } as PostFeedItem;
       });
     }
@@ -323,9 +347,14 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       const postIds = postsData.map(post => post.id);
       
       // Fetch post entities
-      const { data: entityData } = await supabase.rpc('get_post_entities', {
-        post_ids: postIds
-      });
+      const { data: entityData, error: entityError } = await supabase.rpc(
+        'get_post_entities',
+        { post_ids: postIds }
+      );
+      
+      if (entityError) {
+        console.error('Error fetching post entities:', entityError);
+      }
       
       // Organize entities by post
       const entitiesByPostId: Record<string, any[]> = {};
@@ -338,39 +367,52 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
         });
       }
       
-      // Get likes for posts - using stored procedure to avoid type issues
-      const { data: postLikesData } = await supabase.rpc('get_post_likes_by_posts', {
-        p_post_ids: postIds
-      });
+      // Get likes for posts - using stored procedure
+      const { data: postLikesData, error: likesError } = await supabase.rpc(
+        'get_post_likes_by_posts',
+        { p_post_ids: postIds }
+      );
+      
+      if (likesError) {
+        console.error('Error fetching post likes:', likesError);
+      }
       
       // Get user likes for posts
-      const { data: userLikesData } = await supabase.rpc('get_user_post_likes', {
-        p_post_ids: postIds,
-        p_user_id: userId
-      });
+      const { data: userLikesData, error: userLikesError } = await supabase.rpc(
+        'get_user_post_likes',
+        { p_post_ids: postIds, p_user_id: userId }
+      );
+      
+      if (userLikesError) {
+        console.error('Error fetching user likes:', userLikesError);
+      }
       
       // Get saves for posts
-      const { data: userSavesData } = await supabase.rpc('get_user_post_saves', {
-        p_post_ids: postIds,
-        p_user_id: userId
-      });
+      const { data: userSavesData, error: userSavesError } = await supabase.rpc(
+        'get_user_post_saves',
+        { p_post_ids: postIds, p_user_id: userId }
+      );
+      
+      if (userSavesError) {
+        console.error('Error fetching user saves:', userSavesError);
+      }
       
       // Create lookup maps for efficient access
-      const postLikes = new Map();
+      const postLikes = new Map<string, number>();
       if (postLikesData) {
         postLikesData.forEach((item: any) => {
           postLikes.set(item.post_id, item.like_count || 0);
         });
       }
       
-      const userLikedPosts = new Set();
+      const userLikedPosts = new Set<string>();
       if (userLikesData) {
         userLikesData.forEach((item: any) => {
           userLikedPosts.add(item.post_id);
         });
       }
       
-      const userSavedPosts = new Set();
+      const userSavedPosts = new Set<string>();
       if (userSavesData) {
         userSavesData.forEach((item: any) => {
           userSavedPosts.add(item.post_id);
@@ -402,6 +444,12 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
         const isLiked = userLikedPosts.has(post.id);
         const isSaved = userSavedPosts.has(post.id);
         
+        // Ensure status is one of the allowed values
+        let postStatus: 'draft' | 'published' | 'failed' = 'published';
+        if (post.status === 'draft' || post.status === 'failed') {
+          postStatus = post.status;
+        }
+        
         return {
           ...post,
           username: post.profiles?.username || null,
@@ -412,7 +460,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
           is_saved: isSaved,
           tagged_entities: entitiesByPostId[post.id] || [],
           media: mediaItems,
-          status: (post.status || 'published') as 'draft' | 'published' | 'failed'
+          status: postStatus
         } as PostFeedItem;
       });
     }

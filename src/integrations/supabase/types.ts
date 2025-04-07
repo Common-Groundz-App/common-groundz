@@ -122,6 +122,35 @@ export type Database = {
           },
         ]
       }
+      post_likes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_recommendations: {
         Row: {
           created_at: string
@@ -157,6 +186,35 @@ export type Database = {
           },
           {
             foreignKeyName: "post_recommendations_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_saves: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_saves_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "posts"
@@ -367,10 +425,79 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_post_like: {
+        Args: {
+          p_post_id: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      check_post_save: {
+        Args: {
+          p_post_id: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      delete_post_like: {
+        Args: {
+          p_post_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      delete_post_save: {
+        Args: {
+          p_post_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      get_post_likes_by_posts: {
+        Args: {
+          p_post_ids: string[]
+        }
+        Returns: {
+          post_id: string
+          like_count: number
+        }[]
+      }
+      get_user_post_likes: {
+        Args: {
+          p_post_ids: string[]
+          p_user_id: string
+        }
+        Returns: {
+          post_id: string
+        }[]
+      }
+      get_user_post_saves: {
+        Args: {
+          p_post_ids: string[]
+          p_user_id: string
+        }
+        Returns: {
+          post_id: string
+        }[]
+      }
       increment_recommendation_view: {
         Args: {
           rec_id: string
           viewer_id: string
+        }
+        Returns: undefined
+      }
+      insert_post_like: {
+        Args: {
+          p_post_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      insert_post_save: {
+        Args: {
+          p_post_id: string
+          p_user_id: string
         }
         Returns: undefined
       }
