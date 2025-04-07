@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -154,9 +153,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
             <Button
               variant="ghost"
               size="sm"
-              className={cn(
-                "flex items-center gap-1"
-              )}
+              className={cn("flex items-center gap-1")}
               onClick={toggleComments}
             >
               <MessageCircle size={18} />

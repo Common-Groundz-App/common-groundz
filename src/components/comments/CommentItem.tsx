@@ -1,7 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { MoreHorizontal, Edit, Trash, Reply } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash, MessageSquareReply } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -154,7 +154,7 @@ const CommentItem = ({
               className="h-7 px-2 text-xs"
               onClick={() => setIsReplying(!isReplying)}
             >
-              <Reply className="mr-1 h-3 w-3" />
+              <MessageSquareReply className="mr-1 h-3 w-3" />
               Reply
             </Button>
           </div>

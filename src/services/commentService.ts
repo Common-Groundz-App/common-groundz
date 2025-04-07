@@ -123,15 +123,21 @@ export const createComment = async (
   try {
     const field = itemType === 'post' ? 'post_id' : 'recommendation_id';
     
+    const insertData: any = {
+      content,
+      user_id: userId,
+      [field]: itemId,
+      is_deleted: false
+    };
+    
+    // Only add parent_id if it's provided and not null
+    if (parentId) {
+      insertData.parent_id = parentId;
+    }
+    
     const { data, error } = await supabase
       .from('comments')
-      .insert({
-        content,
-        user_id: userId,
-        [field]: itemId,
-        parent_id: parentId,
-        is_deleted: false
-      })
+      .insert(insertData)
       .select('*')
       .single();
 
