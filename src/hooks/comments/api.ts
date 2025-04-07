@@ -63,8 +63,8 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
     }
     
     // Get current user (if authenticated)
-    const { data: { user } } = await supabase.auth.getUser();
-    const currentUserId = user?.id;
+    const { data } = await supabase.auth.getUser();
+    const currentUserId = data.user?.id;
     
     // Enhance comments with profile data and replies count
     return comments.map((comment: any) => ({
@@ -86,7 +86,8 @@ export const createComment = async (params: CreateCommentParams): Promise<Commen
     const { content, target, parent_id } = params;
     
     // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data, error: userError } = await supabase.auth.getUser();
+    const user = data.user;
     
     if (userError || !user) throw new Error('User not authenticated');
     

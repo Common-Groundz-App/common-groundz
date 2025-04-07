@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
   try {
     // Get the request payload
     const payload: WebhookPayload = await req.json();
-    const { query_text, query_params } = payload;
+    const { query_text, query_params = [] } = payload;
 
     if (!query_text) {
       return new Response(
@@ -30,14 +30,14 @@ Deno.serve(async (req) => {
     }
 
     console.log('Executing SQL:', query_text);
-    console.log('With params:', query_params || []);
+    console.log('With params:', query_params);
 
-    // Execute the query directly with the Postgres connection
-    const { data, error } = await supabase
-      .from('comments')
-      .select('*')
-      .limit(10);
-
+    // Execute the query directly using rpc
+    const { data, error } = await supabase.rpc('execute_sql', { 
+      query_text,
+      query_params: JSON.stringify(query_params)
+    });
+    
     if (error) {
       console.error('SQL execution error:', error);
       return new Response(
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
-
+    
     // Return the data (this will be an array)
     return new Response(
       JSON.stringify(data || []),
