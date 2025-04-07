@@ -1,17 +1,18 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Comment } from '@/hooks/comments/types';
+import { CommentTarget } from '@/hooks/comments/types';
 import { CommentItem } from './CommentItem';
 import { CommentForm } from './CommentForm';
 import { useComments } from '@/hooks/comments/use-comments';
-import { Skeleton } from '@/components/ui/skeleton';
-import { MessageCircle, AlertCircle } from 'lucide-react';
-import { fetchComments } from '@/hooks/comments/api';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CommentsErrorAlert } from './CommentsErrorAlert';
+import { CommentRepliesList } from './CommentRepliesList';
+import { CommentSkeletons } from './CommentSkeletons';
+import { CommentsEmptyState } from './CommentsEmptyState';
+import { MessageCircle } from 'lucide-react';
 
 interface CommentsListProps {
-  target: { type: 'post' | 'recommendation'; id: string; };
+  target: CommentTarget;
   className?: string;
 }
 
@@ -38,10 +39,12 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
     }
   });
   
-  // Map to track replies for each comment
-  const [repliesMap, setRepliesMap] = useState<Record<string, Comment[]>>({});
-  const [repliesLoading, setRepliesLoading] = useState<Record<string, boolean>>({});
-  
+  const handleRefresh = () => {
+    setError(null);
+    setRetryCount(prev => prev + 1);
+    loadComments();
+  };
+
   const handleCommentSubmit = async (content: string) => {
     setError(null);
     try {
@@ -56,16 +59,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
     setError(null);
     if (replyingTo) {
       try {
-        const newComment = await addComment(content, replyingTo.id);
-        
-        // Update replies in state if the parent comment's replies are expanded
-        if (expandedReplies[replyingTo.id] && newComment) {
-          setRepliesMap(prev => ({
-            ...prev,
-            [replyingTo.id]: [newComment, ...(prev[replyingTo.id] || [])]
-          }));
-        }
-        
+        await addComment(content, replyingTo.id);
         setReplyingTo(null);
       } catch (err) {
         console.error('Error submitting reply:', err);
@@ -74,71 +68,8 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
     }
   };
   
-  const handleViewReplies = async (commentId: string) => {
-    // Toggle expanded state
-    const newState = !expandedReplies[commentId];
-    setExpandedReplies(prev => ({ ...prev, [commentId]: newState }));
-    
-    // If expanding and we don't have replies loaded yet, fetch them
-    if (newState && (!repliesMap[commentId] || repliesMap[commentId].length === 0)) {
-      setRepliesLoading(prev => ({ ...prev, [commentId]: true }));
-      setError(null);
-      
-      try {
-        // Fetch replies for this comment
-        const replies = await fetchComments({ 
-          target, 
-          parent_id: commentId
-        });
-        
-        // Store the loaded replies
-        setRepliesMap(prev => ({ 
-          ...prev, 
-          [commentId]: replies 
-        }));
-      } catch (error) {
-        console.error('Error loading replies:', error);
-        setError('Failed to load replies. Please try again.');
-      } finally {
-        setRepliesLoading(prev => ({ ...prev, [commentId]: false }));
-      }
-    }
-  };
-
-  // Handle reply button click
-  const handleReply = (commentId: string) => {
-    const comment = comments.find(c => c.id === commentId);
-    if (comment) {
-      setReplyingTo({ id: comment.id, username: comment.username });
-    }
-  };
-  
-  // Handle comment edit
-  const handleEdit = (commentId: string, content: string) => {
-    setError(null);
-    editComment(commentId, content).catch(err => {
-      console.error('Error editing comment:', err);
-      setError('Failed to edit comment. Please try again.');
-    });
-  };
-  
-  // Handle comment delete
-  const handleDelete = (commentId: string) => {
-    setError(null);
-    removeComment(commentId).catch(err => {
-      console.error('Error deleting comment:', err);
-      setError('Failed to delete comment. Please try again.');
-    });
-  };
-
-  const handleRefresh = () => {
-    setError(null);
-    setRetryCount(prev => prev + 1);
-    loadComments();
-  };
-
   // Reset error state when target changes
-  useEffect(() => {
+  React.useEffect(() => {
     setError(null);
   }, [target.id, target.type]);
 
@@ -149,22 +80,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
         <h3 className="text-lg font-medium">Comments</h3>
       </div>
       
-      {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex justify-between items-center">
-            <span>{error}</span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleRefresh}
-              className="ml-2"
-            >
-              Retry
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+      <CommentsErrorAlert error={error} onRetry={handleRefresh} />
       
       <CommentForm onSubmit={handleCommentSubmit} />
       
@@ -184,51 +100,45 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
       
       <div className="space-y-4 mt-6">
         {isLoading ? (
-          // Display skeletons while loading
-          Array(3).fill(0).map((_, index) => (
-            <div key={index} className="flex space-x-3">
-              <Skeleton className="h-8 w-8 rounded-full" />
-              <div className="space-y-2 flex-1">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-16 w-full rounded-md" />
-              </div>
-            </div>
-          ))
+          <CommentSkeletons count={3} />
         ) : comments.length === 0 ? (
-          // Empty state
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No comments yet. Be the first to comment!</p>
-          </div>
+          <CommentsEmptyState />
         ) : (
-          // Display comments
           comments.map(comment => (
             <div key={comment.id} className="space-y-3">
               <CommentItem 
                 comment={comment}
-                onReply={handleReply}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onViewReplies={comment.replies_count ? handleViewReplies : undefined}
+                onReply={(commentId) => {
+                  const comment = comments.find(c => c.id === commentId);
+                  if (comment) {
+                    setReplyingTo({ id: comment.id, username: comment.username });
+                  }
+                }}
+                onEdit={editComment}
+                onDelete={removeComment}
+                onViewReplies={comment.replies_count ? (() => {
+                  // Toggle expanded state
+                  setExpandedReplies(prev => ({
+                    ...prev,
+                    [comment.id]: !prev[comment.id]
+                  }));
+                }) : undefined}
               />
               
               {/* Display replies if expanded */}
               {expandedReplies[comment.id] && (
-                <div className="ml-6 mt-3 space-y-3 border-l-2 border-muted pl-4">
-                  {repliesLoading[comment.id] ? (
-                    <div className="py-2">
-                      <Skeleton className="h-10 w-full" />
-                    </div>
-                  ) : repliesMap[comment.id]?.map(reply => (
-                    <CommentItem 
-                      key={reply.id}
-                      comment={reply}
-                      onReply={handleReply}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      isReply={true}
-                    />
-                  ))}
-                </div>
+                <CommentRepliesList 
+                  commentId={comment.id}
+                  target={target}
+                  onReply={(commentId) => {
+                    const comment = comments.find(c => c.id === commentId);
+                    if (comment) {
+                      setReplyingTo({ id: comment.id, username: comment.username });
+                    }
+                  }}
+                  onEdit={editComment}
+                  onDelete={removeComment}
+                />
               )}
             </div>
           ))
