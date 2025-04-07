@@ -132,9 +132,11 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       // Handle entities - with proper error checking
       let entitiesByPostId: Record<string, any[]> = {};
       try {
-        // Use the RPC function for fetching post entities
+        // Use direct query instead of RPC function
         const { data: entityData, error: entityError } = await supabase
-          .rpc('get_post_entities', { post_ids: postIds });
+          .from('post_entities')
+          .select('post_id, entity_id, entities:entity_id(*)')
+          .in('post_id', postIds);
           
         if (entityError) {
           console.error('Error fetching post entities:', entityError);
@@ -144,8 +146,8 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
             if (!entitiesByPostId[item.post_id]) {
               entitiesByPostId[item.post_id] = [];
             }
-            if (item.entity) {
-              entitiesByPostId[item.post_id].push(item.entity);
+            if (item.entities) {
+              entitiesByPostId[item.post_id].push(item.entities);
             }
           });
         }
@@ -156,6 +158,7 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       // Get post likes count
       const likeCounts = new Map<string, number>();
       try {
+        // Use direct query for likes count
         const { data: postLikesData } = await supabase
           .from('post_likes')
           .select('post_id');
@@ -412,9 +415,11 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       // Handle entities - with proper error checking
       let entitiesByPostId: Record<string, any[]> = {};
       try {
-        // Use the RPC function for fetching post entities
+        // Use direct query instead of RPC function
         const { data: entityData, error: entityError } = await supabase
-          .rpc('get_post_entities', { post_ids: postIds });
+          .from('post_entities')
+          .select('post_id, entity_id, entities:entity_id(*)')
+          .in('post_id', postIds);
           
         if (entityError) {
           console.error('Error fetching post entities:', entityError);
@@ -424,8 +429,8 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
             if (!entitiesByPostId[item.post_id]) {
               entitiesByPostId[item.post_id] = [];
             }
-            if (item.entity) {
-              entitiesByPostId[item.post_id].push(item.entity);
+            if (item.entities) {
+              entitiesByPostId[item.post_id].push(item.entities);
             }
           });
         }
@@ -433,7 +438,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
         console.error('Error fetching post entities:', error);
       }
       
-      // Get post likes count
+      // Get post likes count using direct query
       const likeCounts = new Map<string, number>();
       try {
         const { data: postLikesData } = await supabase
@@ -547,3 +552,6 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
     throw error;
   }
 };
+
+// Export the isItemPost utility
+export { isItemPost } from './api/utils';

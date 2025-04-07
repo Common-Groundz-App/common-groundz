@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { isItemPost } from './api';
+import { isItemPost } from './api/utils';
 
 // Toggle like for a recommendation or post
 export const useInteractions = (onSuccess?: () => void) => {
