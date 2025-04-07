@@ -3,6 +3,7 @@ import React from 'react';
 import { CombinedFeedItem } from '@/hooks/feed/types';
 import { PostItem } from '@/components/feed/PostItem';
 import { RecommendationItem } from '@/components/feed/RecommendationItem';
+import { isItemPost } from '@/hooks/feed/api';
 
 interface FeedItemProps {
   item: CombinedFeedItem;
@@ -11,9 +12,8 @@ interface FeedItemProps {
 }
 
 const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
-  const isPost = 'is_post' in item && item.is_post === true;
-  
-  if (isPost) {
+  // Use the utility function to check if the item is a post
+  if (isItemPost(item)) {
     return <PostItem post={item} onLike={onLike} onSave={onSave} />;
   }
   
