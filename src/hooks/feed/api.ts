@@ -9,26 +9,35 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
     const recFrom = page * itemsPerPage;
     const recTo = recFrom + itemsPerPage - 1;
     
-    // Get recommendations with author data in a join
+    // Get recommendations data first
     const { data: recsData, error: recsError } = await supabase
       .from('recommendations')
-      .select(`
-        *,
-        profiles:user_id(username, avatar_url)
-      `)
+      .select(`*`)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .range(recFrom, recTo);
       
     if (recsError) throw recsError;
     
+    // Fetch user profiles for the recommendations separately
+    const userIds = recsData.map(rec => rec.user_id);
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', userIds);
+    
+    if (profilesError) throw profilesError;
+    
+    // Create lookup map for profiles
+    const profilesMap = new Map();
+    profilesData?.forEach(profile => {
+      profilesMap.set(profile.id, profile);
+    });
+    
     // Fetch posts for the feed
     const { data: postsData, error: postsError } = await supabase
       .from('posts')
-      .select(`
-        *,
-        profiles:user_id(username, avatar_url)
-      `)
+      .select(`*`)
       .eq('visibility', 'public')
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
@@ -36,12 +45,26 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       
     if (postsError) throw postsError;
     
+    // Get user profiles for the posts
+    const postUserIds = postsData.map(post => post.user_id);
+    const { data: postProfilesData } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', postUserIds);
+    
+    // Create lookup map for post profiles
+    const postProfilesMap = new Map();
+    postProfilesData?.forEach(profile => {
+      postProfilesMap.set(profile.id, profile);
+    });
+    
     // Process recommendations
     const processedRecs = recsData.map(rec => {
+      const profile = profilesMap.get(rec.user_id);
       return {
         ...rec,
-        username: rec.profiles?.username || null,
-        avatar_url: rec.profiles?.avatar_url || null,
+        username: profile?.username || null,
+        avatar_url: profile?.avatar_url || null,
         likes: 0, // We'll update this with a count query
         is_liked: false,
         is_saved: false
@@ -55,7 +78,20 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       // Get likes
       const { data: likesData } = await supabase
         .from('recommendation_likes')
-        .select('recommendation_id, count')
+        .select('recommendation_id')
+        .in('recommendation_id', recIds);
+        
+      // Count likes for each recommendation
+      const likesCount = new Map();
+      likesData?.forEach((like: any) => {
+        const count = likesCount.get(like.recommendation_id) || 0;
+        likesCount.set(like.recommendation_id, count + 1);
+      });
+      
+      // Get user likes
+      const { data: userLikes } = await supabase
+        .from('recommendation_likes')
+        .select('recommendation_id')
         .in('recommendation_id', recIds)
         .eq('user_id', userId);
         
@@ -67,13 +103,14 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
         .eq('user_id', userId);
         
       // Update recommendations with like and save status
-      if (likesData) {
-        likesData.forEach((like: any) => {
+      processedRecs.forEach(rec => {
+        rec.likes = likesCount.get(rec.id) || 0;
+      });
+      
+      if (userLikes) {
+        userLikes.forEach((like: any) => {
           const rec = processedRecs.find(r => r.id === like.recommendation_id);
-          if (rec) {
-            rec.is_liked = true;
-            rec.likes = like.count || 1;
-          }
+          if (rec) rec.is_liked = true;
         });
       }
       
@@ -95,21 +132,20 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       // Handle entities - with proper error checking
       let entitiesByPostId: Record<string, any[]> = {};
       try {
-        const { data: entityData } = await supabase
-          .from('post_entities')
-          .select(`
-            post_id,
-            entities:entity_id(id, name, type, venue, description, image_url)
-          `)
-          .in('post_id', postIds);
+        // Use the RPC function for fetching post entities
+        const { data: entityData, error: entityError } = await supabase
+          .rpc('get_post_entities', { post_ids: postIds });
           
-        if (entityData) {
+        if (entityError) {
+          console.error('Error fetching post entities:', entityError);
+        } else if (entityData) {
+          // Group entities by post_id
           entityData.forEach((item: any) => {
             if (!entitiesByPostId[item.post_id]) {
               entitiesByPostId[item.post_id] = [];
             }
-            if (item.entities) {
-              entitiesByPostId[item.post_id].push(item.entities);
+            if (item.entity) {
+              entitiesByPostId[item.post_id].push(item.entity);
             }
           });
         }
@@ -117,43 +153,45 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
         console.error('Error fetching post entities:', error);
       }
       
-      // Get likes for posts - without using the stored procedure
-      const { data: postLikesData } = await supabase
-        .from('post_likes')
-        .select('post_id, count(*)')
-        .in('post_id', postIds)
-        .group('post_id');
+      // Get post likes count
+      const likeCounts = new Map<string, number>();
+      try {
+        const { data: postLikesData } = await supabase
+          .from('post_likes')
+          .select('post_id');
+          
+        if (postLikesData) {
+          postLikesData.forEach((item: any) => {
+            const count = likeCounts.get(item.post_id) || 0;
+            likeCounts.set(item.post_id, count + 1);
+          });
+        }
+      } catch (error) {
+        console.error('Error counting post likes:', error);
+      }
       
       // Get user likes for posts
+      const userLikedPosts = new Set<string>();
       const { data: userLikesData } = await supabase
         .from('post_likes')
         .select('post_id')
         .in('post_id', postIds)
         .eq('user_id', userId);
       
-      // Get saves for posts
-      const { data: userSavesData } = await supabase
-        .from('post_saves')
-        .select('post_id')
-        .in('post_id', postIds)
-        .eq('user_id', userId);
-      
-      // Create lookup maps for efficient access
-      const postLikes = new Map<string, number>();
-      if (postLikesData) {
-        postLikesData.forEach((item: any) => {
-          postLikes.set(item.post_id, parseInt(item.count) || 0);
-        });
-      }
-      
-      const userLikedPosts = new Set<string>();
       if (userLikesData) {
         userLikesData.forEach((item: any) => {
           userLikedPosts.add(item.post_id);
         });
       }
       
+      // Get saves for posts
       const userSavedPosts = new Set<string>();
+      const { data: userSavesData } = await supabase
+        .from('post_saves')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
+      
       if (userSavesData) {
         userSavesData.forEach((item: any) => {
           userSavedPosts.add(item.post_id);
@@ -162,6 +200,11 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       
       // Format the posts as feed items
       processedPosts = postsData.map(post => {
+        // Get profile data
+        const profile = postProfilesMap.get(post.user_id);
+        const username = profile?.username || null;
+        const avatar_url = profile?.avatar_url || null;
+        
         // Process media properly with type safety
         let mediaItems: MediaItem[] = [];
         
@@ -181,7 +224,7 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
         }
         
         // Get post metadata
-        const likes = postLikes.get(post.id) || 0;
+        const likes = likeCounts.get(post.id) || 0;
         const isLiked = userLikedPosts.has(post.id);
         const isSaved = userSavedPosts.has(post.id);
         
@@ -193,8 +236,8 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
         
         return {
           ...post,
-          username: post.profiles?.username || null,
-          avatar_url: post.profiles?.avatar_url || null,
+          username,
+          avatar_url,
           is_post: true,
           likes: likes,
           is_liked: isLiked,
@@ -248,10 +291,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
     
     const { data: recsData, error: recsError } = await supabase
       .from('recommendations')
-      .select(`
-        *,
-        profiles:user_id(username, avatar_url)
-      `)
+      .select(`*`)
       .in('user_id', followingIds)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
@@ -259,13 +299,25 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       
     if (recsError) throw recsError;
     
+    // Fetch user profiles for the recommendations separately
+    const userIds = recsData.map(rec => rec.user_id);
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', userIds);
+    
+    if (profilesError) throw profilesError;
+    
+    // Create lookup map for profiles
+    const profilesMap = new Map();
+    profilesData?.forEach(profile => {
+      profilesMap.set(profile.id, profile);
+    });
+    
     // Fetch posts from followed users
     const { data: postsData, error: postsError } = await supabase
       .from('posts')
-      .select(`
-        *,
-        profiles:user_id(username, avatar_url)
-      `)
+      .select(`*`)
       .in('user_id', followingIds)
       .eq('visibility', 'public')
       .eq('is_deleted', false)
@@ -274,12 +326,26 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       
     if (postsError) throw postsError;
     
+    // Get user profiles for the posts
+    const postUserIds = postsData.map(post => post.user_id);
+    const { data: postProfilesData } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', postUserIds);
+    
+    // Create lookup map for post profiles
+    const postProfilesMap = new Map();
+    postProfilesData?.forEach(profile => {
+      postProfilesMap.set(profile.id, profile);
+    });
+    
     // Process recommendations
     const processedRecs = recsData.map(rec => {
+      const profile = profilesMap.get(rec.user_id);
       return {
         ...rec,
-        username: rec.profiles?.username || null,
-        avatar_url: rec.profiles?.avatar_url || null,
+        username: profile?.username || null,
+        avatar_url: profile?.avatar_url || null,
         likes: 0,
         is_liked: false,
         is_saved: false
@@ -290,12 +356,18 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
     const recIds = processedRecs.map(rec => rec.id);
     
     if (recIds.length > 0) {
-      // Get likes
+      // Get likes count
       const { data: likesData } = await supabase
         .from('recommendation_likes')
-        .select('recommendation_id, count')
-        .in('recommendation_id', recIds);
+        .select('recommendation_id');
         
+      // Count likes for each recommendation
+      const likesCount = new Map();
+      likesData?.forEach((like: any) => {
+        const count = likesCount.get(like.recommendation_id) || 0;
+        likesCount.set(like.recommendation_id, count + 1);
+      });
+      
       // Get user's likes  
       const { data: userLikes } = await supabase
         .from('recommendation_likes')
@@ -311,14 +383,9 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
         .eq('user_id', userId);
         
       // Update recommendations with like and save status
-      if (likesData) {
-        likesData.forEach((like: any) => {
-          const rec = processedRecs.find(r => r.id === like.recommendation_id);
-          if (rec) {
-            rec.likes = like.count || 0;
-          }
-        });
-      }
+      processedRecs.forEach(rec => {
+        rec.likes = likesCount.get(rec.id) || 0;
+      });
       
       if (userLikes) {
         userLikes.forEach((like: any) => {
@@ -345,21 +412,20 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       // Handle entities - with proper error checking
       let entitiesByPostId: Record<string, any[]> = {};
       try {
-        const { data: entityData } = await supabase
-          .from('post_entities')
-          .select(`
-            post_id,
-            entities:entity_id(id, name, type, venue, description, image_url)
-          `)
-          .in('post_id', postIds);
+        // Use the RPC function for fetching post entities
+        const { data: entityData, error: entityError } = await supabase
+          .rpc('get_post_entities', { post_ids: postIds });
           
-        if (entityData) {
+        if (entityError) {
+          console.error('Error fetching post entities:', entityError);
+        } else if (entityData) {
+          // Group entities by post_id
           entityData.forEach((item: any) => {
             if (!entitiesByPostId[item.post_id]) {
               entitiesByPostId[item.post_id] = [];
             }
-            if (item.entities) {
-              entitiesByPostId[item.post_id].push(item.entities);
+            if (item.entity) {
+              entitiesByPostId[item.post_id].push(item.entity);
             }
           });
         }
@@ -367,43 +433,45 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
         console.error('Error fetching post entities:', error);
       }
       
-      // Get likes for posts - without using the stored procedure
-      const { data: postLikesData } = await supabase
-        .from('post_likes')
-        .select('post_id, count(*)')
-        .in('post_id', postIds)
-        .group('post_id');
+      // Get post likes count
+      const likeCounts = new Map<string, number>();
+      try {
+        const { data: postLikesData } = await supabase
+          .from('post_likes')
+          .select('post_id');
+          
+        if (postLikesData) {
+          postLikesData.forEach((item: any) => {
+            const count = likeCounts.get(item.post_id) || 0;
+            likeCounts.set(item.post_id, count + 1);
+          });
+        }
+      } catch (error) {
+        console.error('Error counting post likes:', error);
+      }
       
       // Get user likes for posts
+      const userLikedPosts = new Set<string>();
       const { data: userLikesData } = await supabase
         .from('post_likes')
         .select('post_id')
         .in('post_id', postIds)
         .eq('user_id', userId);
       
-      // Get saves for posts
-      const { data: userSavesData } = await supabase
-        .from('post_saves')
-        .select('post_id')
-        .in('post_id', postIds)
-        .eq('user_id', userId);
-      
-      // Create lookup maps for efficient access
-      const postLikes = new Map<string, number>();
-      if (postLikesData) {
-        postLikesData.forEach((item: any) => {
-          postLikes.set(item.post_id, parseInt(item.count) || 0);
-        });
-      }
-      
-      const userLikedPosts = new Set<string>();
       if (userLikesData) {
         userLikesData.forEach((item: any) => {
           userLikedPosts.add(item.post_id);
         });
       }
       
+      // Get saves for posts
       const userSavedPosts = new Set<string>();
+      const { data: userSavesData } = await supabase
+        .from('post_saves')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
+      
       if (userSavesData) {
         userSavesData.forEach((item: any) => {
           userSavedPosts.add(item.post_id);
@@ -412,6 +480,11 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       
       // Format the posts as feed items
       processedPosts = postsData.map(post => {
+        // Get profile data
+        const profile = postProfilesMap.get(post.user_id);
+        const username = profile?.username || null;
+        const avatar_url = profile?.avatar_url || null;
+        
         // Process media properly with type safety
         let mediaItems: MediaItem[] = [];
         
@@ -431,7 +504,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
         }
         
         // Get post metadata
-        const likes = postLikes.get(post.id) || 0;
+        const likes = likeCounts.get(post.id) || 0;
         const isLiked = userLikedPosts.has(post.id);
         const isSaved = userSavedPosts.has(post.id);
         
@@ -443,8 +516,8 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
         
         return {
           ...post,
-          username: post.profiles?.username || null,
-          avatar_url: post.profiles?.avatar_url || null,
+          username,
+          avatar_url,
           is_post: true,
           likes: likes,
           is_liked: isLiked,

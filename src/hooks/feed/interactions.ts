@@ -50,35 +50,25 @@ export const useInteractions = (onSuccess?: () => void) => {
   
   const togglePostLike = async (postId: string, userId: string) => {
     try {
-      // Check if like exists using rpc function
-      const { data: existingLike, error: checkError } = await supabase
-        .rpc('check_post_like', {
-          p_post_id: postId,
-          p_user_id: userId
+      // Check if like exists
+      const { data: exists } = await supabase
+        .rpc('check_post_like', { 
+          p_post_id: postId, 
+          p_user_id: userId 
         });
       
-      if (checkError) {
-        console.error('Error checking post like:', checkError);
-        throw checkError;
-      }
-      
-      // If like exists, remove it; otherwise, add it
-      if (existingLike) {
-        const { error: deleteError } = await supabase
-          .rpc('delete_post_like', {
-            p_post_id: postId,
-            p_user_id: userId
+      if (exists) {
+        await supabase
+          .rpc('delete_post_like', { 
+            p_post_id: postId, 
+            p_user_id: userId 
           });
-        
-        if (deleteError) throw deleteError;
       } else {
-        const { error: insertError } = await supabase
-          .rpc('insert_post_like', {
-            p_post_id: postId,
-            p_user_id: userId
+        await supabase
+          .rpc('insert_post_like', { 
+            p_post_id: postId, 
+            p_user_id: userId 
           });
-          
-        if (insertError) throw insertError;
       }
     } catch (err) {
       console.error('Error in togglePostLike:', err);
@@ -88,35 +78,25 @@ export const useInteractions = (onSuccess?: () => void) => {
   
   const togglePostSave = async (postId: string, userId: string) => {
     try {
-      // Check if save exists using rpc function
-      const { data: existingSave, error: checkError } = await supabase
-        .rpc('check_post_save', {
-          p_post_id: postId,
-          p_user_id: userId
+      // Check if save exists
+      const { data: exists } = await supabase
+        .rpc('check_post_save', { 
+          p_post_id: postId, 
+          p_user_id: userId 
         });
       
-      if (checkError) {
-        console.error('Error checking post save:', checkError);
-        throw checkError;
-      }
-      
-      // If save exists, remove it; otherwise, add it
-      if (existingSave) {
-        const { error: deleteError } = await supabase
-          .rpc('delete_post_save', {
-            p_post_id: postId,
-            p_user_id: userId
+      if (exists) {
+        await supabase
+          .rpc('delete_post_save', { 
+            p_post_id: postId, 
+            p_user_id: userId 
           });
-          
-        if (deleteError) throw deleteError;
       } else {
-        const { error: insertError } = await supabase
-          .rpc('insert_post_save', {
-            p_post_id: postId,
-            p_user_id: userId
+        await supabase
+          .rpc('insert_post_save', { 
+            p_post_id: postId, 
+            p_user_id: userId 
           });
-          
-        if (insertError) throw insertError;
       }
     } catch (err) {
       console.error('Error in togglePostSave:', err);
