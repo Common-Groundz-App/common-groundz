@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { FeedItem, FeedVisibility, FeedState } from './types';
-import { fetchForYouFeed, fetchFollowingFeed } from './api';
+import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { useInteractions } from './interactions';
 
 const ITEMS_PER_PAGE = 10;
