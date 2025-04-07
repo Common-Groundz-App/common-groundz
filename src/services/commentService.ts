@@ -67,14 +67,7 @@ export const getComments = async (
       };
     });
 
-    // Check if there are more comments
-    const { count, error: countError } = await supabase
-      .from('comments')
-      .select('id', { count: 'exact', head: true })
-      .eq(field, itemId)
-      .eq('is_deleted', false);
-
-    // Apply the same parent_id filtering as in the main query
+    // Check if there are more comments - build and execute a count query
     let countQuery = supabase
       .from('comments')
       .select('id', { count: 'exact', head: true })
