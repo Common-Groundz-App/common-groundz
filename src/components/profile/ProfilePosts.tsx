@@ -11,6 +11,8 @@ import { format } from 'date-fns';
 import { Entity } from '@/services/recommendation/types';
 import { cn } from '@/lib/utils';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
+import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
+import { MediaItem } from '@/types/media';
 
 interface Post {
   id: string;
@@ -21,6 +23,7 @@ interface Post {
   created_at: string;
   updated_at: string;
   tagged_entities?: Entity[];
+  media?: MediaItem[];
 }
 
 interface ProfilePostsProps {
@@ -212,6 +215,16 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
             <div className="text-muted-foreground">
               <RichTextDisplay content={post.content} />
             </div>
+            
+            {/* Display media items if available */}
+            {post.media && post.media.length > 0 && (
+              <div className="mt-4">
+                <PostMediaDisplay 
+                  media={post.media}
+                  displayType={post.media.length > 1 ? 'carousel' : 'grid'} 
+                />
+              </div>
+            )}
             
             {/* Display tagged entities */}
             {post.tagged_entities && post.tagged_entities.length > 0 && (
