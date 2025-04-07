@@ -109,11 +109,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
           <h3 className="text-xl font-semibold mb-2">{post.title}</h3>
           
           <div className="mb-4">
-            {typeof post.content === 'object' ? (
-              <RichTextDisplay content={post.content} />
-            ) : (
-              <p className="text-muted-foreground whitespace-pre-wrap">{post.content}</p>
-            )}
+            <RichTextDisplay content={post.content} />
           </div>
           
           {post.media && post.media.length > 0 && (

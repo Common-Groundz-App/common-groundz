@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -33,7 +32,6 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
   const addLink = () => {
     const url = window.prompt('URL');
     if (url) {
-      // Use the correct method for setting links in TipTap
       editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
     }
   };
@@ -128,9 +126,7 @@ export function RichTextEditor({
         placeholder,
       }),
     ],
-    content: typeof value === 'string' 
-      ? value 
-      : value ? JSON.stringify(value) : '',
+    content: value,
     editable,
     onUpdate: ({ editor }) => {
       if (onChange) {
@@ -152,9 +148,26 @@ export function RichTextEditor({
 }
 
 export function RichTextDisplay({ content }: { content: any }) {
+  const parsedContent = React.useMemo(() => {
+    if (!content) return null;
+    
+    if (typeof content === 'string') {
+      try {
+        if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
+          return JSON.parse(content);
+        }
+        return content;
+      } catch (e) {
+        return content;
+      }
+    }
+    
+    return content;
+  }, [content]);
+
   const editor = useEditor({
     extensions: [StarterKit, Link],
-    content: typeof content === 'string' ? content : JSON.stringify(content),
+    content: parsedContent,
     editable: false,
   });
 

@@ -10,6 +10,7 @@ import { FileText, Clock, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 import { Entity } from '@/services/recommendation/types';
 import { cn } from '@/lib/utils';
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 
 interface Post {
   id: string;
@@ -208,9 +209,9 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
               </div>
             </div>
             
-            <p className="text-muted-foreground whitespace-pre-wrap">
-              {post.content}
-            </p>
+            <div className="text-muted-foreground">
+              <RichTextDisplay content={post.content} />
+            </div>
             
             {/* Display tagged entities */}
             {post.tagged_entities && post.tagged_entities.length > 0 && (
