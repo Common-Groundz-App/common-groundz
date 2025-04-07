@@ -72,8 +72,22 @@ export const getComments = async (
       .from('comments')
       .select('id', { count: 'exact', head: true })
       .eq(field, itemId)
-      .is('parent_id', parentId ? parentId : null)
       .eq('is_deleted', false);
+
+    // Apply the same parent_id filtering as in the main query
+    let countQuery = supabase
+      .from('comments')
+      .select('id', { count: 'exact', head: true })
+      .eq(field, itemId)
+      .eq('is_deleted', false);
+      
+    if (parentId) {
+      countQuery = countQuery.eq('parent_id', parentId);
+    } else {
+      countQuery = countQuery.is('parent_id', null);
+    }
+    
+    const { count, error: countError } = await countQuery;
 
     if (countError) throw countError;
     const hasMore = count ? count > offset + comments.length : false;
