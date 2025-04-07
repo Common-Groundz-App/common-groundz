@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { FeedQueryParams, FeedItem, PostFeedItem } from './types';
+import { FeedQueryParams, FeedItem, PostFeedItem, CombinedFeedItem } from './types';
 import { MediaItem } from '@/types/media';
 
 export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryParams) => {
@@ -9,11 +9,12 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
     const recFrom = page * itemsPerPage;
     const recTo = recFrom + itemsPerPage - 1;
     
+    // Get recommendations with author data in a join
     const { data: recsData, error: recsError } = await supabase
       .from('recommendations')
       .select(`
         *,
-        profiles(username, avatar_url)
+        profiles:user_id(username, avatar_url)
       `)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
@@ -26,7 +27,7 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       .from('posts')
       .select(`
         *,
-        profiles(username, avatar_url)
+        profiles:user_id(username, avatar_url)
       `)
       .eq('visibility', 'public')
       .eq('is_deleted', false)
@@ -91,62 +92,57 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       // Get post IDs for fetching entities
       const postIds = postsData.map(post => post.id);
       
-      // Fetch post entities
-      const { data: entityData, error: entityError } = await supabase.rpc(
-        'get_post_entities',
-        { post_ids: postIds }
-      );
-      
-      if (entityError) {
-        console.error('Error fetching post entities:', entityError);
+      // Handle entities - with proper error checking
+      let entitiesByPostId: Record<string, any[]> = {};
+      try {
+        const { data: entityData } = await supabase
+          .from('post_entities')
+          .select(`
+            post_id,
+            entities:entity_id(id, name, type, venue, description, image_url)
+          `)
+          .in('post_id', postIds);
+          
+        if (entityData) {
+          entityData.forEach((item: any) => {
+            if (!entitiesByPostId[item.post_id]) {
+              entitiesByPostId[item.post_id] = [];
+            }
+            if (item.entities) {
+              entitiesByPostId[item.post_id].push(item.entities);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching post entities:', error);
       }
       
-      // Organize entities by post
-      const entitiesByPostId: Record<string, any[]> = {};
-      if (entityData) {
-        entityData.forEach((item: any) => {
-          if (!entitiesByPostId[item.post_id]) {
-            entitiesByPostId[item.post_id] = [];
-          }
-          entitiesByPostId[item.post_id].push(item.entity);
-        });
-      }
-      
-      // Get likes for posts - using stored procedure
-      const { data: postLikesData, error: likesError } = await supabase.rpc(
-        'get_post_likes_by_posts',
-        { p_post_ids: postIds }
-      );
-      
-      if (likesError) {
-        console.error('Error fetching post likes:', likesError);
-      }
+      // Get likes for posts - without using the stored procedure
+      const { data: postLikesData } = await supabase
+        .from('post_likes')
+        .select('post_id, count(*)')
+        .in('post_id', postIds)
+        .group('post_id');
       
       // Get user likes for posts
-      const { data: userLikesData, error: userLikesError } = await supabase.rpc(
-        'get_user_post_likes',
-        { p_post_ids: postIds, p_user_id: userId }
-      );
-      
-      if (userLikesError) {
-        console.error('Error fetching user likes:', userLikesError);
-      }
+      const { data: userLikesData } = await supabase
+        .from('post_likes')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
       
       // Get saves for posts
-      const { data: userSavesData, error: userSavesError } = await supabase.rpc(
-        'get_user_post_saves',
-        { p_post_ids: postIds, p_user_id: userId }
-      );
-      
-      if (userSavesError) {
-        console.error('Error fetching user saves:', userSavesError);
-      }
+      const { data: userSavesData } = await supabase
+        .from('post_saves')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
       
       // Create lookup maps for efficient access
       const postLikes = new Map<string, number>();
       if (postLikesData) {
         postLikesData.forEach((item: any) => {
-          postLikes.set(item.post_id, item.like_count || 0);
+          postLikes.set(item.post_id, parseInt(item.count) || 0);
         });
       }
       
@@ -192,7 +188,7 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
         // Ensure status is one of the allowed values
         let postStatus: 'draft' | 'published' | 'failed' = 'published';
         if (post.status === 'draft' || post.status === 'failed') {
-          postStatus = post.status;
+          postStatus = post.status as 'draft' | 'published' | 'failed';
         }
         
         return {
@@ -254,7 +250,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       .from('recommendations')
       .select(`
         *,
-        profiles(username, avatar_url)
+        profiles:user_id(username, avatar_url)
       `)
       .in('user_id', followingIds)
       .eq('visibility', 'public')
@@ -268,7 +264,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       .from('posts')
       .select(`
         *,
-        profiles(username, avatar_url)
+        profiles:user_id(username, avatar_url)
       `)
       .in('user_id', followingIds)
       .eq('visibility', 'public')
@@ -346,62 +342,57 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       // Get post IDs for fetching entities
       const postIds = postsData.map(post => post.id);
       
-      // Fetch post entities
-      const { data: entityData, error: entityError } = await supabase.rpc(
-        'get_post_entities',
-        { post_ids: postIds }
-      );
-      
-      if (entityError) {
-        console.error('Error fetching post entities:', entityError);
+      // Handle entities - with proper error checking
+      let entitiesByPostId: Record<string, any[]> = {};
+      try {
+        const { data: entityData } = await supabase
+          .from('post_entities')
+          .select(`
+            post_id,
+            entities:entity_id(id, name, type, venue, description, image_url)
+          `)
+          .in('post_id', postIds);
+          
+        if (entityData) {
+          entityData.forEach((item: any) => {
+            if (!entitiesByPostId[item.post_id]) {
+              entitiesByPostId[item.post_id] = [];
+            }
+            if (item.entities) {
+              entitiesByPostId[item.post_id].push(item.entities);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching post entities:', error);
       }
       
-      // Organize entities by post
-      const entitiesByPostId: Record<string, any[]> = {};
-      if (entityData) {
-        entityData.forEach((item: any) => {
-          if (!entitiesByPostId[item.post_id]) {
-            entitiesByPostId[item.post_id] = [];
-          }
-          entitiesByPostId[item.post_id].push(item.entity);
-        });
-      }
-      
-      // Get likes for posts - using stored procedure
-      const { data: postLikesData, error: likesError } = await supabase.rpc(
-        'get_post_likes_by_posts',
-        { p_post_ids: postIds }
-      );
-      
-      if (likesError) {
-        console.error('Error fetching post likes:', likesError);
-      }
+      // Get likes for posts - without using the stored procedure
+      const { data: postLikesData } = await supabase
+        .from('post_likes')
+        .select('post_id, count(*)')
+        .in('post_id', postIds)
+        .group('post_id');
       
       // Get user likes for posts
-      const { data: userLikesData, error: userLikesError } = await supabase.rpc(
-        'get_user_post_likes',
-        { p_post_ids: postIds, p_user_id: userId }
-      );
-      
-      if (userLikesError) {
-        console.error('Error fetching user likes:', userLikesError);
-      }
+      const { data: userLikesData } = await supabase
+        .from('post_likes')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
       
       // Get saves for posts
-      const { data: userSavesData, error: userSavesError } = await supabase.rpc(
-        'get_user_post_saves',
-        { p_post_ids: postIds, p_user_id: userId }
-      );
-      
-      if (userSavesError) {
-        console.error('Error fetching user saves:', userSavesError);
-      }
+      const { data: userSavesData } = await supabase
+        .from('post_saves')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('user_id', userId);
       
       // Create lookup maps for efficient access
       const postLikes = new Map<string, number>();
       if (postLikesData) {
         postLikesData.forEach((item: any) => {
-          postLikes.set(item.post_id, item.like_count || 0);
+          postLikes.set(item.post_id, parseInt(item.count) || 0);
         });
       }
       
@@ -447,7 +438,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
         // Ensure status is one of the allowed values
         let postStatus: 'draft' | 'published' | 'failed' = 'published';
         if (post.status === 'draft' || post.status === 'failed') {
-          postStatus = post.status;
+          postStatus = post.status as 'draft' | 'published' | 'failed';
         }
         
         return {
