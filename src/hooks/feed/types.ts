@@ -5,6 +5,7 @@ import {
   RecommendationVisibility,
   Entity
 } from '@/services/recommendationService';
+import { MediaItem } from '@/types/media';
 
 export type FeedVisibility = 'for_you' | 'following';
 
@@ -34,6 +35,10 @@ export interface PostFeedItem {
   is_saved: boolean;
   // Add property for tagged entities
   tagged_entities?: Entity[];
+  // Media for posts
+  media?: MediaItem[];
+  // Status field
+  status?: 'draft' | 'published' | 'failed';
 }
 
 export type CombinedFeedItem = FeedItem | PostFeedItem;

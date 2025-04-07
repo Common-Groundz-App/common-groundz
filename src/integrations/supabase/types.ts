@@ -172,6 +172,7 @@ export type Database = {
           is_deleted: boolean
           media: Json | null
           post_type: Database["public"]["Enums"]["post_type"]
+          status: string | null
           tags: string[] | null
           title: string | null
           updated_at: string
@@ -186,6 +187,7 @@ export type Database = {
           is_deleted?: boolean
           media?: Json | null
           post_type?: Database["public"]["Enums"]["post_type"]
+          status?: string | null
           tags?: string[] | null
           title?: string | null
           updated_at?: string
@@ -200,6 +202,7 @@ export type Database = {
           is_deleted?: boolean
           media?: Json | null
           post_type?: Database["public"]["Enums"]["post_type"]
+          status?: string | null
           tags?: string[] | null
           title?: string | null
           updated_at?: string
