@@ -1,9 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { isItemPost } from './api/utils';
 
 // Toggle like for a recommendation or post
-export const useInteractions = (onSuccess?: () => void) => {
+export const useInteractions = () => {
   const handleLike = async (itemId: string, userId: string) => {
     try {
       const isPostItem = await isItemPost(itemId);
@@ -13,8 +12,6 @@ export const useInteractions = (onSuccess?: () => void) => {
       } else {
         await toggleRecommendationLike(itemId, userId);
       }
-      
-      if (onSuccess) onSuccess();
     } catch (err) {
       console.error('Error toggling like:', err);
       throw err;
@@ -30,8 +27,6 @@ export const useInteractions = (onSuccess?: () => void) => {
       } else {
         await toggleRecommendationSave(itemId, userId);
       }
-      
-      if (onSuccess) onSuccess();
     } catch (err) {
       console.error('Error toggling save:', err);
       throw err;

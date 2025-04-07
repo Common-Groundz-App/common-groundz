@@ -76,7 +76,7 @@ export const useFeed = (feedType: FeedVisibility) => {
     fetchFeed(0, true);
   }, [fetchFeed]);
 
-  const { handleLike: interactionLike, handleSave: interactionSave } = useInteractions(refreshFeed);
+  const { handleLike: interactionLike, handleSave: interactionSave } = useInteractions();
 
   const handleLike = async (id: string) => {
     if (!user) {
@@ -111,12 +111,29 @@ export const useFeed = (feedType: FeedVisibility) => {
       await interactionLike(id, user.id);
     } catch (err) {
       console.error('Error toggling like:', err);
-      refreshFeed();
+      
+      // Only refresh in case of error, not on successful operation
       toast({
         title: 'Error',
         description: 'Failed to update like status. Please try again.',
         variant: 'destructive'
       });
+      
+      // Revert optimistic update on error
+      setState(prev => ({
+        ...prev,
+        items: state.items.map(item => {
+          if (item.id === id) {
+            const isLiked = !item.is_liked;
+            return {
+              ...item,
+              is_liked: !isLiked,
+              likes: (item.likes || 0) + (isLiked ? -1 : 1)
+            };
+          }
+          return item;
+        })
+      }));
     }
   };
 
@@ -151,12 +168,27 @@ export const useFeed = (feedType: FeedVisibility) => {
       await interactionSave(id, user.id);
     } catch (err) {
       console.error('Error toggling save:', err);
-      refreshFeed();
+      
+      // Only show toast and revert on error
       toast({
         title: 'Error',
         description: 'Failed to update save status. Please try again.',
         variant: 'destructive'
       });
+      
+      // Revert optimistic update on error
+      setState(prev => ({
+        ...prev,
+        items: state.items.map(item => {
+          if (item.id === id) {
+            return {
+              ...item,
+              is_saved: !item.is_saved
+            };
+          }
+          return item;
+        })
+      }));
     }
   };
 
