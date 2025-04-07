@@ -19,7 +19,7 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
       query = query.eq('parent_id', parent_id);
     }
     
-    // Filter by target (post or recommendation)
+    // Filter by target type (post or recommendation)
     if (target.type === 'post') {
       query = query.eq('post_id', target.id).is('recommendation_id', null);
     } else {
@@ -45,7 +45,7 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
       const commentIds = comments.map(c => c.id);
       
       if (commentIds.length > 0) {
-        // Use a count query instead of group
+        // Use Promise.allSettled to handle counting replies for each comment
         const countPromises = commentIds.map(async (parentId) => {
           try {
             const { count, error: countError } = await supabase
