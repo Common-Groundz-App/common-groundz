@@ -39,11 +39,14 @@ export const useComments = ({ target, parentId = null, immediate = true, onError
       const error = err instanceof Error ? err : new Error('Failed to load comments');
       setError(error);
       
-      toast({
-        title: 'Error',
-        description: 'Failed to load comments. Please try again.',
-        variant: 'destructive'
-      });
+      // Only show toast for non-network errors to avoid too many notifications
+      if (!(err instanceof TypeError) || (err instanceof TypeError && err.message !== 'Failed to fetch')) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load comments. Please try again.',
+          variant: 'destructive'
+        });
+      }
       
       if (onError) {
         onError(error);

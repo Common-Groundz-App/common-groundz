@@ -4,6 +4,8 @@ import { CommentTarget, Comment } from '@/hooks/comments/types';
 import { CommentItem } from './CommentItem';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchComments } from '@/hooks/comments/api';
+import { Button } from '@/components/ui/button';
+import { AlertCircle } from 'lucide-react';
 
 interface CommentRepliesListProps {
   commentId: string;
@@ -23,41 +25,62 @@ export const CommentRepliesList = ({
   const [replies, setReplies] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorVisible, setErrorVisible] = useState(false);
+  
+  const loadReplies = async () => {
+    setIsLoading(true);
+    setError(null);
+    setErrorVisible(false);
+    
+    try {
+      // Fetch replies for this comment
+      const fetchedReplies = await fetchComments({ 
+        target, 
+        parent_id: commentId
+      });
+      
+      setReplies(fetchedReplies);
+    } catch (err) {
+      console.error('Error loading replies:', err);
+      setError('Failed to load replies');
+      setErrorVisible(true);
+      
+      // Auto-hide error after 5 seconds
+      setTimeout(() => {
+        setErrorVisible(false);
+      }, 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   useEffect(() => {
-    const loadReplies = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        // Fetch replies for this comment
-        const fetchedReplies = await fetchComments({ 
-          target, 
-          parent_id: commentId
-        });
-        
-        setReplies(fetchedReplies);
-      } catch (err) {
-        console.error('Error loading replies:', err);
-        setError('Failed to load replies');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
     loadReplies();
   }, [commentId, target]);
   
-  if (error) {
-    return (
-      <div className="ml-6 mt-3 pl-4 border-l-2 border-muted text-sm text-destructive">
-        {error}
-      </div>
-    );
-  }
+  const handleRetry = () => {
+    loadReplies();
+  };
   
   return (
     <div className="ml-6 mt-3 space-y-3 border-l-2 border-muted pl-4">
+      {errorVisible && error && (
+        <div className="flex items-center justify-between py-2 text-sm text-destructive">
+          <div className="flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            <span>{error}</span>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRetry}
+            className="ml-2"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+      
       {isLoading ? (
         <div className="py-2">
           <Skeleton className="h-10 w-full" />
@@ -73,7 +96,7 @@ export const CommentRepliesList = ({
         />
       ))}
       
-      {!isLoading && replies.length === 0 && (
+      {!isLoading && !error && replies.length === 0 && (
         <div className="py-2 text-sm text-muted-foreground">
           No replies yet
         </div>

@@ -47,24 +47,36 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
       if (commentIds.length > 0) {
         // Use a count query instead of group
         const countPromises = commentIds.map(async (parentId) => {
-          const { count, error: countError } = await supabase
-            .from('comments')
-            .select('*', { count: 'exact', head: true })
-            .eq('parent_id', parentId)
-            .eq('is_deleted', false);
-            
-          if (!countError && count !== null) {
-            repliesCounts[parentId] = count;
+          try {
+            const { count, error: countError } = await supabase
+              .from('comments')
+              .select('*', { count: 'exact', head: true })
+              .eq('parent_id', parentId)
+              .eq('is_deleted', false);
+              
+            if (!countError && count !== null) {
+              repliesCounts[parentId] = count;
+            }
+          } catch (err) {
+            console.error(`Error counting replies for comment ${parentId}:`, err);
+            // Continue with execution even if count fails
           }
         });
         
-        await Promise.all(countPromises);
+        // Use Promise.allSettled instead of Promise.all to handle partial failures
+        await Promise.allSettled(countPromises);
       }
     }
     
     // Get current user (if authenticated)
-    const { data } = await supabase.auth.getUser();
-    const currentUserId = data.user?.id;
+    let currentUserId = null;
+    try {
+      const { data } = await supabase.auth.getUser();
+      currentUserId = data.user?.id;
+    } catch (err) {
+      console.error('Error getting current user:', err);
+      // Continue with null currentUserId
+    }
     
     // Enhance comments with profile data and replies count
     return comments.map((comment: any) => ({
@@ -115,14 +127,21 @@ export const createComment = async (params: CreateCommentParams): Promise<Commen
     if (!newComment) throw new Error('Failed to create comment');
     
     // Get user profile for the comment
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('username, avatar_url')
-      .eq('id', user.id)
-      .single();
-    
-    if (profileError) {
-      console.error('Error fetching profile:', profileError);
+    let profileData = null;
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', user.id)
+        .single();
+      
+      if (!profileError) {
+        profileData = profile;
+      } else {
+        console.error('Error fetching profile:', profileError);
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err);
     }
     
     const commentWithProfile = {

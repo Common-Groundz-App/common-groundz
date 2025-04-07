@@ -21,6 +21,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [errorVisible, setErrorVisible] = useState(false);
   
   const { 
     comments, 
@@ -36,27 +37,37 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
     onError: (err) => {
       console.error('Error in comments hook:', err);
       setError('Failed to load comments. Please try again.');
+      setErrorVisible(true);
+
+      // Auto-hide error after 5 seconds to prevent bouncing
+      setTimeout(() => {
+        setErrorVisible(false);
+      }, 5000);
     }
   });
   
   const handleRefresh = () => {
     setError(null);
+    setErrorVisible(false);
     setRetryCount(prev => prev + 1);
     loadComments();
   };
 
   const handleCommentSubmit = async (content: string) => {
     setError(null);
+    setErrorVisible(false);
     try {
       await addComment(content);
     } catch (err) {
       console.error('Error submitting comment:', err);
       setError('Failed to post comment. Please try again.');
+      setErrorVisible(true);
     }
   };
 
   const handleReplySubmit = async (content: string) => {
     setError(null);
+    setErrorVisible(false);
     if (replyingTo) {
       try {
         await addComment(content, replyingTo.id);
@@ -64,6 +75,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
       } catch (err) {
         console.error('Error submitting reply:', err);
         setError('Failed to post reply. Please try again.');
+        setErrorVisible(true);
       }
     }
   };
@@ -71,6 +83,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
   // Reset error state when target changes
   React.useEffect(() => {
     setError(null);
+    setErrorVisible(false);
   }, [target.id, target.type]);
 
   return (
@@ -80,7 +93,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
         <h3 className="text-lg font-medium">Comments</h3>
       </div>
       
-      <CommentsErrorAlert error={error} onRetry={handleRefresh} />
+      {errorVisible && <CommentsErrorAlert error={error} onRetry={handleRefresh} />}
       
       <CommentForm onSubmit={handleCommentSubmit} />
       
