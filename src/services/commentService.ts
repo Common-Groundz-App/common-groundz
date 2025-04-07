@@ -16,15 +16,23 @@ export const getComments = async (
     const field = itemType === 'post' ? 'post_id' : 'recommendation_id';
     const offset = page * limit;
 
-    // Query the comments
-    const { data: comments, error } = await supabase
+    // Build the query
+    let query = supabase
       .from('comments')
       .select(`*`)
       .eq(field, itemId)
-      .eq('parent_id', parentId)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    // Handle parent_id filtering (for top-level vs replies)
+    if (parentId) {
+      query = query.eq('parent_id', parentId);
+    } else {
+      query = query.is('parent_id', null);
+    }
+
+    const { data: comments, error } = await query;
 
     if (error) throw error;
     if (!comments || comments.length === 0) return { comments: [], hasMore: false };
@@ -64,7 +72,7 @@ export const getComments = async (
       .from('comments')
       .select('id', { count: 'exact', head: true })
       .eq(field, itemId)
-      .eq('parent_id', parentId)
+      .is('parent_id', parentId ? parentId : null)
       .eq('is_deleted', false);
 
     if (countError) throw countError;

@@ -7,6 +7,7 @@ import { useComments } from '@/hooks/use-comments';
 import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
 import CommentRepliesList from './CommentRepliesList';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CommentsListProps {
   itemId: string;
@@ -43,9 +44,11 @@ const CommentsList = ({ itemId, itemType }: CommentsListProps) => {
 
   if (error) {
     return (
-      <div className="text-center py-6 text-red-500">
-        Error loading comments. Please try again.
-      </div>
+      <Alert variant="destructive" className="my-4">
+        <AlertDescription>
+          Error loading comments. Please try again.
+        </AlertDescription>
+      </Alert>
     );
   }
 
