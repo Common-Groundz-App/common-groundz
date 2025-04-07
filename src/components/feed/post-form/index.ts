@@ -1,2 +1,0 @@
-
-export { CreatePostForm } from './CreatePostForm';

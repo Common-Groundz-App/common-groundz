@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { CreatePostForm } from './post-form';
+import { CreatePostForm } from './CreatePostForm';
 
 interface CreatePostButtonProps {
   onPostCreated?: () => void;
