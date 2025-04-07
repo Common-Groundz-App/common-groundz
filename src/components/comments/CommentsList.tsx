@@ -1,0 +1,115 @@
+
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
+import { useComments } from '@/hooks/use-comments';
+import CommentItem from './CommentItem';
+import CommentForm from './CommentForm';
+import CommentRepliesList from './CommentRepliesList';
+
+interface CommentsListProps {
+  itemId: string;
+  itemType: 'post' | 'recommendation';
+}
+
+const CommentsList = ({ itemId, itemType }: CommentsListProps) => {
+  const { user } = useAuth();
+  const [commentExpanded, setCommentExpanded] = useState<boolean>(false);
+  
+  const {
+    comments,
+    loading,
+    error,
+    hasMore,
+    loadMore,
+    addComment,
+    updateCommentContent,
+    removeComment,
+    loadReplies,
+    toggleReplies
+  } = useComments({
+    itemId,
+    itemType
+  });
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-6">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-6 text-red-500">
+        Error loading comments. Please try again.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">
+          Comments {comments.length > 0 && `(${comments.length})`}
+        </h3>
+        
+        {user ? (
+          <CommentForm 
+            onSubmit={content => addComment(content)}
+            placeholder={commentExpanded ? "What are your thoughts?" : "Add a comment..."}
+            buttonText="Post Comment"
+          />
+        ) : (
+          <div className="border p-4 rounded-md bg-muted/30 text-center text-sm text-muted-foreground">
+            Please sign in to add comments.
+          </div>
+        )}
+      </div>
+      
+      {comments.length === 0 ? (
+        <div className="text-center py-6 text-muted-foreground">
+          No comments yet. Be the first to share your thoughts!
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {comments.map(comment => (
+            <div key={comment.id} className="space-y-2">
+              <CommentItem
+                comment={comment}
+                onReply={addComment}
+                onUpdate={updateCommentContent}
+                onDelete={removeComment}
+              />
+              
+              <CommentRepliesList
+                comment={comment}
+                onReply={addComment}
+                onUpdate={updateCommentContent}
+                onDelete={removeComment}
+                onToggleReplies={toggleReplies}
+                onLoadMoreReplies={loadReplies}
+              />
+            </div>
+          ))}
+          
+          {hasMore && (
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                onClick={loadMore}
+                className="text-sm"
+              >
+                Load more comments
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CommentsList;

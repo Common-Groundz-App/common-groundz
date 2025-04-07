@@ -1,15 +1,17 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, Star, Tag } from 'lucide-react';
+import { Bookmark, Heart, Star, Tag, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CombinedFeedItem } from '@/hooks/feed/types';
 import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
+import CommentsList from '@/components/comments/CommentsList';
 
 interface FeedItemProps {
   item: CombinedFeedItem;
@@ -19,6 +21,7 @@ interface FeedItemProps {
 
 const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const isPost = 'is_post' in item && item.is_post === true;
+  const [showComments, setShowComments] = useState(false);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -85,6 +88,10 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
       </div>
     );
   };
+
+  const toggleComments = () => {
+    setShowComments(!showComments);
+  };
   
   if (isPost) {
     const post = item as any;
@@ -125,23 +132,39 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
         </CardContent>
         
         <CardFooter className="flex justify-between pt-2 pb-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "flex items-center gap-1",
-              post.is_liked && "text-red-500"
-            )}
-            onClick={() => onLike && onLike(post.id)}
-          >
-            <Heart 
-              size={18} 
-              className={cn(post.is_liked && "fill-red-500")} 
-            />
-            {post.likes > 0 && (
-              <span>{post.likes}</span>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "flex items-center gap-1",
+                post.is_liked && "text-red-500"
+              )}
+              onClick={() => onLike && onLike(post.id)}
+            >
+              <Heart 
+                size={18} 
+                className={cn(post.is_liked && "fill-red-500")} 
+              />
+              {post.likes > 0 && (
+                <span>{post.likes}</span>
+              )}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "flex items-center gap-1"
+              )}
+              onClick={toggleComments}
+            >
+              <MessageCircle size={18} />
+              {post.comment_count > 0 && (
+                <span>{post.comment_count}</span>
+              )}
+            </Button>
+          </div>
           
           <Button
             variant="ghost"
@@ -159,6 +182,15 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
             Save
           </Button>
         </CardFooter>
+
+        {showComments && (
+          <div className="px-6 pb-6 pt-2 border-t">
+            <CommentsList 
+              itemId={post.id}
+              itemType="post"
+            />
+          </div>
+        )}
       </Card>
     );
   }
@@ -220,23 +252,37 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
       </CardContent>
       
       <CardFooter className="flex justify-between pt-2 pb-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "flex items-center gap-1",
-            recommendation.is_liked && "text-red-500"
-          )}
-          onClick={() => onLike && onLike(recommendation.id)}
-        >
-          <Heart 
-            size={18} 
-            className={cn(recommendation.is_liked && "fill-red-500")} 
-          />
-          {recommendation.likes > 0 && (
-            <span>{recommendation.likes}</span>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "flex items-center gap-1",
+              recommendation.is_liked && "text-red-500"
+            )}
+            onClick={() => onLike && onLike(recommendation.id)}
+          >
+            <Heart 
+              size={18} 
+              className={cn(recommendation.is_liked && "fill-red-500")} 
+            />
+            {recommendation.likes > 0 && (
+              <span>{recommendation.likes}</span>
+            )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn("flex items-center gap-1")}
+            onClick={toggleComments}
+          >
+            <MessageCircle size={18} />
+            {recommendation.comment_count > 0 && (
+              <span>{recommendation.comment_count}</span>
+            )}
+          </Button>
+        </div>
         
         <Button
           variant="ghost"
@@ -254,6 +300,15 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
           Save
         </Button>
       </CardFooter>
+
+      {showComments && (
+        <div className="px-6 pb-6 pt-2 border-t">
+          <CommentsList 
+            itemId={recommendation.id}
+            itemType="recommendation"
+          />
+        </div>
+      )}
     </Card>
   );
 };
