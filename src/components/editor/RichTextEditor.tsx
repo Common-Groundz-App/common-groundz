@@ -33,6 +33,7 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
   const addLink = () => {
     const url = window.prompt('URL');
     if (url) {
+      // Use the correct method for setting links in TipTap
       editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
     }
   };
