@@ -1,13 +1,14 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { isItemPost } from './api';
 
 // Toggle like for a recommendation or post
 export const useInteractions = (onSuccess?: () => void) => {
   const handleLike = async (itemId: string, userId: string) => {
     try {
-      const isPost = await isItemPost(itemId);
+      const isPostItem = await isItemPost(itemId);
       
-      if (isPost) {
+      if (isPostItem) {
         await togglePostLike(itemId, userId);
       } else {
         await toggleRecommendationLike(itemId, userId);
@@ -22,9 +23,9 @@ export const useInteractions = (onSuccess?: () => void) => {
 
   const handleSave = async (itemId: string, userId: string) => {
     try {
-      const isPost = await isItemPost(itemId);
+      const isPostItem = await isItemPost(itemId);
       
-      if (isPost) {
+      if (isPostItem) {
         await togglePostSave(itemId, userId);
       } else {
         await toggleRecommendationSave(itemId, userId);
@@ -36,39 +37,27 @@ export const useInteractions = (onSuccess?: () => void) => {
       throw err;
     }
   };
-
-  const isItemPost = async (itemId: string): Promise<boolean> => {
-    // Check if item exists in posts table
-    const { data: post } = await supabase
-      .from('posts')
-      .select('id')
-      .eq('id', itemId)
-      .single();
-      
-    return Boolean(post);
-  };
   
   const togglePostLike = async (postId: string, userId: string) => {
     try {
-      // Check if like exists
+      // Check if like exists using direct query instead of RPC function
       const { data: exists } = await supabase
-        .rpc('check_post_like', { 
-          p_post_id: postId, 
-          p_user_id: userId 
-        });
+        .from('post_likes')
+        .select('id')
+        .eq('post_id', postId)
+        .eq('user_id', userId)
+        .maybeSingle();
       
       if (exists) {
         await supabase
-          .rpc('delete_post_like', { 
-            p_post_id: postId, 
-            p_user_id: userId 
-          });
+          .from('post_likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', userId);
       } else {
         await supabase
-          .rpc('insert_post_like', { 
-            p_post_id: postId, 
-            p_user_id: userId 
-          });
+          .from('post_likes')
+          .insert({ post_id: postId, user_id: userId });
       }
     } catch (err) {
       console.error('Error in togglePostLike:', err);
@@ -80,23 +69,22 @@ export const useInteractions = (onSuccess?: () => void) => {
     try {
       // Check if save exists
       const { data: exists } = await supabase
-        .rpc('check_post_save', { 
-          p_post_id: postId, 
-          p_user_id: userId 
-        });
+        .from('post_saves')
+        .select('id')
+        .eq('post_id', postId)
+        .eq('user_id', userId)
+        .maybeSingle();
       
       if (exists) {
         await supabase
-          .rpc('delete_post_save', { 
-            p_post_id: postId, 
-            p_user_id: userId 
-          });
+          .from('post_saves')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', userId);
       } else {
         await supabase
-          .rpc('insert_post_save', { 
-            p_post_id: postId, 
-            p_user_id: userId 
-          });
+          .from('post_saves')
+          .insert({ post_id: postId, user_id: userId });
       }
     } catch (err) {
       console.error('Error in togglePostSave:', err);
@@ -106,12 +94,12 @@ export const useInteractions = (onSuccess?: () => void) => {
   
   const toggleRecommendationLike = async (recommendationId: string, userId: string) => {
     // Check if like exists
-    const { data: existingLike, error: checkError } = await supabase
+    const { data: existingLike } = await supabase
       .from('recommendation_likes')
       .select('*')
       .eq('recommendation_id', recommendationId)
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
       
     // If like exists, remove it; otherwise, add it
     if (existingLike) {
@@ -121,14 +109,9 @@ export const useInteractions = (onSuccess?: () => void) => {
         .eq('recommendation_id', recommendationId)
         .eq('user_id', userId);
     } else {
-      const { error } = await supabase
+      await supabase
         .from('recommendation_likes')
         .insert({ recommendation_id: recommendationId, user_id: userId });
-        
-      if (error) {
-        console.error('Error adding like:', error);
-        throw error;
-      }
     }
   };
   
@@ -139,7 +122,7 @@ export const useInteractions = (onSuccess?: () => void) => {
       .select('*')
       .eq('recommendation_id', recommendationId)
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
       
     // If save exists, remove it; otherwise, add it
     if (existingSave) {
