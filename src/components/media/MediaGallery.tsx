@@ -11,6 +11,7 @@ interface MediaGalleryProps {
   editable?: boolean;
   onRemove?: (index: number) => void;
   onCaptionChange?: (index: number, caption: string) => void;
+  onAltChange?: (index: number, alt: string) => void;
   className?: string;
 }
 
@@ -19,9 +20,11 @@ export function MediaGallery({
   editable = false,
   onRemove,
   onCaptionChange,
+  onAltChange,
   className
 }: MediaGalleryProps) {
   const [editingCaption, setEditingCaption] = React.useState<number | null>(null);
+  const [editingAlt, setEditingAlt] = React.useState<number | null>(null);
   
   if (!media || media.length === 0) {
     return null;
@@ -30,6 +33,14 @@ export function MediaGallery({
   const handleCaptionEdit = (index: number) => {
     if (editable) {
       setEditingCaption(index);
+      setEditingAlt(null); // Close any open alt editing
+    }
+  };
+
+  const handleAltEdit = (index: number) => {
+    if (editable) {
+      setEditingAlt(index);
+      setEditingCaption(null); // Close any open caption editing
     }
   };
   
@@ -39,6 +50,13 @@ export function MediaGallery({
     }
     setEditingCaption(null);
   };
+
+  const handleAltSave = (index: number, alt: string) => {
+    if (onAltChange) {
+      onAltChange(index, alt);
+    }
+    setEditingAlt(null);
+  };
   
   return (
     <div className={cn("grid grid-cols-1 sm:grid-cols-2 gap-4", className)}>
@@ -47,13 +65,13 @@ export function MediaGallery({
         .sort((a, b) => a.order - b.order)
         .map((item, index) => (
           <div 
-            key={index} 
+            key={item.id || index} 
             className="relative border rounded-md overflow-hidden group"
           >
             {item.type === 'image' ? (
               <img 
                 src={item.url} 
-                alt={item.caption || `Media ${index + 1}`}
+                alt={item.alt || item.caption || `Media ${index + 1}`}
                 className="w-full h-48 object-cover"
               />
             ) : (
@@ -62,6 +80,7 @@ export function MediaGallery({
                 poster={item.thumbnail_url}
                 controls
                 className="w-full h-48 object-cover"
+                aria-label={item.alt || item.caption || `Video ${index + 1}`}
               >
                 Your browser does not support the video tag.
               </video>
@@ -98,20 +117,51 @@ export function MediaGallery({
                   />
                   <Button type="submit" size="sm">Save</Button>
                 </form>
+              ) : editingAlt === index ? (
+                <form 
+                  className="flex space-x-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const input = e.currentTarget.elements.namedItem('alt') as HTMLInputElement;
+                    handleAltSave(index, input.value);
+                  }}
+                >
+                  <Input 
+                    id="alt"
+                    name="alt"
+                    defaultValue={item.alt || ''}
+                    placeholder="Add alt text for accessibility..."
+                    autoFocus
+                    className="flex-1"
+                  />
+                  <Button type="submit" size="sm">Save</Button>
+                </form>
               ) : (
                 <div className="flex justify-between items-center">
                   <p className="text-sm truncate">
                     {item.caption || (editable ? 'No caption' : '')}
                   </p>
                   {editable && onCaptionChange && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="p-1"
-                      onClick={() => handleCaptionEdit(index)}
-                    >
-                      <Edit2 size={14} />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-1"
+                        onClick={() => handleCaptionEdit(index)}
+                      >
+                        <Edit2 size={14} />
+                      </Button>
+                      {onAltChange && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="p-1 text-xs"
+                          onClick={() => handleAltEdit(index)}
+                        >
+                          Alt
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

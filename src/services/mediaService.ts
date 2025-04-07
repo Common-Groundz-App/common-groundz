@@ -1,5 +1,5 @@
 
-import { v4 as uuidv4 } from 'uuid';
+import { generateUUID } from '@/lib/uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';
 
@@ -40,7 +40,7 @@ export const uploadMedia = async (
 
     // Create a unique file name
     const fileExt = file.name.split('.').pop();
-    const fileName = `${uuidv4()}.${fileExt}`;
+    const fileName = `${generateUUID()}.${fileExt}`;
     const filePath = `${userId}/${sessionId}/${fileName}`;
     
     // Determine the media type
@@ -67,14 +67,19 @@ export const uploadMedia = async (
       .from('post_media')
       .getPublicUrl(filePath);
       
-    // Create media item
+    // Create media item with UUID for stable reordering
     const mediaItem: MediaItem = {
+      id: generateUUID(), // Add stable ID for reordering
       url: publicUrl,
       type: isImage ? 'image' : 'video',
       caption: '',
+      alt: file.name.split('.')[0], // Default alt text from filename
       order: 0, // Will be set when adding to the array
       session_id: sessionId,
     };
+    
+    // Log session ID for future implementation
+    console.log('Media uploaded with session ID:', sessionId);
     
     return mediaItem;
   } catch (error) {

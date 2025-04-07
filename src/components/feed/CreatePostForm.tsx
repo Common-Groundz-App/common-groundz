@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -18,6 +17,7 @@ import { generateUUID } from '@/lib/uuid';
 import { cleanupUnusedMedia } from '@/services/mediaService';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Save } from 'lucide-react';
+import { RichTextEditor } from '@/components/editor/RichTextEditor';
 
 interface CreatePostFormProps {
   onSuccess: () => void;
@@ -26,7 +26,6 @@ interface CreatePostFormProps {
 
 type PostFormValues = {
   title: string;
-  content: string;
   postType: 'story' | 'routine' | 'project' | 'note';
   visibility: 'public' | 'circle_only' | 'private';
   status: 'draft' | 'published' | 'failed';
@@ -40,14 +39,22 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [sessionId, setSessionId] = useState<string>('');
   const [currentTab, setCurrentTab] = useState<string>('content');
+  const [contentJson, setContentJson] = useState<object>({});
+  const [contentHtml, setContentHtml] = useState<string>('');
   
   // Initialize session ID for media uploads
   useEffect(() => {
-    setSessionId(generateUUID());
+    const newSessionId = generateUUID();
+    setSessionId(newSessionId);
+    console.log('New session ID created:', newSessionId);
+    
     return () => {
       // Cleanup unused media when component unmounts
       if (user && sessionId) {
-        cleanupUnusedMedia(user.id, sessionId).catch(console.error);
+        console.log('Cleanup may be needed for session:', sessionId);
+        // We're deferring full cleanup until draft support is ready
+        // But we'll keep the mechanism in place for future use
+        // cleanupUnusedMedia(user.id, sessionId).catch(console.error);
       }
     };
   }, [user]);
@@ -55,7 +62,6 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
   const form = useForm<PostFormValues>({
     defaultValues: {
       title: '',
-      content: '',
       postType: 'story',
       visibility: 'public',
       status: 'published',
@@ -90,6 +96,21 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
       );
     });
   };
+
+  const handleMediaAltChange = (index: number, alt: string) => {
+    setMedia(prevMedia => {
+      return prevMedia.map((item, i) => 
+        i === index 
+          ? { ...item, alt } 
+          : item
+      );
+    });
+  };
+
+  const handleContentChange = (json: object, html: string) => {
+    setContentJson(json);
+    setContentHtml(html);
+  };
   
   const handleDraftSave = async () => {
     if (!user) {
@@ -111,7 +132,7 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
         .from('posts')
         .insert({
           title: values.title,
-          content: values.content,
+          content: contentJson, // Store rich text content as JSON
           post_type: values.postType,
           visibility: values.visibility,
           user_id: user.id,
@@ -131,9 +152,13 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
       form.reset();
       setSelectedEntities([]);
       setMedia([]);
+      setContentJson({});
+      setContentHtml('');
       
       // Generate a new session ID to prevent cleanup of used media
-      setSessionId(generateUUID());
+      const newSessionId = generateUUID();
+      setSessionId(newSessionId);
+      console.log('New session ID created after draft save:', newSessionId);
       
       onSuccess();
       
@@ -167,7 +192,7 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
         .from('posts')
         .insert({
           title: values.title,
-          content: values.content,
+          content: contentJson, // Store rich text content as JSON
           post_type: values.postType,
           visibility: values.visibility,
           user_id: user.id,
@@ -203,9 +228,13 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
       form.reset();
       setSelectedEntities([]);
       setMedia([]);
+      setContentJson({});
+      setContentHtml('');
       
       // Generate a new session ID to prevent cleanup of used media
-      setSessionId(generateUUID());
+      const newSessionId = generateUUID();
+      setSessionId(newSessionId);
+      console.log('New session ID created after post publish:', newSessionId);
 
       onSuccess();
     } catch (error) {
@@ -272,24 +301,14 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
           </TabsList>
           
           <TabsContent value="content" className="pt-2">
-            <FormField
-              control={form.control}
-              name="content"
-              rules={{ required: 'Content is required' }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Content</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Write your post content here..." 
-                      className="min-h-[150px]" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormItem>
+              <FormLabel>Content</FormLabel>
+              <RichTextEditor
+                onChange={handleContentChange}
+                placeholder="Write your post content here..."
+                className="min-h-[150px]"
+              />
+            </FormItem>
           </TabsContent>
           
           <TabsContent value="media" className="pt-2">
@@ -307,6 +326,7 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
                     editable={true}
                     onRemove={handleMediaRemove}
                     onCaptionChange={handleMediaCaptionChange}
+                    onAltChange={handleMediaAltChange}
                   />
                 </div>
               )}

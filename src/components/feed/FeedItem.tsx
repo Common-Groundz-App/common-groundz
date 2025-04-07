@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -9,6 +8,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CombinedFeedItem } from '@/hooks/feed/types';
 import { Entity } from '@/services/recommendation/types';
+import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 
 interface FeedItemProps {
   item: CombinedFeedItem;
@@ -17,16 +18,13 @@ interface FeedItemProps {
 }
 
 const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
-  // Check if the item is a post
   const isPost = 'is_post' in item && item.is_post === true;
   
-  // Get initials for avatar fallback
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -43,7 +41,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
     }
   };
 
-  // Get the post type label
   const getPostTypeLabel = (type: string) => {
     switch(type) {
       case 'story': return 'Story';
@@ -54,7 +51,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
     }
   };
 
-  // Get the entity type label and color
   const getEntityTypeColor = (type: string): string => {
     switch(type) {
       case 'book': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
@@ -66,7 +62,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
     }
   };
   
-  // Render tagged entities
   const renderTaggedEntities = (entities: Entity[]) => {
     if (!entities || entities.length === 0) return null;
     
@@ -91,9 +86,8 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
     );
   };
   
-  // Render different content based on whether it's a post or recommendation
   if (isPost) {
-    const post = item as any; // TypeScript workaround
+    const post = item as any;
     
     return (
       <Card className="overflow-hidden">
@@ -113,9 +107,24 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
           </div>
           
           <h3 className="text-xl font-semibold mb-2">{post.title}</h3>
-          <p className="text-muted-foreground whitespace-pre-wrap">{post.content}</p>
           
-          {/* Display tagged entities */}
+          <div className="mb-4">
+            {typeof post.content === 'object' ? (
+              <RichTextDisplay content={post.content} />
+            ) : (
+              <p className="text-muted-foreground whitespace-pre-wrap">{post.content}</p>
+            )}
+          </div>
+          
+          {post.media && post.media.length > 0 && (
+            <div className="mt-4 mb-4">
+              <PostMediaDisplay 
+                media={post.media} 
+                displayType={post.media.length > 1 ? 'carousel' : 'grid'} 
+              />
+            </div>
+          )}
+          
           {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
         </CardContent>
         
@@ -158,7 +167,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
     );
   }
   
-  // It's a recommendation
   const recommendation = item as any;
   
   return (
