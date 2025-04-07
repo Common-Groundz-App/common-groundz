@@ -113,6 +113,8 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
     }
 
     try {
+      console.log('Adding comment with:', { content, userId: user.id, itemId, itemType, parentId });
+      
       const newComment = await createComment(
         content,
         user.id,
@@ -120,6 +122,8 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
         itemType,
         parentId
       );
+
+      console.log('Comment created:', newComment);
 
       // Get user profile data
       const { data: profile } = await supabase

@@ -12,9 +12,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 interface CommentsListProps {
   itemId: string;
   itemType: 'post' | 'recommendation';
+  onCommentAdded?: () => void;
 }
 
-const CommentsList = ({ itemId, itemType }: CommentsListProps) => {
+const CommentsList = ({ itemId, itemType, onCommentAdded }: CommentsListProps) => {
   const { user } = useAuth();
   const [commentExpanded, setCommentExpanded] = useState<boolean>(false);
   
@@ -33,6 +34,14 @@ const CommentsList = ({ itemId, itemType }: CommentsListProps) => {
     itemId,
     itemType
   });
+
+  const handleAddComment = async (content: string) => {
+    const success = await addComment(content);
+    if (success && onCommentAdded) {
+      onCommentAdded();
+    }
+    return success;
+  };
 
   if (loading) {
     return (
@@ -61,7 +70,7 @@ const CommentsList = ({ itemId, itemType }: CommentsListProps) => {
         
         {user ? (
           <CommentForm 
-            onSubmit={content => addComment(content)}
+            onSubmit={handleAddComment}
             placeholder={commentExpanded ? "What are your thoughts?" : "Add a comment..."}
             buttonText="Post Comment"
           />

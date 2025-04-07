@@ -53,11 +53,17 @@ const CommentItem = ({
   const handleReply = async (content: string) => {
     if (!onReply) return false;
     
-    const success = await onReply(comment.id, content);
-    if (success) {
-      setIsReplying(false);
+    try {
+      console.log('Replying to comment:', comment.id, 'with content:', content);
+      const success = await onReply(comment.id, content);
+      if (success) {
+        setIsReplying(false);
+      }
+      return success;
+    } catch (error) {
+      console.error('Error in handleReply:', error);
+      return false;
     }
-    return success;
   };
   
   const handleUpdate = async (content: string) => {

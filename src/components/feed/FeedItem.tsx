@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,6 +22,9 @@ interface FeedItemProps {
 const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const isPost = 'is_post' in item && item.is_post === true;
   const [showComments, setShowComments] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState<number>(
+    isPost ? (item as any).comment_count : (item as any).comment_count
+  );
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -91,6 +95,10 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const toggleComments = () => {
     setShowComments(!showComments);
   };
+
+  const handleCommentAdded = () => {
+    setLocalCommentCount(prev => prev + 1);
+  };
   
   if (isPost) {
     const post = item as any;
@@ -157,8 +165,8 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
               onClick={toggleComments}
             >
               <MessageCircle size={18} />
-              {post.comment_count > 0 && (
-                <span>{post.comment_count}</span>
+              {localCommentCount > 0 && (
+                <span>{localCommentCount}</span>
               )}
             </Button>
           </div>
@@ -185,6 +193,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
             <CommentsList 
               itemId={post.id}
               itemType="post"
+              onCommentAdded={handleCommentAdded}
             />
           </div>
         )}
@@ -275,8 +284,8 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
             onClick={toggleComments}
           >
             <MessageCircle size={18} />
-            {recommendation.comment_count > 0 && (
-              <span>{recommendation.comment_count}</span>
+            {localCommentCount > 0 && (
+              <span>{localCommentCount}</span>
             )}
           </Button>
         </div>
@@ -303,6 +312,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
           <CommentsList 
             itemId={recommendation.id}
             itemType="recommendation"
+            onCommentAdded={handleCommentAdded}
           />
         </div>
       )}
