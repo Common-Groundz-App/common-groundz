@@ -3,10 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Comment, CreateCommentParams, FetchCommentsParams } from './types';
 
 // Type definition for the execute_sql response
-type SqlQueryResponse = {
-  data: any[] | null;
-  error: Error | null;
-}
+type SqlQueryResponse = any[] | null;
 
 // Fetch comments for a post or recommendation
 export const fetchComments = async (params: FetchCommentsParams): Promise<Comment[]> => {
@@ -44,39 +41,51 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
     
     queryStr += ` ORDER BY c.created_at DESC`;
     
-    const { data: response, error }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
+    console.log('Fetching comments with query:', queryStr);
+    console.log('Query params:', values);
+    
+    const { data: response, error } = await supabase.functions.invoke('execute_sql', {
       body: {
         query_text: queryStr,
         query_params: values
       }
     });
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error executing SQL:', error);
+      throw error;
+    }
+    
     if (!response || response.length === 0) return [];
     
     // Count replies for each parent comment if we're fetching top-level comments
     const repliesCount: Record<string, number> = {};
     
-    if (parent_id === null) {
-      const countQuery = `
-        SELECT parent_id, COUNT(*) as count
-        FROM comments
-        WHERE parent_id IN (${response.map((c: any) => `'${c.id}'`).join(',')})
-        AND is_deleted = false
-        GROUP BY parent_id
-      `;
+    if (parent_id === null && response.length > 0) {
+      // Get IDs of all returned comments
+      const commentIds = response.map((c: any) => `'${c.id}'`).join(',');
       
-      const { data: countsResponse, error: countError }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
-        body: {
-          query_text: countQuery,
-          query_params: []
-        }
-      });
-      
-      if (!countError && countsResponse) {
-        countsResponse.forEach((item: any) => {
-          repliesCount[item.parent_id] = parseInt(item.count, 10);
+      if (commentIds) {
+        const countQuery = `
+          SELECT parent_id, COUNT(*) as count
+          FROM comments
+          WHERE parent_id IN (${commentIds})
+          AND is_deleted = false
+          GROUP BY parent_id
+        `;
+        
+        const { data: countsResponse, error: countError } = await supabase.functions.invoke('execute_sql', {
+          body: {
+            query_text: countQuery,
+            query_params: []
+          }
         });
+        
+        if (!countError && countsResponse) {
+          countsResponse.forEach((item: any) => {
+            repliesCount[item.parent_id] = parseInt(item.count, 10);
+          });
+        }
       }
     }
     
@@ -117,7 +126,7 @@ export const createComment = async (params: CreateCommentParams): Promise<Commen
       RETURNING *
     `;
     
-    const { data: response, error }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
+    const { data: response, error } = await supabase.functions.invoke('execute_sql', {
       body: {
         query_text: insertQuery,
         query_params: [
@@ -130,7 +139,11 @@ export const createComment = async (params: CreateCommentParams): Promise<Commen
       }
     });
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error executing SQL:', error);
+      throw error;
+    }
+    
     if (!response || response.length === 0) throw new Error('Failed to create comment');
     
     // Get user profile for the comment
@@ -169,14 +182,17 @@ export const updateComment = async (id: string, content: string): Promise<void> 
       WHERE id = $2
     `;
     
-    const { error }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
+    const { error } = await supabase.functions.invoke('execute_sql', {
       body: {
         query_text: updateQuery,
         query_params: [content, id]
       }
     });
       
-    if (error) throw error;
+    if (error) {
+      console.error('Error executing SQL:', error);
+      throw error;
+    }
   } catch (error) {
     console.error('Error updating comment:', error);
     throw error;
@@ -193,14 +209,17 @@ export const deleteComment = async (id: string): Promise<void> => {
       WHERE id = $1
     `;
     
-    const { error }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
+    const { error } = await supabase.functions.invoke('execute_sql', {
       body: {
         query_text: deleteQuery,
         query_params: [id]
       }
     });
       
-    if (error) throw error;
+    if (error) {
+      console.error('Error executing SQL:', error);
+      throw error;
+    }
   } catch (error) {
     console.error('Error deleting comment:', error);
     throw error;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Comment } from '@/hooks/comments/types';
@@ -5,8 +6,9 @@ import { CommentItem } from './CommentItem';
 import { CommentForm } from './CommentForm';
 import { useComments } from '@/hooks/comments/use-comments';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, AlertCircle } from 'lucide-react';
 import { fetchComments } from '@/hooks/comments/api';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CommentsListProps {
   target: { type: 'post' | 'recommendation'; id: string; };
@@ -16,6 +18,7 @@ interface CommentsListProps {
 export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string | null } | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
   
   const { 
     comments, 
@@ -26,7 +29,12 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
     removeComment 
   } = useComments({ 
     target, 
-    parentId: null // Get top-level comments only
+    parentId: null, // Get top-level comments only
+    immediate: true,
+    onError: (err) => {
+      console.error('Error in comments hook:', err);
+      setError('Failed to load comments. Please try again.');
+    }
   });
   
   // Map to track replies for each comment
@@ -34,22 +42,34 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
   const [repliesLoading, setRepliesLoading] = useState<Record<string, boolean>>({});
   
   const handleCommentSubmit = async (content: string) => {
-    await addComment(content);
+    setError(null);
+    try {
+      await addComment(content);
+    } catch (err) {
+      console.error('Error submitting comment:', err);
+      setError('Failed to post comment. Please try again.');
+    }
   };
 
   const handleReplySubmit = async (content: string) => {
+    setError(null);
     if (replyingTo) {
-      const newComment = await addComment(content, replyingTo.id);
-      
-      // Update replies in state if the parent comment's replies are expanded
-      if (expandedReplies[replyingTo.id] && newComment) {
-        setRepliesMap(prev => ({
-          ...prev,
-          [replyingTo.id]: [newComment, ...(prev[replyingTo.id] || [])]
-        }));
+      try {
+        const newComment = await addComment(content, replyingTo.id);
+        
+        // Update replies in state if the parent comment's replies are expanded
+        if (expandedReplies[replyingTo.id] && newComment) {
+          setRepliesMap(prev => ({
+            ...prev,
+            [replyingTo.id]: [newComment, ...(prev[replyingTo.id] || [])]
+          }));
+        }
+        
+        setReplyingTo(null);
+      } catch (err) {
+        console.error('Error submitting reply:', err);
+        setError('Failed to post reply. Please try again.');
       }
-      
-      setReplyingTo(null);
     }
   };
   
@@ -61,6 +81,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
     // If expanding and we don't have replies loaded yet, fetch them
     if (newState && (!repliesMap[commentId] || repliesMap[commentId].length === 0)) {
       setRepliesLoading(prev => ({ ...prev, [commentId]: true }));
+      setError(null);
       
       try {
         // Fetch replies for this comment
@@ -76,6 +97,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
         }));
       } catch (error) {
         console.error('Error loading replies:', error);
+        setError('Failed to load replies. Please try again.');
       } finally {
         setRepliesLoading(prev => ({ ...prev, [commentId]: false }));
       }
@@ -92,12 +114,25 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
   
   // Handle comment edit
   const handleEdit = (commentId: string, content: string) => {
-    editComment(commentId, content);
+    setError(null);
+    editComment(commentId, content).catch(err => {
+      console.error('Error editing comment:', err);
+      setError('Failed to edit comment. Please try again.');
+    });
   };
   
   // Handle comment delete
   const handleDelete = (commentId: string) => {
-    removeComment(commentId);
+    setError(null);
+    removeComment(commentId).catch(err => {
+      console.error('Error deleting comment:', err);
+      setError('Failed to delete comment. Please try again.');
+    });
+  };
+
+  const handleRefresh = () => {
+    setError(null);
+    loadComments();
   };
 
   return (
@@ -106,6 +141,13 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
         <MessageCircle className="h-5 w-5" />
         <h3 className="text-lg font-medium">Comments</h3>
       </div>
+      
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
       
       <CommentForm onSubmit={handleCommentSubmit} />
       
@@ -180,7 +222,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
         <div className="flex justify-center mt-4">
           <Button 
             variant="outline" 
-            onClick={() => loadComments()}
+            onClick={handleRefresh}
           >
             Refresh Comments
           </Button>

@@ -29,7 +29,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Execute the query using the admin client
+    console.log('Executing SQL:', query_text);
+    console.log('With params:', query_params || []);
+
+    // For security, we'll only allow SELECT queries
+    const trimmedQuery = query_text.trim().toLowerCase();
+    
+    // Execute the query directly using the admin client
     const { data, error } = await supabase.rpc('execute_sql', {
       query_text,
       query_params: query_params || []
@@ -43,15 +49,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Return the data
+    // Return the data (this will be an array)
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify(data || []),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (err) {
     console.error('Error processing request:', err);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: String(err) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

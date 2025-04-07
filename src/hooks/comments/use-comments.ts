@@ -9,9 +9,10 @@ interface UseCommentsProps {
   target: CommentTarget;
   parentId?: string | null;
   immediate?: boolean;
+  onError?: (error: Error) => void;
 }
 
-export const useComments = ({ target, parentId = null, immediate = true }: UseCommentsProps) => {
+export const useComments = ({ target, parentId = null, immediate = true, onError }: UseCommentsProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
@@ -35,17 +36,22 @@ export const useComments = ({ target, parentId = null, immediate = true }: UseCo
       setComments(enhancedComments);
     } catch (err) {
       console.error('Error loading comments:', err);
-      setError(err instanceof Error ? err : new Error('Failed to load comments'));
+      const error = err instanceof Error ? err : new Error('Failed to load comments');
+      setError(error);
       
       toast({
         title: 'Error',
         description: 'Failed to load comments. Please try again.',
         variant: 'destructive'
       });
+      
+      if (onError) {
+        onError(error);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [target, parentId, user, toast]);
+  }, [target, parentId, user, toast, onError]);
   
   const addComment = useCallback(async (content: string, replyToId?: string) => {
     if (!content.trim()) return;
@@ -112,6 +118,8 @@ export const useComments = ({ target, parentId = null, immediate = true }: UseCo
         description: 'Failed to update your comment. Please try again.',
         variant: 'destructive'
       });
+      
+      throw err;
     }
   }, [toast]);
   
@@ -134,6 +142,8 @@ export const useComments = ({ target, parentId = null, immediate = true }: UseCo
         description: 'Failed to delete your comment. Please try again.',
         variant: 'destructive'
       });
+      
+      throw err;
     }
   }, [toast]);
   
