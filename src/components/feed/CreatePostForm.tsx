@@ -12,8 +12,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { EntityTagSelector } from './EntityTagSelector';
-import { usePostMedia, PostMedia } from '@/hooks/use-post-media';
-import { Image, X, Plus, RotateCw } from 'lucide-react';
 
 interface CreatePostFormProps {
   onSuccess: () => void;
@@ -32,14 +30,6 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>([]);
-  const { 
-    media, 
-    isUploading, 
-    handleMediaUpload, 
-    removeMedia, 
-    updateMediaCaption,
-    reorderMedia 
-  } = usePostMedia();
   
   const form = useForm<PostFormValues>({
     defaultValues: {
@@ -49,16 +39,6 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
       visibility: 'public',
     }
   });
-
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) return;
-    
-    const filesArray = Array.from(event.target.files);
-    await handleMediaUpload(filesArray);
-    
-    // Reset the input value so the same file can be selected again if needed
-    event.target.value = '';
-  };
 
   const onSubmit = async (values: PostFormValues) => {
     if (!user) {
@@ -82,7 +62,6 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
           post_type: values.postType,
           visibility: values.visibility,
           user_id: user.id,
-          media: media.length > 0 ? media : null
         } as any)
         .select()
         .single();
@@ -121,12 +100,6 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // Function to handle media reordering with drag and drop
-  const handleDragEnd = (sourceIndex: number, destinationIndex: number) => {
-    if (sourceIndex === destinationIndex) return;
-    reorderMedia(sourceIndex, destinationIndex);
   };
 
   return (
@@ -193,82 +166,6 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
           )}
         />
 
-        {/* Media Uploader */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <FormLabel className="text-sm font-medium">Media</FormLabel>
-            <div className="flex gap-2">
-              <Input 
-                type="file" 
-                id="media-upload" 
-                multiple 
-                accept="image/*,video/*" 
-                className="hidden" 
-                onChange={handleFileSelect}
-                disabled={isUploading}
-              />
-              <label 
-                htmlFor="media-upload" 
-                className={`flex items-center gap-1 text-sm px-2 py-1 rounded-md cursor-pointer
-                  ${isUploading ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary hover:bg-primary/20'}`}
-              >
-                {isUploading ? (
-                  <>
-                    <RotateCw className="h-4 w-4 animate-spin" />
-                    <span>Uploading...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4" />
-                    <span>Add Media</span>
-                  </>
-                )}
-              </label>
-            </div>
-          </div>
-
-          {media.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-3">
-              {media.map((item, index) => (
-                <div key={index} className="relative group border rounded-md overflow-hidden">
-                  <div className="aspect-video relative">
-                    {item.type === 'image' ? (
-                      <img 
-                        src={item.url} 
-                        alt={item.caption || `Media ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <video 
-                        src={item.url} 
-                        controls 
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button 
-                        type="button" 
-                        variant="destructive" 
-                        size="sm" 
-                        className="h-8 w-8 p-0 rounded-full"
-                        onClick={() => removeMedia(index, true)} // true to delete from storage
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <Input
-                    placeholder="Add caption (optional)"
-                    className="text-xs border-0 border-t rounded-none bg-background/80"
-                    value={item.caption || ''}
-                    onChange={(e) => updateMediaCaption(index, e.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Entity Selector */}
         <div className="pt-2 pb-1">
           <EntityTagSelector 
@@ -319,7 +216,7 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
           </Button>
           <Button 
             type="submit" 
-            disabled={isSubmitting || isUploading}
+            disabled={isSubmitting}
             className="bg-brand-orange hover:bg-brand-orange/90"
           >
             {isSubmitting ? 'Creating...' : 'Create Post'}
