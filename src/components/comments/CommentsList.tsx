@@ -19,6 +19,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string | null } | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   const { 
     comments, 
@@ -132,8 +133,14 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
 
   const handleRefresh = () => {
     setError(null);
+    setRetryCount(prev => prev + 1);
     loadComments();
   };
+
+  // Reset error state when target changes
+  useEffect(() => {
+    setError(null);
+  }, [target.id, target.type]);
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -145,7 +152,17 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
       {error && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="flex justify-between items-center">
+            <span>{error}</span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh}
+              className="ml-2"
+            >
+              Retry
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
       

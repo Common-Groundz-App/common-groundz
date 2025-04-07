@@ -2,97 +2,71 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Comment, CreateCommentParams, FetchCommentsParams } from './types';
 
-// Type definition for the execute_sql response
-type SqlQueryResponse = any[] | null;
-
 // Fetch comments for a post or recommendation
 export const fetchComments = async (params: FetchCommentsParams): Promise<Comment[]> => {
   try {
     const { target, parent_id } = params;
     
-    // Using raw SQL query to avoid issues with the 'comments' table not being in TypeScript definitions
-    let queryStr = `
-      SELECT c.*, p.username, p.avatar_url
-      FROM comments c
-      LEFT JOIN profiles p ON c.user_id = p.id
-      WHERE c.is_deleted = false
-    `;
-    
-    const values: any[] = [];
-    let valueIndex = 1;
+    let query = supabase
+      .from('comments')
+      .select('*, profiles:user_id(username, avatar_url)')
+      .eq('is_deleted', false);
     
     // Filter by parent_id (for top-level comments or replies)
     if (parent_id === null) {
-      queryStr += ` AND c.parent_id IS NULL`;
+      query = query.is('parent_id', null);
     } else if (parent_id) {
-      queryStr += ` AND c.parent_id = $${valueIndex}`;
-      values.push(parent_id);
-      valueIndex++;
+      query = query.eq('parent_id', parent_id);
     }
     
     // Filter by target (post or recommendation)
     if (target.type === 'post') {
-      queryStr += ` AND c.post_id = $${valueIndex} AND c.recommendation_id IS NULL`;
-      values.push(target.id);
+      query = query.eq('post_id', target.id).is('recommendation_id', null);
     } else {
-      queryStr += ` AND c.recommendation_id = $${valueIndex} AND c.post_id IS NULL`;
-      values.push(target.id);
+      query = query.eq('recommendation_id', target.id).is('post_id', null);
     }
     
-    queryStr += ` ORDER BY c.created_at DESC`;
+    query = query.order('created_at', { ascending: false });
     
-    console.log('Fetching comments with query:', queryStr);
-    console.log('Query params:', values);
-    
-    const { data: response, error } = await supabase.functions.invoke('execute_sql', {
-      body: {
-        query_text: queryStr,
-        query_params: values
-      }
-    });
+    const { data: comments, error } = await query;
     
     if (error) {
-      console.error('Error executing SQL:', error);
+      console.error('Error fetching comments:', error);
       throw error;
     }
     
-    if (!response || response.length === 0) return [];
+    if (!comments || comments.length === 0) return [];
     
     // Count replies for each parent comment if we're fetching top-level comments
-    const repliesCount: Record<string, number> = {};
+    const repliesCounts: Record<string, number> = {};
     
-    if (parent_id === null && response.length > 0) {
+    if (parent_id === null && comments.length > 0) {
       // Get IDs of all returned comments
-      const commentIds = response.map((c: any) => `'${c.id}'`).join(',');
+      const commentIds = comments.map(c => c.id);
       
-      if (commentIds) {
-        const countQuery = `
-          SELECT parent_id, COUNT(*) as count
-          FROM comments
-          WHERE parent_id IN (${commentIds})
-          AND is_deleted = false
-          GROUP BY parent_id
-        `;
+      if (commentIds.length > 0) {
+        const { data: repliesData, error: countError } = await supabase
+          .from('comments')
+          .select('parent_id, count(*)')
+          .in('parent_id', commentIds)
+          .eq('is_deleted', false)
+          .group('parent_id');
         
-        const { data: countsResponse, error: countError } = await supabase.functions.invoke('execute_sql', {
-          body: {
-            query_text: countQuery,
-            query_params: []
-          }
-        });
-        
-        if (!countError && countsResponse) {
-          countsResponse.forEach((item: any) => {
-            repliesCount[item.parent_id] = parseInt(item.count, 10);
+        if (!countError && repliesData) {
+          repliesData.forEach((item: any) => {
+            repliesCounts[item.parent_id] = parseInt(item.count, 10);
           });
         }
       }
     }
     
     // Enhance comments with profile data and replies count
-    return response.map((comment: any) => ({
+    return comments.map((comment: any) => ({
       ...comment,
-      replies_count: repliesCount[comment.id] || 0
+      username: comment.profiles?.username,
+      avatar_url: comment.profiles?.avatar_url,
+      replies_count: repliesCounts[comment.id] || 0,
+      is_own_comment: comment.user_id === (supabase.auth.getUser())?.data?.user?.id
     })) as Comment[];
   } catch (error) {
     console.error('Error fetching comments:', error);
@@ -119,32 +93,19 @@ export const createComment = async (params: CreateCommentParams): Promise<Commen
       recommendation_id: target.type === 'recommendation' ? target.id : null
     };
     
-    // Insert comment using raw SQL to avoid type issues
-    const insertQuery = `
-      INSERT INTO comments (content, user_id, parent_id, post_id, recommendation_id)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `;
-    
-    const { data: response, error } = await supabase.functions.invoke('execute_sql', {
-      body: {
-        query_text: insertQuery,
-        query_params: [
-          content,
-          user.id,
-          parent_id || null,
-          target.type === 'post' ? target.id : null,
-          target.type === 'recommendation' ? target.id : null
-        ]
-      }
-    });
+    // Insert comment
+    const { data: newComment, error } = await supabase
+      .from('comments')
+      .insert(commentData)
+      .select('*')
+      .single();
     
     if (error) {
-      console.error('Error executing SQL:', error);
+      console.error('Error creating comment:', error);
       throw error;
     }
     
-    if (!response || response.length === 0) throw new Error('Failed to create comment');
+    if (!newComment) throw new Error('Failed to create comment');
     
     // Get user profile for the comment
     const { data: profileData, error: profileError } = await supabase
@@ -157,15 +118,15 @@ export const createComment = async (params: CreateCommentParams): Promise<Commen
       console.error('Error fetching profile:', profileError);
     }
     
-    const newComment = {
-      ...response[0],
+    const commentWithProfile = {
+      ...newComment,
       username: profileData?.username || null,
       avatar_url: profileData?.avatar_url || null,
       replies_count: 0,
       is_own_comment: true
     };
     
-    return newComment as Comment;
+    return commentWithProfile as Comment;
   } catch (error) {
     console.error('Error creating comment:', error);
     throw error;
@@ -175,22 +136,13 @@ export const createComment = async (params: CreateCommentParams): Promise<Commen
 // Update a comment
 export const updateComment = async (id: string, content: string): Promise<void> => {
   try {
-    // Use raw SQL to update
-    const updateQuery = `
-      UPDATE comments
-      SET content = $1
-      WHERE id = $2
-    `;
-    
-    const { error } = await supabase.functions.invoke('execute_sql', {
-      body: {
-        query_text: updateQuery,
-        query_params: [content, id]
-      }
-    });
+    const { error } = await supabase
+      .from('comments')
+      .update({ content })
+      .eq('id', id);
       
     if (error) {
-      console.error('Error executing SQL:', error);
+      console.error('Error updating comment:', error);
       throw error;
     }
   } catch (error) {
@@ -202,22 +154,13 @@ export const updateComment = async (id: string, content: string): Promise<void> 
 // Delete a comment (soft delete)
 export const deleteComment = async (id: string): Promise<void> => {
   try {
-    // Use raw SQL to delete
-    const deleteQuery = `
-      UPDATE comments
-      SET is_deleted = true
-      WHERE id = $1
-    `;
-    
-    const { error } = await supabase.functions.invoke('execute_sql', {
-      body: {
-        query_text: deleteQuery,
-        query_params: [id]
-      }
-    });
+    const { error } = await supabase
+      .from('comments')
+      .update({ is_deleted: true })
+      .eq('id', id);
       
     if (error) {
-      console.error('Error executing SQL:', error);
+      console.error('Error deleting comment:', error);
       throw error;
     }
   } catch (error) {

@@ -32,14 +32,11 @@ Deno.serve(async (req) => {
     console.log('Executing SQL:', query_text);
     console.log('With params:', query_params || []);
 
-    // For security, we'll only allow SELECT queries
-    const trimmedQuery = query_text.trim().toLowerCase();
-    
-    // Execute the query directly using the admin client
-    const { data, error } = await supabase.rpc('execute_sql', {
-      query_text,
-      query_params: query_params || []
-    });
+    // Execute the query directly with the Postgres connection
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*')
+      .limit(10);
 
     if (error) {
       console.error('SQL execution error:', error);
