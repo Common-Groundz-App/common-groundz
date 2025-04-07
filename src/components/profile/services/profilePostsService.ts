@@ -59,10 +59,22 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
       
       // Add entities to posts
       const enrichedPosts = (postsData || []).map(post => {
-        // Convert media JSON to MediaItem[] if it exists
+        // Process media properly with type safety
         let mediaItems: MediaItem[] | undefined;
-        if (post.media && typeof post.media === 'object') {
-          mediaItems = Array.isArray(post.media) ? post.media : undefined;
+        
+        if (post.media && Array.isArray(post.media)) {
+          // Map each item in the media array to ensure it conforms to MediaItem structure
+          mediaItems = post.media.map((item: any): MediaItem => ({
+            url: item.url || '',
+            type: item.type || 'image',
+            caption: item.caption,
+            alt: item.alt,
+            order: item.order || 0,
+            thumbnail_url: item.thumbnail_url,
+            is_deleted: item.is_deleted,
+            session_id: item.session_id,
+            id: item.id
+          }));
         }
 
         return {
@@ -75,10 +87,22 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
       return enrichedPosts as Post[];
     } else {
       return (postsData || []).map(post => {
-        // Convert media JSON to MediaItem[] if it exists
+        // Process media properly for posts without entities
         let mediaItems: MediaItem[] | undefined;
-        if (post.media && typeof post.media === 'object') {
-          mediaItems = Array.isArray(post.media) ? post.media : undefined;
+        
+        if (post.media && Array.isArray(post.media)) {
+          // Map each item in the media array to ensure it conforms to MediaItem structure
+          mediaItems = post.media.map((item: any): MediaItem => ({
+            url: item.url || '',
+            type: item.type || 'image',
+            caption: item.caption,
+            alt: item.alt,
+            order: item.order || 0,
+            thumbnail_url: item.thumbnail_url,
+            is_deleted: item.is_deleted,
+            session_id: item.session_id,
+            id: item.id
+          }));
         }
 
         return {
