@@ -53,8 +53,12 @@ export const uploadMedia = async (
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
-        onUploadProgress: onProgress ? ({ percent }) => onProgress(percent || 0) : undefined
       });
+
+    // Use the progress event manually if onProgress is provided
+    if (onProgress) {
+      onProgress(100); // Since we can't track progress, mark as complete
+    }
 
     if (uploadError) throw uploadError;
     

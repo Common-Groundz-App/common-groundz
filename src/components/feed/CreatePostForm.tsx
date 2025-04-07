@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -74,7 +73,6 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
   const handleMediaRemove = (index: number) => {
     setMedia(prevMedia => {
       const updatedMedia = [...prevMedia];
-      uploadedMedia[index].is_deleted = true;
       return updatedMedia.map((item, i) => 
         i === index 
           ? { ...item, is_deleted: true } 
