@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Comment } from '@/hooks/comments/types';
 import { CommentItem } from './CommentItem';
@@ -7,6 +6,7 @@ import { CommentForm } from './CommentForm';
 import { useComments } from '@/hooks/comments/use-comments';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MessageCircle } from 'lucide-react';
+import { fetchComments } from '@/hooks/comments/api';
 
 interface CommentsListProps {
   target: { type: 'post' | 'recommendation'; id: string; };
@@ -63,15 +63,11 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
       setRepliesLoading(prev => ({ ...prev, [commentId]: true }));
       
       try {
-        // Create a temporary hook instance to fetch replies for this comment
-        const { comments: replies } = useComments({ 
+        // Fetch replies for this comment
+        const replies = await fetchComments({ 
           target, 
-          parentId: commentId, 
-          immediate: false 
+          parent_id: commentId
         });
-        
-        // Load the replies
-        await loadComments();
         
         // Store the loaded replies
         setRepliesMap(prev => ({ 

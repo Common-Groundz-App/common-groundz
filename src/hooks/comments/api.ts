@@ -2,6 +2,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Comment, CreateCommentParams, FetchCommentsParams } from './types';
 
+// Type definition for the execute_sql response
+type SqlQueryResponse = {
+  data: any[] | null;
+  error: Error | null;
+}
+
 // Fetch comments for a post or recommendation
 export const fetchComments = async (params: FetchCommentsParams): Promise<Comment[]> => {
   try {
@@ -38,13 +44,15 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
     
     queryStr += ` ORDER BY c.created_at DESC`;
     
-    const { data: comments, error } = await supabase.rpc('execute_sql', {
-      query_text: queryStr,
-      query_params: values
+    const { data: response, error }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
+      body: {
+        query_text: queryStr,
+        query_params: values
+      }
     });
     
     if (error) throw error;
-    if (!comments || comments.length === 0) return [];
+    if (!response || response.length === 0) return [];
     
     // Count replies for each parent comment if we're fetching top-level comments
     const repliesCount: Record<string, number> = {};
@@ -53,25 +61,27 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
       const countQuery = `
         SELECT parent_id, COUNT(*) as count
         FROM comments
-        WHERE parent_id IN (${comments.map((c: any) => `'${c.id}'`).join(',')})
+        WHERE parent_id IN (${response.map((c: any) => `'${c.id}'`).join(',')})
         AND is_deleted = false
         GROUP BY parent_id
       `;
       
-      const { data: counts, error: countError } = await supabase.rpc('execute_sql', {
-        query_text: countQuery,
-        query_params: []
+      const { data: countsResponse, error: countError }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
+        body: {
+          query_text: countQuery,
+          query_params: []
+        }
       });
       
-      if (!countError && counts) {
-        counts.forEach((item: any) => {
+      if (!countError && countsResponse) {
+        countsResponse.forEach((item: any) => {
           repliesCount[item.parent_id] = parseInt(item.count, 10);
         });
       }
     }
     
     // Enhance comments with profile data and replies count
-    return comments.map((comment: any) => ({
+    return response.map((comment: any) => ({
       ...comment,
       replies_count: repliesCount[comment.id] || 0
     })) as Comment[];
@@ -107,19 +117,21 @@ export const createComment = async (params: CreateCommentParams): Promise<Commen
       RETURNING *
     `;
     
-    const { data: insertedData, error } = await supabase.rpc('execute_sql', {
-      query_text: insertQuery,
-      query_params: [
-        content,
-        user.id,
-        parent_id || null,
-        target.type === 'post' ? target.id : null,
-        target.type === 'recommendation' ? target.id : null
-      ]
+    const { data: response, error }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
+      body: {
+        query_text: insertQuery,
+        query_params: [
+          content,
+          user.id,
+          parent_id || null,
+          target.type === 'post' ? target.id : null,
+          target.type === 'recommendation' ? target.id : null
+        ]
+      }
     });
     
     if (error) throw error;
-    if (!insertedData || !insertedData[0]) throw new Error('Failed to create comment');
+    if (!response || response.length === 0) throw new Error('Failed to create comment');
     
     // Get user profile for the comment
     const { data: profileData, error: profileError } = await supabase
@@ -133,7 +145,7 @@ export const createComment = async (params: CreateCommentParams): Promise<Commen
     }
     
     const newComment = {
-      ...insertedData[0],
+      ...response[0],
       username: profileData?.username || null,
       avatar_url: profileData?.avatar_url || null,
       replies_count: 0,
@@ -157,9 +169,11 @@ export const updateComment = async (id: string, content: string): Promise<void> 
       WHERE id = $2
     `;
     
-    const { error } = await supabase.rpc('execute_sql', {
-      query_text: updateQuery,
-      query_params: [content, id]
+    const { error }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
+      body: {
+        query_text: updateQuery,
+        query_params: [content, id]
+      }
     });
       
     if (error) throw error;
@@ -179,9 +193,11 @@ export const deleteComment = async (id: string): Promise<void> => {
       WHERE id = $1
     `;
     
-    const { error } = await supabase.rpc('execute_sql', {
-      query_text: deleteQuery,
-      query_params: [id]
+    const { error }: SqlQueryResponse = await supabase.functions.invoke('execute_sql', {
+      body: {
+        query_text: deleteQuery,
+        query_params: [id]
+      }
     });
       
     if (error) throw error;
