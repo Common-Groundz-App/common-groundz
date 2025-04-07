@@ -45,20 +45,26 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
       const commentIds = comments.map(c => c.id);
       
       if (commentIds.length > 0) {
-        const { data: repliesData, error: countError } = await supabase
-          .from('comments')
-          .select('parent_id, count(*)')
-          .in('parent_id', commentIds)
-          .eq('is_deleted', false)
-          .group('parent_id');
+        // Use a count query instead of group
+        const countPromises = commentIds.map(async (parentId) => {
+          const { count, error: countError } = await supabase
+            .from('comments')
+            .select('*', { count: 'exact', head: true })
+            .eq('parent_id', parentId)
+            .eq('is_deleted', false);
+            
+          if (!countError && count !== null) {
+            repliesCounts[parentId] = count;
+          }
+        });
         
-        if (!countError && repliesData) {
-          repliesData.forEach((item: any) => {
-            repliesCounts[item.parent_id] = parseInt(item.count, 10);
-          });
-        }
+        await Promise.all(countPromises);
       }
     }
+    
+    // Get current user (if authenticated)
+    const { data: { user } } = await supabase.auth.getUser();
+    const currentUserId = user?.id;
     
     // Enhance comments with profile data and replies count
     return comments.map((comment: any) => ({
@@ -66,7 +72,7 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
       username: comment.profiles?.username,
       avatar_url: comment.profiles?.avatar_url,
       replies_count: repliesCounts[comment.id] || 0,
-      is_own_comment: comment.user_id === (supabase.auth.getUser())?.data?.user?.id
+      is_own_comment: comment.user_id === currentUserId
     })) as Comment[];
   } catch (error) {
     console.error('Error fetching comments:', error);
