@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { CommentWithUser } from '@/types/comment';
 import { fetchProfiles } from '@/hooks/feed/api/profiles';
