@@ -13,8 +13,7 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       .from('recommendations')
       .select(`
         *,
-        profiles(username, avatar_url),
-        recommendation_likes!inner(user_id)
+        profiles(username, avatar_url)
       `)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
@@ -40,8 +39,8 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
     const processedRecs = recsData.map(rec => {
       return {
         ...rec,
-        username: rec.profiles?.username,
-        avatar_url: rec.profiles?.avatar_url,
+        username: rec.profiles?.username || null,
+        avatar_url: rec.profiles?.avatar_url || null,
         likes: 0, // We'll update this with a count query
         is_liked: false,
         is_saved: false
@@ -93,8 +92,7 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
       const postIds = postsData.map(post => post.id);
       
       // Fetch post entities
-      const supabaseAny = supabase as any;
-      const { data: entityData } = await supabaseAny.rpc('get_post_entities', {
+      const { data: entityData } = await supabase.rpc('get_post_entities', {
         post_ids: postIds
       });
       
@@ -109,23 +107,49 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
         });
       }
       
-      // Get likes for posts (using a custom likes table or count of likes)
-      const { data: postLikes } = await supabase
-        .from('post_likes')
-        .select('post_id, count')
-        .in('post_id', postIds);
+      // Get likes for posts - using stored procedure to avoid type issues
+      const { data: postLikesData } = await supabase.rpc('get_post_likes_by_posts', {
+        p_post_ids: postIds
+      });
+      
+      // Get user likes for posts
+      const { data: userLikesData } = await supabase.rpc('get_user_post_likes', {
+        p_post_ids: postIds,
+        p_user_id: userId
+      });
       
       // Get saves for posts
-      const { data: postSaves } = await supabase
-        .from('post_saves')
-        .select('post_id')
-        .in('post_id', postIds)
-        .eq('user_id', userId);
+      const { data: userSavesData } = await supabase.rpc('get_user_post_saves', {
+        p_post_ids: postIds,
+        p_user_id: userId
+      });
+      
+      // Create lookup maps for efficient access
+      const postLikes = new Map();
+      if (postLikesData) {
+        postLikesData.forEach((item: any) => {
+          postLikes.set(item.post_id, item.like_count || 0);
+        });
+      }
+      
+      const userLikedPosts = new Set();
+      if (userLikesData) {
+        userLikesData.forEach((item: any) => {
+          userLikedPosts.add(item.post_id);
+        });
+      }
+      
+      const userSavedPosts = new Set();
+      if (userSavesData) {
+        userSavesData.forEach((item: any) => {
+          userSavedPosts.add(item.post_id);
+        });
+      }
       
       // Format the posts as feed items
       processedPosts = postsData.map(post => {
         // Process media properly with type safety
-        let mediaItems: MediaItem[] | undefined;
+        let mediaItems: MediaItem[] = [];
         
         if (post.media && Array.isArray(post.media)) {
           // Map each item in the media array to ensure it conforms to MediaItem structure
@@ -142,25 +166,23 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
           }));
         }
         
-        // Find likes for this post
-        const likeRecord = postLikes?.find((like: any) => like.post_id === post.id);
-        const isLiked = Boolean(likeRecord);
-        const likes = likeRecord?.count || 0;
-        
-        // Find if post is saved
-        const isSaved = Boolean(postSaves?.find((save: any) => save.post_id === post.id));
+        // Get post metadata
+        const likes = postLikes.get(post.id) || 0;
+        const isLiked = userLikedPosts.has(post.id);
+        const isSaved = userSavedPosts.has(post.id);
         
         return {
           ...post,
-          username: post.profiles?.username,
-          avatar_url: post.profiles?.avatar_url,
+          username: post.profiles?.username || null,
+          avatar_url: post.profiles?.avatar_url || null,
           is_post: true,
           likes: likes,
           is_liked: isLiked,
           is_saved: isSaved,
           tagged_entities: entitiesByPostId[post.id] || [],
-          media: mediaItems
-        };
+          media: mediaItems,
+          status: (post.status || 'published') as 'draft' | 'published' | 'failed'
+        } as PostFeedItem;
       });
     }
     
@@ -236,8 +258,8 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
     const processedRecs = recsData.map(rec => {
       return {
         ...rec,
-        username: rec.profiles?.username,
-        avatar_url: rec.profiles?.avatar_url,
+        username: rec.profiles?.username || null,
+        avatar_url: rec.profiles?.avatar_url || null,
         likes: 0,
         is_liked: false,
         is_saved: false
@@ -301,8 +323,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
       const postIds = postsData.map(post => post.id);
       
       // Fetch post entities
-      const supabaseAny = supabase as any;
-      const { data: entityData } = await supabaseAny.rpc('get_post_entities', {
+      const { data: entityData } = await supabase.rpc('get_post_entities', {
         post_ids: postIds
       });
       
@@ -317,23 +338,49 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
         });
       }
       
-      // Get likes for posts (using a custom likes table or count of likes)
-      const { data: postLikes } = await supabase
-        .from('post_likes')
-        .select('post_id, count')
-        .in('post_id', postIds);
+      // Get likes for posts - using stored procedure to avoid type issues
+      const { data: postLikesData } = await supabase.rpc('get_post_likes_by_posts', {
+        p_post_ids: postIds
+      });
+      
+      // Get user likes for posts
+      const { data: userLikesData } = await supabase.rpc('get_user_post_likes', {
+        p_post_ids: postIds,
+        p_user_id: userId
+      });
       
       // Get saves for posts
-      const { data: postSaves } = await supabase
-        .from('post_saves')
-        .select('post_id')
-        .in('post_id', postIds)
-        .eq('user_id', userId);
+      const { data: userSavesData } = await supabase.rpc('get_user_post_saves', {
+        p_post_ids: postIds,
+        p_user_id: userId
+      });
+      
+      // Create lookup maps for efficient access
+      const postLikes = new Map();
+      if (postLikesData) {
+        postLikesData.forEach((item: any) => {
+          postLikes.set(item.post_id, item.like_count || 0);
+        });
+      }
+      
+      const userLikedPosts = new Set();
+      if (userLikesData) {
+        userLikesData.forEach((item: any) => {
+          userLikedPosts.add(item.post_id);
+        });
+      }
+      
+      const userSavedPosts = new Set();
+      if (userSavesData) {
+        userSavesData.forEach((item: any) => {
+          userSavedPosts.add(item.post_id);
+        });
+      }
       
       // Format the posts as feed items
       processedPosts = postsData.map(post => {
         // Process media properly with type safety
-        let mediaItems: MediaItem[] | undefined;
+        let mediaItems: MediaItem[] = [];
         
         if (post.media && Array.isArray(post.media)) {
           // Map each item in the media array to ensure it conforms to MediaItem structure
@@ -350,25 +397,23 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
           }));
         }
         
-        // Find likes for this post
-        const likeRecord = postLikes?.find((like: any) => like.post_id === post.id);
-        const isLiked = Boolean(likeRecord);
-        const likes = likeRecord?.count || 0;
-        
-        // Find if post is saved
-        const isSaved = Boolean(postSaves?.find((save: any) => save.post_id === post.id));
+        // Get post metadata
+        const likes = postLikes.get(post.id) || 0;
+        const isLiked = userLikedPosts.has(post.id);
+        const isSaved = userSavedPosts.has(post.id);
         
         return {
           ...post,
-          username: post.profiles?.username,
-          avatar_url: post.profiles?.avatar_url,
+          username: post.profiles?.username || null,
+          avatar_url: post.profiles?.avatar_url || null,
           is_post: true,
           likes: likes,
           is_liked: isLiked,
           is_saved: isSaved,
           tagged_entities: entitiesByPostId[post.id] || [],
-          media: mediaItems
-        };
+          media: mediaItems,
+          status: (post.status || 'published') as 'draft' | 'published' | 'failed'
+        } as PostFeedItem;
       });
     }
     

@@ -49,48 +49,54 @@ export const useInteractions = (onSuccess?: () => void) => {
   };
   
   const togglePostLike = async (postId: string, userId: string) => {
-    // Check if like exists
-    const { data: existingLike } = await supabase
-      .from('post_likes')
-      .select('*')
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-      .single();
+    try {
+      // Check if like exists - using raw SQL query to avoid type issues
+      const { data: existingLike } = await supabase.rpc('check_post_like', {
+        p_post_id: postId,
+        p_user_id: userId
+      });
       
-    // If like exists, remove it; otherwise, add it
-    if (existingLike) {
-      await supabase
-        .from('post_likes')
-        .delete()
-        .eq('post_id', postId)
-        .eq('user_id', userId);
-    } else {
-      await supabase
-        .from('post_likes')
-        .insert({ post_id: postId, user_id: userId });
+      // If like exists, remove it; otherwise, add it
+      if (existingLike) {
+        await supabase.rpc('delete_post_like', {
+          p_post_id: postId,
+          p_user_id: userId
+        });
+      } else {
+        await supabase.rpc('insert_post_like', {
+          p_post_id: postId,
+          p_user_id: userId
+        });
+      }
+    } catch (err) {
+      console.error('Error in togglePostLike:', err);
+      throw err;
     }
   };
   
   const togglePostSave = async (postId: string, userId: string) => {
-    // Check if save exists
-    const { data: existingSave } = await supabase
-      .from('post_saves')
-      .select('*')
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-      .single();
+    try {
+      // Check if save exists - using raw SQL query to avoid type issues
+      const { data: existingSave } = await supabase.rpc('check_post_save', {
+        p_post_id: postId,
+        p_user_id: userId
+      });
       
-    // If save exists, remove it; otherwise, add it
-    if (existingSave) {
-      await supabase
-        .from('post_saves')
-        .delete()
-        .eq('post_id', postId)
-        .eq('user_id', userId);
-    } else {
-      await supabase
-        .from('post_saves')
-        .insert({ post_id: postId, user_id: userId });
+      // If save exists, remove it; otherwise, add it
+      if (existingSave) {
+        await supabase.rpc('delete_post_save', {
+          p_post_id: postId,
+          p_user_id: userId
+        });
+      } else {
+        await supabase.rpc('insert_post_save', {
+          p_post_id: postId,
+          p_user_id: userId
+        });
+      }
+    } catch (err) {
+      console.error('Error in togglePostSave:', err);
+      throw err;
     }
   };
   
