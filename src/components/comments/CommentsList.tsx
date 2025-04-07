@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Comment } from '@/hooks/comments/types';
 import { CommentItem } from './CommentItem';
@@ -29,7 +29,7 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
     parentId: null // Get top-level comments only
   });
   
-  // Map to track replies being loaded for each comment
+  // Map to track replies for each comment
   const [repliesMap, setRepliesMap] = useState<Record<string, Comment[]>>({});
   const [repliesLoading, setRepliesLoading] = useState<Record<string, boolean>>({});
   
@@ -63,15 +63,20 @@ export const CommentsList = ({ target, className = '' }: CommentsListProps) => {
       setRepliesLoading(prev => ({ ...prev, [commentId]: true }));
       
       try {
-        // Create a separate useComments hook instance for the specific parent
-        const repliesParams = { target, parentId: commentId, immediate: false };
-        const repliesHook = useComments(repliesParams);
-        await repliesHook.loadComments();
+        // Create a temporary hook instance to fetch replies for this comment
+        const { comments: replies } = useComments({ 
+          target, 
+          parentId: commentId, 
+          immediate: false 
+        });
+        
+        // Load the replies
+        await loadComments();
         
         // Store the loaded replies
         setRepliesMap(prev => ({ 
           ...prev, 
-          [commentId]: repliesHook.comments 
+          [commentId]: replies 
         }));
       } catch (error) {
         console.error('Error loading replies:', error);

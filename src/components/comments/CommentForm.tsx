@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CommentFormProps {
   onSubmit: (content: string) => void;
@@ -30,7 +31,38 @@ export const CommentForm = ({
 }: CommentFormProps) => {
   const [content, setContent] = useState(initialValue);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  
+  // Fetch user profile data when user changes
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) {
+          console.error('Error fetching profile:', error);
+          return;
+        }
+        
+        if (data) {
+          setAvatarUrl(data.avatar_url);
+          setUsername(data.username);
+        }
+      } catch (err) {
+        console.error('Error:', err);
+      }
+    };
+    
+    fetchProfile();
+  }, [user]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,8 +86,8 @@ export const CommentForm = ({
   return (
     <form onSubmit={handleSubmit} className={`flex space-x-3 ${className}`}>
       <Avatar className="h-8 w-8 mt-1">
-        <AvatarImage src={userProfile?.avatar_url || undefined} />
-        <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
+        <AvatarImage src={avatarUrl || undefined} />
+        <AvatarFallback>{getInitials(username)}</AvatarFallback>
       </Avatar>
       
       <div className="flex-1">
