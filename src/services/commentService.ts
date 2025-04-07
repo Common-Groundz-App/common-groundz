@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CommentWithUser } from '@/types/comment';
+import { fetchProfiles } from '@/hooks/feed/api/profiles';
 
 // Get comments for a post or recommendation
 export const getComments = async (
@@ -32,10 +32,7 @@ export const getComments = async (
     const userIds = [...new Set(comments.map(comment => comment.user_id))];
 
     // Fetch profiles for these users
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
+    const { data: profiles, error: profilesError } = await fetchProfiles(userIds);
 
     if (profilesError) throw profilesError;
 
