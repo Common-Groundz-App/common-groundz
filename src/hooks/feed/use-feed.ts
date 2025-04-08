@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +21,7 @@ export const useFeed = (feedType: FeedVisibility) => {
 
   const fetchFeed = useCallback(async (page: number = 0, reset: boolean = false) => {
     if (!user) {
+      console.log("No user found in useFeed");
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -32,12 +32,15 @@ export const useFeed = (feedType: FeedVisibility) => {
     }
 
     try {
+      console.log(`Fetching ${feedType} feed for page ${page}`);
       const fetchFunction = feedType === 'for_you' ? fetchForYouFeed : fetchFollowingFeed;
       const { items, hasMore } = await fetchFunction({ 
         userId: user.id, 
         page,
         itemsPerPage: ITEMS_PER_PAGE
       });
+      
+      console.log(`Received ${items.length} items for ${feedType} feed`);
       
       setState(prev => ({
         ...prev,
@@ -60,9 +63,12 @@ export const useFeed = (feedType: FeedVisibility) => {
   }, [user, feedType]);
 
   useEffect(() => {
-    setState(prev => ({ ...prev, isLoading: true }));
-    fetchFeed(0, true);
-  }, [fetchFeed]);
+    if (user) {
+      console.log(`Setting up initial feed load for ${feedType}`);
+      setState(prev => ({ ...prev, isLoading: true }));
+      fetchFeed(0, true);
+    }
+  }, [fetchFeed, user]);
 
   const loadMore = useCallback(() => {
     if (state.isLoadingMore || !state.hasMore) return;

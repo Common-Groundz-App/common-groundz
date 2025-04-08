@@ -15,7 +15,22 @@ export const fetchRecommendations = async (
     
     let query = supabase
       .from('recommendations')
-      .select('*')
+      .select(`
+        id,
+        title,
+        description,
+        rating,
+        category,
+        visibility,
+        user_id,
+        created_at,
+        updated_at,
+        image_url,
+        venue,
+        view_count,
+        entity_id,
+        is_certified
+      `)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .range(recFrom, recTo);

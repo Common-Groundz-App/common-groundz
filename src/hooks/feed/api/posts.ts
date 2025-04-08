@@ -15,7 +15,20 @@ export const fetchPosts = async (
     
     let query = supabase
       .from('posts')
-      .select(`*`)
+      .select(`
+        id,
+        title,
+        content,
+        post_type,
+        visibility,
+        user_id,
+        created_at,
+        updated_at,
+        media,
+        view_count,
+        status,
+        is_deleted
+      `)
       .eq('visibility', 'public')
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })

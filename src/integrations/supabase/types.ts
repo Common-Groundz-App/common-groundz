@@ -9,6 +9,64 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_deleted: boolean
+          parent_id: string | null
+          post_id: string | null
+          recommendation_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          parent_id?: string | null
+          post_id?: string | null
+          recommendation_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          parent_id?: string | null
+          post_id?: string | null
+          recommendation_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_recommendation_id_fkey"
+            columns: ["recommendation_id"]
+            isOneToOne: false
+            referencedRelation: "recommendations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entities: {
         Row: {
           api_ref: string | null
@@ -224,6 +282,7 @@ export type Database = {
       }
       posts: {
         Row: {
+          comment_count: number
           content: string | null
           created_at: string
           id: string
@@ -239,6 +298,7 @@ export type Database = {
           visibility: Database["public"]["Enums"]["recommendation_visibility"]
         }
         Insert: {
+          comment_count?: number
           content?: string | null
           created_at?: string
           id?: string
@@ -254,6 +314,7 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["recommendation_visibility"]
         }
         Update: {
+          comment_count?: number
           content?: string | null
           created_at?: string
           id?: string
@@ -364,6 +425,7 @@ export type Database = {
       recommendations: {
         Row: {
           category: Database["public"]["Enums"]["recommendation_category"]
+          comment_count: number
           created_at: string
           description: string | null
           entity_id: string | null
@@ -380,6 +442,7 @@ export type Database = {
         }
         Insert: {
           category: Database["public"]["Enums"]["recommendation_category"]
+          comment_count?: number
           created_at?: string
           description?: string | null
           entity_id?: string | null
@@ -396,6 +459,7 @@ export type Database = {
         }
         Update: {
           category?: Database["public"]["Enums"]["recommendation_category"]
+          comment_count?: number
           created_at?: string
           description?: string | null
           entity_id?: string | null
@@ -440,6 +504,10 @@ export type Database = {
       delete_post_save: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
+      }
+      get_comment_reply_count: {
+        Args: { comment_id: string }
+        Returns: number
       }
       get_post_likes_by_posts: {
         Args: { p_post_ids: string[] }
