@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ interface CommentsListProps {
   itemId: string;
   itemType: 'post' | 'recommendation';
   onCommentAdded?: () => void;
+  onCommentDeleted?: () => void;
   onCommentCountUpdate?: (count: number) => void;
 }
 
@@ -21,6 +21,7 @@ const CommentsList = ({
   itemId, 
   itemType, 
   onCommentAdded,
+  onCommentDeleted,
   onCommentCountUpdate 
 }: CommentsListProps) => {
   const { user } = useAuth();
@@ -44,7 +45,6 @@ const CommentsList = ({
     itemType
   });
 
-  // Report the actual comment count to parent component whenever it changes
   useEffect(() => {
     if (onCommentCountUpdate && totalCount !== undefined) {
       onCommentCountUpdate(totalCount);
@@ -80,7 +80,11 @@ const CommentsList = ({
   const handleDeleteComment = async (commentId: string) => {
     try {
       const success = await removeComment(commentId);
-      if (!success) {
+      if (success) {
+        if (onCommentDeleted) {
+          onCommentDeleted();
+        }
+      } else {
         toast({
           title: 'Error',
           description: 'Failed to delete comment. Please try again.',
@@ -117,11 +121,8 @@ const CommentsList = ({
     );
   }
 
-  // Calculate total visible comments (including replies that are loaded)
   const visibleCommentsCount = comments.reduce((total, comment) => {
-    // Count the comment itself
     let count = 1;
-    // Add any loaded replies
     if (comment.showReplies && comment.replies) {
       count += comment.replies.length;
     }

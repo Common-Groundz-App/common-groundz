@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,10 +22,8 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const isPost = 'is_post' in item && item.is_post === true;
   const [showComments, setShowComments] = useState(false);
   
-  // Get the initial comment count from the item and track it locally
   const [commentCount, setCommentCount] = useState<number>(item.comment_count || 0);
   
-  // Ensure commentCount stays in sync with item.comment_count on initial load
   useEffect(() => {
     setCommentCount(item.comment_count || 0);
   }, [item.comment_count]);
@@ -101,16 +98,18 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
     setShowComments(!showComments);
   };
 
-  // Handler for when a comment is added
   const handleCommentAdded = () => {
-    // Update local comment count immediately when a comment is added
     setCommentCount(prevCount => prevCount + 1);
   };
   
-  // Handler to update comment count based on database value
+  const handleCommentDeleted = () => {
+    setCommentCount(prevCount => Math.max(0, prevCount - 1));
+  };
+  
   const handleCommentCountUpdate = (count: number) => {
-    // Update with the accurate count from the database
-    setCommentCount(count);
+    if (count !== commentCount) {
+      setCommentCount(count);
+    }
   };
   
   if (isPost) {
@@ -207,6 +206,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
               itemId={post.id}
               itemType="post"
               onCommentAdded={handleCommentAdded}
+              onCommentDeleted={handleCommentDeleted}
               onCommentCountUpdate={handleCommentCountUpdate}
             />
           </div>
@@ -327,6 +327,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
             itemId={recommendation.id}
             itemType="recommendation"
             onCommentAdded={handleCommentAdded}
+            onCommentDeleted={handleCommentDeleted}
             onCommentCountUpdate={handleCommentCountUpdate}
           />
         </div>
