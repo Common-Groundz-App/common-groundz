@@ -15,10 +15,7 @@ export const fetchPosts = async (
     
     let query = supabase
       .from('posts')
-      .select(`
-        *,
-        comment_count
-      `)
+      .select(`*`)
       .eq('visibility', 'public')
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
@@ -207,9 +204,6 @@ export const processPosts = async (
         postStatus = post.status as 'draft' | 'published' | 'failed';
       }
       
-      // Ensure we include comment_count in the processed post
-      const commentCount = post.comment_count || 0;
-      
       return {
         ...post,
         username,
@@ -220,8 +214,7 @@ export const processPosts = async (
         is_saved: isSaved,
         tagged_entities: entitiesByPostId[post.id] || [],
         media: mediaItems,
-        status: postStatus,
-        comment_count: commentCount
+        status: postStatus
       } as PostFeedItem;
     });
     

@@ -15,7 +15,6 @@ export interface FeedItem extends Recommendation {
   is_saved: boolean;
   username: string | null;
   avatar_url: string | null;
-  comment_count: number; // Ensure comment_count is included
 }
 
 export interface PostFeedItem {
@@ -40,8 +39,6 @@ export interface PostFeedItem {
   media?: MediaItem[];
   // Status field
   status?: 'draft' | 'published' | 'failed';
-  // Comment count
-  comment_count: number;
 }
 
 export type CombinedFeedItem = FeedItem | PostFeedItem;

@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, Star, Tag, MessageCircle } from 'lucide-react';
+import { Bookmark, Heart, Star, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CombinedFeedItem } from '@/hooks/feed/types';
 import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
-import CommentsList from '@/components/comments/CommentsList';
 
 interface FeedItemProps {
   item: CombinedFeedItem;
@@ -20,16 +19,6 @@ interface FeedItemProps {
 
 const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const isPost = 'is_post' in item && item.is_post === true;
-  const [showComments, setShowComments] = useState(false);
-  
-  // Get the initial comment count from the item and track it locally
-  const initialCommentCount = item.comment_count || 0;
-  const [commentCount, setCommentCount] = useState<number>(initialCommentCount);
-  
-  // Ensure commentCount stays in sync with item.comment_count on initial load
-  useEffect(() => {
-    setCommentCount(item.comment_count || 0);
-  }, [item.comment_count]);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -96,20 +85,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
       </div>
     );
   };
-
-  const toggleComments = () => {
-    setShowComments(!showComments);
-  };
-
-  // Handler for when a comment is added
-  const handleCommentAdded = () => {
-    setCommentCount(prevCount => prevCount + 1);
-  };
-  
-  // Handler to update comment count when CommentsList provides an updated count
-  const handleCommentCountUpdate = (count: number) => {
-    setCommentCount(count);
-  };
   
   if (isPost) {
     const post = item as any;
@@ -150,37 +125,23 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
         </CardContent>
         
         <CardFooter className="flex justify-between pt-2 pb-4">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "flex items-center gap-1",
-                post.is_liked && "text-red-500"
-              )}
-              onClick={() => onLike && onLike(post.id)}
-            >
-              <Heart 
-                size={18} 
-                className={cn(post.is_liked && "fill-red-500")} 
-              />
-              {post.likes > 0 && (
-                <span>{post.likes}</span>
-              )}
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn("flex items-center gap-1")}
-              onClick={toggleComments}
-            >
-              <MessageCircle size={18} />
-              {commentCount > 0 && (
-                <span>{commentCount}</span>
-              )}
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "flex items-center gap-1",
+              post.is_liked && "text-red-500"
+            )}
+            onClick={() => onLike && onLike(post.id)}
+          >
+            <Heart 
+              size={18} 
+              className={cn(post.is_liked && "fill-red-500")} 
+            />
+            {post.likes > 0 && (
+              <span>{post.likes}</span>
+            )}
+          </Button>
           
           <Button
             variant="ghost"
@@ -198,17 +159,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
             Save
           </Button>
         </CardFooter>
-
-        {showComments && (
-          <div className="px-6 pb-6 pt-2 border-t">
-            <CommentsList 
-              itemId={post.id}
-              itemType="post"
-              onCommentAdded={handleCommentAdded}
-              onCommentCountUpdate={handleCommentCountUpdate}
-            />
-          </div>
-        )}
       </Card>
     );
   }
@@ -270,37 +220,23 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
       </CardContent>
       
       <CardFooter className="flex justify-between pt-2 pb-4">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "flex items-center gap-1",
-              recommendation.is_liked && "text-red-500"
-            )}
-            onClick={() => onLike && onLike(recommendation.id)}
-          >
-            <Heart 
-              size={18} 
-              className={cn(recommendation.is_liked && "fill-red-500")} 
-            />
-            {recommendation.likes > 0 && (
-              <span>{recommendation.likes}</span>
-            )}
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn("flex items-center gap-1")}
-            onClick={toggleComments}
-          >
-            <MessageCircle size={18} />
-            {commentCount > 0 && (
-              <span>{commentCount}</span>
-            )}
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "flex items-center gap-1",
+            recommendation.is_liked && "text-red-500"
+          )}
+          onClick={() => onLike && onLike(recommendation.id)}
+        >
+          <Heart 
+            size={18} 
+            className={cn(recommendation.is_liked && "fill-red-500")} 
+          />
+          {recommendation.likes > 0 && (
+            <span>{recommendation.likes}</span>
+          )}
+        </Button>
         
         <Button
           variant="ghost"
@@ -318,17 +254,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
           Save
         </Button>
       </CardFooter>
-
-      {showComments && (
-        <div className="px-6 pb-6 pt-2 border-t">
-          <CommentsList 
-            itemId={recommendation.id}
-            itemType="recommendation"
-            onCommentAdded={handleCommentAdded}
-            onCommentCountUpdate={handleCommentCountUpdate}
-          />
-        </div>
-      )}
     </Card>
   );
 };

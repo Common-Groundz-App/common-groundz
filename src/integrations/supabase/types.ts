@@ -282,7 +282,6 @@ export type Database = {
       }
       posts: {
         Row: {
-          comment_count: number
           content: string | null
           created_at: string
           id: string
@@ -298,7 +297,6 @@ export type Database = {
           visibility: Database["public"]["Enums"]["recommendation_visibility"]
         }
         Insert: {
-          comment_count?: number
           content?: string | null
           created_at?: string
           id?: string
@@ -314,7 +312,6 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["recommendation_visibility"]
         }
         Update: {
-          comment_count?: number
           content?: string | null
           created_at?: string
           id?: string
@@ -425,7 +422,6 @@ export type Database = {
       recommendations: {
         Row: {
           category: Database["public"]["Enums"]["recommendation_category"]
-          comment_count: number
           created_at: string
           description: string | null
           entity_id: string | null
@@ -442,7 +438,6 @@ export type Database = {
         }
         Insert: {
           category: Database["public"]["Enums"]["recommendation_category"]
-          comment_count?: number
           created_at?: string
           description?: string | null
           entity_id?: string | null
@@ -459,7 +454,6 @@ export type Database = {
         }
         Update: {
           category?: Database["public"]["Enums"]["recommendation_category"]
-          comment_count?: number
           created_at?: string
           description?: string | null
           entity_id?: string | null
