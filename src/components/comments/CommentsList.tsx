@@ -13,9 +13,15 @@ interface CommentsListProps {
   itemId: string;
   itemType: 'post' | 'recommendation';
   onCommentAdded?: () => void;
+  onCommentCountUpdate?: (count: number) => void; // New prop for updating comment count
 }
 
-const CommentsList = ({ itemId, itemType, onCommentAdded }: CommentsListProps) => {
+const CommentsList = ({ 
+  itemId, 
+  itemType, 
+  onCommentAdded,
+  onCommentCountUpdate 
+}: CommentsListProps) => {
   const { user } = useAuth();
   const [commentExpanded, setCommentExpanded] = useState<boolean>(false);
   
@@ -35,10 +41,19 @@ const CommentsList = ({ itemId, itemType, onCommentAdded }: CommentsListProps) =
     itemType
   });
 
+  // Report the current comment count to parent component
+  useEffect(() => {
+    if (onCommentCountUpdate && !loading) {
+      onCommentCountUpdate(comments.length);
+    }
+  }, [comments.length, onCommentCountUpdate, loading]);
+
   const handleAddComment = async (content: string) => {
     const success = await addComment(content);
-    if (success && onCommentAdded) {
-      onCommentAdded();
+    if (success) {
+      if (onCommentAdded) {
+        onCommentAdded();
+      }
     }
     return success;
   };
