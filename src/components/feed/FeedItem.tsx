@@ -22,9 +22,13 @@ interface FeedItemProps {
 const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const isPost = 'is_post' in item && item.is_post === true;
   const [showComments, setShowComments] = useState(false);
-  const [localCommentCount, setLocalCommentCount] = useState<number>(
-    isPost ? (item as any).comment_count : (item as any).comment_count
-  );
+  
+  // Fix: Use the actual comment_count from the server for initialization
+  const initialCommentCount = isPost 
+    ? (item as any).comment_count || 0
+    : (item as any).comment_count || 0;
+  
+  const [localCommentCount, setLocalCommentCount] = useState<number>(initialCommentCount);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
