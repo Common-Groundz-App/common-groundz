@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageCircle } from 'lucide-react';
 import { useComments } from '@/hooks/use-comments';
 import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
@@ -14,7 +14,7 @@ interface CommentsListProps {
   itemId: string;
   itemType: 'post' | 'recommendation';
   onCommentAdded?: () => void;
-  onCommentCountUpdate?: (count: number) => void; // New prop for updating comment count
+  onCommentCountUpdate?: (count: number) => void;
 }
 
 const CommentsList = ({ 
@@ -44,12 +44,12 @@ const CommentsList = ({
     itemType
   });
 
-  // Report the database's comment count to parent component
+  // Report the actual comment count to parent component whenever it changes
   useEffect(() => {
-    if (onCommentCountUpdate && !loading) {
+    if (onCommentCountUpdate && totalCount !== undefined) {
       onCommentCountUpdate(totalCount);
     }
-  }, [totalCount, onCommentCountUpdate, loading]);
+  }, [totalCount, onCommentCountUpdate]);
 
   const handleAddComment = async (content: string) => {
     try {
@@ -117,11 +117,25 @@ const CommentsList = ({
     );
   }
 
+  // Calculate total visible comments (including replies that are loaded)
+  const visibleCommentsCount = comments.reduce((total, comment) => {
+    // Count the comment itself
+    let count = 1;
+    // Add any loaded replies
+    if (comment.showReplies && comment.replies) {
+      count += comment.replies.length;
+    }
+    return total + count;
+  }, 0);
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">
-          Comments {totalCount > 0 && `(${totalCount})`}
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          Comments 
+          <span className="text-muted-foreground">
+            {totalCount > 0 && `(${totalCount})`}
+          </span>
         </h3>
         
         {user ? (

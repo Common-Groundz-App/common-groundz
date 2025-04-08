@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,8 +24,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const [showComments, setShowComments] = useState(false);
   
   // Get the initial comment count from the item and track it locally
-  const initialCommentCount = item.comment_count || 0;
-  const [commentCount, setCommentCount] = useState<number>(initialCommentCount);
+  const [commentCount, setCommentCount] = useState<number>(item.comment_count || 0);
   
   // Ensure commentCount stays in sync with item.comment_count on initial load
   useEffect(() => {
@@ -103,11 +103,13 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
 
   // Handler for when a comment is added
   const handleCommentAdded = () => {
+    // Update local comment count immediately when a comment is added
     setCommentCount(prevCount => prevCount + 1);
   };
   
-  // Handler to update comment count when CommentsList provides an updated count
+  // Handler to update comment count based on database value
   const handleCommentCountUpdate = (count: number) => {
+    // Update with the accurate count from the database
     setCommentCount(count);
   };
   
