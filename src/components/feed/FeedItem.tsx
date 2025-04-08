@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -23,12 +22,15 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const isPost = 'is_post' in item && item.is_post === true;
   const [showComments, setShowComments] = useState(false);
   
-  // Fix: Use the actual comment_count from the server for initialization
-  const initialCommentCount = isPost 
+  const serverCommentCount = isPost 
     ? (item as any).comment_count || 0
     : (item as any).comment_count || 0;
   
-  const [localCommentCount, setLocalCommentCount] = useState<number>(initialCommentCount);
+  const [localCommentCount, setLocalCommentCount] = useState<number>(serverCommentCount);
+  
+  useEffect(() => {
+    setLocalCommentCount(serverCommentCount);
+  }, [serverCommentCount]);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
