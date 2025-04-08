@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/feed/use-feed';
@@ -27,6 +28,7 @@ const FeedFollowing = () => {
 
   useEffect(() => {
     if (error) {
+      console.error("Following feed error:", error);
       toast({
         title: 'Error',
         description: 'Failed to load feed. Please try again.',
@@ -43,6 +45,18 @@ const FeedFollowing = () => {
       window.removeEventListener('refresh-following-feed', handleRefresh);
     };
   }, [refreshFeed]);
+  
+  // Debug info
+  useEffect(() => {
+    console.log("FeedFollowing render:", { 
+      isLoading, 
+      itemsCount: items?.length,
+      hasMore,
+      isLoadingMore,
+      isAuthenticated: !!user,
+      userId: user?.id
+    });
+  }, [isLoading, items, hasMore, isLoadingMore, user]);
 
   return (
     <div className="space-y-6">

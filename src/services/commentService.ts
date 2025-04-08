@@ -15,7 +15,7 @@ export const fetchComments = async (params: {
   
   try {
     // Build query based on target and parent
-    let query = supabase.from('comments').select('*');
+    let query = supabase.from('comments').select();
     
     if (parentId !== undefined) {
       // Fetch replies to a specific comment
@@ -115,11 +115,10 @@ export const addComment = async (commentData: AddCommentData) => {
         parent_id: parent_id || null,
         user_id: userId
       })
-      .select()
-      .single();
+      .select();
     
     if (error) throw error;
-    return data as Comment;
+    return data[0] as Comment;
   } catch (error) {
     console.error('Error adding comment:', error);
     throw error;
@@ -133,11 +132,10 @@ export const updateComment = async ({ id, content }: UpdateCommentData) => {
       .from('comments')
       .update({ content })
       .eq('id', id)
-      .select()
-      .single();
+      .select();
     
     if (error) throw error;
-    return data as Comment;
+    return data[0] as Comment;
   } catch (error) {
     console.error('Error updating comment:', error);
     throw error;
@@ -151,11 +149,10 @@ export const deleteComment = async (commentId: string) => {
       .from('comments')
       .update({ is_deleted: true })
       .eq('id', commentId)
-      .select()
-      .single();
+      .select();
     
     if (error) throw error;
-    return data as Comment;
+    return data[0] as Comment;
   } catch (error) {
     console.error('Error soft deleting comment:', error);
     throw error;

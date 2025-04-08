@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/feed/use-feed';
@@ -8,8 +9,10 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useAuth } from '@/contexts/AuthContext';
 
 const FeedForYou = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const { 
     items, 
@@ -25,6 +28,7 @@ const FeedForYou = () => {
 
   useEffect(() => {
     if (error) {
+      console.error("Feed error:", error);
       toast({
         title: 'Error',
         description: 'Failed to load feed. Please try again.',
@@ -41,6 +45,18 @@ const FeedForYou = () => {
       window.removeEventListener('refresh-for-you-feed', handleRefresh);
     };
   }, [refreshFeed]);
+  
+  // Debug info
+  useEffect(() => {
+    console.log("FeedForYou render:", { 
+      isLoading, 
+      itemsCount: items?.length,
+      hasMore,
+      isLoadingMore,
+      isAuthenticated: !!user,
+      userId: user?.id
+    });
+  }, [isLoading, items, hasMore, isLoadingMore, user]);
 
   return (
     <div className="space-y-6">
