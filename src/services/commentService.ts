@@ -173,9 +173,16 @@ export const updateComment = async (
 // Delete a comment (soft delete)
 export const deleteComment = async (commentId: string): Promise<boolean> => {
   try {
+    // Changed from update to proper soft delete pattern
+    // The RLS policy issue likely means we should use UPDATE instead of DELETE
+    // And we should update is_deleted to true instead of removing the row
     const { error } = await supabase
       .from('comments')
-      .update({ is_deleted: true })
+      .update({ 
+        is_deleted: true,
+        content: 'This comment has been deleted.',  // Add clear indication it's deleted
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', commentId);
 
     if (error) throw error;

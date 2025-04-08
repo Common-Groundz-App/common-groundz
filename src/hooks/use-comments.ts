@@ -237,50 +237,47 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
     }
 
     try {
-      await deleteComment(commentId);
-
-      // Find if this is a top-level comment or a reply
-      const isTopLevel = comments.some(c => c.id === commentId);
+      const success = await deleteComment(commentId);
       
-      if (isTopLevel) {
-        // Mark the comment as deleted in state (soft delete)
-        setComments(prevComments => 
-          prevComments.map(comment => 
-            comment.id === commentId 
-              ? { ...comment, content: 'This comment has been deleted.', is_deleted: true } 
-              : comment
-          )
-        );
-      } else {
-        // It's a reply, find the parent and update its replies
-        setComments(prevComments => 
-          prevComments.map(comment => {
-            if (comment.replies && comment.replies.some(r => r.id === commentId)) {
-              return {
-                ...comment,
-                replies: comment.replies.map(reply => 
-                  reply.id === commentId 
-                    ? { ...reply, content: 'This comment has been deleted.', is_deleted: true } 
-                    : reply
-                )
-              };
-            }
-            return comment;
-          })
-        );
+      if (success) {
+        // Find if this is a top-level comment or a reply
+        const isTopLevel = comments.some(c => c.id === commentId);
+        
+        if (isTopLevel) {
+          // Mark the comment as deleted in state (soft delete)
+          setComments(prevComments => 
+            prevComments.map(comment => 
+              comment.id === commentId 
+                ? { ...comment, content: 'This comment has been deleted.', is_deleted: true } 
+                : comment
+            )
+          );
+        } else {
+          // It's a reply, find the parent and update its replies
+          setComments(prevComments => 
+            prevComments.map(comment => {
+              if (comment.replies && comment.replies.some(r => r.id === commentId)) {
+                return {
+                  ...comment,
+                  replies: comment.replies.map(reply => 
+                    reply.id === commentId 
+                      ? { ...reply, content: 'This comment has been deleted.', is_deleted: true } 
+                      : reply
+                  )
+                };
+              }
+              return comment;
+            })
+          );
+        }
       }
 
-      return true;
+      return success;
     } catch (err) {
       console.error('Error removing comment:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete comment. Please try again.',
-        variant: 'destructive',
-      });
       return false;
     }
-  }, [user, comments, toast]);
+  }, [user, comments]);
 
   // Load replies for a specific comment
   const loadReplies = useCallback(async (commentId: string) => {

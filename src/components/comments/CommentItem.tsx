@@ -13,6 +13,7 @@ import {
 import { CommentWithReplies } from '@/types/comment';
 import { useAuth } from '@/contexts/AuthContext';
 import CommentForm from './CommentForm';
+import { useToast } from '@/hooks/use-toast';
 
 interface CommentItemProps {
   comment: CommentWithReplies;
@@ -28,8 +29,10 @@ const CommentItem = ({
   onDelete
 }: CommentItemProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [isReplying, setIsReplying] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const isOwner = user && user.id === comment.user_id;
   const isDeleted = comment.is_deleted;
   
@@ -77,6 +80,33 @@ const CommentItem = ({
     return success;
   };
 
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      const success = await onDelete(comment.id);
+      if (!success) {
+        toast({
+          title: 'Error',
+          description: 'Failed to delete comment. Please try again.',
+          variant: 'destructive',
+        });
+      }
+      setIsDeleting(false);
+      return success;
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete comment. Please try again.',
+        variant: 'destructive',
+      });
+      setIsDeleting(false);
+      return false;
+    }
+  };
+
   return (
     <div className="flex space-x-3 group" id={`comment-${comment.id}`}>
       <div className="flex-shrink-0">
@@ -120,10 +150,11 @@ const CommentItem = ({
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     className="text-red-500 focus:text-red-500"
-                    onClick={() => onDelete && onDelete(comment.id)}
+                    onClick={handleDelete}
+                    disabled={isDeleting}
                   >
                     <Trash className="mr-2 h-4 w-4" />
-                    Delete
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

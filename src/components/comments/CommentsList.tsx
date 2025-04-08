@@ -8,6 +8,7 @@ import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
 import CommentRepliesList from './CommentRepliesList';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 interface CommentsListProps {
   itemId: string;
@@ -23,6 +24,7 @@ const CommentsList = ({
   onCommentCountUpdate 
 }: CommentsListProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [commentExpanded, setCommentExpanded] = useState<boolean>(false);
   
   const {
@@ -49,13 +51,51 @@ const CommentsList = ({
   }, [comments.length, onCommentCountUpdate, loading]);
 
   const handleAddComment = async (content: string) => {
-    const success = await addComment(content);
-    if (success) {
-      if (onCommentAdded) {
-        onCommentAdded();
+    try {
+      const success = await addComment(content);
+      if (success) {
+        if (onCommentAdded) {
+          onCommentAdded();
+        }
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to add comment. Please try again.',
+          variant: 'destructive',
+        });
       }
+      return success;
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add comment. Please try again.',
+        variant: 'destructive',
+      });
+      return false;
     }
-    return success;
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      const success = await removeComment(commentId);
+      if (!success) {
+        toast({
+          title: 'Error',
+          description: 'Failed to delete comment. Please try again.',
+          variant: 'destructive',
+        });
+      }
+      return success;
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete comment. Please try again.',
+        variant: 'destructive',
+      });
+      return false;
+    }
   };
 
   if (loading) {
@@ -108,14 +148,14 @@ const CommentsList = ({
                 comment={comment}
                 onReply={addComment}
                 onUpdate={updateCommentContent}
-                onDelete={removeComment}
+                onDelete={handleDeleteComment}
               />
               
               <CommentRepliesList
                 comment={comment}
                 onReply={addComment}
                 onUpdate={updateCommentContent}
-                onDelete={removeComment}
+                onDelete={handleDeleteComment}
                 onToggleReplies={toggleReplies}
                 onLoadMoreReplies={loadReplies}
               />
