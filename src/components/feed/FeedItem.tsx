@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,11 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   // Get the initial comment count from the item and track it locally
   const initialCommentCount = item.comment_count || 0;
   const [commentCount, setCommentCount] = useState<number>(initialCommentCount);
+  
+  // Ensure commentCount stays in sync with item.comment_count on initial load
+  useEffect(() => {
+    setCommentCount(item.comment_count || 0);
+  }, [item.comment_count]);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
