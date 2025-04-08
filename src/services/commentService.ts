@@ -95,6 +95,39 @@ export const getComments = async (
   }
 };
 
+// Get total comment count for a post or recommendation directly from database
+export const getTotalCommentCount = async (
+  itemId: string,
+  itemType: 'post' | 'recommendation'
+): Promise<number> => {
+  try {
+    if (itemType === 'post') {
+      // Get comment_count directly from posts table
+      const { data, error } = await supabase
+        .from('posts')
+        .select('comment_count')
+        .eq('id', itemId)
+        .single();
+
+      if (error) throw error;
+      return data?.comment_count || 0;
+    } else {
+      // Get comment_count directly from recommendations table
+      const { data, error } = await supabase
+        .from('recommendations')
+        .select('comment_count')
+        .eq('id', itemId)
+        .single();
+
+      if (error) throw error;
+      return data?.comment_count || 0;
+    }
+  } catch (err) {
+    console.error('Error getting total comment count:', err);
+    return 0;
+  }
+};
+
 // Get reply count for a comment
 export const getReplyCount = async (commentId: string): Promise<number> => {
   try {

@@ -37,18 +37,19 @@ const CommentsList = ({
     updateCommentContent,
     removeComment,
     loadReplies,
-    toggleReplies
+    toggleReplies,
+    totalCount
   } = useComments({
     itemId,
     itemType
   });
 
-  // Report the current comment count to parent component
+  // Report the database's comment count to parent component
   useEffect(() => {
     if (onCommentCountUpdate && !loading) {
-      onCommentCountUpdate(comments.length);
+      onCommentCountUpdate(totalCount);
     }
-  }, [comments.length, onCommentCountUpdate, loading]);
+  }, [totalCount, onCommentCountUpdate, loading]);
 
   const handleAddComment = async (content: string) => {
     try {
@@ -120,7 +121,7 @@ const CommentsList = ({
     <div className="space-y-6">
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">
-          Comments {comments.length > 0 && `(${comments.length})`}
+          Comments {totalCount > 0 && `(${totalCount})`}
         </h3>
         
         {user ? (
