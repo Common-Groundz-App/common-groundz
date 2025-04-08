@@ -15,7 +15,10 @@ export const fetchRecommendations = async (
     
     let query = supabase
       .from('recommendations')
-      .select('*')
+      .select(`
+        *,
+        comment_count
+      `)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .range(recFrom, recTo);
@@ -64,7 +67,8 @@ export const processRecommendations = async (
         avatar_url: profile?.avatar_url || null,
         likes: 0, // Will update this with a count query
         is_liked: false,
-        is_saved: false
+        is_saved: false,
+        comment_count: rec.comment_count || 0 // Ensure we include comment_count
       };
     });
     

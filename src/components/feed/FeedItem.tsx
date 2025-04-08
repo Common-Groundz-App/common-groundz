@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -23,17 +22,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const isPost = 'is_post' in item && item.is_post === true;
   const [showComments, setShowComments] = useState(false);
   
-  // Get the initial comment count from the server
-  const serverCommentCount = isPost 
-    ? (item as any).comment_count || 0
-    : (item as any).comment_count || 0;
-  
-  const [localCommentCount, setLocalCommentCount] = useState<number>(serverCommentCount);
-  
-  // This useEffect is no longer needed as we'll update the count via the callback
-  // useEffect(() => {
-  //   setLocalCommentCount(serverCommentCount);
-  // }, [serverCommentCount]);
+  const commentCount = item.comment_count || 0;
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -106,12 +95,9 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   };
 
   const handleCommentAdded = () => {
-    setLocalCommentCount(prev => prev + 1);
   };
   
-  // New handler to update comment count from CommentsList
   const handleCommentCountUpdate = (count: number) => {
-    setLocalCommentCount(count);
   };
   
   if (isPost) {
@@ -179,8 +165,8 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
               onClick={toggleComments}
             >
               <MessageCircle size={18} />
-              {localCommentCount > 0 && (
-                <span>{localCommentCount}</span>
+              {commentCount > 0 && (
+                <span>{commentCount}</span>
               )}
             </Button>
           </div>
@@ -299,8 +285,8 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
             onClick={toggleComments}
           >
             <MessageCircle size={18} />
-            {localCommentCount > 0 && (
-              <span>{localCommentCount}</span>
+            {commentCount > 0 && (
+              <span>{commentCount}</span>
             )}
           </Button>
         </div>
