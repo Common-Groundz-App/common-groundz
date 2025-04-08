@@ -22,8 +22,11 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const isPost = 'is_post' in item && item.is_post === true;
   const [showComments, setShowComments] = useState(false);
   
-  const [commentCount, setCommentCount] = useState<number>(item.comment_count || 0);
+  // Get the initial comment count from the item and track it locally
+  const initialCommentCount = item.comment_count || 0;
+  const [commentCount, setCommentCount] = useState<number>(initialCommentCount);
   
+  // Ensure commentCount stays in sync with item.comment_count on initial load
   useEffect(() => {
     setCommentCount(item.comment_count || 0);
   }, [item.comment_count]);
@@ -98,18 +101,14 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
     setShowComments(!showComments);
   };
 
+  // Handler for when a comment is added
   const handleCommentAdded = () => {
     setCommentCount(prevCount => prevCount + 1);
   };
   
-  const handleCommentDeleted = () => {
-    setCommentCount(prevCount => Math.max(0, prevCount - 1));
-  };
-  
+  // Handler to update comment count when CommentsList provides an updated count
   const handleCommentCountUpdate = (count: number) => {
-    if (count !== commentCount) {
-      setCommentCount(count);
-    }
+    setCommentCount(count);
   };
   
   if (isPost) {
@@ -206,7 +205,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
               itemId={post.id}
               itemType="post"
               onCommentAdded={handleCommentAdded}
-              onCommentDeleted={handleCommentDeleted}
               onCommentCountUpdate={handleCommentCountUpdate}
             />
           </div>
@@ -327,7 +325,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
             itemId={recommendation.id}
             itemType="recommendation"
             onCommentAdded={handleCommentAdded}
-            onCommentDeleted={handleCommentDeleted}
             onCommentCountUpdate={handleCommentCountUpdate}
           />
         </div>

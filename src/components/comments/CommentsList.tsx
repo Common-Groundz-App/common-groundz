@@ -1,7 +1,8 @@
+
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Loader2, MessageCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useComments } from '@/hooks/use-comments';
 import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
@@ -13,15 +14,13 @@ interface CommentsListProps {
   itemId: string;
   itemType: 'post' | 'recommendation';
   onCommentAdded?: () => void;
-  onCommentDeleted?: () => void;
-  onCommentCountUpdate?: (count: number) => void;
+  onCommentCountUpdate?: (count: number) => void; // New prop for updating comment count
 }
 
 const CommentsList = ({ 
   itemId, 
   itemType, 
   onCommentAdded,
-  onCommentDeleted,
   onCommentCountUpdate 
 }: CommentsListProps) => {
   const { user } = useAuth();
@@ -38,18 +37,18 @@ const CommentsList = ({
     updateCommentContent,
     removeComment,
     loadReplies,
-    toggleReplies,
-    totalCount
+    toggleReplies
   } = useComments({
     itemId,
     itemType
   });
 
+  // Report the current comment count to parent component
   useEffect(() => {
-    if (onCommentCountUpdate && totalCount !== undefined) {
-      onCommentCountUpdate(totalCount);
+    if (onCommentCountUpdate && !loading) {
+      onCommentCountUpdate(comments.length);
     }
-  }, [totalCount, onCommentCountUpdate]);
+  }, [comments.length, onCommentCountUpdate, loading]);
 
   const handleAddComment = async (content: string) => {
     try {
@@ -80,11 +79,7 @@ const CommentsList = ({
   const handleDeleteComment = async (commentId: string) => {
     try {
       const success = await removeComment(commentId);
-      if (success) {
-        if (onCommentDeleted) {
-          onCommentDeleted();
-        }
-      } else {
+      if (!success) {
         toast({
           title: 'Error',
           description: 'Failed to delete comment. Please try again.',
@@ -121,22 +116,11 @@ const CommentsList = ({
     );
   }
 
-  const visibleCommentsCount = comments.reduce((total, comment) => {
-    let count = 1;
-    if (comment.showReplies && comment.replies) {
-      count += comment.replies.length;
-    }
-    return total + count;
-  }, 0);
-
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          Comments 
-          <span className="text-muted-foreground">
-            {totalCount > 0 && `(${totalCount})`}
-          </span>
+        <h3 className="text-lg font-semibold">
+          Comments {comments.length > 0 && `(${comments.length})`}
         </h3>
         
         {user ? (

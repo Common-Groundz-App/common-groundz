@@ -8,8 +8,7 @@ import {
   createComment, 
   updateComment, 
   deleteComment, 
-  getReplyCount,
-  getTotalCommentCount 
+  getReplyCount 
 } from '@/services/commentService';
 import { CommentWithUser, CommentWithReplies } from '@/types/comment';
 
@@ -30,7 +29,6 @@ interface UseCommentsReturn {
   removeComment: (commentId: string) => Promise<boolean>;
   loadReplies: (commentId: string) => Promise<void>;
   toggleReplies: (commentId: string) => void;
-  totalCount: number;
 }
 
 export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps): UseCommentsReturn => {
@@ -42,26 +40,12 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
   const [error, setError] = useState<Error | null>(null);
   const [page, setPage] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(false);
-  const [totalCount, setTotalCount] = useState<number>(0);
-
-  // Fetch the total comment count from the database
-  const fetchTotalCount = useCallback(async () => {
-    try {
-      const count = await getTotalCommentCount(itemId, itemType);
-      setTotalCount(count);
-    } catch (err) {
-      console.error("Error fetching total comment count:", err);
-    }
-  }, [itemId, itemType]);
 
   // Fetch comments
   const fetchComments = useCallback(async (currentPage: number = 0, isLoadMore: boolean = false) => {
     try {
       const loadingState = isLoadMore ? setLoadingMore : setLoading;
       loadingState(true);
-      
-      // Fetch the comment count first
-      await fetchTotalCount();
       
       const { comments: fetchedComments, hasMore: moreComments } = await getComments(
         itemId,
@@ -104,7 +88,7 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
         setLoading(false);
       }
     }
-  }, [itemId, itemType, limit, toast, fetchTotalCount]);
+  }, [itemId, itemType, limit, toast]);
 
   useEffect(() => {
     fetchComments();
@@ -180,9 +164,6 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
         setComments(prevComments => [commentWithUser, ...prevComments]);
       }
 
-      // Update total count after adding comment
-      fetchTotalCount();
-
       return true;
     } catch (err) {
       console.error('Error adding comment:', err);
@@ -193,7 +174,7 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
       });
       return false;
     }
-  }, [user, itemId, itemType, toast, fetchTotalCount]);
+  }, [user, itemId, itemType, toast]);
 
   // Update a comment
   const updateCommentContent = useCallback(async (commentId: string, content: string): Promise<boolean> => {
@@ -289,9 +270,6 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
             })
           );
         }
-        
-        // Update total count after deleting comment
-        fetchTotalCount();
       }
 
       return success;
@@ -299,7 +277,7 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
       console.error('Error removing comment:', err);
       return false;
     }
-  }, [user, comments, toast, fetchTotalCount]);
+  }, [user, comments]);
 
   // Load replies for a specific comment
   const loadReplies = useCallback(async (commentId: string) => {
@@ -378,7 +356,6 @@ export const useComments = ({ itemId, itemType, limit = 10 }: UseCommentsProps):
     updateCommentContent,
     removeComment,
     loadReplies,
-    toggleReplies,
-    totalCount
+    toggleReplies
   };
 };
