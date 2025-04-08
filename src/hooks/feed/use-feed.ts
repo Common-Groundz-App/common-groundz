@@ -22,7 +22,6 @@ export const useFeed = (feedType: FeedVisibility) => {
 
   const fetchFeed = useCallback(async (page: number = 0, reset: boolean = false) => {
     if (!user) {
-      console.log("Cannot fetch feed: User not authenticated");
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -33,17 +32,11 @@ export const useFeed = (feedType: FeedVisibility) => {
     }
 
     try {
-      console.log(`Fetching ${feedType} feed, page ${page}, reset: ${reset}`);
       const fetchFunction = feedType === 'for_you' ? fetchForYouFeed : fetchFollowingFeed;
       const { items, hasMore } = await fetchFunction({ 
         userId: user.id, 
         page,
         itemsPerPage: ITEMS_PER_PAGE
-      });
-      
-      console.log(`${feedType} feed fetch successful:`, {
-        itemsCount: items.length,
-        hasMore
       });
       
       setState(prev => ({
@@ -67,7 +60,6 @@ export const useFeed = (feedType: FeedVisibility) => {
   }, [user, feedType]);
 
   useEffect(() => {
-    console.log(`useFeed(${feedType}) mounted, isAuthenticated:`, !!user);
     setState(prev => ({ ...prev, isLoading: true }));
     fetchFeed(0, true);
   }, [fetchFeed]);
@@ -80,10 +72,9 @@ export const useFeed = (feedType: FeedVisibility) => {
   }, [state.isLoadingMore, state.hasMore, state.page, fetchFeed]);
 
   const refreshFeed = useCallback(() => {
-    console.log(`Refreshing ${feedType} feed`);
     setState(prev => ({ ...prev, isLoading: true }));
     fetchFeed(0, true);
-  }, [fetchFeed, feedType]);
+  }, [fetchFeed]);
 
   const { handleLike: interactionLike, handleSave: interactionSave } = useInteractions();
 

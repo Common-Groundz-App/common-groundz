@@ -39,8 +39,6 @@ export interface PostFeedItem {
   media?: MediaItem[];
   // Status field
   status?: 'draft' | 'published' | 'failed';
-  // Comments count
-  comment_count?: number;
 }
 
 export type CombinedFeedItem = FeedItem | PostFeedItem;
@@ -58,36 +56,4 @@ export interface FeedQueryParams {
   userId: string;
   page: number;
   itemsPerPage: number;
-}
-
-// Comment types
-export interface Comment {
-  id: string;
-  content: string;
-  user_id: string;
-  post_id: string | null;
-  recommendation_id: string | null;
-  parent_id: string | null;
-  created_at: string;
-  updated_at: string;
-  is_deleted: boolean;
-  // Added profile information
-  username?: string | null;
-  avatar_url?: string | null;
-  // UI state properties
-  isEditing?: boolean;
-  replyCount?: number;
-  showReplies?: boolean;
-}
-
-export interface AddCommentData {
-  content: string;
-  post_id?: string;
-  recommendation_id?: string;
-  parent_id?: string | null;
-}
-
-export interface UpdateCommentData {
-  id: string;
-  content: string;
 }

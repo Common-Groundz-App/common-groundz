@@ -1,13 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-
-// Extend the Supabase User type with our custom properties
-export interface User extends SupabaseUser {
-  username?: string;
-  avatar_url?: string;
-}
 
 type AuthContextType = {
   user: User | null;
@@ -28,53 +22,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
         console.log('Auth state changed:', event);
         setSession(currentSession);
-        
-        if (currentSession?.user) {
-          // Get profile data for the user to access username and avatar_url
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username, avatar_url')
-            .eq('id', currentSession.user.id)
-            .single();
-          
-          // Combine the Supabase user with profile data
-          setUser({
-            ...currentSession.user,
-            username: profile?.username,
-            avatar_url: profile?.avatar_url
-          });
-        } else {
-          setUser(null);
-        }
+        setUser(currentSession?.user ?? null);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       console.log('Initial session check:', currentSession ? 'logged in' : 'logged out');
       setSession(currentSession);
-      
-      if (currentSession?.user) {
-        // Get profile data for the user to access username and avatar_url
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username, avatar_url')
-          .eq('id', currentSession.user.id)
-          .single();
-        
-        // Combine the Supabase user with profile data
-        setUser({
-          ...currentSession.user,
-          username: profile?.username,
-          avatar_url: profile?.avatar_url
-        });
-      } else {
-        setUser(null);
-      }
-      
+      setUser(currentSession?.user ?? null);
       setIsLoading(false);
     });
 
@@ -98,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     });
-    return { error, user: data?.user as User || null };
+    return { error, user: data?.user || null };
   };
 
   const signOut = async () => {
