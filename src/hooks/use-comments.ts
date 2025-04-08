@@ -140,8 +140,9 @@ export const useComments = ({ postId, recommendationId }: UseCommentsProps) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_deleted: false,
-        username: user.username || undefined,
-        avatar_url: user.avatar_url || undefined,
+        // Access username and avatar_url safely with optional chaining
+        username: user?.username || null,
+        avatar_url: user?.avatar_url || null,
         replyCount: 0,
         showReplies: false
       };
@@ -182,8 +183,9 @@ export const useComments = ({ postId, recommendationId }: UseCommentsProps) => {
             .map(reply => 
               reply.id === optimisticId ? { 
                 ...newComment, 
-                username: user.username || undefined, 
-                avatar_url: user.avatar_url || undefined 
+                // Access username and avatar_url safely with optional chaining
+                username: user?.username || null, 
+                avatar_url: user?.avatar_url || null 
               } : reply
             )
         }));
@@ -194,8 +196,9 @@ export const useComments = ({ postId, recommendationId }: UseCommentsProps) => {
             comment.id === optimisticId 
               ? { 
                 ...newComment, 
-                username: user.username || undefined, 
-                avatar_url: user.avatar_url || undefined 
+                // Access username and avatar_url safely with optional chaining
+                username: user?.username || null, 
+                avatar_url: user?.avatar_url || null 
               } 
               : comment
           )
