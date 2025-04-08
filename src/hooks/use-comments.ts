@@ -140,8 +140,8 @@ export const useComments = ({ postId, recommendationId }: UseCommentsProps) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_deleted: false,
-        username: user.username || null,
-        avatar_url: user.avatar_url || null,
+        username: user.username || undefined,
+        avatar_url: user.avatar_url || undefined,
         replyCount: 0,
         showReplies: false
       };
@@ -180,7 +180,11 @@ export const useComments = ({ postId, recommendationId }: UseCommentsProps) => {
           ...prev,
           [commentData.parent_id!]: prev[commentData.parent_id!]
             .map(reply => 
-              reply.id === optimisticId ? { ...newComment, username: user.username || null, avatar_url: user.avatar_url || null } : reply
+              reply.id === optimisticId ? { 
+                ...newComment, 
+                username: user.username || undefined, 
+                avatar_url: user.avatar_url || undefined 
+              } : reply
             )
         }));
       } else {
@@ -188,7 +192,11 @@ export const useComments = ({ postId, recommendationId }: UseCommentsProps) => {
         setComments(prev => 
           prev.map(comment => 
             comment.id === optimisticId 
-              ? { ...newComment, username: user.username || null, avatar_url: user.avatar_url || null } 
+              ? { 
+                ...newComment, 
+                username: user.username || undefined, 
+                avatar_url: user.avatar_url || undefined 
+              } 
               : comment
           )
         );

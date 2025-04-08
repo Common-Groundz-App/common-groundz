@@ -15,10 +15,7 @@ export const fetchComments = async (params: {
   
   try {
     // Build query based on target and parent
-    let query = supabase
-      .from('comments')
-      .select('*')
-      .order('created_at', { ascending: true });
+    let query = supabase.from('comments').select('*');
     
     if (parentId !== undefined) {
       // Fetch replies to a specific comment
@@ -34,6 +31,7 @@ export const fetchComments = async (params: {
       }
     }
     
+    query = query.order('created_at', { ascending: true });
     const { data: commentsData, error } = await query;
     
     if (error) throw error;
@@ -74,16 +72,18 @@ export const getCommentReplyCounts = async (commentIds: string[]) => {
   try {
     const replyCounts = new Map<string, number>();
     
-    // Get reply count for each comment
+    // Get reply count for each comment using a direct query instead of RPC
     for (const commentId of commentIds) {
-      const { data, error } = await supabase.rpc('get_comment_reply_count', { 
-        comment_id: commentId 
-      });
+      const { count, error } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('parent_id', commentId)
+        .eq('is_deleted', false);
       
       if (error) {
         console.error(`Error getting reply count for comment ${commentId}:`, error);
       } else {
-        replyCounts.set(commentId, data || 0);
+        replyCounts.set(commentId, count || 0);
       }
     }
     
@@ -99,6 +99,13 @@ export const addComment = async (commentData: AddCommentData) => {
   try {
     const { content, post_id, recommendation_id, parent_id } = commentData;
     
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+    
     const { data, error } = await supabase
       .from('comments')
       .insert({
@@ -106,7 +113,7 @@ export const addComment = async (commentData: AddCommentData) => {
         post_id: post_id || null,
         recommendation_id: recommendation_id || null,
         parent_id: parent_id || null,
-        user_id: supabase.auth.getUser().then(res => res.data.user?.id || '')
+        user_id: userId
       })
       .select()
       .single();
