@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,7 +23,9 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
   const isPost = 'is_post' in item && item.is_post === true;
   const [showComments, setShowComments] = useState(false);
   
-  const commentCount = item.comment_count || 0;
+  // Get the initial comment count from the item and track it locally
+  const initialCommentCount = item.comment_count || 0;
+  const [commentCount, setCommentCount] = useState<number>(initialCommentCount);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -94,10 +97,14 @@ const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
     setShowComments(!showComments);
   };
 
+  // Handler for when a comment is added
   const handleCommentAdded = () => {
+    setCommentCount(prevCount => prevCount + 1);
   };
   
+  // Handler to update comment count when CommentsList provides an updated count
   const handleCommentCountUpdate = (count: number) => {
+    setCommentCount(count);
   };
   
   if (isPost) {
