@@ -12,6 +12,7 @@ import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { EntityBadge } from '@/components/feed/EntityBadge';
+import CommentsSection from './CommentsSection';
 
 interface PostFeedItemProps {
   post: PostItem;
@@ -108,42 +109,51 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
       </CardContent>
       
-      <CardFooter className="flex justify-between pt-2 pb-4">
-        <div className="flex items-center">
+      <CardFooter className="flex justify-between pt-2 pb-4 flex-col">
+        <div className="flex justify-between w-full">
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "flex items-center gap-1",
+                post.is_liked && "text-red-500"
+              )}
+              onClick={() => onLike && onLike(post.id)}
+            >
+              <Heart 
+                size={18} 
+                className={cn(post.is_liked && "fill-red-500")} 
+              />
+              {post.likes > 0 && (
+                <span>{post.likes}</span>
+              )}
+            </Button>
+          </div>
+          
           <Button
             variant="ghost"
             size="sm"
             className={cn(
               "flex items-center gap-1",
-              post.is_liked && "text-red-500"
+              post.is_saved && "text-brand-orange"
             )}
-            onClick={() => onLike && onLike(post.id)}
+            onClick={() => onSave && onSave(post.id)}
           >
-            <Heart 
+            <Bookmark 
               size={18} 
-              className={cn(post.is_liked && "fill-red-500")} 
+              className={cn(post.is_saved && "fill-brand-orange")} 
             />
-            {post.likes > 0 && (
-              <span>{post.likes}</span>
-            )}
+            Save
           </Button>
         </div>
         
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "flex items-center gap-1",
-            post.is_saved && "text-brand-orange"
-          )}
-          onClick={() => onSave && onSave(post.id)}
-        >
-          <Bookmark 
-            size={18} 
-            className={cn(post.is_saved && "fill-brand-orange")} 
+        <div className="w-full border-t mt-2 pt-2">
+          <CommentsSection
+            post_id={post.id}
+            commentCount={post.comment_count || 0}
           />
-          Save
-        </Button>
+        </div>
       </CardFooter>
     </Card>
   );
