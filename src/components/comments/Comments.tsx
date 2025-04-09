@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import { useComments } from '@/hooks/comments/use-comments';
 import CommentList from './CommentList';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface CommentsProps {
   postId?: string;
@@ -44,22 +45,43 @@ const Comments: React.FC<CommentsProps> = ({ postId, recommendationId }) => {
           Show comments
         </Button>
       ) : (
-        <div className="mt-4">
-          <CommentList
-            comments={comments}
-            isLoading={isLoading}
-            hasMore={hasMore}
-            onLoadMore={loadMore}
-            onLike={handleLike}
-            onEdit={editComment}
-            onDelete={removeComment}
-            onReply={addComment}
-            onViewReplies={viewReplies}
-            isViewingReplies={isViewingReplies}
-            onBackToMainComments={viewMainComments}
-            parentId={parentId}
-          />
-        </div>
+        <AnimatePresence>
+          <motion.div 
+            className="mt-4"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-medium">
+                {isViewingReplies ? 'Replies' : 'Comments'}
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowComments(false)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Hide comments
+              </Button>
+            </div>
+            <CommentList
+              comments={comments}
+              isLoading={isLoading}
+              hasMore={hasMore}
+              onLoadMore={loadMore}
+              onLike={handleLike}
+              onEdit={editComment}
+              onDelete={removeComment}
+              onReply={addComment}
+              onViewReplies={viewReplies}
+              isViewingReplies={isViewingReplies}
+              onBackToMainComments={viewMainComments}
+              parentId={parentId}
+            />
+          </motion.div>
+        </AnimatePresence>
       )}
     </div>
   );

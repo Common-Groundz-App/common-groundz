@@ -5,6 +5,8 @@ import { ChevronLeft } from 'lucide-react';
 import { CommentWithUser } from '@/hooks/comments/types';
 import CommentItem from './CommentItem';
 import CommentInput from './CommentInput';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface CommentListProps {
   comments: CommentWithUser[];
@@ -20,6 +22,19 @@ interface CommentListProps {
   onBackToMainComments: () => void;
   parentId: string | null;
 }
+
+const CommentSkeleton = () => (
+  <div className="flex gap-2">
+    <Skeleton className="h-8 w-8 rounded-full" />
+    <div className="flex-1">
+      <Skeleton className="h-24 w-full rounded-lg mb-2" />
+      <div className="flex gap-2">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-4 w-16" />
+      </div>
+    </div>
+  </div>
+);
 
 const CommentList: React.FC<CommentListProps> = ({
   comments,
@@ -37,58 +52,99 @@ const CommentList: React.FC<CommentListProps> = ({
 }) => {
   return (
     <div className="space-y-4">
-      {isViewingReplies && (
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={onBackToMainComments}
-          className="mb-2 flex items-center gap-1"
-        >
-          <ChevronLeft size={16} />
-          Back to comments
-        </Button>
-      )}
+      <AnimatePresence>
+        {isViewingReplies && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onBackToMainComments}
+              className="mb-2 flex items-center gap-1"
+            >
+              <ChevronLeft size={16} />
+              Back to comments
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
-      <CommentInput onSubmit={onReply} placeholder={isViewingReplies ? "Add a reply..." : "Add a comment..."} />
+      <CommentInput 
+        onSubmit={onReply} 
+        placeholder={isViewingReplies ? "Add a reply..." : "Add a comment..."} 
+        autoFocus={isViewingReplies}
+      />
       
       <div className="space-y-4 mt-4">
-        {comments.length === 0 && !isLoading ? (
-          <p className="text-muted-foreground text-center py-4">
-            {isViewingReplies 
-              ? "No replies yet. Be the first to reply!" 
-              : "No comments yet. Be the first to comment!"}
-          </p>
+        {isLoading && comments.length === 0 ? (
+          <div className="space-y-4">
+            {Array(3).fill(0).map((_, i) => (
+              <CommentSkeleton key={i} />
+            ))}
+          </div>
+        ) : comments.length === 0 && !isLoading ? (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="text-muted-foreground text-center py-6 border border-dashed rounded-md"
+          >
+            <p>
+              {isViewingReplies 
+                ? "No replies yet. Be the first to reply!" 
+                : "No comments yet. Be the first to comment!"}
+            </p>
+          </motion.div>
         ) : (
-          comments.map(comment => (
-            <CommentItem
-              key={comment.id}
-              comment={comment}
-              onLike={() => onLike(comment.id)}
-              onEdit={(content) => onEdit(comment.id, content)}
-              onDelete={() => onDelete(comment.id)}
-              onViewReplies={() => onViewReplies(comment.id)}
-              isReply={isViewingReplies}
-            />
-          ))
+          <motion.div 
+            className="space-y-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            {comments.map(comment => (
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                onLike={() => onLike(comment.id)}
+                onEdit={(content) => onEdit(comment.id, content)}
+                onDelete={() => onDelete(comment.id)}
+                onViewReplies={() => onViewReplies(comment.id)}
+                isReply={isViewingReplies}
+              />
+            ))}
+          </motion.div>
         )}
         
-        {isLoading && (
-          <div className="flex justify-center py-4">
-            <div className="animate-pulse text-muted-foreground">Loading...</div>
+        {isLoading && comments.length > 0 && (
+          <div className="space-y-4 mt-4">
+            {Array(2).fill(0).map((_, i) => (
+              <CommentSkeleton key={i} />
+            ))}
           </div>
         )}
         
-        {hasMore && !isLoading && comments.length > 0 && (
-          <div className="flex justify-center py-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onLoadMore}
+        <AnimatePresence>
+          {hasMore && !isLoading && comments.length > 0 && (
+            <motion.div 
+              className="flex justify-center py-2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
             >
-              Load more {isViewingReplies ? 'replies' : 'comments'}
-            </Button>
-          </div>
-        )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onLoadMore}
+                className="min-w-[120px]"
+              >
+                Load more {isViewingReplies ? 'replies' : 'comments'}
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CommentWithUser } from '@/hooks/comments/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { motion } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,14 +94,19 @@ const CommentItem: React.FC<CommentItemProps> = ({
   };
   
   return (
-    <div className="flex gap-2">
+    <motion.div 
+      className="flex gap-2"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
       <Avatar className="h-8 w-8 mt-1">
         <AvatarImage src={comment.avatar_url || undefined} alt={comment.username || 'User'} />
         <AvatarFallback>{getInitials(comment.username)}</AvatarFallback>
       </Avatar>
       
       <div className="flex-1">
-        <div className="bg-muted p-3 rounded-lg">
+        <div className="bg-muted/60 p-3 rounded-lg hover:bg-muted/80 transition-colors">
           <div className="flex justify-between items-start mb-1">
             <div className="flex items-center gap-2">
               <span className="font-medium text-sm">{comment.username || 'Anonymous'}</span>
@@ -110,7 +116,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             {isOwner && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-auto p-0">
+                  <Button variant="ghost" size="sm" className="h-auto p-0 text-muted-foreground hover:text-foreground">
                     <MoreVertical size={16} />
                   </Button>
                 </DropdownMenuTrigger>
@@ -134,6 +140,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 className="min-h-[60px]"
+                autoFocus
               />
               <div className="flex justify-end gap-2">
                 <Button 
@@ -143,6 +150,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                     setIsEditing(false);
                     setEditContent(comment.content);
                   }}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
@@ -151,7 +159,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                   onClick={handleSubmitEdit}
                   disabled={isSubmitting || editContent.trim() === ''}
                 >
-                  Save
+                  {isSubmitting ? 'Saving...' : 'Save'}
                 </Button>
               </div>
             </div>
@@ -166,14 +174,14 @@ const CommentItem: React.FC<CommentItemProps> = ({
             size="sm" 
             onClick={onLike} 
             className={cn(
-              "h-6 px-1 text-xs",
-              comment.is_liked && "text-red-500"
+              "h-6 px-1 text-xs hover:bg-transparent transition-colors",
+              comment.is_liked ? "text-red-500" : "hover:text-foreground"
             )}
           >
             <Heart 
               size={14} 
               className={cn(
-                "mr-1", 
+                "mr-1 transition-all", 
                 comment.is_liked && "fill-red-500"
               )} 
             />
@@ -185,7 +193,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
               variant="ghost" 
               size="sm" 
               onClick={onViewReplies}
-              className="h-6 px-1 text-xs"
+              className="h-6 px-1 text-xs hover:bg-transparent hover:text-foreground transition-colors"
             >
               <MessageCircle size={14} className="mr-1" />
               {comment.reply_count || 0} {comment.reply_count === 1 ? 'Reply' : 'Replies'}
@@ -193,7 +201,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
