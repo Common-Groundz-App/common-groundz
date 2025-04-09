@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -11,6 +12,7 @@ import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { EntityBadge } from '@/components/feed/EntityBadge';
+import Comments from '@/components/comments/Comments';
 
 interface PostFeedItemProps {
   post: PostItem;
@@ -103,40 +105,46 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({ post, onLike, onSave
         {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
       </CardContent>
       
-      <CardFooter className="flex justify-between pt-2 pb-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "flex items-center gap-1",
-            post.is_liked && "text-red-500"
-          )}
-          onClick={() => onLike && onLike(post.id)}
-        >
-          <Heart 
-            size={18} 
-            className={cn(post.is_liked && "fill-red-500")} 
-          />
-          {post.likes > 0 && (
-            <span>{post.likes}</span>
-          )}
-        </Button>
+      <CardFooter className="flex justify-between pt-2 pb-4 flex-col">
+        <div className="flex justify-between w-full">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "flex items-center gap-1",
+              post.is_liked && "text-red-500"
+            )}
+            onClick={() => onLike && onLike(post.id)}
+          >
+            <Heart 
+              size={18} 
+              className={cn(post.is_liked && "fill-red-500")} 
+            />
+            {post.likes > 0 && (
+              <span>{post.likes}</span>
+            )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "flex items-center gap-1",
+              post.is_saved && "text-brand-orange"
+            )}
+            onClick={() => onSave && onSave(post.id)}
+          >
+            <Bookmark 
+              size={18} 
+              className={cn(post.is_saved && "fill-brand-orange")} 
+            />
+            Save
+          </Button>
+        </div>
         
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "flex items-center gap-1",
-            post.is_saved && "text-brand-orange"
-          )}
-          onClick={() => onSave && onSave(post.id)}
-        >
-          <Bookmark 
-            size={18} 
-            className={cn(post.is_saved && "fill-brand-orange")} 
-          />
-          Save
-        </Button>
+        <div className="w-full mt-2 border-t pt-2">
+          <Comments postId={post.id} />
+        </div>
       </CardFooter>
     </Card>
   );
