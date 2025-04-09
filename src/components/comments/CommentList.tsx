@@ -53,15 +53,8 @@ const CommentList: React.FC<CommentListProps> = ({
   parentId,
   error
 }) => {
-  // Determine if we should show empty state
+  // Determine if we should show empty state - only when not loading, no comments, and no error
   const showEmptyState = !isLoading && comments.length === 0 && !error;
-  
-  // Debug when no comments are shown
-  React.useEffect(() => {
-    if (!isLoading && comments.length === 0) {
-      console.log('No comments to show:', { isLoading, errorExists: !!error, commentsLength: comments.length });
-    }
-  }, [comments, isLoading, error]);
   
   return (
     <div className="space-y-4">

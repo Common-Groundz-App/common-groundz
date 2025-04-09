@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Comment, 
@@ -15,7 +14,7 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
   try {
     const { post_id, recommendation_id, parent_id, limit = 10, offset = 0 } = params;
     
-    // First get comments with a direct join to profiles table to ensure we get user data
+    // Build our query with join to profiles
     let query = supabase
       .from('comments')
       .select(`
@@ -26,8 +25,7 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
         )
       `)
       .eq('is_deleted', false)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order('created_at', { ascending: false });
       
     // Apply filters
     if (post_id) {
@@ -45,6 +43,10 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
       query = query.eq('parent_id', parent_id);
     }
     
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+    
+    // Execute query
     const { data: commentsData, error } = await query;
     
     if (error) {
@@ -86,6 +88,7 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     }
     
     if (!commentsData || commentsData.length === 0) {
+      console.log('No comments found');
       return { comments: [], totalCount };
     }
     
@@ -117,75 +120,59 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     const commentIds = processedComments.map(comment => comment.id);
     
     if (commentIds.length > 0) {
-      // Fetch like counts and user's like status in parallel for better performance
-      await Promise.all([
-        // Get like counts
-        (async () => {
-          for (const comment of processedComments) {
-            try {
-              const { count, error: countError } = await supabase
-                .from('comment_likes')
-                .select('*', { count: 'exact', head: true })
-                .eq('comment_id', comment.id);
+      // Fetch like counts for all comments
+      for (const comment of processedComments) {
+        try {
+          const { count, error: countError } = await supabase
+            .from('comment_likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('comment_id', comment.id);
+          
+          if (!countError && count !== null) {
+            comment.like_count = count;
+          }
+        } catch (err) {
+          console.error(`Error fetching likes for comment ${comment.id}:`, err);
+        }
+      }
+      
+      // Get user like status if user is logged in
+      if (userId) {
+        const { data: userLikesData, error: userLikesError } = await supabase
+          .from('comment_likes')
+          .select('comment_id')
+          .in('comment_id', commentIds)
+          .eq('user_id', userId);
+          
+        if (!userLikesError && userLikesData) {
+          // Set is_liked flag for comments liked by user
+          userLikesData.forEach((like: any) => {
+            const comment = processedComments.find(c => c.id === like.comment_id);
+            if (comment) {
+              comment.is_liked = true;
+            }
+          });
+        }
+      }
+      
+      // Get reply counts for top-level comments
+      if (parent_id === null) {
+        for (const comment of processedComments) {
+          try {
+            const { count, error: countError } = await supabase
+              .from('comments')
+              .select('*', { count: 'exact', head: true })
+              .eq('parent_id', comment.id)
+              .eq('is_deleted', false);
               
-              if (!countError && count !== null) {
-                comment.like_count = count;
-              }
-            } catch (err) {
-              console.error(`Error fetching likes for comment ${comment.id}:`, err);
-              // Continue with next comment
+            if (!countError) {
+              comment.reply_count = count || 0;
             }
+          } catch (err) {
+            console.error(`Error fetching replies for comment ${comment.id}:`, err);
           }
-        })(),
-        
-        // Get user like status if user is logged in
-        (async () => {
-          if (userId) {
-            try {
-              const { data: userLikesData, error: userLikesError } = await supabase
-                .from('comment_likes')
-                .select('comment_id')
-                .in('comment_id', commentIds)
-                .eq('user_id', userId);
-                
-              if (!userLikesError && userLikesData) {
-                // Set is_liked flag for comments liked by user
-                userLikesData.forEach((like: any) => {
-                  const comment = processedComments.find(c => c.id === like.comment_id);
-                  if (comment) {
-                    comment.is_liked = true;
-                  }
-                });
-              }
-            } catch (err) {
-              console.error('Error fetching user likes status:', err);
-              // Continue execution
-            }
-          }
-        })(),
-        
-        // Get reply counts for top-level comments
-        (async () => {
-          if (parent_id === null) {
-            for (const comment of processedComments) {
-              try {
-                const { count, error: countError } = await supabase
-                  .from('comments')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('parent_id', comment.id)
-                  .eq('is_deleted', false);
-                  
-                if (!countError) {
-                  comment.reply_count = count || 0;
-                }
-              } catch (err) {
-                console.error(`Error fetching replies for comment ${comment.id}:`, err);
-                // Continue with next comment
-              }
-            }
-          }
-        })()
-      ]);
+        }
+      }
     }
     
     console.log('Returning processed comments:', processedComments.length);

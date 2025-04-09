@@ -39,6 +39,7 @@ const Comments: React.FC<CommentsProps> = ({
   
   // Handler for comment count changes
   const handleCommentCountChange = (count: number) => {
+    console.log('Comment count changed:', count);
     setCommentCount(count);
     if (onCommentCountChange) {
       onCommentCountChange(count);
@@ -70,6 +71,7 @@ const Comments: React.FC<CommentsProps> = ({
   // Update comment count when total changes
   useEffect(() => {
     if (totalCount !== undefined) {
+      console.log('Total comment count updated:', totalCount);
       setCommentCount(totalCount);
     }
   }, [totalCount]);
@@ -185,7 +187,6 @@ const Comments: React.FC<CommentsProps> = ({
               isViewingReplies={isViewingReplies}
               onBackToMainComments={viewMainComments}
               parentId={parentId}
-              // Only pass error to CommentList if we should show it
               error={showError ? error : null}
             />
           </motion.div>
