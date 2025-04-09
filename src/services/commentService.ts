@@ -9,6 +9,12 @@ import {
 } from '@/types/comments';
 import { generateUUID } from '@/lib/uuid';
 
+// Define an interface for the profile data structure
+interface ProfileData {
+  username: string | null;
+  avatar_url: string | null;
+}
+
 /**
  * Fetch comments for a post or recommendation
  */
@@ -54,13 +60,11 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
     const commentIds = data.map(comment => comment.id);
     
     // Fetch like counts for all comments
-    const likeCountsQuery = supabase
+    const { data: likeCounts, error: likesError } = await supabase
       .from('comment_likes')
-      .select('comment_id, count', { count: 'exact', head: false })
+      .select('comment_id, count', { count: 'exact' })
       .in('comment_id', commentIds);
       
-    const { data: likeCounts, error: likesError } = await likeCountsQuery;
-
     if (likesError) {
       console.error('Error fetching comment likes:', likesError);
     }
@@ -120,7 +124,8 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
     
     // Format the comments with additional data
     const formattedComments = data.map(comment => {
-      const profile = comment.profiles || {};
+      // Cast the profile data to our interface to ensure TypeScript knows the structure
+      const profile = comment.profiles as unknown as ProfileData | null;
       
       return {
         ...comment,
