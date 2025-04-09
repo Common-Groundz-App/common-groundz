@@ -27,13 +27,18 @@ export const processMediaItems = (media: any[]): MediaItem[] => {
   if (!media || !Array.isArray(media)) return [];
   
   return media.map((item) => {
-    // Ensure each media item has the correct properties
+    // Ensure each media item has the correct properties including 'order'
     return {
       id: item.id || '',
       url: item.url || '',
       type: item.type || 'image',
       thumbnail_url: item.thumbnail_url || item.url || '',
-      metadata: item.metadata || {}
+      metadata: item.metadata || {},
+      order: item.order || 0, // Add the required 'order' property
+      caption: item.caption,
+      alt: item.alt,
+      is_deleted: item.is_deleted,
+      session_id: item.session_id
     } as MediaItem;
   });
 };

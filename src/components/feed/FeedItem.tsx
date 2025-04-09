@@ -12,6 +12,7 @@ interface FeedItemProps {
 }
 
 const FeedItem: React.FC<FeedItemProps> = ({ item, onLike, onSave }) => {
+  // Use the isItemPost utility to check if the item is a post
   if (isItemPost(item)) {
     return <PostFeedItem post={item} onLike={onLike} onSave={onSave} />;
   }
