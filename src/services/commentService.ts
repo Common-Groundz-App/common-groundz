@@ -26,7 +26,7 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
       .from('comments')
       .select(`
         *,
-        profiles:user_id (
+        profiles (
           username,
           avatar_url
         )
@@ -121,11 +121,12 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
     // Format the comments with additional data
     const formattedComments = data.map(comment => {
       const profile = comment.profiles || {};
+      
       return {
         ...comment,
         profiles: undefined, // Remove the nested profiles object
-        username: profile.username,
-        avatar_url: profile.avatar_url,
+        username: profile?.username || null,
+        avatar_url: profile?.avatar_url || null,
         likes_count: likeCountMap.get(comment.id) || 0,
         is_liked: userLikedCommentIds.has(comment.id),
         replies_count: replyCountMap.get(comment.id) || 0
