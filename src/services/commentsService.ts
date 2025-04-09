@@ -15,9 +15,10 @@ export const fetchComments = async (itemId: string, itemType: 'recommendation' |
     const tableName = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
     const idField = itemType === 'recommendation' ? 'recommendation_id' : 'post_id';
     
-    // Use custom SQL query to get the comments with profile data to avoid TypeScript issues
-    const { data, error } = await supabase
-      .rpc('get_comments_with_profiles', { 
+    // Use the rpc method but cast it to any to bypass TypeScript issues
+    // This is because our types don't yet include the new functions
+    const { data, error } = await (supabase
+      .rpc as any)('get_comments_with_profiles', { 
         p_table_name: tableName, 
         p_id_field: idField, 
         p_item_id: itemId 
@@ -25,15 +26,15 @@ export const fetchComments = async (itemId: string, itemType: 'recommendation' |
 
     if (error) throw error;
 
-    // Format the response
-    return (data || []).map(comment => ({
+    // Format the response and ensure data is an array
+    return Array.isArray(data) ? data.map(comment => ({
       id: comment.id,
       content: comment.content,
       created_at: comment.created_at,
       user_id: comment.user_id,
       username: comment.username || 'Unknown user',
       avatar_url: comment.avatar_url
-    }));
+    })) : [];
   } catch (error) {
     console.error(`Error fetching ${itemType} comments:`, error);
     return [];
@@ -60,7 +61,8 @@ export const fetchCommentCount = async (itemId: string, itemType: 'recommendatio
 export const addComment = async (itemId: string, itemType: 'recommendation' | 'post', content: string, userId: string): Promise<boolean> => {
   try {
     // Use a custom RPC function to handle comment creation and counter updates
-    const { error } = await supabase.rpc('add_comment', { 
+    // Also cast to any to bypass TypeScript issues with new functions
+    const { error } = await (supabase.rpc as any)('add_comment', { 
       p_item_id: itemId, 
       p_item_type: itemType, 
       p_content: content.trim(),
