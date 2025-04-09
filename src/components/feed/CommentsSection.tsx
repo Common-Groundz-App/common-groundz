@@ -27,7 +27,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     editComment,
     removeComment,
     likeComment,
-    repliesMap,
+    getReplies,
     loadingReplies,
     loadReplies,
     hasLoadedReplies,
@@ -39,6 +39,39 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   // Only fetch comments when the section is expanded
   const handleExpand = () => {
     setExpanded(!expanded);
+  };
+  
+  // Convert the Map and function-based APIs to Record objects for CommentsList
+  const convertReplyMap = () => {
+    const repliesRecord: Record<string, any> = {};
+    
+    comments.forEach(comment => {
+      if (hasLoadedReplies(comment.id)) {
+        repliesRecord[comment.id] = getReplies(comment.id);
+      }
+    });
+    
+    return repliesRecord;
+  };
+  
+  const convertLoadingReplies = () => {
+    const loadingRecord: Record<string, boolean> = {};
+    
+    loadingReplies.forEach(commentId => {
+      loadingRecord[commentId] = true;
+    });
+    
+    return loadingRecord;
+  };
+  
+  const convertHasLoadedReplies = () => {
+    const loadedRecord: Record<string, boolean> = {};
+    
+    comments.forEach(comment => {
+      loadedRecord[comment.id] = hasLoadedReplies(comment.id);
+    });
+    
+    return loadedRecord;
   };
   
   return (
@@ -60,10 +93,10 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         <div className="mt-4">
           <CommentsList
             comments={comments}
-            repliesMap={repliesMap}
+            repliesMap={convertReplyMap()}
             loading={loading}
-            loadingReplies={loadingReplies}
-            hasLoadedReplies={hasLoadedReplies}
+            loadingReplies={convertLoadingReplies()}
+            hasLoadedReplies={convertHasLoadedReplies()}
             onAddComment={addComment}
             onEditComment={editComment}
             onDeleteComment={removeComment}
