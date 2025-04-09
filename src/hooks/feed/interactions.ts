@@ -10,7 +10,14 @@ export const useInteractions = () => {
         throw new Error('User ID is required to perform this action');
       }
 
-      const isPostItem = await isItemPost(itemId);
+      // Check if the item is a post by querying the posts table
+      const { data: postData } = await supabase
+        .from('posts')
+        .select('id')
+        .eq('id', itemId)
+        .maybeSingle();
+      
+      const isPostItem = !!postData;
       
       if (isPostItem) {
         await togglePostLike(itemId, userId);
@@ -29,7 +36,14 @@ export const useInteractions = () => {
         throw new Error('User ID is required to perform this action');
       }
       
-      const isPostItem = await isItemPost(itemId);
+      // Check if the item is a post by querying the posts table
+      const { data: postData } = await supabase
+        .from('posts')
+        .select('id')
+        .eq('id', itemId)
+        .maybeSingle();
+      
+      const isPostItem = !!postData;
       
       if (isPostItem) {
         await togglePostSave(itemId, userId);
