@@ -1,10 +1,9 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import { useComments } from '@/hooks/comments/use-comments';
 import CommentList from './CommentList';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,9 +27,6 @@ const Comments: React.FC<CommentsProps> = ({
   const { toast } = useToast();
   const [showComments, setShowComments] = useState(visible);
   const [commentCount, setCommentCount] = useState(initialCommentCount);
-  const [retryAttempt, setRetryAttempt] = useState(0);
-  const maxRetries = 3;
-  const errorShownRef = useRef(false);
   
   // Update local state when prop changes
   React.useEffect(() => {
@@ -76,17 +72,6 @@ const Comments: React.FC<CommentsProps> = ({
     }
   }, [totalCount]);
 
-  // Reset retry attempts when comments are toggled or IDs change
-  useEffect(() => {
-    setRetryAttempt(0);
-    errorShownRef.current = false;
-  }, [postId, recommendationId, showComments]);
-
-  // Log when comments change for debugging
-  useEffect(() => {
-    console.log('Comments updated:', comments.length, 'items');
-  }, [comments]);
-
   const handleToggleComments = () => {
     const newVisibility = !showComments;
     setShowComments(newVisibility);
@@ -100,26 +85,7 @@ const Comments: React.FC<CommentsProps> = ({
     }
   };
   
-  // Show error toast only once per error state to prevent bouncing
-  useEffect(() => {
-    if (error && retryAttempt >= maxRetries && !errorShownRef.current) {
-      errorShownRef.current = true;
-      
-      toast({
-        variant: "destructive",
-        title: "Failed to load comments",
-        description: "There was an error loading comments. Please try again later."
-      });
-    }
-  }, [error, retryAttempt, maxRetries, toast]);
-  
-  // Check if we should show the error
-  const showError = error && retryAttempt >= maxRetries;
-  
-  // Handle manual retry
   const handleRetry = () => {
-    setRetryAttempt(0);
-    errorShownRef.current = false;
     refreshComments();
   };
   
@@ -136,62 +102,54 @@ const Comments: React.FC<CommentsProps> = ({
         <span>{showComments ? 'Hide comments' : 'Show comments'}</span>
       </Button>
       
-      <AnimatePresence>
-        {showComments && (
-          <motion.div 
-            className="mt-4"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-medium">
-                {isViewingReplies ? 'Replies' : 'Comments'}
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleToggleComments}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Hide comments
-              </Button>
-            </div>
-            
-            {showError && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertTitle>Failed to load comments</AlertTitle>
-                <AlertDescription className="flex justify-between items-center">
-                  <span>Please try again later.</span>
-                  <Button
-                    size="sm" 
-                    onClick={handleRetry}
-                  >
-                    Retry
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <CommentList
-              comments={comments}
-              isLoading={isLoading}
-              hasMore={hasMore}
-              onLoadMore={loadMore}
-              onLike={handleLike}
-              onEdit={editComment}
-              onDelete={removeComment}
-              onReply={addComment}
-              onViewReplies={viewReplies}
-              isViewingReplies={isViewingReplies}
-              onBackToMainComments={viewMainComments}
-              parentId={parentId}
-              error={showError ? error : null}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showComments && (
+        <div className="mt-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-medium">
+              {isViewingReplies ? 'Replies' : 'Comments'}
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleComments}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Hide comments
+            </Button>
+          </div>
+          
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Failed to load comments</AlertTitle>
+              <AlertDescription className="flex justify-between items-center">
+                <span>Please try again later.</span>
+                <Button
+                  size="sm" 
+                  onClick={handleRetry}
+                >
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          <CommentList
+            comments={comments}
+            isLoading={isLoading}
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            onLike={handleLike}
+            onEdit={editComment}
+            onDelete={removeComment}
+            onReply={addComment}
+            onViewReplies={viewReplies}
+            isViewingReplies={isViewingReplies}
+            onBackToMainComments={viewMainComments}
+            parentId={parentId}
+            error={error}
+          />
+        </div>
+      )}
     </div>
   );
 };

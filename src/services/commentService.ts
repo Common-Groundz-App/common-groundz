@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Comment, 
@@ -14,15 +15,12 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
   try {
     const { post_id, recommendation_id, parent_id, limit = 10, offset = 0 } = params;
     
-    // Build our query with join to profiles
+    // Simple query with join to profiles
     let query = supabase
       .from('comments')
       .select(`
         *,
-        profiles:user_id (
-          username,
-          avatar_url
-        )
+        profiles (username, avatar_url)
       `)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });

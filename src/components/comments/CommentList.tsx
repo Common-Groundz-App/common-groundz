@@ -5,7 +5,6 @@ import { ChevronLeft } from 'lucide-react';
 import { CommentWithUser } from '@/hooks/comments/types';
 import CommentItem from './CommentItem';
 import CommentInput from './CommentInput';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
@@ -58,25 +57,17 @@ const CommentList: React.FC<CommentListProps> = ({
   
   return (
     <div className="space-y-4">
-      <AnimatePresence>
-        {isViewingReplies && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onBackToMainComments}
-              className="mb-2 flex items-center gap-1"
-            >
-              <ChevronLeft size={16} />
-              Back to comments
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isViewingReplies && (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onBackToMainComments}
+          className="mb-2 flex items-center gap-1"
+        >
+          <ChevronLeft size={16} />
+          Back to comments
+        </Button>
+      )}
       
       <CommentInput 
         onSubmit={onReply} 
@@ -99,25 +90,15 @@ const CommentList: React.FC<CommentListProps> = ({
             ))}
           </div>
         ) : showEmptyState ? (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-muted-foreground text-center py-6 border border-dashed rounded-md"
-          >
+          <div className="text-muted-foreground text-center py-6 border border-dashed rounded-md">
             <p>
               {isViewingReplies 
                 ? "No replies yet. Be the first to reply!" 
                 : "No comments yet. Be the first to comment!"}
             </p>
-          </motion.div>
+          </div>
         ) : (
-          <motion.div 
-            className="space-y-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            layout
-          >
+          <div className="space-y-4">
             {comments.map(comment => (
               <CommentItem
                 key={comment.id}
@@ -129,7 +110,7 @@ const CommentList: React.FC<CommentListProps> = ({
                 isReply={isViewingReplies}
               />
             ))}
-          </motion.div>
+          </div>
         )}
         
         {isLoading && comments.length > 0 && (
@@ -140,26 +121,18 @@ const CommentList: React.FC<CommentListProps> = ({
           </div>
         )}
         
-        <AnimatePresence>
-          {hasMore && !isLoading && comments.length > 0 && !error && (
-            <motion.div 
-              className="flex justify-center py-2"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              layout
+        {hasMore && !isLoading && comments.length > 0 && !error && (
+          <div className="flex justify-center py-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onLoadMore}
+              className="min-w-[120px]"
             >
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onLoadMore}
-                className="min-w-[120px]"
-              >
-                Load more {isViewingReplies ? 'replies' : 'comments'}
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              Load more {isViewingReplies ? 'replies' : 'comments'}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
