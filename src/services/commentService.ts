@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Comment, 
@@ -215,10 +216,11 @@ export const incrementCommentCount = async (type: 'post' | 'recommendation', id:
   try {
     const tableName = type === 'post' ? 'posts' : 'recommendations';
     
-    const { error } = await supabase
-      .from(tableName)
-      .update({ comment_count: supabase.sql`comment_count + 1` })
-      .eq('id', id);
+    // Use a direct update with raw SQL expression instead of supabase.sql
+    const { error } = await supabase.rpc(
+      'increment_comment_count',
+      { table_name: tableName, item_id: id }
+    );
     
     if (error) {
       console.error(`Error incrementing comment count:`, error);
