@@ -15,6 +15,7 @@ export interface FeedItem extends Recommendation {
   is_saved: boolean;
   username: string | null;
   avatar_url: string | null;
+  comment_count: number; // Add this property explicitly
 }
 
 export interface PostFeedItem {
@@ -33,6 +34,7 @@ export interface PostFeedItem {
   likes: number;
   is_liked: boolean;
   is_saved: boolean;
+  comment_count: number; // Add this property explicitly
   // Add property for tagged entities
   tagged_entities?: Entity[];
   // Media for posts

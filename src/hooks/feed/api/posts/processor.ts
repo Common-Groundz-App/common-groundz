@@ -48,6 +48,9 @@ export const processPosts = async (
       const isLiked = userLikedPosts.has(post.id);
       const isSaved = userSavedPosts.has(post.id);
       
+      // Ensure the comment_count is set
+      const comment_count = post.comment_count || 0;
+      
       // Ensure status is one of the allowed values
       let postStatus: 'draft' | 'published' | 'failed' = 'published';
       if (post.status === 'draft' || post.status === 'failed') {
@@ -62,6 +65,7 @@ export const processPosts = async (
         likes,
         is_liked: isLiked,
         is_saved: isSaved,
+        comment_count,
         tagged_entities: entitiesByPostId[post.id] || [],
         media: mediaItems,
         status: postStatus
