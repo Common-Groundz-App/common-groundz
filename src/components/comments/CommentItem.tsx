@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CommentWithUser } from '@/hooks/comments/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { motion } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,7 +94,12 @@ const CommentItem: React.FC<CommentItemProps> = ({
   };
   
   return (
-    <div className="flex gap-2">
+    <motion.div 
+      className="flex gap-2"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
       <Avatar className="h-8 w-8 mt-1">
         <AvatarImage src={comment.avatar_url || undefined} alt={comment.username || 'User'} />
         <AvatarFallback>{getInitials(comment.username)}</AvatarFallback>
@@ -195,7 +201,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

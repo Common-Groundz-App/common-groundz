@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,17 +33,29 @@ export const useComments = ({
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [retryCount, setRetryCount] = useState<number>(0);
+  const maxRetries = 3;
+  
   const isMounted = useRef(true);
+  const isRefreshing = useRef(false);
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
   const limit = 10;
 
   useEffect(() => {
     return () => {
       isMounted.current = false;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
     };
   }, []);
   
   const loadComments = useCallback(async (reset: boolean = false) => {
     if (!postId && !recommendationId) return;
+    if (isRefreshing.current) return;
+    
+    isRefreshing.current = true;
     
     try {
       setIsLoading(true);
@@ -77,20 +88,40 @@ export const useComments = ({
         
         setOffset(reset ? limit : offset + limit);
         setHasMore(fetchedComments.length >= limit);
+        
         setError(null);
+        setRetryCount(0);
       }
     } catch (err) {
       console.error("Error loading comments:", err);
       
       if (isMounted.current) {
         setError(err as Error);
+        
+        if (retryCount < maxRetries) {
+          if (retryTimerRef.current) {
+            clearTimeout(retryTimerRef.current);
+          }
+          
+          const delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000);
+          
+          console.log(`Retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+          
+          retryTimerRef.current = setTimeout(() => {
+            if (isMounted.current) {
+              setRetryCount(prevCount => prevCount + 1);
+              loadComments(reset);
+            }
+          }, delay);
+        }
       }
     } finally {
       if (isMounted.current) {
         setIsLoading(false);
       }
+      isRefreshing.current = false;
     }
-  }, [postId, recommendationId, parentId, offset, limit, user?.id, onCommentCountChange]);
+  }, [postId, recommendationId, parentId, offset, limit, user?.id, onCommentCountChange, retryCount, maxRetries]);
   
   const viewReplies = useCallback((commentId: string) => {
     setParentId(commentId);
@@ -267,6 +298,13 @@ export const useComments = ({
   }, [user, toast]);
   
   useEffect(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    
+    setRetryCount(0);
+    
     if (postId || recommendationId) {
       loadComments(true);
     }
@@ -276,6 +314,12 @@ export const useComments = ({
       setOffset(0);
       setHasMore(true);
       setError(null);
+      setRetryCount(0);
+      
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
     };
   }, [postId, recommendationId, parentId, loadComments]);
   

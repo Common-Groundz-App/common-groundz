@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface CommentInputProps {
   onSubmit: (content: string) => Promise<any>;
@@ -71,38 +71,48 @@ const CommentInput: React.FC<CommentInputProps> = ({
         )}
       />
       
-      {(isFocused || content) && (
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">
-            Tip: Press Ctrl+Enter to post
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setContent('');
-                setIsFocused(false);
-                if (textareaRef.current) {
-                  textareaRef.current.blur();
-                }
-              }}
-              disabled={isSubmitting || !content}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSubmit}
-              disabled={isSubmitting || !content.trim()}
-            >
-              {isSubmitting ? 'Posting...' : 'Post'}
-            </Button>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {(isFocused || content) && (
+          <motion.div 
+            className="flex justify-between items-center"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <span className="text-xs text-muted-foreground">
+              Tip: Press Ctrl+Enter to post
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setContent('');
+                  setIsFocused(false);
+                  if (textareaRef.current) {
+                    textareaRef.current.blur();
+                  }
+                }}
+                disabled={isSubmitting || !content}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSubmit}
+                disabled={isSubmitting || !content.trim()}
+              >
+                {isSubmitting ? 'Posting...' : 'Post'}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
+
+// Import cn utility
+import { cn } from '@/lib/utils';
 
 export default CommentInput;
