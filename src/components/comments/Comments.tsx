@@ -9,10 +9,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface CommentsProps {
   postId?: string;
   recommendationId?: string;
+  visible?: boolean;
+  onToggleVisibility?: () => void;
 }
 
-const Comments: React.FC<CommentsProps> = ({ postId, recommendationId }) => {
-  const [showComments, setShowComments] = useState(false);
+const Comments: React.FC<CommentsProps> = ({ 
+  postId, 
+  recommendationId,
+  visible = false,
+  onToggleVisibility
+}) => {
+  const [showComments, setShowComments] = useState(visible);
+  
+  // Update local state when prop changes
+  React.useEffect(() => {
+    setShowComments(visible);
+  }, [visible]);
   
   const {
     comments,
@@ -31,21 +43,19 @@ const Comments: React.FC<CommentsProps> = ({ postId, recommendationId }) => {
     postId, 
     recommendationId 
   });
+
+  const handleToggleComments = () => {
+    const newVisibility = !showComments;
+    setShowComments(newVisibility);
+    if (onToggleVisibility) {
+      onToggleVisibility();
+    }
+  };
   
   return (
     <div className="mt-2">
-      {!showComments ? (
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => setShowComments(true)}
-          className="flex items-center gap-1"
-        >
-          <MessageCircle size={18} />
-          Show comments
-        </Button>
-      ) : (
-        <AnimatePresence>
+      <AnimatePresence>
+        {showComments && (
           <motion.div 
             className="mt-4"
             initial={{ opacity: 0, height: 0 }}
@@ -60,7 +70,7 @@ const Comments: React.FC<CommentsProps> = ({ postId, recommendationId }) => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowComments(false)}
+                onClick={handleToggleComments}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
                 Hide comments
@@ -81,8 +91,8 @@ const Comments: React.FC<CommentsProps> = ({ postId, recommendationId }) => {
               parentId={parentId}
             />
           </motion.div>
-        </AnimatePresence>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 };

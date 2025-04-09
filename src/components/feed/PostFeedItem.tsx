@@ -1,10 +1,9 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, Tag } from 'lucide-react';
+import { Bookmark, Heart, MessageCircle, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
@@ -21,6 +20,8 @@ interface PostFeedItemProps {
 }
 
 export const PostFeedItem: React.FC<PostFeedItemProps> = ({ post, onLike, onSave }) => {
+  const [showComments, setShowComments] = useState(false);
+  
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
@@ -107,23 +108,35 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({ post, onLike, onSave
       
       <CardFooter className="flex justify-between pt-2 pb-4 flex-col">
         <div className="flex justify-between w-full">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "flex items-center gap-1",
-              post.is_liked && "text-red-500"
-            )}
-            onClick={() => onLike && onLike(post.id)}
-          >
-            <Heart 
-              size={18} 
-              className={cn(post.is_liked && "fill-red-500")} 
-            />
-            {post.likes > 0 && (
-              <span>{post.likes}</span>
-            )}
-          </Button>
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "flex items-center gap-1",
+                post.is_liked && "text-red-500"
+              )}
+              onClick={() => onLike && onLike(post.id)}
+            >
+              <Heart 
+                size={18} 
+                className={cn(post.is_liked && "fill-red-500")} 
+              />
+              {post.likes > 0 && (
+                <span>{post.likes}</span>
+              )}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowComments(!showComments)}
+              className="flex items-center gap-1"
+            >
+              <MessageCircle size={18} />
+              <span>Comments</span>
+            </Button>
+          </div>
           
           <Button
             variant="ghost"
@@ -143,7 +156,11 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({ post, onLike, onSave
         </div>
         
         <div className="w-full mt-2 border-t pt-2">
-          <Comments postId={post.id} />
+          <Comments 
+            postId={post.id} 
+            visible={showComments} 
+            onToggleVisibility={() => setShowComments(!showComments)} 
+          />
         </div>
       </CardFooter>
     </Card>
