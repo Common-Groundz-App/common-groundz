@@ -1,30 +1,25 @@
-import React, { useState } from 'react';
+
+import React from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, MessageCircle, Star } from 'lucide-react';
+import { Bookmark, Heart, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { FeedItem } from '@/hooks/feed/types';
-import Comments from '@/components/comments/Comments';
 
 interface RecommendationFeedItemProps {
   recommendation: FeedItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
-  onCommentCountChange?: (id: string, count: number) => void;
 }
 
 export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({ 
   recommendation, 
   onLike, 
-  onSave,
-  onCommentCountChange
+  onSave
 }) => {
-  const [showComments, setShowComments] = useState(false);
-  const [localCommentCount, setLocalCommentCount] = useState(recommendation.comment_count || 0);
-  
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
@@ -43,13 +38,6 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
       return `${diffInDays} days ago`;
     } else {
       return format(date, 'MMM d, yyyy');
-    }
-  };
-
-  const handleCommentCountChange = (count: number) => {
-    setLocalCommentCount(count);
-    if (onCommentCountChange) {
-      onCommentCountChange(recommendation.id, count);
     }
   };
 
@@ -107,48 +95,42 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         )}
       </CardContent>
       
-      <CardFooter className="flex justify-between pt-2 pb-4 flex-col">
-        <div className="flex justify-between w-full">
-          <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "flex items-center gap-1",
-                recommendation.is_liked && "text-red-500"
-              )}
-              onClick={() => onLike && onLike(recommendation.id)}
-            >
-              <Heart 
-                size={18} 
-                className={cn(recommendation.is_liked && "fill-red-500")} 
-              />
-              {recommendation.likes > 0 && (
-                <span>{recommendation.likes}</span>
-              )}
-            </Button>
-          </div>
-          
+      <CardFooter className="flex justify-between pt-2 pb-4">
+        <div className="flex items-center">
           <Button
             variant="ghost"
             size="sm"
             className={cn(
               "flex items-center gap-1",
-              recommendation.is_saved && "text-brand-orange"
+              recommendation.is_liked && "text-red-500"
             )}
-            onClick={() => onSave && onSave(recommendation.id)}
+            onClick={() => onLike && onLike(recommendation.id)}
           >
-            <Bookmark 
+            <Heart 
               size={18} 
-              className={cn(recommendation.is_saved && "fill-brand-orange")} 
+              className={cn(recommendation.is_liked && "fill-red-500")} 
             />
-            Save
+            {recommendation.likes > 0 && (
+              <span>{recommendation.likes}</span>
+            )}
           </Button>
         </div>
         
-        <div className="w-full mt-2 border-t pt-2">
-          <Comments recommendationId={recommendation.id} />
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "flex items-center gap-1",
+            recommendation.is_saved && "text-brand-orange"
+          )}
+          onClick={() => onSave && onSave(recommendation.id)}
+        >
+          <Bookmark 
+            size={18} 
+            className={cn(recommendation.is_saved && "fill-brand-orange")} 
+          />
+          Save
+        </Button>
       </CardFooter>
     </Card>
   );

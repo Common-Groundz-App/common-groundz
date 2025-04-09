@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+
+import React from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, MessageCircle, Tag } from 'lucide-react';
+import { Bookmark, Heart, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
@@ -11,24 +12,18 @@ import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { EntityBadge } from '@/components/feed/EntityBadge';
-import Comments from '@/components/comments/Comments';
 
 interface PostFeedItemProps {
   post: PostItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
-  onCommentCountChange?: (id: string, count: number) => void;
 }
 
 export const PostFeedItem: React.FC<PostFeedItemProps> = ({ 
   post, 
   onLike, 
-  onSave,
-  onCommentCountChange
+  onSave
 }) => {
-  const [showComments, setShowComments] = useState(false);
-  const [localCommentCount, setLocalCommentCount] = useState(post.comment_count || 0);
-  
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
@@ -57,13 +52,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       case 'project': return 'Project';
       case 'note': return 'Note';
       default: return type;
-    }
-  };
-
-  const handleCommentCountChange = (count: number) => {
-    setLocalCommentCount(count);
-    if (onCommentCountChange) {
-      onCommentCountChange(post.id, count);
     }
   };
 
@@ -120,48 +108,42 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
       </CardContent>
       
-      <CardFooter className="flex justify-between pt-2 pb-4 flex-col">
-        <div className="flex justify-between w-full">
-          <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "flex items-center gap-1",
-                post.is_liked && "text-red-500"
-              )}
-              onClick={() => onLike && onLike(post.id)}
-            >
-              <Heart 
-                size={18} 
-                className={cn(post.is_liked && "fill-red-500")} 
-              />
-              {post.likes > 0 && (
-                <span>{post.likes}</span>
-              )}
-            </Button>
-          </div>
-          
+      <CardFooter className="flex justify-between pt-2 pb-4">
+        <div className="flex items-center">
           <Button
             variant="ghost"
             size="sm"
             className={cn(
               "flex items-center gap-1",
-              post.is_saved && "text-brand-orange"
+              post.is_liked && "text-red-500"
             )}
-            onClick={() => onSave && onSave(post.id)}
+            onClick={() => onLike && onLike(post.id)}
           >
-            <Bookmark 
+            <Heart 
               size={18} 
-              className={cn(post.is_saved && "fill-brand-orange")} 
+              className={cn(post.is_liked && "fill-red-500")} 
             />
-            Save
+            {post.likes > 0 && (
+              <span>{post.likes}</span>
+            )}
           </Button>
         </div>
         
-        <div className="w-full mt-2 border-t pt-2">
-          <Comments postId={post.id} />
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "flex items-center gap-1",
+            post.is_saved && "text-brand-orange"
+          )}
+          onClick={() => onSave && onSave(post.id)}
+        >
+          <Bookmark 
+            size={18} 
+            className={cn(post.is_saved && "fill-brand-orange")} 
+          />
+          Save
+        </Button>
       </CardFooter>
     </Card>
   );
