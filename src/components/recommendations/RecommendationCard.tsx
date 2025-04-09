@@ -22,6 +22,9 @@ const RecommendationCard = ({
   onSave,
   onComment
 }: RecommendationCardProps) => {
+  // Ensure comment_count is treated as a number
+  const commentCount = typeof recommendation.comment_count === 'number' ? recommendation.comment_count : 0;
+  
   return (
     <Card 
       key={recommendation.id} 
@@ -130,8 +133,8 @@ const RecommendationCard = ({
               }}
             >
               <MessageCircle size={16} />
-              {recommendation.comment_count && recommendation.comment_count > 0 && (
-                <span>{recommendation.comment_count}</span>
+              {commentCount > 0 && (
+                <span>{commentCount}</span>
               )}
             </Button>
           </div>
