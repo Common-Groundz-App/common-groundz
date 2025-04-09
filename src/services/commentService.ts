@@ -213,11 +213,12 @@ export const createComment = async (data: CreateCommentPayload, userId: string):
  */
 export const incrementCommentCount = async (type: 'post' | 'recommendation', id: string): Promise<void> => {
   try {
-    const table = type === 'post' ? 'posts' : 'recommendations';
-    const { error } = await supabase.rpc(
-      'increment_comment_count',
-      { table_name: table, item_id: id }
-    );
+    const tableName = type === 'post' ? 'posts' : 'recommendations';
+    
+    const { error } = await supabase
+      .from(tableName)
+      .update({ comment_count: supabase.sql`comment_count + 1` })
+      .eq('id', id);
     
     if (error) {
       console.error(`Error incrementing comment count:`, error);
