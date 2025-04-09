@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import { useComments } from '@/hooks/comments/use-comments';
@@ -11,20 +11,33 @@ interface CommentsProps {
   recommendationId?: string;
   visible?: boolean;
   onToggleVisibility?: () => void;
+  onCommentCountChange?: (count: number) => void;
+  initialCommentCount?: number;
 }
 
 const Comments: React.FC<CommentsProps> = ({ 
   postId, 
   recommendationId,
   visible = false,
-  onToggleVisibility
+  onToggleVisibility,
+  onCommentCountChange,
+  initialCommentCount = 0
 }) => {
   const [showComments, setShowComments] = useState(visible);
+  const [commentCount, setCommentCount] = useState(initialCommentCount);
   
   // Update local state when prop changes
   React.useEffect(() => {
     setShowComments(visible);
   }, [visible]);
+  
+  // Handler for comment count changes
+  const handleCommentCountChange = (count: number) => {
+    setCommentCount(count);
+    if (onCommentCountChange) {
+      onCommentCountChange(count);
+    }
+  };
   
   const {
     comments,
@@ -38,11 +51,20 @@ const Comments: React.FC<CommentsProps> = ({
     viewReplies,
     viewMainComments,
     isViewingReplies,
-    parentId
+    parentId,
+    totalCount
   } = useComments({ 
     postId, 
-    recommendationId 
+    recommendationId,
+    onCommentCountChange: handleCommentCountChange
   });
+
+  // Update comment count when total changes
+  useEffect(() => {
+    if (totalCount !== undefined) {
+      setCommentCount(totalCount);
+    }
+  }, [totalCount]);
 
   const handleToggleComments = () => {
     const newVisibility = !showComments;

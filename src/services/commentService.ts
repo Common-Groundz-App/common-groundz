@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Comment, 
@@ -11,16 +10,16 @@ import {
 /**
  * Fetches comments based on provided parameters
  */
-export const fetchComments = async (params: CommentQueryParams, userId?: string): Promise<CommentWithUser[]> => {
+export const fetchComments = async (params: CommentQueryParams, userId?: string): Promise<{comments: CommentWithUser[], totalCount: number}> => {
   try {
     const { post_id, recommendation_id, parent_id, limit = 10, offset = 0 } = params;
     
-    // Build base query
+    // Build base query for comments
     let query = supabase
       .from('comments')
       .select(`
         *,
-        profiles(id, username, avatar_url)
+        profiles:profiles(id, username, avatar_url)
       `)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
@@ -47,7 +46,33 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     if (error) throw error;
     
     if (!comments || comments.length === 0) {
-      return [];
+      // Get total count of comments for the parent item
+      let totalCount = 0;
+      if (post_id || recommendation_id) {
+        const countQuery = supabase
+          .from('comments')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_deleted', false);
+          
+        if (post_id) {
+          countQuery.eq('post_id', post_id);
+        } else if (recommendation_id) {
+          countQuery.eq('recommendation_id', recommendation_id);
+        }
+        
+        if (parent_id === null) {
+          countQuery.is('parent_id', null);
+        } else if (parent_id) {
+          countQuery.eq('parent_id', parent_id);
+        }
+        
+        const { count, error: countError } = await countQuery;
+        if (!countError && count !== null) {
+          totalCount = count;
+        }
+      }
+      
+      return { comments: [], totalCount };
     }
     
     // Process comments to add profile information
@@ -69,8 +94,7 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     const commentIds = processedComments.map(comment => comment.id);
     
     if (commentIds.length > 0) {
-      // Get like counts - Fix: Use a traditional count approach instead of groupBy
-      // We'll query each comment's likes separately
+      // Get like counts
       for (const comment of processedComments) {
         // Get like count for this comment
         const { count, error: countError } = await supabase
@@ -108,7 +132,7 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
       if (parent_id === null) {
         for (const comment of processedComments) {
           try {
-            // Use simple count query instead of RPC function
+            // Use simple count query 
             const { count, error: countError } = await supabase
               .from('comments')
               .select('*', { count: 'exact', head: true })
@@ -127,7 +151,31 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
       }
     }
     
-    return processedComments;
+    // Get total count of comments for the parent item
+    let totalCount = 0;
+    if (post_id || recommendation_id) {
+      const countQuery = supabase
+        .from('comments')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_deleted', false);
+        
+      if (post_id) {
+        countQuery.eq('post_id', post_id);
+      } else if (recommendation_id) {
+        countQuery.eq('recommendation_id', recommendation_id);
+      }
+      
+      if (parent_id === null) {
+        countQuery.is('parent_id', null);
+      }
+      
+      const { count, error: countError } = await countQuery;
+      if (!countError && count !== null) {
+        totalCount = count;
+      }
+    }
+    
+    return { comments: processedComments, totalCount };
   } catch (error) {
     console.error('Error in fetchComments:', error);
     throw error;
@@ -156,6 +204,27 @@ export const createComment = async (data: CreateCommentPayload, userId: string):
     return comment as Comment;
   } catch (error) {
     console.error('Error in createComment:', error);
+    throw error;
+  }
+};
+
+/**
+ * Increment comment count for a post or recommendation
+ */
+export const incrementCommentCount = async (type: 'post' | 'recommendation', id: string): Promise<void> => {
+  try {
+    const table = type === 'post' ? 'posts' : 'recommendations';
+    const { error } = await supabase.rpc(
+      'increment_comment_count',
+      { table_name: table, item_id: id }
+    );
+    
+    if (error) {
+      console.error(`Error incrementing comment count:`, error);
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error incrementing comment count:`, error);
     throw error;
   }
 };

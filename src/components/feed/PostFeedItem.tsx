@@ -18,10 +18,17 @@ interface PostFeedItemProps {
   post: PostItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
+  onCommentCountChange?: (id: string, count: number) => void;
 }
 
-export const PostFeedItem: React.FC<PostFeedItemProps> = ({ post, onLike, onSave }) => {
+export const PostFeedItem: React.FC<PostFeedItemProps> = ({ 
+  post, 
+  onLike, 
+  onSave,
+  onCommentCountChange
+}) => {
   const [showComments, setShowComments] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState(post.comment_count || 0);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -51,6 +58,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({ post, onLike, onSave
       case 'project': return 'Project';
       case 'note': return 'Note';
       default: return type;
+    }
+  };
+
+  const handleCommentCountChange = (count: number) => {
+    setLocalCommentCount(count);
+    if (onCommentCountChange) {
+      onCommentCountChange(post.id, count);
     }
   };
 
@@ -135,8 +149,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({ post, onLike, onSave
               className="flex items-center gap-1"
             >
               <MessageCircle size={18} />
-              {post.comment_count > 0 && (
-                <span>{post.comment_count}</span>
+              {localCommentCount > 0 && (
+                <span>{localCommentCount}</span>
               )}
             </Button>
           </div>
@@ -162,7 +176,9 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({ post, onLike, onSave
           <Comments 
             postId={post.id} 
             visible={showComments} 
-            onToggleVisibility={() => setShowComments(!showComments)} 
+            onToggleVisibility={() => setShowComments(!showComments)}
+            onCommentCountChange={handleCommentCountChange}
+            initialCommentCount={post.comment_count || 0} 
           />
         </div>
       </CardFooter>

@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,7 +6,8 @@ import {
   createComment, 
   updateComment, 
   deleteComment,
-  toggleCommentLike
+  toggleCommentLike,
+  incrementCommentCount
 } from '@/services/commentService';
 import { CommentWithUser, CreateCommentPayload, UpdateCommentPayload, CommentQueryParams } from './types';
 
@@ -15,12 +15,14 @@ interface UseCommentsProps {
   postId?: string;
   recommendationId?: string;
   initialParentId?: string | null;
+  onCommentCountChange?: (count: number) => void;
 }
 
 export const useComments = ({ 
   postId, 
   recommendationId,
-  initialParentId = null
+  initialParentId = null,
+  onCommentCountChange
 }: UseCommentsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -30,6 +32,7 @@ export const useComments = ({
   const [parentId, setParentId] = useState<string | null>(initialParentId);
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
+  const [totalCount, setTotalCount] = useState<number>(0);
   
   // Default limit for comments per page
   const limit = 10;
@@ -53,12 +56,18 @@ export const useComments = ({
       if (postId) params.post_id = postId;
       if (recommendationId) params.recommendation_id = recommendationId;
       
-      const fetchedComments = await fetchComments(params, user?.id);
+      const { comments: fetchedComments, totalCount } = await fetchComments(params, user?.id);
       
       if (reset) {
         setComments(fetchedComments);
       } else {
         setComments(prev => [...prev, ...fetchedComments]);
+      }
+      
+      // Set total count for parent item
+      setTotalCount(totalCount);
+      if (onCommentCountChange) {
+        onCommentCountChange(totalCount);
       }
       
       // Update pagination
@@ -74,7 +83,7 @@ export const useComments = ({
     } finally {
       setIsLoading(false);
     }
-  }, [postId, recommendationId, parentId, offset, limit, user?.id, toast]);
+  }, [postId, recommendationId, parentId, offset, limit, user?.id, toast, onCommentCountChange]);
   
   // Function to handle changing parent ID (for viewing replies)
   const viewReplies = useCallback((commentId: string) => {
@@ -124,6 +133,22 @@ export const useComments = ({
       
       setComments(prev => [commentWithUser, ...prev]);
       
+      // Increment comment count in the parent item
+      if (!parentId) {
+        const newTotalCount = totalCount + 1;
+        setTotalCount(newTotalCount);
+        if (onCommentCountChange) {
+          onCommentCountChange(newTotalCount);
+        }
+        
+        // Update the comment count in the database
+        if (postId) {
+          await incrementCommentCount('post', postId);
+        } else if (recommendationId) {
+          await incrementCommentCount('recommendation', recommendationId);
+        }
+      }
+      
       toast({
         title: 'Comment Added',
         description: 'Your comment has been posted.',
@@ -138,7 +163,7 @@ export const useComments = ({
       });
       return null;
     }
-  }, [postId, recommendationId, parentId, user, toast]);
+  }, [postId, recommendationId, parentId, user, toast, totalCount, onCommentCountChange]);
   
   // Function to edit a comment
   const editComment = useCallback(async (commentId: string, content: string) => {
@@ -265,6 +290,7 @@ export const useComments = ({
     viewReplies,
     viewMainComments,
     isViewingReplies: parentId !== null,
-    parentId
+    parentId,
+    totalCount
   };
 };

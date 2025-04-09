@@ -14,14 +14,17 @@ interface RecommendationFeedItemProps {
   recommendation: FeedItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
+  onCommentCountChange?: (id: string, count: number) => void;
 }
 
 export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({ 
   recommendation, 
   onLike, 
-  onSave 
+  onSave,
+  onCommentCountChange
 }) => {
   const [showComments, setShowComments] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState(recommendation.comment_count || 0);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -41,6 +44,13 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
       return `${diffInDays} days ago`;
     } else {
       return format(date, 'MMM d, yyyy');
+    }
+  };
+
+  const handleCommentCountChange = (count: number) => {
+    setLocalCommentCount(count);
+    if (onCommentCountChange) {
+      onCommentCountChange(recommendation.id, count);
     }
   };
 
@@ -126,8 +136,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
               className="flex items-center gap-1"
             >
               <MessageCircle size={18} />
-              {recommendation.comment_count > 0 && (
-                <span>{recommendation.comment_count}</span>
+              {localCommentCount > 0 && (
+                <span>{localCommentCount}</span>
               )}
             </Button>
           </div>
@@ -154,6 +164,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             recommendationId={recommendation.id} 
             visible={showComments}
             onToggleVisibility={() => setShowComments(!showComments)}
+            onCommentCountChange={handleCommentCountChange}
+            initialCommentCount={recommendation.comment_count || 0}
           />
         </div>
       </CardFooter>
