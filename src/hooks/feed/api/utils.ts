@@ -1,9 +1,10 @@
 
 import { CombinedFeedItem } from '../types';
 import { MediaItem } from '@/types/media';
+import { PostFeedItem, FeedItem } from '../types';
 
 // Helper function to determine if a feed item is a post
-export const isItemPost = (item: any): boolean => {
+export const isItemPost = (item: CombinedFeedItem): item is PostFeedItem => {
   return 'is_post' in item && item.is_post === true;
 };
 
