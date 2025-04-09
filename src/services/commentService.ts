@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Comment, 
@@ -69,21 +68,18 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     const commentIds = processedComments.map(comment => comment.id);
     
     if (commentIds.length > 0) {
-      // Get like counts
-      const { data: likesData } = await supabase
-        .from('comment_likes')
-        .select('comment_id, count(*)', { count: 'exact' })
-        .in('comment_id', commentIds)
-        .groupBy('comment_id');
+      // Get like counts - Fix: Use a traditional count approach instead of groupBy
+      // We'll query each comment's likes separately
+      for (const comment of processedComments) {
+        // Get like count for this comment
+        const { count, error: countError } = await supabase
+          .from('comment_likes')
+          .select('*', { count: 'exact', head: true })
+          .eq('comment_id', comment.id);
         
-      if (likesData) {
-        // Add like counts to comments
-        likesData.forEach((like: any) => {
-          const comment = processedComments.find(c => c.id === like.comment_id);
-          if (comment) {
-            comment.like_count = parseInt(like.count);
-          }
-        });
+        if (!countError && count !== null) {
+          comment.like_count = count;
+        }
       }
       
       // Get like status for current user
