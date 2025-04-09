@@ -1,13 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-
-// Extend the Supabase User type to include profile fields
-export interface User extends SupabaseUser {
-  username?: string | null;
-  avatar_url?: string | null;
-}
 
 type AuthContextType = {
   user: User | null;
@@ -28,73 +22,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
         console.log('Auth state changed:', event);
         setSession(currentSession);
-        
-        // If we have a user, fetch their profile data to get username and avatar
-        if (currentSession?.user) {
-          try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('username, avatar_url')
-              .eq('id', currentSession.user.id)
-              .single();
-              
-            // Combine the user data with profile data
-            const enrichedUser = {
-              ...currentSession.user,
-              username: profile?.username || null,
-              avatar_url: profile?.avatar_url || null
-            };
-            
-            setUser(enrichedUser);
-          } catch (error) {
-            console.error('Error fetching profile:', error);
-            // Still set the user even if profile fetch fails
-            setUser(currentSession.user);
-          }
-        } else {
-          setUser(null);
-        }
+        setUser(currentSession?.user ?? null);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       console.log('Initial session check:', currentSession ? 'logged in' : 'logged out');
       setSession(currentSession);
-      
-      if (currentSession?.user) {
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username, avatar_url')
-            .eq('id', currentSession.user.id)
-            .single();
-            
-          // Combine the user data with profile data
-          const enrichedUser = {
-            ...currentSession.user,
-            username: profile?.username || null,
-            avatar_url: profile?.avatar_url || null
-          };
-          
-          setUser(enrichedUser);
-        } catch (error) {
-          console.error('Error fetching profile:', error);
-          // Still set the user even if profile fetch fails
-          setUser(currentSession.user);
-        }
-      } else {
-        setUser(null);
-      }
-      
-      // Set loading to false regardless of the result
+      setUser(currentSession?.user ?? null);
       setIsLoading(false);
-    }).catch((error) => {
-      console.error('Error checking session:', error);
-      setIsLoading(false); // Make sure we end the loading state
     });
 
     return () => subscription.unsubscribe();
@@ -117,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     });
-    return { error, user: data?.user ? { ...data.user, username: userData?.username || null } as User : null };
+    return { error, user: data?.user || null };
   };
 
   const signOut = async () => {

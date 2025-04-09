@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -7,7 +8,6 @@ import { Bookmark, Heart, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { FeedItem } from '@/hooks/feed/types';
-import CommentsSection from './CommentsSection';
 
 interface RecommendationFeedItemProps {
   recommendation: FeedItem;
@@ -95,51 +95,42 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         )}
       </CardContent>
       
-      <CardFooter className="flex justify-between pt-2 pb-4 flex-col">
-        <div className="flex justify-between w-full">
-          <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "flex items-center gap-1",
-                recommendation.is_liked && "text-red-500"
-              )}
-              onClick={() => onLike && onLike(recommendation.id)}
-            >
-              <Heart 
-                size={18} 
-                className={cn(recommendation.is_liked && "fill-red-500")} 
-              />
-              {recommendation.likes > 0 && (
-                <span>{recommendation.likes}</span>
-              )}
-            </Button>
-          </div>
-          
+      <CardFooter className="flex justify-between pt-2 pb-4">
+        <div className="flex items-center">
           <Button
             variant="ghost"
             size="sm"
             className={cn(
               "flex items-center gap-1",
-              recommendation.is_saved && "text-brand-orange"
+              recommendation.is_liked && "text-red-500"
             )}
-            onClick={() => onSave && onSave(recommendation.id)}
+            onClick={() => onLike && onLike(recommendation.id)}
           >
-            <Bookmark 
+            <Heart 
               size={18} 
-              className={cn(recommendation.is_saved && "fill-brand-orange")} 
+              className={cn(recommendation.is_liked && "fill-red-500")} 
             />
-            Save
+            {recommendation.likes > 0 && (
+              <span>{recommendation.likes}</span>
+            )}
           </Button>
         </div>
         
-        <div className="w-full border-t mt-2 pt-2">
-          <CommentsSection 
-            recommendation_id={recommendation.id}
-            commentCount={0}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "flex items-center gap-1",
+            recommendation.is_saved && "text-brand-orange"
+          )}
+          onClick={() => onSave && onSave(recommendation.id)}
+        >
+          <Bookmark 
+            size={18} 
+            className={cn(recommendation.is_saved && "fill-brand-orange")} 
           />
-        </div>
+          Save
+        </Button>
       </CardFooter>
     </Card>
   );
