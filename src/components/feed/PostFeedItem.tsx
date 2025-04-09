@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { EntityBadge } from '@/components/feed/EntityBadge';
 import CommentDialog from '@/components/comments/CommentDialog';
+import { fetchCommentCount } from '@/services/commentsService';
 
 interface PostFeedItemProps {
   post: PostItem;
@@ -28,6 +29,28 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   onComment
 }) => {
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState(post.comment_count || 0);
+  
+  useEffect(() => {
+    // Initialize with the post's comment count
+    setLocalCommentCount(post.comment_count || 0);
+    
+    // Listen for comment count updates for this specific post
+    const handleCommentCountUpdate = async (event: CustomEvent) => {
+      if (event.detail.itemId === post.id) {
+        const updatedCount = await fetchCommentCount(post.id, 'post');
+        setLocalCommentCount(updatedCount);
+      }
+    };
+    
+    // Add event listener
+    window.addEventListener('refresh-post-comment-count', handleCommentCountUpdate as EventListener);
+    
+    return () => {
+      // Remove event listener on cleanup
+      window.removeEventListener('refresh-post-comment-count', handleCommentCountUpdate as EventListener);
+    };
+  }, [post.id, post.comment_count]);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -83,6 +106,11 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     if (onComment) onComment(post.id);
   };
   
+  const handleCommentAdded = () => {
+    // Increment the local comment count when a comment is added
+    setLocalCommentCount(prev => prev + 1);
+  };
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="pt-6">
@@ -145,8 +173,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             onClick={handleCommentClick}
           >
             <MessageCircle size={18} />
-            {post.comment_count > 0 && (
-              <span>{post.comment_count}</span>
+            {localCommentCount > 0 && (
+              <span>{localCommentCount}</span>
             )}
           </Button>
         </div>
@@ -173,6 +201,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         onClose={() => setIsCommentDialogOpen(false)} 
         itemId={post.id} 
         itemType="post" 
+        onCommentAdded={handleCommentAdded}
       />
     </Card>
   );

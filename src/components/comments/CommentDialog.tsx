@@ -77,6 +77,11 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         onCommentAdded();
       }
 
+      // Also trigger a feed refresh event to update comment counts across the app
+      const refreshEventName = `refresh-${itemType}-comment-count`;
+      const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
+      window.dispatchEvent(refreshEvent);
+
       toast({
         title: "Comment added",
         description: "Your comment has been added successfully"
