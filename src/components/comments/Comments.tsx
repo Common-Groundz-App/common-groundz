@@ -6,6 +6,7 @@ import { useComments } from '@/hooks/comments/use-comments';
 import CommentList from './CommentList';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 interface CommentsProps {
   postId?: string;
@@ -24,6 +25,7 @@ const Comments: React.FC<CommentsProps> = ({
   onCommentCountChange,
   initialCommentCount = 0
 }) => {
+  const { toast } = useToast();
   const [showComments, setShowComments] = useState(visible);
   const [commentCount, setCommentCount] = useState(initialCommentCount);
   const [retryAttempt, setRetryAttempt] = useState(0);
@@ -78,11 +80,21 @@ const Comments: React.FC<CommentsProps> = ({
     errorShownRef.current = false;
   }, [postId, recommendationId, showComments]);
 
+  // Log when comments change for debugging
+  useEffect(() => {
+    console.log('Comments updated:', comments.length, 'items');
+  }, [comments]);
+
   const handleToggleComments = () => {
     const newVisibility = !showComments;
     setShowComments(newVisibility);
     if (onToggleVisibility) {
       onToggleVisibility();
+    }
+    
+    // Refresh comments when opening if there was an error before
+    if (newVisibility && error) {
+      refreshComments();
     }
   };
   
@@ -90,11 +102,24 @@ const Comments: React.FC<CommentsProps> = ({
   useEffect(() => {
     if (error && retryAttempt >= maxRetries && !errorShownRef.current) {
       errorShownRef.current = true;
+      
+      toast({
+        variant: "destructive",
+        title: "Failed to load comments",
+        description: "There was an error loading comments. Please try again later."
+      });
     }
-  }, [error, retryAttempt, maxRetries]);
+  }, [error, retryAttempt, maxRetries, toast]);
   
   // Check if we should show the error
   const showError = error && retryAttempt >= maxRetries;
+  
+  // Handle manual retry
+  const handleRetry = () => {
+    setRetryAttempt(0);
+    errorShownRef.current = false;
+    refreshComments();
+  };
   
   return (
     <div className="mt-2">
@@ -139,11 +164,7 @@ const Comments: React.FC<CommentsProps> = ({
                   <span>Please try again later.</span>
                   <Button
                     size="sm" 
-                    onClick={() => {
-                      setRetryAttempt(0);
-                      errorShownRef.current = false;
-                      refreshComments();
-                    }}
+                    onClick={handleRetry}
                   >
                     Retry
                   </Button>

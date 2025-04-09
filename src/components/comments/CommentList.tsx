@@ -56,6 +56,13 @@ const CommentList: React.FC<CommentListProps> = ({
   // Determine if we should show empty state
   const showEmptyState = !isLoading && comments.length === 0 && !error;
   
+  // Debug when no comments are shown
+  React.useEffect(() => {
+    if (!isLoading && comments.length === 0) {
+      console.log('No comments to show:', { isLoading, errorExists: !!error, commentsLength: comments.length });
+    }
+  }, [comments, isLoading, error]);
+  
   return (
     <div className="space-y-4">
       <AnimatePresence>
@@ -135,7 +142,7 @@ const CommentList: React.FC<CommentListProps> = ({
         {isLoading && comments.length > 0 && (
           <div className="space-y-4 mt-4">
             {Array(2).fill(0).map((_, i) => (
-              <CommentSkeleton key={i} />
+              <CommentSkeleton key={`loading-more-${i}`} />
             ))}
           </div>
         )}
