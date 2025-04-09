@@ -1,7 +1,7 @@
 
 import { PostFeedItem } from '../../types';
 import { fetchProfiles } from '../profiles';
-import { createMap, processMediaItems } from '../utils';
+import { createMap, processMediaItems } from '../../api/utils';
 import { fetchPostEntities } from './entities';
 import { getPostLikeCounts, getUserPostLikes, getUserPostSaves } from './interactions';
 
