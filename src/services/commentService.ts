@@ -216,15 +216,29 @@ export const incrementCommentCount = async (type: 'post' | 'recommendation', id:
   try {
     const tableName = type === 'post' ? 'posts' : 'recommendations';
     
-    // Use a direct update with raw SQL expression instead of supabase.sql
-    const { error } = await supabase.rpc(
-      'increment_comment_count',
-      { table_name: tableName, item_id: id }
-    );
+    // First, get the current comment count
+    const { data, error: fetchError } = await supabase
+      .from(tableName)
+      .select('comment_count')
+      .eq('id', id)
+      .single();
     
-    if (error) {
-      console.error(`Error incrementing comment count:`, error);
-      throw error;
+    if (fetchError) {
+      console.error(`Error fetching current comment count:`, fetchError);
+      throw fetchError;
+    }
+    
+    const currentCount = data?.comment_count || 0;
+    
+    // Then, update with the incremented value
+    const { error: updateError } = await supabase
+      .from(tableName)
+      .update({ comment_count: currentCount + 1 })
+      .eq('id', id);
+    
+    if (updateError) {
+      console.error(`Error updating comment count:`, updateError);
+      throw updateError;
     }
   } catch (error) {
     console.error(`Error incrementing comment count:`, error);
