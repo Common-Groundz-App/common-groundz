@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -74,6 +75,7 @@ export const useComments = ({
       setOffset(reset ? limit : offset + limit);
       setHasMore(fetchedComments.length >= limit);
     } catch (err) {
+      console.error("Error loading comments:", err);
       setError(err as Error);
       toast({
         title: 'Error',

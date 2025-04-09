@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Comment, 
@@ -15,12 +14,12 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
   try {
     const { post_id, recommendation_id, parent_id, limit = 10, offset = 0 } = params;
     
-    // Build base query for comments
+    // Build base query for comments with proper join to profiles
     let query = supabase
       .from('comments')
       .select(`
         *,
-        profiles:profiles(id, username, avatar_url)
+        profiles(id, username, avatar_url)
       `)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
@@ -44,41 +43,52 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     
     const { data: comments, error } = await query;
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching comments:', error);
+      throw error;
+    }
     
-    if (!comments || comments.length === 0) {
-      // Get total count of comments for the parent item
-      let totalCount = 0;
-      if (post_id || recommendation_id) {
-        const countQuery = supabase
-          .from('comments')
-          .select('id', { count: 'exact', head: true })
-          .eq('is_deleted', false);
-          
-        if (post_id) {
-          countQuery.eq('post_id', post_id);
-        } else if (recommendation_id) {
-          countQuery.eq('recommendation_id', recommendation_id);
-        }
+    // Get total count for pagination
+    let totalCount = 0;
+    try {
+      const countQuery = supabase
+        .from('comments')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_deleted', false);
         
-        if (parent_id === null) {
-          countQuery.is('parent_id', null);
-        } else if (parent_id) {
-          countQuery.eq('parent_id', parent_id);
-        }
-        
-        const { count, error: countError } = await countQuery;
-        if (!countError && count !== null) {
-          totalCount = count;
-        }
+      if (post_id) {
+        countQuery.eq('post_id', post_id);
       }
       
+      if (recommendation_id) {
+        countQuery.eq('recommendation_id', recommendation_id);
+      }
+      
+      if (parent_id === null) {
+        countQuery.is('parent_id', null);
+      } else if (parent_id) {
+        countQuery.eq('parent_id', parent_id);
+      }
+      
+      const { count, error: countError } = await countQuery;
+      if (!countError && count !== null) {
+        totalCount = count;
+      }
+    } catch (countErr) {
+      console.error('Error fetching comment count:', countErr);
+      // Don't throw here, we can still return comments without the count
+    }
+    
+    if (!comments || comments.length === 0) {
       return { comments: [], totalCount };
     }
     
     // Process comments to add profile information
     const processedComments = comments.map((comment: any) => {
-      const profile = comment.profiles as any | null;
+      // Extract profile data from the joined result
+      const profile = Array.isArray(comment.profiles) && comment.profiles.length > 0 
+        ? comment.profiles[0]  // If it's an array, take the first item
+        : comment.profiles;    // Otherwise use as is
       
       return {
         ...comment,
@@ -95,44 +105,52 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     const commentIds = processedComments.map(comment => comment.id);
     
     if (commentIds.length > 0) {
-      // Get like counts
-      for (const comment of processedComments) {
-        // Get like count for this comment
-        const { count, error: countError } = await supabase
-          .from('comment_likes')
-          .select('*', { count: 'exact', head: true })
-          .eq('comment_id', comment.id);
-        
-        if (!countError && count !== null) {
-          comment.like_count = count;
-        }
-      }
-      
-      // Get like status for current user
-      if (userId) {
-        const { data: userLikesData, error: userLikesError } = await supabase
-          .from('comment_likes')
-          .select('comment_id')
-          .in('comment_id', commentIds)
-          .eq('user_id', userId);
-          
-        if (userLikesError) {
-          console.error('Error fetching user comment likes:', userLikesError);
-        } else if (userLikesData) {
-          // Set is_liked flag for comments liked by user
-          userLikesData.forEach((like: any) => {
-            const comment = processedComments.find(c => c.id === like.comment_id);
-            if (comment) {
-              comment.is_liked = true;
-            }
-          });
-        }
-      }
-      
-      // Get reply counts for top-level comments
-      if (parent_id === null) {
+      try {
+        // Get like counts
         for (const comment of processedComments) {
-          try {
+          // Get like count for this comment
+          const { count, error: countError } = await supabase
+            .from('comment_likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('comment_id', comment.id);
+          
+          if (!countError && count !== null) {
+            comment.like_count = count;
+          }
+        }
+      } catch (likesErr) {
+        console.error('Error fetching comment likes:', likesErr);
+        // Continue execution, this is not critical
+      }
+      
+      try {
+        // Get like status for current user
+        if (userId) {
+          const { data: userLikesData, error: userLikesError } = await supabase
+            .from('comment_likes')
+            .select('comment_id')
+            .in('comment_id', commentIds)
+            .eq('user_id', userId);
+            
+          if (!userLikesError && userLikesData) {
+            // Set is_liked flag for comments liked by user
+            userLikesData.forEach((like: any) => {
+              const comment = processedComments.find(c => c.id === like.comment_id);
+              if (comment) {
+                comment.is_liked = true;
+              }
+            });
+          }
+        }
+      } catch (userLikesErr) {
+        console.error('Error fetching user likes status:', userLikesErr);
+        // Continue execution, this is not critical
+      }
+      
+      try {
+        // Get reply counts for top-level comments
+        if (parent_id === null) {
+          for (const comment of processedComments) {
             // Use simple count query 
             const { count, error: countError } = await supabase
               .from('comments')
@@ -140,39 +158,14 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
               .eq('parent_id', comment.id)
               .eq('is_deleted', false);
               
-            if (countError) {
-              console.error('Error fetching reply count:', countError);
-            } else {
+            if (!countError) {
               comment.reply_count = count || 0;
             }
-          } catch (err) {
-            console.error(`Error getting reply count for comment ${comment.id}:`, err);
           }
         }
-      }
-    }
-    
-    // Get total count of comments for the parent item
-    let totalCount = 0;
-    if (post_id || recommendation_id) {
-      const countQuery = supabase
-        .from('comments')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_deleted', false);
-        
-      if (post_id) {
-        countQuery.eq('post_id', post_id);
-      } else if (recommendation_id) {
-        countQuery.eq('recommendation_id', recommendation_id);
-      }
-      
-      if (parent_id === null) {
-        countQuery.is('parent_id', null);
-      }
-      
-      const { count, error: countError } = await countQuery;
-      if (!countError && count !== null) {
-        totalCount = count;
+      } catch (replyCountErr) {
+        console.error('Error fetching reply counts:', replyCountErr);
+        // Continue execution, this is not critical
       }
     }
     

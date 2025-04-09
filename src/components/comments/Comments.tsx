@@ -42,6 +42,7 @@ const Comments: React.FC<CommentsProps> = ({
   const {
     comments,
     isLoading,
+    error,
     hasMore,
     loadMore,
     addComment,
@@ -52,7 +53,8 @@ const Comments: React.FC<CommentsProps> = ({
     viewMainComments,
     isViewingReplies,
     parentId,
-    totalCount
+    totalCount,
+    refreshComments
   } = useComments({ 
     postId, 
     recommendationId,
@@ -65,6 +67,18 @@ const Comments: React.FC<CommentsProps> = ({
       setCommentCount(totalCount);
     }
   }, [totalCount]);
+
+  // Try to refresh comments if we encounter an error
+  useEffect(() => {
+    if (error && showComments) {
+      // Add a slight delay before retrying to prevent immediate re-fetch
+      const timer = setTimeout(() => {
+        refreshComments();
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [error, showComments, refreshComments]);
 
   const handleToggleComments = () => {
     const newVisibility = !showComments;
