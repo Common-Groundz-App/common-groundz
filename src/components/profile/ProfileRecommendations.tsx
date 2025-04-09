@@ -8,6 +8,7 @@ import RecommendationFilters from '@/components/recommendations/RecommendationFi
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import RecommendationSkeleton from '@/components/recommendations/RecommendationSkeleton';
 import EmptyRecommendations from '@/components/recommendations/EmptyRecommendations';
+import CommentDialog from '@/components/comments/CommentDialog';
 
 type ProfileRecommendationsProps = {
   profileUserId?: string;
@@ -17,6 +18,10 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
   const { user } = useAuth();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [commentDialogState, setCommentDialogState] = useState({
+    isOpen: false,
+    recommendationId: ''
+  });
   
   const {
     recommendations,
@@ -29,7 +34,8 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
     handleSave,
     handleImageUpload,
     addRecommendation,
-    clearFilters
+    clearFilters,
+    refreshRecommendations
   } = useRecommendations({ 
     profileUserId: profileUserId || (user?.id || '') 
   });
@@ -73,10 +79,15 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
   };
 
   const handleComment = (id: string) => {
-    toast({
-      title: "Comments",
-      description: "Comment functionality will be implemented soon!"
+    setCommentDialogState({
+      isOpen: true,
+      recommendationId: id
     });
+  };
+
+  const handleCommentAdded = () => {
+    // Refresh recommendations to update comment counts
+    refreshRecommendations();
   };
 
   return (
@@ -123,6 +134,14 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
           onImageUpload={handleImageUpload}
         />
       )}
+
+      <CommentDialog 
+        isOpen={commentDialogState.isOpen}
+        onClose={() => setCommentDialogState({ isOpen: false, recommendationId: '' })}
+        itemId={commentDialogState.recommendationId}
+        itemType="recommendation"
+        onCommentAdded={handleCommentAdded}
+      />
     </div>
   );
 }

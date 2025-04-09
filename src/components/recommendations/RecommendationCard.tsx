@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import RatingStars from './RatingStars';
 import { Recommendation } from '@/services/recommendationService';
 import { getCategoryLabel } from './RecommendationFilters';
+import CommentDialog from '../comments/CommentDialog';
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
@@ -24,6 +25,23 @@ const RecommendationCard = ({
 }: RecommendationCardProps) => {
   // Ensure comment_count is treated as a number
   const commentCount = typeof recommendation.comment_count === 'number' ? recommendation.comment_count : 0;
+  const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+  
+  const handleCommentClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsCommentDialogOpen(true);
+    if (onComment) onComment(recommendation.id);
+  };
+
+  const handleCommentAdded = () => {
+    // Update the comment count locally after a comment is added
+    if (typeof recommendation.comment_count === 'number') {
+      recommendation.comment_count += 1;
+    } else {
+      recommendation.comment_count = 1;
+    }
+  };
   
   return (
     <Card 
@@ -126,11 +144,7 @@ const RecommendationCard = ({
               variant="ghost"
               size="sm"
               className="transition-colors flex items-center gap-1 px-2 text-gray-500 hover:text-gray-700"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                if (onComment) onComment(recommendation.id);
-              }}
+              onClick={handleCommentClick}
             >
               <MessageCircle size={16} />
               {commentCount > 0 && (
@@ -144,6 +158,14 @@ const RecommendationCard = ({
           </Button>
         </div>
       </CardContent>
+
+      <CommentDialog 
+        isOpen={isCommentDialogOpen} 
+        onClose={() => setIsCommentDialogOpen(false)} 
+        itemId={recommendation.id}
+        itemType="recommendation"
+        onCommentAdded={handleCommentAdded}
+      />
     </Card>
   );
 };

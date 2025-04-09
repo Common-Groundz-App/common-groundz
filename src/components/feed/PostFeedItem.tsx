@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { EntityBadge } from '@/components/feed/EntityBadge';
+import CommentDialog from '@/components/comments/CommentDialog';
 
 interface PostFeedItemProps {
   post: PostItem;
@@ -26,6 +27,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   onSave,
   onComment
 }) => {
+  const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+  
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
@@ -73,6 +76,11 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         </div>
       </div>
     );
+  };
+  
+  const handleCommentClick = () => {
+    setIsCommentDialogOpen(true);
+    if (onComment) onComment(post.id);
   };
   
   return (
@@ -134,7 +142,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             variant="ghost"
             size="sm"
             className="flex items-center gap-1"
-            onClick={() => onComment && onComment(post.id)}
+            onClick={handleCommentClick}
           >
             <MessageCircle size={18} />
             {post.comment_count > 0 && (
@@ -159,6 +167,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           Save
         </Button>
       </CardFooter>
+      
+      <CommentDialog 
+        isOpen={isCommentDialogOpen} 
+        onClose={() => setIsCommentDialogOpen(false)} 
+        itemId={post.id} 
+        itemType="post" 
+      />
     </Card>
   );
 };

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Bookmark, Heart, Star, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { FeedItem } from '@/hooks/feed/types';
+import CommentDialog from '@/components/comments/CommentDialog';
 
 interface RecommendationFeedItemProps {
   recommendation: FeedItem;
@@ -22,6 +23,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   onSave,
   onComment
 }) => {
+  const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+  
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
@@ -41,6 +44,11 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     } else {
       return format(date, 'MMM d, yyyy');
     }
+  };
+
+  const handleCommentClick = () => {
+    setIsCommentDialogOpen(true);
+    if (onComment) onComment(recommendation.id);
   };
 
   return (
@@ -121,7 +129,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             variant="ghost"
             size="sm"
             className="flex items-center gap-1"
-            onClick={() => onComment && onComment(recommendation.id)}
+            onClick={handleCommentClick}
           >
             <MessageCircle size={18} />
             {recommendation.comment_count > 0 && (
@@ -146,6 +154,13 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           Save
         </Button>
       </CardFooter>
+      
+      <CommentDialog 
+        isOpen={isCommentDialogOpen} 
+        onClose={() => setIsCommentDialogOpen(false)} 
+        itemId={recommendation.id}
+        itemType="recommendation" 
+      />
     </Card>
   );
 };
