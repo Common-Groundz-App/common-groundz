@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -26,13 +27,21 @@ export const useFeed = (feedType: FeedVisibility) => {
         ...prev,
         isLoading: false,
         error: new Error('User not authenticated'),
-        items: []
+        items: [],
+        hasMore: false,
+        isLoadingMore: false
       }));
       return;
     }
 
     try {
       console.log(`Fetching ${feedType} feed for page ${page}`);
+      setState(prev => ({
+        ...prev,
+        isLoading: !prev.items.length || reset,
+        isLoadingMore: !!prev.items.length && !reset
+      }));
+      
       const fetchFunction = feedType === 'for_you' ? fetchForYouFeed : fetchFollowingFeed;
       const { items, hasMore } = await fetchFunction({ 
         userId: user.id, 
@@ -59,13 +68,18 @@ export const useFeed = (feedType: FeedVisibility) => {
         isLoadingMore: false,
         error: error instanceof Error ? error : new Error('Failed to fetch feed')
       }));
+      
+      toast({
+        title: 'Feed Error',
+        description: error instanceof Error ? error.message : 'Failed to load feed items',
+        variant: 'destructive'
+      });
     }
-  }, [user, feedType]);
+  }, [user, feedType, toast]);
 
   useEffect(() => {
     if (user) {
       console.log(`Setting up initial feed load for ${feedType}`);
-      setState(prev => ({ ...prev, isLoading: true }));
       fetchFeed(0, true);
     }
   }, [fetchFeed, user]);
@@ -88,7 +102,7 @@ export const useFeed = (feedType: FeedVisibility) => {
     if (!user) {
       toast({
         title: 'Authentication required',
-        description: 'Please sign in to like recommendations',
+        description: 'Please sign in to like content',
         variant: 'destructive'
       });
       return;
@@ -118,7 +132,6 @@ export const useFeed = (feedType: FeedVisibility) => {
     } catch (err) {
       console.error('Error toggling like:', err);
       
-      // Only refresh in case of error, not on successful operation
       toast({
         title: 'Error',
         description: 'Failed to update like status. Please try again.',
@@ -147,7 +160,7 @@ export const useFeed = (feedType: FeedVisibility) => {
     if (!user) {
       toast({
         title: 'Authentication required',
-        description: 'Please sign in to save recommendations',
+        description: 'Please sign in to save content',
         variant: 'destructive'
       });
       return;
@@ -175,7 +188,6 @@ export const useFeed = (feedType: FeedVisibility) => {
     } catch (err) {
       console.error('Error toggling save:', err);
       
-      // Only show toast and revert on error
       toast({
         title: 'Error',
         description: 'Failed to update save status. Please try again.',
@@ -185,7 +197,7 @@ export const useFeed = (feedType: FeedVisibility) => {
       // Revert optimistic update on error
       setState(prev => ({
         ...prev,
-        items: state.items.map(item => {
+        items: prev.items.map(item => {
           if (item.id === id) {
             return {
               ...item,

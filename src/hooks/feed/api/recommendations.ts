@@ -42,7 +42,11 @@ export const fetchRecommendations = async (
     
     const { data: recsData, error: recsError } = await query;
       
-    if (recsError) throw recsError;
+    if (recsError) {
+      console.error('Error in fetchRecommendations query:', recsError);
+      throw recsError;
+    }
+    
     if (!recsData || recsData.length === 0) return { recommendations: [], userIds: [] };
     
     // Extract user IDs for profile fetching
@@ -65,7 +69,12 @@ export const processRecommendations = async (
   try {
     // Get user profiles
     const userIds = recsData.map(rec => rec.user_id);
-    const { data: profilesData } = await fetchProfiles(userIds);
+    const { data: profilesData, error: profileError } = await fetchProfiles(userIds);
+    
+    if (profileError) {
+      console.error('Error fetching profiles:', profileError);
+      throw profileError;
+    }
     
     // Create lookup map for profiles
     const profilesMap = createMap(profilesData, 'id');
@@ -88,9 +97,13 @@ export const processRecommendations = async (
     
     if (recIds.length > 0) {
       // Get likes count
-      const { data: likesData } = await supabase
+      const { data: likesData, error: likesError } = await supabase
         .from('recommendation_likes')
         .select('recommendation_id');
+        
+      if (likesError) {
+        console.error('Error fetching recommendation likes:', likesError);
+      }
         
       // Count likes for each recommendation
       const likesCount = new Map();
@@ -102,18 +115,26 @@ export const processRecommendations = async (
       }
       
       // Get user likes
-      const { data: userLikes } = await supabase
+      const { data: userLikes, error: userLikesError } = await supabase
         .from('recommendation_likes')
         .select('recommendation_id')
         .in('recommendation_id', recIds)
         .eq('user_id', userId);
         
+      if (userLikesError) {
+        console.error('Error fetching user likes:', userLikesError);
+      }
+        
       // Get saves  
-      const { data: savesData } = await supabase
+      const { data: savesData, error: savesError } = await supabase
         .from('recommendation_saves')
         .select('recommendation_id')
         .in('recommendation_id', recIds)
         .eq('user_id', userId);
+        
+      if (savesError) {
+        console.error('Error fetching recommendation saves:', savesError);
+      }
         
       // Update recommendations with like and save status
       processedRecs.forEach(rec => {
