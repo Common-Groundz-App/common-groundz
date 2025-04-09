@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Comment, 
@@ -14,13 +15,10 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
   try {
     const { post_id, recommendation_id, parent_id, limit = 10, offset = 0 } = params;
     
-    // Build query with a cleaner join to profiles
+    // Modified query to avoid join failures - fetch profiles separately
     let query = supabase
       .from('comments')
-      .select(`
-        *,
-        profiles:user_id(username, avatar_url)
-      `)
+      .select('*')
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -83,24 +81,45 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
       return { comments: [], totalCount };
     }
     
-    // Process comments to add profile information
-    const processedComments = comments.map((comment: any) => {
-      // Extract profile data from the joined result
-      const profileData = comment.profiles || {};
-      
+    // Process comments and fetch user profiles separately
+    const processedComments: CommentWithUser[] = comments.map((comment: any) => {
       return {
         ...comment,
-        profiles: undefined, // Remove the profiles object
-        username: profileData.username || null,
-        avatar_url: profileData.avatar_url || null,
-        like_count: 0, // Will be updated
-        is_liked: false, // Will be updated
-        reply_count: 0 // Will be updated
+        username: null,
+        avatar_url: null,
+        like_count: 0,
+        is_liked: false,
+        reply_count: 0
       } as CommentWithUser;
     });
     
-    // Get comment IDs for further queries
+    // Get comment IDs and user IDs for further queries
     const commentIds = processedComments.map(comment => comment.id);
+    const userIds = processedComments.map(comment => comment.user_id);
+    
+    if (userIds.length > 0) {
+      try {
+        // Fetch user profiles separately instead of using join
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', userIds);
+          
+        if (!profilesError && profiles) {
+          // Map profiles to comments
+          processedComments.forEach(comment => {
+            const profile = profiles.find(p => p.id === comment.user_id);
+            if (profile) {
+              comment.username = profile.username;
+              comment.avatar_url = profile.avatar_url;
+            }
+          });
+        }
+      } catch (profileErr) {
+        console.error('Error fetching user profiles:', profileErr);
+        // Continue execution, this is not critical
+      }
+    }
     
     if (commentIds.length > 0) {
       try {

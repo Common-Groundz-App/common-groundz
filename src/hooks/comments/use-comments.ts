@@ -38,12 +38,16 @@ export const useComments = ({
   
   const isMounted = useRef(true);
   const isRefreshing = useRef(false);
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const limit = 10;
 
   useEffect(() => {
     return () => {
       isMounted.current = false;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
     };
   }, []);
   
@@ -85,6 +89,7 @@ export const useComments = ({
         setOffset(reset ? limit : offset + limit);
         setHasMore(fetchedComments.length >= limit);
         
+        setError(null);
         setRetryCount(0);
       }
     } catch (err) {
@@ -94,21 +99,20 @@ export const useComments = ({
         setError(err as Error);
         
         if (retryCount < maxRetries) {
-          const nextRetry = Math.min(1000 * Math.pow(2, retryCount), 8000);
-          console.log(`Retrying in ${nextRetry}ms (attempt ${retryCount + 1}/${maxRetries})`);
+          if (retryTimerRef.current) {
+            clearTimeout(retryTimerRef.current);
+          }
           
-          setTimeout(() => {
-            setRetryCount(prevCount => prevCount + 1);
+          const delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000);
+          
+          console.log(`Retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+          
+          retryTimerRef.current = setTimeout(() => {
             if (isMounted.current) {
+              setRetryCount(prevCount => prevCount + 1);
               loadComments(reset);
             }
-          }, nextRetry);
-        } else {
-          toast({
-            title: 'Error',
-            description: 'Failed to load comments after multiple attempts.',
-            variant: 'destructive'
-          });
+          }, delay);
         }
       }
     } finally {
@@ -117,7 +121,7 @@ export const useComments = ({
       }
       isRefreshing.current = false;
     }
-  }, [postId, recommendationId, parentId, offset, limit, user?.id, toast, onCommentCountChange, retryCount, maxRetries]);
+  }, [postId, recommendationId, parentId, offset, limit, user?.id, onCommentCountChange, retryCount, maxRetries]);
   
   const viewReplies = useCallback((commentId: string) => {
     setParentId(commentId);
@@ -294,6 +298,13 @@ export const useComments = ({
   }, [user, toast]);
   
   useEffect(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    
+    setRetryCount(0);
+    
     if (postId || recommendationId) {
       loadComments(true);
     }
@@ -303,6 +314,12 @@ export const useComments = ({
       setOffset(0);
       setHasMore(true);
       setError(null);
+      setRetryCount(0);
+      
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
     };
   }, [postId, recommendationId, parentId, loadComments]);
   

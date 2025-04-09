@@ -26,9 +26,9 @@ const Comments: React.FC<CommentsProps> = ({
 }) => {
   const [showComments, setShowComments] = useState(visible);
   const [commentCount, setCommentCount] = useState(initialCommentCount);
-  const errorTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const maxRetries = 3;
+  const errorShownRef = useRef(false);
   
   // Update local state when prop changes
   React.useEffect(() => {
@@ -72,34 +72,10 @@ const Comments: React.FC<CommentsProps> = ({
     }
   }, [totalCount]);
 
-  // Improved error handling with limited retries
-  useEffect(() => {
-    if (error && showComments && retryAttempt < maxRetries) {
-      // Clear any existing timers
-      if (errorTimerRef.current) {
-        clearTimeout(errorTimerRef.current);
-      }
-      
-      // Add a progressive delay before retrying to prevent constant bouncing
-      const delay = Math.min(2000 * Math.pow(1.5, retryAttempt), 10000);
-      
-      errorTimerRef.current = setTimeout(() => {
-        console.log(`Retry attempt ${retryAttempt + 1}/${maxRetries}`);
-        setRetryAttempt(prev => prev + 1);
-        refreshComments();
-      }, delay);
-      
-      return () => {
-        if (errorTimerRef.current) {
-          clearTimeout(errorTimerRef.current);
-        }
-      };
-    }
-  }, [error, showComments, refreshComments, retryAttempt, maxRetries]);
-
   // Reset retry attempts when comments are toggled or IDs change
   useEffect(() => {
     setRetryAttempt(0);
+    errorShownRef.current = false;
   }, [postId, recommendationId, showComments]);
 
   const handleToggleComments = () => {
@@ -109,6 +85,16 @@ const Comments: React.FC<CommentsProps> = ({
       onToggleVisibility();
     }
   };
+  
+  // Show error toast only once per error state to prevent bouncing
+  useEffect(() => {
+    if (error && retryAttempt >= maxRetries && !errorShownRef.current) {
+      errorShownRef.current = true;
+    }
+  }, [error, retryAttempt, maxRetries]);
+  
+  // Check if we should show the error
+  const showError = error && retryAttempt >= maxRetries;
   
   return (
     <div className="mt-2">
@@ -146,7 +132,7 @@ const Comments: React.FC<CommentsProps> = ({
               </Button>
             </div>
             
-            {error && retryAttempt >= maxRetries && (
+            {showError && (
               <Alert variant="destructive" className="mb-4">
                 <AlertTitle>Failed to load comments</AlertTitle>
                 <AlertDescription className="flex justify-between items-center">
@@ -155,6 +141,7 @@ const Comments: React.FC<CommentsProps> = ({
                     size="sm" 
                     onClick={() => {
                       setRetryAttempt(0);
+                      errorShownRef.current = false;
                       refreshComments();
                     }}
                   >
@@ -177,7 +164,8 @@ const Comments: React.FC<CommentsProps> = ({
               isViewingReplies={isViewingReplies}
               onBackToMainComments={viewMainComments}
               parentId={parentId}
-              error={error && retryAttempt >= maxRetries ? error : null}
+              // Only pass error to CommentList if we should show it
+              error={showError ? error : null}
             />
           </motion.div>
         )}
