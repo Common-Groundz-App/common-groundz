@@ -431,6 +431,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_comment: {
+        Args: {
+          p_item_id: string
+          p_item_type: string
+          p_content: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       check_post_like: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: boolean
@@ -446,6 +455,17 @@ export type Database = {
       delete_post_save: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
+      }
+      get_comments_with_profiles: {
+        Args: { p_table_name: string; p_id_field: string; p_item_id: string }
+        Returns: {
+          id: string
+          content: string
+          created_at: string
+          user_id: string
+          username: string
+          avatar_url: string
+        }[]
       }
       get_post_likes_by_posts: {
         Args: { p_post_ids: string[] }
