@@ -37,6 +37,7 @@ export interface Recommendation {
   created_at: string;
   updated_at: string;
   likes?: number;
+  comment_count?: number;
   isLiked?: boolean;
   isSaved?: boolean;
   entity?: Entity | null;

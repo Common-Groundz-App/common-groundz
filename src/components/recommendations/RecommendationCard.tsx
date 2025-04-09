@@ -130,7 +130,7 @@ const RecommendationCard = ({
               }}
             >
               <MessageCircle size={16} />
-              {recommendation.comment_count > 0 && (
+              {recommendation.comment_count && recommendation.comment_count > 0 && (
                 <span>{recommendation.comment_count}</span>
               )}
             </Button>
