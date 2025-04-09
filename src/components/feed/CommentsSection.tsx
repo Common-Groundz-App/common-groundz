@@ -15,7 +15,7 @@ interface CommentsSectionProps {
 export const CommentsSection: React.FC<CommentsSectionProps> = ({
   post_id,
   recommendation_id,
-  commentCount
+  commentCount = 0
 }) => {
   const [expanded, setExpanded] = React.useState(false);
   const { user } = useAuth();

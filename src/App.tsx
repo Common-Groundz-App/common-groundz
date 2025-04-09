@@ -14,7 +14,14 @@ import Profile from "./pages/Profile";
 import Feed from "./pages/Feed";
 
 // Create a new QueryClient instance outside of the component
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Use a regular function component instead of an arrow function
 function App() {

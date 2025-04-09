@@ -1,65 +1,60 @@
 
-import React, { useState, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import React, { useState } from 'react';
 import { CommentWithUser } from '@/types/comments';
-import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
+import CommentItem from './CommentItem';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CommentsListProps {
   comments: CommentWithUser[];
-  repliesMap: Map<string, CommentWithUser[]>;
+  repliesMap: Record<string, CommentWithUser[]>;
   loading: boolean;
-  loadingReplies: string[];
-  hasLoadedReplies: (commentId: string) => boolean;
-  onAddComment: (content: string, parentId: string | null) => Promise<void>;
-  onEditComment: (id: string, content: string) => Promise<void>;
-  onDeleteComment: (id: string) => void;
-  onLikeComment: (id: string, isLiked: boolean) => void;
-  onLoadReplies: (commentId: string) => void;
+  loadingReplies: Record<string, boolean>;
+  hasLoadedReplies: Record<string, boolean>;
+  onAddComment: (content: string, parentId?: string | null) => Promise<any>;
+  onEditComment: (commentId: string, content: string, parentId?: string | null) => Promise<any>;
+  onDeleteComment: (commentId: string, parentId?: string | null) => Promise<void>;
+  onLikeComment: (commentId: string, isLiked: boolean, parentId?: string | null) => Promise<void>;
+  onLoadReplies: (commentId: string) => Promise<void>;
 }
 
-export const CommentsList: React.FC<CommentsListProps> = ({
-  comments,
-  repliesMap,
-  loading,
-  loadingReplies,
-  hasLoadedReplies,
+const CommentsList: React.FC<CommentsListProps> = ({
+  comments = [],
+  repliesMap = {},
+  loading = false,
+  loadingReplies = {},
+  hasLoadedReplies = {},
   onAddComment,
   onEditComment,
   onDeleteComment,
   onLikeComment,
-  onLoadReplies
+  onLoadReplies,
 }) => {
   const { user } = useAuth();
-  const [replyingToId, setReplyingToId] = useState<string | null>(null);
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
   
-  const handleReply = useCallback((commentId: string) => {
-    setReplyingToId(commentId === replyingToId ? null : commentId);
-  }, [replyingToId]);
+  const handleAddComment = async (content: string) => {
+    await onAddComment(content);
+  };
   
-  const toggleReplies = useCallback((commentId: string) => {
-    setExpandedComments(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(commentId)) {
-        newSet.delete(commentId);
-      } else {
-        newSet.add(commentId);
-      }
-      return newSet;
-    });
-  }, []);
+  const handleAddReply = async (content: string, parentId: string) => {
+    await onAddComment(content, parentId);
+    setReplyingTo(null);
+  };
   
   if (loading) {
     return (
-      <div className="space-y-6">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="flex space-x-3">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <div className="space-y-2 flex-1">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-16 w-full" />
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex space-x-4 animate-pulse">
+            <div className="w-10 h-10 rounded-full bg-muted"></div>
+            <div className="flex-1 py-1 space-y-2">
+              <div className="h-4 w-1/4 bg-muted rounded"></div>
+              <div className="h-3 bg-muted rounded"></div>
+              <div className="h-3 w-3/4 bg-muted rounded"></div>
             </div>
           </div>
         ))}
@@ -68,60 +63,39 @@ export const CommentsList: React.FC<CommentsListProps> = ({
   }
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {user && (
-        <CommentForm
-          onSubmit={content => onAddComment(content, null)}
-          placeholder="Write a comment..."
+        <CommentForm 
+          onSubmit={handleAddComment}
+          placeholder="Add a comment..."
         />
       )}
       
-      {comments.length === 0 ? (
-        <div className="text-center py-6">
-          <p className="text-muted-foreground">No comments yet. Be the first to comment!</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {comments.map(comment => (
-            <div key={comment.id} className="space-y-4">
-              <CommentItem
+      {comments.length > 0 ? (
+        <ScrollArea className="max-h-[500px] pr-4">
+          <div className="space-y-5 py-1">
+            {comments.map((comment) => (
+              <CommentItem 
+                key={comment.id}
                 comment={comment}
-                onReply={handleReply}
-                onEdit={onEditComment}
-                onDelete={onDeleteComment}
-                onLike={onLikeComment}
-                onLoadReplies={onLoadReplies}
-                isReplyOpen={replyingToId === comment.id}
-                hasReplies={comment.replies_count > 0}
-                repliesLoaded={hasLoadedReplies(comment.id)}
-                isLoadingReplies={loadingReplies.includes(comment.id)}
-                showReplies={expandedComments.has(comment.id)}
-                onToggleReplies={() => toggleReplies(comment.id)}
+                onEdit={(content) => onEditComment(comment.id, content)}
+                onDelete={() => onDeleteComment(comment.id)}
+                onLike={() => onLikeComment(comment.id, comment.is_liked)}
+                onReply={() => setReplyingTo(comment.id)}
+                isReplying={replyingTo === comment.id}
+                onCancelReply={() => setReplyingTo(null)}
+                onSubmitReply={(content) => handleAddReply(content, comment.id)}
+                replies={repliesMap[comment.id] || []}
+                isLoadingReplies={loadingReplies[comment.id] || false}
+                hasLoadedReplies={hasLoadedReplies[comment.id] || false}
+                onLoadReplies={() => onLoadReplies(comment.id)}
               />
-              
-              {expandedComments.has(comment.id) && hasLoadedReplies(comment.id) && (
-                <div className="ml-8 pl-4 border-l space-y-4">
-                  {repliesMap.get(comment.id)?.map(reply => (
-                    <CommentItem
-                      key={reply.id}
-                      comment={reply}
-                      onReply={handleReply}
-                      onEdit={onEditComment}
-                      onDelete={onDeleteComment}
-                      onLike={(id, isLiked) => onLikeComment(id, isLiked)}
-                      onLoadReplies={() => {}} // Replies to replies not supported for simplicity
-                      isReplyOpen={replyingToId === reply.id}
-                      hasReplies={false}
-                      repliesLoaded={false}
-                      isLoadingReplies={false}
-                      showReplies={false}
-                      onToggleReplies={() => {}}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
+        </ScrollArea>
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          {user ? 'Be the first to comment!' : 'No comments yet.'}
         </div>
       )}
     </div>

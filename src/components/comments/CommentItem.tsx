@@ -1,225 +1,210 @@
 
 import React, { useState } from 'react';
-import { format } from 'date-fns';
-import { Heart, Reply, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
 import { CommentWithUser } from '@/types/comments';
 import { useAuth } from '@/contexts/AuthContext';
+import { format } from 'date-fns';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Heart, MessageCircle, MoreVertical, Trash, Pencil } from 'lucide-react';
 import CommentForm from './CommentForm';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface CommentItemProps {
   comment: CommentWithUser;
-  onReply: (commentId: string) => void;
-  onEdit: (commentId: string, content: string) => Promise<void>;
-  onDelete: (commentId: string) => void;
-  onLike: (commentId: string, isLiked: boolean) => void;
-  onLoadReplies: (commentId: string) => void;
-  isReplyOpen?: boolean;
-  hasReplies: boolean;
-  repliesLoaded: boolean;
+  onEdit: (content: string) => Promise<any>;
+  onDelete: () => Promise<void>;
+  onLike: () => Promise<void>;
+  onReply: () => void;
+  isReplying: boolean;
+  onCancelReply: () => void;
+  onSubmitReply: (content: string) => Promise<any>;
+  replies: CommentWithUser[];
   isLoadingReplies: boolean;
-  showReplies: boolean;
-  onToggleReplies: () => void;
+  hasLoadedReplies: boolean;
+  onLoadReplies: () => Promise<void>;
 }
 
-export const CommentItem: React.FC<CommentItemProps> = ({
+const CommentItem: React.FC<CommentItemProps> = ({
   comment,
-  onReply,
   onEdit,
   onDelete,
   onLike,
-  onLoadReplies,
-  isReplyOpen,
-  hasReplies,
-  repliesLoaded,
+  onReply,
+  isReplying,
+  onCancelReply,
+  onSubmitReply,
+  replies = [],
   isLoadingReplies,
-  showReplies,
-  onToggleReplies
+  hasLoadedReplies,
+  onLoadReplies,
 }) => {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Invalid date';
-      
-      const now = new Date();
-      const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-      
-      if (diffInHours < 1) {
-        return 'Just now';
-      } else if (diffInHours < 24) {
-        return `${diffInHours}h ago`;
-      } else {
-        return format(date, 'MMM d, yyyy');
-      }
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Unknown date';
-    }
-  };
+  const isOwner = user?.id === comment.user_id;
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
   };
   
-  const isOwner = user?.id === comment.user_id;
+  const formatDate = (dateString: string) => {
+    return format(new Date(dateString), 'MMM d, yyyy • h:mm a');
+  };
   
-  const handleSaveEdit = async (content: string) => {
-    await onEdit(comment.id, content);
+  const handleEditSubmit = async (content: string) => {
+    await onEdit(content);
     setIsEditing(false);
   };
-  
-  const handleToggleReplies = () => {
-    if (!repliesLoaded && hasReplies) {
-      onLoadReplies(comment.id);
-    }
-    onToggleReplies();
-  };
-  
+
   return (
-    <div className="flex flex-col space-y-2">
-      <div className="flex space-x-3">
-        <div className="flex-shrink-0">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={comment.avatar_url || undefined} alt={comment.username || 'User'} />
-            <AvatarFallback>{getInitials(comment.username)}</AvatarFallback>
-          </Avatar>
-        </div>
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={comment.avatar_url || undefined} alt={comment.username || 'User'} />
+          <AvatarFallback>{getInitials(comment.username)}</AvatarFallback>
+        </Avatar>
         
-        <div className="flex-1 min-w-0">
-          <div className="bg-muted/50 px-3 py-2 rounded-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="font-semibold text-sm">
-                  {comment.username || 'Anonymous'}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {formatDate(comment.created_at)}
-                </span>
-                {comment.created_at !== comment.updated_at && (
-                  <span className="text-xs text-muted-foreground italic">(edited)</span>
+        <div className="flex-1 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm">{comment.username || 'Anonymous'}</span>
+            <span className="text-xs text-muted-foreground">{formatDate(comment.created_at)}</span>
+          </div>
+          
+          {isEditing ? (
+            <CommentForm
+              initialContent={comment.content}
+              onSubmit={handleEditSubmit}
+              onCancel={() => setIsEditing(false)}
+              isEditing={true}
+            />
+          ) : (
+            <div className="text-sm">{comment.content}</div>
+          )}
+          
+          {!isEditing && (
+            <div className="flex items-center gap-4 pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "p-0 h-auto text-xs font-medium flex items-center gap-1",
+                  comment.is_liked && "text-red-500"
                 )}
-              </div>
+                onClick={onLike}
+              >
+                <Heart size={14} className={cn(comment.is_liked && "fill-red-500")} />
+                {comment.likes_count > 0 && <span>{comment.likes_count}</span>}
+                {comment.is_liked ? "Liked" : "Like"}
+              </Button>
               
-              {isOwner && !isEditing && (
+              {user && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-0 h-auto text-xs font-medium"
+                  onClick={onReply}
+                >
+                  <MessageCircle size={14} className="mr-1" />
+                  Reply
+                </Button>
+              )}
+              
+              {isOwner && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="sr-only">More options</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                      <MoreVertical size={14} />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="w-32">
                     <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                      <Pencil size={14} className="mr-2" />
                       Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => onDelete(comment.id)}
-                      className="text-destructive focus:text-destructive"
-                    >
+                    <DropdownMenuItem onClick={onDelete} className="text-red-500 focus:text-red-500">
+                      <Trash size={14} className="mr-2" />
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
             </div>
-            
-            {isEditing ? (
-              <CommentForm
-                initialContent={comment.content}
-                onSubmit={handleSaveEdit}
-                onCancel={() => setIsEditing(false)}
-                isEditing
-              />
-            ) : (
-              <div className="mt-1 text-sm">{comment.content}</div>
-            )}
-          </div>
-          
-          {!isEditing && (
-            <div className="flex items-center space-x-4 mt-1 ml-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-7 p-0 text-xs flex items-center space-x-1",
-                  comment.is_liked && "text-red-500"
-                )}
-                onClick={() => onLike(comment.id, comment.is_liked)}
-              >
-                <Heart 
-                  className={cn(
-                    "h-3.5 w-3.5", 
-                    comment.is_liked && "fill-red-500"
-                  )} 
-                />
-                <span>{comment.likes_count > 0 ? comment.likes_count : ''}</span>
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 p-0 text-xs flex items-center space-x-1"
-                onClick={() => onReply(comment.id)}
-              >
-                <Reply className="h-3.5 w-3.5" />
-                <span>Reply</span>
-              </Button>
-              
-              {hasReplies && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 p-0 text-xs flex items-center space-x-1"
-                  onClick={handleToggleReplies}
-                  disabled={isLoadingReplies}
-                >
-                  {isLoadingReplies ? (
-                    <span>Loading...</span>
-                  ) : (
-                    <>
-                      {showReplies ? (
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      )}
-                      <span>
-                        {showReplies ? 'Hide' : `View ${comment.replies_count}`} 
-                        {comment.replies_count === 1 ? ' reply' : ' replies'}
-                      </span>
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
           )}
           
-          {isReplyOpen && (
-            <div className="mt-3 ml-[-12px]">
-              <CommentForm 
-                parentId={comment.id}
+          {/* Reply form */}
+          {isReplying && (
+            <div className="mt-3">
+              <CommentForm
                 placeholder="Write a reply..."
-                onSubmit={async (content) => {
-                  await onEdit(comment.id, content);
-                  onReply(''); // Close reply form
-                }}
-                onCancel={() => onReply('')}
+                onSubmit={onSubmitReply}
+                onCancel={onCancelReply}
               />
             </div>
           )}
         </div>
       </div>
+      
+      {/* Show replies or load replies button */}
+      {comment.replies_count > 0 && !hasLoadedReplies && (
+        <div className="ml-11">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground flex items-center"
+            onClick={onLoadReplies}
+            disabled={isLoadingReplies}
+          >
+            <MessageCircle size={14} className="mr-1" />
+            {isLoadingReplies ? 'Loading...' : `Show ${comment.replies_count} ${comment.replies_count === 1 ? 'reply' : 'replies'}`}
+          </Button>
+        </div>
+      )}
+      
+      {/* Loading replies skeleton */}
+      {isLoadingReplies && (
+        <div className="ml-11 space-y-3">
+          {[1, 2].map(i => (
+            <div key={i} className="flex gap-3 animate-pulse">
+              <div className="w-7 h-7 rounded-full bg-muted"></div>
+              <div className="flex-1 space-y-1">
+                <div className="h-3 w-20 bg-muted rounded"></div>
+                <div className="h-2 w-full bg-muted rounded"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* Replies list */}
+      {replies.length > 0 && (
+        <div className="ml-11 space-y-4">
+          {replies.map(reply => (
+            <CommentItem
+              key={reply.id}
+              comment={reply}
+              onEdit={(content) => onEdit(content)}
+              onDelete={onDelete}
+              onLike={() => onLike()}
+              onReply={() => {}}
+              isReplying={false}
+              onCancelReply={() => {}}
+              onSubmitReply={() => Promise.resolve()}
+              replies={[]}
+              isLoadingReplies={false}
+              hasLoadedReplies={true}
+              onLoadReplies={() => Promise.resolve()}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
