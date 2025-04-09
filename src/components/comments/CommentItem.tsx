@@ -4,9 +4,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Heart, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { CommentWithUser } from '@/hooks/comments/types';
+import { formatDistanceToNow } from 'date-fns';
+import { Comment } from '@/types/comment';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import {
@@ -17,22 +17,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 interface CommentItemProps {
-  comment: CommentWithUser;
+  comment: Comment;
   onLike: () => void;
   onEdit: (content: string) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
-  onViewReplies: () => void;
-  isReply: boolean;
+  onViewReplies?: () => void;
+  isReply?: boolean;
 }
 
-const CommentItem: React.FC<CommentItemProps> = ({
+export default function CommentItem({
   comment,
   onLike,
   onEdit,
   onDelete,
   onViewReplies,
-  isReply
-}) => {
+  isReply = false
+}: CommentItemProps) {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
@@ -40,7 +40,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
   
   const isOwner = user?.id === comment.user_id;
   
-  const getInitials = (name: string | null | undefined) => {
+  const getInitials = (name: string | undefined) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
   };
@@ -48,20 +48,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      const now = new Date();
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-      
-      if (diffInMinutes < 1) {
-        return 'Just now';
-      } else if (diffInMinutes < 60) {
-        return `${diffInMinutes}m ago`;
-      } else if (diffInMinutes < 60 * 24) {
-        return `${Math.floor(diffInMinutes / 60)}h ago`;
-      } else if (diffInMinutes < 60 * 24 * 7) {
-        return `${Math.floor(diffInMinutes / (60 * 24))}d ago`;
-      } else {
-        return format(date, 'MMM d, yyyy');
-      }
+      return formatDistanceToNow(date, { addSuffix: true });
     } catch (e) {
       return 'Invalid date';
     }
@@ -101,7 +88,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
       transition={{ duration: 0.3 }}
     >
       <Avatar className="h-8 w-8 mt-1">
-        <AvatarImage src={comment.avatar_url || undefined} alt={comment.username || 'User'} />
+        <AvatarImage src={comment.avatar_url} alt={comment.username || 'User'} />
         <AvatarFallback>{getInitials(comment.username)}</AvatarFallback>
       </Avatar>
       
@@ -188,7 +175,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             {comment.like_count || 0} {comment.like_count === 1 ? 'Like' : 'Likes'}
           </Button>
           
-          {!isReply && (
+          {!isReply && onViewReplies && (
             <Button 
               variant="ghost" 
               size="sm" 
@@ -203,6 +190,4 @@ const CommentItem: React.FC<CommentItemProps> = ({
       </div>
     </motion.div>
   );
-};
-
-export default CommentItem;
+}

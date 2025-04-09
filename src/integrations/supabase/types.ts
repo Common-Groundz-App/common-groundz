@@ -534,10 +534,6 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
       }
-      get_comment_reply_count: {
-        Args: { comment_id: string }
-        Returns: number
-      }
       get_post_likes_by_posts: {
         Args: { p_post_ids: string[] }
         Returns: {
@@ -556,6 +552,10 @@ export type Database = {
         Returns: {
           post_id: string
         }[]
+      }
+      increment_comment_count: {
+        Args: { table_name: string; item_id: string }
+        Returns: undefined
       }
       increment_recommendation_view: {
         Args: { rec_id: string; viewer_id: string }

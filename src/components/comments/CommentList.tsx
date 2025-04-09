@@ -2,27 +2,26 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
-import { CommentWithUser } from '@/hooks/comments/types';
-import CommentItem from './CommentItem';
-import CommentInput from './CommentInput';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Comment } from '@/types/comment';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { motion, AnimatePresence } from 'framer-motion';
+import CommentItem from './CommentItem';
+import CommentInput from './CommentInput';
 
 interface CommentListProps {
-  comments: CommentWithUser[];
-  isLoading: boolean;
+  comments: Comment[];
+  loading: boolean;
+  error: Error | null;
   hasMore: boolean;
   onLoadMore: () => void;
-  onLike: (commentId: string) => void;
-  onEdit: (commentId: string, content: string) => Promise<boolean>;
-  onDelete: (commentId: string) => Promise<boolean>;
-  onReply: (content: string) => Promise<CommentWithUser | null>;
-  onViewReplies: (commentId: string) => void;
-  isViewingReplies: boolean;
-  onBackToMainComments: () => void;
-  parentId: string | null;
-  error: Error | null;
+  onAddComment: (content: string) => Promise<any>;
+  onLike: (id: string) => void;
+  onEdit: (id: string, content: string) => Promise<boolean>;
+  onDelete: (id: string) => Promise<boolean>;
+  onViewReplies?: (id: string) => void;
+  onBackToMain?: () => void;
+  isViewingReplies?: boolean;
 }
 
 const CommentSkeleton = () => (
@@ -38,28 +37,27 @@ const CommentSkeleton = () => (
   </div>
 );
 
-const CommentList: React.FC<CommentListProps> = ({
+export default function CommentList({
   comments,
-  isLoading,
+  loading,
+  error,
   hasMore,
   onLoadMore,
+  onAddComment,
   onLike,
   onEdit,
   onDelete,
-  onReply,
   onViewReplies,
-  isViewingReplies,
-  onBackToMainComments,
-  parentId,
-  error
-}) => {
-  // Determine if we should show empty state - only when not loading, no comments, and no error
-  const showEmptyState = !isLoading && comments.length === 0 && !error;
+  onBackToMain,
+  isViewingReplies = false
+}: CommentListProps) {
+  // Determine if we should show empty state
+  const showEmptyState = !loading && comments.length === 0 && !error;
   
   return (
     <div className="space-y-4">
       <AnimatePresence>
-        {isViewingReplies && (
+        {isViewingReplies && onBackToMain && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -68,7 +66,7 @@ const CommentList: React.FC<CommentListProps> = ({
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={onBackToMainComments}
+              onClick={onBackToMain}
               className="mb-2 flex items-center gap-1"
             >
               <ChevronLeft size={16} />
@@ -79,7 +77,7 @@ const CommentList: React.FC<CommentListProps> = ({
       </AnimatePresence>
       
       <CommentInput 
-        onSubmit={onReply} 
+        onSubmit={onAddComment} 
         placeholder={isViewingReplies ? "Add a reply..." : "Add a comment..."} 
         autoFocus={isViewingReplies}
       />
@@ -92,7 +90,7 @@ const CommentList: React.FC<CommentListProps> = ({
               {error.message || "Failed to load comments. Please try again later."}
             </AlertDescription>
           </Alert>
-        ) : isLoading && comments.length === 0 ? (
+        ) : loading && comments.length === 0 ? (
           <div className="space-y-4">
             {Array(3).fill(0).map((_, i) => (
               <CommentSkeleton key={i} />
@@ -116,7 +114,6 @@ const CommentList: React.FC<CommentListProps> = ({
             className="space-y-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            layout
           >
             {comments.map(comment => (
               <CommentItem
@@ -125,14 +122,14 @@ const CommentList: React.FC<CommentListProps> = ({
                 onLike={() => onLike(comment.id)}
                 onEdit={(content) => onEdit(comment.id, content)}
                 onDelete={() => onDelete(comment.id)}
-                onViewReplies={() => onViewReplies(comment.id)}
+                onViewReplies={onViewReplies ? () => onViewReplies(comment.id) : undefined}
                 isReply={isViewingReplies}
               />
             ))}
           </motion.div>
         )}
         
-        {isLoading && comments.length > 0 && (
+        {loading && comments.length > 0 && (
           <div className="space-y-4 mt-4">
             {Array(2).fill(0).map((_, i) => (
               <CommentSkeleton key={`loading-more-${i}`} />
@@ -141,13 +138,12 @@ const CommentList: React.FC<CommentListProps> = ({
         )}
         
         <AnimatePresence>
-          {hasMore && !isLoading && comments.length > 0 && !error && (
+          {hasMore && !loading && comments.length > 0 && !error && (
             <motion.div 
               className="flex justify-center py-2"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              layout
             >
               <Button 
                 variant="outline" 
@@ -163,6 +159,4 @@ const CommentList: React.FC<CommentListProps> = ({
       </div>
     </div>
   );
-};
-
-export default CommentList;
+}

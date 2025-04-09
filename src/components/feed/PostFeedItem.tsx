@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -141,18 +140,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                 <span>{post.likes}</span>
               )}
             </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowComments(!showComments)}
-              className="flex items-center gap-1"
-            >
-              <MessageCircle size={18} />
-              {localCommentCount > 0 && (
-                <span>{localCommentCount}</span>
-              )}
-            </Button>
           </div>
           
           <Button
@@ -173,13 +160,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         </div>
         
         <div className="w-full mt-2 border-t pt-2">
-          <Comments 
-            postId={post.id} 
-            visible={showComments} 
-            onToggleVisibility={() => setShowComments(!showComments)}
-            onCommentCountChange={handleCommentCountChange}
-            initialCommentCount={post.comment_count || 0} 
-          />
+          <Comments postId={post.id} />
         </div>
       </CardFooter>
     </Card>

@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CommentInputProps {
@@ -11,11 +12,11 @@ interface CommentInputProps {
   autoFocus?: boolean;
 }
 
-const CommentInput: React.FC<CommentInputProps> = ({ 
-  onSubmit, 
+export default function CommentInput({
+  onSubmit,
   placeholder = "Add a comment...",
   autoFocus = false
-}) => {
+}: CommentInputProps) {
   const { user } = useAuth();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,7 +58,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
   }
   
   return (
-    <div className="space-y-2 relative">
+    <div className="space-y-2">
       <Textarea 
         ref={textareaRef}
         value={content}
@@ -66,7 +67,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className={cn(
-          "min-h-[60px] transition-all resize-none",
+          "resize-none transition-all",
           isFocused || content ? "min-h-[80px]" : "min-h-[40px]"
         )}
       />
@@ -110,9 +111,4 @@ const CommentInput: React.FC<CommentInputProps> = ({
       </AnimatePresence>
     </div>
   );
-};
-
-// Import cn utility
-import { cn } from '@/lib/utils';
-
-export default CommentInput;
+}
