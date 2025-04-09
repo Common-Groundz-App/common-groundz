@@ -1,7 +1,12 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Comment, CommentWithUser, CreateCommentPayload, UpdateCommentPayload, CommentQueryParams } from '@/hooks/comments/types';
-import { Profile } from '@/services/profileService';
+import { 
+  Comment, 
+  CommentWithUser, 
+  CreateCommentPayload, 
+  UpdateCommentPayload, 
+  CommentQueryParams 
+} from '@/hooks/comments/types';
 
 /**
  * Fetches comments based on provided parameters
@@ -15,7 +20,7 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
       .from('comments')
       .select(`
         *,
-        profiles:profiles(id, username, avatar_url)
+        profiles(id, username, avatar_url)
       `)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
@@ -47,7 +52,7 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     
     // Process comments to add profile information
     const processedComments = comments.map((comment: any) => {
-      const profile = comment.profiles as Profile | null;
+      const profile = comment.profiles as any | null;
       
       return {
         ...comment,
@@ -67,8 +72,9 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
       // Get like counts
       const { data: likesData, error: likesError } = await supabase
         .from('comment_likes')
-        .select('comment_id, count(*)', { count: 'exact' })
+        .select('comment_id, count')
         .in('comment_id', commentIds)
+        .select('comment_id, count(*)', { count: 'exact', head: false })
         .group('comment_id');
         
       if (likesError) {
@@ -108,13 +114,17 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
       if (parent_id === null) {
         for (const comment of processedComments) {
           try {
-            const { data: replyCount, error: countError } = await supabase
-              .rpc('get_comment_reply_count', { comment_id: comment.id });
+            // Use simple count query instead of RPC function
+            const { count, error: countError } = await supabase
+              .from('comments')
+              .select('*', { count: 'exact', head: true })
+              .eq('parent_id', comment.id)
+              .eq('is_deleted', false);
               
             if (countError) {
               console.error('Error fetching reply count:', countError);
             } else {
-              comment.reply_count = replyCount;
+              comment.reply_count = count || 0;
             }
           } catch (err) {
             console.error(`Error getting reply count for comment ${comment.id}:`, err);
@@ -144,12 +154,12 @@ export const createComment = async (data: CreateCommentPayload, userId: string):
         parent_id: data.parent_id || null,
         user_id: userId
       })
-      .select()
+      .select('*')
       .single();
     
     if (error) throw error;
     
-    return comment;
+    return comment as Comment;
   } catch (error) {
     console.error('Error in createComment:', error);
     throw error;
@@ -169,12 +179,12 @@ export const updateComment = async (id: string, data: UpdateCommentPayload, user
       })
       .eq('id', id)
       .eq('user_id', userId) // Ensure user owns this comment
-      .select()
+      .select('*')
       .single();
     
     if (error) throw error;
     
-    return comment;
+    return comment as Comment;
   } catch (error) {
     console.error('Error in updateComment:', error);
     throw error;

@@ -1,6 +1,4 @@
 
-import { Profile } from '@/services/profileService';
-
 export interface Comment {
   id: string;
   content: string;
@@ -21,7 +19,12 @@ export interface Comment {
 }
 
 export interface CommentWithUser extends Comment {
-  profile?: Profile;
+  profile?: {
+    id: string;
+    username: string | null;
+    avatar_url: string | null;
+    [key: string]: any;
+  };
 }
 
 export interface CreateCommentPayload {
