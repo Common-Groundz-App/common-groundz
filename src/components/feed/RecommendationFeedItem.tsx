@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -125,7 +126,9 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
               className="flex items-center gap-1"
             >
               <MessageCircle size={18} />
-              <span>Comments</span>
+              {recommendation.comment_count > 0 && (
+                <span>{recommendation.comment_count}</span>
+              )}
             </Button>
           </div>
           

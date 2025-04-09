@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -134,7 +135,9 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({ post, onLike, onSave
               className="flex items-center gap-1"
             >
               <MessageCircle size={18} />
-              <span>Comments</span>
+              {post.comment_count > 0 && (
+                <span>{post.comment_count}</span>
+              )}
             </Button>
           </div>
           
