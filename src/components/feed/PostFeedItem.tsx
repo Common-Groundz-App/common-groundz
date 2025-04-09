@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, Tag } from 'lucide-react';
+import { Bookmark, Heart, Tag, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
@@ -17,12 +17,14 @@ interface PostFeedItemProps {
   post: PostItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
+  onComment?: (id: string) => void;
 }
 
 export const PostFeedItem: React.FC<PostFeedItemProps> = ({ 
   post, 
   onLike, 
-  onSave
+  onSave,
+  onComment
 }) => {
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -109,7 +111,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       </CardContent>
       
       <CardFooter className="flex justify-between pt-2 pb-4">
-        <div className="flex items-center">
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
@@ -125,6 +127,18 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             />
             {post.likes > 0 && (
               <span>{post.likes}</span>
+            )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={() => onComment && onComment(post.id)}
+          >
+            <MessageCircle size={18} />
+            {post.comment_count > 0 && (
+              <span>{post.comment_count}</span>
             )}
           </Button>
         </div>

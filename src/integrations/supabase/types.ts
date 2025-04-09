@@ -9,93 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      comment_likes: {
-        Row: {
-          comment_id: string
-          created_at: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          comment_id: string
-          created_at?: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          comment_id?: string
-          created_at?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comment_likes_comment_id_fkey"
-            columns: ["comment_id"]
-            isOneToOne: false
-            referencedRelation: "comments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      comments: {
-        Row: {
-          content: string
-          created_at: string
-          id: string
-          is_deleted: boolean
-          parent_id: string | null
-          post_id: string | null
-          recommendation_id: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          id?: string
-          is_deleted?: boolean
-          parent_id?: string | null
-          post_id?: string | null
-          recommendation_id?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          id?: string
-          is_deleted?: boolean
-          parent_id?: string | null
-          post_id?: string | null
-          recommendation_id?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comments_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "comments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comments_post_id_fkey"
-            columns: ["post_id"]
-            isOneToOne: false
-            referencedRelation: "posts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comments_recommendation_id_fkey"
-            columns: ["recommendation_id"]
-            isOneToOne: false
-            referencedRelation: "recommendations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       entities: {
         Row: {
           api_ref: string | null
@@ -552,10 +465,6 @@ export type Database = {
         Returns: {
           post_id: string
         }[]
-      }
-      increment_comment_count: {
-        Args: { table_name: string; item_id: string }
-        Returns: undefined
       }
       increment_recommendation_view: {
         Args: { rec_id: string; viewer_id: string }

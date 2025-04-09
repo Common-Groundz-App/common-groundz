@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, Star } from 'lucide-react';
+import { Bookmark, Heart, Star, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { FeedItem } from '@/hooks/feed/types';
@@ -13,12 +13,14 @@ interface RecommendationFeedItemProps {
   recommendation: FeedItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
+  onComment?: (id: string) => void;
 }
 
 export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({ 
   recommendation, 
   onLike, 
-  onSave
+  onSave,
+  onComment
 }) => {
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -96,7 +98,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
       </CardContent>
       
       <CardFooter className="flex justify-between pt-2 pb-4">
-        <div className="flex items-center">
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
@@ -112,6 +114,18 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             />
             {recommendation.likes > 0 && (
               <span>{recommendation.likes}</span>
+            )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={() => onComment && onComment(recommendation.id)}
+          >
+            <MessageCircle size={18} />
+            {recommendation.comment_count > 0 && (
+              <span>{recommendation.comment_count}</span>
             )}
           </Button>
         </div>
