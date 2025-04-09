@@ -14,12 +14,12 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
   try {
     const { post_id, recommendation_id, parent_id, limit = 10, offset = 0 } = params;
     
-    // Build base query for comments with proper join to profiles
+    // Build query with a cleaner join to profiles
     let query = supabase
       .from('comments')
       .select(`
         *,
-        profiles(id, username, avatar_url)
+        profiles:user_id(username, avatar_url)
       `)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
@@ -86,15 +86,13 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     // Process comments to add profile information
     const processedComments = comments.map((comment: any) => {
       // Extract profile data from the joined result
-      const profile = Array.isArray(comment.profiles) && comment.profiles.length > 0 
-        ? comment.profiles[0]  // If it's an array, take the first item
-        : comment.profiles;    // Otherwise use as is
+      const profileData = comment.profiles || {};
       
       return {
         ...comment,
         profiles: undefined, // Remove the profiles object
-        username: profile?.username || null,
-        avatar_url: profile?.avatar_url || null,
+        username: profileData.username || null,
+        avatar_url: profileData.avatar_url || null,
         like_count: 0, // Will be updated
         is_liked: false, // Will be updated
         reply_count: 0 // Will be updated

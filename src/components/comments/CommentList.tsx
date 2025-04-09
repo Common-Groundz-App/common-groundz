@@ -7,6 +7,7 @@ import CommentItem from './CommentItem';
 import CommentInput from './CommentInput';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface CommentListProps {
   comments: CommentWithUser[];
@@ -21,6 +22,7 @@ interface CommentListProps {
   isViewingReplies: boolean;
   onBackToMainComments: () => void;
   parentId: string | null;
+  error: Error | null;
 }
 
 const CommentSkeleton = () => (
@@ -48,8 +50,12 @@ const CommentList: React.FC<CommentListProps> = ({
   onViewReplies,
   isViewingReplies,
   onBackToMainComments,
-  parentId
+  parentId,
+  error
 }) => {
+  // Determine if we should show empty state
+  const showEmptyState = !isLoading && comments.length === 0 && !error;
+  
   return (
     <div className="space-y-4">
       <AnimatePresence>
@@ -79,13 +85,20 @@ const CommentList: React.FC<CommentListProps> = ({
       />
       
       <div className="space-y-4 mt-4">
-        {isLoading && comments.length === 0 ? (
+        {error ? (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTitle>Error loading comments</AlertTitle>
+            <AlertDescription>
+              {error.message || "Failed to load comments. Please try again later."}
+            </AlertDescription>
+          </Alert>
+        ) : isLoading && comments.length === 0 ? (
           <div className="space-y-4">
             {Array(3).fill(0).map((_, i) => (
               <CommentSkeleton key={i} />
             ))}
           </div>
-        ) : comments.length === 0 && !isLoading ? (
+        ) : showEmptyState ? (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -103,6 +116,7 @@ const CommentList: React.FC<CommentListProps> = ({
             className="space-y-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            layout
           >
             {comments.map(comment => (
               <CommentItem
@@ -127,12 +141,13 @@ const CommentList: React.FC<CommentListProps> = ({
         )}
         
         <AnimatePresence>
-          {hasMore && !isLoading && comments.length > 0 && (
+          {hasMore && !isLoading && comments.length > 0 && !error && (
             <motion.div 
               className="flex justify-center py-2"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
+              layout
             >
               <Button 
                 variant="outline" 

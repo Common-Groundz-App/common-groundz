@@ -1,5 +1,4 @@
-
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -34,13 +33,25 @@ export const useComments = ({
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [retryCount, setRetryCount] = useState<number>(0);
+  const maxRetries = 3;
   
-  // Default limit for comments per page
+  const isMounted = useRef(true);
+  const isRefreshing = useRef(false);
+  
   const limit = 10;
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
   
-  // Function to load comments
   const loadComments = useCallback(async (reset: boolean = false) => {
     if (!postId && !recommendationId) return;
+    if (isRefreshing.current) return;
+    
+    isRefreshing.current = true;
     
     try {
       setIsLoading(true);
@@ -59,49 +70,69 @@ export const useComments = ({
       
       const { comments: fetchedComments, totalCount } = await fetchComments(params, user?.id);
       
-      if (reset) {
-        setComments(fetchedComments);
-      } else {
-        setComments(prev => [...prev, ...fetchedComments]);
+      if (isMounted.current) {
+        if (reset) {
+          setComments(fetchedComments);
+        } else {
+          setComments(prev => [...prev, ...fetchedComments]);
+        }
+        
+        setTotalCount(totalCount);
+        if (onCommentCountChange) {
+          onCommentCountChange(totalCount);
+        }
+        
+        setOffset(reset ? limit : offset + limit);
+        setHasMore(fetchedComments.length >= limit);
+        
+        setRetryCount(0);
       }
-      
-      // Set total count for parent item
-      setTotalCount(totalCount);
-      if (onCommentCountChange) {
-        onCommentCountChange(totalCount);
-      }
-      
-      // Update pagination
-      setOffset(reset ? limit : offset + limit);
-      setHasMore(fetchedComments.length >= limit);
     } catch (err) {
       console.error("Error loading comments:", err);
-      setError(err as Error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load comments. Please try again.',
-        variant: 'destructive'
-      });
+      
+      if (isMounted.current) {
+        setError(err as Error);
+        
+        if (retryCount < maxRetries) {
+          const nextRetry = Math.min(1000 * Math.pow(2, retryCount), 8000);
+          console.log(`Retrying in ${nextRetry}ms (attempt ${retryCount + 1}/${maxRetries})`);
+          
+          setTimeout(() => {
+            setRetryCount(prevCount => prevCount + 1);
+            if (isMounted.current) {
+              loadComments(reset);
+            }
+          }, nextRetry);
+        } else {
+          toast({
+            title: 'Error',
+            description: 'Failed to load comments after multiple attempts.',
+            variant: 'destructive'
+          });
+        }
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
+      isRefreshing.current = false;
     }
-  }, [postId, recommendationId, parentId, offset, limit, user?.id, toast, onCommentCountChange]);
+  }, [postId, recommendationId, parentId, offset, limit, user?.id, toast, onCommentCountChange, retryCount, maxRetries]);
   
-  // Function to handle changing parent ID (for viewing replies)
   const viewReplies = useCallback((commentId: string) => {
     setParentId(commentId);
     setOffset(0);
     setHasMore(true);
+    setComments([]);
   }, []);
   
-  // Function to go back to main comments
   const viewMainComments = useCallback(() => {
     setParentId(null);
     setOffset(0);
     setHasMore(true);
+    setComments([]);
   }, []);
   
-  // Function to add a new comment
   const addComment = useCallback(async (content: string) => {
     if (!user) {
       toast({
@@ -123,7 +154,6 @@ export const useComments = ({
       
       const newComment = await createComment(payload, user.id);
       
-      // Optimistically add the new comment to the list
       const commentWithUser: CommentWithUser = {
         ...newComment,
         username: user.user_metadata?.username || null,
@@ -135,7 +165,6 @@ export const useComments = ({
       
       setComments(prev => [commentWithUser, ...prev]);
       
-      // Increment comment count in the parent item
       if (!parentId) {
         const newTotalCount = totalCount + 1;
         setTotalCount(newTotalCount);
@@ -143,7 +172,6 @@ export const useComments = ({
           onCommentCountChange(newTotalCount);
         }
         
-        // Update the comment count in the database
         if (postId) {
           await incrementCommentCount('post', postId);
         } else if (recommendationId) {
@@ -167,7 +195,6 @@ export const useComments = ({
     }
   }, [postId, recommendationId, parentId, user, toast, totalCount, onCommentCountChange]);
   
-  // Function to edit a comment
   const editComment = useCallback(async (commentId: string, content: string) => {
     if (!user) {
       toast({
@@ -182,7 +209,6 @@ export const useComments = ({
       const payload: UpdateCommentPayload = { content };
       await updateComment(commentId, payload, user.id);
       
-      // Update the comment in the local state
       setComments(prev => 
         prev.map(comment => 
           comment.id === commentId ? { ...comment, content } : comment
@@ -205,7 +231,6 @@ export const useComments = ({
     }
   }, [user, toast]);
   
-  // Function to remove a comment
   const removeComment = useCallback(async (commentId: string) => {
     if (!user) {
       toast({
@@ -219,7 +244,6 @@ export const useComments = ({
     try {
       await deleteComment(commentId, user.id);
       
-      // Remove the comment from the local state
       setComments(prev => prev.filter(comment => comment.id !== commentId));
       
       toast({
@@ -238,7 +262,6 @@ export const useComments = ({
     }
   }, [user, toast]);
   
-  // Function to handle liking a comment
   const handleLike = useCallback(async (commentId: string) => {
     if (!user) {
       toast({
@@ -252,7 +275,6 @@ export const useComments = ({
     try {
       const isLiked = await toggleCommentLike(commentId, user.id);
       
-      // Update the comment in the local state
       setComments(prev => 
         prev.map(comment => {
           if (comment.id === commentId) {
@@ -271,11 +293,17 @@ export const useComments = ({
     }
   }, [user, toast]);
   
-  // Load comments on mount or when dependencies change
   useEffect(() => {
     if (postId || recommendationId) {
       loadComments(true);
     }
+    
+    return () => {
+      setComments([]);
+      setOffset(0);
+      setHasMore(true);
+      setError(null);
+    };
   }, [postId, recommendationId, parentId, loadComments]);
   
   return {

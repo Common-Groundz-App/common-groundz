@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import { useComments } from '@/hooks/comments/use-comments';
 import CommentList from './CommentList';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface CommentsProps {
   postId?: string;
@@ -25,6 +26,9 @@ const Comments: React.FC<CommentsProps> = ({
 }) => {
   const [showComments, setShowComments] = useState(visible);
   const [commentCount, setCommentCount] = useState(initialCommentCount);
+  const errorTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const maxRetries = 3;
   
   // Update local state when prop changes
   React.useEffect(() => {
@@ -68,17 +72,35 @@ const Comments: React.FC<CommentsProps> = ({
     }
   }, [totalCount]);
 
-  // Try to refresh comments if we encounter an error
+  // Improved error handling with limited retries
   useEffect(() => {
-    if (error && showComments) {
-      // Add a slight delay before retrying to prevent immediate re-fetch
-      const timer = setTimeout(() => {
-        refreshComments();
-      }, 2000);
+    if (error && showComments && retryAttempt < maxRetries) {
+      // Clear any existing timers
+      if (errorTimerRef.current) {
+        clearTimeout(errorTimerRef.current);
+      }
       
-      return () => clearTimeout(timer);
+      // Add a progressive delay before retrying to prevent constant bouncing
+      const delay = Math.min(2000 * Math.pow(1.5, retryAttempt), 10000);
+      
+      errorTimerRef.current = setTimeout(() => {
+        console.log(`Retry attempt ${retryAttempt + 1}/${maxRetries}`);
+        setRetryAttempt(prev => prev + 1);
+        refreshComments();
+      }, delay);
+      
+      return () => {
+        if (errorTimerRef.current) {
+          clearTimeout(errorTimerRef.current);
+        }
+      };
     }
-  }, [error, showComments, refreshComments]);
+  }, [error, showComments, refreshComments, retryAttempt, maxRetries]);
+
+  // Reset retry attempts when comments are toggled or IDs change
+  useEffect(() => {
+    setRetryAttempt(0);
+  }, [postId, recommendationId, showComments]);
 
   const handleToggleComments = () => {
     const newVisibility = !showComments;
@@ -90,6 +112,17 @@ const Comments: React.FC<CommentsProps> = ({
   
   return (
     <div className="mt-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleToggleComments}
+        className="flex items-center gap-1"
+      >
+        <MessageCircle size={18} />
+        {commentCount > 0 && <span>{commentCount}</span>}
+        <span>{showComments ? 'Hide comments' : 'Show comments'}</span>
+      </Button>
+      
       <AnimatePresence>
         {showComments && (
           <motion.div 
@@ -112,6 +145,25 @@ const Comments: React.FC<CommentsProps> = ({
                 Hide comments
               </Button>
             </div>
+            
+            {error && retryAttempt >= maxRetries && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertTitle>Failed to load comments</AlertTitle>
+                <AlertDescription className="flex justify-between items-center">
+                  <span>Please try again later.</span>
+                  <Button
+                    size="sm" 
+                    onClick={() => {
+                      setRetryAttempt(0);
+                      refreshComments();
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <CommentList
               comments={comments}
               isLoading={isLoading}
@@ -125,6 +177,7 @@ const Comments: React.FC<CommentsProps> = ({
               isViewingReplies={isViewingReplies}
               onBackToMainComments={viewMainComments}
               parentId={parentId}
+              error={error && retryAttempt >= maxRetries ? error : null}
             />
           </motion.div>
         )}
