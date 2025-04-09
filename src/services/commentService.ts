@@ -17,7 +17,7 @@ export async function fetchComments(
       .from('comments')
       .select(`
         *,
-        profiles:user_id (
+        profiles!comments_user_id_fkey (
           username,
           avatar_url
         )
