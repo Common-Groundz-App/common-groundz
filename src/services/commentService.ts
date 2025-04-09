@@ -54,11 +54,12 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
     const commentIds = data.map(comment => comment.id);
     
     // Fetch like counts for all comments
-    const { data: likeCounts, error: likesError } = await supabase
+    const likeCountsQuery = supabase
       .from('comment_likes')
-      .select('comment_id, count(*)', { count: 'exact' })
-      .in('comment_id', commentIds)
-      .group('comment_id');
+      .select('comment_id, count', { count: 'exact', head: false })
+      .in('comment_id', commentIds);
+      
+    const { data: likeCounts, error: likesError } = await likeCountsQuery;
 
     if (likesError) {
       console.error('Error fetching comment likes:', likesError);
@@ -68,7 +69,8 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
     const likeCountMap = new Map();
     if (likeCounts) {
       likeCounts.forEach((row: any) => {
-        likeCountMap.set(row.comment_id, parseInt(row.count));
+        const count = parseInt(row.count || '0');
+        likeCountMap.set(row.comment_id, count);
       });
     }
 
@@ -93,10 +95,21 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
     // Create a set of comment_ids that the user has liked
     const userLikedCommentIds = new Set(userLikes.map((like: any) => like.comment_id));
     
-    // Get reply counts for each comment
-    const replyCountsPromises = commentIds.map(commentId => 
-      getCommentRepliesCount(commentId)
-    );
+    // Get reply counts for each comment using separate queries instead of RPC
+    const replyCountsPromises = commentIds.map(async (commentId) => {
+      const { count, error } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('parent_id', commentId)
+        .eq('is_deleted', false);
+      
+      if (error) {
+        console.error(`Error getting replies count for comment ${commentId}:`, error);
+        return 0;
+      }
+      
+      return count || 0;
+    });
     
     const replyCounts = await Promise.all(replyCountsPromises);
     const replyCountMap = new Map();
@@ -132,15 +145,18 @@ export const fetchComments = async (params: FetchCommentsParams): Promise<Commen
  */
 export const getCommentRepliesCount = async (commentId: string): Promise<number> => {
   try {
-    const { data, error } = await supabase
-      .rpc('get_comment_replies_count', { comment_id: commentId });
+    const { count, error } = await supabase
+      .from('comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', commentId)
+      .eq('is_deleted', false);
     
     if (error) {
       console.error('Error fetching comment replies count:', error);
       return 0;
     }
     
-    return data || 0;
+    return count || 0;
   } catch (error) {
     console.error('Error in getCommentRepliesCount:', error);
     return 0;

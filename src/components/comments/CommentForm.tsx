@@ -42,7 +42,7 @@ export const CommentForm: React.FC<CommentFormProps> = ({
     }
   };
   
-  const getInitials = (name: string | null) => {
+  const getInitials = (name: string | null | undefined) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
   };
