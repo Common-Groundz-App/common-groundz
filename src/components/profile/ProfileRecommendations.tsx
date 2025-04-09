@@ -72,6 +72,13 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
     }
   };
 
+  const handleComment = (id: string) => {
+    toast({
+      title: "Comments",
+      description: "Comment functionality will be implemented soon!"
+    });
+  };
+
   return (
     <div className="space-y-6 mx-0 my-0">
       <RecommendationFilters 
@@ -102,6 +109,7 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
               recommendation={item}
               onLike={handleLike}
               onSave={handleSave}
+              onComment={handleComment}
             />
           ))}
         </div>

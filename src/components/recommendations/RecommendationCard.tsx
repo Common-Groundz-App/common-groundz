@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Award, Bookmark, Eye } from 'lucide-react';
+import { Heart, Award, Bookmark, Eye, MessageCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import RatingStars from './RatingStars';
 import { Recommendation } from '@/services/recommendationService';
@@ -13,12 +13,14 @@ interface RecommendationCardProps {
   recommendation: Recommendation;
   onLike: (id: string) => void;
   onSave: (id: string) => void;
+  onComment?: (id: string) => void;
 }
 
 const RecommendationCard = ({ 
   recommendation, 
   onLike, 
-  onSave 
+  onSave,
+  onComment
 }: RecommendationCardProps) => {
   return (
     <Card 
@@ -94,27 +96,46 @@ const RecommendationCard = ({
         <RatingStars rating={recommendation.rating} />
         
         <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className={cn(
-              "transition-colors flex items-center gap-1 px-2",
-              recommendation.isLiked 
-                ? "text-red-500" 
-                : "text-gray-500 hover:text-red-500"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onLike(recommendation.id);
-            }}
-          >
-            <Heart 
-              size={16} 
-              className={recommendation.isLiked ? "fill-red-500" : ""} 
-            />
-            <span>{recommendation.likes}</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={cn(
+                "transition-colors flex items-center gap-1 px-2",
+                recommendation.isLiked 
+                  ? "text-red-500" 
+                  : "text-gray-500 hover:text-red-500"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onLike(recommendation.id);
+              }}
+            >
+              <Heart 
+                size={16} 
+                className={recommendation.isLiked ? "fill-red-500" : ""} 
+              />
+              <span>{recommendation.likes}</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="transition-colors flex items-center gap-1 px-2 text-gray-500 hover:text-gray-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (onComment) onComment(recommendation.id);
+              }}
+            >
+              <MessageCircle size={16} />
+              {recommendation.comment_count > 0 && (
+                <span>{recommendation.comment_count}</span>
+              )}
+            </Button>
+          </div>
+          
           <Button variant="outline" size="sm" className="text-xs">
             View Details
           </Button>
