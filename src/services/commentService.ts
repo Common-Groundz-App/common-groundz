@@ -70,16 +70,13 @@ export const fetchComments = async (params: CommentQueryParams, userId?: string)
     
     if (commentIds.length > 0) {
       // Get like counts
-      const { data: likesData, error: likesError } = await supabase
+      const { data: likesData } = await supabase
         .from('comment_likes')
-        .select('comment_id, count')
+        .select('comment_id, count(*)', { count: 'exact' })
         .in('comment_id', commentIds)
-        .select('comment_id, count(*)', { count: 'exact', head: false })
-        .group('comment_id');
+        .groupBy('comment_id');
         
-      if (likesError) {
-        console.error('Error fetching comment likes:', likesError);
-      } else if (likesData) {
+      if (likesData) {
         // Add like counts to comments
         likesData.forEach((like: any) => {
           const comment = processedComments.find(c => c.id === like.comment_id);
