@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -149,9 +148,9 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         </div>
         
         <div className="w-full border-t mt-2 pt-2">
-          <CommentsSection
-            post_id={post.id}
-            commentCount={post.comment_count || 0}
+          <CommentsSection 
+            post_id={post.id} 
+            commentCount={0} 
           />
         </div>
       </CardFooter>

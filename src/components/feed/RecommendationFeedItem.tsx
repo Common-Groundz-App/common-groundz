@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -136,9 +135,9 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         </div>
         
         <div className="w-full border-t mt-2 pt-2">
-          <CommentsSection
+          <CommentsSection 
             recommendation_id={recommendation.id}
-            commentCount={recommendation.comment_count || 0}
+            commentCount={0}
           />
         </div>
       </CardFooter>
