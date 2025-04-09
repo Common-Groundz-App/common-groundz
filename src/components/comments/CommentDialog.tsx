@@ -6,19 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-
-export interface Comment {
-  id: string;
-  content: string;
-  created_at: string;
-  user_id: string;
-  username?: string;
-  avatar_url?: string;
-}
+import { fetchComments, addComment, CommentData } from '@/services/commentsService';
 
 interface CommentDialogProps {
   isOpen: boolean;
@@ -29,7 +20,7 @@ interface CommentDialogProps {
 }
 
 const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: CommentDialogProps) => {
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<CommentData[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -38,45 +29,17 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
 
   useEffect(() => {
     if (isOpen && itemId) {
-      fetchComments();
+      loadComments();
     }
   }, [isOpen, itemId]);
 
-  const fetchComments = async () => {
+  const loadComments = async () => {
     setIsLoading(true);
     try {
-      const tableName = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
-      const idField = itemType === 'recommendation' ? 'recommendation_id' : 'post_id';
-      
-      const { data, error } = await supabase
-        .from(tableName)
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id,
-          profiles:user_id (
-            username,
-            avatar_url
-          )
-        `)
-        .eq(idField, itemId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      const formattedComments = data.map(comment => ({
-        id: comment.id,
-        content: comment.content,
-        created_at: comment.created_at,
-        user_id: comment.user_id,
-        username: comment.profiles?.username || 'Unknown user',
-        avatar_url: comment.profiles?.avatar_url
-      }));
-
-      setComments(formattedComments);
+      const commentData = await fetchComments(itemId, itemType);
+      setComments(commentData);
     } catch (error) {
-      console.error('Error fetching comments:', error);
+      console.error('Error loading comments:', error);
       toast({
         title: "Error loading comments",
         description: "Please try again later",
@@ -101,30 +64,13 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     
     setIsSending(true);
     try {
-      const tableName = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
-      const idField = itemType === 'recommendation' ? 'recommendation_id' : 'post_id';
+      const success = await addComment(itemId, itemType, newComment, user.id);
       
-      // Insert the comment
-      const { error: insertError } = await supabase
-        .from(tableName)
-        .insert({
-          [idField]: itemId,
-          user_id: user.id,
-          content: newComment.trim()
-        });
-
-      if (insertError) throw insertError;
-
-      // Increment comment count
-      await supabase
-        .rpc('increment_comment_count', { 
-          table_name: itemType === 'recommendation' ? 'recommendations' : 'posts', 
-          item_id: itemId 
-        });
+      if (!success) throw new Error("Failed to add comment");
 
       // Clear the input and refresh comments
       setNewComment('');
-      fetchComments();
+      loadComments();
       
       // Notify parent component
       if (onCommentAdded) {
