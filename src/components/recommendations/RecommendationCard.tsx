@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import RatingStars from './RatingStars';
 import { Recommendation } from '@/services/recommendationService';
 import { getCategoryLabel } from './RecommendationFilters';
 import CommentDialog from '../comments/CommentDialog';
+import { fetchCommentCount } from '@/services/commentsService';
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
@@ -23,9 +23,37 @@ const RecommendationCard = ({
   onSave,
   onComment
 }: RecommendationCardProps) => {
-  // Ensure comment_count is treated as a number
-  const commentCount = typeof recommendation.comment_count === 'number' ? recommendation.comment_count : 0;
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
+  
+  useEffect(() => {
+    const getInitialCommentCount = async () => {
+      try {
+        const count = await fetchCommentCount(recommendation.id, 'recommendation');
+        setLocalCommentCount(count);
+      } catch (error) {
+        console.error("Error fetching comment count:", error);
+        setLocalCommentCount(recommendation.comment_count || 0);
+      }
+    };
+    
+    getInitialCommentCount();
+  }, [recommendation.id, recommendation.comment_count]);
+  
+  useEffect(() => {
+    const handleCommentCountUpdate = async (event: CustomEvent) => {
+      if (event.detail.itemId === recommendation.id) {
+        const updatedCount = await fetchCommentCount(recommendation.id, 'recommendation');
+        setLocalCommentCount(updatedCount);
+      }
+    };
+    
+    window.addEventListener('refresh-recommendation-comment-count', handleCommentCountUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('refresh-recommendation-comment-count', handleCommentCountUpdate as EventListener);
+    };
+  }, [recommendation.id]);
   
   const handleCommentClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -35,13 +63,10 @@ const RecommendationCard = ({
   };
 
   const handleCommentAdded = () => {
-    // Update the comment count locally after a comment is added
-    if (typeof recommendation.comment_count === 'number') {
-      recommendation.comment_count += 1;
-    } else {
-      recommendation.comment_count = 1;
-    }
+    setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
+
+  const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
   
   return (
     <Card 
@@ -147,8 +172,8 @@ const RecommendationCard = ({
               onClick={handleCommentClick}
             >
               <MessageCircle size={16} />
-              {commentCount > 0 && (
-                <span>{commentCount}</span>
+              {displayCommentCount > 0 && (
+                <span>{displayCommentCount}</span>
               )}
             </Button>
           </div>

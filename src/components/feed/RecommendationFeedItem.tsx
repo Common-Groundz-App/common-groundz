@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -25,13 +24,23 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   onComment
 }) => {
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
-  const [localCommentCount, setLocalCommentCount] = useState(recommendation.comment_count || 0);
+  const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
 
   useEffect(() => {
-    // Initialize with the recommendation's comment count
-    setLocalCommentCount(recommendation.comment_count || 0);
+    const getInitialCommentCount = async () => {
+      try {
+        const count = await fetchCommentCount(recommendation.id, 'recommendation');
+        setLocalCommentCount(count);
+      } catch (error) {
+        console.error("Error fetching comment count:", error);
+        setLocalCommentCount(recommendation.comment_count || 0);
+      }
+    };
     
-    // Listen for comment count updates for this specific recommendation
+    getInitialCommentCount();
+  }, [recommendation.id, recommendation.comment_count]);
+  
+  useEffect(() => {
     const handleCommentCountUpdate = async (event: CustomEvent) => {
       if (event.detail.itemId === recommendation.id) {
         const updatedCount = await fetchCommentCount(recommendation.id, 'recommendation');
@@ -39,14 +48,12 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
       }
     };
     
-    // Add event listener
     window.addEventListener('refresh-recommendation-comment-count', handleCommentCountUpdate as EventListener);
     
     return () => {
-      // Remove event listener on cleanup
       window.removeEventListener('refresh-recommendation-comment-count', handleCommentCountUpdate as EventListener);
     };
-  }, [recommendation.id, recommendation.comment_count]);
+  }, [recommendation.id]);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -75,9 +82,10 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   };
 
   const handleCommentAdded = () => {
-    // Increment the local comment count when a comment is added
-    setLocalCommentCount(prev => prev + 1);
+    setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
+
+  const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
 
   return (
     <Card className="overflow-hidden">
@@ -160,8 +168,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             onClick={handleCommentClick}
           >
             <MessageCircle size={18} />
-            {localCommentCount > 0 && (
-              <span>{localCommentCount}</span>
+            {displayCommentCount > 0 && (
+              <span>{displayCommentCount}</span>
             )}
           </Button>
         </div>
