@@ -85,6 +85,7 @@ export function useComments({
     try {
       const input: CommentInput = {
         content: content.trim(),
+        user_id: user.id,
         parent_id: parentId
       };
       
@@ -116,6 +117,15 @@ export function useComments({
       
       // Update total count
       setTotal(prev => prev + 1);
+      
+      // Update parent resource comment count if this is a top-level comment
+      if (!parentId) {
+        if (postId) {
+          await commentService.incrementCommentCount('posts', postId);
+        } else if (recommendationId) {
+          await commentService.incrementCommentCount('recommendations', recommendationId);
+        }
+      }
       
       return commentWithProfile;
     } catch (err) {
@@ -195,7 +205,7 @@ export function useComments({
     }
     
     try {
-      const liked = await commentService.toggleCommentLike(id);
+      const liked = await commentService.toggleCommentLike(id, user.id);
       
       setComments(prev => 
         prev.map(comment => {

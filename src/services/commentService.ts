@@ -123,13 +123,15 @@ export async function createComment(
   input: CommentInput
 ): Promise<Comment> {
   try {
+    // Ensure user_id is required in the CommentInput type
     const { data, error } = await supabase
       .from('comments')
       .insert({
         content: input.content,
         post_id: input.post_id || null,
         recommendation_id: input.recommendation_id || null,
-        parent_id: input.parent_id || null
+        parent_id: input.parent_id || null,
+        user_id: input.user_id // This is now required in the CommentInput type
       })
       .select()
       .single();
@@ -159,7 +161,7 @@ export async function incrementCommentCount(
   id: string
 ): Promise<void> {
   try {
-    await supabase.rpc('increment_comment_count', {
+    await supabase.rpc('increment_comment_count', { 
       table_name: tableName,
       item_id: id
     });
@@ -219,7 +221,8 @@ export async function deleteComment(id: string): Promise<void> {
  * Toggle like status on a comment
  */
 export async function toggleCommentLike(
-  commentId: string
+  commentId: string,
+  userId: string
 ): Promise<boolean> {
   try {
     // Check if already liked
@@ -227,6 +230,7 @@ export async function toggleCommentLike(
       .from('comment_likes')
       .select('id')
       .eq('comment_id', commentId)
+      .eq('user_id', userId)
       .maybeSingle();
       
     if (checkError) throw checkError;
@@ -245,7 +249,10 @@ export async function toggleCommentLike(
     else {
       const { error: insertError } = await supabase
         .from('comment_likes')
-        .insert({ comment_id: commentId });
+        .insert({ 
+          comment_id: commentId,
+          user_id: userId
+        });
         
       if (insertError) throw insertError;
       return true; // Now liked

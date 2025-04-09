@@ -29,6 +29,7 @@ export interface CommentWithUser extends Comment {
 
 export interface CreateCommentPayload {
   content: string;
+  user_id: string;
   post_id?: string;
   recommendation_id?: string;
   parent_id?: string;

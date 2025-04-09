@@ -22,6 +22,7 @@ export interface Comment {
 
 export interface CommentInput {
   content: string;
+  user_id: string; // Added required user_id
   post_id?: string;
   recommendation_id?: string;
   parent_id?: string;
