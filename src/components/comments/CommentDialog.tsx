@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { fetchComments, addComment, deleteComment, updateComment, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Edit, Trash2, X, Save } from 'lucide-react';
+import { Edit, Trash2, X, Save, MessageSquare, Send } from 'lucide-react';
 
 interface CommentDialogProps {
   isOpen: boolean;
@@ -277,28 +277,76 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     return format(date, 'MMM d, yyyy h:mm a');
   };
 
+  const isCurrentUserComment = (userId: string) => {
+    return user && user.id === userId;
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleCloseDialog}>
-        <DialogContent className="sm:max-w-md md:max-w-lg">
+        <DialogContent className="sm:max-w-md md:max-w-lg bg-white rounded-xl border-none shadow-lg">
           <DialogHeader>
-            <DialogTitle>Comments</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              Comments
+            </DialogTitle>
           </DialogHeader>
           
-          <div className="flex flex-col h-96">
-            <ScrollArea className="flex-1 pr-4">
+          <div className="flex flex-col h-[450px]">
+            <div className="flex flex-col gap-3 pb-3">
+              <div className="relative flex items-end gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.avatar_url || undefined} />
+                  <AvatarFallback>{user?.username?.charAt(0) || '?'}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 relative">
+                  <Textarea
+                    placeholder="Add a comment..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    disabled={!user || isSending}
+                    className="min-h-20 pr-10 resize-none bg-gray-50 border-gray-200 focus:border-primary focus-visible:ring-1 focus-visible:ring-primary rounded-lg"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-2 bottom-2 text-primary hover:text-primary hover:bg-primary/10"
+                    onClick={handleAddComment}
+                    disabled={!newComment.trim() || isSending || !user}
+                  >
+                    <Send size={18} className={isSending ? "animate-pulse" : ""} />
+                    <span className="sr-only">Send comment</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            <Separator className="my-2" />
+            
+            <ScrollArea className="flex-1 pr-4 -mr-4">
               {isLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-muted-foreground">Loading comments...</p>
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <div className="animate-pulse flex space-x-2">
+                    <div className="h-2 w-2 bg-muted-foreground rounded-full"></div>
+                    <div className="h-2 w-2 bg-muted-foreground rounded-full"></div>
+                    <div className="h-2 w-2 bg-muted-foreground rounded-full"></div>
+                  </div>
+                  <p className="mt-2 text-sm">Loading comments...</p>
                 </div>
               ) : comments.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-muted-foreground">No comments yet. Be the first to comment!</p>
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <MessageSquare className="h-12 w-12 mb-2 text-muted-foreground opacity-50" />
+                  <p className="text-sm">No comments yet. Be the first to comment!</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-3">
+                    <div 
+                      key={comment.id} 
+                      className={`flex gap-3 p-3 rounded-lg transition-colors ${
+                        editingCommentId === comment.id ? "bg-gray-50" : "hover:bg-gray-50"
+                      }`}
+                    >
                       <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarImage src={comment.avatar_url || undefined} />
                         <AvatarFallback>{comment.username?.charAt(0) || '?'}</AvatarFallback>
@@ -306,66 +354,71 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-medium">{comment.username}</p>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <span className="text-xs text-muted-foreground">
                               {formatDate(comment.created_at)}
                             </span>
-                            {user && user.id === comment.user_id && (
-                              <div className="flex items-center gap-1">
+                            {isCurrentUserComment(comment.user_id) && (
+                              <div className="flex items-center ml-2">
                                 {editingCommentId !== comment.id ? (
-                                  <>
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex">
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
-                                      className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                      className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10"
                                       onClick={() => handleEditClick(comment)}
                                       disabled={isDeleting || isEditing}
                                     >
                                       <Edit size={14} />
+                                      <span className="sr-only">Edit</span>
                                     </Button>
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
-                                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                      className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                       onClick={(e) => handleDeleteClick(e, comment.id)}
                                       disabled={isDeleting || isEditing}
-                                      data-comment-id={comment.id} // Add a data attribute as backup
+                                      data-comment-id={comment.id}
                                     >
                                       <Trash2 size={14} />
+                                      <span className="sr-only">Delete</span>
                                     </Button>
-                                  </>
+                                  </div>
                                 ) : (
-                                  <>
+                                  <div className="flex">
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
-                                      className="h-6 w-6 text-muted-foreground hover:text-green-500"
+                                      className="h-6 w-6 text-muted-foreground hover:text-green-600 hover:bg-green-600/10"
                                       onClick={handleEditSave}
                                       disabled={isEditing || !editCommentContent.trim()}
                                     >
                                       <Save size={14} />
+                                      <span className="sr-only">Save</span>
                                     </Button>
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
-                                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                      className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                       onClick={handleEditCancel}
                                       disabled={isEditing}
                                     >
                                       <X size={14} />
+                                      <span className="sr-only">Cancel</span>
                                     </Button>
-                                  </>
+                                  </div>
                                 )}
                               </div>
                             )}
                           </div>
                         </div>
+                        
                         {editingCommentId === comment.id ? (
                           <div className="mt-1">
                             <Textarea
                               value={editCommentContent}
                               onChange={(e) => setEditCommentContent(e.target.value)}
-                              className="min-h-[60px] text-sm"
+                              className="min-h-[60px] text-sm resize-none bg-gray-50 border-gray-200 focus:border-primary"
                               placeholder="Edit your comment..."
                               disabled={isEditing}
                             />
@@ -379,28 +432,11 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                 </div>
               )}
             </ScrollArea>
-            
-            <Separator className="my-4" />
-            
-            <div className="flex flex-col gap-2">
-              <Textarea 
-                placeholder="Add a comment..." 
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                disabled={!user || isSending}
-                className="min-h-20"
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
-                <Button 
-                  onClick={handleAddComment} 
-                  disabled={!newComment.trim() || isSending || !user}
-                >
-                  {isSending ? "Sending..." : "Comment"}
-                </Button>
-              </div>
-            </div>
           </div>
+          
+          <DialogFooter className="sm:justify-between gap-2">
+            <Button variant="outline" onClick={handleCloseDialog}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -413,21 +449,34 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
           }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-white rounded-xl border-none shadow-lg max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Comment</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this comment? This action cannot be undone.
+            <AlertDialogTitle className="text-center">Delete Comment?</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              This action cannot be undone. Are you sure you want to permanently delete this comment?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDeleteCancel} disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex justify-center gap-2">
+            <AlertDialogCancel 
+              onClick={handleDeleteCancel} 
+              disabled={isDeleting}
+              className="border-gray-200 hover:bg-gray-100 hover:text-gray-900"
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteConfirm}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isDeleting}
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? (
+                <>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 bg-white rounded-full animate-ping"></span>
+                    Deleting...
+                  </span>
+                </>
+              ) : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
