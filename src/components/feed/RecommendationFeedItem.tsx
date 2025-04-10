@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -84,10 +83,6 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
 
   const handleCommentAdded = () => {
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
-  };
-
-  const handleCommentDeleted = () => {
-    setLocalCommentCount(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
   };
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
@@ -202,7 +197,6 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         itemId={recommendation.id}
         itemType="recommendation" 
         onCommentAdded={handleCommentAdded}
-        onCommentDeleted={handleCommentDeleted}
       />
     </Card>
   );

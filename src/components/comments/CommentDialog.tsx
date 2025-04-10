@@ -19,10 +19,9 @@ interface CommentDialogProps {
   itemId: string;
   itemType: 'recommendation' | 'post';
   onCommentAdded?: () => void;
-  onCommentDeleted?: () => void;
 }
 
-const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCommentDeleted }: CommentDialogProps) => {
+const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: CommentDialogProps) => {
   const [comments, setComments] = useState<CommentData[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -31,7 +30,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
   const [editingContent, setEditingContent] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -150,11 +148,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
     }
   };
 
-  const handleOpenDeleteDialog = (commentId: string, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-      e.preventDefault();
-    }
+  const handleOpenDeleteDialog = (commentId: string) => {
     setCommentToDelete(commentId);
     setDeleteDialogOpen(true);
   };
@@ -162,24 +156,17 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
   const handleConfirmDelete = async () => {
     if (!commentToDelete) return;
     
-    setIsDeleting(true);
     try {
-      console.log(`Attempting to delete comment: ${commentToDelete} for ${itemType} ${itemId}`);
       const success = await deleteComment(commentToDelete, itemId, itemType);
       
-      if (!success) {
-        throw new Error("Failed to delete comment");
-      }
-      
-      console.log("Delete comment successful!");
+      if (!success) throw new Error("Failed to delete comment");
       
       // Remove the comment from the local state
       setComments(comments.filter(comment => comment.id !== commentToDelete));
       
-      // Call the onCommentDeleted callback to update parent components
-      if (onCommentDeleted) {
-        onCommentDeleted();
-      }
+      // Close the delete dialog
+      setDeleteDialogOpen(false);
+      setCommentToDelete(null);
       
       // Trigger a feed refresh event to update comment counts across the app
       const refreshEventName = `refresh-${itemType}-comment-count`;
@@ -197,21 +184,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
         description: "Please try again later",
         variant: "destructive"
       });
-    } finally {
-      setIsDeleting(false);
-      // Always close the dialog when deletion is done, whether successful or not
-      setDeleteDialogOpen(false);
-      setCommentToDelete(null);
-    }
-  };
-
-  const handleDialogClose = (open: boolean) => {
-    if (!open && !isDeleting) {
-      // Reset all states when dialog is closed
-      setEditingCommentId(null);
-      setEditingContent('');
-      setCommentToDelete(null);
-      onClose();
     }
   };
 
@@ -224,14 +196,10 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
     return user && user.id === commentUserId;
   };
 
-  const handleContentClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-md md:max-w-lg" onClick={handleContentClick}>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md md:max-w-lg">
           <DialogHeader>
             <DialogTitle>Comments</DialogTitle>
           </DialogHeader>
@@ -264,10 +232,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
                                   variant="ghost" 
                                   size="icon" 
                                   className="h-6 w-6" 
-                                  onClick={(e) => {
-                                    e.stopPropagation(); 
-                                    handleStartEdit(comment);
-                                  }}
+                                  onClick={() => handleStartEdit(comment)}
                                 >
                                   <Pencil size={14} />
                                 </Button>
@@ -275,7 +240,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
                                   variant="ghost" 
                                   size="icon" 
                                   className="h-6 w-6 text-destructive" 
-                                  onClick={(e) => handleOpenDeleteDialog(comment.id, e)}
+                                  onClick={() => handleOpenDeleteDialog(comment.id)}
                                 >
                                   <Trash2 size={14} />
                                 </Button>
@@ -293,17 +258,13 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
                               onChange={(e) => setEditingContent(e.target.value)}
                               className="min-h-20 text-sm"
                               autoFocus
-                              onClick={e => e.stopPropagation()}
                             />
                             <div className="flex justify-end gap-2 mt-2">
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-7 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCancelEdit();
-                                }}
+                                onClick={handleCancelEdit}
                               >
                                 <X size={14} className="mr-1" /> Cancel
                               </Button>
@@ -311,10 +272,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
                                 variant="default" 
                                 size="sm" 
                                 className="h-7 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSaveEdit(comment.id);
-                                }}
+                                onClick={() => handleSaveEdit(comment.id)}
                                 disabled={!editingContent.trim()}
                               >
                                 <Check size={14} className="mr-1" /> Save
@@ -340,26 +298,12 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
                 onChange={(e) => setNewComment(e.target.value)}
                 disabled={!user || isSending}
                 className="min-h-20"
-                onClick={e => e.stopPropagation()}
               />
               <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={onClose}>Cancel</Button>
                 <Button 
-                  variant="outline" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                  }}
-                  type="button"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddComment();
-                  }}
+                  onClick={handleAddComment} 
                   disabled={!newComment.trim() || isSending || !user}
-                  type="button"
                 >
                   {isSending ? "Sending..." : "Comment"}
                 </Button>
@@ -369,16 +313,8 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
         </DialogContent>
       </Dialog>
       
-      <AlertDialog 
-        open={deleteDialogOpen} 
-        onOpenChange={(open) => {
-          // Only allow closing through the cancel button when not deleting
-          if (!isDeleting || !open) {
-            setDeleteDialogOpen(open);
-          }
-        }}
-      >
-        <AlertDialogContent onClick={e => e.stopPropagation()}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Comment</AlertDialogTitle>
             <AlertDialogDescription>
@@ -386,27 +322,9 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCo
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel 
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isDeleting) {
-                  setDeleteDialogOpen(false);
-                  setCommentToDelete(null);
-                }
-              }}
-              disabled={isDeleting}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleConfirmDelete();
-              }} 
-              className="bg-destructive text-destructive-foreground"
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground">
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

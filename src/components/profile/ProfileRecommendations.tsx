@@ -89,11 +89,6 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
     // Refresh recommendations to update comment counts
     refreshRecommendations();
   };
-  
-  const handleCommentDeleted = () => {
-    // Refresh recommendations to update comment counts
-    refreshRecommendations();
-  };
 
   return (
     <div className="space-y-6 mx-0 my-0">
@@ -146,7 +141,6 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
         itemId={commentDialogState.recommendationId}
         itemType="recommendation"
         onCommentAdded={handleCommentAdded}
-        onCommentDeleted={handleCommentDeleted}
       />
     </div>
   );

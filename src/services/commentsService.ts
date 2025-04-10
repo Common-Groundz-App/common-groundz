@@ -103,43 +103,36 @@ export const deleteComment = async (
   itemId: string,
   itemType: 'recommendation' | 'post'
 ): Promise<boolean> => {
-  // Validate inputs to prevent invalid UUID errors
-  if (!commentId || !itemId) {
-    console.error(`Invalid parameters: commentId=${commentId}, itemId=${itemId}`);
-    return false;
-  }
-
   try {
-    console.log(`Deleting comment: commentId=${commentId}, itemId=${itemId}, itemType=${itemType}`);
-    
-    // Determine which tables to use
     const commentTable = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
     const parentTable = itemType === 'recommendation' ? 'recommendations' : 'posts';
     
-    // Step 1: Delete the comment
+    // First, mark the comment as deleted
     const { error: deleteError } = await supabase
       .from(commentTable)
-      .delete()
+      .update({ is_deleted: true })
       .eq('id', commentId);
     
-    if (deleteError) {
-      console.error(`Error deleting ${itemType} comment:`, deleteError);
-      throw deleteError;
-    }
+    if (deleteError) throw deleteError;
     
-    // Step 2: Update the comment count with a direct decrement to ensure data consistency
-    // Use type assertion to bypass TypeScript's type checking for the RPC function name
-    const { error: updateError } = await (supabase.rpc as any)('decrement_comment_count', { 
-      p_table_name: parentTable,
-      p_item_id: itemId
-    });
+    // Then get the current count
+    const { data, error: fetchError } = await supabase
+      .from(parentTable)
+      .select('comment_count')
+      .eq('id', itemId)
+      .single();
+      
+    if (fetchError) throw fetchError;
     
-    if (updateError) {
-      console.error(`Error updating ${itemType} comment count:`, updateError);
-      throw updateError;
-    }
+    // Now update with the decremented count, ensuring it's not negative
+    const newCount = Math.max(0, (data?.comment_count || 1) - 1);
+    const { error: updateError } = await supabase
+      .from(parentTable)
+      .update({ comment_count: newCount })
+      .eq('id', itemId);
+      
+    if (updateError) throw updateError;
     
-    console.log(`Successfully deleted comment and updated count for ${itemType}`);
     return true;
   } catch (error) {
     console.error(`Error deleting ${itemType} comment:`, error);
