@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CommentData {
@@ -104,7 +105,8 @@ export const updateComment = async (commentId: string, content: string, itemType
   try {
     console.log(`Calling update_comment with: commentId=${commentId}, content=${content}, itemType=${itemType}, userId=${userId}`);
     
-    const { data, error } = await supabase.rpc('update_comment', {
+    // Use type assertion to bypass TypeScript's type checking for RPC functions
+    const { data, error } = await (supabase.rpc as any)('update_comment', {
       p_comment_id: commentId,
       p_content: content.trim(),
       p_user_id: userId,
