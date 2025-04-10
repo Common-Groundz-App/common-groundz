@@ -76,7 +76,8 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
   try {
     console.log(`Calling delete_comment with: commentId=${commentId}, itemType=${itemType}, userId=${userId}`);
     
-    const { data, error } = await supabase.rpc('delete_comment', {
+    // Use type assertion to bypass TypeScript's type checking for RPC functions
+    const { data, error } = await (supabase.rpc as any)('delete_comment', {
       p_comment_id: commentId,
       p_item_type: itemType,
       p_user_id: userId

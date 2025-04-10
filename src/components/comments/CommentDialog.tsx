@@ -173,7 +173,12 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     }
   };
 
-  const handleDeleteClick = (commentId: string) => {
+  const handleDeleteClick = (event: React.MouseEvent, commentId: string) => {
+    // Stop event propagation to prevent parent elements from handling the click
+    event.preventDefault();
+    event.stopPropagation();
+    
+    console.log("Delete button clicked for comment:", commentId);
     setCommentToDelete(commentId);
     setDeleteDialogOpen(true);
   };
@@ -197,29 +202,30 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       
       console.log("Delete success:", success);
 
-      // Remove the deleted comment from local state
-      setComments(prev => prev.filter(comment => comment.id !== commentToDelete));
-      
-      // Trigger refresh event for comment counts
-      const refreshEventName = `refresh-${itemType}-comment-count`;
-      const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
-      window.dispatchEvent(refreshEvent);
-      
-      // Notify parent component if needed
-      if (onCommentAdded) {
-        onCommentAdded();
-      }
-
-      toast({
-        title: "Comment deleted",
-        description: "Your comment has been removed successfully"
-      });
-      
-      // Close the confirmation dialog first
+      // Close the confirmation dialog first to avoid UI issues
       setDeleteDialogOpen(false);
       
-      // Reset deletion state
+      // Add a small delay to ensure the dialog is closed before updating state
       setTimeout(() => {
+        // Remove the deleted comment from local state
+        setComments(prev => prev.filter(comment => comment.id !== commentToDelete));
+        
+        // Trigger refresh event for comment counts
+        const refreshEventName = `refresh-${itemType}-comment-count`;
+        const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
+        window.dispatchEvent(refreshEvent);
+        
+        // Notify parent component if needed
+        if (onCommentAdded) {
+          onCommentAdded();
+        }
+
+        toast({
+          title: "Comment deleted",
+          description: "Your comment has been removed successfully"
+        });
+        
+        // Reset deletion state
         setCommentToDelete(null);
         setIsDeleting(false);
       }, 100);
@@ -238,6 +244,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   };
 
   const handleDeleteCancel = () => {
+    console.log("Delete cancelled");
     setDeleteDialogOpen(false);
     setCommentToDelete(null);
   };
@@ -317,8 +324,9 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                                       variant="ghost" 
                                       size="icon" 
                                       className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                      onClick={() => handleDeleteClick(comment.id)}
+                                      onClick={(e) => handleDeleteClick(e, comment.id)}
                                       disabled={isDeleting || isEditing}
+                                      data-comment-id={comment.id}
                                     >
                                       <Trash2 size={14} />
                                     </Button>
@@ -396,6 +404,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       <AlertDialog 
         open={deleteDialogOpen} 
         onOpenChange={(open) => {
+          console.log("AlertDialog onOpenChange:", open);
           if (!open && !isDeleting) {
             setDeleteDialogOpen(false);
             setCommentToDelete(null);
