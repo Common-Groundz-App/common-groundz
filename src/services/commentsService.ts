@@ -126,7 +126,8 @@ export const deleteComment = async (
     }
     
     // Step 2: Update the comment count with a direct decrement to ensure data consistency
-    const { error: updateError } = await supabase.rpc('decrement_comment_count', { 
+    // Use type assertion to bypass TypeScript's type checking for the RPC function name
+    const { error: updateError } = await (supabase.rpc as any)('decrement_comment_count', { 
       p_table_name: parentTable,
       p_item_id: itemId
     });
