@@ -81,8 +81,8 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
   try {
     console.log(`Calling delete_comment with: commentId=${commentId}, itemType=${itemType}, userId=${userId}`);
     
-    // Use the custom RPC function to handle comment soft deletion and counter updates
-    const { data, error } = await (supabase.rpc as any)('delete_comment', {
+    // Directly use the delete_comment RPC function without any TypeScript casting
+    const { data, error } = await supabase.rpc('delete_comment', {
       p_comment_id: commentId,
       p_item_type: itemType,
       p_user_id: userId
@@ -94,7 +94,14 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
     }
     
     console.log('Delete comment response:', data);
-    return !!data;
+    
+    // Check if the response indicates success
+    if (data === true) {
+      return true;
+    } else {
+      console.warn('Delete operation returned false or null:', data);
+      return false;
+    }
   } catch (error) {
     console.error(`Error deleting comment from ${itemType}:`, error);
     return false;

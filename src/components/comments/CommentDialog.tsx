@@ -122,25 +122,33 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   };
 
   const handleDeleteConfirm = async () => {
-    if (!user || !commentToDelete) return;
+    if (!user || !commentToDelete) {
+      console.error("Missing user or comment ID for deletion");
+      return;
+    }
     
     setIsDeleting(true);
+    
     try {
       console.log("Deleting comment:", commentToDelete, itemType, user.id);
       const success = await deleteComment(commentToDelete, itemType, user.id);
       
-      if (!success) throw new Error("Failed to delete comment");
+      if (!success) {
+        console.error("Delete operation returned false");
+        throw new Error("Failed to delete comment");
+      }
+      
       console.log("Delete success:", success);
 
-      // Remove comment from the list
+      // Remove the deleted comment from local state
       setComments(prev => prev.filter(comment => comment.id !== commentToDelete));
       
-      // Also trigger a feed refresh event to update comment counts across the app
+      // Trigger refresh event for comment counts
       const refreshEventName = `refresh-${itemType}-comment-count`;
       const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
       window.dispatchEvent(refreshEvent);
-
-      // Notify parent component
+      
+      // Notify parent component if needed
       if (onCommentAdded) {
         onCommentAdded();
       }
@@ -150,10 +158,14 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         description: "Your comment has been removed successfully"
       });
       
-      // Close the delete dialog first
+      // Close the confirmation dialog first
       setDeleteDialogOpen(false);
-      setCommentToDelete(null);
-      setIsDeleting(false);
+      
+      // Reset deletion state
+      setTimeout(() => {
+        setCommentToDelete(null);
+        setIsDeleting(false);
+      }, 100);
       
     } catch (error) {
       console.error('Error deleting comment:', error);
