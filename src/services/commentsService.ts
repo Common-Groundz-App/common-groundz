@@ -76,3 +76,40 @@ export const addComment = async (itemId: string, itemType: 'recommendation' | 'p
     return false;
   }
 };
+
+export const deleteComment = async (commentId: string, itemId: string, itemType: 'recommendation' | 'post'): Promise<boolean> => {
+  try {
+    const tableName = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
+    
+    console.log(`Deleting comment with ID: ${commentId} from ${tableName}`);
+    
+    // First delete the comment from the comments table
+    const { error: deleteError } = await supabase
+      .from(tableName)
+      .delete()
+      .eq('id', commentId);
+      
+    if (deleteError) {
+      console.error('Error deleting comment:', deleteError);
+      throw deleteError;
+    }
+    
+    // Then decrement the comment count in the parent table
+    const parentTable = itemType === 'recommendation' ? 'recommendations' : 'posts';
+    
+    const { error: updateError } = await supabase
+      .from(parentTable)
+      .update({ comment_count: supabase.rpc('decrement', { row_count: 1 }) })
+      .eq('id', itemId);
+      
+    if (updateError) {
+      console.error('Error updating comment count:', updateError);
+      throw updateError;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`Error deleting comment:`, error);
+    return false;
+  }
+};
