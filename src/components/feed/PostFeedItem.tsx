@@ -13,6 +13,7 @@ import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { EntityBadge } from '@/components/feed/EntityBadge';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface PostFeedItemProps {
   post: PostItem;
@@ -128,7 +129,11 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             <AvatarFallback>{getInitials(post.username)}</AvatarFallback>
           </Avatar>
           <div>
-            <div className="font-medium">{post.username || 'Anonymous'}</div>
+            <UsernameLink 
+              username={post.username} 
+              userId={post.user_id}
+              className="font-medium"
+            />
             <div className="text-sm text-muted-foreground">{formatDate(post.created_at)}</div>
           </div>
           <div className="ml-auto">

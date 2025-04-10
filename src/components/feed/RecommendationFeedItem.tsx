@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { FeedItem } from '@/hooks/feed/types';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface RecommendationFeedItemProps {
   recommendation: FeedItem;
@@ -96,7 +97,11 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             <AvatarFallback>{getInitials(recommendation.username)}</AvatarFallback>
           </Avatar>
           <div>
-            <div className="font-medium">{recommendation.username || 'Anonymous'}</div>
+            <UsernameLink 
+              username={recommendation.username} 
+              userId={recommendation.user_id}
+              className="font-medium"
+            />
             <div className="text-sm text-muted-foreground">{formatDate(recommendation.created_at)}</div>
           </div>
           <div className="ml-auto">

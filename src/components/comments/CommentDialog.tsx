@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { MoreHorizontal, MessageCircle, Send } from 'lucide-react';
 import { fetchUserProfile } from '@/services/profileService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface CommentDialogProps {
   isOpen: boolean;
@@ -341,7 +343,11 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                         <div className="flex items-start">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium">{comment.username || 'Anonymous'}</p>
+                              <UsernameLink 
+                                username={comment.username}
+                                userId={comment.user_id}
+                                className="text-sm"
+                              />
                               <span className="text-xs text-muted-foreground">
                                 {formatRelativeTime(comment.created_at)}
                               </span>
