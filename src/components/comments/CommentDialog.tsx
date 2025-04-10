@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -32,13 +31,12 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentContent, setEditCommentContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [dialogClosing, setDialogClosing] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Reset state when dialog closes
   useEffect(() => {
     if (!isOpen) {
-      // Small delay to ensure proper cleanup after animations
       const timeout = setTimeout(() => {
         setCommentToDelete(null);
         setIsDeleting(false);
@@ -46,6 +44,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         setEditingCommentId(null);
         setEditCommentContent('');
         setIsEditing(false);
+        setDialogClosing(false);
       }, 300);
       return () => clearTimeout(timeout);
     }
@@ -92,16 +91,13 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       
       if (!success) throw new Error("Failed to add comment");
 
-      // Clear the input and refresh comments
       setNewComment('');
       loadComments();
       
-      // Notify parent component
       if (onCommentAdded) {
         onCommentAdded();
       }
 
-      // Also trigger a feed refresh event to update comment counts across the app
       const refreshEventName = `refresh-${itemType}-comment-count`;
       const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
       window.dispatchEvent(refreshEvent);
@@ -146,7 +142,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         throw new Error("Failed to update comment");
       }
       
-      // Update the comment in the local state
       setComments(prev => prev.map(comment => 
         comment.id === editingCommentId 
           ? { ...comment, content: editCommentContent } 
@@ -158,7 +153,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         description: "Your comment has been updated successfully"
       });
       
-      // Reset edit state
       setEditingCommentId(null);
       setEditCommentContent('');
     } catch (error) {
@@ -174,16 +168,20 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   };
 
   const handleDeleteClick = (event: React.MouseEvent, commentId: string) => {
-    // Stop event propagation to prevent parent elements from handling the click
     event.preventDefault();
     event.stopPropagation();
     
     console.log("Delete button clicked for comment:", commentId);
+    
     setCommentToDelete(commentId);
-    setDeleteDialogOpen(true);
+    setTimeout(() => {
+      setDeleteDialogOpen(true);
+    }, 0);
   };
 
   const handleDeleteConfirm = async () => {
+    console.log("Delete confirmation triggered for comment:", commentToDelete);
+    
     if (!user || !commentToDelete) {
       console.error("Missing user or comment ID for deletion");
       return;
@@ -192,46 +190,53 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     setIsDeleting(true);
     
     try {
-      console.log("Deleting comment:", commentToDelete, itemType, user.id);
-      const success = await deleteComment(commentToDelete, itemType, user.id);
+      console.log("Initiating deletion process for:", commentToDelete, itemType, user.id);
       
-      if (!success) {
-        console.error("Delete operation returned false");
-        throw new Error("Failed to delete comment");
-      }
+      const commentIdToDelete = commentToDelete;
       
-      console.log("Delete success:", success);
-
-      // Close the confirmation dialog first to avoid UI issues
-      setDeleteDialogOpen(false);
-      
-      // Add a small delay to ensure the dialog is closed before updating state
-      setTimeout(() => {
-        // Remove the deleted comment from local state
-        setComments(prev => prev.filter(comment => comment.id !== commentToDelete));
-        
-        // Trigger refresh event for comment counts
-        const refreshEventName = `refresh-${itemType}-comment-count`;
-        const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
-        window.dispatchEvent(refreshEvent);
-        
-        // Notify parent component if needed
-        if (onCommentAdded) {
-          onCommentAdded();
+      setTimeout(async () => {
+        try {
+          console.log("Executing deletion for comment:", commentIdToDelete);
+          const success = await deleteComment(commentIdToDelete, itemType, user.id);
+          
+          if (!success) {
+            console.error("Delete operation returned false");
+            throw new Error("Failed to delete comment");
+          }
+          
+          console.log("Delete success:", success);
+          
+          setComments(prev => prev.filter(comment => comment.id !== commentIdToDelete));
+          
+          const refreshEventName = `refresh-${itemType}-comment-count`;
+          const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
+          window.dispatchEvent(refreshEvent);
+          
+          if (onCommentAdded) {
+            onCommentAdded();
+          }
+          
+          toast({
+            title: "Comment deleted",
+            description: "Your comment has been removed successfully"
+          });
+        } catch (error) {
+          console.error('Error in delayed deletion:', error);
+          toast({
+            title: "Error deleting comment",
+            description: "Please try again later",
+            variant: "destructive"
+          });
+        } finally {
+          setIsDeleting(false);
+          setCommentToDelete(null);
         }
-
-        toast({
-          title: "Comment deleted",
-          description: "Your comment has been removed successfully"
-        });
-        
-        // Reset deletion state
-        setCommentToDelete(null);
-        setIsDeleting(false);
       }, 100);
       
+      setDeleteDialogOpen(false);
+      
     } catch (error) {
-      console.error('Error deleting comment:', error);
+      console.error('Error in delete confirmation handler:', error);
       toast({
         title: "Error deleting comment",
         description: "Please try again later",
@@ -250,24 +255,34 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   };
 
   const handleCloseDialog = () => {
-    // Ensure we first close any delete dialogs if open
+    if (isDeleting) {
+      console.log("Attempted to close dialog while delete in progress, delaying");
+      setDialogClosing(true);
+      return;
+    }
+    
     if (deleteDialogOpen) {
       setDeleteDialogOpen(false);
       setCommentToDelete(null);
     }
     
-    // Cancel any edits in progress
     if (editingCommentId) {
       setEditingCommentId(null);
       setEditCommentContent('');
     }
     
-    // Then close the main dialog with a slight delay
-    // to ensure any pending state updates are completed
     setTimeout(() => {
       onClose();
     }, 100);
   };
+
+  useEffect(() => {
+    if (dialogClosing && !isDeleting) {
+      console.log("Delayed dialog close now happening");
+      onClose();
+      setDialogClosing(false);
+    }
+  }, [dialogClosing, isDeleting, onClose]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

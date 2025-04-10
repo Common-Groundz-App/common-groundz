@@ -76,6 +76,9 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
   try {
     console.log(`Calling delete_comment with: commentId=${commentId}, itemType=${itemType}, userId=${userId}`);
     
+    // Add delay to ensure the call completes properly
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     // Use type assertion to bypass TypeScript's type checking for RPC functions
     const { data, error } = await (supabase.rpc as any)('delete_comment', {
       p_comment_id: commentId,
@@ -89,6 +92,9 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
     }
     
     console.log('Delete comment response:', data);
+    
+    // Add a small delay after the call completes to ensure state updates properly
+    await new Promise(resolve => setTimeout(resolve, 50));
     
     if (data === true) {
       return true;
