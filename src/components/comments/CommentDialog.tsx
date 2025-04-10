@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,11 +7,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { fetchComments, addComment, deleteComment, updateComment, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Edit, Trash2, X, Save, MessageCircle, Send } from 'lucide-react';
+import { MoreHorizontal, MessageCircle, Send } from 'lucide-react';
 import { fetchUserProfile } from '@/services/profileService';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface CommentDialogProps {
   isOpen: boolean;
@@ -189,11 +189,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     }
   };
 
-  const handleDeleteClick = (event: React.MouseEvent, commentId: string) => {
-    // Stop event propagation to prevent any parent handlers from firing
-    event.preventDefault();
-    event.stopPropagation();
-    
+  const handleDeleteClick = (commentId: string) => {
     // Store the comment ID to delete in the ref for persistence
     commentToDeleteRef.current = commentId;
     console.log("Delete button clicked for comment:", commentId, "Stored in ref:", commentToDeleteRef.current);
@@ -290,9 +286,15 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     }
   }, [dialogClosing, isDeleting, onClose]);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, 'MMM d, yyyy h:mm a');
+  // Format the date to relative time (Instagram style)
+  const formatRelativeTime = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return formatDistanceToNow(date, { addSuffix: false });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
   };
 
   const isCurrentUserComment = (userId: string) => {
@@ -338,7 +340,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                     <div 
                       key={comment.id} 
                       className={`relative group flex gap-3 p-3 rounded-lg transition-colors ${
-                        editingCommentId === comment.id ? "bg-gray-50" : "hover:bg-gray-50"
+                        editingCommentId === comment.id ? "bg-gray-50" : ""
                       }`}
                     >
                       <Avatar className="h-8 w-8 flex-shrink-0">
@@ -346,72 +348,76 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                         <AvatarFallback>{getInitials(comment.username)}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">{comment.username || 'Anonymous'}</p>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(comment.created_at)}
-                          </span>
-                        </div>
-                        
-                        {editingCommentId === comment.id ? (
-                          <div className="mt-1">
-                            <Textarea
-                              value={editCommentContent}
-                              onChange={(e) => setEditCommentContent(e.target.value)}
-                              className="min-h-[60px] text-sm resize-none bg-gray-50 border-gray-200 focus:border-primary"
-                              placeholder="Edit your comment..."
-                              disabled={isEditing}
-                            />
-                            <div className="flex justify-end gap-2 mt-2">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                className="text-muted-foreground"
-                                onClick={handleEditCancel}
-                                disabled={isEditing}
-                              >
-                                Cancel
-                              </Button>
-                              <Button 
-                                variant="default"
-                                size="sm"
-                                onClick={handleEditSave}
-                                disabled={isEditing || !editCommentContent.trim()}
-                              >
-                                Save
-                              </Button>
+                        <div className="flex items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium">{comment.username || 'Anonymous'}</p>
+                              <span className="text-xs text-muted-foreground">
+                                {formatRelativeTime(comment.created_at)}
+                              </span>
                             </div>
+                            
+                            {editingCommentId === comment.id ? (
+                              <div className="mt-1">
+                                <Textarea
+                                  value={editCommentContent}
+                                  onChange={(e) => setEditCommentContent(e.target.value)}
+                                  className="min-h-[60px] text-sm resize-none bg-gray-50 border-gray-200 focus:border-primary"
+                                  placeholder="Edit your comment..."
+                                  disabled={isEditing}
+                                />
+                                <div className="flex justify-end gap-2 mt-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-muted-foreground"
+                                    onClick={handleEditCancel}
+                                    disabled={isEditing}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button 
+                                    variant="default"
+                                    size="sm"
+                                    onClick={handleEditSave}
+                                    disabled={isEditing || !editCommentContent.trim()}
+                                  >
+                                    Save
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="mt-1 text-sm break-words">{comment.content}</p>
+                            )}
                           </div>
-                        ) : (
-                          <p className="mt-1 text-sm break-words">{comment.content}</p>
-                        )}
-                      </div>
-                      
-                      {isCurrentUserComment(comment.user_id) && editingCommentId !== comment.id && (
-                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                            onClick={() => handleEditClick(comment)}
-                            disabled={isDeleting || isEditing}
-                          >
-                            <Edit size={14} />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                            onClick={(e) => handleDeleteClick(e, comment.id)}
-                            disabled={isDeleting || isEditing}
-                            data-comment-id={comment.id}
-                          >
-                            <Trash2 size={14} />
-                            <span className="sr-only">Delete</span>
-                          </Button>
+                          
+                          {isCurrentUserComment(comment.user_id) && editingCommentId !== comment.id && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <MoreHorizontal size={14} />
+                                  <span className="sr-only">More options</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem onClick={() => handleEditClick(comment)}>
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => handleDeleteClick(comment.id)}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   ))}
                 </div>
