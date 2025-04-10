@@ -80,6 +80,7 @@ export const addComment = async (itemId: string, itemType: 'recommendation' | 'p
 export const deleteComment = async (commentId: string, itemId: string, itemType: 'recommendation' | 'post'): Promise<boolean> => {
   try {
     const tableName = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
+    const parentTable = itemType === 'recommendation' ? 'recommendations' : 'posts';
     
     console.log(`Deleting comment with ID: ${commentId} from ${tableName}`);
     
@@ -94,12 +95,11 @@ export const deleteComment = async (commentId: string, itemId: string, itemType:
       throw deleteError;
     }
     
-    // Then decrement the comment count in the parent table
-    const parentTable = itemType === 'recommendation' ? 'recommendations' : 'posts';
-    
+    // Then manually decrement the comment count in the parent table
+    // Using type assertion to handle the PostgrestFilterBuilder return type
     const { error: updateError } = await supabase
       .from(parentTable)
-      .update({ comment_count: supabase.rpc('decrement', { row_count: 1 }) })
+      .update({ comment_count: (supabase.rpc as any)('decrement', { row_count: 1 }) })
       .eq('id', itemId);
       
     if (updateError) {
