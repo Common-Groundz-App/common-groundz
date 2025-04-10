@@ -103,36 +103,38 @@ export const deleteComment = async (
   itemId: string,
   itemType: 'recommendation' | 'post'
 ): Promise<boolean> => {
+  // Validate inputs to prevent invalid UUID errors
+  if (!commentId || !itemId) {
+    console.error(`Invalid parameters: commentId=${commentId}, itemId=${itemId}`);
+    return false;
+  }
+
   try {
-    // Begin a transaction by opening a connection to the database
+    // Determine which tables to use
     const commentTable = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
     const parentTable = itemType === 'recommendation' ? 'recommendations' : 'posts';
     
-    // Step 1: Actually delete the comment (not just marking as deleted)
+    // Step 1: Delete the comment
     const { error: deleteError } = await supabase
       .from(commentTable)
       .delete()
       .eq('id', commentId);
     
-    if (deleteError) throw deleteError;
+    if (deleteError) {
+      console.error(`Error deleting ${itemType} comment:`, deleteError);
+      throw deleteError;
+    }
     
-    // Step 2: Update the comment count in the parent table
-    const { data, error: fetchError } = await supabase
-      .from(parentTable)
-      .select('comment_count')
-      .eq('id', itemId)
-      .single();
-      
-    if (fetchError) throw fetchError;
+    // Step 2: Update the comment count with a direct decrement to ensure data consistency
+    const { error: updateError } = await supabase.rpc('decrement_comment_count', { 
+      p_table_name: parentTable,
+      p_item_id: itemId
+    });
     
-    // Step 3: Decrement the count, ensuring it's not negative
-    const newCount = Math.max(0, (data?.comment_count || 1) - 1);
-    const { error: updateError } = await supabase
-      .from(parentTable)
-      .update({ comment_count: newCount })
-      .eq('id', itemId);
-      
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error(`Error updating ${itemType} comment count:`, updateError);
+      throw updateError;
+    }
     
     return true;
   } catch (error) {

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -181,6 +180,9 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         title: "Comment deleted",
         description: "Your comment has been deleted successfully"
       });
+      
+      // If there are no more comments, and this is the last comment deleted, we might want to close the dialog
+      // but for now we keep it open to show the empty state
     } catch (error) {
       console.error('Error deleting comment:', error);
       toast({
@@ -198,6 +200,10 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
 
   const handleDialogClose = (open: boolean) => {
     if (!open && !isDeleting) {
+      // Reset all states when dialog is closed
+      setEditingCommentId(null);
+      setEditingContent('');
+      setCommentToDelete(null);
       onClose();
     }
   };
@@ -211,10 +217,14 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     return user && user.id === commentUserId;
   };
 
+  const handleContentClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-md md:max-w-lg" onClick={e => e.stopPropagation()}>
+        <DialogContent className="sm:max-w-md md:max-w-lg" onClick={handleContentClick}>
           <DialogHeader>
             <DialogTitle>Comments</DialogTitle>
           </DialogHeader>
@@ -354,7 +364,12 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       
       <AlertDialog 
         open={deleteDialogOpen} 
-        onOpenChange={setDeleteDialogOpen}
+        onOpenChange={(open) => {
+          // Only allow closing through the cancel button when not deleting
+          if (!isDeleting || !open) {
+            setDeleteDialogOpen(open);
+          }
+        }}
       >
         <AlertDialogContent onClick={e => e.stopPropagation()}>
           <AlertDialogHeader>
@@ -367,7 +382,10 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
             <AlertDialogCancel 
               onClick={(e) => {
                 e.stopPropagation();
-                setDeleteDialogOpen(false);
+                if (!isDeleting) {
+                  setDeleteDialogOpen(false);
+                  setCommentToDelete(null);
+                }
               }}
               disabled={isDeleting}
             >
