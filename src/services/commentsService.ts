@@ -115,11 +115,20 @@ export const deleteComment = async (
     
     if (deleteError) throw deleteError;
     
-    // Then decrement the comment count on the parent item
-    // Instead of using RPC, directly update the comment_count with a decrement expression
+    // Then get the current count
+    const { data, error: fetchError } = await supabase
+      .from(parentTable)
+      .select('comment_count')
+      .eq('id', itemId)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    // Now update with the decremented count, ensuring it's not negative
+    const newCount = Math.max(0, (data?.comment_count || 1) - 1);
     const { error: updateError } = await supabase
       .from(parentTable)
-      .update({ comment_count: supabase.sql`comment_count - 1` })
+      .update({ comment_count: newCount })
       .eq('id', itemId);
       
     if (updateError) throw updateError;
