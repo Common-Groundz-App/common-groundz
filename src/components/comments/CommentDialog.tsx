@@ -39,6 +39,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       const timeout = setTimeout(() => {
         setCommentToDelete(null);
         setIsDeleting(false);
+        setDeleteDialogOpen(false);
       }, 300);
       return () => clearTimeout(timeout);
     }
@@ -125,9 +126,11 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     
     setIsDeleting(true);
     try {
+      console.log("Deleting comment:", commentToDelete, itemType, user.id);
       const success = await deleteComment(commentToDelete, itemType, user.id);
       
       if (!success) throw new Error("Failed to delete comment");
+      console.log("Delete success:", success);
 
       // Remove comment from the list
       setComments(prev => prev.filter(comment => comment.id !== commentToDelete));

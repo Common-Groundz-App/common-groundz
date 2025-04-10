@@ -79,6 +79,8 @@ export const addComment = async (itemId: string, itemType: 'recommendation' | 'p
 
 export const deleteComment = async (commentId: string, itemType: 'recommendation' | 'post', userId: string): Promise<boolean> => {
   try {
+    console.log(`Calling delete_comment with: commentId=${commentId}, itemType=${itemType}, userId=${userId}`);
+    
     // Use the custom RPC function to handle comment soft deletion and counter updates
     const { data, error } = await (supabase.rpc as any)('delete_comment', {
       p_comment_id: commentId,
@@ -86,7 +88,12 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
       p_user_id: userId
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
+    
+    console.log('Delete comment response:', data);
     return !!data;
   } catch (error) {
     console.error(`Error deleting comment from ${itemType}:`, error);
