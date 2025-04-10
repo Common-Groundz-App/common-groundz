@@ -96,10 +96,25 @@ export const deleteComment = async (commentId: string, itemId: string, itemType:
     }
     
     // Then manually decrement the comment count in the parent table
-    // Using type assertion to handle the PostgrestFilterBuilder return type
+    // Update directly with a simple decrement expression
+    const { data: currentData, error: fetchError } = await supabase
+      .from(parentTable)
+      .select('comment_count')
+      .eq('id', itemId)
+      .single();
+      
+    if (fetchError) {
+      console.error('Error fetching current comment count:', fetchError);
+      throw fetchError;
+    }
+    
+    // Calculate new count (ensure it doesn't go below 0)
+    const newCount = Math.max(0, (currentData?.comment_count || 1) - 1);
+    
+    // Update with the new count
     const { error: updateError } = await supabase
       .from(parentTable)
-      .update({ comment_count: (supabase.rpc as any)('decrement', { row_count: 1 }) })
+      .update({ comment_count: newCount })
       .eq('id', itemId);
       
     if (updateError) {

@@ -57,6 +57,8 @@ const CommentDialog = ({
   }, [isOpen, itemId]);
 
   const loadComments = async () => {
+    if (!itemId) return;
+    
     setIsLoading(true);
     try {
       const commentData = await fetchComments(itemId, itemType);
@@ -128,11 +130,13 @@ const CommentDialog = ({
   };
   
   const handleDeleteComment = async () => {
-    if (!commentToDelete || !user) return;
+    if (!commentToDelete || !user || !itemId) {
+      console.log('Missing data for deletion:', { commentToDelete, userId: user?.id, itemId });
+      return;
+    }
     
     setIsDeleting(true);
     try {
-      console.log('Deleting comment:', commentToDelete);
       const success = await deleteComment(commentToDelete, itemId, itemType);
       
       if (!success) throw new Error("Failed to delete comment");
