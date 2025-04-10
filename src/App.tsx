@@ -8,7 +8,7 @@ import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 import './App.css';
 import { Toaster } from "./components/ui/toaster";
-import SearchDialog from './components/SearchDialog';
+import { SearchDialog } from './components/SearchDialog';
 
 function App() {
   return (
@@ -42,7 +42,7 @@ function App() {
         />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <SearchDialog />
+      <SearchDialog open={false} onOpenChange={() => {}} />
       <Toaster />
     </BrowserRouter>
   );

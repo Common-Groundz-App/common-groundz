@@ -47,13 +47,7 @@ const Profile = () => {
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
       <div className="flex-1 pt-2 md:pt-0">
-        <ProfileContent 
-          userId={viewingUserId} 
-          isOwnProfile={isOwnProfile}
-          profileData={profileData}
-          isLoading={isLoading}
-          error={error}
-        />
+        <ProfileContent />
       </div>
       <Footer />
     </div>
