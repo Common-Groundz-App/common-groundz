@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CommentData {
@@ -15,8 +14,6 @@ export const fetchComments = async (itemId: string, itemType: 'recommendation' |
     const tableName = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
     const idField = itemType === 'recommendation' ? 'recommendation_id' : 'post_id';
     
-    // Use the rpc method but cast it to any to bypass TypeScript issues
-    // This is because our types don't yet include the new functions
     const { data, error } = await (supabase
       .rpc as any)('get_comments_with_profiles', { 
         p_table_name: tableName, 
@@ -26,7 +23,6 @@ export const fetchComments = async (itemId: string, itemType: 'recommendation' |
 
     if (error) throw error;
 
-    // Format the response and ensure data is an array
     return Array.isArray(data) ? data.map(comment => ({
       id: comment.id,
       content: comment.content,
@@ -60,8 +56,6 @@ export const fetchCommentCount = async (itemId: string, itemType: 'recommendatio
 
 export const addComment = async (itemId: string, itemType: 'recommendation' | 'post', content: string, userId: string): Promise<boolean> => {
   try {
-    // Use a custom RPC function to handle comment creation and counter updates
-    // Also cast to any to bypass TypeScript issues with new functions
     const { error } = await (supabase.rpc as any)('add_comment', { 
       p_item_id: itemId, 
       p_item_type: itemType, 
@@ -81,7 +75,6 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
   try {
     console.log(`Calling delete_comment with: commentId=${commentId}, itemType=${itemType}, userId=${userId}`);
     
-    // Directly use the delete_comment RPC function without any TypeScript casting
     const { data, error } = await supabase.rpc('delete_comment', {
       p_comment_id: commentId,
       p_item_type: itemType,
@@ -95,7 +88,6 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
     
     console.log('Delete comment response:', data);
     
-    // Check if the response indicates success
     if (data === true) {
       return true;
     } else {
@@ -104,6 +96,36 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
     }
   } catch (error) {
     console.error(`Error deleting comment from ${itemType}:`, error);
+    return false;
+  }
+};
+
+export const updateComment = async (commentId: string, content: string, itemType: 'recommendation' | 'post', userId: string): Promise<boolean> => {
+  try {
+    console.log(`Calling update_comment with: commentId=${commentId}, content=${content}, itemType=${itemType}, userId=${userId}`);
+    
+    const { data, error } = await supabase.rpc('update_comment', {
+      p_comment_id: commentId,
+      p_content: content.trim(),
+      p_user_id: userId,
+      p_item_type: itemType
+    });
+
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
+    
+    console.log('Update comment response:', data);
+    
+    if (data === true) {
+      return true;
+    } else {
+      console.warn('Update operation returned false or null:', data);
+      return false;
+    }
+  } catch (error) {
+    console.error(`Error updating comment for ${itemType}:`, error);
     return false;
   }
 };

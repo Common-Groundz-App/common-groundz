@@ -9,9 +9,9 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { fetchComments, addComment, deleteComment, CommentData } from '@/services/commentsService';
+import { fetchComments, addComment, deleteComment, updateComment, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Trash2 } from 'lucide-react';
+import { Edit, Trash2, X, Save } from 'lucide-react';
 
 interface CommentDialogProps {
   isOpen: boolean;
@@ -29,6 +29,9 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   const [isDeleting, setIsDeleting] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentContent, setEditCommentContent] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -40,6 +43,9 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         setCommentToDelete(null);
         setIsDeleting(false);
         setDeleteDialogOpen(false);
+        setEditingCommentId(null);
+        setEditCommentContent('');
+        setIsEditing(false);
       }, 300);
       return () => clearTimeout(timeout);
     }
@@ -113,6 +119,57 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleEditClick = (comment: CommentData) => {
+    setEditingCommentId(comment.id);
+    setEditCommentContent(comment.content);
+  };
+
+  const handleEditCancel = () => {
+    setEditingCommentId(null);
+    setEditCommentContent('');
+  };
+
+  const handleEditSave = async () => {
+    if (!user || !editingCommentId || !editCommentContent.trim()) {
+      return;
+    }
+    
+    setIsEditing(true);
+    
+    try {
+      const success = await updateComment(editingCommentId, editCommentContent, itemType, user.id);
+      
+      if (!success) {
+        throw new Error("Failed to update comment");
+      }
+      
+      // Update the comment in the local state
+      setComments(prev => prev.map(comment => 
+        comment.id === editingCommentId 
+          ? { ...comment, content: editCommentContent } 
+          : comment
+      ));
+      
+      toast({
+        title: "Comment updated",
+        description: "Your comment has been updated successfully"
+      });
+      
+      // Reset edit state
+      setEditingCommentId(null);
+      setEditCommentContent('');
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      toast({
+        title: "Error updating comment",
+        description: "Please try again later",
+        variant: "destructive"
+      });
+    } finally {
+      setIsEditing(false);
     }
   };
 
@@ -192,6 +249,12 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       setCommentToDelete(null);
     }
     
+    // Cancel any edits in progress
+    if (editingCommentId) {
+      setEditingCommentId(null);
+      setEditCommentContent('');
+    }
+    
     // Then close the main dialog with a slight delay
     // to ensure any pending state updates are completed
     setTimeout(() => {
@@ -238,18 +301,67 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                               {formatDate(comment.created_at)}
                             </span>
                             {user && user.id === comment.user_id && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDeleteClick(comment.id)}
-                              >
-                                <Trash2 size={14} />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                {editingCommentId !== comment.id ? (
+                                  <>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                      onClick={() => handleEditClick(comment)}
+                                      disabled={isDeleting || isEditing}
+                                    >
+                                      <Edit size={14} />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                      onClick={() => handleDeleteClick(comment.id)}
+                                      disabled={isDeleting || isEditing}
+                                    >
+                                      <Trash2 size={14} />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-6 w-6 text-muted-foreground hover:text-green-500"
+                                      onClick={handleEditSave}
+                                      disabled={isEditing || !editCommentContent.trim()}
+                                    >
+                                      <Save size={14} />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                      onClick={handleEditCancel}
+                                      disabled={isEditing}
+                                    >
+                                      <X size={14} />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
-                        <p className="mt-1 text-sm">{comment.content}</p>
+                        {editingCommentId === comment.id ? (
+                          <div className="mt-1">
+                            <Textarea
+                              value={editCommentContent}
+                              onChange={(e) => setEditCommentContent(e.target.value)}
+                              className="min-h-[60px] text-sm"
+                              placeholder="Edit your comment..."
+                              disabled={isEditing}
+                            />
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-sm">{comment.content}</p>
+                        )}
                       </div>
                     </div>
                   ))}

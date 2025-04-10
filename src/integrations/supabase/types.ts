@@ -578,6 +578,15 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
       }
+      update_comment: {
+        Args: {
+          p_comment_id: string
+          p_content: string
+          p_user_id: string
+          p_item_type: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       entity_type: "book" | "movie" | "place" | "product" | "food"
