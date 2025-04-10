@@ -32,18 +32,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Reset state when dialog closes
-  useEffect(() => {
-    if (!isOpen) {
-      // Small delay to ensure proper cleanup after animations
-      const timeout = setTimeout(() => {
-        setCommentToDelete(null);
-        setIsDeleting(false);
-      }, 300);
-      return () => clearTimeout(timeout);
-    }
-  }, [isOpen]);
-
   useEffect(() => {
     if (isOpen && itemId) {
       loadComments();
@@ -146,12 +134,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         title: "Comment deleted",
         description: "Your comment has been removed successfully"
       });
-      
-      // Close the delete dialog first
-      setDeleteDialogOpen(false);
-      setCommentToDelete(null);
-      setIsDeleting(false);
-      
     } catch (error) {
       console.error('Error deleting comment:', error);
       toast({
@@ -159,6 +141,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         description: "Please try again later",
         variant: "destructive"
       });
+    } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
       setCommentToDelete(null);
@@ -170,20 +153,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     setCommentToDelete(null);
   };
 
-  const handleCloseDialog = () => {
-    // Ensure we first close any delete dialogs if open
-    if (deleteDialogOpen) {
-      setDeleteDialogOpen(false);
-      setCommentToDelete(null);
-    }
-    
-    // Then close the main dialog with a slight delay
-    // to ensure any pending state updates are completed
-    setTimeout(() => {
-      onClose();
-    }, 100);
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return format(date, 'MMM d, yyyy h:mm a');
@@ -191,7 +160,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={handleCloseDialog}>
+      <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-md md:max-w-lg">
           <DialogHeader>
             <DialogTitle>Comments</DialogTitle>
@@ -253,7 +222,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                 className="min-h-20"
               />
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
+                <Button variant="outline" onClick={onClose}>Cancel</Button>
                 <Button 
                   onClick={handleAddComment} 
                   disabled={!newComment.trim() || isSending || !user}
@@ -266,15 +235,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         </DialogContent>
       </Dialog>
 
-      <AlertDialog 
-        open={deleteDialogOpen} 
-        onOpenChange={(open) => {
-          if (!open && !isDeleting) {
-            setDeleteDialogOpen(false);
-            setCommentToDelete(null);
-          }
-        }}
-      >
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Comment</AlertDialogTitle>
