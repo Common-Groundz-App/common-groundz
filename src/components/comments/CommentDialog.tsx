@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,25 +27,28 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentContent, setEditCommentContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [dialogClosing, setDialogClosing] = useState(false);
+  
+  // Use a ref to store the comment ID to be deleted - this is more persistent than state for our purposes
+  const commentToDeleteRef = useRef<string | null>(null);
+  
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     if (!isOpen) {
       const timeout = setTimeout(() => {
-        setCommentToDelete(null);
         setIsDeleting(false);
         setDeleteDialogOpen(false);
         setEditingCommentId(null);
         setEditCommentContent('');
         setIsEditing(false);
         setDialogClosing(false);
+        commentToDeleteRef.current = null;
       }, 300);
       return () => clearTimeout(timeout);
     }
@@ -168,21 +172,25 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   };
 
   const handleDeleteClick = (event: React.MouseEvent, commentId: string) => {
+    // Stop event propagation to prevent any parent handlers from firing
     event.preventDefault();
     event.stopPropagation();
     
-    console.log("Delete button clicked for comment:", commentId);
+    // Store the comment ID to delete in the ref for persistence
+    commentToDeleteRef.current = commentId;
+    console.log("Delete button clicked for comment:", commentId, "Stored in ref:", commentToDeleteRef.current);
     
-    setCommentToDelete(commentId);
-    setTimeout(() => {
-      setDeleteDialogOpen(true);
-    }, 0);
+    // Open the delete confirmation dialog
+    setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    console.log("Delete confirmation triggered for comment:", commentToDelete);
+    // Get the comment ID from our persistent ref
+    const commentId = commentToDeleteRef.current;
     
-    if (!user || !commentToDelete) {
+    console.log("Delete confirmation triggered for comment:", commentId);
+    
+    if (!user || !commentId) {
       console.error("Missing user or comment ID for deletion");
       return;
     }
@@ -190,51 +198,33 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     setIsDeleting(true);
     
     try {
-      console.log("Initiating deletion process for:", commentToDelete, itemType, user.id);
+      console.log("Starting deletion process for:", commentId, itemType, user.id);
       
-      const commentIdToDelete = commentToDelete;
+      const success = await deleteComment(commentId, itemType, user.id);
       
-      setTimeout(async () => {
-        try {
-          console.log("Executing deletion for comment:", commentIdToDelete);
-          const success = await deleteComment(commentIdToDelete, itemType, user.id);
-          
-          if (!success) {
-            console.error("Delete operation returned false");
-            throw new Error("Failed to delete comment");
-          }
-          
-          console.log("Delete success:", success);
-          
-          setComments(prev => prev.filter(comment => comment.id !== commentIdToDelete));
-          
-          const refreshEventName = `refresh-${itemType}-comment-count`;
-          const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
-          window.dispatchEvent(refreshEvent);
-          
-          if (onCommentAdded) {
-            onCommentAdded();
-          }
-          
-          toast({
-            title: "Comment deleted",
-            description: "Your comment has been removed successfully"
-          });
-        } catch (error) {
-          console.error('Error in delayed deletion:', error);
-          toast({
-            title: "Error deleting comment",
-            description: "Please try again later",
-            variant: "destructive"
-          });
-        } finally {
-          setIsDeleting(false);
-          setCommentToDelete(null);
-        }
-      }, 100);
+      if (!success) {
+        console.error("Delete operation failed");
+        throw new Error("Failed to delete comment");
+      }
       
-      setDeleteDialogOpen(false);
+      console.log("Delete success:", success);
       
+      // Update UI to remove the deleted comment
+      setComments(prev => prev.filter(comment => comment.id !== commentId));
+      
+      // Dispatch event to refresh comment counts
+      const refreshEventName = `refresh-${itemType}-comment-count`;
+      const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
+      window.dispatchEvent(refreshEvent);
+      
+      if (onCommentAdded) {
+        onCommentAdded();
+      }
+      
+      toast({
+        title: "Comment deleted",
+        description: "Your comment has been removed successfully"
+      });
     } catch (error) {
       console.error('Error in delete confirmation handler:', error);
       toast({
@@ -242,16 +232,17 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         description: "Please try again later",
         variant: "destructive"
       });
+    } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
-      setCommentToDelete(null);
+      // Clear the comment ID ref after deletion attempt
+      commentToDeleteRef.current = null;
     }
   };
 
   const handleDeleteCancel = () => {
     console.log("Delete cancelled");
     setDeleteDialogOpen(false);
-    setCommentToDelete(null);
   };
 
   const handleCloseDialog = () => {
@@ -263,7 +254,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     
     if (deleteDialogOpen) {
       setDeleteDialogOpen(false);
-      setCommentToDelete(null);
     }
     
     if (editingCommentId) {
@@ -271,9 +261,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       setEditCommentContent('');
     }
     
-    setTimeout(() => {
-      onClose();
-    }, 100);
+    onClose();
   };
 
   useEffect(() => {
@@ -341,7 +329,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                                       className="h-6 w-6 text-muted-foreground hover:text-destructive"
                                       onClick={(e) => handleDeleteClick(e, comment.id)}
                                       disabled={isDeleting || isEditing}
-                                      data-comment-id={comment.id}
+                                      data-comment-id={comment.id} // Add a data attribute as backup
                                     >
                                       <Trash2 size={14} />
                                     </Button>
@@ -422,7 +410,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
           console.log("AlertDialog onOpenChange:", open);
           if (!open && !isDeleting) {
             setDeleteDialogOpen(false);
-            setCommentToDelete(null);
           }
         }}
       >

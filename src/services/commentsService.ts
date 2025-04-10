@@ -74,10 +74,13 @@ export const addComment = async (itemId: string, itemType: 'recommendation' | 'p
 
 export const deleteComment = async (commentId: string, itemType: 'recommendation' | 'post', userId: string): Promise<boolean> => {
   try {
-    console.log(`Calling delete_comment with: commentId=${commentId}, itemType=${itemType}, userId=${userId}`);
+    // Immediately log the parameters to identify any issues
+    console.log(`Starting deleteComment with: commentId=${commentId}, itemType=${itemType}, userId=${userId}`);
     
-    // Add delay to ensure the call completes properly
-    await new Promise(resolve => setTimeout(resolve, 50));
+    if (!commentId || !itemType || !userId) {
+      console.error('Missing required parameters for deleteComment', { commentId, itemType, userId });
+      return false;
+    }
     
     // Use type assertion to bypass TypeScript's type checking for RPC functions
     const { data, error } = await (supabase.rpc as any)('delete_comment', {
@@ -87,21 +90,12 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
     });
 
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('Supabase error deleting comment:', error);
       throw error;
     }
     
     console.log('Delete comment response:', data);
-    
-    // Add a small delay after the call completes to ensure state updates properly
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
-    if (data === true) {
-      return true;
-    } else {
-      console.warn('Delete operation returned false or null:', data);
-      return false;
-    }
+    return data === true;
   } catch (error) {
     console.error(`Error deleting comment from ${itemType}:`, error);
     return false;
