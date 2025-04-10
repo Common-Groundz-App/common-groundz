@@ -96,13 +96,13 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             <AvatarImage src={recommendation.avatar_url || undefined} alt={recommendation.username || 'User'} />
             <AvatarFallback>{getInitials(recommendation.username)}</AvatarFallback>
           </Avatar>
-          <div>
+          <div className="flex flex-col">
             <UsernameLink 
               username={recommendation.username} 
               userId={recommendation.user_id}
-              className="font-medium"
+              className="text-sm md:text-base leading-tight"
             />
-            <div className="text-sm text-muted-foreground">{formatDate(recommendation.created_at)}</div>
+            <div className="text-xs md:text-sm text-muted-foreground">{formatDate(recommendation.created_at)}</div>
           </div>
           <div className="ml-auto">
             <Badge>{recommendation.category}</Badge>

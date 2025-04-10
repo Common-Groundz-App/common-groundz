@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -128,13 +129,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
             <AvatarFallback>{getInitials(post.username)}</AvatarFallback>
           </Avatar>
-          <div>
+          <div className="flex flex-col">
             <UsernameLink 
               username={post.username} 
               userId={post.user_id}
-              className="font-medium"
+              className="text-sm md:text-base leading-tight"
             />
-            <div className="text-sm text-muted-foreground">{formatDate(post.created_at)}</div>
+            <div className="text-xs md:text-sm text-muted-foreground">{formatDate(post.created_at)}</div>
           </div>
           <div className="ml-auto">
             <Badge variant="outline">{getPostTypeLabel(post.post_type)}</Badge>
