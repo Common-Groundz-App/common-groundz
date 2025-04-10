@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,10 +64,6 @@ const RecommendationCard = ({
 
   const handleCommentAdded = () => {
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
-  };
-
-  const handleCommentDeleted = () => {
-    setLocalCommentCount(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
   };
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
@@ -195,7 +190,6 @@ const RecommendationCard = ({
         itemId={recommendation.id}
         itemType="recommendation"
         onCommentAdded={handleCommentAdded}
-        onCommentDeleted={handleCommentDeleted}
       />
     </Card>
   );
