@@ -107,7 +107,7 @@ export const deleteComment = async (
     const commentTable = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
     const parentTable = itemType === 'recommendation' ? 'recommendations' : 'posts';
     
-    // First, mark the comment as deleted
+    // Step 1: Begin a transaction by marking the comment as deleted
     const { error: deleteError } = await supabase
       .from(commentTable)
       .update({ is_deleted: true })
@@ -115,7 +115,7 @@ export const deleteComment = async (
     
     if (deleteError) throw deleteError;
     
-    // Then get the current count
+    // Step 2: Get the current count
     const { data, error: fetchError } = await supabase
       .from(parentTable)
       .select('comment_count')
@@ -124,7 +124,7 @@ export const deleteComment = async (
       
     if (fetchError) throw fetchError;
     
-    // Now update with the decremented count, ensuring it's not negative
+    // Step 3: Update with the decremented count, ensuring it's not negative
     const newCount = Math.max(0, (data?.comment_count || 1) - 1);
     const { error: updateError } = await supabase
       .from(parentTable)

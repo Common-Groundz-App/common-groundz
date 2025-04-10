@@ -30,6 +30,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   const [editingContent, setEditingContent] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -148,7 +149,11 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     }
   };
 
-  const handleOpenDeleteDialog = (commentId: string) => {
+  const handleOpenDeleteDialog = (commentId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
     setCommentToDelete(commentId);
     setDeleteDialogOpen(true);
   };
@@ -156,6 +161,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   const handleConfirmDelete = async () => {
     if (!commentToDelete) return;
     
+    setIsDeleting(true);
     try {
       const success = await deleteComment(commentToDelete, itemId, itemType);
       
@@ -184,6 +190,14 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         description: "Please try again later",
         variant: "destructive"
       });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    if (!open && !isDeleting) {
+      onClose();
     }
   };
 
@@ -198,7 +212,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={handleDialogClose}>
         <DialogContent className="sm:max-w-md md:max-w-lg">
           <DialogHeader>
             <DialogTitle>Comments</DialogTitle>
@@ -240,7 +254,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                                   variant="ghost" 
                                   size="icon" 
                                   className="h-6 w-6 text-destructive" 
-                                  onClick={() => handleOpenDeleteDialog(comment.id)}
+                                  onClick={(e) => handleOpenDeleteDialog(comment.id, e)}
                                 >
                                   <Trash2 size={14} />
                                 </Button>
@@ -300,10 +314,17 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                 className="min-h-20"
               />
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={onClose}>Cancel</Button>
+                <Button 
+                  variant="outline" 
+                  onClick={onClose}
+                  type="button"
+                >
+                  Cancel
+                </Button>
                 <Button 
                   onClick={handleAddComment} 
                   disabled={!newComment.trim() || isSending || !user}
+                  type="button"
                 >
                   {isSending ? "Sending..." : "Comment"}
                 </Button>
@@ -322,8 +343,21 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground">
+            <AlertDialogCancel 
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteDialogOpen(false);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleConfirmDelete();
+              }} 
+              className="bg-destructive text-destructive-foreground"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
