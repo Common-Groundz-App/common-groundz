@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,9 +43,13 @@ const RecommendationCard = ({
   
   useEffect(() => {
     const handleCommentCountUpdate = async (event: CustomEvent) => {
-      if (event.detail.itemId === recommendation.id) {
-        const updatedCount = await fetchCommentCount(recommendation.id, 'recommendation');
-        setLocalCommentCount(updatedCount);
+      if (event.detail && event.detail.itemId === recommendation.id) {
+        try {
+          const updatedCount = await fetchCommentCount(recommendation.id, 'recommendation');
+          setLocalCommentCount(updatedCount);
+        } catch (error) {
+          console.error("Error updating comment count:", error);
+        }
       }
     };
     
@@ -64,6 +69,10 @@ const RecommendationCard = ({
 
   const handleCommentAdded = () => {
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
+  };
+  
+  const handleCommentDialogClose = () => {
+    setIsCommentDialogOpen(false);
   };
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
@@ -132,6 +141,7 @@ const RecommendationCard = ({
               e.preventDefault();
               onSave(recommendation.id);
             }}
+            type="button"
           >
             <Bookmark size={18} className={recommendation.isSaved ? "fill-brand-orange" : ""} />
           </Button>
@@ -157,6 +167,7 @@ const RecommendationCard = ({
                 e.preventDefault();
                 onLike(recommendation.id);
               }}
+              type="button"
             >
               <Heart 
                 size={16} 
@@ -170,6 +181,7 @@ const RecommendationCard = ({
               size="sm"
               className="transition-colors flex items-center gap-1 px-2 text-gray-500 hover:text-gray-700"
               onClick={handleCommentClick}
+              type="button"
             >
               <MessageCircle size={16} />
               {displayCommentCount > 0 && (
@@ -178,7 +190,7 @@ const RecommendationCard = ({
             </Button>
           </div>
           
-          <Button variant="outline" size="sm" className="text-xs">
+          <Button variant="outline" size="sm" className="text-xs" type="button">
             View Details
           </Button>
         </div>
@@ -186,7 +198,7 @@ const RecommendationCard = ({
 
       <CommentDialog 
         isOpen={isCommentDialogOpen} 
-        onClose={() => setIsCommentDialogOpen(false)} 
+        onClose={handleCommentDialogClose} 
         itemId={recommendation.id}
         itemType="recommendation"
         onCommentAdded={handleCommentAdded}
