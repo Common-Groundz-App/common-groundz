@@ -35,13 +35,11 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   const [dialogClosing, setDialogClosing] = useState(false);
   const [userProfile, setUserProfile] = useState<{ avatar_url?: string; username?: string }>({});
   
-  // Use a ref to store the comment ID to be deleted - this is more persistent than state for our purposes
   const commentToDeleteRef = useRef<string | null>(null);
   
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Fetch user profile when user changes
   useEffect(() => {
     const loadUserProfile = async () => {
       if (user) {
@@ -190,16 +188,13 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   };
 
   const handleDeleteClick = (commentId: string) => {
-    // Store the comment ID to delete in the ref for persistence
     commentToDeleteRef.current = commentId;
     console.log("Delete button clicked for comment:", commentId, "Stored in ref:", commentToDeleteRef.current);
     
-    // Open the delete confirmation dialog
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    // Get the comment ID from our persistent ref
     const commentId = commentToDeleteRef.current;
     
     console.log("Delete confirmation triggered for comment:", commentId);
@@ -223,10 +218,8 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       
       console.log("Delete success:", success);
       
-      // Update UI to remove the deleted comment
       setComments(prev => prev.filter(comment => comment.id !== commentId));
       
-      // Dispatch event to refresh comment counts
       const refreshEventName = `refresh-${itemType}-comment-count`;
       const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
       window.dispatchEvent(refreshEvent);
@@ -249,7 +242,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
-      // Clear the comment ID ref after deletion attempt
       commentToDeleteRef.current = null;
     }
   };
@@ -286,7 +278,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     }
   }, [dialogClosing, isDeleting, onClose]);
 
-  // Format the date to relative time (Instagram style)
   const formatRelativeTime = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -301,7 +292,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     return user && user.id === userId;
   };
   
-  // Get initials from a name string
   const getInitials = (name: string | undefined) => {
     if (!name) return user?.email?.substring(0, 1).toUpperCase() || '?';
     return name.charAt(0).toUpperCase();
@@ -362,7 +352,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                                 <Textarea
                                   value={editCommentContent}
                                   onChange={(e) => setEditCommentContent(e.target.value)}
-                                  className="min-h-[60px] text-sm resize-none bg-gray-50 border-gray-200 focus:border-primary"
+                                  className="min-h-[60px] text-sm resize-none bg-gray-50 border-gray-200 focus:border-primary focus:ring-0 focus-visible:ring-0"
                                   placeholder="Edit your comment..."
                                   disabled={isEditing}
                                 />
@@ -437,7 +427,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   disabled={!user || isSending}
-                  className="min-h-[60px] pr-10 resize-none bg-gray-50 border-gray-200 focus:border-primary focus-visible:ring-1 focus-visible:ring-primary rounded-lg"
+                  className="min-h-[60px] pr-10 resize-none bg-gray-50 border border-gray-200 focus:border-primary focus:ring-0 focus-visible:ring-0 rounded-lg"
                 />
                 <Button
                   size="icon"
