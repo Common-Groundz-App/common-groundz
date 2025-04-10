@@ -110,6 +110,8 @@ export const deleteComment = async (
   }
 
   try {
+    console.log(`Deleting comment: commentId=${commentId}, itemId=${itemId}, itemType=${itemType}`);
+    
     // Determine which tables to use
     const commentTable = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
     const parentTable = itemType === 'recommendation' ? 'recommendations' : 'posts';
@@ -137,6 +139,7 @@ export const deleteComment = async (
       throw updateError;
     }
     
+    console.log(`Successfully deleted comment and updated count for ${itemType}`);
     return true;
   } catch (error) {
     console.error(`Error deleting ${itemType} comment:`, error);

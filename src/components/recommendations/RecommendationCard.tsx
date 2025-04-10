@@ -71,6 +71,10 @@ const RecommendationCard = ({
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
   
+  const handleCommentDeleted = () => {
+    setLocalCommentCount(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
+  };
+  
   const handleCommentDialogClose = () => {
     setIsCommentDialogOpen(false);
   };
@@ -202,6 +206,7 @@ const RecommendationCard = ({
         itemId={recommendation.id}
         itemType="recommendation"
         onCommentAdded={handleCommentAdded}
+        onCommentDeleted={handleCommentDeleted}
       />
     </Card>
   );

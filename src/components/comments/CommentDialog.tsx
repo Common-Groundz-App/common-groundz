@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -18,9 +19,10 @@ interface CommentDialogProps {
   itemId: string;
   itemType: 'recommendation' | 'post';
   onCommentAdded?: () => void;
+  onCommentDeleted?: () => void;
 }
 
-const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: CommentDialogProps) => {
+const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, onCommentDeleted }: CommentDialogProps) => {
   const [comments, setComments] = useState<CommentData[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -162,14 +164,22 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     
     setIsDeleting(true);
     try {
+      console.log(`Attempting to delete comment: ${commentToDelete} for ${itemType} ${itemId}`);
       const success = await deleteComment(commentToDelete, itemId, itemType);
       
       if (!success) {
         throw new Error("Failed to delete comment");
       }
       
+      console.log("Delete comment successful!");
+      
       // Remove the comment from the local state
       setComments(comments.filter(comment => comment.id !== commentToDelete));
+      
+      // Call the onCommentDeleted callback to update parent components
+      if (onCommentDeleted) {
+        onCommentDeleted();
+      }
       
       // Trigger a feed refresh event to update comment counts across the app
       const refreshEventName = `refresh-${itemType}-comment-count`;
@@ -180,9 +190,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         title: "Comment deleted",
         description: "Your comment has been deleted successfully"
       });
-      
-      // If there are no more comments, and this is the last comment deleted, we might want to close the dialog
-      // but for now we keep it open to show the empty state
     } catch (error) {
       console.error('Error deleting comment:', error);
       toast({
