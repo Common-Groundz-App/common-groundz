@@ -30,12 +30,15 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
   isLoading = false,
 }) => {
   return (
-    <AlertDialog open={isOpen} onOpenChange={(open) => {
-      // Only allow closing via the onOpenChange if we're not in a loading state
-      if (!open && !isLoading) {
-        onClose();
-      }
-    }}>
+    <AlertDialog 
+      open={isOpen} 
+      onOpenChange={(open) => {
+        // Only allow closing via the onOpenChange if we're not in a loading state
+        if (!open && !isLoading) {
+          onClose();
+        }
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -166,19 +167,27 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         description: "Your post has been deleted successfully"
       });
       
+      // First close the dialog to prevent UI lock
       setIsDeleteDialogOpen(false);
+      setIsDeleting(false);
       
+      // Then update local state and trigger refresh
       if (onDelete) {
         onDelete(post.id);
       }
       
-      if (refreshFeed) {
-        setTimeout(() => {
+      // Add a slight delay before dispatching refresh events
+      // This helps ensure the UI remains responsive
+      setTimeout(() => {
+        // Dispatch global refresh event
+        window.dispatchEvent(new CustomEvent('refresh-feed'));
+        
+        // If there's a parent refresh function, call it
+        if (refreshFeed) {
           refreshFeed();
-        }, 100);
-      }
+        }
+      }, 100);
       
-      window.dispatchEvent(new CustomEvent('refresh-feed'));
     } catch (error) {
       console.error("Error deleting post:", error);
       toast({
@@ -315,7 +324,10 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       
       <DeleteConfirmationDialog
         isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
+        onClose={() => {
+          setIsDeleteDialogOpen(false);
+          setIsDeleting(false);
+        }}
         onConfirm={handleDeleteConfirm}
         title="Delete Post"
         description="Are you sure you want to delete this post? This action cannot be undone."

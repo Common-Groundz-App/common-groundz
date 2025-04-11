@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -104,13 +105,19 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
         description: "Your post has been deleted successfully"
       });
       
+      // First close the dialog to prevent UI lock
       setIsDeleteDialogOpen(false);
+      setIsDeleting(false);
       
+      // Then update local state
       if (onDeleted) {
         onDeleted(post.id);
       }
       
-      window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+      // Add a slight delay before dispatching the global refresh event
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+      }, 100);
     } catch (error) {
       console.error("Error deleting post:", error);
       toast({
@@ -118,7 +125,6 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
         description: "Failed to delete post",
         variant: "destructive"
       });
-    } finally {
       setIsDeleting(false);
     }
   };
@@ -203,7 +209,10 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
       
       <DeleteConfirmationDialog
         isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
+        onClose={() => {
+          setIsDeleteDialogOpen(false);
+          setIsDeleting(false);
+        }}
         onConfirm={handleDeleteConfirm}
         title="Delete Post"
         description="Are you sure you want to delete this post? This action cannot be undone."
