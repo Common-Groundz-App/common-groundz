@@ -10,7 +10,8 @@ export type {
 
 export { 
   fetchUserRecommendations,
-  fetchRecommendationWithLikesAndSaves
+  fetchRecommendationWithLikesAndSaves,
+  fetchRecommendationById
 } from './recommendation/fetchRecommendations';
 
 export {

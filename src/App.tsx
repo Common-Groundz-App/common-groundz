@@ -1,5 +1,5 @@
 
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
@@ -40,6 +40,8 @@ function App() {
             </ProtectedRoute>
           } 
         />
+        {/* Redirect old edit routes to profile */}
+        <Route path="/recommendations/edit/:id" element={<Navigate to="/profile" />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <SearchDialog open={false} onOpenChange={() => {}} />

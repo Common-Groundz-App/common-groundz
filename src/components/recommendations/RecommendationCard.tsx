@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Heart, Award, Bookmark, Eye, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import RatingStars from './RatingStars';
-import { Recommendation } from '@/services/recommendationService';
+import { Recommendation, fetchRecommendationById } from '@/services/recommendationService';
 import { getCategoryLabel } from './RecommendationFilters';
 import CommentDialog from '../comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
@@ -17,16 +17,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { useNavigate } from 'react-router-dom';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { deleteRecommendation } from '@/services/recommendation/crudOperations';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import RecommendationForm from './RecommendationForm';
+import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
   onLike: (id: string) => void;
   onSave: (id: string) => void;
-  onComment?: (id: string) => void;
   onDeleted?: () => void;
 }
 
@@ -34,17 +34,18 @@ const RecommendationCard = ({
   recommendation, 
   onLike, 
   onSave,
-  onComment,
   onDeleted
 }: RecommendationCardProps) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
   const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editRecommendation, setEditRecommendation] = useState<Recommendation | null>(null);
   
+  const { handleImageUpload } = useRecommendationUploads();
   const isOwner = user?.id === recommendation.user_id;
   
   useEffect(() => {
@@ -80,18 +81,33 @@ const RecommendationCard = ({
     e.stopPropagation();
     e.preventDefault();
     setIsCommentDialogOpen(true);
-    if (onComment) onComment(recommendation.id);
   };
 
   const handleCommentAdded = () => {
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
 
-  const handleEdit = (e: React.MouseEvent) => {
+  const handleEdit = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    // Navigate to edit recommendation page
-    navigate(`/recommendations/edit/${recommendation.id}`);
+    
+    // Fetch the full recommendation data
+    if (user) {
+      try {
+        const fullRecommendation = await fetchRecommendationById(recommendation.id, user.id);
+        if (fullRecommendation) {
+          setEditRecommendation(fullRecommendation);
+          setIsEditing(true);
+        }
+      } catch (error) {
+        console.error("Error fetching recommendation details:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load recommendation details for editing",
+          variant: "destructive"
+        });
+      }
+    }
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -133,147 +149,190 @@ const RecommendationCard = ({
     }
   };
 
+  const handleFormSubmit = async (values: any) => {
+    if (!user || !editRecommendation) return;
+    
+    try {
+      // Update the recommendation in the database
+      await updateRecommendation(recommendation.id, {
+        title: values.title,
+        venue: values.venue || null,
+        description: values.description || null,
+        rating: values.rating,
+        image_url: values.image_url,
+        category: values.category,
+        visibility: values.visibility,
+      });
+      
+      toast({
+        title: "Recommendation updated",
+        description: "Your recommendation has been updated successfully"
+      });
+      
+      // Close the form
+      setIsEditing(false);
+      
+      // Call onDeleted to refresh the list
+      if (onDeleted) {
+        onDeleted();
+      }
+      
+      // Force a refresh of component state
+      window.dispatchEvent(new CustomEvent('refresh-recommendations'));
+    } catch (error) {
+      console.error("Error updating recommendation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update recommendation",
+        variant: "destructive"
+      });
+    }
+  };
+
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
   
   return (
-    <Card 
-      key={recommendation.id} 
-      className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border border-gray-200"
-    >
-      <div className="relative">
-        <div className="absolute top-3 left-3 z-10">
-          <Badge variant="secondary" className="bg-black/70 hover:bg-black/80 text-white">
-            {getCategoryLabel(recommendation.category)}
-          </Badge>
-        </div>
-        {recommendation.is_certified && (
-          <div className="absolute top-3 right-3 z-10">
-            <Badge variant="secondary" className="bg-brand-orange hover:bg-brand-orange/90 text-white flex items-center gap-1">
-              <Award size={12} />
-              <span>Certified</span>
+    <>
+      <Card 
+        key={recommendation.id} 
+        className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border border-gray-200"
+      >
+        <div className="relative">
+          <div className="absolute top-3 left-3 z-10">
+            <Badge variant="secondary" className="bg-black/70 hover:bg-black/80 text-white">
+              {getCategoryLabel(recommendation.category)}
             </Badge>
           </div>
-        )}
-        <div className="h-48 relative overflow-hidden group">
-          <img 
-            src={recommendation.image_url || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07'} 
-            alt={recommendation.title} 
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
-            <div className="p-3 w-full flex justify-between items-center">
-              <div className="flex items-center gap-1 text-white">
-                <Eye size={14} />
-                <span className="text-xs">{recommendation.view_count}</span>
-              </div>
-              <Badge 
-                variant="outline" 
-                className={cn(
-                  "text-xs border-0 text-white",
-                  recommendation.visibility === 'private' ? "bg-red-500/70" : 
-                  recommendation.visibility === 'circle_only' ? "bg-blue-500/70" : "bg-green-500/70"
-                )}
-              >
-                {recommendation.visibility === 'public' ? 'Public' : 
-                 recommendation.visibility === 'private' ? 'Private' : 'Circle Only'}
+          {recommendation.is_certified && (
+            <div className="absolute top-3 right-3 z-10">
+              <Badge variant="secondary" className="bg-brand-orange hover:bg-brand-orange/90 text-white flex items-center gap-1">
+                <Award size={12} />
+                <span>Certified</span>
               </Badge>
+            </div>
+          )}
+          <div className="h-48 relative overflow-hidden group">
+            <img 
+              src={recommendation.image_url || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07'} 
+              alt={recommendation.title} 
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
+              <div className="p-3 w-full flex justify-between items-center">
+                <div className="flex items-center gap-1 text-white">
+                  <Eye size={14} />
+                  <span className="text-xs">{recommendation.view_count}</span>
+                </div>
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "text-xs border-0 text-white",
+                    recommendation.visibility === 'private' ? "bg-red-500/70" : 
+                    recommendation.visibility === 'circle_only' ? "bg-blue-500/70" : "bg-green-500/70"
+                  )}
+                >
+                  {recommendation.visibility === 'public' ? 'Public' : 
+                   recommendation.visibility === 'private' ? 'Private' : 'Circle Only'}
+                </Badge>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      
-      <CardContent className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold line-clamp-1">{recommendation.title}</h3>
-          <div className="flex items-center">
-            {isOwner && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">More options</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
-                    <Pencil className="h-4 w-4" /> Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={handleDeleteClick} 
-                    className="text-destructive focus:text-destructive flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={cn(
-                "h-8 w-8 transition-colors", 
-                recommendation.isSaved 
-                  ? "text-brand-orange" 
-                  : "text-gray-500 hover:text-brand-orange"
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onSave(recommendation.id);
-              }}
-            >
-              <Bookmark size={18} className={recommendation.isSaved ? "fill-brand-orange" : ""} />
-            </Button>
-          </div>
-        </div>
         
-        <p className="text-gray-600 mb-3 text-sm">{recommendation.venue || 'Unknown venue'}</p>
-        
-        <RatingStars rating={recommendation.rating} />
-        
-        <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className={cn(
-                "transition-colors flex items-center gap-1 px-2",
-                recommendation.isLiked 
-                  ? "text-red-500" 
-                  : "text-gray-500 hover:text-red-500"
+        <CardContent className="p-4">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="text-lg font-bold line-clamp-1">{recommendation.title}</h3>
+            <div className="flex items-center">
+              {isOwner && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                      <MoreVertical className="h-4 w-4" />
+                      <span className="sr-only">More options</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                      <Pencil className="h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={handleDeleteClick} 
+                      className="text-destructive focus:text-destructive flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onLike(recommendation.id);
-              }}
-            >
-              <Heart 
-                size={16} 
-                className={recommendation.isLiked ? "fill-red-500" : ""} 
-              />
-              <span>{recommendation.likes}</span>
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              className="transition-colors flex items-center gap-1 px-2 text-gray-500 hover:text-gray-700"
-              onClick={handleCommentClick}
-            >
-              <MessageCircle size={16} />
-              {displayCommentCount > 0 && (
-                <span>{displayCommentCount}</span>
-              )}
-            </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={cn(
+                  "h-8 w-8 transition-colors", 
+                  recommendation.isSaved 
+                    ? "text-brand-orange" 
+                    : "text-gray-500 hover:text-brand-orange"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onSave(recommendation.id);
+                }}
+              >
+                <Bookmark size={18} className={recommendation.isSaved ? "fill-brand-orange" : ""} />
+              </Button>
+            </div>
           </div>
           
-          <Button variant="outline" size="sm" className="text-xs">
-            View Details
-          </Button>
-        </div>
-      </CardContent>
+          <p className="text-gray-600 mb-3 text-sm">{recommendation.venue || 'Unknown venue'}</p>
+          
+          <RatingStars rating={recommendation.rating} />
+          
+          <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn(
+                  "transition-colors flex items-center gap-1 px-2",
+                  recommendation.isLiked 
+                    ? "text-red-500" 
+                    : "text-gray-500 hover:text-red-500"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onLike(recommendation.id);
+                }}
+              >
+                <Heart 
+                  size={16} 
+                  className={recommendation.isLiked ? "fill-red-500" : ""} 
+                />
+                <span>{recommendation.likes}</span>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                className="transition-colors flex items-center gap-1 px-2 text-gray-500 hover:text-gray-700"
+                onClick={handleCommentClick}
+              >
+                <MessageCircle size={16} />
+                {displayCommentCount > 0 && (
+                  <span>{displayCommentCount}</span>
+                )}
+              </Button>
+            </div>
+            
+            <Button variant="outline" size="sm" className="text-xs">
+              View Details
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
+      {/* Comment Dialog */}
       <CommentDialog 
         isOpen={isCommentDialogOpen} 
         onClose={() => setIsCommentDialogOpen(false)} 
@@ -282,6 +341,7 @@ const RecommendationCard = ({
         onCommentAdded={handleCommentAdded}
       />
       
+      {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
@@ -290,8 +350,39 @@ const RecommendationCard = ({
         description="Are you sure you want to delete this recommendation? This action cannot be undone."
         isLoading={isDeleting}
       />
-    </Card>
+      
+      {/* Edit Form Dialog */}
+      {editRecommendation && (
+        <RecommendationForm
+          isOpen={isEditing}
+          onClose={() => setIsEditing(false)}
+          onSubmit={handleFormSubmit}
+          onImageUpload={handleImageUpload}
+          recommendation={editRecommendation}
+          isEditMode={true}
+        />
+      )}
+    </>
   );
 };
 
 export default RecommendationCard;
+
+// Helper to update a recommendation
+const updateRecommendation = async (id: string, updates: Partial<Recommendation>) => {
+  const { supabase } = await import('@/integrations/supabase/client');
+  
+  const { data, error } = await supabase
+    .from('recommendations')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating recommendation:', error);
+    throw error;
+  }
+
+  return data;
+};

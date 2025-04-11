@@ -7,40 +7,44 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Star } from "lucide-react";
+import { Star, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import EntitySearch from './EntitySearch';
-import { RecommendationCategory, RecommendationVisibility } from '@/services/recommendationService';
+import { RecommendationCategory, RecommendationVisibility, Recommendation } from '@/services/recommendationService';
 
 interface RecommendationFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (values: any) => void;
   onImageUpload: (file: File) => Promise<string | null>;
+  recommendation?: Recommendation; // For edit mode
+  isEditMode?: boolean;
 }
 
 const RecommendationForm = ({
   isOpen,
   onClose,
   onSubmit,
-  onImageUpload
+  onImageUpload,
+  recommendation,
+  isEditMode = false
 }: RecommendationFormProps) => {
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm({
     defaultValues: {
-      title: '',
-      venue: '',
-      description: '',
-      rating: 0,
-      image_url: '',
-      category: 'food' as RecommendationCategory,
-      visibility: 'public' as RecommendationVisibility,
-      entity_id: '',
+      title: recommendation?.title || '',
+      venue: recommendation?.venue || '',
+      description: recommendation?.description || '',
+      rating: recommendation?.rating || 0,
+      image_url: recommendation?.image_url || '',
+      category: recommendation?.category || 'food' as RecommendationCategory,
+      visibility: recommendation?.visibility || 'public' as RecommendationVisibility,
+      entity_id: recommendation?.entity_id || '',
     }
   });
   
   const selectedCategory = watch('category');
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(recommendation?.image_url || null);
   const [isUploading, setIsUploading] = useState(false);
   
   // Listen for custom event to open the form
@@ -59,10 +63,27 @@ const RecommendationForm = ({
   // Reset form on close
   useEffect(() => {
     if (!isOpen) {
-      reset();
-      setSelectedImage(null);
+      if (!isEditMode) {
+        reset();
+        setSelectedImage(null);
+      }
     }
-  }, [isOpen, reset]);
+  }, [isOpen, reset, isEditMode]);
+  
+  // Set form values when in edit mode and recommendation changes
+  useEffect(() => {
+    if (isEditMode && recommendation) {
+      setValue('title', recommendation.title);
+      setValue('venue', recommendation.venue || '');
+      setValue('description', recommendation.description || '');
+      setValue('rating', recommendation.rating);
+      setValue('image_url', recommendation.image_url || '');
+      setValue('category', recommendation.category);
+      setValue('visibility', recommendation.visibility);
+      setValue('entity_id', recommendation.entity_id || '');
+      setSelectedImage(recommendation.image_url || null);
+    }
+  }, [recommendation, isEditMode, setValue]);
   
   const handleImageUploadChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -85,15 +106,17 @@ const RecommendationForm = ({
   
   const handleFormSubmit = async (values: any) => {
     await onSubmit(values);
-    reset();
-    setSelectedImage(null);
+    if (!isEditMode) {
+      reset();
+      setSelectedImage(null);
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Recommendation</DialogTitle>
+          <DialogTitle>{isEditMode ? 'Edit Recommendation' : 'Add New Recommendation'}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
@@ -105,7 +128,7 @@ const RecommendationForm = ({
               render={({ field }) => (
                 <Select 
                   onValueChange={field.onChange}
-                  defaultValue={field.value}
+                  value={field.value}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a category" />
@@ -122,7 +145,7 @@ const RecommendationForm = ({
             />
           </div>
           
-          {(selectedCategory === 'movie' || selectedCategory === 'book' || 
+          {!isEditMode && (selectedCategory === 'movie' || selectedCategory === 'book' || 
             selectedCategory === 'place' || selectedCategory === 'product') && (
             <div className="space-y-2">
               <Label>Search for {selectedCategory}</Label>
@@ -266,7 +289,7 @@ const RecommendationForm = ({
               control={control}
               render={({ field }) => (
                 <RadioGroup
-                  defaultValue={field.value}
+                  value={field.value}
                   onValueChange={field.onChange}
                   className="grid grid-cols-3 gap-2"
                 >
@@ -296,7 +319,14 @@ const RecommendationForm = ({
               disabled={isSubmitting || isUploading}
               className="bg-brand-orange hover:bg-brand-orange/90"
             >
-              {isSubmitting ? "Saving..." : "Save Recommendation"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditMode ? "Updating..." : "Saving..."}
+                </>
+              ) : (
+                isEditMode ? "Update Recommendation" : "Save Recommendation"
+              )}
             </Button>
           </div>
         </form>
