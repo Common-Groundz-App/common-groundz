@@ -11,6 +11,7 @@ import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
 import { CreatePostButton } from '@/components/feed/CreatePostButton';
+import { Glow } from '@/components/ui/glow';
 
 const Feed = () => {
   const isMobile = useIsMobile();
@@ -81,7 +82,7 @@ const Feed = () => {
             </div>
             
             <div className="w-full">
-              <div className="flex items-center w-full text-muted-foreground bg-background border-b">
+              <div className="flex items-center w-full text-muted-foreground border-b relative">
                 <div 
                   onClick={() => setActiveTab("for-you")} 
                   className={cn(
@@ -106,6 +107,7 @@ const Feed = () => {
                         <div className="absolute w-8 h-6 bg-brand-orange/20 rounded-full blur-md -top-1" />
                         <div className="absolute w-4 h-4 bg-brand-orange/20 rounded-full blur-sm top-0 left-2" />
                       </div>
+                      <div className="absolute h-full w-full bg-accent opacity-40 rounded-md" />
                     </motion.div>
                   )}
                 </div>
@@ -134,6 +136,7 @@ const Feed = () => {
                         <div className="absolute w-8 h-6 bg-brand-orange/20 rounded-full blur-md -top-1" />
                         <div className="absolute w-4 h-4 bg-brand-orange/20 rounded-full blur-sm top-0 left-2" />
                       </div>
+                      <div className="absolute h-full w-full bg-accent opacity-40 rounded-md" />
                     </motion.div>
                   )}
                 </div>
