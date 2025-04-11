@@ -118,6 +118,9 @@ const RecommendationCard = ({
       if (onDeleted) {
         onDeleted();
       }
+      
+      // Force a refresh of component state
+      window.dispatchEvent(new CustomEvent('refresh-recommendations'));
     } catch (error) {
       console.error("Error deleting recommendation:", error);
       toast({

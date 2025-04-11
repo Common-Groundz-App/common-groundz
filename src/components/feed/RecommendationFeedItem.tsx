@@ -141,6 +141,9 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
       if (refreshFeed) {
         refreshFeed();
       }
+      
+      // Force a refresh of the component state
+      window.dispatchEvent(new CustomEvent('refresh-feed'));
     } catch (error) {
       console.error("Error deleting recommendation:", error);
       toast({
@@ -163,7 +166,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             <AvatarImage src={recommendation.avatar_url || undefined} alt={recommendation.username || 'User'} />
             <AvatarFallback>{getInitials(recommendation.username)}</AvatarFallback>
           </Avatar>
-          <div>
+          <div className="flex-grow">
             <UsernameLink 
               username={recommendation.username} 
               userId={recommendation.user_id}
@@ -172,7 +175,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             />
             <div className="text-sm text-muted-foreground">{formatDate(recommendation.created_at)}</div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          
+          <div className="flex items-center gap-2">
             <Badge>{recommendation.category}</Badge>
             
             {isOwner && (

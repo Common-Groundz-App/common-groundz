@@ -113,6 +113,9 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
       if (onDeleted) {
         onDeleted();
       }
+      
+      // Force a refresh of the profile posts
+      window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
     } catch (error) {
       console.error("Error deleting post:", error);
       toast({

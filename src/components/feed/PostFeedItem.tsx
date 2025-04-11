@@ -180,6 +180,9 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       if (refreshFeed) {
         refreshFeed();
       }
+      
+      // Force a refresh of the component state
+      window.dispatchEvent(new CustomEvent('refresh-feed'));
     } catch (error) {
       console.error("Error deleting post:", error);
       toast({
@@ -202,7 +205,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
             <AvatarFallback>{getInitials(post.username)}</AvatarFallback>
           </Avatar>
-          <div>
+          <div className="flex-grow">
             <UsernameLink 
               username={post.username} 
               userId={post.user_id}
@@ -211,7 +214,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             />
             <div className="text-sm text-muted-foreground">{formatDate(post.created_at)}</div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          
+          <div className="flex items-center gap-2">
             <Badge variant="outline">{getPostTypeLabel(post.post_type)}</Badge>
             
             {isOwner && (
