@@ -1,31 +1,54 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, Star, MessageCircle } from 'lucide-react';
+import { Bookmark, Heart, Star, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { FeedItem } from '@/hooks/feed/types';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
+import { useAuth } from '@/contexts/AuthContext';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { useToast } from '@/hooks/use-toast';
+import { deleteRecommendation } from '@/services/recommendation/crudOperations';
+import { useNavigate } from 'react-router-dom';
 
 interface RecommendationFeedItemProps {
   recommendation: FeedItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
   onComment?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  refreshFeed?: () => void;
 }
 
 export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({ 
   recommendation, 
   onLike, 
   onSave,
-  onComment
+  onComment,
+  onDelete,
+  refreshFeed
 }) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
   const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  const isOwner = user?.id === recommendation.user_id;
 
   useEffect(() => {
     const getInitialCommentCount = async () => {
@@ -86,6 +109,50 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
 
+  const handleEdit = () => {
+    // Navigate to edit recommendation page
+    navigate(`/recommendations/edit/${recommendation.id}`);
+  };
+
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!user) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteRecommendation(recommendation.id);
+      
+      toast({
+        title: "Recommendation deleted",
+        description: "Your recommendation has been deleted successfully"
+      });
+      
+      setIsDeleteDialogOpen(false);
+      
+      // Call onDelete callback if provided
+      if (onDelete) {
+        onDelete(recommendation.id);
+      }
+      
+      // Refresh the feed if refresh function is provided
+      if (refreshFeed) {
+        refreshFeed();
+      }
+    } catch (error) {
+      console.error("Error deleting recommendation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete recommendation",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
 
   return (
@@ -101,11 +168,34 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
               username={recommendation.username} 
               userId={recommendation.user_id}
               className="font-medium"
+              isCurrentUser={isOwner}
             />
             <div className="text-sm text-muted-foreground">{formatDate(recommendation.created_at)}</div>
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             <Badge>{recommendation.category}</Badge>
+            
+            {isOwner && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="sr-only">More options</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleDeleteClick} 
+                    className="text-destructive focus:text-destructive flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
         
@@ -202,6 +292,15 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         itemId={recommendation.id}
         itemType="recommendation" 
         onCommentAdded={handleCommentAdded}
+      />
+      
+      <DeleteConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Recommendation"
+        description="Are you sure you want to delete this recommendation? This action cannot be undone."
+        isLoading={isDeleting}
       />
     </Card>
   );

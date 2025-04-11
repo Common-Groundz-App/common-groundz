@@ -1,14 +1,26 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Tag } from 'lucide-react';
+import { Clock, Tag, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
+import { useAuth } from '@/contexts/AuthContext';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Post {
   id: string;
@@ -20,13 +32,23 @@ interface Post {
   updated_at: string;
   tagged_entities?: Entity[];
   media?: MediaItem[];
+  user_id?: string;
 }
 
 interface ProfilePostItemProps {
   post: Post;
+  onDeleted?: () => void;
 }
 
-const ProfilePostItem = ({ post }: ProfilePostItemProps) => {
+const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  const isOwner = user?.id === post.user_id;
+
   const getPostTypeLabel = (type: string) => {
     switch(type) {
       case 'story': return 'Story';
@@ -57,6 +79,52 @@ const ProfilePostItem = ({ post }: ProfilePostItemProps) => {
     }
   };
 
+  const handleEdit = () => {
+    // Navigate to edit page
+    navigate(`/posts/edit/${post.id}`);
+  };
+
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!user) return;
+    
+    setIsDeleting(true);
+    try {
+      // Soft delete the post
+      const { error } = await supabase
+        .from('posts')
+        .update({ is_deleted: true })
+        .eq('id', post.id)
+        .eq('user_id', user.id);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Post deleted",
+        description: "Your post has been deleted successfully"
+      });
+      
+      setIsDeleteDialogOpen(false);
+      
+      // Call onDeleted callback if provided
+      if (onDeleted) {
+        onDeleted();
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete post",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-6">
@@ -70,9 +138,34 @@ const ProfilePostItem = ({ post }: ProfilePostItemProps) => {
               </Badge>
             </div>
           </div>
-          <div className="flex items-center text-muted-foreground text-sm">
-            <Clock size={14} className="mr-1" />
-            <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
+          
+          <div className="flex items-center gap-2">
+            <div className="flex items-center text-muted-foreground text-sm">
+              <Clock size={14} className="mr-1" />
+              <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
+            </div>
+            
+            {isOwner && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="sr-only">More options</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleDeleteClick} 
+                    className="text-destructive focus:text-destructive flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
         
@@ -111,6 +204,15 @@ const ProfilePostItem = ({ post }: ProfilePostItemProps) => {
           </div>
         )}
       </CardContent>
+      
+      <DeleteConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Post"
+        description="Are you sure you want to delete this post? This action cannot be undone."
+        isLoading={isDeleting}
+      />
     </Card>
   );
 };

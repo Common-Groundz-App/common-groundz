@@ -1,30 +1,51 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Award, Bookmark, Eye, MessageCircle } from 'lucide-react';
+import { Heart, Award, Bookmark, Eye, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import RatingStars from './RatingStars';
 import { Recommendation } from '@/services/recommendationService';
 import { getCategoryLabel } from './RecommendationFilters';
 import CommentDialog from '../comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { useNavigate } from 'react-router-dom';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { useToast } from '@/hooks/use-toast';
+import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
   onLike: (id: string) => void;
   onSave: (id: string) => void;
   onComment?: (id: string) => void;
+  onDeleted?: () => void;
 }
 
 const RecommendationCard = ({ 
   recommendation, 
   onLike, 
   onSave,
-  onComment
+  onComment,
+  onDeleted
 }: RecommendationCardProps) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
   const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  const isOwner = user?.id === recommendation.user_id;
   
   useEffect(() => {
     const getInitialCommentCount = async () => {
@@ -64,6 +85,49 @@ const RecommendationCard = ({
 
   const handleCommentAdded = () => {
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    // Navigate to edit recommendation page
+    navigate(`/recommendations/edit/${recommendation.id}`);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!user) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteRecommendation(recommendation.id);
+      
+      toast({
+        title: "Recommendation deleted",
+        description: "Your recommendation has been deleted successfully"
+      });
+      
+      setIsDeleteDialogOpen(false);
+      
+      // Call onDeleted callback if provided
+      if (onDeleted) {
+        onDeleted();
+      }
+    } catch (error) {
+      console.error("Error deleting recommendation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete recommendation",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
@@ -118,23 +182,46 @@ const RecommendationCard = ({
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <h3 className="text-lg font-bold line-clamp-1">{recommendation.title}</h3>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className={cn(
-              "h-8 w-8 transition-colors", 
-              recommendation.isSaved 
-                ? "text-brand-orange" 
-                : "text-gray-500 hover:text-brand-orange"
+          <div className="flex items-center">
+            {isOwner && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="sr-only">More options</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleDeleteClick} 
+                    className="text-destructive focus:text-destructive flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onSave(recommendation.id);
-            }}
-          >
-            <Bookmark size={18} className={recommendation.isSaved ? "fill-brand-orange" : ""} />
-          </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={cn(
+                "h-8 w-8 transition-colors", 
+                recommendation.isSaved 
+                  ? "text-brand-orange" 
+                  : "text-gray-500 hover:text-brand-orange"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onSave(recommendation.id);
+              }}
+            >
+              <Bookmark size={18} className={recommendation.isSaved ? "fill-brand-orange" : ""} />
+            </Button>
+          </div>
         </div>
         
         <p className="text-gray-600 mb-3 text-sm">{recommendation.venue || 'Unknown venue'}</p>
@@ -190,6 +277,15 @@ const RecommendationCard = ({
         itemId={recommendation.id}
         itemType="recommendation"
         onCommentAdded={handleCommentAdded}
+      />
+      
+      <DeleteConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Recommendation"
+        description="Are you sure you want to delete this recommendation? This action cannot be undone."
+        isLoading={isDeleting}
       />
     </Card>
   );

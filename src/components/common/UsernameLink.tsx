@@ -8,6 +8,7 @@ interface UsernameLinkProps {
   userId?: string | null;
   className?: string;
   fallback?: string;
+  isCurrentUser?: boolean;
 }
 
 /**
@@ -18,7 +19,8 @@ const UsernameLink: React.FC<UsernameLinkProps> = ({
   username, 
   userId, 
   className,
-  fallback = 'Anonymous'
+  fallback = 'Anonymous',
+  isCurrentUser = false
 }) => {
   if (!username || !userId) {
     return <span className={className}>{fallback}</span>;
@@ -29,10 +31,11 @@ const UsernameLink: React.FC<UsernameLinkProps> = ({
       to={`/profile/${userId}`}
       className={cn(
         "font-medium hover:underline transition-all", 
+        isCurrentUser && "text-primary",
         className
       )}
     >
-      {username}
+      {username}{isCurrentUser ? ' (You)' : ''}
     </Link>
   );
 };

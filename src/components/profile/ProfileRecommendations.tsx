@@ -90,6 +90,11 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
     refreshRecommendations();
   };
 
+  const handleRecommendationDeleted = () => {
+    // Refresh recommendations after deletion
+    refreshRecommendations();
+  };
+
   return (
     <div className="space-y-6 mx-0 my-0">
       <RecommendationFilters 
@@ -121,6 +126,7 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
               onLike={handleLike}
               onSave={handleSave}
               onComment={handleComment}
+              onDeleted={handleRecommendationDeleted}
             />
           ))}
         </div>

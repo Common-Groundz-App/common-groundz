@@ -37,7 +37,7 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
     loadPosts();
   }, [profileUserId, isOwnProfile]);
 
-  // Refresh posts when a new post is created or posts are updated
+  // Refresh posts when a new post is created or posts are updated or deleted
   useEffect(() => {
     const handleRefreshPosts = () => loadPosts();
     window.addEventListener('refresh-profile-posts', handleRefreshPosts);
@@ -46,6 +46,10 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
       window.removeEventListener('refresh-profile-posts', handleRefreshPosts);
     };
   }, []);
+
+  const handlePostDeleted = () => {
+    loadPosts();
+  };
 
   if (loading) {
     return <ProfilePostsLoading />;
@@ -58,7 +62,7 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   return (
     <div className="space-y-6">
       {posts.map(post => (
-        <ProfilePostItem key={post.id} post={post} />
+        <ProfilePostItem key={post.id} post={post} onDeleted={handlePostDeleted} />
       ))}
     </div>
   );
