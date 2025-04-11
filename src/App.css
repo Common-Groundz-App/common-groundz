@@ -9,7 +9,6 @@ body, html {
 #root {
   /* Removed max-width: 1280px to allow content to extend naturally */
   margin: 0 auto;
-  text-align: center;
 }
 
 .logo {
