@@ -6,11 +6,11 @@ import Logo from '@/components/Logo';
 import { Home, Star, Search, User } from "lucide-react";
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
+import Footer from '@/components/Footer';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
 import { CreatePostButton } from '@/components/feed/CreatePostButton';
-import { Glow } from '@/components/ui/glow';
 
 const Feed = () => {
   const isMobile = useIsMobile();
@@ -45,7 +45,7 @@ const Feed = () => {
   };
   
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col">
       {isMobile && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
           <div className="container p-3 mx-auto flex justify-start">
@@ -68,12 +68,12 @@ const Feed = () => {
           !isMobile && "md:ml-64",
           isMobile && "pt-16"
         )}>
-          <div className="w-full max-w-4xl mx-auto">
-            <div className="px-5 py-6 md:py-8">
+          <div className="max-w-4xl mx-auto w-full">
+            <div className="px-4 py-6 md:py-8 mb-2">
               <div className="flex justify-between items-center">
-                <div className="text-left">
-                  <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-brand-orange to-brand-blue bg-clip-text text-transparent">Feed</h1>
-                  <p className="text-muted-foreground text-sm md:text-base">Discover recommendations from the community</p>
+                <div>
+                  <h1 className="text-2xl font-bold">Feed</h1>
+                  <p className="text-muted-foreground">Discover recommendations from the community</p>
                 </div>
                 
                 <CreatePostButton onPostCreated={handlePostCreated} />
@@ -81,12 +81,12 @@ const Feed = () => {
             </div>
             
             <div className="w-full">
-              <div className="flex items-center w-full text-muted-foreground border-b relative">
+              <div className="flex items-center w-full text-muted-foreground bg-background border-b">
                 <div 
                   onClick={() => setActiveTab("for-you")} 
                   className={cn(
                     "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
-                    activeTab === "for-you" ? "text-brand-orange" : "hover:text-primary"
+                    activeTab === "for-you" ? "text-primary" : "hover:text-primary"
                   )}
                 >
                   <span className="text-lg">For You</span>
@@ -101,12 +101,11 @@ const Feed = () => {
                         damping: 30
                       }}
                     >
-                      <div className="absolute top-0 left-0 right-0 h-[3px] bg-brand-orange">
-                        <div className="absolute -top-1 left-0 right-0 h-4 bg-gradient-to-b from-brand-orange/50 to-transparent blur-md" />
-                        <div className="absolute -top-3 left-1/4 right-1/4 h-6 bg-brand-orange/30 rounded-full blur-lg" />
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-orange rounded-t-full">
+                        <div className="absolute w-12 h-6 bg-brand-orange/20 rounded-full blur-md -top-2 -left-2" />
+                        <div className="absolute w-8 h-6 bg-brand-orange/20 rounded-full blur-md -top-1" />
+                        <div className="absolute w-4 h-4 bg-brand-orange/20 rounded-full blur-sm top-0 left-2" />
                       </div>
-                      
-                      <div className="absolute h-full w-full bg-brand-orange/5 rounded-md" />
                     </motion.div>
                   )}
                 </div>
@@ -115,7 +114,7 @@ const Feed = () => {
                   onClick={() => setActiveTab("following")} 
                   className={cn(
                     "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
-                    activeTab === "following" ? "text-brand-orange" : "hover:text-primary"
+                    activeTab === "following" ? "text-primary" : "hover:text-primary"
                   )}
                 >
                   <span className="text-lg">Following</span>
@@ -130,25 +129,22 @@ const Feed = () => {
                         damping: 30
                       }}
                     >
-                      <div className="absolute top-0 left-0 right-0 h-[3px] bg-brand-orange">
-                        <div className="absolute -top-1 left-0 right-0 h-4 bg-gradient-to-b from-brand-orange/50 to-transparent blur-md" />
-                        <div className="absolute -top-3 left-1/4 right-1/4 h-6 bg-brand-orange/30 rounded-full blur-lg" />
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-orange rounded-t-full">
+                        <div className="absolute w-12 h-6 bg-brand-orange/20 rounded-full blur-md -top-2 -left-2" />
+                        <div className="absolute w-8 h-6 bg-brand-orange/20 rounded-full blur-md -top-1" />
+                        <div className="absolute w-4 h-4 bg-brand-orange/20 rounded-full blur-sm top-0 left-2" />
                       </div>
-                      
-                      <div className="absolute h-full w-full bg-brand-orange/5 rounded-md" />
                     </motion.div>
                   )}
                 </div>
               </div>
               
-              <div className="px-5 py-6">
-                <div className="animate-fade-in">
-                  {activeTab === "for-you" ? (
-                    <FeedForYou />
-                  ) : (
-                    <FeedFollowing />
-                  )}
-                </div>
+              <div className="px-4 mt-6">
+                {activeTab === "for-you" ? (
+                  <FeedForYou />
+                ) : (
+                  <FeedFollowing />
+                )}
               </div>
             </div>
           </div>

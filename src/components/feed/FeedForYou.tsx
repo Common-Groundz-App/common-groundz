@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/feed/use-feed';
@@ -51,26 +50,24 @@ const FeedForYou = () => {
           size="sm" 
           onClick={refreshFeed}
           disabled={isLoading}
-          className="flex items-center gap-1.5"
+          className="flex items-center gap-1"
         >
-          <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-          <span>Refresh</span>
+          <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+          Refresh
         </Button>
       </div>
       
       {error ? (
-        <Alert variant="destructive" className="rounded-lg border-red-200">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error loading feed</AlertTitle>
-          </div>
-          <AlertDescription className="mt-2">
-            <p className="mb-3">There was a problem loading your feed.</p>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            There was a problem loading the feed.
             <Button 
               variant="outline" 
               size="sm" 
               onClick={refreshFeed}
-              className="bg-white/20"
+              className="ml-2"
             >
               Try again
             </Button>
@@ -82,7 +79,7 @@ const FeedForYou = () => {
         <FeedEmptyState />
       ) : (
         <>
-          <div className="space-y-6 md:space-y-8">
+          <div className="space-y-8">
             {items.map(item => (
               <FeedItem 
                 key={item.id} 
@@ -99,16 +96,8 @@ const FeedForYou = () => {
                 variant="outline" 
                 onClick={loadMore} 
                 disabled={isLoadingMore}
-                className="px-8 py-2 border-brand-orange/30 hover:border-brand-orange/60 transition-colors"
               >
-                {isLoadingMore ? (
-                  <div className="flex items-center gap-2">
-                    <RefreshCw size={16} className="animate-spin" />
-                    <span>Loading...</span>
-                  </div>
-                ) : (
-                  'Load more'
-                )}
+                {isLoadingMore ? 'Loading...' : 'Load more'}
               </Button>
             </div>
           )}

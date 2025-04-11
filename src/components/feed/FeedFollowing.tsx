@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/feed/use-feed';
@@ -53,26 +52,24 @@ const FeedFollowing = () => {
           size="sm" 
           onClick={refreshFeed}
           disabled={isLoading}
-          className="flex items-center gap-1.5"
+          className="flex items-center gap-1"
         >
-          <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-          <span>Refresh</span>
+          <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+          Refresh
         </Button>
       </div>
       
       {error ? (
-        <Alert variant="destructive" className="rounded-lg border-red-200">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error loading feed</AlertTitle>
-          </div>
-          <AlertDescription className="mt-2">
-            <p className="mb-3">There was a problem loading your feed.</p>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            There was a problem loading the feed.
             <Button 
               variant="outline" 
               size="sm" 
               onClick={refreshFeed}
-              className="bg-white/20"
+              className="ml-2"
             >
               Try again
             </Button>
@@ -81,19 +78,19 @@ const FeedFollowing = () => {
       ) : isLoading ? (
         <FeedSkeleton />
       ) : items.length === 0 ? (
-        <Card className="border-dashed overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+        <Card className="border-dashed">
           <CardContent className="text-center py-12 flex flex-col items-center">
-            <div className="mb-4 p-5 bg-brand-orange/10 rounded-full">
-              <UserPlus size={40} className="text-brand-orange" />
+            <div className="mb-4 p-4 bg-muted rounded-full">
+              <UserPlus size={40} className="text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">No recommendations yet</h3>
+            <h3 className="text-lg font-medium mb-2">No recommendations yet</h3>
             <p className="text-muted-foreground mb-6 max-w-sm">
-              Follow people to see their recommendations and posts in your feed
+              Follow people to see their recommendations in your feed
             </p>
             <Button 
               size="lg"
               asChild
-              className="px-8 bg-brand-orange hover:bg-brand-orange/90 transition-all"
+              className="px-6"
             >
               <Link to={`/profile/${user?.id}`}>Find people to follow</Link>
             </Button>
@@ -101,7 +98,7 @@ const FeedFollowing = () => {
         </Card>
       ) : (
         <>
-          <div className="space-y-6 md:space-y-8">
+          <div className="space-y-8">
             {items.map(item => (
               <FeedItem 
                 key={item.id} 
@@ -118,16 +115,8 @@ const FeedFollowing = () => {
                 variant="outline" 
                 onClick={loadMore} 
                 disabled={isLoadingMore}
-                className="px-8 py-2 border-brand-orange/30 hover:border-brand-orange/60 transition-colors"
               >
-                {isLoadingMore ? (
-                  <div className="flex items-center gap-2">
-                    <RefreshCw size={16} className="animate-spin" />
-                    <span>Loading...</span>
-                  </div>
-                ) : (
-                  'Load more'
-                )}
+                {isLoadingMore ? 'Loading...' : 'Load more'}
               </Button>
             </div>
           )}
