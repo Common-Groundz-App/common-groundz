@@ -8,7 +8,6 @@ import RecommendationFilters from '@/components/recommendations/RecommendationFi
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import RecommendationSkeleton from '@/components/recommendations/RecommendationSkeleton';
 import EmptyRecommendations from '@/components/recommendations/EmptyRecommendations';
-import CommentDialog from '@/components/comments/CommentDialog';
 
 type ProfileRecommendationsProps = {
   profileUserId?: string;
@@ -18,10 +17,6 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
   const { user } = useAuth();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [commentDialogState, setCommentDialogState] = useState({
-    isOpen: false,
-    recommendationId: ''
-  });
   
   const {
     recommendations,
@@ -78,34 +73,6 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
     }
   };
 
-  const handleComment = (id: string) => {
-    // Close previous dialog if open to prevent multiple dialogs
-    if (commentDialogState.isOpen) {
-      setCommentDialogState({
-        isOpen: false,
-        recommendationId: ''
-      });
-      
-      // Use setTimeout to ensure the previous dialog is fully closed
-      setTimeout(() => {
-        setCommentDialogState({
-          isOpen: true,
-          recommendationId: id
-        });
-      }, 100);
-    } else {
-      setCommentDialogState({
-        isOpen: true,
-        recommendationId: id
-      });
-    }
-  };
-
-  const handleCommentAdded = () => {
-    // Refresh recommendations to update comment counts
-    refreshRecommendations();
-  };
-
   const handleRecommendationDeleted = () => {
     // Refresh recommendations after deletion
     refreshRecommendations();
@@ -141,7 +108,6 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
               recommendation={item}
               onLike={handleLike}
               onSave={handleSave}
-              onComment={handleComment}
               onDeleted={handleRecommendationDeleted}
             />
           ))}
@@ -154,17 +120,6 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleFormSubmit}
           onImageUpload={handleImageUpload}
-        />
-      )}
-
-      {/* Only render CommentDialog when active */}
-      {commentDialogState.isOpen && (
-        <CommentDialog 
-          isOpen={commentDialogState.isOpen}
-          onClose={() => setCommentDialogState({ isOpen: false, recommendationId: '' })}
-          itemId={commentDialogState.recommendationId}
-          itemType="recommendation"
-          onCommentAdded={handleCommentAdded}
         />
       )}
     </div>
