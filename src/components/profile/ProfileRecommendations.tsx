@@ -79,10 +79,26 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
   };
 
   const handleComment = (id: string) => {
-    setCommentDialogState({
-      isOpen: true,
-      recommendationId: id
-    });
+    // Close previous dialog if open to prevent multiple dialogs
+    if (commentDialogState.isOpen) {
+      setCommentDialogState({
+        isOpen: false,
+        recommendationId: ''
+      });
+      
+      // Use setTimeout to ensure the previous dialog is fully closed
+      setTimeout(() => {
+        setCommentDialogState({
+          isOpen: true,
+          recommendationId: id
+        });
+      }, 100);
+    } else {
+      setCommentDialogState({
+        isOpen: true,
+        recommendationId: id
+      });
+    }
   };
 
   const handleCommentAdded = () => {
@@ -141,13 +157,16 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
         />
       )}
 
-      <CommentDialog 
-        isOpen={commentDialogState.isOpen}
-        onClose={() => setCommentDialogState({ isOpen: false, recommendationId: '' })}
-        itemId={commentDialogState.recommendationId}
-        itemType="recommendation"
-        onCommentAdded={handleCommentAdded}
-      />
+      {/* Only render CommentDialog when active */}
+      {commentDialogState.isOpen && (
+        <CommentDialog 
+          isOpen={commentDialogState.isOpen}
+          onClose={() => setCommentDialogState({ isOpen: false, recommendationId: '' })}
+          itemId={commentDialogState.recommendationId}
+          itemType="recommendation"
+          onCommentAdded={handleCommentAdded}
+        />
+      )}
     </div>
   );
 }

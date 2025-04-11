@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,13 @@ interface CommentDialogProps {
   onCommentAdded?: () => void;
 }
 
+// Helper function to reset body pointer events
+const resetBodyPointerEvents = () => {
+  if (document.body.style.pointerEvents === 'none') {
+    document.body.style.pointerEvents = '';
+  }
+};
+
 const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: CommentDialogProps) => {
   const [comments, setComments] = useState<CommentData[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -35,12 +43,14 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   const [isEditing, setIsEditing] = useState(false);
   const [dialogClosing, setDialogClosing] = useState(false);
   const [userProfile, setUserProfile] = useState<{ avatar_url?: string; username?: string }>({});
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   
   const commentToDeleteRef = useRef<string | null>(null);
   
   const { user } = useAuth();
   const { toast } = useToast();
   
+  // Load user profile
   useEffect(() => {
     const loadUserProfile = async () => {
       if (user) {
@@ -56,6 +66,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     loadUserProfile();
   }, [user]);
 
+  // Reset state when dialog is closed
   useEffect(() => {
     if (!isOpen) {
       const timeout = setTimeout(() => {
@@ -66,18 +77,28 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
         setIsEditing(false);
         setDialogClosing(false);
         commentToDeleteRef.current = null;
+        resetBodyPointerEvents();
       }, 300);
       return () => clearTimeout(timeout);
+    } else {
+      // When dialog opens, reset the initial load flag to ensure we don't have stale data
+      if (!initialLoadDone) {
+        setInitialLoadDone(false);
+      }
     }
   }, [isOpen]);
 
+  // Load comments when dialog opens and itemId is available
   useEffect(() => {
-    if (isOpen && itemId) {
+    if (isOpen && itemId && !initialLoadDone) {
       loadComments();
+      setInitialLoadDone(true);
     }
   }, [isOpen, itemId]);
 
   const loadComments = async () => {
+    if (!itemId) return;
+    
     setIsLoading(true);
     try {
       const commentData = await fetchComments(itemId, itemType);
@@ -253,6 +274,9 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   };
 
   const handleCloseDialog = () => {
+    // Ensure we properly clean up when closing
+    resetBodyPointerEvents();
+    
     if (isDeleting) {
       console.log("Attempted to close dialog while delete in progress, delaying");
       setDialogClosing(true);
@@ -268,14 +292,18 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       setEditCommentContent('');
     }
     
+    // Reset states before closing
+    setInitialLoadDone(false);
     onClose();
   };
 
   useEffect(() => {
     if (dialogClosing && !isDeleting) {
       console.log("Delayed dialog close now happening");
+      resetBodyPointerEvents();
       onClose();
       setDialogClosing(false);
+      setInitialLoadDone(false);
     }
   }, [dialogClosing, isDeleting, onClose]);
 
@@ -460,6 +488,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
           console.log("AlertDialog onOpenChange:", open);
           if (!open && !isDeleting) {
             setDeleteDialogOpen(false);
+            resetBodyPointerEvents();
           }
         }}
       >
