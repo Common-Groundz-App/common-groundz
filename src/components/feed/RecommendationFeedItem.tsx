@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,6 +21,12 @@ import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDial
 import { useToast } from '@/hooks/use-toast';
 import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { useNavigate } from 'react-router-dom';
+
+const resetBodyPointerEvents = () => {
+  if (document.body.style.pointerEvents === 'none') {
+    document.body.style.pointerEvents = '';
+  }
+};
 
 interface RecommendationFeedItemProps {
   recommendation: FeedItem;
@@ -110,7 +115,6 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   };
 
   const handleEdit = () => {
-    // Navigate to edit recommendation page
     navigate(`/recommendations/edit/${recommendation.id}`);
   };
 
@@ -131,19 +135,23 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
       });
       
       setIsDeleteDialogOpen(false);
+      setIsDeleting(false);
       
-      // Call onDelete callback if provided
+      resetBodyPointerEvents();
+      
       if (onDelete) {
         onDelete(recommendation.id);
       }
       
-      // Refresh the feed if refresh function is provided
-      if (refreshFeed) {
-        refreshFeed();
-      }
-      
-      // Force a refresh of the component state
-      window.dispatchEvent(new CustomEvent('refresh-feed'));
+      setTimeout(() => {
+        resetBodyPointerEvents();
+        
+        if (refreshFeed) {
+          refreshFeed();
+        }
+        
+        window.dispatchEvent(new CustomEvent('refresh-feed'));
+      }, 100);
     } catch (error) {
       console.error("Error deleting recommendation:", error);
       toast({
@@ -151,8 +159,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         description: "Failed to delete recommendation",
         variant: "destructive"
       });
-    } finally {
       setIsDeleting(false);
+      resetBodyPointerEvents();
     }
   };
 
@@ -300,7 +308,11 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
       
       <DeleteConfirmationDialog
         isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
+        onClose={() => {
+          setIsDeleteDialogOpen(false);
+          setIsDeleting(false);
+          resetBodyPointerEvents();
+        }}
         onConfirm={handleDeleteConfirm}
         title="Delete Recommendation"
         description="Are you sure you want to delete this recommendation? This action cannot be undone."

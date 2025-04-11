@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +20,13 @@ import { useNavigate } from 'react-router-dom';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+
+// Helper function to reset pointer-events on body if they're set to none
+const resetBodyPointerEvents = () => {
+  if (document.body.style.pointerEvents === 'none') {
+    document.body.style.pointerEvents = '';
+  }
+};
 
 interface Post {
   id: string;
@@ -109,6 +115,9 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
       setIsDeleteDialogOpen(false);
       setIsDeleting(false);
       
+      // Explicitly reset pointer-events
+      resetBodyPointerEvents();
+      
       // Then update local state
       if (onDeleted) {
         onDeleted(post.id);
@@ -116,6 +125,9 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
       
       // Add a slight delay before dispatching the global refresh event
       setTimeout(() => {
+        // Explicitly reset pointer-events again after the timeout
+        resetBodyPointerEvents();
+        
         window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
       }, 100);
     } catch (error) {
@@ -126,6 +138,7 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
         variant: "destructive"
       });
       setIsDeleting(false);
+      resetBodyPointerEvents();
     }
   };
 
@@ -212,6 +225,7 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
         onClose={() => {
           setIsDeleteDialogOpen(false);
           setIsDeleting(false);
+          resetBodyPointerEvents();
         }}
         onConfirm={handleDeleteConfirm}
         title="Delete Post"

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,13 @@ interface DeleteConfirmationDialogProps {
   isLoading?: boolean;
 }
 
+// Helper function to reset pointer-events on body if they're set to none
+const resetBodyPointerEvents = () => {
+  if (document.body.style.pointerEvents === 'none') {
+    document.body.style.pointerEvents = '';
+  }
+};
+
 const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
   isOpen,
   onClose,
@@ -29,6 +36,19 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
   description,
   isLoading = false,
 }) => {
+  // Clean up pointer-events when dialog closes or component unmounts
+  useEffect(() => {
+    // When dialog closes, ensure pointer-events are reset
+    if (!isOpen) {
+      resetBodyPointerEvents();
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      resetBodyPointerEvents();
+    };
+  }, [isOpen]);
+
   return (
     <AlertDialog 
       open={isOpen} 
@@ -36,6 +56,8 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
         // Only allow closing via the onOpenChange if we're not in a loading state
         if (!open && !isLoading) {
           onClose();
+          // Explicitly reset pointer-events when dialog closes
+          resetBodyPointerEvents();
         }
       }}
     >
@@ -45,7 +67,7 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLoading} onClick={() => resetBodyPointerEvents()}>Cancel</AlertDialogCancel>
           <AlertDialogAction 
             onClick={(e) => {
               e.preventDefault();

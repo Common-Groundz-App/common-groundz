@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -26,6 +25,12 @@ import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDial
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+
+const resetBodyPointerEvents = () => {
+  if (document.body.style.pointerEvents === 'none') {
+    document.body.style.pointerEvents = '';
+  }
+};
 
 interface PostFeedItemProps {
   post: PostItem;
@@ -171,6 +176,9 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       setIsDeleteDialogOpen(false);
       setIsDeleting(false);
       
+      // Explicitly reset pointer-events
+      resetBodyPointerEvents();
+      
       // Then update local state and trigger refresh
       if (onDelete) {
         onDelete(post.id);
@@ -179,6 +187,9 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       // Add a slight delay before dispatching refresh events
       // This helps ensure the UI remains responsive
       setTimeout(() => {
+        // Explicitly reset pointer-events again after the timeout
+        resetBodyPointerEvents();
+        
         // Dispatch global refresh event
         window.dispatchEvent(new CustomEvent('refresh-feed'));
         
@@ -187,7 +198,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           refreshFeed();
         }
       }, 100);
-      
     } catch (error) {
       console.error("Error deleting post:", error);
       toast({
@@ -196,6 +206,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         variant: "destructive"
       });
       setIsDeleting(false);
+      resetBodyPointerEvents();
     }
   };
 
@@ -327,6 +338,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         onClose={() => {
           setIsDeleteDialogOpen(false);
           setIsDeleting(false);
+          resetBodyPointerEvents();
         }}
         onConfirm={handleDeleteConfirm}
         title="Delete Post"
