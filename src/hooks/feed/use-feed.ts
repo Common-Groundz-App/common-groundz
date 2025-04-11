@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -210,11 +209,32 @@ export const useFeed = (feedType: FeedVisibility) => {
     }
   };
 
+  const handleDelete = useCallback(async (id: string) => {
+    setState(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== id)
+    }));
+  }, []);
+
+  useEffect(() => {
+    const handleGlobalRefresh = () => {
+      console.log(`Refreshing ${feedType} feed due to global event`);
+      refreshFeed();
+    };
+    
+    window.addEventListener('refresh-feed', handleGlobalRefresh);
+    
+    return () => {
+      window.removeEventListener('refresh-feed', handleGlobalRefresh);
+    };
+  }, [refreshFeed, feedType]);
+
   return {
     ...state,
     loadMore,
     refreshFeed,
     handleLike,
-    handleSave
+    handleSave,
+    handleDelete
   };
 };

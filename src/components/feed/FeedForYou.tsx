@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/feed/use-feed';
@@ -20,7 +21,8 @@ const FeedForYou = () => {
     isLoadingMore,
     refreshFeed,
     handleLike,
-    handleSave
+    handleSave,
+    handleDelete
   } = useFeed('for_you');
 
   useEffect(() => {
@@ -86,6 +88,9 @@ const FeedForYou = () => {
                 item={item} 
                 onLike={handleLike}
                 onSave={handleSave}
+                onComment={(id) => console.log('Comment on', id)}
+                onDelete={handleDelete}
+                refreshFeed={refreshFeed}
               />
             ))}
           </div>

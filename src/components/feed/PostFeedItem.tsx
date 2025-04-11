@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -142,7 +141,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   };
 
   const handleEdit = () => {
-    // Navigate to edit post page
     navigate(`/posts/edit/${post.id}`);
   };
 
@@ -155,7 +153,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     
     setIsDeleting(true);
     try {
-      // Soft delete the post
       const { error } = await supabase
         .from('posts')
         .update({ is_deleted: true })
@@ -171,17 +168,16 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       
       setIsDeleteDialogOpen(false);
       
-      // Call onDelete callback if provided
       if (onDelete) {
         onDelete(post.id);
       }
       
-      // Refresh the feed if refresh function is provided
       if (refreshFeed) {
-        refreshFeed();
+        setTimeout(() => {
+          refreshFeed();
+        }, 100);
       }
       
-      // Force a refresh of the component state
       window.dispatchEvent(new CustomEvent('refresh-feed'));
     } catch (error) {
       console.error("Error deleting post:", error);
@@ -190,7 +186,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         description: "Failed to delete post",
         variant: "destructive"
       });
-    } finally {
       setIsDeleting(false);
     }
   };

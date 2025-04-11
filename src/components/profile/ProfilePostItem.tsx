@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +36,7 @@ interface Post {
 
 interface ProfilePostItemProps {
   post: Post;
-  onDeleted?: () => void;
+  onDeleted?: (postId: string) => void;
 }
 
 const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
@@ -80,7 +79,6 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   };
 
   const handleEdit = () => {
-    // Navigate to edit page
     navigate(`/posts/edit/${post.id}`);
   };
 
@@ -93,7 +91,6 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
     
     setIsDeleting(true);
     try {
-      // Soft delete the post
       const { error } = await supabase
         .from('posts')
         .update({ is_deleted: true })
@@ -109,12 +106,10 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
       
       setIsDeleteDialogOpen(false);
       
-      // Call onDeleted callback if provided
       if (onDeleted) {
-        onDeleted();
+        onDeleted(post.id);
       }
       
-      // Force a refresh of the profile posts
       window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
     } catch (error) {
       console.error("Error deleting post:", error);
@@ -176,7 +171,6 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           <RichTextDisplay content={post.content} />
         </div>
         
-        {/* Display media items if available */}
         {post.media && post.media.length > 0 && (
           <div className="mt-4">
             <PostMediaDisplay 
@@ -186,7 +180,6 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           </div>
         )}
         
-        {/* Display tagged entities */}
         {post.tagged_entities && post.tagged_entities.length > 0 && (
           <div className="mt-4">
             <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">

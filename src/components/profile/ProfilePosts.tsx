@@ -47,7 +47,11 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
     };
   }, []);
 
-  const handlePostDeleted = () => {
+  const handlePostDeleted = (deletedPostId: string) => {
+    // Immediately update the local state by filtering out the deleted post
+    setPosts(currentPosts => currentPosts.filter(post => post.id !== deletedPostId));
+    
+    // Also refresh from the server to ensure data consistency
     loadPosts();
   };
 
@@ -62,7 +66,7 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   return (
     <div className="space-y-6">
       {posts.map(post => (
-        <ProfilePostItem key={post.id} post={post} onDeleted={handlePostDeleted} />
+        <ProfilePostItem key={post.id} post={post} onDeleted={() => handlePostDeleted(post.id)} />
       ))}
     </div>
   );
