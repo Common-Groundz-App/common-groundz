@@ -9,19 +9,19 @@ const FeedEmptyState = () => {
   const navigate = useNavigate();
   
   return (
-    <Card className="border-dashed">
+    <Card className="border-dashed overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
       <CardContent className="text-center py-12 flex flex-col items-center">
-        <div className="mb-4 p-4 bg-muted rounded-full">
-          <Search size={40} className="text-muted-foreground" />
+        <div className="mb-4 p-5 bg-brand-orange/10 rounded-full">
+          <Search size={40} className="text-brand-orange" />
         </div>
-        <h3 className="text-lg font-medium mb-2">No recommendations yet</h3>
+        <h3 className="text-xl font-semibold mb-2">No recommendations yet</h3>
         <p className="text-muted-foreground mb-6 max-w-sm">
           Recommendations will appear here as people share their experiences
         </p>
         <Button 
           size="lg"
           onClick={() => navigate('/profile')}
-          className="px-6"
+          className="px-8 bg-brand-orange hover:bg-brand-orange/90 transition-all"
         >
           Add your first recommendation
         </Button>

@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -6,7 +7,6 @@ import Logo from '@/components/Logo';
 import { Home, Star, Search, User } from "lucide-react";
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import Footer from '@/components/Footer';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
@@ -45,7 +45,7 @@ const Feed = () => {
   };
   
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       {isMobile && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
           <div className="container p-3 mx-auto flex justify-start">
@@ -68,12 +68,12 @@ const Feed = () => {
           !isMobile && "md:ml-64",
           isMobile && "pt-16"
         )}>
-          <div className="max-w-4xl mx-auto w-full">
-            <div className="px-4 py-6 md:py-8 mb-2">
+          <div className="w-full max-w-4xl mx-auto">
+            <div className="px-5 py-6 md:py-8">
               <div className="flex justify-between items-center">
-                <div>
-                  <h1 className="text-2xl font-bold">Feed</h1>
-                  <p className="text-muted-foreground">Discover recommendations from the community</p>
+                <div className="text-left">
+                  <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-brand-orange to-brand-blue bg-clip-text text-transparent">Feed</h1>
+                  <p className="text-muted-foreground text-sm md:text-base">Discover recommendations from the community</p>
                 </div>
                 
                 <CreatePostButton onPostCreated={handlePostCreated} />
@@ -139,12 +139,14 @@ const Feed = () => {
                 </div>
               </div>
               
-              <div className="px-4 mt-6">
-                {activeTab === "for-you" ? (
-                  <FeedForYou />
-                ) : (
-                  <FeedFollowing />
-                )}
+              <div className="px-5 py-6">
+                <div className="animate-fade-in">
+                  {activeTab === "for-you" ? (
+                    <FeedForYou />
+                  ) : (
+                    <FeedFollowing />
+                  )}
+                </div>
               </div>
             </div>
           </div>
