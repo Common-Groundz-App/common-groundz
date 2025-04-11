@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,8 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CreatePostForm } from '@/components/feed/CreatePostForm';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,9 +50,9 @@ interface ProfilePostItemProps {
 
 const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
   const isOwner = user?.id === post.user_id;
@@ -86,7 +88,21 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   };
 
   const handleEdit = () => {
-    navigate(`/posts/edit/${post.id}`);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    setIsEditDialogOpen(false);
+    toast({
+      title: "Post updated",
+      description: "Your post has been updated successfully"
+    });
+    
+    // Add a slight delay before dispatching the global refresh event
+    setTimeout(() => {
+      resetBodyPointerEvents();
+      window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+    }, 100);
   };
 
   const handleDeleteClick = () => {
@@ -219,6 +235,20 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           </div>
         )}
       </CardContent>
+      
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Post</DialogTitle>
+          </DialogHeader>
+          <CreatePostForm 
+            postToEdit={post}
+            onSuccess={handleEditSuccess}
+            onCancel={() => setIsEditDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
       
       <DeleteConfirmationDialog
         isOpen={isDeleteDialogOpen}

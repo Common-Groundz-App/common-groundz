@@ -42,6 +42,7 @@ function App() {
         />
         {/* Redirect old edit routes to profile */}
         <Route path="/recommendations/edit/:id" element={<Navigate to="/profile" />} />
+        <Route path="/posts/edit/:id" element={<Navigate to="/profile" />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <SearchDialog open={false} onOpenChange={() => {}} />

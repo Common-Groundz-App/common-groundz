@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,9 +22,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CreatePostForm } from '@/components/feed/CreatePostForm';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
 const resetBodyPointerEvents = () => {
@@ -51,8 +53,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -147,7 +149,29 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   };
 
   const handleEdit = () => {
-    navigate(`/posts/edit/${post.id}`);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    setIsEditDialogOpen(false);
+    toast({
+      title: "Post updated",
+      description: "Your post has been updated successfully"
+    });
+    
+    // Add a slight delay before dispatching refresh events
+    setTimeout(() => {
+      resetBodyPointerEvents();
+      
+      // Dispatch global refresh events
+      window.dispatchEvent(new CustomEvent('refresh-feed'));
+      window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+      
+      // If there's a parent refresh function, call it
+      if (refreshFeed) {
+        refreshFeed();
+      }
+    }, 100);
   };
 
   const handleDeleteClick = () => {
@@ -332,6 +356,20 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         itemType="post" 
         onCommentAdded={handleCommentAdded}
       />
+      
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Post</DialogTitle>
+          </DialogHeader>
+          <CreatePostForm 
+            postToEdit={post}
+            onSuccess={handleEditSuccess}
+            onCancel={() => setIsEditDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
       
       <DeleteConfirmationDialog
         isOpen={isDeleteDialogOpen}
