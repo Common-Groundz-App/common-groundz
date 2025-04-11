@@ -28,7 +28,7 @@ const HeroSection = () => {
   return (
     <section className="pt-36 pb-16 md:pt-44 md:pb-24 relative overflow-hidden">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col items-start text-left mb-16 relative">
+        <div className="flex flex-col items-center text-center mb-16 relative">
           <GlowElements />
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl relative z-10">
             Recommendations from{" "}
