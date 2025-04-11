@@ -28,6 +28,8 @@ import { useToast } from '@/hooks/use-toast';
 import { EntityTagSelector } from './EntityTagSelector';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
+import { v4 as uuidv4 } from 'uuid';
+import { Json } from '@/integrations/supabase/types';
 
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required' }).max(100),
@@ -62,6 +64,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>([]);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const sessionId = useState<string>(() => uuidv4())[0]; // Generate a stable sessionId
   const isEditMode = !!postToEdit;
   
   const form = useForm<FormData>({
@@ -104,12 +107,15 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     setIsSubmitting(true);
     
     try {
+      // Convert MediaItem[] to Json for database compatibility
+      const mediaJson = JSON.parse(JSON.stringify(mediaItems)) as Json;
+      
       const postData = {
         title: data.title,
         content: data.content,
         post_type: data.post_type,
         visibility: data.visibility,
-        media: mediaItems,
+        media: mediaJson,
         user_id: user.id,
       };
       
@@ -193,8 +199,15 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     }
   };
   
-  const handleMediaChange = (media: MediaItem[]) => {
-    setMediaItems(media);
+  const handleMediaUploaded = (media: MediaItem) => {
+    setMediaItems(prev => {
+      // Add order number to new media item
+      const newMedia = {
+        ...media,
+        order: prev.length
+      };
+      return [...prev, newMedia];
+    });
   };
   
   const handleEntitiesChange = (entities: Entity[]) => {
@@ -236,14 +249,34 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           )}
         />
         
-        <MediaUploader
-          initialMedia={postToEdit?.media || []}
-          onChange={handleMediaChange}
-        />
+        {/* Media uploader with the correct props */}
+        <div>
+          {isEditMode && mediaItems.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm font-medium mb-2">Current Media</p>
+              <div className="grid grid-cols-2 gap-2">
+                {mediaItems.map((item, index) => (
+                  <div key={index} className="relative border rounded overflow-hidden">
+                    {item.type === 'image' ? (
+                      <img src={item.url} alt={item.alt || `Image ${index + 1}`} className="w-full h-40 object-cover" />
+                    ) : (
+                      <video src={item.url} className="w-full h-40 object-cover" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <MediaUploader
+            sessionId={sessionId}
+            onMediaUploaded={handleMediaUploaded}
+          />
+        </div>
         
-        <EntityTagSelector 
+        {/* Entity selector with the correct props */}
+        <EntityTagSelector
+          onEntitiesChange={handleEntitiesChange}
           initialEntities={postToEdit?.tagged_entities || []}
-          onChange={handleEntitiesChange}
         />
         
         <div className="space-y-3 pt-3">

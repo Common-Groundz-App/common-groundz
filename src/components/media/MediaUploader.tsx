@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
@@ -13,10 +13,11 @@ import { cn } from '@/lib/utils';
 interface MediaUploaderProps {
   sessionId: string;
   onMediaUploaded: (media: MediaItem) => void;
+  initialMedia?: MediaItem[];
   className?: string;
 }
 
-export function MediaUploader({ sessionId, onMediaUploaded, className }: MediaUploaderProps) {
+export function MediaUploader({ sessionId, onMediaUploaded, initialMedia = [], className }: MediaUploaderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploads, setUploads] = useState<MediaUploadState[]>([]);
