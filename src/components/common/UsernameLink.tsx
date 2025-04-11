@@ -21,7 +21,7 @@ const UsernameLink: React.FC<UsernameLinkProps> = ({
   fallback = 'Anonymous'
 }) => {
   if (!username || !userId) {
-    return <span className={cn("font-medium", className)}>{fallback}</span>;
+    return <span className={className}>{fallback}</span>;
   }
 
   return (
