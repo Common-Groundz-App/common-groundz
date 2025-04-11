@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -87,7 +86,7 @@ const Feed = () => {
                   onClick={() => setActiveTab("for-you")} 
                   className={cn(
                     "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
-                    activeTab === "for-you" ? "text-primary" : "hover:text-primary"
+                    activeTab === "for-you" ? "text-brand-orange" : "hover:text-primary"
                   )}
                 >
                   <span className="text-lg">For You</span>
@@ -102,12 +101,12 @@ const Feed = () => {
                         damping: 30
                       }}
                     >
-                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-orange rounded-t-full">
-                        <div className="absolute w-12 h-6 bg-brand-orange/20 rounded-full blur-md -top-2 -left-2" />
-                        <div className="absolute w-8 h-6 bg-brand-orange/20 rounded-full blur-md -top-1" />
-                        <div className="absolute w-4 h-4 bg-brand-orange/20 rounded-full blur-sm top-0 left-2" />
+                      <div className="absolute top-0 left-0 right-0 h-[3px] bg-brand-orange">
+                        <div className="absolute -top-1 left-0 right-0 h-4 bg-gradient-to-b from-brand-orange/50 to-transparent blur-md" />
+                        <div className="absolute -top-3 left-1/4 right-1/4 h-6 bg-brand-orange/30 rounded-full blur-lg" />
                       </div>
-                      <div className="absolute h-full w-full bg-accent opacity-40 rounded-md" />
+                      
+                      <div className="absolute h-full w-full bg-brand-orange/5 rounded-md" />
                     </motion.div>
                   )}
                 </div>
@@ -116,7 +115,7 @@ const Feed = () => {
                   onClick={() => setActiveTab("following")} 
                   className={cn(
                     "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
-                    activeTab === "following" ? "text-primary" : "hover:text-primary"
+                    activeTab === "following" ? "text-brand-orange" : "hover:text-primary"
                   )}
                 >
                   <span className="text-lg">Following</span>
@@ -131,12 +130,12 @@ const Feed = () => {
                         damping: 30
                       }}
                     >
-                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-orange rounded-t-full">
-                        <div className="absolute w-12 h-6 bg-brand-orange/20 rounded-full blur-md -top-2 -left-2" />
-                        <div className="absolute w-8 h-6 bg-brand-orange/20 rounded-full blur-md -top-1" />
-                        <div className="absolute w-4 h-4 bg-brand-orange/20 rounded-full blur-sm top-0 left-2" />
+                      <div className="absolute top-0 left-0 right-0 h-[3px] bg-brand-orange">
+                        <div className="absolute -top-1 left-0 right-0 h-4 bg-gradient-to-b from-brand-orange/50 to-transparent blur-md" />
+                        <div className="absolute -top-3 left-1/4 right-1/4 h-6 bg-brand-orange/30 rounded-full blur-lg" />
                       </div>
-                      <div className="absolute h-full w-full bg-accent opacity-40 rounded-md" />
+                      
+                      <div className="absolute h-full w-full bg-brand-orange/5 rounded-md" />
                     </motion.div>
                   )}
                 </div>
