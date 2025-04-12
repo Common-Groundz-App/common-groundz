@@ -18,8 +18,7 @@ import {
   Star, 
   Settings,
   LogOut,
-  MoreHorizontal,
-  PlusCircle
+  MoreHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Logo from '@/components/Logo';
@@ -141,30 +140,6 @@ export const SidebarNavigation = () => {
               </Tooltip>
             );
           })}
-          
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <Link
-                to="/profile"
-                className={cn(
-                  "flex items-center p-3 rounded-md text-sm font-medium transition-colors mt-6",
-                  "text-brand-orange hover:bg-brand-orange/10"
-                )}
-                onClick={(e) => {
-                  e.preventDefault();
-                  // Open recommendation form
-                  const event = new CustomEvent('open-recommendation-form');
-                  window.dispatchEvent(event);
-                }}
-              >
-                <PlusCircle className="h-5 w-5 md:mr-2" />
-                <span className="hidden md:inline">Add Recommendation</span>
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="md:hidden">
-              Add Recommendation
-            </TooltipContent>
-          </Tooltip>
         </nav>
       </div>
       
@@ -173,15 +148,17 @@ export const SidebarNavigation = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center w-full p-2 rounded-md hover:bg-accent transition-colors">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={profileData.avatarUrl || ""} />
-                  <AvatarFallback>{getInitials()}</AvatarFallback>
-                </Avatar>
-                <div className="ml-3 flex-1 min-w-0 hidden md:block">
-                  <p className="text-sm font-medium truncate">{profileData.fullName}</p>
-                  <p className="text-xs text-muted-foreground truncate">@{profileData.username}</p>
+                <div className="flex items-center w-full">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={profileData.avatarUrl || ""} />
+                    <AvatarFallback>{getInitials()}</AvatarFallback>
+                  </Avatar>
+                  <div className="ml-3 flex-1 min-w-0 hidden md:block text-left">
+                    <p className="text-sm font-medium truncate">{profileData.fullName}</p>
+                    <p className="text-xs text-muted-foreground truncate">@{profileData.username}</p>
+                  </div>
+                  <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
                 </div>
-                <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">

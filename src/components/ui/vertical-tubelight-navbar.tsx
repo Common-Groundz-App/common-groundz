@@ -207,15 +207,17 @@ export function VerticalTubelightNavbar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center px-3 py-2 rounded-md hover:bg-accent transition-colors">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={profileData.avatarUrl || ""} />
-                  <AvatarFallback>{getInitials()}</AvatarFallback>
-                </Avatar>
-                <div className="ml-3 flex-1 min-w-0 hidden md:block">
-                  <p className="text-sm font-medium truncate">{profileData.fullName}</p>
-                  <p className="text-xs text-muted-foreground truncate">@{profileData.username}</p>
+                <div className="flex items-center w-full">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={profileData.avatarUrl || ""} />
+                    <AvatarFallback>{getInitials()}</AvatarFallback>
+                  </Avatar>
+                  <div className="ml-3 flex-1 min-w-0 hidden md:block text-left">
+                    <p className="text-sm font-medium truncate">{profileData.fullName}</p>
+                    <p className="text-xs text-muted-foreground truncate">@{profileData.username}</p>
+                  </div>
+                  <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
                 </div>
-                <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end">
