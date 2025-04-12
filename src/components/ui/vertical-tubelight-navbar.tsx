@@ -4,9 +4,20 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/Logo";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface NavItem {
   name: string;
@@ -29,6 +40,13 @@ export function VerticalTubelightNavbar({
   logoSize = "md"
 }: VerticalNavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+  const [profileData, setProfileData] = useState({
+    fullName: "",
+    username: "",
+    avatarUrl: null as string | null
+  });
 
   useEffect(() => {
     if (initialActiveTab) {
@@ -36,10 +54,77 @@ export function VerticalTubelightNavbar({
     }
   }, [initialActiveTab]);
 
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      if (!user) return;
+      
+      try {
+        // Get user metadata for name
+        const userMetadata = user.user_metadata;
+        const firstName = userMetadata?.first_name || '';
+        const lastName = userMetadata?.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        
+        // Get username and avatar from profiles table
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) throw error;
+        
+        setProfileData({
+          fullName: fullName || (data?.username || user.email?.split('@')[0] || 'User'),
+          username: data?.username || user.email?.split('@')[0] || 'user',
+          avatarUrl: data?.avatar_url
+        });
+      } catch (error) {
+        console.error("Error fetching profile data:", error);
+      }
+    };
+    
+    fetchProfileData();
+  }, [user]);
+
   const handleNavItemClick = (item: NavItem) => {
     setActiveTab(item.name);
     if (item.onClick) {
       item.onClick();
+    }
+  };
+
+  const getInitials = () => {
+    if (profileData.fullName) {
+      const words = profileData.fullName.trim().split(' ');
+      if (words.length === 1) {
+        return words[0].substring(0, 2).toUpperCase();
+      }
+      return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    }
+    
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    
+    return "U";
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been signed out of your account",
+      });
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast({
+        title: "Error signing out",
+        description: "There was a problem signing you out",
+        variant: "destructive",
+      });
     }
   };
 
@@ -116,36 +201,38 @@ export function VerticalTubelightNavbar({
         </div>
       </div>
 
-      {/* Add recommendation button at bottom */}
-      <div className="p-2 mb-4">
-        <button
-          onClick={() => {
-            // Open recommendation form
-            const event = new CustomEvent('open-recommendation-form');
-            window.dispatchEvent(event);
-          }}
-          className={cn(
-            "flex items-center w-full space-x-2 px-3 py-2 rounded-md transition-colors",
-            "text-brand-orange hover:bg-brand-orange/10"
-          )}
-        >
-          <svg 
-            width="18" 
-            height="18" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2.5" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="16"></line>
-            <line x1="8" y1="12" x2="16" y2="12"></line>
-          </svg>
-          <span className="hidden md:inline">Add Recommendation</span>
-        </button>
-      </div>
+      {/* Profile section at bottom */}
+      {user && (
+        <div className="p-2 mt-auto mb-4 border-t">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full flex items-center px-3 py-2 rounded-md hover:bg-accent transition-colors">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={profileData.avatarUrl || ""} />
+                  <AvatarFallback>{getInitials()}</AvatarFallback>
+                </Avatar>
+                <div className="ml-3 flex-1 min-w-0 hidden md:block">
+                  <p className="text-sm font-medium truncate">{profileData.fullName}</p>
+                  <p className="text-xs text-muted-foreground truncate">@{profileData.username}</p>
+                </div>
+                <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end">
+              <DropdownMenuItem asChild>
+                <Link to="/profile" className="cursor-pointer">View Profile</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="cursor-pointer">Settings</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
     </div>
   );
 }

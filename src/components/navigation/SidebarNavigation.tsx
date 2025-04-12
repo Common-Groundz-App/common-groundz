@@ -5,24 +5,84 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { 
   Home, 
   Search, 
   User, 
   Star, 
-  PlusCircle,
   Settings,
-  LogOut
+  LogOut,
+  MoreHorizontal,
+  PlusCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Logo from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from 'react';
 
 export const SidebarNavigation = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const [profileData, setProfileData] = useState({
+    fullName: "",
+    username: "",
+    avatarUrl: null as string | null
+  });
   
-  const getInitials = (username?: string) => {
-    return username ? username.substring(0, 2).toUpperCase() : 'UN';
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      if (!user) return;
+      
+      try {
+        // Get user metadata for name
+        const userMetadata = user.user_metadata;
+        const firstName = userMetadata?.first_name || '';
+        const lastName = userMetadata?.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        
+        // Get username and avatar from profiles table
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) throw error;
+        
+        setProfileData({
+          fullName: fullName || (data?.username || user.email?.split('@')[0] || 'User'),
+          username: data?.username || user.email?.split('@')[0] || 'user',
+          avatarUrl: data?.avatar_url
+        });
+      } catch (error) {
+        console.error("Error fetching profile data:", error);
+      }
+    };
+    
+    fetchProfileData();
+  }, [user]);
+  
+  const getInitials = () => {
+    if (profileData.fullName) {
+      const words = profileData.fullName.trim().split(' ');
+      if (words.length === 1) {
+        return words[0].substring(0, 2).toUpperCase();
+      }
+      return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    }
+    
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    
+    return "U";
   };
   
   const navItems = [
@@ -109,53 +169,37 @@ export const SidebarNavigation = () => {
       </div>
       
       {user && (
-        <div className="p-4 border-t">
-          <div className="flex items-center justify-between">
-            <Link to="/profile" className="flex items-center space-x-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user.user_metadata?.avatar_url} />
-                <AvatarFallback>{getInitials(user.user_metadata?.username)}</AvatarFallback>
-              </Avatar>
-              <div className="hidden md:block flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {user.user_metadata?.username || 'User'}
-                </p>
-              </div>
-            </Link>
-            
-            <div className="flex items-center gap-1">
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Link
-                    to="/settings"
-                    className="p-2 rounded-full hover:bg-accent text-muted-foreground"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:hidden">
-                  Settings
-                </TooltipContent>
-              </Tooltip>
-              
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => {
-                      // Sign out
-                      supabase.auth.signOut();
-                    }}
-                    className="p-2 rounded-full hover:bg-accent text-muted-foreground"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:hidden">
-                  Sign out
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
+        <div className="p-4 border-t mt-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center w-full p-2 rounded-md hover:bg-accent transition-colors">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={profileData.avatarUrl || ""} />
+                  <AvatarFallback>{getInitials()}</AvatarFallback>
+                </Avatar>
+                <div className="ml-3 flex-1 min-w-0 hidden md:block">
+                  <p className="text-sm font-medium truncate">{profileData.fullName}</p>
+                  <p className="text-xs text-muted-foreground truncate">@{profileData.username}</p>
+                </div>
+                <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link to="/profile" className="cursor-pointer">View Profile</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="cursor-pointer">Settings</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => signOut()} 
+                className="cursor-pointer"
+              >
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )}
     </div>
