@@ -26,9 +26,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { EntityTagSelector } from './EntityTagSelector';
+import { generateUUID } from '@/lib/uuid';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
-import { v4 as uuidv4 } from 'uuid';
 import { Json } from '@/integrations/supabase/types';
 
 const formSchema = z.object({
@@ -64,7 +64,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>([]);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const sessionId = useState<string>(() => uuidv4())[0]; // Generate a stable sessionId
+  const sessionId = useState<string>(() => generateUUID())[0]; // Generate a stable sessionId using our local function
   const isEditMode = !!postToEdit;
   
   const form = useForm<FormData>({
