@@ -144,7 +144,7 @@ export const SidebarNavigation = () => {
       </div>
       
       {user && (
-        <div className="p-4 border-t mt-auto">
+        <div className="p-4 mt-auto mb-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center w-full p-2 rounded-md hover:bg-accent transition-colors">

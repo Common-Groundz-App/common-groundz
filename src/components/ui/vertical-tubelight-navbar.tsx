@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -54,19 +53,16 @@ export function VerticalTubelightNavbar({
     }
   }, [initialActiveTab]);
 
-  // Fetch user profile data
   useEffect(() => {
     const fetchProfileData = async () => {
       if (!user) return;
       
       try {
-        // Get user metadata for name
         const userMetadata = user.user_metadata;
         const firstName = userMetadata?.first_name || '';
         const lastName = userMetadata?.last_name || '';
         const fullName = `${firstName} ${lastName}`.trim();
         
-        // Get username and avatar from profiles table
         const { data, error } = await supabase
           .from('profiles')
           .select('username, avatar_url')
@@ -133,12 +129,10 @@ export function VerticalTubelightNavbar({
       "h-full w-16 md:w-64 bg-background border-r flex flex-col",
       className
     )}>
-      {/* Logo Section */}
       <div className="p-4 flex justify-center md:justify-start">
         <Logo size={logoSize} />
       </div>
 
-      {/* Navigation Items */}
       <div className="p-2 flex-grow flex flex-col">
         <div className={cn(
           "w-full flex flex-col items-center md:items-start gap-2 py-1 px-1 rounded-md"
@@ -201,9 +195,8 @@ export function VerticalTubelightNavbar({
         </div>
       </div>
 
-      {/* Profile section at bottom */}
       {user && (
-        <div className="p-2 mt-auto mb-4 border-t">
+        <div className="p-2 mt-auto mb-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center px-3 py-2 rounded-md hover:bg-accent transition-colors">
