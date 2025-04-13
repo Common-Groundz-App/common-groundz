@@ -5,6 +5,7 @@ import Index from './pages/Index';
 import Auth from './pages/Auth';
 import Feed from './pages/Feed';
 import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import './App.css';
 import { Toaster } from "./components/ui/toaster";
@@ -37,6 +38,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/settings" 
+          element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           } 
         />

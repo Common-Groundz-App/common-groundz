@@ -92,7 +92,8 @@ export const SidebarNavigation = () => {
       const event = new CustomEvent('open-search-dialog');
       window.dispatchEvent(event);
     }},
-    { name: 'Profile', path: '/profile', icon: User }
+    { name: 'Profile', path: '/profile', icon: User },
+    { name: 'Settings', path: '/settings', icon: Settings }
   ];
 
   return (
