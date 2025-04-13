@@ -3,7 +3,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -99,49 +99,51 @@ export const SidebarNavigation = () => {
   return (
     <div className="h-screen w-16 md:w-64 fixed left-0 top-0 pt-16 bg-background border-r hidden md:flex flex-col">
       <div className="p-4 flex-1">
-        <nav className="space-y-2">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path || 
-                            (item.path === '/profile' && location.pathname.startsWith('/profile'));
-            
-            return (
-              <Tooltip key={item.name} delayDuration={300}>
-                <TooltipTrigger asChild>
-                  {item.path.startsWith('#') ? (
-                    <button
-                      onClick={item.onClick}
-                      className={cn(
-                        "flex items-center w-full p-3 rounded-md text-sm font-medium transition-colors",
-                        isActive 
-                          ? "bg-accent text-accent-foreground" 
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <item.icon className="h-5 w-5 md:mr-2" />
-                      <span className="hidden md:inline">{item.name}</span>
-                    </button>
-                  ) : (
-                    <Link
-                      to={item.path}
-                      className={cn(
-                        "flex items-center p-3 rounded-md text-sm font-medium transition-colors",
-                        isActive 
-                          ? "bg-accent text-accent-foreground" 
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <item.icon className="h-5 w-5 md:mr-2" />
-                      <span className="hidden md:inline">{item.name}</span>
-                    </Link>
-                  )}
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:hidden">
-                  {item.name}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
-        </nav>
+        <TooltipProvider>
+          <nav className="space-y-2">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.path || 
+                              (item.path === '/profile' && location.pathname.startsWith('/profile'));
+              
+              return (
+                <Tooltip key={item.name} delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    {item.path.startsWith('#') ? (
+                      <button
+                        onClick={item.onClick}
+                        className={cn(
+                          "flex items-center w-full p-3 rounded-md text-sm font-medium transition-colors",
+                          isActive 
+                            ? "bg-accent text-accent-foreground" 
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5 md:mr-2" />
+                        <span className="hidden md:inline">{item.name}</span>
+                      </button>
+                    ) : (
+                      <Link
+                        to={item.path}
+                        className={cn(
+                          "flex items-center p-3 rounded-md text-sm font-medium transition-colors",
+                          isActive 
+                            ? "bg-accent text-accent-foreground" 
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5 md:mr-2" />
+                        <span className="hidden md:inline">{item.name}</span>
+                      </Link>
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="md:hidden">
+                    {item.name}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </nav>
+        </TooltipProvider>
       </div>
       
       {user && (
