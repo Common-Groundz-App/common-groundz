@@ -16,14 +16,12 @@ interface NavItem {
   icon: LucideIcon;
   onClick?: () => void;
 }
-
 interface NavBarProps {
   items: NavItem[];
   className?: string;
   rightSection?: React.ReactNode;
   initialActiveTab?: string;
 }
-
 export function NavBar({
   items,
   className,

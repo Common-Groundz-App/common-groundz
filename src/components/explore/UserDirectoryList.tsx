@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -9,7 +10,6 @@ import { useFollow } from '@/hooks/use-follow';
 import { useToast } from '@/hooks/use-toast';
 import { UserCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { SearchResult } from '@/hooks/use-search';
 
 type User = {
   id: string;
@@ -23,224 +23,150 @@ type User = {
 
 interface UserDirectoryListProps {
   sortOption: string;
-  searchResults: SearchResult[] | null;
-  isSearching: boolean;
 }
 
-export const UserDirectoryList = ({ sortOption, searchResults, isSearching }: UserDirectoryListProps) => {
+export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   
   useEffect(() => {
-    if (isSearching && searchResults) {
-      processSearchResults(searchResults);
-      return;
-    }
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        
+        let query = supabase
+          .from('profiles')
+          .select(`
+            id, 
+            username, 
+            avatar_url, 
+            bio
+          `);
+          
+        // Skip current user
+        if (currentUser) {
+          query = query.neq('id', currentUser.id);
+        }
+          
+        // Apply sorting
+        if (sortOption === 'recent') {
+          query = query.order('created_at', { ascending: false });
+        }
+        
+        // Limit results
+        query = query.limit(24);
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (!data) {
+          return;
+        }
+        
+        // Get recommendation counts
+        const userIds = data.map(user => user.id);
+        
+        // Get recommendation counts using count()
+        const { data: recommendationCounts, error: recError } = await supabase
+          .from('recommendations')
+          .select('user_id, count', { count: 'exact' })
+          .in('user_id', userIds);
+          
+        if (recError) {
+          console.error('Error fetching recommendation counts:', recError);
+        }
+        
+        // Get follower counts using count()
+        const { data: followerCounts, error: followError } = await supabase
+          .from('follows')
+          .select('following_id, count', { count: 'exact' })
+          .in('following_id', userIds);
+          
+        if (followError) {
+          console.error('Error fetching follower counts:', followError);
+        }
+        
+        // Check who current user is following
+        let followingData: any[] = [];
+        if (currentUser) {
+          const { data: following, error: followingError } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', currentUser.id)
+            .in('following_id', userIds);
+            
+          if (followingError) {
+            console.error('Error fetching following status:', followingError);
+          } else {
+            followingData = following || [];
+          }
+        }
+        
+        // Process recommendations data
+        const recCountMap = new Map();
+        recommendationCounts?.forEach((item: any) => {
+          recCountMap.set(item.user_id, parseInt(item.count) || 0);
+        });
+        
+        // Process followers data
+        const followerCountMap = new Map();
+        followerCounts?.forEach((item: any) => {
+          followerCountMap.set(item.following_id, parseInt(item.count) || 0);
+        });
+        
+        // Combine all data
+        const enhancedUsers = data.map(user => {
+          const recCount = recCountMap.get(user.id) || 0;
+          const followers = followerCountMap.get(user.id) || 0;
+          const isFollowing = followingData.some(f => f.following_id === user.id);
+          
+          return {
+            ...user,
+            recommendation_count: recCount,
+            follower_count: followers,
+            is_following: isFollowing
+          };
+        });
+        
+        // Sort data if needed
+        let sortedUsers = [...enhancedUsers];
+        
+        if (sortOption === 'popular') {
+          sortedUsers.sort((a, b) => b.follower_count - a.follower_count);
+        } else if (sortOption === 'active') {
+          sortedUsers.sort((a, b) => b.recommendation_count - a.recommendation_count);
+        }
+        
+        setUsers(sortedUsers);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load users. Please try again.',
+          variant: 'destructive'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
     
     fetchUsers();
-  }, [currentUser, sortOption, toast, isSearching, searchResults]);
-  
-  const processSearchResults = async (results: SearchResult[]) => {
-    try {
-      setLoading(true);
-      
-      if (results.length === 0) {
-        setUsers([]);
-        return;
-      }
-      
-      const userIds = results.map(user => user.id);
-      
-      const { data: recommendationCounts, error: recError } = await supabase
-        .from('recommendations')
-        .select('user_id, count', { count: 'exact' })
-        .in('user_id', userIds);
-        
-      if (recError) {
-        console.error('Error fetching recommendation counts:', recError);
-      }
-      
-      const { data: followerCounts, error: followError } = await supabase
-        .from('follows')
-        .select('following_id, count', { count: 'exact' })
-        .in('following_id', userIds);
-        
-      if (followError) {
-        console.error('Error fetching follower counts:', followError);
-      }
-      
-      let followingData: any[] = [];
-      if (currentUser) {
-        const { data: following, error: followingError } = await supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', currentUser.id)
-          .in('following_id', userIds);
-          
-        if (followingError) {
-          console.error('Error fetching following status:', followingError);
-        } else {
-          followingData = following || [];
-        }
-      }
-      
-      const recCountMap = new Map();
-      recommendationCounts?.forEach((item: any) => {
-        recCountMap.set(item.user_id, parseInt(item.count) || 0);
-      });
-      
-      const followerCountMap = new Map();
-      followerCounts?.forEach((item: any) => {
-        followerCountMap.set(item.following_id, parseInt(item.count) || 0);
-      });
-      
-      const enhancedUsers = results.map(user => {
-        const recCount = recCountMap.get(user.id) || 0;
-        const followers = followerCountMap.get(user.id) || 0;
-        const isFollowing = followingData.some(f => f.following_id === user.id);
-        
-        return {
-          ...user,
-          recommendation_count: recCount,
-          follower_count: followers,
-          is_following: isFollowing
-        };
-      });
-      
-      setUsers(enhancedUsers);
-    } catch (error) {
-      console.error('Error processing search results:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to process search results.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      
-      let query = supabase
-        .from('profiles')
-        .select(`
-          id, 
-          username, 
-          avatar_url, 
-          bio
-        `);
-        
-      if (currentUser) {
-        query = query.neq('id', currentUser.id);
-      }
-        
-      if (sortOption === 'recent') {
-        query = query.order('created_at', { ascending: false });
-      }
-      
-      query = query.limit(24);
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (!data) {
-        return;
-      }
-      
-      const userIds = data.map(user => user.id);
-      
-      const { data: recommendationCounts, error: recError } = await supabase
-        .from('recommendations')
-        .select('user_id, count', { count: 'exact' })
-        .in('user_id', userIds);
-        
-      if (recError) {
-        console.error('Error fetching recommendation counts:', recError);
-      }
-      
-      const { data: followerCounts, error: followError } = await supabase
-        .from('follows')
-        .select('following_id, count', { count: 'exact' })
-        .in('following_id', userIds);
-        
-      if (followError) {
-        console.error('Error fetching follower counts:', followError);
-      }
-      
-      let followingData: any[] = [];
-      if (currentUser) {
-        const { data: following, error: followingError } = await supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', currentUser.id)
-          .in('following_id', userIds);
-          
-        if (followingError) {
-          console.error('Error fetching following status:', followingError);
-        } else {
-          followingData = following || [];
-        }
-      }
-      
-      const recCountMap = new Map();
-      recommendationCounts?.forEach((item: any) => {
-        recCountMap.set(item.user_id, parseInt(item.count) || 0);
-      });
-      
-      const followerCountMap = new Map();
-      followerCounts?.forEach((item: any) => {
-        followerCountMap.set(item.following_id, parseInt(item.count) || 0);
-      });
-      
-      const enhancedUsers = data.map(user => {
-        const recCount = recCountMap.get(user.id) || 0;
-        const followers = followerCountMap.get(user.id) || 0;
-        const isFollowing = followingData.some(f => f.following_id === user.id);
-        
-        return {
-          ...user,
-          recommendation_count: recCount,
-          follower_count: followers,
-          is_following: isFollowing
-        };
-      });
-      
-      let sortedUsers = [...enhancedUsers];
-      
-      if (sortOption === 'popular') {
-        sortedUsers.sort((a, b) => b.follower_count - a.follower_count);
-      } else if (sortOption === 'active') {
-        sortedUsers.sort((a, b) => b.recommendation_count - a.recommendation_count);
-      }
-      
-      setUsers(sortedUsers);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load users. Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [currentUser, sortOption, toast]);
   
   const handleFollowToggle = async (userId: string, isFollowing: boolean) => {
     if (!currentUser) return;
     
     try {
+      // Call the useFollow hook's handleFollowToggle method
       const { handleFollowToggle } = useFollow(userId);
       await handleFollowToggle();
       
+      // Update local state
       setUsers(prev => 
         prev.map(user => {
           if (user.id === userId) {
@@ -296,14 +222,6 @@ export const UserDirectoryList = ({ sortOption, searchResults, isSearching }: Us
   }
   
   if (users.length === 0) {
-    if (isSearching) {
-      return (
-        <div className="text-center py-10">
-          <p className="text-muted-foreground">No users found matching your search criteria.</p>
-        </div>
-      );
-    }
-    
     return (
       <div className="text-center py-10">
         <p className="text-muted-foreground">No users found. Try changing the filters.</p>

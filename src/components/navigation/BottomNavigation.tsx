@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, User, Star, PlusCircle } from 'lucide-react';
+import { Home, Search, User, Star, PlusCircle, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const BottomNavigation = () => {
@@ -11,7 +11,7 @@ export const BottomNavigation = () => {
     { name: 'Home', path: '/', icon: Home },
     { name: 'Feed', path: '/feed', icon: Star },
     { name: 'Add', path: '#add', icon: PlusCircle, primary: true },
-    { name: 'Search', path: '/explore', icon: Search },
+    { name: 'Explore', path: '/explore', icon: Compass },
     { name: 'Profile', path: '/profile', icon: User }
   ];
   
@@ -26,7 +26,13 @@ export const BottomNavigation = () => {
           if (item.path.startsWith('#')) {
             let onClick;
             
-            if (item.path === '#add') {
+            if (item.path === '#search') {
+              onClick = () => {
+                // Open search dialog
+                const event = new CustomEvent('open-search-dialog');
+                window.dispatchEvent(event);
+              };
+            } else if (item.path === '#add') {
               onClick = () => {
                 // Open recommendation form
                 const event = new CustomEvent('open-recommendation-form');
