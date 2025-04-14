@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -23,7 +24,7 @@ interface NavItem {
   name: string;
   url: string;
   icon: LucideIcon;
-  onClick?: () => void;
+  onClick?: () => void;  // Added optional onClick property to fix the TypeScript error
 }
 
 interface VerticalNavBarProps {
@@ -166,7 +167,8 @@ export function VerticalTubelightNavbar({
                     "text-foreground/80 hover:text-primary"
                   )}
                 >
-                  {item.url.startsWith('#') || item.onClick ? (
+                  {/* Check if item has onClick or URL starts with # */}
+                  {(item.url.startsWith('#') || item.onClick) ? (
                     <button 
                       className={cn(
                         "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",

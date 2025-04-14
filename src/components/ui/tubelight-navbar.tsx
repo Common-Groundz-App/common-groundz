@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -83,30 +82,30 @@ export function NavBar({
               scrolled ? "bg-background/5 border border-border backdrop-blur-lg" : "bg-background/30 border border-white/10 backdrop-blur-md"
             )}>
               {items.map(item => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.name;
-            return <div key={item.name} 
-                onClick={() => handleNavItemClick(item)} 
-                className={cn("relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors", 
-                  "text-foreground/80 hover:text-primary", 
-                  isActive && "bg-muted text-primary")}
-                >
-                  {item.url.startsWith('#') || item.onClick ? (
-                    <button className="flex items-center space-x-2">
-                      <span className="hidden md:inline">{item.name}</span>
-                      <span className="md:hidden">
-                        <Icon size={18} strokeWidth={2.5} />
-                      </span>
-                    </button>
-                  ) : (
-                    <Link to={item.url} className="flex items-center space-x-2">
-                      <span className="hidden md:inline">{item.name}</span>
-                      <span className="md:hidden">
-                        <Icon size={18} strokeWidth={2.5} />
-                      </span>
-                    </Link>
-                  )}
-                  {isActive && <motion.div layoutId="lamp" className="absolute inset-0 w-full bg-primary/10 rounded-full -z-10" initial={false} transition={{
+                const Icon = item.icon;
+                const isActive = activeTab === item.name;
+                return <div key={item.name} 
+                    onClick={() => handleNavItemClick(item)} 
+                    className={cn("relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors", 
+                      "text-foreground/80 hover:text-primary", 
+                      isActive && "bg-muted text-primary")}
+                    >
+                      {item.url.startsWith('#') || item.onClick ? (
+                        <button className="flex items-center space-x-2">
+                          <span className="hidden md:inline">{item.name}</span>
+                          <span className="md:hidden">
+                            <Icon size={18} strokeWidth={2.5} />
+                          </span>
+                        </button>
+                      ) : (
+                        <Link to={item.url} className="flex items-center space-x-2">
+                          <span className="hidden md:inline">{item.name}</span>
+                          <span className="md:hidden">
+                            <Icon size={18} strokeWidth={2.5} />
+                          </span>
+                        </Link>
+                      )}
+                      {isActive && <motion.div layoutId="lamp" className="absolute inset-0 w-full bg-primary/10 rounded-full -z-10" initial={false} transition={{
                 type: "spring",
                 stiffness: 300,
                 damping: 30
@@ -118,7 +117,7 @@ export function NavBar({
                     </div>
                   </motion.div>}
                 </div>;
-          })}
+              })}
             </div>
           </div> : <div className="flex-grow flex justify-end">
             <Sheet>
