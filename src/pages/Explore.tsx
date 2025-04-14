@@ -9,8 +9,10 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users } from 'lucide-react';
+import { Filter, Search, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useSearch } from '@/hooks/use-search';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,10 +25,12 @@ const Explore = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [sortOption, setSortOption] = useState('popular');
+  const [searchQuery, setSearchQuery] = useState('');
+  const { results, isLoading: searchLoading } = useSearch(searchQuery);
   
   // Using the getInitialActiveTab similar to Feed page
   const getInitialActiveTab = () => {
-    return 'Explore';
+    return 'Search';
   };
 
   if (!user) {
@@ -40,6 +44,10 @@ const Explore = () => {
       icon: Users
     }
   ];
+  
+  const handleClearSearch = () => {
+    setSearchQuery('');
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -64,7 +72,7 @@ const Explore = () => {
         )}>
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-3xl font-bold">Explore</h1>
+              <h1 className="text-3xl font-bold">Search</h1>
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -83,9 +91,34 @@ const Explore = () => {
               </DropdownMenu>
             </div>
             
+            {/* Search bar */}
+            <div className="relative mb-6">
+              <div className="flex items-center border rounded-md px-3 py-2 bg-background focus-within:ring-2 focus-within:ring-ring focus-within:border-input">
+                <Search className="h-4 w-4 text-muted-foreground mr-2" />
+                <Input 
+                  placeholder="Search for people..."
+                  className="border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70 text-sm h-8 px-0 flex-1"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={handleClearSearch}
+                    className="p-1 rounded-full hover:bg-transparent"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+            </div>
+            
             <TubelightTabs defaultValue="people" items={tabItems}>
               <TabsContent value="people">
-                <UserDirectoryList sortOption={sortOption} />
+                <UserDirectoryList 
+                  sortOption={sortOption} 
+                  searchResults={searchQuery.length >= 2 ? results : null}
+                  isSearching={searchQuery.length >= 2}
+                />
               </TabsContent>
             </TubelightTabs>
           </div>
