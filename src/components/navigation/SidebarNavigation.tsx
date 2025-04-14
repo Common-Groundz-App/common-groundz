@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -86,7 +87,11 @@ export const SidebarNavigation = () => {
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
     { name: 'Feed', path: '/feed', icon: Star },
-    { name: 'Explore', path: '/explore', icon: Search },
+    { name: 'Search', path: '#', icon: Search, onClick: () => {
+      // Open the search dialog
+      const event = new CustomEvent('open-search-dialog');
+      window.dispatchEvent(event);
+    }},
     { name: 'Profile', path: '/profile', icon: User },
     { name: 'Settings', path: '/settings', icon: Settings }
   ];
@@ -103,18 +108,33 @@ export const SidebarNavigation = () => {
               return (
                 <Tooltip key={item.name} delayDuration={300}>
                   <TooltipTrigger asChild>
-                    <Link
-                      to={item.path}
-                      className={cn(
-                        "flex items-center p-3 rounded-md text-sm font-medium transition-colors",
-                        isActive 
-                          ? "bg-accent text-accent-foreground" 
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <item.icon className="h-5 w-5 md:mr-2" />
-                      <span className="hidden md:inline">{item.name}</span>
-                    </Link>
+                    {item.path.startsWith('#') ? (
+                      <button
+                        onClick={item.onClick}
+                        className={cn(
+                          "flex items-center w-full p-3 rounded-md text-sm font-medium transition-colors",
+                          isActive 
+                            ? "bg-accent text-accent-foreground" 
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5 md:mr-2" />
+                        <span className="hidden md:inline">{item.name}</span>
+                      </button>
+                    ) : (
+                      <Link
+                        to={item.path}
+                        className={cn(
+                          "flex items-center p-3 rounded-md text-sm font-medium transition-colors",
+                          isActive 
+                            ? "bg-accent text-accent-foreground" 
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5 md:mr-2" />
+                        <span className="hidden md:inline">{item.name}</span>
+                      </Link>
+                    )}
                   </TooltipTrigger>
                   <TooltipContent side="right" className="md:hidden">
                     {item.name}
