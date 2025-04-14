@@ -5,7 +5,7 @@ import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Bell, User, Shield, Palette, Globe, Search } from 'lucide-react';
+import { Bell, User, Shield, Palette, Globe } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -18,16 +18,11 @@ const Settings = () => {
   if (!user) {
     return <div>Loading...</div>;
   }
-
-  const navItems = [
-    { name: 'Home', url: '/', icon: User },
-    { name: 'Feed', url: '/feed', icon: Bell },
-    { name: 'Search', url: '#', icon: Search, onClick: () => {
-      const event = new CustomEvent('open-search-dialog');
-      window.dispatchEvent(event);
-    }},
-    { name: 'Profile', url: '/profile', icon: User }
-  ];
+  
+  // Using the getInitialActiveTab similar to Feed page
+  const getInitialActiveTab = () => {
+    return 'Settings';
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -42,8 +37,7 @@ const Settings = () => {
       <div className="flex flex-1">
         {!isMobile && (
           <VerticalTubelightNavbar 
-            items={navItems} 
-            initialActiveTab="Settings"
+            initialActiveTab={getInitialActiveTab()}
             className="fixed left-0 top-0 h-screen pt-4" 
           />
         )}
@@ -164,7 +158,7 @@ const Settings = () => {
         </div>
       </div>
       
-      <BottomNavigation />
+      {isMobile && <BottomNavigation />}
     </div>
   );
 };
