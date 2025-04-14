@@ -9,7 +9,6 @@ import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import './App.css';
 import { Toaster } from "./components/ui/toaster";
-import { SearchDialog } from './components/SearchDialog';
 import { TooltipProvider } from './components/ui/tooltip';
 
 function App() {
@@ -56,7 +55,6 @@ function App() {
           <Route path="/posts/edit/:id" element={<Navigate to="/profile" />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-        <SearchDialog open={false} onOpenChange={() => {}} />
         <Toaster />
       </TooltipProvider>
     </BrowserRouter>

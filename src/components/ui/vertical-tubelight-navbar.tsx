@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { SearchDialog } from "@/components/SearchDialog";
 
 interface NavItem {
   name: string;
@@ -39,13 +40,15 @@ export function VerticalTubelightNavbar({
   initialActiveTab,
   logoSize = "md"
 }: VerticalNavBarProps) {
+  // State for search dialog
+  const [showSearchDialog, setShowSearchDialog] = useState(false);
+  
   // Define default navigation items
   const defaultNavItems = [
     { name: 'Home', url: '/', icon: Home },
     { name: 'Feed', url: '/feed', icon: Star },
     { name: 'Search', url: '#', icon: Search, onClick: () => {
-      const event = new CustomEvent('open-search-dialog');
-      window.dispatchEvent(event);
+      setShowSearchDialog(true);
     }},
     { name: 'Profile', url: '/profile', icon: User },
     { name: 'Settings', url: '/settings', icon: Settings }
@@ -141,109 +144,114 @@ export function VerticalTubelightNavbar({
   };
 
   return (
-    <div className={cn(
-      "h-full w-16 md:w-64 bg-background border-r flex flex-col",
-      className
-    )}>
-      <div className="p-4 flex justify-center md:justify-start">
-        <Logo size={logoSize} />
-      </div>
-
-      <div className="p-2 flex-grow flex flex-col">
-        <div className={cn(
-          "w-full flex flex-col items-center md:items-start gap-2 py-1 px-1 rounded-md"
-        )}>
-          {items.map(item => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.name;
-            return (
-              <div 
-                key={item.name}
-                onClick={() => handleNavItemClick(item)}
-                className={cn(
-                  "relative cursor-pointer text-sm font-semibold w-full rounded-md transition-colors", 
-                  "text-foreground/80 hover:text-primary"
-                )}
-              >
-                {item.url.startsWith('#') || item.onClick ? (
-                  <button 
-                    className={cn(
-                      "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",
-                      isActive && "bg-muted text-primary"
-                    )}
-                  >
-                    <Icon size={18} strokeWidth={2.5} />
-                    <span className="hidden md:inline">{item.name}</span>
-                  </button>
-                ) : (
-                  <Link 
-                    to={item.url} 
-                    className={cn(
-                      "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",
-                      isActive && "bg-muted text-primary"
-                    )}
-                  >
-                    <Icon size={18} strokeWidth={2.5} />
-                    <span className="hidden md:inline">{item.name}</span>
-                  </Link>
-                )}
-                {isActive && (
-                  <motion.div 
-                    layoutId="vertical-lamp" 
-                    className="absolute inset-0 w-full bg-primary/10 rounded-md -z-10" 
-                    initial={false} 
-                    transition={{
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 30
-                    }}
-                  >
-                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 h-8 w-1 bg-brand-orange rounded-full">
-                      <div className="absolute h-12 w-6 bg-brand-orange/20 rounded-full blur-md -left-2 -top-2" />
-                      <div className="absolute h-8 w-6 bg-brand-orange/20 rounded-full blur-md -left-1" />
-                      <div className="absolute h-4 w-4 bg-brand-orange/20 rounded-full blur-sm -left-0.5" />
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            );
-          })}
+    <>
+      <div className={cn(
+        "h-full w-16 md:w-64 bg-background border-r flex flex-col",
+        className
+      )}>
+        <div className="p-4 flex justify-center md:justify-start">
+          <Logo size={logoSize} />
         </div>
-      </div>
 
-      {user && (
-        <div className="p-2 mt-auto mb-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="w-full flex items-center px-3 py-2 rounded-md hover:bg-accent transition-colors">
-                <div className="flex items-center w-full">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={profileData.avatarUrl || ""} />
-                    <AvatarFallback>{getInitials()}</AvatarFallback>
-                  </Avatar>
-                  <div className="ml-3 flex-1 min-w-0 hidden md:block text-left">
-                    <p className="text-sm font-medium truncate">{profileData.fullName}</p>
-                    <p className="text-xs text-muted-foreground truncate">@{profileData.username}</p>
-                  </div>
-                  <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
+        <div className="p-2 flex-grow flex flex-col">
+          <div className={cn(
+            "w-full flex flex-col items-center md:items-start gap-2 py-1 px-1 rounded-md"
+          )}>
+            {items.map(item => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.name;
+              return (
+                <div 
+                  key={item.name}
+                  onClick={() => handleNavItemClick(item)}
+                  className={cn(
+                    "relative cursor-pointer text-sm font-semibold w-full rounded-md transition-colors", 
+                    "text-foreground/80 hover:text-primary"
+                  )}
+                >
+                  {item.url.startsWith('#') || item.onClick ? (
+                    <button 
+                      className={cn(
+                        "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",
+                        isActive && "bg-muted text-primary"
+                      )}
+                    >
+                      <Icon size={18} strokeWidth={2.5} />
+                      <span className="hidden md:inline">{item.name}</span>
+                    </button>
+                  ) : (
+                    <Link 
+                      to={item.url} 
+                      className={cn(
+                        "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",
+                        isActive && "bg-muted text-primary"
+                      )}
+                    >
+                      <Icon size={18} strokeWidth={2.5} />
+                      <span className="hidden md:inline">{item.name}</span>
+                    </Link>
+                  )}
+                  {isActive && (
+                    <motion.div 
+                      layoutId="vertical-lamp" 
+                      className="absolute inset-0 w-full bg-primary/10 rounded-md -z-10" 
+                      initial={false} 
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30
+                      }}
+                    >
+                      <div className="absolute -left-2 top-1/2 -translate-y-1/2 h-8 w-1 bg-brand-orange rounded-full">
+                        <div className="absolute h-12 w-6 bg-brand-orange/20 rounded-full blur-md -left-2 -top-2" />
+                        <div className="absolute h-8 w-6 bg-brand-orange/20 rounded-full blur-md -left-1" />
+                        <div className="absolute h-4 w-4 bg-brand-orange/20 rounded-full blur-sm -left-0.5" />
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end">
-              <DropdownMenuItem asChild>
-                <Link to="/profile" className="cursor-pointer">View Profile</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/settings" className="cursor-pointer">Settings</Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              );
+            })}
+          </div>
         </div>
-      )}
-    </div>
+
+        {user && (
+          <div className="p-2 mt-auto mb-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-full flex items-center px-3 py-2 rounded-md hover:bg-accent transition-colors">
+                  <div className="flex items-center w-full">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={profileData.avatarUrl || ""} />
+                      <AvatarFallback>{getInitials()}</AvatarFallback>
+                    </Avatar>
+                    <div className="ml-3 flex-1 min-w-0 hidden md:block text-left">
+                      <p className="text-sm font-medium truncate">{profileData.fullName}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{profileData.username}</p>
+                    </div>
+                    <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/profile" className="cursor-pointer">View Profile</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/settings" className="cursor-pointer">Settings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+
+      {/* Add search dialog directly to the component instead of relying on custom events */}
+      <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
+    </>
   );
 }
