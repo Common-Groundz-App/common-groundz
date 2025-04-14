@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, User, Star, PlusCircle } from 'lucide-react';
+import { Home, Search, User, Star, PlusCircle, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const BottomNavigation = () => {
@@ -11,7 +11,7 @@ export const BottomNavigation = () => {
     { name: 'Home', path: '/', icon: Home },
     { name: 'Feed', path: '/feed', icon: Star },
     { name: 'Add', path: '#add', icon: PlusCircle, primary: true },
-    { name: 'Search', path: '#search', icon: Search },
+    { name: 'Explore', path: '/explore', icon: Compass },
     { name: 'Profile', path: '/profile', icon: User }
   ];
   
@@ -20,7 +20,8 @@ export const BottomNavigation = () => {
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path || 
-                          (item.path === '/profile' && location.pathname.startsWith('/profile'));
+                          (item.path === '/profile' && location.pathname.startsWith('/profile')) ||
+                          (item.path === '/explore' && location.pathname.startsWith('/explore'));
           
           if (item.path.startsWith('#')) {
             let onClick;
