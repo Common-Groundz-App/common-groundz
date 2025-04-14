@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Tabs as RadixTabs } from "@radix-ui/react-tabs";
+import * as RadixTabs from "@radix-ui/react-tabs";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 
@@ -42,7 +42,7 @@ export function TubelightTabs({
   };
 
   return (
-    <RadixTabs
+    <RadixTabs.Root
       value={activeTab}
       onValueChange={handleTabChange}
       className={cn("w-full", className)}
@@ -94,7 +94,7 @@ export function TubelightTabs({
       </div>
       
       {children}
-    </RadixTabs>
+    </RadixTabs.Root>
   );
 }
 
