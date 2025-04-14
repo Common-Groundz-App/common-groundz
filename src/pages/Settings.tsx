@@ -2,7 +2,8 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Bell, User, Shield, Palette, Globe } from 'lucide-react';
@@ -23,6 +24,34 @@ const Settings = () => {
   const getInitialActiveTab = () => {
     return 'Settings';
   };
+
+  const tabItems = [
+    {
+      value: "account",
+      label: "Account",
+      icon: User
+    },
+    {
+      value: "notifications",
+      label: "Notifications",
+      icon: Bell
+    },
+    {
+      value: "privacy",
+      label: "Privacy",
+      icon: Shield
+    },
+    {
+      value: "appearance",
+      label: "Appearance",
+      icon: Palette
+    },
+    {
+      value: "language",
+      label: "Language",
+      icon: Globe
+    }
+  ];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -48,25 +77,7 @@ const Settings = () => {
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <h1 className="text-3xl font-bold mb-6">Settings</h1>
             
-            <Tabs defaultValue="account" className="w-full">
-              <TabsList className="mb-6 flex gap-4 overflow-x-auto">
-                <TabsTrigger value="account" className="flex items-center gap-2">
-                  <User size={16} /> Account
-                </TabsTrigger>
-                <TabsTrigger value="notifications" className="flex items-center gap-2">
-                  <Bell size={16} /> Notifications
-                </TabsTrigger>
-                <TabsTrigger value="privacy" className="flex items-center gap-2">
-                  <Shield size={16} /> Privacy
-                </TabsTrigger>
-                <TabsTrigger value="appearance" className="flex items-center gap-2">
-                  <Palette size={16} /> Appearance
-                </TabsTrigger>
-                <TabsTrigger value="language" className="flex items-center gap-2">
-                  <Globe size={16} /> Language
-                </TabsTrigger>
-              </TabsList>
-              
+            <TubelightTabs defaultValue="account" items={tabItems}>
               <TabsContent value="account">
                 <Card>
                   <CardHeader>
@@ -153,7 +164,7 @@ const Settings = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
-            </Tabs>
+            </TubelightTabs>
           </div>
         </div>
       </div>
