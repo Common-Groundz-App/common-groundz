@@ -46,10 +46,7 @@ export function VerticalTubelightNavbar({
   const defaultNavItems = [
     { name: 'Home', url: '/', icon: Home },
     { name: 'Feed', url: '/feed', icon: Star },
-    { name: 'Explore', url: '/explore', icon: Compass },
-    { name: 'Search', url: '#', icon: Search, onClick: () => {
-      setShowSearchDialog(true);
-    }},
+    { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User },
     { name: 'Settings', url: '/settings', icon: Settings }
   ];
