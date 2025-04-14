@@ -252,3 +252,5 @@ export function VerticalTubelightNavbar({
     </>
   );
 }
+
+export default VerticalTubelightNavbar;
