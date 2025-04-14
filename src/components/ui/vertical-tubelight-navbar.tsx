@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { LucideIcon, MoreHorizontal } from "lucide-react";
+import { LucideIcon, MoreHorizontal, Settings, Home, Star, Search, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/Logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,18 +27,33 @@ interface NavItem {
 }
 
 interface VerticalNavBarProps {
-  items: NavItem[];
+  items?: NavItem[];
   className?: string;
   initialActiveTab?: string;
   logoSize?: "sm" | "md" | "lg";
 }
 
 export function VerticalTubelightNavbar({
-  items,
+  items: propItems,
   className,
   initialActiveTab,
   logoSize = "md"
 }: VerticalNavBarProps) {
+  // Define default navigation items
+  const defaultNavItems = [
+    { name: 'Home', url: '/', icon: Home },
+    { name: 'Feed', url: '/feed', icon: Star },
+    { name: 'Search', url: '#', icon: Search, onClick: () => {
+      const event = new CustomEvent('open-search-dialog');
+      window.dispatchEvent(event);
+    }},
+    { name: 'Profile', url: '/profile', icon: User },
+    { name: 'Settings', url: '/settings', icon: Settings }
+  ];
+
+  // Use provided items or default items
+  const items = propItems || defaultNavItems;
+
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const { user, signOut } = useAuth();
   const { toast } = useToast();

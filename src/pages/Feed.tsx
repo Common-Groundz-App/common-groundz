@@ -1,12 +1,11 @@
+
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
-import { Home, Star, Search, User } from "lucide-react";
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import Footer from '@/components/Footer';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
@@ -16,16 +15,6 @@ const Feed = () => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState("for-you");
-  
-  const navItems = [
-    { name: 'Home', url: '/', icon: Home },
-    { name: 'Feed', url: '/feed', icon: Star },
-    { name: 'Search', url: '#', icon: Search, onClick: () => {
-      const event = new CustomEvent('open-search-dialog');
-      window.dispatchEvent(event);
-    }},
-    { name: 'Profile', url: '/profile', icon: User }
-  ];
   
   const getInitialActiveTab = () => {
     if (location.pathname === '/feed') {
@@ -57,7 +46,6 @@ const Feed = () => {
       <div className="flex flex-1">
         {!isMobile && (
           <VerticalTubelightNavbar 
-            items={navItems} 
             initialActiveTab={getInitialActiveTab()}
             className="fixed left-0 top-0 h-screen pt-4" 
           />
