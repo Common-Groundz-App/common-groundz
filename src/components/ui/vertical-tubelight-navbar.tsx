@@ -39,10 +39,8 @@ export function VerticalTubelightNavbar({
   initialActiveTab,
   logoSize = "md"
 }: VerticalNavBarProps) {
-  // State for search dialog
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   
-  // Define default navigation items
   const defaultNavItems = [
     { name: 'Home', url: '/', icon: Home },
     { name: 'Feed', url: '/feed', icon: Star },
@@ -51,7 +49,6 @@ export function VerticalTubelightNavbar({
     { name: 'Settings', url: '/settings', icon: Settings }
   ];
 
-  // Use provided items or default items
   const items = propItems || defaultNavItems;
 
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
@@ -247,7 +244,6 @@ export function VerticalTubelightNavbar({
         )}
       </div>
 
-      {/* Add search dialog directly to the component instead of relying on custom events */}
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>
   );
