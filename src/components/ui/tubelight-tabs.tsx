@@ -48,7 +48,7 @@ export function TubelightTabs({
       className={cn("w-full", className)}
     >
       <div className="flex justify-center mb-6">
-        <div className={cn(
+        <RadixTabs.List className={cn(
           "flex items-center gap-2 py-1 px-1 rounded-full shadow-lg",
           "bg-background/30 border border-white/10 backdrop-blur-md"
         )}>
@@ -90,7 +90,7 @@ export function TubelightTabs({
               </RadixTabs.Trigger>
             );
           })}
-        </div>
+        </RadixTabs.List>
       </div>
       
       {children}
