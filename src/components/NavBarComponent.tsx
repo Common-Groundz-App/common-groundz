@@ -1,5 +1,5 @@
 
-import { Home, Star, Search, User, Compass } from 'lucide-react'
+import { Home, Star, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
 import { useLocation } from 'react-router-dom'
@@ -27,8 +27,7 @@ export function NavBarComponent() {
   const navItems = [
     { name: 'Home', url: '/', icon: Home },
     { name: 'Feed', url: '/feed', icon: Star },
-    { name: 'Explore', url: '/explore', icon: Compass },
-    { name: 'Search', url: '#', icon: Search, onClick: () => setShowSearchDialog(true) },
+    { name: 'Search', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User }
   ];
 
@@ -41,7 +40,7 @@ export function NavBarComponent() {
     } else if (location.pathname === '/feed') {
       setActiveTab('Feed');
     } else if (location.pathname === '/explore') {
-      setActiveTab('Explore');
+      setActiveTab('Search');
     }
   }, [location.pathname]);
 

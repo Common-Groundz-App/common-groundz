@@ -9,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users } from 'lucide-react';
+import { Filter, Users, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,15 +18,21 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { useSearch } from '@/hooks/use-search';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Link } from 'react-router-dom';
 
 const Explore = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [sortOption, setSortOption] = useState('popular');
+  const [searchQuery, setSearchQuery] = useState('');
+  const { results, isLoading } = useSearch(searchQuery);
   
   // Using the getInitialActiveTab similar to Feed page
   const getInitialActiveTab = () => {
-    return 'Explore';
+    return 'Search';
   };
 
   if (!user) {
@@ -64,7 +70,7 @@ const Explore = () => {
         )}>
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-3xl font-bold">Explore</h1>
+              <h1 className="text-3xl font-bold">Search & Explore</h1>
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -81,6 +87,61 @@ const Explore = () => {
                   </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
+            
+            {/* Search Bar */}
+            <div className="relative mb-6">
+              <div className="flex items-center border rounded-lg overflow-hidden bg-background">
+                <div className="pl-3 text-muted-foreground">
+                  <Search size={18} />
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Search for people..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+              </div>
+              
+              {/* Search Results */}
+              {searchQuery && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-72 overflow-y-auto">
+                  {isLoading && (
+                    <div className="p-4 text-center">
+                      <p className="text-sm text-muted-foreground">Searching...</p>
+                    </div>
+                  )}
+                  
+                  {!isLoading && results.length === 0 && (
+                    <div className="p-4 text-center">
+                      <p className="text-sm text-muted-foreground">No users found</p>
+                    </div>
+                  )}
+                  
+                  {!isLoading && results.map(user => (
+                    <Link
+                      key={user.id}
+                      to={`/profile/${user.id}`}
+                      className="flex items-center gap-2 px-4 py-2 hover:bg-muted/30 transition-colors"
+                      onClick={() => setSearchQuery('')}
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.avatar_url || undefined} alt={user.username || 'User'} />
+                        <AvatarFallback>
+                          {user.username?.[0]?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{user.username || 'Unknown User'}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {user.bio || 'No bio available'}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
             
             <TubelightTabs defaultValue="people" items={tabItems}>
