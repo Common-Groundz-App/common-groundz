@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -24,7 +23,7 @@ interface NavItem {
   name: string;
   url: string;
   icon: LucideIcon;
-  onClick?: () => void;  // Added optional onClick property to fix the TypeScript error
+  onClick?: () => void;  // Explicit optional onClick property
 }
 
 interface VerticalNavBarProps {
@@ -43,8 +42,8 @@ export function VerticalTubelightNavbar({
   // State for search dialog
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   
-  // Define default navigation items
-  const defaultNavItems = [
+  // Define default navigation items - explicitly typed as NavItem[] for type safety
+  const defaultNavItems: NavItem[] = [
     { name: 'Home', url: '/', icon: Home },
     { name: 'Feed', url: '/feed', icon: Star },
     { name: 'Search', url: '/explore', icon: Search },
@@ -167,13 +166,14 @@ export function VerticalTubelightNavbar({
                     "text-foreground/80 hover:text-primary"
                   )}
                 >
-                  {/* Check if item has onClick or URL starts with # */}
+                  {/* Safe check for onClick or URL with # */}
                   {(item.url.startsWith('#') || item.onClick) ? (
                     <button 
                       className={cn(
                         "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",
                         isActive && "bg-muted text-primary"
                       )}
+                      onClick={item.onClick}
                     >
                       <Icon size={18} strokeWidth={2.5} />
                       <span className="hidden md:inline">{item.name}</span>

@@ -24,6 +24,7 @@ export function NavBarComponent() {
     };
   }, []);
   
+  // Type safe NavItem array with explicit onClick handlers where needed
   const navItems = [
     { name: 'Home', url: '/', icon: Home },
     { name: 'Feed', url: '/feed', icon: Star },

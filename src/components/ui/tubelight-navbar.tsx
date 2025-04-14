@@ -84,14 +84,15 @@ export function NavBar({
               {items.map(item => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.name;
-                return <div key={item.name} 
+                return <div 
+                    key={item.name} 
                     onClick={() => handleNavItemClick(item)} 
                     className={cn("relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors", 
                       "text-foreground/80 hover:text-primary", 
                       isActive && "bg-muted text-primary")}
                     >
                       {item.url.startsWith('#') || item.onClick ? (
-                        <button className="flex items-center space-x-2">
+                        <button className="flex items-center space-x-2" onClick={item.onClick}>
                           <span className="hidden md:inline">{item.name}</span>
                           <span className="md:hidden">
                             <Icon size={18} strokeWidth={2.5} />

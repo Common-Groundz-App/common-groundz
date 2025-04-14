@@ -4,13 +4,26 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, Search, User, Star, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Define NavItem type with optional onClick
+interface NavItem {
+  name: string;
+  path: string;
+  icon: React.ElementType;
+  onClick?: () => void;
+  primary?: boolean;
+}
+
 export const BottomNavigation = () => {
   const location = useLocation();
   
-  const navItems = [
+  const navItems: NavItem[] = [
     { name: 'Home', path: '/', icon: Home },
     { name: 'Feed', path: '/feed', icon: Star },
-    { name: 'Add', path: '#add', icon: PlusCircle, primary: true },
+    { name: 'Add', path: '#add', icon: PlusCircle, primary: true, onClick: () => {
+      // Open recommendation form
+      const event = new CustomEvent('open-recommendation-form');
+      window.dispatchEvent(event);
+    }},
     { name: 'Search', path: '/explore', icon: Search },
     { name: 'Profile', path: '/profile', icon: User }
   ];
@@ -24,26 +37,10 @@ export const BottomNavigation = () => {
                           (item.path === '/explore' && location.pathname.startsWith('/explore'));
           
           if (item.path.startsWith('#')) {
-            let onClick;
-            
-            if (item.path === '#search') {
-              onClick = () => {
-                // Open search dialog
-                const event = new CustomEvent('open-search-dialog');
-                window.dispatchEvent(event);
-              };
-            } else if (item.path === '#add') {
-              onClick = () => {
-                // Open recommendation form
-                const event = new CustomEvent('open-recommendation-form');
-                window.dispatchEvent(event);
-              };
-            }
-            
             return (
               <button
                 key={item.name}
-                onClick={onClick}
+                onClick={item.onClick}
                 className={cn(
                   "flex flex-col items-center justify-center w-1/5 h-full",
                   item.primary 
