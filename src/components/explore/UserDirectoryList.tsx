@@ -28,7 +28,6 @@ interface UserDirectoryListProps {
 export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const { followUser, unfollowUser } = useFollow();
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   
@@ -72,22 +71,21 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
         // Get recommendation counts
         const userIds = data.map(user => user.id);
         
+        // Get recommendation counts using count()
         const { data: recommendationCounts, error: recError } = await supabase
           .from('recommendations')
-          .select('user_id, count')
-          .in('user_id', userIds)
-          .group('user_id');
+          .select('user_id, count', { count: 'exact' })
+          .in('user_id', userIds);
           
         if (recError) {
           console.error('Error fetching recommendation counts:', recError);
         }
         
-        // Get follower counts
+        // Get follower counts using count()
         const { data: followerCounts, error: followError } = await supabase
           .from('follows')
-          .select('following_id, count')
-          .in('following_id', userIds)
-          .group('following_id');
+          .select('following_id, count', { count: 'exact' })
+          .in('following_id', userIds);
           
         if (followError) {
           console.error('Error fetching follower counts:', followError);
@@ -109,10 +107,22 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
           }
         }
         
+        // Process recommendations data
+        const recCountMap = new Map();
+        recommendationCounts?.forEach((item: any) => {
+          recCountMap.set(item.user_id, parseInt(item.count) || 0);
+        });
+        
+        // Process followers data
+        const followerCountMap = new Map();
+        followerCounts?.forEach((item: any) => {
+          followerCountMap.set(item.following_id, parseInt(item.count) || 0);
+        });
+        
         // Combine all data
         const enhancedUsers = data.map(user => {
-          const recCount = recommendationCounts?.find(r => r.user_id === user.id)?.count || 0;
-          const followers = followerCounts?.find(f => f.following_id === user.id)?.count || 0;
+          const recCount = recCountMap.get(user.id) || 0;
+          const followers = followerCountMap.get(user.id) || 0;
           const isFollowing = followingData.some(f => f.following_id === user.id);
           
           return {
@@ -152,11 +162,9 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
     if (!currentUser) return;
     
     try {
-      if (isFollowing) {
-        await unfollowUser(userId);
-      } else {
-        await followUser(userId);
-      }
+      // Call the useFollow hook's handleFollowToggle method
+      const { handleFollowToggle } = useFollow(userId);
+      await handleFollowToggle();
       
       // Update local state
       setUsers(prev => 
