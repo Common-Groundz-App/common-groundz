@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Recommendation, fetchRecommendationById } from '@/services/recommendationService';
+import { Recommendation } from '@/services/recommendation/types';
+import { fetchRecommendationById } from '@/services/recommendationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
@@ -36,6 +37,7 @@ const RecommendationDetail = () => {
       
       try {
         setIsLoading(true);
+        // Pass both id and user?.id to fetchRecommendationById
         const data = await fetchRecommendationById(id, user?.id || null);
         
         if (!data) {
@@ -265,14 +267,14 @@ const RecommendationDetail = () => {
             {/* User info */}
             <div className="flex items-center space-x-4 mb-6 pb-6 border-b">
               <Avatar className="h-12 w-12 border">
-                <AvatarImage src={recommendation.user_avatar_url || undefined} />
+                <AvatarImage src={recommendation.user_id ? `/api/avatar/${recommendation.user_id}` : undefined} />
                 <AvatarFallback>
-                  {recommendation.username?.[0]?.toUpperCase() || 'U'}
+                  {recommendation.user_id ? recommendation.user_id[0]?.toUpperCase() : 'U'}
                 </AvatarFallback>
               </Avatar>
               <div>
                 <UsernameLink 
-                  username={recommendation.username || 'Unknown User'} 
+                  username={'User'} 
                   userId={recommendation.user_id}
                   className="font-semibold"
                   isCurrentUser={user?.id === recommendation.user_id}
