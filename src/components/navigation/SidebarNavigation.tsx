@@ -33,19 +33,16 @@ export const SidebarNavigation = () => {
     avatarUrl: null as string | null
   });
   
-  // Fetch user profile data
   useEffect(() => {
     const fetchProfileData = async () => {
       if (!user) return;
       
       try {
-        // Get user metadata for name
         const userMetadata = user.user_metadata;
         const firstName = userMetadata?.first_name || '';
         const lastName = userMetadata?.last_name || '';
         const fullName = `${firstName} ${lastName}`.trim();
         
-        // Get username and avatar from profiles table
         const { data, error } = await supabase
           .from('profiles')
           .select('username, avatar_url')
@@ -86,7 +83,7 @@ export const SidebarNavigation = () => {
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
     { name: 'Feed', path: '/feed', icon: Star },
-    { name: 'Search', path: '/explore', icon: Search },
+    { name: 'Explore', path: '/explore', icon: Search },
     { name: 'Profile', path: '/profile', icon: User },
     { name: 'Settings', path: '/settings', icon: Settings }
   ];

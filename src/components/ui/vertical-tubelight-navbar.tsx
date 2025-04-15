@@ -23,7 +23,7 @@ interface NavItem {
   name: string;
   url: string;
   icon: LucideIcon;
-  onClick?: () => void;  // Explicit optional onClick property
+  onClick?: () => void;
 }
 
 interface VerticalNavBarProps {
@@ -39,19 +39,16 @@ export function VerticalTubelightNavbar({
   initialActiveTab,
   logoSize = "md"
 }: VerticalNavBarProps) {
-  // State for search dialog
   const [showSearchDialog, setShowSearchDialog] = useState(false);
-  
-  // Define default navigation items - explicitly typed as NavItem[] for type safety
+
   const defaultNavItems: NavItem[] = [
     { name: 'Home', url: '/', icon: Home },
     { name: 'Feed', url: '/feed', icon: Star },
-    { name: 'Search', url: '/explore', icon: Search },
+    { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User },
     { name: 'Settings', url: '/settings', icon: Settings }
   ];
 
-  // Use provided items or default items
   const items = propItems || defaultNavItems;
 
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
@@ -166,7 +163,6 @@ export function VerticalTubelightNavbar({
                     "text-foreground/80 hover:text-primary"
                   )}
                 >
-                  {/* Safe check for onClick or URL with # */}
                   {(item.url.startsWith('#') || item.onClick) ? (
                     <button 
                       className={cn(
@@ -249,7 +245,6 @@ export function VerticalTubelightNavbar({
         )}
       </div>
 
-      {/* Add search dialog directly to the component instead of relying on custom events */}
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>
   );

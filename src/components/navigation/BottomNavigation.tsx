@@ -1,10 +1,8 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Search, User, Star, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Define NavItem type with optional onClick
 interface NavItem {
   name: string;
   path: string;
@@ -20,11 +18,10 @@ export const BottomNavigation = () => {
     { name: 'Home', path: '/', icon: Home },
     { name: 'Feed', path: '/feed', icon: Star },
     { name: 'Add', path: '#add', icon: PlusCircle, primary: true, onClick: () => {
-      // Open recommendation form
       const event = new CustomEvent('open-recommendation-form');
       window.dispatchEvent(event);
     }},
-    { name: 'Search', path: '/explore', icon: Search },
+    { name: 'Explore', path: '/explore', icon: Search },
     { name: 'Profile', path: '/profile', icon: User }
   ];
   
