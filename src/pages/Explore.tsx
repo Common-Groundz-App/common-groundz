@@ -32,7 +32,7 @@ const Explore = () => {
   
   // Using the getInitialActiveTab similar to Feed page
   const getInitialActiveTab = () => {
-    return 'Search';
+    return 'People';
   };
 
   if (!user) {
@@ -70,7 +70,7 @@ const Explore = () => {
         )}>
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-3xl font-bold">Search & Explore</h1>
+              <h1 className="text-3xl font-bold">Explore</h1>
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -159,3 +159,4 @@ const Explore = () => {
 };
 
 export default Explore;
+
