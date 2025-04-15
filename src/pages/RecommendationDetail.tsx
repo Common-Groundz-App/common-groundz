@@ -47,8 +47,8 @@ const RecommendationDetail = () => {
         
         setRecommendation(data);
         
-        // Increment view count
-        await incrementViewCount(id);
+        // Pass both id and the user id to incrementViewCount
+        await incrementViewCount(id, user?.id || null);
         
         // Load comment count
         const count = await fetchCommentCount(id, 'recommendation');
