@@ -4,33 +4,18 @@ import {
   RecommendationCategory, 
   RecommendationVisibility,
   Entity
-} from '@/services/recommendation/types';
+} from '@/services/recommendationService';
 import { MediaItem } from '@/types/media';
 
 export type FeedVisibility = 'for_you' | 'following';
 
-export interface FeedItem {
-  id: string;
-  title: string;
-  venue: string | null;
-  description: string | null;
-  rating: number;
-  image_url: string | null;
-  category: RecommendationCategory;
-  visibility: RecommendationVisibility;
-  is_certified: boolean;
-  view_count: number;
-  user_id: string;
-  entity_id: string | null;
-  created_at: string;
-  updated_at: string;
-  likes?: number;
-  comment_count?: number;
-  is_liked?: boolean;
-  is_saved?: boolean;
-  username?: string | null;
-  avatar_url?: string | null;
-  entity?: Entity | null;
+export interface FeedItem extends Recommendation {
+  likes: number;
+  is_liked: boolean;
+  is_saved: boolean;
+  username: string | null;
+  avatar_url: string | null;
+  comment_count: number; // Add this property explicitly
 }
 
 export interface PostFeedItem {

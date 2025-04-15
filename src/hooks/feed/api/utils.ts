@@ -47,7 +47,6 @@ export const processMediaItems = (media: any[]): MediaItem[] => {
 // Sort feed items by date (most recent first)
 export const sortItemsByDate = (items: CombinedFeedItem[]): CombinedFeedItem[] => {
   return [...items].sort((a, b) => {
-    // Ensure we have access to created_at
     const dateA = new Date(a.created_at);
     const dateB = new Date(b.created_at);
     return dateB.getTime() - dateA.getTime();

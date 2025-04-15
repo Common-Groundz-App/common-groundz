@@ -1,9 +1,5 @@
 
-import { supabase } from '@/integrations/supabase/client';
-import { fetchRecommendationById as fetchRecommendationByIdFromTypes } from './recommendation/fetchRecommendationById';
-import { Recommendation } from './recommendation/types';
-
-// Export all recommendation service types
+// Export all recommendation service functions from their respective files
 export type { 
   Recommendation, 
   RecommendationCategory, 
@@ -12,10 +8,10 @@ export type {
   EntityType
 } from './recommendation/types';
 
-// Export the recommendation service functions
 export { 
   fetchUserRecommendations,
-  fetchRecommendationWithLikesAndSaves
+  fetchRecommendationWithLikesAndSaves,
+  fetchRecommendationById
 } from './recommendation/fetchRecommendations';
 
 export {
@@ -41,8 +37,3 @@ export {
   findOrCreateEntity,
   getEntitiesByType
 } from './recommendation/entityOperations';
-
-// Wrapper function for fetchRecommendationById with proper parameter handling
-export const fetchRecommendationById = async (id: string, userId: string | null = null): Promise<Recommendation | null> => {
-  return fetchRecommendationByIdFromTypes(id, userId);
-};
