@@ -1,9 +1,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { fetchRecommendationById as fetchRecommendationByIdFromTypes } from './recommendation/fetchRecommendationById';
+import { Recommendation } from './recommendation/types';
 
 // Export all recommendation service types
-export { 
+export type { 
   Recommendation, 
   RecommendationCategory, 
   RecommendationVisibility,
