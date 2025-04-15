@@ -37,7 +37,7 @@ const RecommendationDetail = () => {
       
       try {
         setIsLoading(true);
-        // Pass both id and user?.id to fetchRecommendationById
+        // Fix: Pass both id and user?.id to fetchRecommendationById
         const data = await fetchRecommendationById(id, user?.id || null);
         
         if (!data) {
