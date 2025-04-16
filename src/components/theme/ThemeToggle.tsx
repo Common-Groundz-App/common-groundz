@@ -5,12 +5,15 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Moon, Sun, Laptop } from "lucide-react";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Theme</h3>
+        <span className="text-sm text-muted-foreground">
+          Currently: {resolvedTheme === 'dark' ? 'Dark' : 'Light'}
+        </span>
       </div>
       
       <RadioGroup

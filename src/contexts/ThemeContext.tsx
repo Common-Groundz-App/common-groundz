@@ -6,6 +6,8 @@ type Theme = 'light' | 'dark' | 'system';
 interface ThemeContextType {
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  resolvedTheme: 'light' | 'dark'; // Add resolved theme property
+  getThemedValue: <T>(lightValue: T, darkValue: T) => T; // Add utility function
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -22,6 +24,11 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     return 'system';
   });
 
+  // Track the resolved theme (what's actually applied)
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(
+    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  );
+
   useEffect(() => {
     const root = window.document.documentElement;
     
@@ -35,8 +42,10 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     if (theme === 'system') {
       const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       root.classList.add(systemTheme);
+      setResolvedTheme(systemTheme);
     } else {
       root.classList.add(theme);
+      setResolvedTheme(theme);
     }
   }, [theme]);
 
@@ -49,16 +58,25 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     const handleChange = () => {
       const root = window.document.documentElement;
       root.classList.remove('light', 'dark');
-      root.classList.add(mediaQuery.matches ? 'dark' : 'light');
+      const newTheme = mediaQuery.matches ? 'dark' : 'light';
+      root.classList.add(newTheme);
+      setResolvedTheme(newTheme);
     };
     
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
 
+  // Utility function to get the correct value based on current theme
+  const getThemedValue = <T,>(lightValue: T, darkValue: T): T => {
+    return resolvedTheme === 'dark' ? darkValue : lightValue;
+  };
+
   const value = {
     theme,
     setTheme,
+    resolvedTheme,
+    getThemedValue,
   };
 
   return (
