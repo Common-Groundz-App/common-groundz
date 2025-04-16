@@ -21,7 +21,7 @@ const ProfileUserInfo = ({
   return (
     <div className="w-full text-center mb-6">
       <div className="flex items-center justify-center">
-        <h2 className="text-xl md:text-2xl font-bold">{username}</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-foreground">{username}</h2>
         {isOwnProfile && onEditClick && (
           <Button 
             variant="ghost" 
@@ -35,10 +35,10 @@ const ProfileUserInfo = ({
       </div>
       
       {formattedUsername && (
-        <p className="text-sm text-gray-500 mb-2">{formattedUsername}</p>
+        <p className="text-sm text-muted-foreground mb-2">{formattedUsername}</p>
       )}
       
-      <p className="text-gray-600 mt-4 px-4">{bio || 'No bio yet'}</p>
+      <p className="text-muted-foreground mt-4 px-4">{bio || 'No bio yet'}</p>
     </div>
   );
 };

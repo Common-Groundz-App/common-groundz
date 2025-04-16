@@ -20,16 +20,28 @@ const ProfileTabs = ({ profileUserId, isOwnProfile }: ProfileTabsProps) => {
   return <Tabs defaultValue="recommendations" className={`w-full ${isMobile ? 'my-6' : 'my-[112px]'} px-0`}>
       <div className="bg-background pb-1 mb-2 border-b">
         <TabsList className="w-full rounded-none bg-transparent p-0 h-auto overflow-x-auto border-0">
-          <TabsTrigger value="recommendations" className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
+          <TabsTrigger 
+            value="recommendations" 
+            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-foreground"
+          >
             Recommendations
           </TabsTrigger>
-          <TabsTrigger value="posts" className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
+          <TabsTrigger 
+            value="posts" 
+            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-foreground"
+          >
             My Posts
           </TabsTrigger>
-          <TabsTrigger value="circles" className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
+          <TabsTrigger 
+            value="circles" 
+            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-foreground"
+          >
             Circles
           </TabsTrigger>
-          <TabsTrigger value="about" className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-black">
+          <TabsTrigger 
+            value="about" 
+            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-foreground"
+          >
             About
           </TabsTrigger>
         </TabsList>

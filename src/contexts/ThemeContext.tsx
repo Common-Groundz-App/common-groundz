@@ -6,8 +6,10 @@ type Theme = 'light' | 'dark' | 'system';
 interface ThemeContextType {
   theme: Theme;
   setTheme: (theme: Theme) => void;
-  resolvedTheme: 'light' | 'dark'; // Add resolved theme property
-  getThemedValue: <T>(lightValue: T, darkValue: T) => T; // Add utility function
+  resolvedTheme: 'light' | 'dark';
+  getThemedValue: <T>(lightValue: T, darkValue: T) => T;
+  isLightMode: boolean;
+  isDarkMode: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -71,12 +73,18 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const getThemedValue = <T,>(lightValue: T, darkValue: T): T => {
     return resolvedTheme === 'dark' ? darkValue : lightValue;
   };
+  
+  // Helper booleans for simpler conditional logic in components
+  const isLightMode = resolvedTheme === 'light';
+  const isDarkMode = resolvedTheme === 'dark';
 
   const value = {
     theme,
     setTheme,
     resolvedTheme,
     getThemedValue,
+    isLightMode,
+    isDarkMode
   };
 
   return (

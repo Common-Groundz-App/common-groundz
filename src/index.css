@@ -116,4 +116,83 @@
     margin-right: 0;
     font-style: italic;
   }
+
+  /* Dark Mode TipTap Overrides */
+  .dark .ProseMirror a {
+    color: hsl(var(--primary));
+  }
+
+  .dark .ProseMirror blockquote {
+    border-left-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+  }
+}
+
+/* Utility classes for theming */
+@layer utilities {
+  .theme-card {
+    @apply bg-card text-card-foreground;
+  }
+  
+  .theme-accent {
+    @apply bg-accent text-accent-foreground;
+  }
+  
+  .theme-secondary {
+    @apply bg-secondary text-secondary-foreground;
+  }
+  
+  .theme-glass {
+    @apply bg-background/80 backdrop-blur-md border border-border;
+  }
+  
+  .theme-card-hover {
+    @apply hover:bg-accent/50 transition-colors;
+  }
+}
+
+/* Add animation for fade-in effect */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Enhanced glow pulse animation */
+@keyframes glow-pulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+}
+
+.animate-pulse {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+/* Alternating pulse animations with different delays */
+.animate-pulse-delay-0 {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+.animate-pulse-delay-2 {
+  animation: glow-pulse 4s ease-in-out infinite;
+  animation-delay: 2s; /* This creates the alternating effect */
 }

@@ -136,7 +136,7 @@ const ProfileCard = (props: ProfileCardProps) => {
 
   return (
     <>
-      <Card className="relative bg-white shadow-lg rounded-lg overflow-hidden">
+      <Card className="relative shadow-lg rounded-lg overflow-hidden">
         <div className="p-6 flex flex-col items-center">
           <ProfileAvatar 
             username={displayName}

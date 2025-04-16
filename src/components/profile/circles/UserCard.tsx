@@ -104,7 +104,7 @@ const UserCard = ({
 
   return (
     <Link to={`/profile/${id}`} className="block" onClick={handleCardClick}>
-      <div className="py-3 px-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
+      <div className="py-3 px-4 flex items-center justify-between cursor-pointer hover:bg-accent/50 transition-colors">
         <div className="flex items-center">
           <Avatar className="h-9 w-9">
             {avatarUrl ? (
@@ -116,8 +116,8 @@ const UserCard = ({
             )}
           </Avatar>
           <div className="ml-3">
-            <div className="font-medium">{username || 'User'}</div>
-            <div className="text-xs text-gray-500">{formattedUsername}</div>
+            <div className="font-medium text-foreground">{username || 'User'}</div>
+            <div className="text-xs text-muted-foreground">{formattedUsername}</div>
           </div>
         </div>
         
