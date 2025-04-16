@@ -20,7 +20,7 @@ const Logo: React.FC<LogoProps> = ({ className, size = 'md' }) => {
   // Use different logo images based on theme
   const logoSrc = getThemedValue(
     "/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png", // Light mode logo
-    "/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png"  // Replace with dark mode logo URL
+    "/lovable-uploads/d4621fe6-4a75-45d1-a171-c55f4ad5fa28.png"  // Dark mode logo
   );
 
   return (
@@ -35,3 +35,4 @@ const Logo: React.FC<LogoProps> = ({ className, size = 'md' }) => {
 };
 
 export default Logo;
+
