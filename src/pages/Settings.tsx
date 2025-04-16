@@ -11,6 +11,7 @@ import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navb
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Logo from '@/components/Logo';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -144,9 +145,13 @@ const Settings = () => {
                   <CardHeader>
                     <CardTitle>Appearance Settings</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-6">
+                    <ThemeToggle />
+                    
+                    <Separator />
+                    
                     <p className="text-muted-foreground">
-                      Customize your app appearance here. This feature will be available soon.
+                      Additional appearance settings will be available soon.
                     </p>
                   </CardContent>
                 </Card>
