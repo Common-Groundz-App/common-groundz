@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Edit } from 'lucide-react';
+import { Edit, CheckCircle } from 'lucide-react';
 
 interface ProfileUserInfoProps {
   username: string;
@@ -9,6 +9,7 @@ interface ProfileUserInfoProps {
   isOwnProfile: boolean;
   formattedUsername?: string;
   onEditClick?: () => void;
+  isVerified?: boolean;
 }
 
 const ProfileUserInfo = ({ 
@@ -16,12 +17,20 @@ const ProfileUserInfo = ({
   bio, 
   isOwnProfile, 
   formattedUsername,
-  onEditClick
+  onEditClick,
+  isVerified = false
 }: ProfileUserInfoProps) => {
   return (
     <div className="w-full text-center mb-6">
       <div className="flex items-center justify-center">
         <h2 className="text-xl md:text-2xl font-bold text-foreground">{username}</h2>
+        {isVerified && (
+          <CheckCircle 
+            size={16} 
+            className="ml-1 text-brand-orange fill-brand-orange" 
+            data-tooltip="Verified Account"
+          />
+        )}
         {isOwnProfile && onEditClick && (
           <Button 
             variant="ghost" 

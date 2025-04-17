@@ -1,68 +1,64 @@
 
-import React from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import ProfileRecommendations from './ProfileRecommendations';
-import ProfileCircles from './ProfileCircles';
-import ProfileAbout from './ProfileAbout';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import ProfilePosts from './ProfilePosts';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth } from '@/contexts/AuthContext';
+import ProfileRecommendations from './ProfileRecommendations';
+import ProfileReviews from './ProfileReviews';
+import ProfileCircles from './ProfileCircles';
 
 interface ProfileTabsProps {
-  profileUserId: string;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
   isOwnProfile: boolean;
+  profileUserId: string;
+  username: string;
 }
 
-const ProfileTabs = ({ profileUserId, isOwnProfile }: ProfileTabsProps) => {
-  const isMobile = useIsMobile(768);
-  const { user } = useAuth();
-  
-  return <Tabs defaultValue="recommendations" className={`w-full ${isMobile ? 'my-6' : 'my-[112px]'} px-0`}>
-      <div className="bg-background pb-1 mb-2 border-b">
-        <TabsList className="w-full rounded-none bg-transparent p-0 h-auto overflow-x-auto border-0">
-          <TabsTrigger 
-            value="recommendations" 
-            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-foreground"
-          >
-            Recommendations
-          </TabsTrigger>
-          <TabsTrigger 
-            value="posts" 
-            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-foreground"
-          >
-            My Posts
-          </TabsTrigger>
-          <TabsTrigger 
-            value="circles" 
-            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-foreground"
-          >
-            Circles
-          </TabsTrigger>
-          <TabsTrigger 
-            value="about" 
-            className="rounded-none border-b-2 border-transparent px-4 md:px-6 py-3 font-medium data-[state=active]:border-brand-orange data-[state=active]:text-foreground"
-          >
-            About
-          </TabsTrigger>
-        </TabsList>
-      </div>
+const ProfileTabs = ({ 
+  activeTab, 
+  onTabChange, 
+  isOwnProfile, 
+  profileUserId,
+  username
+}: ProfileTabsProps) => {
+  return (
+    <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
+      <TabsList className="w-full max-w-2xl mx-auto grid grid-cols-4 mb-8">
+        <TabsTrigger value="posts">Posts</TabsTrigger>
+        <TabsTrigger value="recommendations">Recs</TabsTrigger>
+        <TabsTrigger value="reviews">Reviews</TabsTrigger>
+        <TabsTrigger value="circles">Circles</TabsTrigger>
+      </TabsList>
       
-      <TabsContent value="recommendations" className="mt-4">
-        <ProfileRecommendations profileUserId={profileUserId} />
+      <TabsContent value="posts">
+        <ProfilePosts 
+          profileUserId={profileUserId} 
+          isOwnProfile={isOwnProfile} 
+          username={username}
+        />
       </TabsContent>
       
-      <TabsContent value="posts" className="mt-4">
-        <ProfilePosts profileUserId={profileUserId} isOwnProfile={isOwnProfile} />
+      <TabsContent value="recommendations">
+        <ProfileRecommendations 
+          profileUserId={profileUserId} 
+          isOwnProfile={isOwnProfile}
+        />
       </TabsContent>
       
-      <TabsContent value="circles" className="mt-4">
-        <ProfileCircles profileUserId={profileUserId} isOwnProfile={isOwnProfile} />
+      <TabsContent value="reviews">
+        <ProfileReviews 
+          profileUserId={profileUserId} 
+          isOwnProfile={isOwnProfile}
+        />
       </TabsContent>
       
-      <TabsContent value="about" className="mt-4">
-        <ProfileAbout profileUserId={profileUserId} isOwnProfile={isOwnProfile} />
+      <TabsContent value="circles">
+        <ProfileCircles 
+          profileUserId={profileUserId} 
+          isOwnProfile={isOwnProfile}
+        />
       </TabsContent>
-    </Tabs>;
+    </Tabs>
+  );
 };
 
 export default ProfileTabs;
