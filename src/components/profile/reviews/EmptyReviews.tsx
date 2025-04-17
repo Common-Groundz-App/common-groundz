@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { StarHalf, PlusCircle } from 'lucide-react';
+import { StarHalf } from 'lucide-react';
 
 interface EmptyReviewsProps {
   isOwnProfile: boolean;
@@ -12,7 +12,10 @@ const EmptyReviews = ({ isOwnProfile, onCreateReview }: EmptyReviewsProps) => {
   return (
     <div className="w-full py-12 flex flex-col items-center justify-center text-center">
       <div className="rounded-full bg-muted/50 p-6 mb-4">
-        <StarHalf size={40} className="text-muted-foreground" />
+        <StarHalf 
+          size={40} 
+          className="text-muted-foreground stroke-[1.5] stroke-brand-orange/70 fill-brand-orange/10" 
+        />
       </div>
       
       <h3 className="text-xl font-semibold mb-2">
@@ -30,7 +33,7 @@ const EmptyReviews = ({ isOwnProfile, onCreateReview }: EmptyReviewsProps) => {
           onClick={onCreateReview}
           className="flex items-center gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
         >
-          <PlusCircle size={16} />
+          <StarHalf size={16} />
           <span>Write Your First Review</span>
         </Button>
       )}
@@ -39,3 +42,4 @@ const EmptyReviews = ({ isOwnProfile, onCreateReview }: EmptyReviewsProps) => {
 };
 
 export default EmptyReviews;
+
