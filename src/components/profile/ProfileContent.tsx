@@ -102,50 +102,52 @@ const ProfileContent = () => {
           
           {/* Content area with tabs */}
           <div className="flex-1 min-w-0">
-            <div className="relative">
-              <Carousel className="w-full max-w-[600px]">
-                <CarouselContent>
-                  <TubelightTabs 
-                    defaultValue={activeTab} 
-                    onValueChange={setActiveTab}
-                    items={tabItems}
-                    className="mb-6"
+            <TubelightTabs 
+              defaultValue={activeTab} 
+              onValueChange={setActiveTab}
+              items={tabItems}
+              className="mb-6"
+            >
+              <div className="relative mb-6">
+                <Carousel className="w-full max-w-[600px]">
+                  <CarouselContent>
+                    {/* Tabs navigation is handled by TubelightTabs above */}
+                  </CarouselContent>
+                  <CarouselPrevious className="left-0" />
+                  <CarouselNext className="right-0" />
+                </Carousel>
+              </div>
+              
+              <ScrollArea className="w-full mt-6">
+                <TabsContent value="posts">
+                  <ProfilePosts 
+                    profileUserId={profileData.id} 
+                    isOwnProfile={isOwnProfile} 
                   />
-                </CarouselContent>
-                <CarouselPrevious className="left-0" />
-                <CarouselNext className="right-0" />
-              </Carousel>
-            </div>
-            
-            <ScrollArea className="w-full mt-6">
-              <TabsContent value="posts">
-                <ProfilePosts 
-                  profileUserId={profileData.id} 
-                  isOwnProfile={isOwnProfile} 
-                />
-              </TabsContent>
-              
-              <TabsContent value="recommendations">
-                <ProfileRecommendations 
-                  profileUserId={profileData.id}
-                  isOwnProfile={isOwnProfile}
-                />
-              </TabsContent>
-              
-              <TabsContent value="reviews">
-                <ProfileReviews 
-                  profileUserId={profileData.id} 
-                  isOwnProfile={isOwnProfile}
-                />
-              </TabsContent>
-              
-              <TabsContent value="circles">
-                <ProfileCircles 
-                  profileUserId={profileData.id} 
-                  isOwnProfile={isOwnProfile}
-                />
-              </TabsContent>
-            </ScrollArea>
+                </TabsContent>
+                
+                <TabsContent value="recommendations">
+                  <ProfileRecommendations 
+                    profileUserId={profileData.id}
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="reviews">
+                  <ProfileReviews 
+                    profileUserId={profileData.id} 
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="circles">
+                  <ProfileCircles 
+                    profileUserId={profileData.id} 
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+              </ScrollArea>
+            </TubelightTabs>
           </div>
         </div>
       </div>
