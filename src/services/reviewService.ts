@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -16,6 +15,8 @@ export interface Review {
   updated_at: string;
   is_converted: boolean;
   recommendation_id: string | null;
+  experience_date: string | null;
+  status: 'published' | 'flagged' | 'deleted';
   likes?: number;
   comment_count?: number;
   isLiked?: boolean;
@@ -181,7 +182,7 @@ export const toggleReviewSave = async (reviewId: string, userId: string, isSaved
 };
 
 // Create review
-export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'updated_at' | 'is_converted' | 'recommendation_id'>) => {
+export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'updated_at' | 'is_converted' | 'recommendation_id' | 'status'>) => {
   const { data, error } = await supabase
     .from('reviews')
     .insert({
@@ -193,8 +194,10 @@ export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'u
       category: review.category,
       visibility: review.visibility,
       user_id: review.user_id,
+      experience_date: review.experience_date,
       is_converted: false,
-      recommendation_id: null
+      recommendation_id: null,
+      status: 'published'
     })
     .select()
     .single();
@@ -354,7 +357,8 @@ export const updateReview = async (id: string, updates: Partial<Review>) => {
     image_url: updates.image_url,
     category: updates.category,
     visibility: updates.visibility as 'public' | 'private' | 'circle_only',
-    updated_at: new Date().toISOString()
+    experience_date: updates.experience_date
+    // No need to include updated_at as our DB trigger handles that now
   };
   
   const { data, error } = await supabase
@@ -385,4 +389,21 @@ export const deleteReview = async (id: string) => {
   }
 
   return true;
+};
+
+// Update review status (for moderation)
+export const updateReviewStatus = async (id: string, status: 'published' | 'flagged' | 'deleted') => {
+  const { data, error } = await supabase
+    .from('reviews')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating review status:', error);
+    throw error;
+  }
+
+  return data;
 };

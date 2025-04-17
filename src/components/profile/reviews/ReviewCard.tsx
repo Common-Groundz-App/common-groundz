@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud } from 'lucide-react';
+import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,9 +15,10 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
-import { deleteReview } from '@/services/reviewService';
+import { deleteReview, updateReviewStatus } from '@/services/reviewService';
 import ReviewForm from './ReviewForm';
 import RatingStars from '@/components/recommendations/RatingStars';
+import { format } from 'date-fns';
 
 interface ReviewCardProps {
   review: Review;
@@ -41,6 +42,7 @@ const ReviewCard = ({
   const [isDeleting, setIsDeleting] = useState(false);
   
   const isOwner = user?.id === review.user_id;
+  const isAdmin = user?.email?.includes('@lovable.dev') || false; // Simple admin check
   
   const getCategoryLabel = (category: string): string => {
     const labels: Record<string, string> = {
@@ -93,13 +95,53 @@ const ReviewCard = ({
     }
   };
 
+  const handleStatusChange = async (status: 'published' | 'flagged' | 'deleted') => {
+    try {
+      await updateReviewStatus(review.id, status);
+      toast({
+        title: 'Status Updated',
+        description: `Review status changed to ${status}`
+      });
+      refreshReviews();
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update review status',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const getStatusBadge = () => {
+    if (review.status === 'flagged') {
+      return (
+        <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-300">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          Flagged
+        </Badge>
+      );
+    }
+    if (review.status === 'deleted') {
+      return (
+        <Badge variant="outline" className="bg-red-50 text-red-800 border-red-300">
+          <Trash2 className="h-3 w-3 mr-1" />
+          Deleted
+        </Badge>
+      );
+    }
+    return null;
+  };
+
   return (
     <>
       <Card 
         key={review.id} 
         className={cn(
           "overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border border-gray-200",
-          review.is_converted && "opacity-75"
+          review.is_converted && "opacity-75",
+          review.status === 'flagged' && "border-yellow-300",
+          review.status === 'deleted' && "opacity-50 border-red-300"
         )}
       >
         <div className="relative">
@@ -109,14 +151,16 @@ const ReviewCard = ({
             </Badge>
           </div>
           
-          {review.is_converted && (
-            <div className="absolute top-3 right-3 z-10">
+          <div className="absolute top-3 right-3 z-10 flex gap-2">
+            {getStatusBadge()}
+            
+            {review.is_converted && (
               <Badge variant="secondary" className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
                 <UploadCloud size={12} />
                 <span>Converted to Recommendation</span>
               </Badge>
-            </div>
-          )}
+            )}
+          </div>
           
           <div className="h-48 relative overflow-hidden group">
             <img 
@@ -131,7 +175,7 @@ const ReviewCard = ({
           <div className="flex justify-between items-start mb-2">
             <h3 className="text-lg font-bold line-clamp-1">{review.title}</h3>
             <div className="flex items-center">
-              {isOwner && (
+              {(isOwner || isAdmin) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
@@ -140,20 +184,44 @@ const ReviewCard = ({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
-                      <Pencil className="h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                    {!review.is_converted && onConvert && (
+                    {isOwner && (
+                      <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
+                        <Pencil className="h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                    )}
+                    
+                    {!review.is_converted && isOwner && onConvert && (
                       <DropdownMenuItem onClick={handleConvertClick} className="flex items-center gap-2">
                         <UploadCloud className="h-4 w-4" /> Convert to Recommendation
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem 
-                      onClick={handleDeleteClick} 
-                      className="text-destructive focus:text-destructive flex items-center gap-2"
-                    >
-                      <Trash2 className="h-4 w-4" /> Delete
-                    </DropdownMenuItem>
+                    
+                    {isAdmin && review.status !== 'flagged' && (
+                      <DropdownMenuItem 
+                        onClick={() => handleStatusChange('flagged')}
+                        className="flex items-center gap-2"
+                      >
+                        <Flag className="h-4 w-4" /> Flag for Review
+                      </DropdownMenuItem>
+                    )}
+                    
+                    {isAdmin && review.status === 'flagged' && (
+                      <DropdownMenuItem 
+                        onClick={() => handleStatusChange('published')}
+                        className="flex items-center gap-2"
+                      >
+                        <Flag className="h-4 w-4" /> Remove Flag
+                      </DropdownMenuItem>
+                    )}
+                    
+                    {(isOwner || isAdmin) && (
+                      <DropdownMenuItem 
+                        onClick={handleDeleteClick} 
+                        className="text-destructive focus:text-destructive flex items-center gap-2"
+                      >
+                        <Trash2 className="h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -179,7 +247,16 @@ const ReviewCard = ({
           
           <p className="text-gray-600 mb-3 text-sm">{review.venue || 'Unknown venue'}</p>
           
-          <RatingStars rating={review.rating} />
+          <div className="flex flex-wrap gap-2 items-center mb-3">
+            <RatingStars rating={review.rating} />
+            
+            {review.experience_date && (
+              <div className="text-xs text-gray-500 flex items-center">
+                <Calendar className="h-3 w-3 mr-1" />
+                <span>Experienced: {format(new Date(review.experience_date), 'MMM d, yyyy')}</span>
+              </div>
+            )}
+          </div>
           
           {review.description && (
             <p className="mt-3 text-sm line-clamp-2">{review.description}</p>

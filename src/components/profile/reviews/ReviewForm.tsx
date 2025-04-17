@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Star, Loader2 } from "lucide-react";
+import { Star, Loader2, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,6 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 import { createReview, updateReview, Review } from '@/services/reviewService';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import EntitySearch from '@/components/recommendations/EntitySearch';
+import { format } from 'date-fns';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface ReviewFormProps {
   isOpen: boolean;
@@ -45,12 +48,15 @@ const ReviewForm = ({
       category: review?.category || 'food',
       visibility: review?.visibility || 'public',
       entity_id: review?.entity_id || '',
+      experience_date: review?.experience_date ? new Date(review.experience_date) : undefined,
     }
   });
   
   const selectedCategory = watch('category');
   const [selectedImage, setSelectedImage] = useState<string | null>(review?.image_url || null);
   const [isUploading, setIsUploading] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const experienceDate = watch('experience_date');
 
   // Reset form on close
   useEffect(() => {
@@ -73,6 +79,9 @@ const ReviewForm = ({
       setValue('category', review.category);
       setValue('visibility', review.visibility);
       setValue('entity_id', review.entity_id || '');
+      if (review.experience_date) {
+        setValue('experience_date', new Date(review.experience_date));
+      }
       setSelectedImage(review.image_url || null);
     }
   }, [review, isEditMode, setValue]);
@@ -113,7 +122,7 @@ const ReviewForm = ({
       if (isEditMode && review) {
         await updateReview(review.id, {
           ...values,
-          updated_at: new Date().toISOString()
+          // The updated_at is automatically set by the database trigger
         });
         toast({
           title: 'Success',
@@ -177,6 +186,7 @@ const ReviewForm = ({
             />
           </div>
           
+          {/* Entity search for non-food categories */}
           {!isEditMode && (selectedCategory === 'movie' || selectedCategory === 'book' || 
             selectedCategory === 'place' || selectedCategory === 'product') && (
             <div className="space-y-2">
@@ -197,6 +207,45 @@ const ReviewForm = ({
             </div>
           )}
           
+          {/* Experience Date Field */}
+          <div className="space-y-2">
+            <Label htmlFor="experience_date">When did you experience this? (optional)</Label>
+            <Controller
+              name="experience_date"
+              control={control}
+              render={({ field }) => (
+                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {field.value ? format(field.value, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={field.value}
+                      onSelect={(date) => {
+                        field.onChange(date);
+                        setDatePickerOpen(false);
+                      }}
+                      disabled={(date) => date > new Date()}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+            />
+          </div>
+          
+          {/* Title Field */}
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input 
@@ -210,6 +259,7 @@ const ReviewForm = ({
             )}
           </div>
           
+          {/* Venue Field */}
           <div className="space-y-2">
             <Label htmlFor="venue">
               {selectedCategory === 'food' ? 'Restaurant/Source' : 
@@ -224,6 +274,7 @@ const ReviewForm = ({
             />
           </div>
           
+          {/* Description Field */}
           <div className="space-y-2">
             <Label htmlFor="description">Review (optional)</Label>
             <Textarea 
@@ -234,6 +285,7 @@ const ReviewForm = ({
             />
           </div>
           
+          {/* Rating Field */}
           <div className="space-y-2">
             <Label>Rating</Label>
             <div className="flex items-center">
@@ -271,6 +323,7 @@ const ReviewForm = ({
             )}
           </div>
           
+          {/* Image Upload */}
           <div className="space-y-2">
             <Label>Add Image (optional)</Label>
             <div className="flex items-center gap-4">
@@ -314,6 +367,7 @@ const ReviewForm = ({
             </div>
           </div>
           
+          {/* Visibility */}
           <div className="space-y-2">
             <Label>Visibility</Label>
             <Controller
@@ -342,6 +396,7 @@ const ReviewForm = ({
             />
           </div>
           
+          {/* Form Buttons */}
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}>
               Cancel

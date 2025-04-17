@@ -566,11 +566,13 @@ export type Database = {
           created_at: string
           description: string | null
           entity_id: string | null
+          experience_date: string | null
           id: string
           image_url: string | null
           is_converted: boolean
           rating: number
           recommendation_id: string | null
+          status: string
           title: string
           updated_at: string
           user_id: string
@@ -582,11 +584,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           entity_id?: string | null
+          experience_date?: string | null
           id?: string
           image_url?: string | null
           is_converted?: boolean
           rating: number
           recommendation_id?: string | null
+          status?: string
           title: string
           updated_at?: string
           user_id: string
@@ -598,11 +602,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           entity_id?: string | null
+          experience_date?: string | null
           id?: string
           image_url?: string | null
           is_converted?: boolean
           rating?: number
           recommendation_id?: string | null
+          status?: string
           title?: string
           updated_at?: string
           user_id?: string
