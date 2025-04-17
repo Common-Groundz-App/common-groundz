@@ -2,6 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
 import ProfileRecommendations from './ProfileRecommendations';
@@ -36,7 +43,6 @@ const ProfileContent = () => {
   } = useProfileData(userId);
 
   useEffect(() => {
-    // Reset to first tab when changing profiles
     setActiveTab('posts');
   }, [userId]);
 
@@ -96,41 +102,49 @@ const ProfileContent = () => {
           
           {/* Content area with tabs */}
           <div className="flex-1 min-w-0">
-            <ScrollArea className="w-full">
-              <TubelightTabs 
-                defaultValue={activeTab} 
-                onValueChange={setActiveTab}
-                items={tabItems}
-                className="mb-6"
-              >
-                <TabsContent value="posts">
-                  <ProfilePosts 
-                    profileUserId={profileData.id} 
-                    isOwnProfile={isOwnProfile} 
+            <div className="relative">
+              <Carousel className="w-full max-w-[600px]">
+                <CarouselContent>
+                  <TubelightTabs 
+                    defaultValue={activeTab} 
+                    onValueChange={setActiveTab}
+                    items={tabItems}
+                    className="mb-6"
                   />
-                </TabsContent>
-                
-                <TabsContent value="recommendations">
-                  <ProfileRecommendations 
-                    profileUserId={profileData.id}
-                    isOwnProfile={isOwnProfile}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="reviews">
-                  <ProfileReviews 
-                    profileUserId={profileData.id} 
-                    isOwnProfile={isOwnProfile}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="circles">
-                  <ProfileCircles 
-                    profileUserId={profileData.id} 
-                    isOwnProfile={isOwnProfile}
-                  />
-                </TabsContent>
-              </TubelightTabs>
+                </CarouselContent>
+                <CarouselPrevious className="left-0" />
+                <CarouselNext className="right-0" />
+              </Carousel>
+            </div>
+            
+            <ScrollArea className="w-full mt-6">
+              <TabsContent value="posts">
+                <ProfilePosts 
+                  profileUserId={profileData.id} 
+                  isOwnProfile={isOwnProfile} 
+                />
+              </TabsContent>
+              
+              <TabsContent value="recommendations">
+                <ProfileRecommendations 
+                  profileUserId={profileData.id}
+                  isOwnProfile={isOwnProfile}
+                />
+              </TabsContent>
+              
+              <TabsContent value="reviews">
+                <ProfileReviews 
+                  profileUserId={profileData.id} 
+                  isOwnProfile={isOwnProfile}
+                />
+              </TabsContent>
+              
+              <TabsContent value="circles">
+                <ProfileCircles 
+                  profileUserId={profileData.id} 
+                  isOwnProfile={isOwnProfile}
+                />
+              </TabsContent>
             </ScrollArea>
           </div>
         </div>

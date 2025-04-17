@@ -40,7 +40,8 @@ const ProfileHeader = ({
   isOwnProfile,
   profileUserId
 }: ProfileHeaderProps) => {
-  return <>
+  return (
+    <div className="relative">
       <ProfileCoverImage 
         coverImage={coverImage} 
         isLoading={isLoading} 
@@ -50,7 +51,7 @@ const ProfileHeader = ({
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24 relative z-10">
         <div className="flex flex-col md:flex-row gap-6 items-start">
-          {/* Profile Card - fixed width */}
+          {/* Profile Card */}
           <div className="md:w-[300px] flex-shrink-0">
             <ProfileCard 
               username={username} 
@@ -70,7 +71,8 @@ const ProfileHeader = ({
           </div>
         </div>
       </div>
-    </>;
+    </div>
+  );
 };
 
 export default ProfileHeader;
