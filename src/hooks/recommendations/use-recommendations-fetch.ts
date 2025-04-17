@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Recommendation,
-  fetchRecommendationWithLikesAndSaves
+  fetchRecommendationWithLikesAndSaves,
+  fetchUserRecommendations
 } from '@/services/recommendationService';
 
 interface UseRecommendationsFetchProps {
@@ -24,11 +25,13 @@ export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFet
     
     try {
       setIsLoading(true);
-      const data = await fetchRecommendationWithLikesAndSaves(
-        user?.id || '', 
+      // Use fetchUserRecommendations instead of fetchRecommendationWithLikesAndSaves
+      // because it returns a direct array of recommendations
+      const data = await fetchUserRecommendations(
+        user?.id || null, 
         profileUserId
       );
-      setRecommendations(data as Recommendation[]);
+      setRecommendations(data);
       setError(null);
     } catch (err) {
       console.error('Error in useRecommendationsFetch:', err);

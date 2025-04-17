@@ -106,10 +106,11 @@ export const fetchUserRecommendations = async (
 // Fetch recommendations with likes and saves
 export const fetchRecommendationWithLikesAndSaves = async (
   userId: string | null,
-  limit = 10,
-  offset = 0,
+  profileUserId?: string,
   category?: string,
-  sort: 'latest' | 'popular' = 'latest'
+  sort: 'latest' | 'popular' = 'latest',
+  limit = 10,
+  offset = 0
 ): Promise<{ recommendations: Recommendation[]; totalCount: number }> => {
   try {
     // Building the base query
@@ -123,6 +124,12 @@ export const fetchRecommendationWithLikesAndSaves = async (
       .limit(limit)
       .range(offset, offset + limit - 1);
 
+    // Filter by user profile if provided
+    if (profileUserId) {
+      query = query.eq('user_id', profileUserId);
+    }
+    
+    // Filter by category if provided
     if (category) {
       query = query.eq('category', category);
     }

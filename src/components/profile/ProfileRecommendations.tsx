@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -9,7 +10,7 @@ import RecommendationSkeleton from '@/components/recommendations/RecommendationS
 import EmptyRecommendations from '@/components/recommendations/EmptyRecommendations';
 
 type ProfileRecommendationsProps = {
-  profileUserId?: string;
+  profileUserId: string;
   isOwnProfile?: boolean;
 };
 
@@ -32,10 +33,12 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     clearFilters,
     refreshRecommendations
   } = useRecommendations({ 
-    profileUserId: profileUserId || (user?.id || '') 
+    profileUserId
   });
   
-  const categories = [...new Set(recommendations.map(item => item.category))];
+  const categories = recommendations.length > 0 
+    ? [...new Set(recommendations.map(item => item.category))] 
+    : [];
   
   useEffect(() => {
     const handleOpenForm = () => {

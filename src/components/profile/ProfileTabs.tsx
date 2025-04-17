@@ -39,6 +39,7 @@ const ProfileTabs = ({
       <TabsContent value="recommendations">
         <ProfileRecommendations 
           profileUserId={profileUserId}
+          isOwnProfile={isOwnProfile}
         />
       </TabsContent>
       
