@@ -26,25 +26,39 @@ export interface Review {
 // Fetch user reviews
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
-    const { data, error } = await supabase
+    // Fetch reviews
+    const { data: reviewsData, error: reviewsError } = await supabase
       .from('reviews')
-      .select(`
-        *,
-        entities(*)
-      `)
+      .select('*')
       .eq('user_id', profileUserId)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching reviews:', error);
-      throw error;
+    if (reviewsError) {
+      console.error('Error fetching reviews:', reviewsError);
+      throw reviewsError;
     }
 
     // No reviews found
-    if (!data || data.length === 0) return [];
+    if (!reviewsData || reviewsData.length === 0) return [];
 
     // Get array of review IDs
-    const reviewIds = data.map(rev => rev.id);
+    const reviewIds = reviewsData.map(rev => rev.id);
+
+    // Get entities data
+    const entitiesMap = new Map();
+    for (const review of reviewsData) {
+      if (review.entity_id) {
+        const { data: entityData } = await supabase
+          .from('entities')
+          .select('*')
+          .eq('id', review.entity_id)
+          .single();
+        
+        if (entityData) {
+          entitiesMap.set(review.entity_id, entityData);
+        }
+      }
+    }
 
     // Get likes for each review
     let userLikes: any[] = [];
@@ -69,31 +83,33 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     }
 
     // Get like counts
-    const { data: likeCounts, error: likeCountsError } = await supabase
-      .from('review_likes')
-      .select('review_id, count(*)')
-      .in('review_id', reviewIds)
-      .group('review_id');
-
-    if (likeCountsError) {
-      console.error('Error fetching like counts:', likeCountsError);
+    const likeCountMap = new Map();
+    for (const reviewId of reviewIds) {
+      const { count } = await supabase
+        .from('review_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('review_id', reviewId);
+      
+      likeCountMap.set(reviewId, count || 0);
     }
 
-    // Map likes and saves to reviews
-    return data.map(review => {
-      const likes = likeCounts?.find(c => c.review_id === review.id)?.count || 0;
+    // Map all data to reviews
+    const reviews = reviewsData.map(review => {
+      const likes = likeCountMap.get(review.id) || 0;
       const isLiked = userLikes?.some(l => l.review_id === review.id) || false;
       const isSaved = userSaves?.some(s => s.review_id === review.id) || false;
+      const entity = review.entity_id ? entitiesMap.get(review.entity_id) : null;
 
       return {
         ...review,
         likes: Number(likes),
         isLiked,
         isSaved,
-        entity: review.entities,
-        entities: undefined
+        entity
       };
     });
+
+    return reviews;
   } catch (error) {
     console.error('Error in fetchUserReviews:', error);
     throw error;
@@ -248,10 +264,7 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
   try {
     const { data, error } = await supabase
       .from('reviews')
-      .select(`
-        *,
-        entities(*)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -261,6 +274,18 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
     }
 
     if (!data) return null;
+
+    // Get entity data if there's an entity_id
+    let entity = null;
+    if (data.entity_id) {
+      const { data: entityData } = await supabase
+        .from('entities')
+        .select('*')
+        .eq('id', data.entity_id)
+        .single();
+      
+      entity = entityData;
+    }
 
     // Get likes count
     const { count: likesCount, error: likesError } = await supabase
@@ -301,8 +326,7 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
       likes: likesCount || 0,
       isLiked,
       isSaved,
-      entity: data.entities,
-      entities: undefined
+      entity
     } as Review;
   } catch (error) {
     console.error('Error in fetchReviewById:', error);

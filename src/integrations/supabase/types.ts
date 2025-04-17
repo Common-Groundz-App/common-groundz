@@ -502,6 +502,130 @@ export type Database = {
           },
         ]
       }
+      review_likes: {
+        Row: {
+          created_at: string
+          id: string
+          review_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          review_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          review_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_likes_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_saves: {
+        Row: {
+          created_at: string
+          id: string
+          review_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          review_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          review_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_saves_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          entity_id: string | null
+          id: string
+          image_url: string | null
+          is_converted: boolean
+          rating: number
+          recommendation_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          venue: string | null
+          visibility: Database["public"]["Enums"]["recommendation_visibility"]
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          entity_id?: string | null
+          id?: string
+          image_url?: string | null
+          is_converted?: boolean
+          rating: number
+          recommendation_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          venue?: string | null
+          visibility?: Database["public"]["Enums"]["recommendation_visibility"]
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          entity_id?: string | null
+          id?: string
+          image_url?: string | null
+          is_converted?: boolean
+          rating?: number
+          recommendation_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          venue?: string | null
+          visibility?: Database["public"]["Enums"]["recommendation_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_recommendation_id_fkey"
+            columns: ["recommendation_id"]
+            isOneToOne: false
+            referencedRelation: "recommendations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

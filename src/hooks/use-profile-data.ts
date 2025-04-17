@@ -12,10 +12,13 @@ import {
   getDisplayName
 } from '@/services/profileService';
 
-export const useProfileData = () => {
+export const useProfileData = (userId?: string) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [followerCount, setFollowerCount] = useState<number>(0);
   
   // Default cover image with a nice pattern
@@ -54,8 +57,13 @@ export const useProfileData = () => {
       try {
         setIsLoading(true);
         
+        // Determine if this is the current user's profile
+        const viewingUserId = userId || user.id;
+        setIsOwnProfile(!userId || userId === user.id);
+        
         // Get profile data from profiles table
-        const profileData = await fetchUserProfile(user.id);
+        const profileData = await fetchUserProfile(viewingUserId);
+        setProfileData(profileData);
         
         if (profileData) {
           console.log('Profile data loaded:', profileData);
@@ -74,22 +82,23 @@ export const useProfileData = () => {
           setInitialImages(profileData);
           
           // Fetch following and follower counts
-          const followingData = await fetchFollowingCount(user.id);
-          const followerData = await fetchFollowerCount(user.id);
+          const followingData = await fetchFollowingCount(viewingUserId);
+          const followerData = await fetchFollowerCount(viewingUserId);
           
           // Update counts
           setFollowingCount(followingData);
           setFollowerCount(followerData);
         }
-      } catch (error) {
-        console.error('Error:', error);
+      } catch (err) {
+        console.error('Error:', err);
+        setError(err instanceof Error ? err : new Error('Failed to load profile data'));
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchProfile();
-  }, [user]);
+  }, [user, userId]);
 
   // Listen for follow status changes
   useEffect(() => {
@@ -193,6 +202,9 @@ export const useProfileData = () => {
 
   return {
     isLoading,
+    error,
+    profileData,
+    isOwnProfile,
     coverImage,
     profileImage,
     username,

@@ -33,7 +33,6 @@ const ProfileTabs = ({
         <ProfilePosts 
           profileUserId={profileUserId} 
           isOwnProfile={isOwnProfile} 
-          username={username}
         />
       </TabsContent>
       

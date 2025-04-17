@@ -8,7 +8,12 @@ import { useProfileData } from '@/hooks/use-profile-data';
 const ProfileContent = () => {
   const { userId } = useParams();
   const [activeTab, setActiveTab] = useState('posts');
-  const { profileData, isLoading, error, isOwnProfile } = useProfileData(userId);
+  const { 
+    profileData, 
+    isLoading, 
+    error, 
+    isOwnProfile 
+  } = useProfileData(userId);
 
   useEffect(() => {
     // Reset to first tab when changing profiles
@@ -39,8 +44,11 @@ const ProfileContent = () => {
   return (
     <div className="container mx-auto pb-12">
       <ProfileHeader 
-        profile={profileData} 
+        coverImage={profileData.cover_url}
+        profileImage={profileData.avatar_url}
+        username={profileData.username || ''}
         isOwnProfile={isOwnProfile} 
+        bio={profileData.bio || ''}
       />
 
       <ProfileTabs 
@@ -48,7 +56,7 @@ const ProfileContent = () => {
         onTabChange={setActiveTab}
         isOwnProfile={isOwnProfile}
         profileUserId={profileData.id}
-        username={profileData.username}
+        username={profileData.username || ''}
       />
     </div>
   );
