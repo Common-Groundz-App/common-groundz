@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -11,9 +10,10 @@ import EmptyRecommendations from '@/components/recommendations/EmptyRecommendati
 
 type ProfileRecommendationsProps = {
   profileUserId?: string;
+  isOwnProfile?: boolean;
 };
 
-const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) => {
+const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: ProfileRecommendationsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -36,9 +36,7 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
   });
   
   const categories = [...new Set(recommendations.map(item => item.category))];
-  const isOwnProfile = user?.id === profileUserId || (!profileUserId && !!user);
-
-  // Listen for custom event to open recommendation form
+  
   useEffect(() => {
     const handleOpenForm = () => {
       setIsFormOpen(true);
@@ -74,7 +72,6 @@ const ProfileRecommendations = ({ profileUserId }: ProfileRecommendationsProps) 
   };
 
   const handleRecommendationDeleted = () => {
-    // Refresh recommendations after deletion
     refreshRecommendations();
   };
 

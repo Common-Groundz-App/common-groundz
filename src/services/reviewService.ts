@@ -10,7 +10,7 @@ export interface Review {
   rating: number;
   image_url: string | null;
   category: string;
-  visibility: string;
+  visibility: 'public' | 'private' | 'circle_only';
   user_id: string;
   created_at: string;
   updated_at: string;
@@ -82,7 +82,7 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       userSaves = savesData || [];
     }
 
-    // Get like counts
+    // Get like counts - using count instead of group
     const likeCountMap = new Map();
     for (const reviewId of reviewIds) {
       const { count } = await supabase
@@ -106,7 +106,7 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
         isLiked,
         isSaved,
         entity
-      };
+      } as Review;
     });
 
     return reviews;
@@ -185,7 +185,14 @@ export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'u
   const { data, error } = await supabase
     .from('reviews')
     .insert({
-      ...review,
+      title: review.title,
+      venue: review.venue,
+      description: review.description,
+      rating: review.rating,
+      image_url: review.image_url,
+      category: review.category,
+      visibility: review.visibility,
+      user_id: review.user_id,
       is_converted: false,
       recommendation_id: null
     })
@@ -225,10 +232,12 @@ export const convertReviewToRecommendation = async (reviewId: string, userId: st
         venue: review.venue,
         rating: review.rating,
         image_url: review.image_url,
-        category: review.category,
+        category: review.category as "food" | "movie" | "book" | "place" | "product", // Type cast
         visibility: review.visibility,
         entity_id: review.entity_id,
-        user_id: userId
+        user_id: userId,
+        is_certified: false,
+        view_count: 0
       })
       .select()
       .single();
@@ -336,9 +345,21 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
 
 // Update review
 export const updateReview = async (id: string, updates: Partial<Review>) => {
+  // Create a new object with only the supported fields
+  const validUpdates = {
+    title: updates.title,
+    venue: updates.venue,
+    description: updates.description,
+    rating: updates.rating,
+    image_url: updates.image_url,
+    category: updates.category,
+    visibility: updates.visibility as 'public' | 'private' | 'circle_only',
+    updated_at: new Date().toISOString()
+  };
+  
   const { data, error } = await supabase
     .from('reviews')
-    .update(updates)
+    .update(validUpdates)
     .eq('id', id)
     .select()
     .single();

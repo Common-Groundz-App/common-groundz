@@ -9,10 +9,23 @@ const ProfileContent = () => {
   const { userId } = useParams();
   const [activeTab, setActiveTab] = useState('posts');
   const { 
-    profileData, 
     isLoading, 
-    error, 
-    isOwnProfile 
+    error,
+    coverImage,
+    profileImage,
+    username,
+    bio,
+    location,
+    memberSince,
+    followingCount,
+    followerCount,
+    hasChanges,
+    isOwnProfile,
+    handleProfileImageChange,
+    handleCoverImageChange,
+    handleCoverImageUpdated,
+    handleSaveChanges,
+    profileData
   } = useProfileData(userId);
 
   useEffect(() => {
@@ -44,11 +57,22 @@ const ProfileContent = () => {
   return (
     <div className="container mx-auto pb-12">
       <ProfileHeader 
-        coverImage={profileData.cover_url}
-        profileImage={profileData.avatar_url}
-        username={profileData.username || ''}
+        coverImage={coverImage}
+        profileImage={profileImage}
+        username={username || ''}
         isOwnProfile={isOwnProfile} 
-        bio={profileData.bio || ''}
+        bio={bio || ''}
+        isLoading={isLoading}
+        onCoverImageChange={handleCoverImageChange}
+        onCoverImageUpdated={handleCoverImageUpdated}
+        location={location || ''}
+        memberSince={memberSince || ''}
+        followingCount={followingCount}
+        followerCount={followerCount}
+        onProfileImageChange={handleProfileImageChange}
+        hasChanges={hasChanges}
+        onSaveChanges={handleSaveChanges}
+        profileUserId={profileData.id}
       />
 
       <ProfileTabs 
@@ -56,7 +80,7 @@ const ProfileContent = () => {
         onTabChange={setActiveTab}
         isOwnProfile={isOwnProfile}
         profileUserId={profileData.id}
-        username={profileData.username || ''}
+        username={username || ''}
       />
     </div>
   );
