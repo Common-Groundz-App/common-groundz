@@ -2,12 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
-import ProfileTabs from './ProfileTabs';
+import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
+import ProfilePosts from './ProfilePosts';
+import ProfileRecommendations from './ProfileRecommendations';
+import ProfileReviews from './ProfileReviews';
+import ProfileCircles from './ProfileCircles';
 import { useProfileData } from '@/hooks/use-profile-data';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useCardStyles } from '@/utils/theme-utils';
 
 const ProfileContent = () => {
   const { userId } = useParams();
   const [activeTab, setActiveTab] = useState('posts');
+  const cardStyles = useCardStyles();
   const { 
     isLoading, 
     error,
@@ -54,8 +61,15 @@ const ProfileContent = () => {
     );
   }
 
+  const tabItems = [
+    { value: 'posts', label: 'Posts' },
+    { value: 'recommendations', label: 'Recs' },
+    { value: 'reviews', label: 'Reviews' },
+    { value: 'circles', label: 'Circles' }
+  ];
+
   return (
-    <div className="container mx-auto pb-12">
+    <div className="pb-12">
       <ProfileHeader 
         coverImage={coverImage}
         profileImage={profileImage}
@@ -75,13 +89,52 @@ const ProfileContent = () => {
         profileUserId={profileData.id}
       />
 
-      <ProfileTabs 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab}
-        isOwnProfile={isOwnProfile}
-        profileUserId={profileData.id}
-        username={username || ''}
-      />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8">
+        <div className="flex flex-wrap md:flex-nowrap gap-6">
+          {/* Space for profile card (it's rendered in ProfileHeader) */}
+          <div className="md:w-[300px] flex-shrink-0"></div>
+          
+          {/* Content area with tabs */}
+          <div className="flex-1 min-w-0">
+            <ScrollArea className="w-full">
+              <TubelightTabs 
+                defaultValue={activeTab} 
+                onValueChange={setActiveTab}
+                items={tabItems}
+                className="mb-6"
+              >
+                <TabsContent value="posts">
+                  <ProfilePosts 
+                    profileUserId={profileData.id} 
+                    isOwnProfile={isOwnProfile} 
+                  />
+                </TabsContent>
+                
+                <TabsContent value="recommendations">
+                  <ProfileRecommendations 
+                    profileUserId={profileData.id}
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="reviews">
+                  <ProfileReviews 
+                    profileUserId={profileData.id} 
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="circles">
+                  <ProfileCircles 
+                    profileUserId={profileData.id} 
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+              </TubelightTabs>
+            </ScrollArea>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

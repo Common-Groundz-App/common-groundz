@@ -1,3 +1,4 @@
+
 import { Home, Star, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
@@ -47,6 +48,7 @@ export function NavBarComponent() {
         items={navItems} 
         rightSection={<UserMenu />}
         initialActiveTab={activeTab}
+        className="relative z-50"
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>

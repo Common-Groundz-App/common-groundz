@@ -110,7 +110,7 @@ const ProfileCoverImage = ({
 
   return (
     <div 
-      className="w-full h-48 md:h-64 bg-cover bg-center relative group"
+      className="w-full h-48 md:h-64 bg-cover bg-center relative group z-0"
       style={{ 
         backgroundImage: `url(${coverImage || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80'})`,
         cursor: isEditable ? 'pointer' : 'default'
