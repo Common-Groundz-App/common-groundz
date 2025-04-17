@@ -35,10 +35,10 @@ export const useCardStyles = () => {
     secondaryText: 'text-muted-foreground',
     
     // Buttons
-    primaryButton: 'bg-primary text-primary-foreground hover:bg-primary/90',
+    primaryButton: 'bg-brand-orange text-white hover:bg-brand-orange/90',
     secondaryButton: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-    outlineButton: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-    ghostButton: 'hover:bg-accent hover:text-accent-foreground',
+    outlineButton: 'border border-brand-orange/30 bg-background hover:text-brand-orange',
+    ghostButton: 'hover:bg-accent hover:text-brand-orange',
     
     // Standard rounds
     normalRounded: 'rounded-md',
@@ -60,7 +60,7 @@ export const useTextStyles = () => {
     subheading: 'text-foreground/90 font-medium',
     body: 'text-foreground',
     muted: 'text-muted-foreground',
-    link: 'text-primary hover:underline',
+    link: 'text-brand-orange hover:underline',
   };
 };
 

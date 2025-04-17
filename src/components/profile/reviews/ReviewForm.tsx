@@ -171,7 +171,7 @@ const ReviewForm = ({
                   onValueChange={field.onChange}
                   value={field.value}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="border-brand-orange/30 focus:ring-brand-orange/30">
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -220,15 +220,15 @@ const ReviewForm = ({
                       variant="outline"
                       size="sm"
                       className={cn(
-                        "w-full justify-start text-left font-normal",
+                        "w-full justify-start text-left font-normal border-brand-orange/30 focus:ring-brand-orange/30",
                         !field.value && "text-muted-foreground"
                       )}
                     >
-                      <Calendar className="mr-2 h-4 w-4" />
+                      <Calendar className="mr-2 h-4 w-4 text-brand-orange" />
                       {field.value ? format(field.value, "PPP") : "Pick a date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0 z-50" align="start">
                     <CalendarComponent
                       mode="single"
                       selected={field.value}
@@ -252,7 +252,7 @@ const ReviewForm = ({
               id="title"
               {...register('title', { required: "Title is required" })}
               placeholder={`What are you reviewing?`}
-              className={errors.title ? "border-red-500" : ""}
+              className={cn(errors.title ? "border-red-500" : "border-brand-orange/30 focus:ring-brand-orange/30")}
             />
             {errors.title && (
               <p className="text-red-500 text-xs">{errors.title.message?.toString()}</p>
@@ -271,6 +271,7 @@ const ReviewForm = ({
               id="venue"
               {...register('venue')}
               placeholder={`Where can this ${selectedCategory} be found?`}
+              className="border-brand-orange/30 focus:ring-brand-orange/30"
             />
           </div>
           
@@ -282,6 +283,7 @@ const ReviewForm = ({
               {...register('description')}
               placeholder="Share your honest thoughts and experience..."
               rows={3}
+              className="border-brand-orange/30 focus:ring-brand-orange/30"
             />
           </div>
           
@@ -306,7 +308,7 @@ const ReviewForm = ({
                         <Star
                           className={cn(
                             "h-6 w-6",
-                            star <= field.value ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                            star <= field.value ? "fill-brand-orange text-brand-orange" : "text-gray-300"
                           )}
                         />
                       </Button>
@@ -337,7 +339,7 @@ const ReviewForm = ({
                 />
                 <Label
                   htmlFor="image"
-                  className="cursor-pointer inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                  className="cursor-pointer inline-flex items-center px-3 py-2 border border-brand-orange/30 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-orange"
                 >
                   {isUploading ? "Uploading..." : "Choose File"}
                 </Label>
@@ -379,16 +381,16 @@ const ReviewForm = ({
                   onValueChange={field.onChange}
                   className="grid grid-cols-3 gap-2"
                 >
-                  <div className="flex items-center space-x-2 border p-3 rounded-lg">
-                    <RadioGroupItem value="public" id="public" />
+                  <div className="flex items-center space-x-2 border border-brand-orange/30 p-3 rounded-lg">
+                    <RadioGroupItem value="public" id="public" className="text-brand-orange" />
                     <Label htmlFor="public">Public</Label>
                   </div>
-                  <div className="flex items-center space-x-2 border p-3 rounded-lg">
-                    <RadioGroupItem value="circle_only" id="circle" />
+                  <div className="flex items-center space-x-2 border border-brand-orange/30 p-3 rounded-lg">
+                    <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" />
                     <Label htmlFor="circle">Circle Only</Label>
                   </div>
-                  <div className="flex items-center space-x-2 border p-3 rounded-lg">
-                    <RadioGroupItem value="private" id="private" />
+                  <div className="flex items-center space-x-2 border border-brand-orange/30 p-3 rounded-lg">
+                    <RadioGroupItem value="private" id="private" className="text-brand-orange" />
                     <Label htmlFor="private">Private</Label>
                   </div>
                 </RadioGroup>
@@ -398,13 +400,14 @@ const ReviewForm = ({
           
           {/* Form Buttons */}
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}>
+            <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}
+                    className="border-brand-orange/30 hover:text-brand-orange">
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={isSubmitting || isUploading}
-              className="bg-brand-orange hover:bg-brand-orange/90"
+              className="bg-brand-orange hover:bg-brand-orange/90 text-white"
             >
               {isSubmitting ? (
                 <>
