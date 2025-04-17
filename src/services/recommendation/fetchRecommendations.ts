@@ -1,12 +1,11 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { Recommendation } from './types';
+import { Recommendation, EntityType } from '@/services/recommendation/types';
 
 // Fetch all user recommendations
 export const fetchUserRecommendations = async (
   userId: string | null = null, 
   profileUserId?: string,
-  category?: string,
+  category?: EntityType,
   sortBy: 'latest' | 'top' = 'latest',
   limit = 50
 ): Promise<Recommendation[]> => {
@@ -26,7 +25,7 @@ export const fetchUserRecommendations = async (
       query = query.eq('user_id', profileUserId);
     }
 
-    // Filter by category if provided
+    // Filter by category if provided with type safety
     if (category) {
       query = query.eq('category', category);
     }
@@ -107,7 +106,7 @@ export const fetchUserRecommendations = async (
 export const fetchRecommendationWithLikesAndSaves = async (
   userId: string | null,
   profileUserId?: string,
-  category?: string,
+  category?: EntityType,
   sort: 'latest' | 'popular' = 'latest',
   limit = 10,
   offset = 0
@@ -129,7 +128,7 @@ export const fetchRecommendationWithLikesAndSaves = async (
       query = query.eq('user_id', profileUserId);
     }
     
-    // Filter by category if provided
+    // Add type-safe category filtering
     if (category) {
       query = query.eq('category', category);
     }
