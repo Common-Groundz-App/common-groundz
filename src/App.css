@@ -11,6 +11,11 @@ body, html {
   margin: 0 auto;
 }
 
+/* Ensure content flows properly with sticky header */
+.sticky-nav-offset {
+  padding-top: 70px; /* Adjust based on your navbar height */
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

@@ -48,7 +48,7 @@ export function NavBarComponent() {
         items={navItems} 
         rightSection={<UserMenu />}
         initialActiveTab={activeTab}
-        className="relative z-50"
+        className="relative z-50 sticky top-0"
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>
