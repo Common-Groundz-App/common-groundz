@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
@@ -10,6 +9,7 @@ import ProfileCircles from './ProfileCircles';
 import { useProfileData } from '@/hooks/use-profile-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCardStyles } from '@/utils/theme-utils';
+import ProfileCard from './ProfileCard';
 
 const ProfileContent = () => {
   const { userId } = useParams();
@@ -36,7 +36,6 @@ const ProfileContent = () => {
   } = useProfileData(userId);
 
   useEffect(() => {
-    // Reset to first tab when changing profiles
     setActiveTab('posts');
   }, [userId]);
 
@@ -72,30 +71,32 @@ const ProfileContent = () => {
     <div className="pb-12">
       <ProfileHeader 
         coverImage={coverImage}
-        profileImage={profileImage}
-        username={username || ''}
-        isOwnProfile={isOwnProfile} 
-        bio={bio || ''}
         isLoading={isLoading}
         onCoverImageChange={handleCoverImageChange}
-        onCoverImageUpdated={handleCoverImageUpdated}
-        location={location || ''}
-        memberSince={memberSince || ''}
-        followingCount={followingCount}
-        followerCount={followerCount}
-        onProfileImageChange={handleProfileImageChange}
-        hasChanges={hasChanges}
-        onSaveChanges={handleSaveChanges}
-        profileUserId={profileData.id}
+        onCoverImageUpdated={handleCoverImageUpdated} 
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap md:flex-nowrap gap-6">
-          {/* Space for profile card (rendered in ProfileHeader) */}
-          <div className="hidden md:block w-[300px] flex-shrink-0"></div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-10">
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="w-full md:w-[300px] flex-shrink-0">
+            <ProfileCard 
+              username={username || ''}
+              bio={bio || ''}
+              location={location || ''}
+              memberSince={memberSince || ''}
+              followingCount={followingCount}
+              followerCount={followerCount}
+              profileImage={profileImage}
+              isLoading={isLoading}
+              onProfileImageChange={handleProfileImageChange}
+              hasChanges={hasChanges}
+              onSaveChanges={handleSaveChanges}
+              isOwnProfile={isOwnProfile}
+              profileUserId={profileData.id}
+            />
+          </div>
           
-          {/* Content area with tabs */}
-          <div className="flex-1 min-w-0">
+          <div className="w-full md:flex-1 min-w-0">
             <ScrollArea className="w-full">
               <TubelightTabs 
                 defaultValue={activeTab} 
