@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { FileText, Award, Star, Users } from 'lucide-react';
 import ProfileHeader from './ProfileHeader';
-import { TabsContent } from '@/components/ui/tabs';
+import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileReviews from './ProfileReviews';
@@ -12,7 +11,6 @@ import { useProfileData } from '@/hooks/use-profile-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCardStyles } from '@/utils/theme-utils';
 import ProfileCard from './ProfileCard';
-import { ExpandableTabs } from '@/components/ui/expandable-tabs';
 
 const ProfileContent = () => {
   const { userId } = useParams();
@@ -38,19 +36,6 @@ const ProfileContent = () => {
     profileData
   } = useProfileData(userId);
 
-  const tabs = [
-    { title: "Posts", icon: FileText },
-    { title: "Recs", icon: Award },
-    { title: "Reviews", icon: Star },
-    { title: "Circles", icon: Users }
-  ];
-
-  const handleTabChange = (index: number | null) => {
-    if (index === null) return;
-    const tabValue = tabs[index].title.toLowerCase();
-    setActiveTab(tabValue);
-  };
-
   useEffect(() => {
     setActiveTab('posts');
   }, [userId]);
@@ -75,6 +60,13 @@ const ProfileContent = () => {
       </div>
     );
   }
+
+  const tabItems = [
+    { value: 'posts', label: 'Posts' },
+    { value: 'recommendations', label: 'Recs' },
+    { value: 'reviews', label: 'Reviews' },
+    { value: 'circles', label: 'Circles' }
+  ];
 
   return (
     <div className="pb-12">
@@ -107,43 +99,40 @@ const ProfileContent = () => {
           
           <div className="w-full md:flex-1 min-w-0">
             <ScrollArea className="w-full">
-              <div className="mb-6">
-                <ExpandableTabs 
-                  tabs={tabs}
-                  onChange={handleTabChange}
-                  activeColor="text-brand-orange"
-                  defaultSelected={0}
-                  className="border-brand-orange/20 dark:border-brand-orange/10"
-                />
-              </div>
-
-              {activeTab === 'posts' && (
-                <ProfilePosts 
-                  profileUserId={profileData?.id} 
-                  isOwnProfile={isOwnProfile} 
-                />
-              )}
-              
-              {activeTab === 'recs' && (
-                <ProfileRecommendations 
-                  profileUserId={profileData?.id}
-                  isOwnProfile={isOwnProfile}
-                />
-              )}
-              
-              {activeTab === 'reviews' && (
-                <ProfileReviews 
-                  profileUserId={profileData?.id} 
-                  isOwnProfile={isOwnProfile}
-                />
-              )}
-              
-              {activeTab === 'circles' && (
-                <ProfileCircles 
-                  profileUserId={profileData?.id} 
-                  isOwnProfile={isOwnProfile}
-                />
-              )}
+              <TubelightTabs 
+                defaultValue={activeTab} 
+                onValueChange={setActiveTab}
+                items={tabItems}
+                className="mb-6"
+              >
+                <TabsContent value="posts">
+                  <ProfilePosts 
+                    profileUserId={profileData?.id} 
+                    isOwnProfile={isOwnProfile} 
+                  />
+                </TabsContent>
+                
+                <TabsContent value="recommendations">
+                  <ProfileRecommendations 
+                    profileUserId={profileData?.id}
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="reviews">
+                  <ProfileReviews 
+                    profileUserId={profileData?.id} 
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="circles">
+                  <ProfileCircles 
+                    profileUserId={profileData?.id} 
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+              </TubelightTabs>
             </ScrollArea>
           </div>
         </div>
