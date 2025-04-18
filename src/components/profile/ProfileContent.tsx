@@ -100,8 +100,8 @@ const ProfileContent = () => {
           {/* Space for profile card (it's rendered in ProfileHeader) */}
           <div className="md:w-[300px] flex-shrink-0"></div>
           
-          {/* Content area with tabs */}
-          <div className="flex-1 min-w-0">
+          {/* Content area with tabs - positioned next to the profile card */}
+          <div className="flex-1 min-w-0 -mt-16 z-20 relative">
             <TubelightTabs 
               defaultValue={activeTab} 
               onValueChange={setActiveTab}
