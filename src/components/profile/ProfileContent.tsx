@@ -1,13 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
 import ProfileRecommendations from './ProfileRecommendations';
@@ -42,6 +36,7 @@ const ProfileContent = () => {
   } = useProfileData(userId);
 
   useEffect(() => {
+    // Reset to first tab when changing profiles
     setActiveTab('posts');
   }, [userId]);
 
@@ -75,80 +70,68 @@ const ProfileContent = () => {
 
   return (
     <div className="pb-12">
-      <div className="relative">
-        <ProfileHeader 
-          coverImage={coverImage}
-          profileImage={profileImage}
-          username={username || ''}
-          isOwnProfile={isOwnProfile} 
-          bio={bio || ''}
-          isLoading={isLoading}
-          onCoverImageChange={handleCoverImageChange}
-          onCoverImageUpdated={handleCoverImageUpdated}
-          location={location || ''}
-          memberSince={memberSince || ''}
-          followingCount={followingCount}
-          followerCount={followerCount}
-          onProfileImageChange={handleProfileImageChange}
-          hasChanges={hasChanges}
-          onSaveChanges={handleSaveChanges}
-          profileUserId={profileData.id}
-        />
+      <ProfileHeader 
+        coverImage={coverImage}
+        profileImage={profileImage}
+        username={username || ''}
+        isOwnProfile={isOwnProfile} 
+        bio={bio || ''}
+        isLoading={isLoading}
+        onCoverImageChange={handleCoverImageChange}
+        onCoverImageUpdated={handleCoverImageUpdated}
+        location={location || ''}
+        memberSince={memberSince || ''}
+        followingCount={followingCount}
+        followerCount={followerCount}
+        onProfileImageChange={handleProfileImageChange}
+        hasChanges={hasChanges}
+        onSaveChanges={handleSaveChanges}
+        profileUserId={profileData.id}
+      />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-6">
-            <div className="w-[300px] flex-shrink-0"></div>
-            
-            <div className="flex-1 min-w-0 -mt-40 md:-mt-32 z-20 relative">
-              <div className="profile-tabs md:pl-4">
-                <TubelightTabs 
-                  defaultValue={activeTab} 
-                  onValueChange={setActiveTab}
-                  items={tabItems}
-                  className="mb-6"
-                >
-                  <div className="relative mb-6">
-                    <Carousel className="w-full max-w-[600px]">
-                      <CarouselContent>
-                        {/* Tabs navigation is handled by TubelightTabs above */}
-                      </CarouselContent>
-                      <CarouselPrevious className="left-0" />
-                      <CarouselNext className="right-0" />
-                    </Carousel>
-                  </div>
-                  
-                  <ScrollArea className="w-full mt-6">
-                    <TabsContent value="posts">
-                      <ProfilePosts 
-                        profileUserId={profileData.id} 
-                        isOwnProfile={isOwnProfile} 
-                      />
-                    </TabsContent>
-                    
-                    <TabsContent value="recommendations">
-                      <ProfileRecommendations 
-                        profileUserId={profileData.id}
-                        isOwnProfile={isOwnProfile}
-                      />
-                    </TabsContent>
-                    
-                    <TabsContent value="reviews">
-                      <ProfileReviews 
-                        profileUserId={profileData.id} 
-                        isOwnProfile={isOwnProfile}
-                      />
-                    </TabsContent>
-                    
-                    <TabsContent value="circles">
-                      <ProfileCircles 
-                        profileUserId={profileData.id} 
-                        isOwnProfile={isOwnProfile}
-                      />
-                    </TabsContent>
-                  </ScrollArea>
-                </TubelightTabs>
-              </div>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8">
+        <div className="flex flex-wrap md:flex-nowrap gap-6">
+          {/* Space for profile card (it's rendered in ProfileHeader) */}
+          <div className="md:w-[300px] flex-shrink-0"></div>
+          
+          {/* Content area with tabs */}
+          <div className="flex-1 min-w-0">
+            <ScrollArea className="w-full">
+              <TubelightTabs 
+                defaultValue={activeTab} 
+                onValueChange={setActiveTab}
+                items={tabItems}
+                className="mb-6"
+              >
+                <TabsContent value="posts">
+                  <ProfilePosts 
+                    profileUserId={profileData.id} 
+                    isOwnProfile={isOwnProfile} 
+                  />
+                </TabsContent>
+                
+                <TabsContent value="recommendations">
+                  <ProfileRecommendations 
+                    profileUserId={profileData.id}
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="reviews">
+                  <ProfileReviews 
+                    profileUserId={profileData.id} 
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="circles">
+                  <ProfileCircles 
+                    profileUserId={profileData.id} 
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+              </TubelightTabs>
+            </ScrollArea>
           </div>
         </div>
       </div>

@@ -97,10 +97,3 @@ body, html {
   animation: glow-pulse 4s ease-in-out infinite;
   animation-delay: 2s; /* This creates the alternating effect */
 }
-
-/* Profile tab positioning */
-.profile-tabs {
-  position: relative;
-  z-index: 20;
-  margin-top: 1rem;
-}
