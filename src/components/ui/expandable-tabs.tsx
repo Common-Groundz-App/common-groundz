@@ -79,10 +79,11 @@ export function ExpandableTabs({
           return <Separator key={`separator-${index}`} />;
         }
 
-        const Icon = tab.icon;
+        // Now TypeScript knows this is a Tab type, not a Separator
+        const Icon = (tab as Tab).icon;
         return (
           <motion.button
-            key={tab.title}
+            key={(tab as Tab).title}
             variants={buttonVariants}
             initial={false}
             animate="animate"
@@ -107,7 +108,7 @@ export function ExpandableTabs({
                   transition={transition}
                   className="overflow-hidden"
                 >
-                  {tab.title}
+                  {(tab as Tab).title}
                 </motion.span>
               )}
             </AnimatePresence>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { FileText, Award, MessageSquare, Users } from 'lucide-react';
+import { FileText, Award, Star, Users } from 'lucide-react';
 import ProfileHeader from './ProfileHeader';
 import { TabsContent } from '@/components/ui/tabs';
 import ProfilePosts from './ProfilePosts';
@@ -41,7 +41,7 @@ const ProfileContent = () => {
   const tabs = [
     { title: "Posts", icon: FileText },
     { title: "Recs", icon: Award },
-    { title: "Reviews", icon: MessageSquare },
+    { title: "Reviews", icon: Star },
     { title: "Circles", icon: Users }
   ];
 
