@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +16,6 @@ export const useRecommendationActions = (
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Handle like action
   const handleLike = async (id: string) => {
     if (!user) {
       toast({

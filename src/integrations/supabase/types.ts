@@ -703,6 +703,13 @@ export type Database = {
           like_count: number
         }[]
       }
+      get_recommendation_likes_by_ids: {
+        Args: { p_recommendation_ids: string[] }
+        Returns: {
+          recommendation_id: string
+          like_count: number
+        }[]
+      }
       get_user_post_likes: {
         Args: { p_post_ids: string[]; p_user_id: string }
         Returns: {
@@ -713,6 +720,12 @@ export type Database = {
         Args: { p_post_ids: string[]; p_user_id: string }
         Returns: {
           post_id: string
+        }[]
+      }
+      get_user_recommendation_likes: {
+        Args: { p_recommendation_ids: string[]; p_user_id: string }
+        Returns: {
+          recommendation_id: string
         }[]
       }
       gtrgm_compress: {
@@ -765,6 +778,10 @@ export type Database = {
       }
       toggle_post_save: {
         Args: { p_post_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      toggle_recommendation_like: {
+        Args: { p_recommendation_id: string; p_user_id: string }
         Returns: boolean
       }
       update_comment: {
