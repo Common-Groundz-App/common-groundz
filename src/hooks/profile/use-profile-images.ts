@@ -3,18 +3,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { updateUserProfile } from '@/services/profileService';
 
-interface UseProfileImagesResult {
-  coverImage: string;
-  profileImage: string;
-  tempCoverImage: string | null;
-  hasChanges: boolean;
-  handleProfileImageChange: (url: string) => void;
-  handleCoverImageChange: (url: string) => void;
-  handleCoverImageUpdated: (url: string | null) => void;
-  handleSaveChanges: (userId: string) => Promise<void>;
-}
-
-export const useProfileImages = (defaultCoverImage: string): UseProfileImagesResult => {
+export const useProfileImages = (defaultCoverImage: string) => {
   const [coverImage, setCoverImage] = useState<string>(defaultCoverImage);
   const [profileImage, setProfileImage] = useState<string>('');
   const [tempCoverImage, setTempCoverImage] = useState<string | null>(null);
@@ -35,6 +24,22 @@ export const useProfileImages = (defaultCoverImage: string): UseProfileImagesRes
 
   const handleCoverImageUpdated = (url: string | null) => {
     setTempCoverImage(url);
+  };
+  
+  const setInitialImages = (profileData: any) => {
+    if (profileData?.avatar_url) {
+      // Add timestamp to force browser to reload the image
+      setProfileImage(profileData.avatar_url + '?t=' + new Date().getTime());
+    } else {
+      setProfileImage(''); // Empty string to trigger initials avatar
+    }
+    
+    if (profileData?.cover_url) {
+      // Add timestamp to force browser to reload the image
+      setCoverImage(profileData.cover_url + '?t=' + new Date().getTime());
+    } else {
+      setCoverImage(defaultCoverImage);
+    }
   };
 
   const handleSaveChanges = async (userId: string) => {
@@ -68,6 +73,7 @@ export const useProfileImages = (defaultCoverImage: string): UseProfileImagesRes
     handleProfileImageChange,
     handleCoverImageChange,
     handleCoverImageUpdated,
-    handleSaveChanges
+    handleSaveChanges,
+    setInitialImages
   };
 };

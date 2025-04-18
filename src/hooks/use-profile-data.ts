@@ -1,7 +1,7 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserProfile, getDisplayName } from '@/services/profileService'; // Add getDisplayName import
+import { fetchUserProfile, getDisplayName } from '@/services/profileService'; 
 import { useProfileFollows } from './profile/use-profile-follows';
 import { useProfileImages } from './profile/use-profile-images';
 import { useProfileMetadata } from './profile/use-profile-metadata';
@@ -30,7 +30,8 @@ export const useProfileData = (userId?: string) => {
     handleProfileImageChange,
     handleCoverImageChange,
     handleCoverImageUpdated,
-    handleSaveChanges
+    handleSaveChanges,
+    setInitialImages
   } = useProfileImages(defaultCoverImage);
 
   const {
@@ -57,6 +58,7 @@ export const useProfileData = (userId?: string) => {
         const displayName = getDisplayName(user, profile);
         setUsername(displayName);
         setProfileMetadata(user.user_metadata, profile);
+        setInitialImages(profile);
       }
     } catch (err) {
       console.error('Error:', err);
@@ -65,6 +67,10 @@ export const useProfileData = (userId?: string) => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadProfileData();
+  }, [user, userId]);
 
   return {
     isLoading,

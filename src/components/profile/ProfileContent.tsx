@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
@@ -92,7 +93,7 @@ const ProfileContent = () => {
               hasChanges={hasChanges}
               onSaveChanges={handleSaveChanges}
               isOwnProfile={isOwnProfile}
-              profileUserId={profileData.id}
+              profileUserId={profileData?.id}
             />
           </div>
           
@@ -106,28 +107,28 @@ const ProfileContent = () => {
               >
                 <TabsContent value="posts">
                   <ProfilePosts 
-                    profileUserId={profileData.id} 
+                    profileUserId={profileData?.id} 
                     isOwnProfile={isOwnProfile} 
                   />
                 </TabsContent>
                 
                 <TabsContent value="recommendations">
                   <ProfileRecommendations 
-                    profileUserId={profileData.id}
+                    profileUserId={profileData?.id}
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
                 
                 <TabsContent value="reviews">
                   <ProfileReviews 
-                    profileUserId={profileData.id} 
+                    profileUserId={profileData?.id} 
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
                 
                 <TabsContent value="circles">
                   <ProfileCircles 
-                    profileUserId={profileData.id} 
+                    profileUserId={profileData?.id} 
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
