@@ -89,10 +89,10 @@ const ProfileContent = () => {
         profileUserId={profileData.id}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap md:flex-nowrap gap-6">
-          {/* Space for profile card (it's rendered in ProfileHeader) */}
-          <div className="md:w-[300px] flex-shrink-0"></div>
+          {/* Space for profile card (rendered in ProfileHeader) */}
+          <div className="hidden md:block w-[300px] flex-shrink-0"></div>
           
           {/* Content area with tabs */}
           <div className="flex-1 min-w-0">
