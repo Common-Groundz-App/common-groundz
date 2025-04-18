@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Entity, EntityType } from './types';
+import { Entity } from './types';
 
 // Fetch an entity by its ID
 export const fetchEntityById = async (entityId: string): Promise<Entity | null> => {

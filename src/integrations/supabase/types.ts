@@ -19,11 +19,16 @@ export type Database = {
           id: string
           image_url: string | null
           is_deleted: boolean
+          is_verified: boolean | null
           metadata: Json | null
           name: string
+          open_graph_data: Json | null
+          slug: string | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at: string
           venue: string | null
+          verification_date: string | null
+          website_url: string | null
         }
         Insert: {
           api_ref?: string | null
@@ -34,11 +39,16 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_deleted?: boolean
+          is_verified?: boolean | null
           metadata?: Json | null
           name: string
+          open_graph_data?: Json | null
+          slug?: string | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
           venue?: string | null
+          verification_date?: string | null
+          website_url?: string | null
         }
         Update: {
           api_ref?: string | null
@@ -49,11 +59,16 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_deleted?: boolean
+          is_verified?: boolean | null
           metadata?: Json | null
           name?: string
+          open_graph_data?: Json | null
+          slug?: string | null
           type?: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
           venue?: string | null
+          verification_date?: string | null
+          website_url?: string | null
         }
         Relationships: [
           {
@@ -666,6 +681,10 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
       }
+      generate_entity_slug: {
+        Args: { name: string }
+        Returns: string
+      }
       get_comments_with_profiles: {
         Args: { p_table_name: string; p_id_field: string; p_item_id: string }
         Returns: {
@@ -696,6 +715,26 @@ export type Database = {
           post_id: string
         }[]
       }
+      gtrgm_compress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_decompress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_in: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_options: {
+        Args: { "": unknown }
+        Returns: undefined
+      }
+      gtrgm_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
       increment_recommendation_view: {
         Args: { rec_id: string; viewer_id: string }
         Returns: undefined
@@ -707,6 +746,18 @@ export type Database = {
       insert_post_save: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
+      }
+      set_limit: {
+        Args: { "": number }
+        Returns: number
+      }
+      show_limit: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      show_trgm: {
+        Args: { "": string }
+        Returns: string[]
       }
       update_comment: {
         Args: {
