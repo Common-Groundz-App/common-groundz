@@ -101,6 +101,6 @@ body, html {
 /* Profile tab positioning */
 .profile-tabs {
   position: relative;
-  top: -1rem;
   z-index: 20;
+  margin-top: 1rem;
 }
