@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.search-movies]
 verify_jwt = false
+
+[functions.fetch-url-metadata]
+verify_jwt = false
