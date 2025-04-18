@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { CombinedFeedItem } from '@/hooks/feed/types';
 import PostFeedItem from './PostFeedItem';
 import RecommendationFeedItem from './RecommendationFeedItem';
+import { isItemPost } from '@/hooks/feed/api/utils';
 
 interface FeedItemProps {
   item: CombinedFeedItem;
@@ -20,8 +22,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   onDelete,
   refreshFeed
 }) => {
-  // Check if the item is a post based on is_post flag
-  if (item.is_post) {
+  if (isItemPost(item)) {
     return (
       <PostFeedItem 
         post={item} 
@@ -34,7 +35,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     );
   }
   
-  // Otherwise, it's a recommendation feed item
   return (
     <RecommendationFeedItem 
       recommendation={item} 

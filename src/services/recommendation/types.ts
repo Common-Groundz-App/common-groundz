@@ -19,6 +19,8 @@ export interface Entity {
   is_deleted: boolean;
   created_at: string;
   updated_at: string;
+  is_verified?: boolean;
+  website_url?: string;
 }
 
 export interface Recommendation {

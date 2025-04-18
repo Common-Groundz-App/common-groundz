@@ -14,7 +14,7 @@ interface EntityDisplayProps {
 export function EntityDisplay({ entity, className }: EntityDisplayProps) {
   // Get isVerified from entity metadata or direct property
   const isVerified = 
-    (entity.is_verified !== undefined) ? entity.is_verified : 
+    entity.is_verified !== undefined ? entity.is_verified : 
     (entity.metadata && 
     typeof entity.metadata === 'object' && 
     (entity.metadata as any).is_verified ? 
@@ -22,7 +22,7 @@ export function EntityDisplay({ entity, className }: EntityDisplayProps) {
   
   // Get websiteUrl from entity metadata or direct property
   const websiteUrl = 
-    (entity.website_url !== undefined) ? entity.website_url :
+    entity.website_url !== undefined ? entity.website_url :
     (entity.metadata && 
     typeof entity.metadata === 'object' && 
     (entity.metadata as any).website_url ? 

@@ -35,20 +35,21 @@ export function sortItemsByDate<T extends { created_at: string }>(
 export function processMediaItems(media: any[]): MediaItem[] {
   if (!media || !Array.isArray(media)) return [];
   
-  return media.map(item => {
+  return media.map((item, index) => {
     if (typeof item === 'string') {
       // If it's just a string URL
-      return { url: item, type: 'image' };
+      return { url: item, type: 'image', order: index };
     } else if (typeof item === 'object' && item) {
       // Use existing type or default to 'image'
       return {
         url: item.url,
         type: item.type || 'image',
         thumbnail_url: item.thumbnail_url,
-        caption: item.caption
+        caption: item.caption,
+        order: item.order ?? index
       };
     }
-    return { url: '', type: 'image' };
+    return { url: '', type: 'image', order: index };
   });
 }
 
