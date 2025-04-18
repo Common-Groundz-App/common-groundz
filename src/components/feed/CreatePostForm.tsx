@@ -15,7 +15,9 @@ import { MediaItem } from '@/types/media';
 import { generateUUID } from '@/lib/uuid';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { supabase } from '@/integrations/supabase/client';
 
+// Define the exact types for post_type and visibility to match schema
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required' }).max(100),
   content: z.string().min(1, { message: 'Content is required' }),
@@ -23,29 +25,32 @@ const formSchema = z.object({
   visibility: z.enum(['public', 'circle_only', 'private']),
 });
 
+type FormValues = z.infer<typeof formSchema>;
+
 interface CreatePostFormProps {
   onSuccess: () => void;
   onCancel: () => void;
+  postToEdit?: any; // Add optional postToEdit prop
 }
 
-export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
+export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFormProps) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const sessionId = useState<string>(() => generateUUID())[0];
 
-  const form = useForm({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: '',
-      content: '',
-      post_type: 'story',
-      visibility: 'public',
+      title: postToEdit?.title || '',
+      content: postToEdit?.content || '',
+      post_type: (postToEdit?.post_type as 'story' | 'routine' | 'project' | 'note') || 'story',
+      visibility: (postToEdit?.visibility as 'public' | 'circle_only' | 'private') || 'public',
     },
   });
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: FormValues) => {
     if (!user) return;
     setIsSubmitting(true);
 
@@ -193,7 +198,7 @@ export function CreatePostForm({ onSuccess, onCancel }: CreatePostFormProps) {
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating...' : 'Create Post'}
+            {isSubmitting ? 'Creating...' : (postToEdit ? 'Update Post' : 'Create Post')}
           </Button>
         </div>
       </form>

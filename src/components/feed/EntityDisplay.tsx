@@ -25,7 +25,8 @@ export function EntityDisplay({ entity, className }: EntityDisplayProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <h3 className="font-medium text-base truncate">{entity.name}</h3>
-          {entity.is_verified ? (
+          {/* Check if is_verified exists in the metadata, fallback to false */}
+          {((entity as any).is_verified || (entity.metadata && (entity.metadata as any).is_verified)) ? (
             <Badge variant="secondary" className="flex items-center gap-1">
               <Check className="w-3 h-3" />
               Verified
@@ -48,14 +49,15 @@ export function EntityDisplay({ entity, className }: EntityDisplayProps) {
           </p>
         )}
         
-        {entity.website_url && (
+        {/* Check if website_url exists in the entity object or in metadata */}
+        {((entity as any).website_url || (entity.metadata && (entity.metadata as any).website_url)) && (
           <a 
-            href={entity.website_url}
+            href={(entity as any).website_url || (entity.metadata && (entity.metadata as any).website_url)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-primary hover:underline truncate block mt-1"
           >
-            {new URL(entity.website_url).hostname}
+            {new URL((entity as any).website_url || (entity.metadata && (entity.metadata as any).website_url)).hostname}
           </a>
         )}
       </div>

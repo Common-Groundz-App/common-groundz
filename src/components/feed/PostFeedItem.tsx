@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
-import { Post } from '@/hooks/feed/types';
+import { PostFeedItem as Post } from '@/hooks/feed/types';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Heart, MessageSquare, Bookmark, Trash2, HeartOff } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatDistanceToNow } from 'date-fns';
