@@ -759,6 +759,14 @@ export type Database = {
         Args: { "": string }
         Returns: string[]
       }
+      toggle_post_like: {
+        Args: { p_post_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      toggle_post_save: {
+        Args: { p_post_id: string; p_user_id: string }
+        Returns: boolean
+      }
       update_comment: {
         Args: {
           p_comment_id: string

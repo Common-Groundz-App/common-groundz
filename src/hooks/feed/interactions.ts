@@ -7,9 +7,8 @@ export const useInteractions = () => {
 
   const handleLike = async (id: string, userId: string) => {
     try {
-      // Using the functions API but with explicit typing
       const { data, error } = await supabase
-        .rpc('toggle_post_like' as any, {
+        .rpc('toggle_post_like', {
           p_post_id: id,
           p_user_id: userId
         });
@@ -24,9 +23,8 @@ export const useInteractions = () => {
 
   const handleSave = async (id: string, userId: string) => {
     try {
-      // Using the functions API but with explicit typing
       const { data, error } = await supabase
-        .rpc('toggle_post_save' as any, {
+        .rpc('toggle_post_save', {
           p_post_id: id,
           p_user_id: userId
         });
