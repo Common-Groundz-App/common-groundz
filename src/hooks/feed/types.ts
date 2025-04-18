@@ -1,59 +1,50 @@
 
-import { 
-  Recommendation,
-  RecommendationCategory, 
-  RecommendationVisibility,
-  Entity
-} from '@/services/recommendationService';
 import { MediaItem } from '@/types/media';
+import { Entity } from '@/services/recommendation/types';
 
-export type FeedVisibility = 'for_you' | 'following';
-
-export interface FeedItem extends Recommendation {
-  likes: number;
-  is_liked: boolean;
-  is_saved: boolean;
-  username: string | null;
-  avatar_url: string | null;
-  comment_count: number; // Add this property explicitly
-}
-
-export interface PostFeedItem {
+// Base interface for feed items
+export interface FeedItem {
   id: string;
-  title: string;
-  content: string;
-  post_type: 'story' | 'routine' | 'project' | 'note';
-  visibility: 'public' | 'circle_only' | 'private';
   user_id: string;
+  username?: string;
+  avatar_url?: string;
   created_at: string;
   updated_at: string;
-  username: string | null;
-  avatar_url: string | null;
-  is_post: boolean;
-  // Add these properties to match FeedItem interface for consistent handling
-  likes: number;
-  is_liked: boolean;
-  is_saved: boolean;
-  comment_count: number; // Add this property explicitly
-  // Add property for tagged entities
-  tagged_entities?: Entity[];
-  // Media for posts
+  is_liked?: boolean;
+  is_saved?: boolean;
+  likes?: number;
+  comment_count?: number;
+}
+
+// Interface for post feed items
+export interface PostFeedItem extends FeedItem {
+  is_post: true;
+  title?: string;
+  content: string;
   media?: MediaItem[];
-  // Status field
-  status?: 'draft' | 'published' | 'failed';
+  post_type: 'story' | 'routine' | 'project' | 'note';
+  visibility: 'public' | 'circle_only' | 'private';
+  tagged_entities?: Entity[];
+  status: 'draft' | 'published' | 'failed';
+  view_count?: number;
 }
 
-export type CombinedFeedItem = FeedItem | PostFeedItem;
-
-export interface FeedState {
-  items: CombinedFeedItem[];
-  isLoading: boolean;
-  error: Error | null;
-  hasMore: boolean;
-  page: number;
-  isLoadingMore: boolean;
+// Interface for recommendation feed items
+export interface RecommendationFeedItem extends FeedItem {
+  is_post: false;
+  title: string;
+  description?: string;
+  entity_id: string;
+  entity?: Entity;
+  rating: number;
+  category: string;
+  image_url?: string;
 }
 
+// Combined type for feed items
+export type CombinedFeedItem = PostFeedItem | RecommendationFeedItem;
+
+// Feed query parameters
 export interface FeedQueryParams {
   userId: string;
   page: number;

@@ -12,6 +12,22 @@ interface EntityDisplayProps {
 }
 
 export function EntityDisplay({ entity, className }: EntityDisplayProps) {
+  // Extract is_verified either directly from entity or from entity.metadata
+  const isVerified = 
+    'is_verified' in entity 
+      ? entity.is_verified 
+      : entity.metadata && typeof entity.metadata === 'object' 
+        ? (entity.metadata as any).is_verified 
+        : false;
+
+  // Extract website_url either directly from entity or from entity.metadata
+  const websiteUrl = 
+    'website_url' in entity 
+      ? entity.website_url 
+      : entity.metadata && typeof entity.metadata === 'object'
+        ? (entity.metadata as any).website_url
+        : null;
+
   return (
     <Card className={cn("p-3 flex items-start gap-3", className)}>
       {entity.image_url && (
@@ -25,8 +41,7 @@ export function EntityDisplay({ entity, className }: EntityDisplayProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <h3 className="font-medium text-base truncate">{entity.name}</h3>
-          {/* Check if is_verified exists in the metadata, fallback to false */}
-          {((entity as any).is_verified || (entity.metadata && (entity.metadata as any).is_verified)) ? (
+          {isVerified ? (
             <Badge variant="secondary" className="flex items-center gap-1">
               <Check className="w-3 h-3" />
               Verified
@@ -49,15 +64,14 @@ export function EntityDisplay({ entity, className }: EntityDisplayProps) {
           </p>
         )}
         
-        {/* Check if website_url exists in the entity object or in metadata */}
-        {((entity as any).website_url || (entity.metadata && (entity.metadata as any).website_url)) && (
+        {websiteUrl && (
           <a 
-            href={(entity as any).website_url || (entity.metadata && (entity.metadata as any).website_url)}
+            href={websiteUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-primary hover:underline truncate block mt-1"
           >
-            {new URL((entity as any).website_url || (entity.metadata && (entity.metadata as any).website_url)).hostname}
+            {new URL(websiteUrl).hostname}
           </a>
         )}
       </div>

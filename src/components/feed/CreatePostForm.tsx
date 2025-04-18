@@ -27,10 +27,17 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-interface CreatePostFormProps {
+export interface CreatePostFormProps {
   onSuccess: () => void;
   onCancel: () => void;
-  postToEdit?: any; // Add optional postToEdit prop
+  postToEdit?: {
+    id: string;
+    title?: string;
+    content?: string;
+    post_type?: 'story' | 'routine' | 'project' | 'note';
+    visibility?: 'public' | 'circle_only' | 'private';
+    [key: string]: any;
+  };
 }
 
 export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFormProps) {

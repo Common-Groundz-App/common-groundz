@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { EntityDisplay } from './EntityDisplay';
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 
 interface PostFeedItemProps {
   post: Post;
@@ -91,7 +92,15 @@ export default function PostFeedItem({ post, onLike, onSave, onComment, onDelete
         <EntityDisplay entity={linkedEntity} className="mt-4" />
       )}
 
-      <div className="text-sm">{post.content}</div>
+      <div className="text-sm">
+        {/* Render rich text content if it appears to be JSON, otherwise just render as plain text */}
+        {post.content && post.content.startsWith('{') ? (
+          <RichTextDisplay content={post.content} />
+        ) : (
+          <p>{post.content}</p>
+        )}
+      </div>
+      
       <div className="flex justify-between items-center">
         <div className="flex space-x-2">
           <Button 
