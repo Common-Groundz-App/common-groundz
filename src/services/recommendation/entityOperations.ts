@@ -87,7 +87,11 @@ export const findOrCreateEntity = async (
     api_source: apiSource,
     api_ref: apiRef,
     metadata,
-    created_by: userId
+    created_by: userId,
+    is_verified: false,
+    verification_date: null,
+    website_url: null,
+    slug: name ? name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : null
   });
 };
 
