@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { FeedQueryParams, CombinedFeedItem, RecommendationFeedItem, PostFeedItem } from '../types';
+import { FeedQueryParams, CombinedFeedItem } from '../types';
 import { fetchRecommendations, processRecommendations } from './recommendations';
 import { fetchPosts, processPosts } from './posts';
 import { sortItemsByDate } from './utils';
@@ -12,13 +12,13 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
     const { recommendations: recsData } = await fetchRecommendations({ userId, page, itemsPerPage });
     
     // Process recommendations with user profiles and metadata
-    const processedRecs = await processRecommendations(recsData, userId) as RecommendationFeedItem[];
+    const processedRecs = await processRecommendations(recsData, userId);
     
     // Fetch posts
     const { posts: postsData } = await fetchPosts({ userId, page, itemsPerPage });
     
     // Process posts with metadata
-    const processedPosts = await processPosts(postsData, userId) as PostFeedItem[];
+    const processedPosts = await processPosts(postsData, userId);
     
     // Combine and sort all feed items
     const allItems: CombinedFeedItem[] = [...processedRecs, ...processedPosts];
@@ -62,7 +62,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
     );
     
     // Process recommendations with user profiles and metadata
-    const processedRecs = await processRecommendations(recsData, userId) as RecommendationFeedItem[];
+    const processedRecs = await processRecommendations(recsData, userId);
     
     // Fetch posts from followed users
     const { posts: postsData } = await fetchPosts(
@@ -71,7 +71,7 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
     );
     
     // Process posts with metadata
-    const processedPosts = await processPosts(postsData, userId) as PostFeedItem[];
+    const processedPosts = await processPosts(postsData, userId);
     
     // Combine and sort all feed items
     const allItems: CombinedFeedItem[] = [...processedRecs, ...processedPosts];

@@ -1,13 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, Star, MessageSquare, MoreHorizontal } from 'lucide-react';
+import { Bookmark, Heart, Star, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { RecommendationFeedItem as RecommendationType } from '@/hooks/feed/types';
+import { FeedItem } from '@/hooks/feed/types';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
@@ -22,7 +21,6 @@ import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDial
 import { useToast } from '@/hooks/use-toast';
 import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { useNavigate } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -31,7 +29,7 @@ const resetBodyPointerEvents = () => {
 };
 
 interface RecommendationFeedItemProps {
-  recommendation: RecommendationType;
+  recommendation: FeedItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
   onComment?: (id: string) => void;
@@ -39,14 +37,14 @@ interface RecommendationFeedItemProps {
   refreshFeed?: () => void;
 }
 
-export default function RecommendationFeedItem({ 
+export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({ 
   recommendation, 
   onLike, 
   onSave,
   onComment,
   onDelete,
   refreshFeed
-}: RecommendationFeedItemProps) {
+}) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -86,8 +84,25 @@ export default function RecommendationFeedItem({
     };
   }, [recommendation.id]);
   
-  const formatTimeAgo = (dateString: string) => {
-    return `${formatDistanceToNow(new Date(dateString))} ago`;
+  const getInitials = (name: string | null) => {
+    if (!name) return 'U';
+    return name.charAt(0).toUpperCase();
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) {
+      return 'Today';
+    } else if (diffInDays === 1) {
+      return 'Yesterday';
+    } else if (diffInDays < 7) {
+      return `${diffInDays} days ago`;
+    } else {
+      return format(date, 'MMM d, yyyy');
+    }
   };
 
   const handleCommentClick = () => {
@@ -149,58 +164,62 @@ export default function RecommendationFeedItem({
     }
   };
 
+  const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
+
   return (
-    <div className="border rounded-lg bg-card p-4 space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-3">
+    <Card className="overflow-hidden">
+      <CardContent className="pt-6">
+        <div className="flex items-center space-x-4 mb-4">
           <Avatar className="h-10 w-10 border">
-            <AvatarImage src={recommendation.avatar_url || undefined} alt="User" />
-            <AvatarFallback>{recommendation.username?.charAt(0) || 'U'}</AvatarFallback>
+            <AvatarImage src={recommendation.avatar_url || undefined} alt={recommendation.username || 'User'} />
+            <AvatarFallback>{getInitials(recommendation.username)}</AvatarFallback>
           </Avatar>
-          <div>
-            <div className="font-medium">{recommendation.username || recommendation.user_id}</div>
-            <div className="text-sm text-muted-foreground">
-              {formatTimeAgo(recommendation.created_at)}
-            </div>
+          <div className="flex-grow">
+            <UsernameLink 
+              username={recommendation.username} 
+              userId={recommendation.user_id}
+              className="font-medium"
+              isCurrentUser={isOwner}
+            />
+            <div className="text-sm text-muted-foreground">{formatDate(recommendation.created_at)}</div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Badge>{recommendation.category}</Badge>
+            
+            {isOwner && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="sr-only">More options</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleDeleteClick} 
+                    className="text-destructive focus:text-destructive flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          {recommendation.category && <Badge>{recommendation.category}</Badge>}
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
-                <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">More options</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {isOwner && (
-                <>
-                  <DropdownMenuItem onClick={handleEdit}>
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive">
-                    Delete
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      
-      {recommendation.title && <h3 className="text-lg font-semibold">{recommendation.title}</h3>}
-      
-      {recommendation.venue && (
-        <div className="text-sm text-muted-foreground">
-          Venue: {recommendation.venue}
-        </div>
-      )}
-      
-      {recommendation.rating && (
-        <div className="flex items-center">
+        <h3 className="text-xl font-semibold mb-2">{recommendation.title}</h3>
+        
+        {recommendation.venue && (
+          <div className="mb-2 text-sm text-muted-foreground">
+            Venue: {recommendation.venue}
+          </div>
+        )}
+        
+        <div className="flex items-center mb-4">
           {[1, 2, 3, 4, 5].map((star) => (
             <Star
               key={star}
@@ -211,57 +230,73 @@ export default function RecommendationFeedItem({
               )}
             />
           ))}
+          <span className="ml-1 text-sm font-medium">{recommendation.rating.toFixed(1)}</span>
         </div>
-      )}
+        
+        {recommendation.description && (
+          <p className="text-muted-foreground">{recommendation.description}</p>
+        )}
+        
+        {recommendation.image_url && (
+          <div className="mt-4 rounded-md overflow-hidden">
+            <img 
+              src={recommendation.image_url} 
+              alt={recommendation.title}
+              className="w-full h-48 object-cover" 
+            />
+          </div>
+        )}
+      </CardContent>
       
-      {recommendation.description && (
-        <p className="text-sm">{recommendation.description}</p>
-      )}
-      
-      {recommendation.image_url && (
-        <div className="rounded-md overflow-hidden">
-          <img 
-            src={recommendation.image_url} 
-            alt={recommendation.title || 'Recommendation'}
-            className="w-full h-48 object-cover" 
-          />
-        </div>
-      )}
-      
-      <div className="flex justify-between items-center">
-        <div className="flex gap-4">
+      <CardFooter className="flex justify-between pt-2 pb-4">
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
-            className="px-2 flex items-center gap-1"
+            className={cn(
+              "flex items-center gap-1",
+              recommendation.is_liked && "text-red-500"
+            )}
             onClick={() => onLike && onLike(recommendation.id)}
           >
             <Heart 
-              className={`h-5 w-5 ${recommendation.is_liked ? "fill-red-500 text-red-500" : ""}`} 
+              size={18} 
+              className={cn(recommendation.is_liked && "fill-red-500")} 
             />
+            {recommendation.likes > 0 && (
+              <span>{recommendation.likes}</span>
+            )}
           </Button>
           
           <Button
             variant="ghost"
             size="sm"
-            className="px-2 flex items-center gap-1"
+            className="flex items-center gap-1"
             onClick={handleCommentClick}
           >
-            <MessageSquare className="h-5 w-5" />
+            <MessageCircle size={18} />
+            {displayCommentCount > 0 && (
+              <span>{displayCommentCount}</span>
+            )}
           </Button>
         </div>
         
         <Button
           variant="ghost"
           size="sm"
-          className="px-2 flex items-center gap-1"
+          className={cn(
+            "flex items-center gap-1",
+            recommendation.is_saved && "text-brand-orange"
+          )}
           onClick={() => onSave && onSave(recommendation.id)}
         >
           <Bookmark 
-            className={`h-5 w-5 ${recommendation.is_saved ? "fill-current" : ""}`} 
+            size={18} 
+            className={cn(recommendation.is_saved && "fill-brand-orange")} 
           />
+          Save
         </Button>
-      </div>
+      </CardFooter>
       
       <CommentDialog 
         isOpen={isCommentDialogOpen} 
@@ -283,6 +318,8 @@ export default function RecommendationFeedItem({
         description="Are you sure you want to delete this recommendation? This action cannot be undone."
         isLoading={isDeleting}
       />
-    </div>
+    </Card>
   );
-}
+};
+
+export default RecommendationFeedItem;
