@@ -17,6 +17,10 @@ export interface Entity {
   metadata: any | null;
   created_by: string | null;
   is_deleted: boolean;
+  is_verified: boolean | null;
+  verification_date: string | null;
+  website_url: string | null;
+  slug: string | null;
   created_at: string;
   updated_at: string;
 }

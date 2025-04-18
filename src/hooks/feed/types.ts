@@ -4,7 +4,7 @@ import {
   RecommendationCategory, 
   RecommendationVisibility,
   Entity
-} from '@/services/recommendationService';
+} from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 
 export type FeedVisibility = 'for_you' | 'following';
@@ -15,7 +15,7 @@ export interface FeedItem extends Recommendation {
   is_saved: boolean;
   username: string | null;
   avatar_url: string | null;
-  comment_count: number; // Add this property explicitly
+  comment_count: number;
 }
 
 export interface PostFeedItem {
@@ -30,16 +30,12 @@ export interface PostFeedItem {
   username: string | null;
   avatar_url: string | null;
   is_post: boolean;
-  // Add these properties to match FeedItem interface for consistent handling
   likes: number;
   is_liked: boolean;
   is_saved: boolean;
-  comment_count: number; // Add this property explicitly
-  // Add property for tagged entities
+  comment_count: number;
   tagged_entities?: Entity[];
-  // Media for posts
   media?: MediaItem[];
-  // Status field
   status?: 'draft' | 'published' | 'failed';
 }
 

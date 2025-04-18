@@ -3,12 +3,12 @@ export interface MediaItem {
   url: string;
   type: 'image' | 'video';
   caption?: string;
-  alt?: string; // Added for accessibility and SEO
+  alt?: string;
   order: number;
   thumbnail_url?: string;
   is_deleted?: boolean;
   session_id?: string;
-  id?: string; // Added for stable reordering
+  id?: string;
 }
 
 export type MediaUploadStatus = 'idle' | 'uploading' | 'success' | 'error';
