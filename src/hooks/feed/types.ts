@@ -27,7 +27,6 @@ export interface FeedItem {
   is_saved?: boolean;
   likes?: number;
   comment_count?: number;
-  // Used for determining the type of feed item
   is_post: boolean;
 }
 
