@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { PostFeedItem as Post } from '@/hooks/feed/types';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -50,6 +49,7 @@ export default function PostFeedItem({ post, onLike, onSave, onComment, onDelete
   }, [post.id]);
 
   return (
+    
     <div className="border rounded-lg bg-card p-4 space-y-4">
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-3">

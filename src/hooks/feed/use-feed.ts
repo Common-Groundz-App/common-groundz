@@ -1,8 +1,7 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { FeedItem, FeedVisibility, FeedState } from './types';
+import { CombinedFeedItem, FeedVisibility, FeedState } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { useInteractions } from './interactions';
 
@@ -112,7 +111,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       const item = state.items.find(r => r.id === id);
       if (!item) return;
 
-      // Optimistically update UI
       setState(prev => ({
         ...prev,
         items: prev.items.map(item => {
@@ -138,7 +136,6 @@ export const useFeed = (feedType: FeedVisibility) => {
         variant: 'destructive'
       });
       
-      // Revert optimistic update on error
       setState(prev => ({
         ...prev,
         items: state.items.map(item => {
@@ -170,7 +167,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       const item = state.items.find(r => r.id === id);
       if (!item) return;
 
-      // Optimistically update UI
       setState(prev => ({
         ...prev,
         items: prev.items.map(item => {
@@ -194,7 +190,6 @@ export const useFeed = (feedType: FeedVisibility) => {
         variant: 'destructive'
       });
       
-      // Revert optimistic update on error
       setState(prev => ({
         ...prev,
         items: prev.items.map(item => {

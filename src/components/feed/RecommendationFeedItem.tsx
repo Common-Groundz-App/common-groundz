@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Bookmark, Heart, Star, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { FeedItem } from '@/hooks/feed/types';
+import { RecommendationFeedItem as RecommendationType } from '@/hooks/feed/types';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
@@ -29,7 +29,7 @@ const resetBodyPointerEvents = () => {
 };
 
 interface RecommendationFeedItemProps {
-  recommendation: FeedItem;
+  recommendation: RecommendationType;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
   onComment?: (id: string) => void;

@@ -12,21 +12,17 @@ interface EntityDisplayProps {
 }
 
 export function EntityDisplay({ entity, className }: EntityDisplayProps) {
-  // Extract is_verified either directly from entity or from entity.metadata
-  const isVerified = 
-    'is_verified' in entity 
-      ? entity.is_verified 
-      : entity.metadata && typeof entity.metadata === 'object' 
-        ? (entity.metadata as any).is_verified 
-        : false;
-
-  // Extract website_url either directly from entity or from entity.metadata
-  const websiteUrl = 
-    'website_url' in entity 
-      ? entity.website_url 
-      : entity.metadata && typeof entity.metadata === 'object'
-        ? (entity.metadata as any).website_url
-        : null;
+  // Check if website_url exists in entity or entity.metadata
+  const websiteUrl = entity.metadata && 
+    typeof entity.metadata === 'object' && 
+    (entity.metadata as any).website_url ? 
+    (entity.metadata as any).website_url : null;
+  
+  // Check if is_verified exists in entity or entity.metadata
+  const isVerified = entity.metadata && 
+    typeof entity.metadata === 'object' && 
+    (entity.metadata as any).is_verified ? 
+    Boolean((entity.metadata as any).is_verified) : false;
 
   return (
     <Card className={cn("p-3 flex items-start gap-3", className)}>
