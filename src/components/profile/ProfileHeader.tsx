@@ -48,26 +48,23 @@ const ProfileHeader = ({
         onCoverImageUpdated={onCoverImageUpdated} 
       />
       
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24 relative z-10">
-        <div className="flex flex-col md:flex-row gap-6 md:items-start">
-          {/* Profile Card */}
-          <div className="md:w-[300px] flex-shrink-0">
-            <ProfileCard 
-              username={username} 
-              bio={bio} 
-              location={location} 
-              memberSince={memberSince} 
-              followingCount={followingCount}
-              followerCount={followerCount}
-              profileImage={profileImage} 
-              isLoading={isLoading} 
-              onProfileImageChange={onProfileImageChange} 
-              hasChanges={hasChanges} 
-              onSaveChanges={onSaveChanges} 
-              isOwnProfile={isOwnProfile}
-              profileUserId={profileUserId}
-            />
-          </div>
+      <div className="px-4 sm:px-6 lg:px-8 -mt-16 md:-mt-24 relative z-10">
+        <div className="w-[300px]">
+          <ProfileCard 
+            username={username} 
+            bio={bio} 
+            location={location} 
+            memberSince={memberSince} 
+            followingCount={followingCount}
+            followerCount={followerCount}
+            profileImage={profileImage} 
+            isLoading={isLoading} 
+            onProfileImageChange={onProfileImageChange} 
+            hasChanges={hasChanges} 
+            onSaveChanges={onSaveChanges} 
+            isOwnProfile={isOwnProfile}
+            profileUserId={profileUserId}
+          />
         </div>
       </div>
     </div>
