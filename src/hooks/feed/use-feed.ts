@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { FeedItem, FeedVisibility, FeedState } from './types';
+import { FeedVisibility, FeedState } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { useInteractions } from './interactions';
 
@@ -86,8 +86,6 @@ export const useFeed = (feedType: FeedVisibility) => {
 
   const loadMore = useCallback(() => {
     if (state.isLoadingMore || !state.hasMore) return;
-    
-    setState(prev => ({ ...prev, isLoadingMore: true }));
     fetchFeed(state.page + 1);
   }, [state.isLoadingMore, state.hasMore, state.page, fetchFeed]);
 
@@ -131,7 +129,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       await interactionLike(id, user.id);
     } catch (err) {
       console.error('Error toggling like:', err);
-      
       toast({
         title: 'Error',
         description: 'Failed to update like status. Please try again.',
@@ -141,7 +138,7 @@ export const useFeed = (feedType: FeedVisibility) => {
       // Revert optimistic update on error
       setState(prev => ({
         ...prev,
-        items: state.items.map(item => {
+        items: prev.items.map(item => {
           if (item.id === id) {
             const isLiked = !item.is_liked;
             return {
@@ -187,7 +184,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       await interactionSave(id, user.id);
     } catch (err) {
       console.error('Error toggling save:', err);
-      
       toast({
         title: 'Error',
         description: 'Failed to update save status. Please try again.',

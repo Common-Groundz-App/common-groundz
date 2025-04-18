@@ -35,7 +35,7 @@ export const processMediaItems = (media: any[]): MediaItem[] => {
       type: item.type || 'image',
       thumbnail_url: item.thumbnail_url || item.url || '',
       metadata: item.metadata || {},
-      order: item.order || 0, // Add the required 'order' property
+      order: item.order || 0,
       caption: item.caption,
       alt: item.alt,
       is_deleted: item.is_deleted,
