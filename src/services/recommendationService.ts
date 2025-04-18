@@ -1,6 +1,41 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Recommendation } from './recommendation/types';
+import { Recommendation, EntityType } from './recommendation/types';
+
+// Export types that are used across multiple files
+export type { 
+  Recommendation, 
+  Entity, 
+  EntityType,
+  RecommendationCategory,
+  RecommendationVisibility 
+} from './recommendation/types';
+
+// Re-export functions from other files
+export { 
+  uploadRecommendationImage 
+} from './recommendation/imageUpload';
+
+export { 
+  createRecommendation,
+  updateRecommendation,
+  deleteRecommendation 
+} from './recommendation/crudOperations';
+
+export { 
+  findOrCreateEntity,
+  getEntitiesByType 
+} from './recommendation/entityOperations';
+
+export {
+  toggleSave
+} from './recommendation/interactionOperations';
+
+// Export the fetchRecommendationById function
+export { fetchRecommendationById } from './recommendation/fetchRecommendationById';
+
+// Export fetchUserRecommendations function from fetchRecommendations.ts
+export { fetchUserRecommendations } from './recommendation/fetchRecommendations';
 
 export const toggleLike = async (recommendationId: string, userId: string, isLiked: boolean) => {
   const { data, error } = await supabase.rpc('toggle_recommendation_like', {
@@ -16,37 +51,3 @@ export const toggleLike = async (recommendationId: string, userId: string, isLik
   return data;
 };
 
-export const fetchRecommendationById = async (recommendationId: string, userId: string): Promise<Recommendation | null> => {
-  const { data, error } = await supabase
-    .from('recommendations')
-    .select(`
-      *,
-      entities(*)
-    `)
-    .eq('id', recommendationId)
-    .single();
-
-  if (error) {
-    console.error('Error fetching recommendation:', error);
-    return null;
-  }
-
-  // Fetch likes count
-  const { data: likesData } = await supabase.rpc('get_recommendation_likes_by_ids', {
-    p_recommendation_ids: [recommendationId]
-  });
-
-  // Check if user liked this recommendation
-  const { data: userLikedData } = await supabase.rpc('get_user_recommendation_likes', {
-    p_recommendation_ids: [recommendationId],
-    p_user_id: userId
-  });
-
-  return {
-    ...data,
-    likes: likesData?.[0]?.like_count || 0,
-    isLiked: userLikedData?.length > 0,
-    entity: data.entities,
-    entities: undefined
-  } as Recommendation;
-};

@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { Recommendation, EntityType } from './types';
-import { fetchProfiles } from '../profileService';
+import { fetchUserProfile } from '../profileService';
 
 export const fetchUserRecommendations = async (
   userId: string | null = null, 
@@ -80,3 +80,4 @@ export const fetchUserRecommendations = async (
     throw error;
   }
 };
+

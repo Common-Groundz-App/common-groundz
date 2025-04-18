@@ -1,6 +1,5 @@
-
-import { useState, useMemo } from 'react';
-import { Recommendation } from '@/services/recommendationService';
+import { useState, useEffect, useMemo } from 'react';
+import { Recommendation, EntityType } from '@/services/recommendationService';
 
 export const useRecommendationFilters = (recommendations: Recommendation[]) => {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
