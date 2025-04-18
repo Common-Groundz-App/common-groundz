@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FeedVisibility, FeedState } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { useInteractions } from './interactions';
+import { isItemPost } from './api/utils';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -109,6 +110,8 @@ export const useFeed = (feedType: FeedVisibility) => {
     try {
       const item = state.items.find(r => r.id === id);
       if (!item) return;
+      
+      const itemType = isItemPost(item) ? 'post' : 'recommendation';
 
       // Optimistically update UI
       setState(prev => ({
@@ -126,7 +129,7 @@ export const useFeed = (feedType: FeedVisibility) => {
         })
       }));
 
-      await interactionLike(id, user.id);
+      await interactionLike(id, user.id, itemType);
     } catch (err) {
       console.error('Error toggling like:', err);
       toast({
@@ -166,6 +169,8 @@ export const useFeed = (feedType: FeedVisibility) => {
     try {
       const item = state.items.find(r => r.id === id);
       if (!item) return;
+      
+      const itemType = isItemPost(item) ? 'post' : 'recommendation';
 
       // Optimistically update UI
       setState(prev => ({
@@ -181,7 +186,7 @@ export const useFeed = (feedType: FeedVisibility) => {
         })
       }));
 
-      await interactionSave(id, user.id);
+      await interactionSave(id, user.id, itemType);
     } catch (err) {
       console.error('Error toggling save:', err);
       toast({
