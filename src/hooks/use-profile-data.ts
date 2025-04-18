@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserProfile } from '@/services/profileService';
+import { fetchUserProfile, getDisplayName } from '@/services/profileService'; // Add getDisplayName import
 import { useProfileFollows } from './profile/use-profile-follows';
 import { useProfileImages } from './profile/use-profile-images';
 import { useProfileMetadata } from './profile/use-profile-metadata';
