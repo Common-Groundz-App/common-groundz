@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { FeedVisibility, FeedState } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
-import { useInteractions } from './interactions';
+import { toggleFeedItemLike, toggleFeedItemSave } from './interactions';
 import { isItemPost } from './api/utils';
 
 const ITEMS_PER_PAGE = 10;
@@ -129,7 +129,7 @@ export const useFeed = (feedType: FeedVisibility) => {
         })
       }));
 
-      await interactionLike(id, user.id, itemType);
+      await toggleFeedItemLike(item, user.id);
     } catch (err) {
       console.error('Error toggling like:', err);
       toast({
@@ -186,7 +186,7 @@ export const useFeed = (feedType: FeedVisibility) => {
         })
       }));
 
-      await interactionSave(id, user.id, itemType);
+      await toggleFeedItemSave(item, user.id);
     } catch (err) {
       console.error('Error toggling save:', err);
       toast({

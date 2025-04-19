@@ -1,166 +1,175 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { FeedItem, FeedQueryParams } from '../types';
+import { FeedQueryParams, RecommendationFeedItem } from '../../feed/types';
 import { fetchProfiles } from './profiles';
-import { createMap } from './utils';
+import { createMap } from '../api/utils';
 
-// Fetch recommendations with pagination
+// Fetch recommendations from database based on query parameters
 export const fetchRecommendations = async (
-  { page, itemsPerPage }: FeedQueryParams,
-  followingIds?: string[] // Optional parameter to filter by following users
-) => {
+  { userId, page = 0, itemsPerPage = 10 }: FeedQueryParams, 
+  followingIds?: string[]
+): Promise<{ recommendations: any[] }> => {
   try {
-    const recFrom = page * itemsPerPage;
-    const recTo = recFrom + itemsPerPage - 1;
-    
     let query = supabase
       .from('recommendations')
-      .select(`
-        id,
-        title,
-        description,
-        rating,
-        category,
-        visibility,
-        user_id,
-        created_at,
-        updated_at,
-        image_url,
-        venue,
-        view_count,
-        entity_id,
-        is_certified
-      `)
+      .select('*')
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
-      .range(recFrom, recTo);
-    
-    // Filter by following users if provided
+      .range(page * itemsPerPage, (page + 1) * itemsPerPage - 1);
+      
+    // If following IDs provided, only get recommendations from those users
     if (followingIds && followingIds.length > 0) {
       query = query.in('user_id', followingIds);
     }
     
-    const { data: recsData, error: recsError } = await query;
-      
-    if (recsError) {
-      console.error('Error in fetchRecommendations query:', recsError);
-      throw recsError;
-    }
+    const { data: recommendationsData, error } = await query;
     
-    if (!recsData || recsData.length === 0) return { recommendations: [], userIds: [] };
+    if (error) throw error;
     
-    // Extract user IDs for profile fetching
-    const userIds = recsData.map(rec => rec.user_id);
-    
-    return { recommendations: recsData, userIds };
+    return { recommendations: recommendationsData || [] };
   } catch (error) {
     console.error('Error fetching recommendations:', error);
     throw error;
   }
 };
 
-// Process recommendation data with user profiles
-export const processRecommendations = async (
-  recsData: any[],
-  userId: string | null
-): Promise<FeedItem[]> => {
-  if (!recsData.length) return [];
+// Get recommendation like counts for a list of recommendation IDs
+export const getRecommendationLikeCounts = async (recommendationIds: string[]): Promise<Map<string, number>> => {
+  if (!recommendationIds.length) return new Map<string, number>();
   
   try {
-    // Get user profiles
-    const userIds = recsData.map(rec => rec.user_id);
-    const { data: profilesData, error: profileError } = await fetchProfiles(userIds);
+    const { data: likesData, error } = await supabase
+      .from('recommendation_likes')
+      .select('recommendation_id');
     
-    if (profileError) {
-      console.error('Error fetching profiles:', profileError);
-      throw profileError;
+    if (error) throw error;
+    
+    const likeCounts = new Map<string, number>();
+    
+    // Count likes per recommendation
+    if (likesData) {
+      // Use reduce to count occurrences
+      likesData.forEach((item: any) => {
+        const recId = item.recommendation_id;
+        const currentCount = likeCounts.get(recId) || 0;
+        likeCounts.set(recId, currentCount + 1);
+      });
     }
+    
+    return likeCounts;
+  } catch (error) {
+    console.error('Error counting recommendation likes:', error);
+    return new Map<string, number>();
+  }
+};
+
+// Get user likes for recommendations
+export const getUserRecommendationLikes = async (recommendationIds: string[], userId: string): Promise<Set<string>> => {
+  if (!recommendationIds.length) return new Set<string>();
+  
+  try {
+    const { data: userLikesData, error } = await supabase
+      .from('recommendation_likes')
+      .select('recommendation_id')
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    
+    const userLikedRecommendations = new Set<string>();
+    
+    if (userLikesData) {
+      userLikesData.forEach((item: any) => {
+        userLikedRecommendations.add(item.recommendation_id);
+      });
+    }
+    
+    return userLikedRecommendations;
+  } catch (error) {
+    console.error('Error fetching user recommendation likes:', error);
+    return new Set<string>();
+  }
+};
+
+// Get user saves for recommendations
+export const getUserRecommendationSaves = async (recommendationIds: string[], userId: string): Promise<Set<string>> => {
+  if (!recommendationIds.length) return new Set<string>();
+  
+  try {
+    const { data: userSavesData, error } = await supabase
+      .from('recommendation_saves')
+      .select('recommendation_id')
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    
+    const userSavedRecommendations = new Set<string>();
+    
+    if (userSavesData) {
+      userSavesData.forEach((item: any) => {
+        userSavedRecommendations.add(item.recommendation_id);
+      });
+    }
+    
+    return userSavedRecommendations;
+  } catch (error) {
+    console.error('Error fetching user recommendation saves:', error);
+    return new Set<string>();
+  }
+};
+
+// Process recommendations data with additional metadata
+export const processRecommendations = async (
+  recommendationsData: any[], 
+  userId: string
+): Promise<RecommendationFeedItem[]> => {
+  if (!recommendationsData.length) return [];
+  
+  try {
+    // Get recommendation IDs for fetching related data
+    const recommendationIds = recommendationsData.map(rec => rec.id);
+    
+    // Fetch user profiles
+    const userIds = recommendationsData.map(rec => rec.user_id);
+    const { data: profilesData } = await fetchProfiles(userIds);
     
     // Create lookup map for profiles
     const profilesMap = createMap(profilesData, 'id');
     
-    // Process recommendations with profile data
-    const processedRecs = recsData.map(rec => {
+    // Get recommendation likes count
+    const likeCounts = await getRecommendationLikeCounts(recommendationIds);
+    
+    // Get user likes and saves for recommendations
+    const userLikedRecommendations = await getUserRecommendationLikes(recommendationIds, userId);
+    const userSavedRecommendations = await getUserRecommendationSaves(recommendationIds, userId);
+    
+    // Format the recommendations as feed items
+    const processedRecommendations = recommendationsData.map(rec => {
+      // Get profile data
       const profile = profilesMap.get(rec.user_id);
+      const username = profile?.username || null;
+      const avatar_url = profile?.avatar_url || null;
+      
+      // Get recommendation metadata
+      const likes = likeCounts.get(rec.id) || 0;
+      const isLiked = userLikedRecommendations.has(rec.id);
+      const isSaved = userSavedRecommendations.has(rec.id);
+      
+      // Ensure the comment_count is set
+      const comment_count = rec.comment_count || 0;
+      
       return {
         ...rec,
-        username: profile?.username || null,
-        avatar_url: profile?.avatar_url || null,
-        likes: 0, // Will update this with a count query
-        is_liked: false,
-        is_saved: false,
-        comment_count: rec.comment_count || 0
+        username,
+        avatar_url,
+        is_post: false,
+        likes,
+        is_liked: isLiked,
+        is_saved: isSaved,
+        comment_count
       };
     });
     
-    // Get recommendation IDs for likes/saves queries
-    const recIds = processedRecs.map(rec => rec.id);
-    
-    if (recIds.length > 0) {
-      // Get likes count directly with a count query
-      const { data: likesData, error: likesError } = await supabase
-        .from('recommendation_likes')
-        .select('recommendation_id, count(*)', { count: 'exact' })
-        .in('recommendation_id', recIds)
-        .group('recommendation_id');
-        
-      if (likesError) {
-        console.error('Error fetching recommendation likes count:', likesError);
-      } else if (likesData) {
-        // Build a map for quick lookups
-        const likesMap = new Map();
-        likesData.forEach((item: any) => {
-          likesMap.set(item.recommendation_id, parseInt(item.count, 10));
-        });
-        
-        // Update like counts in processed recommendations
-        processedRecs.forEach(rec => {
-          rec.likes = likesMap.get(rec.id) || 0;
-        });
-      }
-      
-      // Get user likes only if user is logged in
-      if (userId) {
-        const { data: userLikes, error: userLikesError } = await supabase
-          .from('recommendation_likes')
-          .select('recommendation_id')
-          .in('recommendation_id', recIds)
-          .eq('user_id', userId);
-          
-        if (userLikesError) {
-          console.error('Error fetching user likes:', userLikesError);
-        } else if (userLikes) {
-          // Create a set of liked recommendation IDs for faster lookups
-          const userLikedIds = new Set(userLikes.map((like: any) => like.recommendation_id));
-          
-          // Update is_liked flag in processed recommendations
-          processedRecs.forEach(rec => {
-            rec.is_liked = userLikedIds.has(rec.id);
-          });
-        }
-        
-        // Get saves  
-        const { data: savesData, error: savesError } = await supabase
-          .from('recommendation_saves')
-          .select('recommendation_id')
-          .in('recommendation_id', recIds)
-          .eq('user_id', userId);
-          
-        if (savesError) {
-          console.error('Error fetching recommendation saves:', savesError);
-        } else if (savesData) {
-          // Create a set of saved recommendation IDs for faster lookups
-          const userSavedIds = new Set(savesData.map((save: any) => save.recommendation_id));
-          
-          // Update is_saved flag in processed recommendations
-          processedRecs.forEach(rec => {
-            rec.is_saved = userSavedIds.has(rec.id);
-          });
-        }
-      }
-    }
-    
-    return processedRecs;
+    return processedRecommendations;
   } catch (error) {
     console.error('Error processing recommendations:', error);
     throw error;
