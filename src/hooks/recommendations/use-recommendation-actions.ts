@@ -45,8 +45,15 @@ export const useRecommendationActions = (
         })
       );
 
-      // Server update
-      await toggleLike(id, user.id, !!item.isLiked);
+      // Server update - note we're passing the current state before the optimistic update
+      const newLikeState = await toggleLike(id, user.id, !!item.isLiked);
+      
+      // If there's a mismatch between our optimistic update and the server response,
+      // refresh to get the correct state
+      if (newLikeState !== !item.isLiked) {
+        console.log("Like state mismatch, refreshing...");
+        refreshRecommendations();
+      }
     } catch (err) {
       console.error('Error toggling like:', err);
       // Revert on failure

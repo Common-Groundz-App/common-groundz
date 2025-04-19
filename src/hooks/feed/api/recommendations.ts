@@ -62,7 +62,7 @@ export const fetchRecommendations = async (
 // Process recommendation data with user profiles
 export const processRecommendations = async (
   recsData: any[],
-  userId: string
+  userId: string | null
 ): Promise<FeedItem[]> => {
   if (!recsData.length) return [];
   
@@ -88,7 +88,8 @@ export const processRecommendations = async (
         avatar_url: profile?.avatar_url || null,
         likes: 0, // Will update this with a count query
         is_liked: false,
-        is_saved: false
+        is_saved: false,
+        comment_count: rec.comment_count || 0
       };
     });
     
@@ -96,63 +97,66 @@ export const processRecommendations = async (
     const recIds = processedRecs.map(rec => rec.id);
     
     if (recIds.length > 0) {
-      // Get likes count
+      // Get likes count directly with a count query
       const { data: likesData, error: likesError } = await supabase
         .from('recommendation_likes')
-        .select('recommendation_id');
+        .select('recommendation_id, count(*)', { count: 'exact' })
+        .in('recommendation_id', recIds)
+        .group('recommendation_id');
         
       if (likesError) {
-        console.error('Error fetching recommendation likes:', likesError);
-      }
+        console.error('Error fetching recommendation likes count:', likesError);
+      } else if (likesData) {
+        // Build a map for quick lookups
+        const likesMap = new Map();
+        likesData.forEach((item: any) => {
+          likesMap.set(item.recommendation_id, parseInt(item.count, 10));
+        });
         
-      // Count likes for each recommendation
-      const likesCount = new Map();
-      if (likesData) {
-        likesData.forEach((like: any) => {
-          const count = likesCount.get(like.recommendation_id) || 0;
-          likesCount.set(like.recommendation_id, count + 1);
+        // Update like counts in processed recommendations
+        processedRecs.forEach(rec => {
+          rec.likes = likesMap.get(rec.id) || 0;
         });
       }
       
-      // Get user likes
-      const { data: userLikes, error: userLikesError } = await supabase
-        .from('recommendation_likes')
-        .select('recommendation_id')
-        .in('recommendation_id', recIds)
-        .eq('user_id', userId);
+      // Get user likes only if user is logged in
+      if (userId) {
+        const { data: userLikes, error: userLikesError } = await supabase
+          .from('recommendation_likes')
+          .select('recommendation_id')
+          .in('recommendation_id', recIds)
+          .eq('user_id', userId);
+          
+        if (userLikesError) {
+          console.error('Error fetching user likes:', userLikesError);
+        } else if (userLikes) {
+          // Create a set of liked recommendation IDs for faster lookups
+          const userLikedIds = new Set(userLikes.map((like: any) => like.recommendation_id));
+          
+          // Update is_liked flag in processed recommendations
+          processedRecs.forEach(rec => {
+            rec.is_liked = userLikedIds.has(rec.id);
+          });
+        }
         
-      if (userLikesError) {
-        console.error('Error fetching user likes:', userLikesError);
-      }
-        
-      // Get saves  
-      const { data: savesData, error: savesError } = await supabase
-        .from('recommendation_saves')
-        .select('recommendation_id')
-        .in('recommendation_id', recIds)
-        .eq('user_id', userId);
-        
-      if (savesError) {
-        console.error('Error fetching recommendation saves:', savesError);
-      }
-        
-      // Update recommendations with like and save status
-      processedRecs.forEach(rec => {
-        rec.likes = likesCount.get(rec.id) || 0;
-      });
-      
-      if (userLikes) {
-        userLikes.forEach((like: any) => {
-          const rec = processedRecs.find(r => r.id === like.recommendation_id);
-          if (rec) rec.is_liked = true;
-        });
-      }
-      
-      if (savesData) {
-        savesData.forEach((save: any) => {
-          const rec = processedRecs.find(r => r.id === save.recommendation_id);
-          if (rec) rec.is_saved = true;
-        });
+        // Get saves  
+        const { data: savesData, error: savesError } = await supabase
+          .from('recommendation_saves')
+          .select('recommendation_id')
+          .in('recommendation_id', recIds)
+          .eq('user_id', userId);
+          
+        if (savesError) {
+          console.error('Error fetching recommendation saves:', savesError);
+        } else if (savesData) {
+          // Create a set of saved recommendation IDs for faster lookups
+          const userSavedIds = new Set(savesData.map((save: any) => save.recommendation_id));
+          
+          // Update is_saved flag in processed recommendations
+          processedRecs.forEach(rec => {
+            rec.is_saved = userSavedIds.has(rec.id);
+          });
+        }
       }
     }
     

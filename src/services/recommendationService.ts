@@ -27,7 +27,7 @@ export {
   getEntitiesByType 
 } from './recommendation/entityOperations';
 
-export {
+export { 
   toggleSave
 } from './recommendation/interactionOperations';
 
@@ -37,17 +37,42 @@ export { fetchRecommendationById } from './recommendation/fetchRecommendationByI
 // Export fetchUserRecommendations function from fetchRecommendations.ts
 export { fetchUserRecommendations } from './recommendation/fetchRecommendations';
 
+// Fix the toggleLike function to properly handle the response and errors
 export const toggleLike = async (recommendationId: string, userId: string, isLiked: boolean) => {
-  const { data, error } = await supabase.rpc('toggle_recommendation_like', {
-    p_recommendation_id: recommendationId,
-    p_user_id: userId
-  });
+  try {
+    // Direct approach to add or remove the like based on current state
+    if (isLiked) {
+      // Remove like
+      const { error } = await supabase
+        .from('recommendation_likes')
+        .delete()
+        .eq('recommendation_id', recommendationId)
+        .eq('user_id', userId);
 
-  if (error) {
-    console.error('Error toggling like:', error);
+      if (error) {
+        console.error('Error removing like:', error);
+        throw error;
+      }
+      
+      return false; // Indicate like was removed
+    } else {
+      // Add like
+      const { error } = await supabase
+        .from('recommendation_likes')
+        .insert({
+          recommendation_id: recommendationId,
+          user_id: userId
+        });
+
+      if (error) {
+        console.error('Error adding like:', error);
+        throw error;
+      }
+      
+      return true; // Indicate like was added
+    }
+  } catch (error) {
+    console.error('Error in toggleLike:', error);
     throw error;
   }
-
-  return data;
 };
-

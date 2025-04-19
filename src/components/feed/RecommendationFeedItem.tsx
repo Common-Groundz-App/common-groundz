@@ -164,6 +164,12 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     }
   };
 
+  const handleLike = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onLike) onLike(recommendation.id);
+  };
+
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
 
   return (
@@ -257,7 +263,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
               "flex items-center gap-1",
               recommendation.is_liked && "text-red-500"
             )}
-            onClick={() => onLike && onLike(recommendation.id)}
+            onClick={handleLike}
           >
             <Heart 
               size={18} 

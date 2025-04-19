@@ -1,120 +1,44 @@
-
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { toggleLike as toggleRecommendationLike } from '@/services/recommendationService';
+import { toggleSave as toggleRecommendationSave } from '@/services/recommendation/interactionOperations';
+import { toggleLike as togglePostLike, toggleSave as togglePostSave } from '@/services/postService';
+import { isItemPost } from './api/utils';
+import type { CombinedFeedItem } from './types';
 
-export const useInteractions = () => {
-  const { user } = useAuth();
-
-  const handleLike = async (id: string, userId: string, itemType: 'post' | 'recommendation' = 'post') => {
-    try {
-      if (itemType === 'post') {
-        const { data, error } = await supabase
-          .rpc('toggle_post_like', {
-            p_post_id: id,
-            p_user_id: userId
-          });
-
-        if (error) throw error;
-        return data;
-      } else {
-        // Handle recommendation likes
-        const { data, error } = await supabase
-          .from('recommendation_likes')
-          .select('id')
-          .eq('recommendation_id', id)
-          .eq('user_id', userId)
-          .single();
-
-        if (error && error.code !== 'PGSQL_ERROR') {
-          console.error('Error checking recommendation like:', error);
-          throw error;
-        }
-
-        if (data) {
-          // Like exists, remove it
-          const { error: deleteError } = await supabase
-            .from('recommendation_likes')
-            .delete()
-            .eq('recommendation_id', id)
-            .eq('user_id', userId);
-          
-          if (deleteError) throw deleteError;
-          return false;
-        } else {
-          // Like doesn't exist, add it
-          const { error: insertError } = await supabase
-            .from('recommendation_likes')
-            .insert({
-              recommendation_id: id,
-              user_id: userId
-            });
-          
-          if (insertError) throw insertError;
-          return true;
-        }
-      }
-    } catch (err) {
-      console.error('Error toggling like:', err);
-      throw err;
+// Toggle like for feed item (post or recommendation)
+export const toggleFeedItemLike = async (
+  item: CombinedFeedItem, 
+  userId: string
+): Promise<boolean> => {
+  try {
+    // If the item is a post, use post like toggling
+    if (isItemPost(item)) {
+      return togglePostLike(item.id, userId);
     }
-  };
+    
+    // Otherwise use recommendation like toggling
+    return toggleRecommendationLike(item.id, userId, !!item.is_liked);
+  } catch (error) {
+    console.error('Error toggling like for feed item:', error);
+    throw error;
+  }
+};
 
-  const handleSave = async (id: string, userId: string, itemType: 'post' | 'recommendation' = 'post') => {
-    try {
-      if (itemType === 'post') {
-        const { data, error } = await supabase
-          .rpc('toggle_post_save', {
-            p_post_id: id,
-            p_user_id: userId
-          });
-
-        if (error) throw error;
-        return data;
-      } else {
-        // Handle recommendation saves
-        const { data, error } = await supabase
-          .from('recommendation_saves')
-          .select('id')
-          .eq('recommendation_id', id)
-          .eq('user_id', userId)
-          .single();
-        
-        if (error && error.code !== 'PGSQL_ERROR') {
-          console.error('Error checking recommendation save:', error);
-          throw error;
-        }
-
-        if (data) {
-          // Save exists, remove it
-          const { error: deleteError } = await supabase
-            .from('recommendation_saves')
-            .delete()
-            .eq('recommendation_id', id)
-            .eq('user_id', userId);
-          
-          if (deleteError) throw deleteError;
-          return false;
-        } else {
-          // Save doesn't exist, add it
-          const { error: insertError } = await supabase
-            .from('recommendation_saves')
-            .insert({
-              recommendation_id: id,
-              user_id: userId
-            });
-          
-          if (insertError) throw insertError;
-          return true;
-        }
-      }
-    } catch (err) {
-      console.error('Error toggling save:', err);
-      throw err;
+// Toggle save for feed item (post or recommendation)
+export const toggleFeedItemSave = async (
+  item: CombinedFeedItem, 
+  userId: string
+): Promise<boolean> => {
+  try {
+    // If the item is a post, use post save toggling
+    if (isItemPost(item)) {
+      return togglePostSave(item.id, userId);
     }
-  };
-
-  return {
-    handleLike,
-    handleSave
-  };
+    
+    // Otherwise use recommendation save toggling
+    return toggleRecommendationSave(item.id, userId, !!item.is_saved);
+  } catch (error) {
+    console.error('Error toggling save for feed item:', error);
+    throw error;
+  }
 };
