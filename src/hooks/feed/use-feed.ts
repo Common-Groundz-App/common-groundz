@@ -6,6 +6,7 @@ import { FeedVisibility } from './types';
 import { useInteractions } from './interactions';
 import { useFeedState } from './use-feed-state';
 import { useFeedOperations } from './use-feed-operations';
+import { isItemPost } from './api/utils';
 
 export const useFeed = (feedType: FeedVisibility) => {
   const { user } = useAuth();
@@ -55,6 +56,9 @@ export const useFeed = (feedType: FeedVisibility) => {
     const item = state.items.find(r => r.id === id);
     if (!item) return;
 
+    // Determine item type - post or recommendation
+    const itemType = isItemPost(item) ? 'post' : 'recommendation';
+
     // Optimistic update
     updateItemById(id, {
       is_liked: !item.is_liked,
@@ -62,7 +66,7 @@ export const useFeed = (feedType: FeedVisibility) => {
     });
 
     try {
-      await interactionLike(id, user.id);
+      await interactionLike(id, user.id, itemType);
     } catch (err) {
       console.error('Error toggling like:', err);
       toast({
@@ -92,11 +96,14 @@ export const useFeed = (feedType: FeedVisibility) => {
     const item = state.items.find(r => r.id === id);
     if (!item) return;
 
+    // Determine item type - post or recommendation
+    const itemType = isItemPost(item) ? 'post' : 'recommendation';
+
     // Optimistic update
     updateItemById(id, { is_saved: !item.is_saved });
 
     try {
-      await interactionSave(id, user.id);
+      await interactionSave(id, user.id, itemType);
     } catch (err) {
       console.error('Error toggling save:', err);
       toast({
