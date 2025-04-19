@@ -18,6 +18,9 @@ export interface FeedItem extends Recommendation {
   comment_count: number;
 }
 
+// Export this explicitly to fix the import error
+export type RecommendationFeedItem = FeedItem;
+
 export interface PostFeedItem {
   id: string;
   title: string;

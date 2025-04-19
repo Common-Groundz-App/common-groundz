@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { FeedVisibility, FeedState } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
-import { toggleFeedItemLike, toggleFeedItemSave } from './interactions';
+import { toggleFeedItemLike, toggleFeedItemSave, useInteractions } from './interactions';
 import { isItemPost } from './api/utils';
 
 const ITEMS_PER_PAGE = 10;
