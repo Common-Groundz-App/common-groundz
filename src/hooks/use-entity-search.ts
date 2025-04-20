@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -104,25 +105,16 @@ export function useEntitySearch(type: EntityType) {
 
   const createEntityFromExternal = async (result: ExternalSearchResult): Promise<Entity | null> => {
     try {
-      const { data, error } = await supabase
-        .from('entities')
-        .insert({
-          name: result.name,
-          type: type,
-          venue: result.venue,
-          description: result.description,
-          image_url: result.image_url,
-          api_source: result.api_source,
-          api_ref: result.api_ref,
-          metadata: result.metadata,
-          is_deleted: false
-        })
-        .select('*')
-        .single();
-      
-      if (error) throw error;
-      
-      return data as Entity;
+      return await handleEntityCreation(
+        result.name,
+        type,
+        result.api_source,
+        result.api_ref,
+        result.venue,
+        result.description,
+        result.image_url,
+        result.metadata
+      );
     } catch (error) {
       console.error('Error creating entity from external result:', error);
       toast({

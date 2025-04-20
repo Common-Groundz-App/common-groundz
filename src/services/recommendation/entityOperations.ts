@@ -67,7 +67,8 @@ export const findOrCreateEntity = async (
   description: string | null = null,
   imageUrl: string | null = null,
   metadata: any | null = null,
-  userId: string | null = null
+  userId: string | null = null,
+  websiteUrl: string | null = null
 ): Promise<Entity | null> => {
   // If we have API reference information, try to find the entity first
   if (apiSource && apiRef) {
@@ -90,7 +91,7 @@ export const findOrCreateEntity = async (
     created_by: userId,
     is_verified: false,
     verification_date: null,
-    website_url: null,
+    website_url: websiteUrl,
     slug: name ? name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : null
   });
 };
