@@ -1,8 +1,8 @@
-
 import { useState } from 'react';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useEntityOperations } from '@/hooks/recommendations/use-entity-operations';
 
 interface ExternalSearchResult {
   name: string;
@@ -16,12 +16,12 @@ interface ExternalSearchResult {
 
 export function useEntitySearch(type: EntityType) {
   const { toast } = useToast();
+  const { handleEntityCreation } = useEntityOperations();
   const [query, setQuery] = useState('');
   const [localResults, setLocalResults] = useState<Entity[]>([]);
   const [externalResults, setExternalResults] = useState<ExternalSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Search local entities
   const searchLocalEntities = async (searchQuery: string) => {
     if (!searchQuery.trim()) return [];
     
@@ -43,7 +43,6 @@ export function useEntitySearch(type: EntityType) {
     }
   };
 
-  // Search external API based on entity type
   const searchExternalAPI = async (searchQuery: string): Promise<ExternalSearchResult[]> => {
     if (!searchQuery.trim()) return [];
     
@@ -58,7 +57,7 @@ export function useEntitySearch(type: EntityType) {
           functionName = 'search-movies';
           break;
         default:
-          return []; // No external API for other types yet
+          return [];
       }
       
       if (!functionName) return [];
@@ -75,7 +74,6 @@ export function useEntitySearch(type: EntityType) {
     }
   };
 
-  // Handle search
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       setLocalResults([]);
@@ -87,11 +85,9 @@ export function useEntitySearch(type: EntityType) {
     setIsLoading(true);
     
     try {
-      // Search local entities
       const local = await searchLocalEntities(searchQuery);
       setLocalResults(local);
       
-      // Search external API
       const external = await searchExternalAPI(searchQuery);
       setExternalResults(external);
     } catch (error) {
@@ -106,7 +102,6 @@ export function useEntitySearch(type: EntityType) {
     }
   };
 
-  // Create entity from external result
   const createEntityFromExternal = async (result: ExternalSearchResult): Promise<Entity | null> => {
     try {
       const { data, error } = await supabase
@@ -139,12 +134,45 @@ export function useEntitySearch(type: EntityType) {
     }
   };
 
+  const createEntityFromUrl = async (url: string): Promise<Entity | null> => {
+    try {
+      const entity = await handleEntityCreation(
+        '', // Name will be populated from metadata
+        type,
+        'website',
+        url,
+        null,
+        null,
+        null,
+        null,
+        url
+      );
+
+      if (entity) {
+        toast({
+          title: 'Success',
+          description: 'Website added successfully'
+        });
+      }
+
+      return entity;
+    } catch (error) {
+      console.error('Error creating entity from URL:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create entity from URL'
+      });
+      return null;
+    }
+  };
+
   return {
     query,
     localResults,
     externalResults,
     isLoading,
     handleSearch,
+    createEntityFromUrl,
     createEntityFromExternal
   };
 }

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -8,6 +7,7 @@ import {
   findOrCreateEntity,
   getEntitiesByType
 } from '@/services/recommendationService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useEntityOperations = () => {
   const { user } = useAuth();
@@ -15,7 +15,20 @@ export const useEntityOperations = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
 
-  // Find or create an entity based on external API data
+  const fetchUrlMetadata = async (url: string): Promise<any> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-url-metadata', {
+        body: { url }
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching URL metadata:', error);
+      return null;
+    }
+  };
+
   const handleEntityCreation = async (
     name: string,
     type: EntityType,
@@ -24,7 +37,8 @@ export const useEntityOperations = () => {
     venue: string | null = null,
     description: string | null = null,
     imageUrl: string | null = null,
-    metadata: any | null = null
+    metadata: any | null = null,
+    websiteUrl: string | null = null
   ): Promise<Entity | null> => {
     if (!user) {
       toast({
@@ -37,6 +51,20 @@ export const useEntityOperations = () => {
 
     try {
       setIsLoading(true);
+
+      if (websiteUrl) {
+        const urlMetadata = await fetchUrlMetadata(websiteUrl);
+        if (urlMetadata) {
+          name = name || urlMetadata.title;
+          description = description || urlMetadata.description;
+          imageUrl = imageUrl || urlMetadata.image;
+          metadata = {
+            ...metadata,
+            openGraph: urlMetadata
+          };
+        }
+      }
+
       const entity = await findOrCreateEntity(
         name,
         type,
@@ -46,7 +74,8 @@ export const useEntityOperations = () => {
         description,
         imageUrl,
         metadata,
-        user.id
+        user.id,
+        websiteUrl
       );
 
       if (!entity) {
@@ -72,7 +101,6 @@ export const useEntityOperations = () => {
     }
   };
 
-  // Search for entities by type
   const searchEntities = async (type: EntityType, searchTerm: string = ''): Promise<Entity[]> => {
     try {
       setIsLoading(true);
