@@ -1,184 +1,128 @@
-import { supabase } from '@/integrations/supabase/client';
 
-export type ReviewStatus = 'published' | 'flagged' | 'deleted';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
   id: string;
   title: string;
-  description?: string;
+  entity_id: string | null;
+  venue: string | null;
+  description: string | null;
   rating: number;
+  image_url: string | null;
+  category: string;
+  visibility: 'public' | 'private' | 'circle_only';
   user_id: string;
   created_at: string;
-  category: string;
-  venue?: string;
-  entity_id?: string;
-  entity?: any;
-  image_url?: string;
-  visibility: 'public' | 'private' | 'circle_only';
-  experience_date?: string;
-  status: ReviewStatus;
-  is_converted?: boolean;
-  metadata?: {
-    food_tags?: string[];
-    [key: string]: any;
-  };
+  updated_at: string;
+  is_converted: boolean;
+  recommendation_id: string | null;
+  experience_date: string | null;
+  status: 'published' | 'flagged' | 'deleted';
   likes?: number;
-  view_count?: number;
   comment_count?: number;
   isLiked?: boolean;
   isSaved?: boolean;
-  user?: {
-    username?: string;
-    first_name?: string;
-    last_name?: string;
-    avatar_url?: string;
-  };
-}
-
-export const fetchUserReviews = async (userId: string, viewerId: string | null = null) => {
-  try {
-    // First, fetch the reviews without joining the profiles table
-    let query = supabase
-      .from('reviews')
-      .select(`
-        *,
-        entity:entity_id (*)
-      `)
-      .eq('user_id', userId)
-      .neq('status', 'deleted')
-      .order('created_at', { ascending: false });
-
-    if (viewerId !== userId) {
-      // Only show public reviews to other users
-      query = query.eq('visibility', 'public');
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-
-    // If there's a viewer, fetch like and save status for each review
-    if (viewerId && data) {
-      const enhancedReviews = await Promise.all((data || []).map(async (review) => {
-        const [likeStatus, saveStatus, userProfile] = await Promise.all([
-          checkLikeStatus(review.id, viewerId),
-          checkSaveStatus(review.id, viewerId),
-          // Fetch user profile information separately
-          getUserProfile(review.user_id)
-        ]);
-        
-        return {
-          ...review,
-          isLiked: likeStatus,
-          isSaved: saveStatus,
-          user: userProfile
-        } as Review;
-      }));
-      
-      return enhancedReviews;
-    } else if (data) {
-      // If there's no viewer, just fetch the user profiles
-      const enhancedReviews = await Promise.all((data || []).map(async (review) => {
-        const userProfile = await getUserProfile(review.user_id);
-        
-        return {
-          ...review,
-          user: userProfile
-        } as Review;
-      }));
-      
-      return enhancedReviews;
-    }
-
-    return [];
-  } catch (error) {
-    console.error('Error fetching user reviews:', error);
-    throw error;
-  }
-};
-
-// Helper function to fetch user profile data
-async function getUserProfile(userId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('username, first_name, last_name, avatar_url')
-      .eq('id', userId)
-      .single();
-      
-    if (error) {
-      console.error('Error fetching user profile:', error);
-      return null;
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error in getUserProfile:', error);
-    return null;
-  }
-}
-
-export const createReview = async (reviewData: { 
-  title: string; 
-  rating: number; 
-  user_id: string; 
-  category: string;
-  visibility: 'public' | 'private' | 'circle_only';
-  description?: string;
-  venue?: string;
-  entity_id?: string;
-  image_url?: string;
-  experience_date?: string;
+  entity?: any | null;
   metadata?: {
     food_tags?: string[];
     [key: string]: any;
   };
-}): Promise<Review> => {
-  try {
-    // Log the image URL to verify it's being passed correctly
-    console.log('Creating review with image URL:', reviewData.image_url);
-    
-    // Ensure status is set to 'published'
-    const dataToInsert = {
-      ...reviewData,
-      status: 'published' as ReviewStatus
-    };
-    
-    const { data, error } = await supabase
-      .from('reviews')
-      .insert(dataToInsert)
-      .select()
-      .single();
+}
 
-    if (error) throw error;
-    return data as Review;
+// Fetch user reviews
+export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
+  try {
+    // Fetch reviews
+    const { data: reviewsData, error: reviewsError } = await supabase
+      .from('reviews')
+      .select('*')
+      .eq('user_id', profileUserId)
+      .order('created_at', { ascending: false });
+
+    if (reviewsError) {
+      console.error('Error fetching reviews:', reviewsError);
+      throw reviewsError;
+    }
+
+    // No reviews found
+    if (!reviewsData || reviewsData.length === 0) return [];
+
+    // Get array of review IDs
+    const reviewIds = reviewsData.map(rev => rev.id);
+
+    // Get entities data
+    const entitiesMap = new Map();
+    for (const review of reviewsData) {
+      if (review.entity_id) {
+        const { data: entityData } = await supabase
+          .from('entities')
+          .select('*')
+          .eq('id', review.entity_id)
+          .single();
+        
+        if (entityData) {
+          entitiesMap.set(review.entity_id, entityData);
+        }
+      }
+    }
+
+    // Get likes for each review
+    let userLikes: any[] = [];
+    let userSaves: any[] = [];
+    
+    if (currentUserId) {
+      const { data: likesData } = await supabase
+        .from('review_likes')
+        .select('review_id')
+        .in('review_id', reviewIds)
+        .eq('user_id', currentUserId);
+        
+      userLikes = likesData || [];
+        
+      const { data: savesData } = await supabase
+        .from('review_saves')
+        .select('review_id')
+        .in('review_id', reviewIds)
+        .eq('user_id', currentUserId);
+        
+      userSaves = savesData || [];
+    }
+
+    // Get like counts - using count instead of group
+    const likeCountMap = new Map();
+    for (const reviewId of reviewIds) {
+      const { count } = await supabase
+        .from('review_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('review_id', reviewId);
+      
+      likeCountMap.set(reviewId, count || 0);
+    }
+
+    // Map all data to reviews
+    const reviews = reviewsData.map(review => {
+      const likes = likeCountMap.get(review.id) || 0;
+      const isLiked = userLikes?.some(l => l.review_id === review.id) || false;
+      const isSaved = userSaves?.some(s => s.review_id === review.id) || false;
+      const entity = review.entity_id ? entitiesMap.get(review.entity_id) : null;
+
+      return {
+        ...review,
+        likes: Number(likes),
+        isLiked,
+        isSaved,
+        entity
+      } as Review;
+    });
+
+    return reviews;
   } catch (error) {
-    console.error('Error creating review:', error);
+    console.error('Error in fetchUserReviews:', error);
     throw error;
   }
 };
 
-export const updateReview = async (reviewId: string, reviewData: Partial<Review>): Promise<Review> => {
-  try {
-    // Log the image URL to verify it's being updated correctly
-    console.log('Updating review with image URL:', reviewData.image_url);
-    console.log('Updating review with metadata:', reviewData.metadata);
-    
-    const { data, error } = await supabase
-      .from('reviews')
-      .update(reviewData)
-      .eq('id', reviewId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as Review;
-  } catch (error) {
-    console.error('Error updating review:', error);
-    throw error;
-  }
-};
-
+// Toggle like on review
 export const toggleReviewLike = async (reviewId: string, userId: string, isLiked: boolean) => {
   if (isLiked) {
     // Remove like
@@ -210,6 +154,7 @@ export const toggleReviewLike = async (reviewId: string, userId: string, isLiked
   return !isLiked;
 };
 
+// Toggle save on review
 export const toggleReviewSave = async (reviewId: string, userId: string, isSaved: boolean) => {
   if (isSaved) {
     // Remove save
@@ -241,6 +186,39 @@ export const toggleReviewSave = async (reviewId: string, userId: string, isSaved
   return !isSaved;
 };
 
+// Create review
+export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'updated_at' | 'is_converted' | 'recommendation_id' | 'status'>) => {
+  console.log("Creating review with metadata:", review.metadata);
+  
+  const { data, error } = await supabase
+    .from('reviews')
+    .insert({
+      title: review.title,
+      venue: review.venue,
+      description: review.description,
+      rating: review.rating,
+      image_url: review.image_url,
+      category: review.category,
+      visibility: review.visibility,
+      user_id: review.user_id,
+      experience_date: review.experience_date,
+      metadata: review.metadata,
+      is_converted: false,
+      recommendation_id: null,
+      status: 'published'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating review:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Convert review to recommendation
 export const convertReviewToRecommendation = async (reviewId: string, userId: string) => {
   try {
     // First, get the review details
@@ -301,6 +279,7 @@ export const convertReviewToRecommendation = async (reviewId: string, userId: st
   }
 };
 
+// Fetch review by ID
 export const fetchReviewById = async (id: string, userId: string | null = null): Promise<Review | null> => {
   try {
     const { data, error } = await supabase
@@ -375,6 +354,40 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
   }
 };
 
+// Update review
+export const updateReview = async (id: string, updates: Partial<Review>) => {
+  console.log("Updating review with metadata:", updates.metadata);
+  
+  // Create a new object with only the supported fields
+  const validUpdates = {
+    title: updates.title,
+    venue: updates.venue,
+    description: updates.description,
+    rating: updates.rating,
+    image_url: updates.image_url,
+    category: updates.category,
+    visibility: updates.visibility as 'public' | 'private' | 'circle_only',
+    experience_date: updates.experience_date,
+    metadata: updates.metadata
+    // No need to include updated_at as our DB trigger handles that now
+  };
+  
+  const { data, error } = await supabase
+    .from('reviews')
+    .update(validUpdates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating review:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Delete review
 export const deleteReview = async (id: string) => {
   const { error } = await supabase
     .from('reviews')
@@ -389,6 +402,7 @@ export const deleteReview = async (id: string) => {
   return true;
 };
 
+// Update review status (for moderation)
 export const updateReviewStatus = async (id: string, status: 'published' | 'flagged' | 'deleted') => {
   const { data, error } = await supabase
     .from('reviews')
@@ -404,25 +418,3 @@ export const updateReviewStatus = async (id: string, status: 'published' | 'flag
 
   return data;
 };
-
-async function checkLikeStatus(reviewId: string, userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('review_likes')
-    .select('id')
-    .eq('review_id', reviewId)
-    .eq('user_id', userId)
-    .single();
-
-  return !!data;
-}
-
-async function checkSaveStatus(reviewId: string, userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('review_saves')
-    .select('id')
-    .eq('review_id', reviewId)
-    .eq('user_id', userId)
-    .single();
-
-  return !!data;
-}

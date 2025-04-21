@@ -1,46 +1,20 @@
-import { supabase } from '@/integrations/supabase/client';
-import { Entity, EntityType, Recommendation, RecommendationCategory, RecommendationVisibility } from './recommendation/types';
 
+import { supabase } from '@/integrations/supabase/client';
+import { Recommendation, EntityType } from './recommendation/types';
+
+// Export types that are used across multiple files
 export type { 
-  Entity,
+  Recommendation, 
+  Entity, 
   EntityType,
-  Recommendation,
   RecommendationCategory,
   RecommendationVisibility 
-};
+} from './recommendation/types';
 
-export const uploadRecommendationImage = async (userId: string, file: File): Promise<string | null> => {
-  try {
-    // Create a unique file name
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-    const filePath = `${userId}/${fileName}`;
-
-    // Upload file to Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('recommendation_images')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-
-    // Get the public URL for the uploaded image
-    const { data: { publicUrl } } = supabase.storage
-      .from('recommendation_images')
-      .getPublicUrl(filePath);
-
-    console.log('Image uploaded to:', publicUrl);
-    return publicUrl;
-  } catch (error) {
-    console.error('Error in uploadRecommendationImage:', error);
-    return null;
-  }
-};
+// Re-export functions from other files
+export { 
+  uploadRecommendationImage 
+} from './recommendation/imageUpload';
 
 export { 
   createRecommendation,
@@ -57,14 +31,13 @@ export {
   toggleSave
 } from './recommendation/interactionOperations';
 
-export { 
-  fetchRecommendationById 
-} from './recommendation/fetchRecommendationById';
+// Export the fetchRecommendationById function
+export { fetchRecommendationById } from './recommendation/fetchRecommendationById';
 
-export { 
-  fetchUserRecommendations 
-} from './recommendation/fetchRecommendations';
+// Export fetchUserRecommendations function from fetchRecommendations.ts
+export { fetchUserRecommendations } from './recommendation/fetchRecommendations';
 
+// Fix the toggleLike function to properly handle the response and errors
 export const toggleLike = async (recommendationId: string, userId: string, isLiked: boolean) => {
   try {
     // Direct approach to add or remove the like based on current state

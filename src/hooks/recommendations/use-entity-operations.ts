@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  findOrCreateEntity,
-  getEntitiesByType,
   Entity,
-  EntityType
+  EntityType,
+  findOrCreateEntity,
+  getEntitiesByType
 } from '@/services/recommendationService';
 import { supabase } from '@/integrations/supabase/client';
 

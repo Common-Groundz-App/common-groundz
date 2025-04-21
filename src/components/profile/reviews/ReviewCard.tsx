@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -134,25 +133,10 @@ const ReviewCard = ({
   };
 
   const getImageUrl = () => {
-    // First check if the review itself has an image
-    if (review.image_url && review.image_url.trim() !== '') {
-      return review.image_url;
-    }
-    // Then check if the entity has an image
-    if (review.entity && review.entity.image_url) {
-      return review.entity.image_url;
-    }
-    // Fall back to a default image
+    if (review.image_url) return review.image_url;
+    if (review.entity && review.entity.image_url) return review.entity.image_url;
     return "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07";
   };
-
-  // Debug log to track image URLs
-  console.log('Review image data:', {
-    id: review.id,
-    title: review.title,
-    image_url: review.image_url,
-    entity_image: review.entity?.image_url
-  });
 
   return (
     <>

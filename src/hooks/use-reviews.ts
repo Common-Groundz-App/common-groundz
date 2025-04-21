@@ -26,7 +26,7 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
     
     try {
       setIsLoading(true);
-      const data = await fetchUserReviews(profileUserId, user?.id || null);
+      const data = await fetchUserReviews(user?.id || null, profileUserId);
       setReviews(data);
       setError(null);
     } catch (err) {
