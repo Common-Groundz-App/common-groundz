@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,27 +45,36 @@ export function useEntitySearch(type: EntityType) {
 
   const searchExternalAPI = async (searchQuery: string): Promise<ExternalSearchResult[]> => {
     if (!searchQuery.trim()) return [];
-    
+
     try {
-      let functionName = '';
-      
+      let functionName = "";
+
       switch (type) {
-        case 'place':
-          functionName = 'search-places';
+        case "place":
+          functionName = "search-places";
           break;
-        case 'movie':
-          functionName = 'search-movies';
+        case "movie":
+          functionName = "search-movies";
+          break;
+        case "book":
+          functionName = "search-books";
+          break;
+        case "food":
+          functionName = "search-food";
+          break;
+        case "product":
+          functionName = "search-products";
           break;
         default:
           return [];
       }
-      
+
       if (!functionName) return [];
-      
+
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: { query: searchQuery }
       });
-      
+
       if (error) throw error;
       return data.results || [];
     } catch (error) {
