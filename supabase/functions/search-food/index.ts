@@ -11,7 +11,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  
   try {
+    const SPOONACULAR_API_KEY = Deno.env.get("SPOONACULAR_API_KEY");
+    if (!SPOONACULAR_API_KEY) {
+      throw new Error("SPOONACULAR_API_KEY is not set");
+    }
+
     const { query } = await req.json();
     if (!query) {
       return new Response(
@@ -19,27 +25,44 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    // Mocked food results as there's no strong public API for generic food items
-    const results = [
-      {
-        name: "Pizza Margherita",
-        venue: "Any Italian Restaurant",
-        description: "Classic Neapolitan pizza with tomatoes, mozzarella, and basil.",
-        image_url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80",
-        api_source: "mock_food",
-        api_ref: "pizza-margherita",
-        metadata: { cuisine: "Italian", type: "Pizza" }
-      },
-      {
-        name: "Sushi Platter",
-        venue: "Sushi House",
-        description: "Assorted sushi rolls with fresh fish and vegetables.",
-        image_url: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80",
-        api_source: "mock_food",
-        api_ref: "sushi-platter",
-        metadata: { cuisine: "Japanese", type: "Sushi" }
+
+    // Call Spoonacular Search Recipes endpoint
+    const params = new URLSearchParams({
+      query,
+      number: "5",
+      apiKey: SPOONACULAR_API_KEY
+    });
+    const url = `https://api.spoonacular.com/recipes/complexSearch?${params.toString()}&addRecipeInformation=true`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    // Handle possible errors in the response
+    if (!response.ok || !data.results) {
+      console.error("Spoonacular error:", data);
+      return new Response(
+        JSON.stringify({ error: data.message || "Failed to fetch from Spoonacular" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Map Spoonacular results to our external result structure
+    const results = data.results.map((item: any) => ({
+      name: item.title,
+      venue: item.sourceName || "Unknown",
+      description: item.summary ? item.summary.replace(/(<([^>]+)>)/gi, "") : null,
+      image_url: item.image || null,
+      api_source: "spoonacular",
+      api_ref: item.id?.toString(),
+      metadata: {
+        cuisines: item.cuisines,
+        dishTypes: item.dishTypes,
+        readyInMinutes: item.readyInMinutes,
+        servings: item.servings,
+        sourceUrl: item.sourceUrl
       }
-    ].filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
+    }));
+
     return new Response(
       JSON.stringify({ results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
