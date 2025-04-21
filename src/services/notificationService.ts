@@ -69,6 +69,24 @@ const generateActionUrl = (notification: Notification): string | null => {
   return null;
 };
 
+// Helper function to validate notification type
+const validateNotificationType = (type: string): NotificationType => {
+  const validTypes: NotificationType[] = ['like', 'comment', 'follow', 'system'];
+  return validTypes.includes(type as NotificationType) 
+    ? type as NotificationType 
+    : 'system'; // Default to system for unknown types
+};
+
+// Helper function to validate entity type
+const validateEntityType = (type: string | null): EntityType | undefined => {
+  if (!type) return undefined;
+  
+  const validTypes: EntityType[] = ['post', 'recommendation', 'review', 'profile', 'system'];
+  return validTypes.includes(type as EntityType) 
+    ? type as EntityType 
+    : undefined;
+};
+
 export const fetchNotifications = async (limit = 20): Promise<Notification[]> => {
   const { data, error } = await supabase
     .from('notifications')
@@ -80,16 +98,27 @@ export const fetchNotifications = async (limit = 20): Promise<Notification[]> =>
   
   // Process notifications to ensure they have the correct action URLs
   const processedNotifications = data.map(notification => {
+    // Ensure notification type is valid
+    const validatedType = validateNotificationType(notification.type);
+    const validatedEntityType = validateEntityType(notification.entity_type);
+    
+    // Create a properly typed notification object
+    const typedNotification: Notification = {
+      ...notification,
+      type: validatedType,
+      entity_type: validatedEntityType
+    };
+    
     // Use the database-provided action_url if it exists, otherwise generate one
-    const actionUrl = notification.action_url || generateActionUrl(notification);
+    const actionUrl = notification.action_url || generateActionUrl(typedNotification);
     
     return {
-      ...notification,
+      ...typedNotification,
       action_url: actionUrl
     };
   });
   
-  return processedNotifications as Notification[];
+  return processedNotifications;
 };
 
 export const markNotificationsAsRead = async (notificationIds: string[]): Promise<string[]> => {
