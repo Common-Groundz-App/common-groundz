@@ -35,7 +35,7 @@ export interface Review {
   };
 }
 
-export const fetchUserReviews = async (userId: string, viewerId?: string | null = null) => {
+export const fetchUserReviews = async (userId: string, viewerId: string | null = null) => {
   try {
     let query = supabase
       .from('reviews')
