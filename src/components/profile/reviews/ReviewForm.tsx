@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -53,12 +52,18 @@ const ReviewForm = ({
   });
   
   const selectedCategory = watch('category');
+  const watchImageUrl = watch('image_url');
   const [selectedImage, setSelectedImage] = useState<string | null>(review?.image_url || null);
   const [isUploading, setIsUploading] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const experienceDate = watch('experience_date');
 
-  // Reset form on close
+  useEffect(() => {
+    if (watchImageUrl !== selectedImage) {
+      setSelectedImage(watchImageUrl || null);
+    }
+  }, [watchImageUrl]);
+
   useEffect(() => {
     if (!isOpen) {
       if (!isEditMode) {
@@ -68,7 +73,6 @@ const ReviewForm = ({
     }
   }, [isOpen, reset, isEditMode]);
   
-  // Set form values when in edit mode and review changes
   useEffect(() => {
     if (isEditMode && review) {
       setValue('title', review.title);
@@ -186,7 +190,6 @@ const ReviewForm = ({
             />
           </div>
           
-          {/* Entity search for non-food categories */}
           {!isEditMode && (selectedCategory === 'movie' || selectedCategory === 'book' || 
             selectedCategory === 'place' || selectedCategory === 'product') && (
             <div className="space-y-2">
@@ -200,14 +203,12 @@ const ReviewForm = ({
                   if (entity.description) setValue('description', entity.description);
                   if (entity.image_url) {
                     setValue('image_url', entity.image_url);
-                    setSelectedImage(entity.image_url);
                   }
                 }}
               />
             </div>
           )}
           
-          {/* Experience Date Field */}
           <div className="space-y-2">
             <Label htmlFor="experience_date">When did you experience this? (optional)</Label>
             <Controller
@@ -245,7 +246,6 @@ const ReviewForm = ({
             />
           </div>
           
-          {/* Title Field */}
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input 
@@ -259,7 +259,6 @@ const ReviewForm = ({
             )}
           </div>
           
-          {/* Venue Field */}
           <div className="space-y-2">
             <Label htmlFor="venue">
               {selectedCategory === 'food' ? 'Restaurant/Source' : 
@@ -275,7 +274,6 @@ const ReviewForm = ({
             />
           </div>
           
-          {/* Description Field */}
           <div className="space-y-2">
             <Label htmlFor="description">Review (optional)</Label>
             <Textarea 
@@ -287,7 +285,6 @@ const ReviewForm = ({
             />
           </div>
           
-          {/* Rating Field */}
           <div className="space-y-2">
             <Label>Rating</Label>
             <div className="flex items-center">
@@ -325,7 +322,6 @@ const ReviewForm = ({
             )}
           </div>
           
-          {/* Image Upload */}
           <div className="space-y-2">
             <Label>Add Image (optional)</Label>
             <div className="flex items-center gap-4">
@@ -369,7 +365,6 @@ const ReviewForm = ({
             </div>
           </div>
           
-          {/* Visibility */}
           <div className="space-y-2">
             <Label>Visibility</Label>
             <Controller
@@ -398,7 +393,6 @@ const ReviewForm = ({
             />
           </div>
           
-          {/* Form Buttons */}
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}
                     className="border-brand-orange/30 hover:text-brand-orange">

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -133,6 +132,12 @@ const ReviewCard = ({
     return null;
   };
 
+  const getImageUrl = () => {
+    if (review.image_url) return review.image_url;
+    if (review.entity && review.entity.image_url) return review.entity.image_url;
+    return "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07";
+  };
+
   return (
     <>
       <Card 
@@ -164,7 +169,7 @@ const ReviewCard = ({
           
           <div className="h-48 relative overflow-hidden group">
             <img 
-              src={review.image_url || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07'} 
+              src={getImageUrl()} 
               alt={review.title} 
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
             />
