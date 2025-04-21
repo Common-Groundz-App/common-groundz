@@ -13,7 +13,7 @@ interface EntityPreviewCardProps {
     description?: string;
   };
   type: string;
-  onChange: () => void;
+  onChange?: () => void;
 }
 
 export const EntityPreviewCard = ({
@@ -30,16 +30,18 @@ export const EntityPreviewCard = ({
 
   return (
     <div className="w-full mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-sm">{`Selected ${type}:`}</span>
-        <button
-          type="button"
-          className="text-sm px-3 py-1 border rounded-md bg-white hover:bg-accent border-border shadow-sm transition"
-          onClick={onChange}
-        >
-          Change
-        </button>
-      </div>
+      {onChange && (
+        <div className="flex items-center justify-between mb-2">
+          <span className="font-medium text-sm">{`Selected ${type}:`}</span>
+          <button
+            type="button"
+            className="text-sm px-3 py-1 border rounded-md bg-white hover:bg-accent border-border shadow-sm transition"
+            onClick={onChange}
+          >
+            Change
+          </button>
+        </div>
+      )}
       <div className={cn(
         "flex w-full rounded-xl bg-white p-4 shadow-md border gap-4",
         "items-start"
