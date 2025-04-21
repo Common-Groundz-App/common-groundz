@@ -27,7 +27,7 @@ export const NotificationBell: React.FC = () => {
 
   const handleNotificationClick = (notification: any) => {
     setOpen(false);
-    const { action_url, title } = notification;
+    const { action_url, title, entity_type, type } = notification;
     
     if (action_url) {
       // Show a toast to indicate where we're navigating to
@@ -36,6 +36,9 @@ export const NotificationBell: React.FC = () => {
         description: `Going to: ${title}`,
         duration: 2000,
       });
+      
+      // Log the navigation for debugging
+      console.log("Navigating to:", action_url);
       
       // Navigate to the specified URL
       navigate(action_url);

@@ -32,11 +32,11 @@ const generateActionUrl = (notification: Notification): string | null => {
   switch (type) {
     case 'like':
       if (entity_type === 'post') {
-        return `/profile/${sender_id}?post=${entity_id}`;
+        return `/profile?post=${entity_id}`;
       } else if (entity_type === 'recommendation') {
-        return `/profile/${sender_id}?rec=${entity_id}`;
+        return `/profile?rec=${entity_id}`;
       } else if (entity_type === 'review') {
-        return `/profile/${sender_id}?review=${entity_id}`;
+        return `/profile?review=${entity_id}`;
       }
       break;
       
@@ -45,18 +45,21 @@ const generateActionUrl = (notification: Notification): string | null => {
         // If we have a comment ID in metadata, include it to scroll to that comment
         const commentId = metadata?.comment_id;
         return commentId 
-          ? `/profile/${sender_id}?post=${entity_id}&comment=${commentId}`
-          : `/profile/${sender_id}?post=${entity_id}`;
+          ? `/profile?post=${entity_id}&comment=${commentId}`
+          : `/profile?post=${entity_id}`;
       } else if (entity_type === 'recommendation') {
         const commentId = metadata?.comment_id;
         return commentId 
-          ? `/profile/${sender_id}?rec=${entity_id}&comment=${commentId}`
-          : `/profile/${sender_id}?rec=${entity_id}`;
+          ? `/profile?rec=${entity_id}&comment=${commentId}`
+          : `/profile?rec=${entity_id}`;
       }
       break;
       
     case 'follow':
-      return `/profile/${sender_id}`;
+      if (sender_id) {
+        return `/profile/${sender_id}`;
+      }
+      break;
       
     case 'system':
       // System notifications might have custom URLs defined already

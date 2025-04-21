@@ -1,5 +1,5 @@
 
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
