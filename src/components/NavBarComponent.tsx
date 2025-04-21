@@ -1,4 +1,3 @@
-
 import { Home, Star, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
@@ -6,6 +5,7 @@ import { useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { SearchDialog } from '@/components/SearchDialog'
 import { supabase } from '@/integrations/supabase/client'
+import NotificationBell from './notifications/NotificationBell'
 
 export function NavBarComponent() {
   const location = useLocation();
@@ -46,7 +46,12 @@ export function NavBarComponent() {
     <>
       <NavBar 
         items={navItems} 
-        rightSection={<UserMenu />}
+        rightSection={
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <UserMenu />
+          </div>
+        }
         initialActiveTab={activeTab}
         className="relative z-50 sticky top-0"
       />

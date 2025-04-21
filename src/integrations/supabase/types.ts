@@ -101,6 +101,57 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          action_url: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          image_url: string | null
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          sender_id: string | null
+          title: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          image_url?: string | null
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          sender_id?: string | null
+          title: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          image_url?: string | null
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          sender_id?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_comments: {
         Row: {
           content: string
@@ -762,6 +813,10 @@ export type Database = {
       insert_post_save: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
+      }
+      mark_notifications_as_read: {
+        Args: { notification_ids: string[] }
+        Returns: string[]
       }
       set_limit: {
         Args: { "": number }
