@@ -188,6 +188,8 @@ export const toggleReviewSave = async (reviewId: string, userId: string, isSaved
 
 // Create review
 export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'updated_at' | 'is_converted' | 'recommendation_id' | 'status'>) => {
+  console.log("Creating review with metadata:", review.metadata);
+  
   const { data, error } = await supabase
     .from('reviews')
     .insert({
@@ -354,6 +356,8 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
 
 // Update review
 export const updateReview = async (id: string, updates: Partial<Review>) => {
+  console.log("Updating review with metadata:", updates.metadata);
+  
   // Create a new object with only the supported fields
   const validUpdates = {
     title: updates.title,

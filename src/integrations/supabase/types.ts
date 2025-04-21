@@ -585,6 +585,7 @@ export type Database = {
           id: string
           image_url: string | null
           is_converted: boolean
+          metadata: Json | null
           rating: number
           recommendation_id: string | null
           status: string
@@ -603,6 +604,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_converted?: boolean
+          metadata?: Json | null
           rating: number
           recommendation_id?: string | null
           status?: string
@@ -621,6 +623,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_converted?: boolean
+          metadata?: Json | null
           rating?: number
           recommendation_id?: string | null
           status?: string
