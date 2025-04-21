@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Star, Loader2, Calendar } from "lucide-react";
+import { Star, Loader2, Calendar, Tag as TagIcon, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +18,7 @@ import EntitySearch from '@/components/recommendations/EntitySearch';
 import { format } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
 
 interface ReviewFormProps {
   isOpen: boolean;
@@ -48,6 +50,7 @@ const ReviewForm = ({
       visibility: review?.visibility || 'public',
       entity_id: review?.entity_id || '',
       experience_date: review?.experience_date ? new Date(review.experience_date) : undefined,
+      food_tags: review?.metadata?.food_tags || [],
     }
   });
   
@@ -57,6 +60,12 @@ const ReviewForm = ({
   const [isUploading, setIsUploading] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const experienceDate = watch('experience_date');
+  const [newFoodTag, setNewFoodTag] = useState('');
+  const [foodTags, setFoodTags] = useState<string[]>(review?.metadata?.food_tags || []);
+  
+  const commonFoodTags = ["Spicy", "Sweet", "Savory", "Vegetarian", "Vegan", "Gluten-Free", 
+                          "Dairy-Free", "Non-Veg", "Dessert", "Breakfast", "Lunch", "Dinner", 
+                          "Appetizer", "Main Course", "Large Portion", "Value for Money"];
 
   useEffect(() => {
     if (watchImageUrl !== selectedImage) {
@@ -69,6 +78,7 @@ const ReviewForm = ({
       if (!isEditMode) {
         reset();
         setSelectedImage(null);
+        setFoodTags([]);
       }
     }
   }, [isOpen, reset, isEditMode]);
@@ -87,6 +97,9 @@ const ReviewForm = ({
         setValue('experience_date', new Date(review.experience_date));
       }
       setSelectedImage(review.image_url || null);
+      if (review.metadata?.food_tags) {
+        setFoodTags(review.metadata.food_tags);
+      }
     }
   }, [review, isEditMode, setValue]);
   
@@ -123,10 +136,13 @@ const ReviewForm = ({
     }
     
     try {
+      // Add food tags to metadata if it's a food review
+      const metadata = values.category === 'food' ? { food_tags: foodTags } : undefined;
+      
       if (isEditMode && review) {
         await updateReview(review.id, {
           ...values,
-          // The updated_at is automatically set by the database trigger
+          metadata,
         });
         toast({
           title: 'Success',
@@ -135,6 +151,7 @@ const ReviewForm = ({
       } else {
         await createReview({
           ...values,
+          metadata,
           user_id: user.id
         });
         toast({
@@ -144,6 +161,7 @@ const ReviewForm = ({
         if (!isEditMode) {
           reset();
           setSelectedImage(null);
+          setFoodTags([]);
         }
       }
       await onSubmit();
@@ -155,6 +173,23 @@ const ReviewForm = ({
         description: 'Failed to save review. Please try again.'
       });
     }
+  };
+
+  const addFoodTag = () => {
+    if (newFoodTag.trim() && !foodTags.includes(newFoodTag.trim())) {
+      setFoodTags([...foodTags, newFoodTag.trim()]);
+      setNewFoodTag('');
+    }
+  };
+
+  const addCommonTag = (tag: string) => {
+    if (!foodTags.includes(tag)) {
+      setFoodTags([...foodTags, tag]);
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setFoodTags(foodTags.filter(t => t !== tag));
   };
 
   return (
@@ -191,7 +226,7 @@ const ReviewForm = ({
           </div>
           
           {!isEditMode && (
-            ['movie', 'book', 'place', 'product', 'food'].includes(selectedCategory)
+            ['movie', 'book', 'place', 'product'].includes(selectedCategory)
           ) && (
             <div className="space-y-2">
               <Label>Search for {selectedCategory}</Label>
@@ -207,6 +242,24 @@ const ReviewForm = ({
                   }
                 }}
               />
+            </div>
+          )}
+          
+          {/* For Food category, we'll let users search for restaurant using Places API */}
+          {!isEditMode && selectedCategory === 'food' && (
+            <div className="space-y-2">
+              <Label>Search for restaurant</Label>
+              <EntitySearch 
+                type="place"
+                onSelect={(entity) => {
+                  // Just fill the venue with the restaurant name/location
+                  setValue('venue', entity.name);
+                  if (entity.description) setValue('description', entity.description);
+                }}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Search for the restaurant or place where you had this food
+              </p>
             </div>
           )}
           
@@ -248,11 +301,13 @@ const ReviewForm = ({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">
+              {selectedCategory === 'food' ? 'Dish Name' : 'Title'}
+            </Label>
             <Input 
               id="title"
               {...register('title', { required: "Title is required" })}
-              placeholder={`What are you reviewing?`}
+              placeholder={selectedCategory === 'food' ? "What dish did you have?" : "What are you reviewing?"}
               className={cn(errors.title ? "border-red-500" : "border-brand-orange/30 focus:ring-brand-orange/30")}
             />
             {errors.title && (
@@ -274,6 +329,73 @@ const ReviewForm = ({
               className="border-brand-orange/30 focus:ring-brand-orange/30"
             />
           </div>
+          
+          {/* Add food tags section */}
+          {selectedCategory === 'food' && (
+            <div className="space-y-2">
+              <Label>Add Tags</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {foodTags.map((tag) => (
+                  <Badge 
+                    key={tag} 
+                    variant="secondary"
+                    className="flex items-center gap-1 bg-brand-orange/20"
+                  >
+                    {tag}
+                    <button 
+                      type="button"
+                      className="ml-1 hover:text-red-500 focus:outline-none"
+                      onClick={() => removeTag(tag)}
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              
+              <div className="flex gap-2">
+                <Input
+                  value={newFoodTag}
+                  onChange={(e) => setNewFoodTag(e.target.value)}
+                  placeholder="Add a tag (e.g., Spicy, Vegan)"
+                  className="border-brand-orange/30 focus:ring-brand-orange/30"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addFoodTag();
+                    }
+                  }}
+                />
+                <Button 
+                  type="button" 
+                  onClick={addFoodTag}
+                  variant="outline"
+                  className="border-brand-orange/30 hover:bg-brand-orange/10"
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
+              </div>
+              
+              <div className="mt-2">
+                <p className="text-sm font-medium mb-1">Common tags:</p>
+                <div className="flex flex-wrap gap-1">
+                  {commonFoodTags.map((tag) => (
+                    <Badge 
+                      key={tag}
+                      variant="outline" 
+                      className={cn(
+                        "cursor-pointer hover:bg-brand-orange/10 transition-colors",
+                        foodTags.includes(tag) ? "bg-brand-orange/20" : ""
+                      )}
+                      onClick={() => addCommonTag(tag)}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           
           <div className="space-y-2">
             <Label htmlFor="description">Review (optional)</Label>
