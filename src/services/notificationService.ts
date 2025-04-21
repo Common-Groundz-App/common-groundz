@@ -29,7 +29,20 @@ export const fetchNotifications = async (limit = 20): Promise<Notification[]> =>
     .limit(limit);
 
   if (error) throw error;
-  return data as Notification[];
+  
+  // Correct action URLs before returning
+  const notificationsWithFixedUrls = data.map(notification => {
+    if (notification.entity_type === 'recommendation' && notification.action_url?.startsWith('/recommendations/')) {
+      // Use the correct profile route with recommendation section instead
+      return {
+        ...notification,
+        action_url: `/profile?rec=${notification.entity_id}`
+      };
+    }
+    return notification;
+  });
+  
+  return notificationsWithFixedUrls as Notification[];
 };
 
 export const markNotificationsAsRead = async (notificationIds: string[]): Promise<string[]> => {

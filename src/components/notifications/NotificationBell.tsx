@@ -8,11 +8,12 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
 } from '@/components/ui/dropdown-menu';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export const NotificationBell: React.FC = () => {
   const { notifications, unreadCount, markAsRead, loading } = useNotifications();
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleDropdownChange = (val: boolean) => {
     setOpen(val);
@@ -20,6 +21,13 @@ export const NotificationBell: React.FC = () => {
       // Mark all unread as read when opened
       const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
       if (unreadIds.length > 0) markAsRead(unreadIds);
+    }
+  };
+
+  const handleNotificationClick = (actionUrl: string | null) => {
+    setOpen(false);
+    if (actionUrl) {
+      navigate(actionUrl);
     }
   };
 
@@ -44,16 +52,15 @@ export const NotificationBell: React.FC = () => {
             <p className="text-sm text-muted-foreground">No notifications yet.</p>
           ) : (
             notifications.map((n) => (
-              <Link
-                to={n.action_url || '#'}
+              <div
                 key={n.id}
-                className={`flex items-start gap-2 p-2 rounded hover:bg-accent transition relative ${
+                onClick={() => handleNotificationClick(n.action_url)}
+                className={`flex items-start gap-2 p-2 rounded hover:bg-accent transition relative cursor-pointer ${
                   !n.is_read ? 'bg-orange-50' : ''
                 }`}
-                style={{ textDecoration: 'none' }}
               >
                 {n.image_url ? (
-                  <img src={n.image_url} className="w-8 h-8 rounded-full object-cover border" />
+                  <img src={n.image_url} className="w-8 h-8 rounded-full object-cover border" alt="" />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                     <Bell className="w-5 h-5" />
@@ -65,7 +72,7 @@ export const NotificationBell: React.FC = () => {
                   <div className="text-xs text-gray-400">{new Date(n.created_at).toLocaleString()}</div>
                 </div>
                 {n.is_read && <Check className="w-4 h-4 text-green-400 mt-1" />}
-              </Link>
+              </div>
             ))
           )}
         </div>

@@ -61,6 +61,8 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            {/* Redirect old recommendation URLs to profile with recommendation parameter */}
+            <Route path="/recommendations/:id" element={<Navigate to={location => `/profile?rec=${location.pathname.split('/').pop()}`} />} />
             {/* Redirect old edit routes to profile */}
             <Route path="/recommendations/edit/:id" element={<Navigate to="/profile" />} />
             <Route path="/posts/edit/:id" element={<Navigate to="/profile" />} />
