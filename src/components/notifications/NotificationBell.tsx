@@ -9,6 +9,7 @@ import {
   DropdownMenuContent,
 } from '@/components/ui/dropdown-menu';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from '@/hooks/use-toast';
 
 export const NotificationBell: React.FC = () => {
   const { notifications, unreadCount, markAsRead, loading } = useNotifications();
@@ -24,10 +25,30 @@ export const NotificationBell: React.FC = () => {
     }
   };
 
-  const handleNotificationClick = (actionUrl: string | null) => {
+  const handleNotificationClick = (notification: any) => {
     setOpen(false);
-    if (actionUrl) {
-      navigate(actionUrl);
+    const { action_url, title } = notification;
+    
+    if (action_url) {
+      // Show a toast to indicate where we're navigating to
+      toast({
+        title: "Navigating",
+        description: `Going to: ${title}`,
+        duration: 2000,
+      });
+      
+      // Navigate to the specified URL
+      navigate(action_url);
+    } else {
+      // If no action URL is available, navigate to profile as fallback
+      navigate('/profile');
+      
+      toast({
+        title: "No specific destination",
+        description: "Navigating to your profile",
+        variant: "destructive",
+        duration: 3000,
+      });
     }
   };
 
@@ -54,7 +75,7 @@ export const NotificationBell: React.FC = () => {
             notifications.map((n) => (
               <div
                 key={n.id}
-                onClick={() => handleNotificationClick(n.action_url)}
+                onClick={() => handleNotificationClick(n)}
                 className={`flex items-start gap-2 p-2 rounded hover:bg-accent transition relative cursor-pointer ${
                   !n.is_read ? 'bg-orange-50' : ''
                 }`}
