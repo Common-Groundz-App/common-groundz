@@ -1,4 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
+
+export type ReviewStatus = 'published' | 'flagged' | 'deleted';
 
 export interface Review {
   id: string;
@@ -14,7 +17,7 @@ export interface Review {
   image_url?: string;
   visibility: 'public' | 'private' | 'circle_only';
   experience_date?: string;
-  status?: 'published' | 'flagged' | 'deleted';
+  status?: ReviewStatus;
   is_converted?: boolean;
   metadata?: {
     food_tags?: string[];
@@ -39,7 +42,7 @@ export const fetchUserReviews = async (userId: string, viewerId?: string) => {
       .from('reviews')
       .select(`
         *,
-        user:user_id (username, first_name, last_name, avatar_url),
+        user:profiles (username, first_name, last_name, avatar_url),
         entity:entity_id (*)
       `)
       .eq('user_id', userId)
@@ -57,7 +60,7 @@ export const fetchUserReviews = async (userId: string, viewerId?: string) => {
 
     // If there's a viewer, fetch like and save status for each review
     if (viewerId) {
-      const enhancedReviews = await Promise.all(data.map(async (review) => {
+      const enhancedReviews = await Promise.all((data || []).map(async (review) => {
         const [likeStatus, saveStatus] = await Promise.all([
           checkLikeStatus(review.id, viewerId),
           checkSaveStatus(review.id, viewerId)
@@ -67,13 +70,13 @@ export const fetchUserReviews = async (userId: string, viewerId?: string) => {
           ...review,
           isLiked: likeStatus,
           isSaved: saveStatus
-        };
+        } as Review;
       }));
       
       return enhancedReviews;
     }
 
-    return data;
+    return data as Review[];
   } catch (error) {
     console.error('Error fetching user reviews:', error);
     throw error;
@@ -87,12 +90,12 @@ export const createReview = async (reviewData: Partial<Review>): Promise<Review>
     
     const { data, error } = await supabase
       .from('reviews')
-      .insert([reviewData])
+      .insert(reviewData)
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return data as Review;
   } catch (error) {
     console.error('Error creating review:', error);
     throw error;
@@ -113,7 +116,7 @@ export const updateReview = async (reviewId: string, reviewData: Partial<Review>
       .single();
 
     if (error) throw error;
-    return data;
+    return data as Review;
   } catch (error) {
     console.error('Error updating review:', error);
     throw error;

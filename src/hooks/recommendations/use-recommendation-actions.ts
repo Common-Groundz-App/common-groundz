@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -109,7 +110,7 @@ export const useRecommendationActions = (
   };
 
   // Add recommendation
-  const addRecommendation = async (recommendation: Omit<Recommendation, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'likes' | 'isLiked' | 'isSaved'>) => {
+  const addRecommendation = async (recommendation: Partial<Recommendation> & { title: string; rating: number; category: string }) => {
     if (!user) {
       toast({
         title: 'Authentication required',

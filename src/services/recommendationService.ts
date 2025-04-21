@@ -1,44 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
+import { Entity, EntityType, Recommendation, RecommendationCategory, RecommendationVisibility } from './recommendation/types';
 
-export type RecommendationCategory = 'food' | 'movie' | 'book' | 'place' | 'product';
-export type RecommendationVisibility = 'public' | 'private' | 'circle_only';
+export type { 
+  Entity,
+  EntityType,
+  Recommendation,
+  RecommendationCategory,
+  RecommendationVisibility 
+};
 
-export interface Recommendation {
-  id: string;
-  title: string;
-  venue?: string;
-  description?: string;
-  rating: number;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-  image_url?: string;
-  category: RecommendationCategory;
-  visibility: RecommendationVisibility;
-  is_certified?: boolean;
-  is_promoted?: boolean;
-  is_sponsored?: boolean;
-  entity_id?: string;
-  entity?: any;
-  user?: {
-    id: string;
-    username?: string;
-    first_name?: string;
-    last_name?: string;
-    avatar_url?: string;
-  };
-  likes?: number;
-  view_count?: number;
-  comment_count?: number;
-  isLiked?: boolean;
-  isSaved?: boolean;
-  metadata?: {
-    [key: string]: any;
-  };
-  tags?: string[];
-}
-
-// Upload image to Supabase Storage
 export const uploadRecommendationImage = async (userId: string, file: File): Promise<string | null> => {
   try {
     // Create a unique file name
