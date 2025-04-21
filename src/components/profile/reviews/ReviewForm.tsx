@@ -190,8 +190,9 @@ const ReviewForm = ({
             />
           </div>
           
-          {!isEditMode && (selectedCategory === 'movie' || selectedCategory === 'book' || 
-            selectedCategory === 'place' || selectedCategory === 'product') && (
+          {!isEditMode && (
+            ['movie', 'book', 'place', 'product', 'food'].includes(selectedCategory)
+          ) && (
             <div className="space-y-2">
               <Label>Search for {selectedCategory}</Label>
               <EntitySearch 
