@@ -144,6 +144,14 @@ const ReviewForm = ({
       return;
     }
     
+    if (
+      !values.image_url && // No custom uploaded image by user
+      selectedEntity &&
+      selectedEntity.image_url
+    ) {
+      values.image_url = selectedEntity.image_url;
+    }
+
     try {
       const metadata = values.category === 'food' ? { food_tags: foodTags } : undefined;
       
