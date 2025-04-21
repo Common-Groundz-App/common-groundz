@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export type ReviewStatus = 'published' | 'flagged' | 'deleted';
@@ -37,11 +38,11 @@ export interface Review {
 
 export const fetchUserReviews = async (userId: string, viewerId: string | null = null) => {
   try {
+    // First, fetch the reviews without joining the profiles table
     let query = supabase
       .from('reviews')
       .select(`
         *,
-        user:profiles (username, first_name, last_name, avatar_url),
         entity:entity_id (*)
       `)
       .eq('user_id', userId)
@@ -58,29 +59,65 @@ export const fetchUserReviews = async (userId: string, viewerId: string | null =
     if (error) throw error;
 
     // If there's a viewer, fetch like and save status for each review
-    if (viewerId) {
+    if (viewerId && data) {
       const enhancedReviews = await Promise.all((data || []).map(async (review) => {
-        const [likeStatus, saveStatus] = await Promise.all([
+        const [likeStatus, saveStatus, userProfile] = await Promise.all([
           checkLikeStatus(review.id, viewerId),
-          checkSaveStatus(review.id, viewerId)
+          checkSaveStatus(review.id, viewerId),
+          // Fetch user profile information separately
+          getUserProfile(review.user_id)
         ]);
         
         return {
           ...review,
           isLiked: likeStatus,
-          isSaved: saveStatus
+          isSaved: saveStatus,
+          user: userProfile
+        } as Review;
+      }));
+      
+      return enhancedReviews;
+    } else if (data) {
+      // If there's no viewer, just fetch the user profiles
+      const enhancedReviews = await Promise.all((data || []).map(async (review) => {
+        const userProfile = await getUserProfile(review.user_id);
+        
+        return {
+          ...review,
+          user: userProfile
         } as Review;
       }));
       
       return enhancedReviews;
     }
 
-    return data as Review[];
+    return [];
   } catch (error) {
     console.error('Error fetching user reviews:', error);
     throw error;
   }
 };
+
+// Helper function to fetch user profile data
+async function getUserProfile(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('username, first_name, last_name, avatar_url')
+      .eq('id', userId)
+      .single();
+      
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in getUserProfile:', error);
+    return null;
+  }
+}
 
 export const createReview = async (reviewData: Partial<Review> & { 
   title: string; 
