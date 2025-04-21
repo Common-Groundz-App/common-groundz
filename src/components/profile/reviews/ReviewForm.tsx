@@ -196,7 +196,6 @@ const ReviewForm = ({
               handleImageUploadChange={handleImageUploadChange}
               onRemoveImage={() => {
                 setValue('image_url', '');
-                setSelectedImage(null);
               }}
             />
             
