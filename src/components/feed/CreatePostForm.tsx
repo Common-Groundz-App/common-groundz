@@ -29,6 +29,7 @@ import { generateUUID } from '@/lib/uuid';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Json } from '@/integrations/supabase/types';
+import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required' }).max(100),
@@ -56,39 +57,6 @@ interface CreatePostFormProps {
   onCancel: () => void;
   postToEdit?: PostToEdit;
 }
-
-const EntityPreviewBox = ({ entity, type, onChange }: { entity: any, type: string, onChange: () => void }) => {
-  if (!entity) return null;
-  return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-sm">{`Selected ${type}:`}</span>
-        <button
-          type="button"
-          className="text-sm px-2 py-1 border rounded hover:bg-gray-100 focus:outline-none"
-          onClick={onChange}
-        >
-          Change
-        </button>
-      </div>
-      <div className="flex border rounded-lg bg-white p-2 items-center max-w-lg shadow-sm overflow-hidden">
-        {entity.image_url && (
-          <img
-            src={entity.image_url}
-            alt={entity.name || 'Preview'}
-            className="w-12 h-12 object-cover rounded mr-3 flex-shrink-0 bg-gray-100"
-          />
-        )}
-        <div className="min-w-0">
-          <div className="font-semibold truncate break-words">{entity.name || entity.title}</div>
-          {entity.description && (
-            <div className="text-xs text-gray-600 mt-1 truncate break-words">{entity.description}</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFormProps) {
   const { user } = useAuth();
@@ -311,7 +279,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         </div>
         
         {(selectedEntity && !showEntitySelector) ? (
-          <EntityPreviewBox
+          <EntityPreviewCard
             entity={selectedEntity}
             type={getEntityTypeLabel(selectedEntity)}
             onChange={() => setShowEntitySelector(true)}
