@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export type ReviewStatus = 'published' | 'flagged' | 'deleted';
@@ -119,21 +118,30 @@ async function getUserProfile(userId: string) {
   }
 }
 
-export const createReview = async (reviewData: Partial<Review> & { 
+export const createReview = async (reviewData: { 
   title: string; 
   rating: number; 
   user_id: string; 
   category: string;
   visibility: 'public' | 'private' | 'circle_only';
+  description?: string;
+  venue?: string;
+  entity_id?: string;
+  image_url?: string;
+  experience_date?: string;
+  metadata?: {
+    food_tags?: string[];
+    [key: string]: any;
+  };
 }): Promise<Review> => {
   try {
     // Log the image URL to verify it's being passed correctly
     console.log('Creating review with image URL:', reviewData.image_url);
     
-    // Ensure status is set to 'published' if not provided
+    // Ensure status is set to 'published'
     const dataToInsert = {
       ...reviewData,
-      status: reviewData.status || 'published'
+      status: 'published' as ReviewStatus
     };
     
     const { data, error } = await supabase

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,14 +42,12 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
   const selectedCategory = watch('category');
   const watchImageUrl = watch('image_url');
 
-  // Update image when form value changes
   useEffect(() => {
     if (watchImageUrl !== selectedImage) {
       setSelectedImage(watchImageUrl || null);
     }
   }, [watchImageUrl, selectedImage]);
 
-  // Set initial entity data when in edit mode
   useEffect(() => {
     if (!isEditMode && review?.entity && review.entity_id) {
       setSelectedEntity(review.entity);
@@ -58,7 +55,6 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
     }
   }, [review, isEditMode]);
 
-  // Set initial form values for edit mode
   useEffect(() => {
     if (isEditMode && review) {
       setValue('title', review.title);
@@ -88,11 +84,9 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
     try {
       const url = await handleImageUpload(file);
       if (url) {
-        // Ensure the URL is saved to the form
         setValue('image_url', url);
         setSelectedImage(url);
         
-        // Debug log
         console.log('Image uploaded successfully:', url);
       }
     } catch (error) {
@@ -118,7 +112,6 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
     try {
       const metadata = values.category === 'food' ? { food_tags: foodTags } : undefined;
       
-      // Ensure the image URL is included in the submitted data
       console.log('Creating review with metadata:', metadata);
       console.log('Review data being submitted:', {
         ...values,
@@ -128,7 +121,6 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
       if (isEditMode && review) {
         await updateReview(review.id, {
           ...values,
-          // Ensure image_url is included
           image_url: values.image_url || selectedImage,
           metadata,
         });
@@ -138,11 +130,17 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
         });
       } else {
         await createReview({
-          ...values,
-          // Ensure image_url is included
+          title: values.title,
+          rating: values.rating,
+          user_id: user.id,
+          category: values.category,
+          visibility: values.visibility,
+          description: values.description,
+          venue: values.venue,
+          entity_id: values.entity_id,
           image_url: values.image_url || selectedImage,
-          metadata,
-          user_id: user.id
+          experience_date: values.experience_date ? values.experience_date.toISOString().split('T')[0] : undefined,
+          metadata
         });
         toast({
           title: 'Success',
