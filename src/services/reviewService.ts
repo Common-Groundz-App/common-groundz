@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export type ReviewStatus = 'published' | 'flagged' | 'deleted';
@@ -17,7 +16,7 @@ export interface Review {
   image_url?: string;
   visibility: 'public' | 'private' | 'circle_only';
   experience_date?: string;
-  status?: ReviewStatus;
+  status: ReviewStatus;
   is_converted?: boolean;
   metadata?: {
     food_tags?: string[];
@@ -36,7 +35,7 @@ export interface Review {
   };
 }
 
-export const fetchUserReviews = async (userId: string, viewerId?: string) => {
+export const fetchUserReviews = async (userId: string, viewerId?: string | null = null) => {
   try {
     let query = supabase
       .from('reviews')
@@ -83,14 +82,26 @@ export const fetchUserReviews = async (userId: string, viewerId?: string) => {
   }
 };
 
-export const createReview = async (reviewData: Partial<Review>): Promise<Review> => {
+export const createReview = async (reviewData: Partial<Review> & { 
+  title: string; 
+  rating: number; 
+  user_id: string; 
+  category: string;
+  visibility: 'public' | 'private' | 'circle_only';
+}): Promise<Review> => {
   try {
     // Log the image URL to verify it's being passed correctly
     console.log('Creating review with image URL:', reviewData.image_url);
     
+    // Ensure status is set to 'published' if not provided
+    const dataToInsert = {
+      ...reviewData,
+      status: reviewData.status || 'published'
+    };
+    
     const { data, error } = await supabase
       .from('reviews')
-      .insert(reviewData)
+      .insert(dataToInsert)
       .select()
       .single();
 
