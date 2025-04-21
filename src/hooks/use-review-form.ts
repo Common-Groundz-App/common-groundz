@@ -50,7 +50,7 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
     }
   }, [watchImageUrl, selectedImage]);
 
-  // Reset form when dialog closes
+  // Set initial entity data when in edit mode
   useEffect(() => {
     if (!isEditMode && review?.entity && review.entity_id) {
       setSelectedEntity(review.entity);
@@ -88,8 +88,12 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
     try {
       const url = await handleImageUpload(file);
       if (url) {
+        // Ensure the URL is saved to the form
         setValue('image_url', url);
         setSelectedImage(url);
+        
+        // Debug log
+        console.log('Image uploaded successfully:', url);
       }
     } catch (error) {
       console.error('Image upload failed:', error);
@@ -114,9 +118,18 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
     try {
       const metadata = values.category === 'food' ? { food_tags: foodTags } : undefined;
       
+      // Ensure the image URL is included in the submitted data
+      console.log('Creating review with metadata:', metadata);
+      console.log('Review data being submitted:', {
+        ...values,
+        image_url: values.image_url || selectedImage,
+      });
+      
       if (isEditMode && review) {
         await updateReview(review.id, {
           ...values,
+          // Ensure image_url is included
+          image_url: values.image_url || selectedImage,
           metadata,
         });
         toast({
@@ -126,6 +139,8 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
       } else {
         await createReview({
           ...values,
+          // Ensure image_url is included
+          image_url: values.image_url || selectedImage,
           metadata,
           user_id: user.id
         });
@@ -186,7 +201,6 @@ export const useReviewForm = ({ review, isEditMode = false, onSuccess, onClose }
     formState,
     selectedCategory,
     selectedImage,
-    setSelectedImage,
     isUploading,
     datePickerOpen,
     setDatePickerOpen,
