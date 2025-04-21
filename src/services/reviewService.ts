@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -22,6 +23,10 @@ export interface Review {
   isLiked?: boolean;
   isSaved?: boolean;
   entity?: any | null;
+  metadata?: {
+    food_tags?: string[];
+    [key: string]: any;
+  };
 }
 
 // Fetch user reviews
@@ -195,6 +200,7 @@ export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'u
       visibility: review.visibility,
       user_id: review.user_id,
       experience_date: review.experience_date,
+      metadata: review.metadata,
       is_converted: false,
       recommendation_id: null,
       status: 'published'
@@ -357,7 +363,8 @@ export const updateReview = async (id: string, updates: Partial<Review>) => {
     image_url: updates.image_url,
     category: updates.category,
     visibility: updates.visibility as 'public' | 'private' | 'circle_only',
-    experience_date: updates.experience_date
+    experience_date: updates.experience_date,
+    metadata: updates.metadata
     // No need to include updated_at as our DB trigger handles that now
   };
   
