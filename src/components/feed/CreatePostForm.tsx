@@ -62,7 +62,7 @@ const EntityPreviewBox = ({ entity, type, onChange }: { entity: any, type: strin
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-sm">Selected {type}:</span>
+        <span className="font-medium text-sm">{`Selected ${type}:`}</span>
         <button
           type="button"
           className="text-sm px-2 py-1 border rounded hover:bg-gray-100 focus:outline-none"
@@ -71,7 +71,7 @@ const EntityPreviewBox = ({ entity, type, onChange }: { entity: any, type: strin
           Change
         </button>
       </div>
-      <div className="flex border rounded-lg bg-white p-2 items-center max-w-lg shadow-sm">
+      <div className="flex border rounded-lg bg-white p-2 items-center max-w-lg shadow-sm overflow-hidden">
         {entity.image_url && (
           <img
             src={entity.image_url}
@@ -79,10 +79,10 @@ const EntityPreviewBox = ({ entity, type, onChange }: { entity: any, type: strin
             className="w-12 h-12 object-cover rounded mr-3 flex-shrink-0 bg-gray-100"
           />
         )}
-        <div>
-          <div className="font-semibold truncate">{entity.name || entity.title}</div>
+        <div className="min-w-0">
+          <div className="font-semibold truncate break-words">{entity.name || entity.title}</div>
           {entity.description && (
-            <div className="text-xs text-gray-600 mt-1 truncate">{entity.description}</div>
+            <div className="text-xs text-gray-600 mt-1 truncate break-words">{entity.description}</div>
           )}
         </div>
       </div>
