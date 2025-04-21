@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -58,15 +57,50 @@ interface CreatePostFormProps {
   postToEdit?: PostToEdit;
 }
 
+const EntityPreviewBox = ({ entity, type, onChange }: { entity: any, type: string, onChange: () => void }) => {
+  if (!entity) return null;
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-medium text-sm">Selected {type}:</span>
+        <button
+          type="button"
+          className="text-sm px-2 py-1 border rounded hover:bg-gray-100 focus:outline-none"
+          onClick={onChange}
+        >
+          Change
+        </button>
+      </div>
+      <div className="flex border rounded-lg bg-white p-2 items-center max-w-lg shadow-sm">
+        {entity.image_url && (
+          <img
+            src={entity.image_url}
+            alt={entity.name || 'Preview'}
+            className="w-12 h-12 object-cover rounded mr-3 flex-shrink-0 bg-gray-100"
+          />
+        )}
+        <div>
+          <div className="font-semibold truncate">{entity.name || entity.title}</div>
+          {entity.description && (
+            <div className="text-xs text-gray-600 mt-1 truncate">{entity.description}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>([]);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const sessionId = useState<string>(() => generateUUID())[0]; // Generate a stable sessionId using our local function
+  const sessionId = useState<string>(() => generateUUID())[0];
   const isEditMode = !!postToEdit;
-  
+  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(postToEdit?.tagged_entities?.[0] || null);
+  const [showEntitySelector, setShowEntitySelector] = useState(false);
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -78,8 +112,13 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
       tagged_entities: [],
     },
   });
-  
-  // Load post data for editing
+
+  useEffect(() => {
+    if (postToEdit?.tagged_entities?.[0]) {
+      setSelectedEntity(postToEdit.tagged_entities[0]);
+    }
+  }, [postToEdit]);
+
   useEffect(() => {
     if (postToEdit) {
       form.reset({
@@ -107,7 +146,6 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     setIsSubmitting(true);
     
     try {
-      // Convert MediaItem[] to Json for database compatibility
       const mediaJson = JSON.parse(JSON.stringify(mediaItems)) as Json;
       
       const postData = {
@@ -120,7 +158,6 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
       };
       
       if (isEditMode) {
-        // Update existing post
         const { error } = await supabase
           .from('posts')
           .update(postData)
@@ -129,9 +166,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           
         if (error) throw error;
         
-        // Delete existing entity relationships and create new ones
         if (selectedEntities.length > 0) {
-          // First, remove all existing entity relationships
           const { error: deleteError } = await supabase
             .from('post_entities')
             .delete()
@@ -139,7 +174,6 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
             
           if (deleteError) throw deleteError;
           
-          // Now create new entity relationships
           for (const entity of selectedEntities) {
             const { error: insertError } = await supabase
               .from('post_entities')
@@ -157,7 +191,6 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           description: 'Your post has been updated successfully.',
         });
       } else {
-        // Create new post
         const { data: newPost, error } = await supabase
           .from('posts')
           .insert(postData)
@@ -166,7 +199,6 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           
         if (error) throw error;
         
-        // Create entity relationships
         if (selectedEntities.length > 0 && newPost) {
           for (const entity of selectedEntities) {
             const { error: entityError } = await supabase
@@ -198,10 +230,9 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
       setIsSubmitting(false);
     }
   };
-  
+
   const handleMediaUploaded = (media: MediaItem) => {
     setMediaItems(prev => {
-      // Add order number to new media item
       const newMedia = {
         ...media,
         order: prev.length
@@ -209,10 +240,17 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
       return [...prev, newMedia];
     });
   };
-  
+
   const handleEntitiesChange = (entities: Entity[]) => {
     setSelectedEntities(entities);
   };
+
+  function getEntityTypeLabel(entity: Entity | null): string {
+    if (!entity) return "place";
+    if ((entity as any).entity_type) return (entity as any).entity_type;
+    if ((entity as any).category) return (entity as any).category;
+    return "place";
+  }
 
   return (
     <Form {...form}>
@@ -249,7 +287,6 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           )}
         />
         
-        {/* Media uploader with the correct props */}
         <div>
           {isEditMode && mediaItems.length > 0 && (
             <div className="mb-4">
@@ -273,11 +310,24 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           />
         </div>
         
-        {/* Entity selector with the correct props */}
-        <EntityTagSelector
-          onEntitiesChange={handleEntitiesChange}
-          initialEntities={postToEdit?.tagged_entities || []}
-        />
+        {(selectedEntity && !showEntitySelector) ? (
+          <EntityPreviewBox
+            entity={selectedEntity}
+            type={getEntityTypeLabel(selectedEntity)}
+            onChange={() => setShowEntitySelector(true)}
+          />
+        ) : (
+          <div>
+            <EntityTagSelector
+              onEntitiesChange={(entities) => {
+                setSelectedEntity(entities[0]);
+                setShowEntitySelector(false);
+                form.setValue('tagged_entities', entities);
+              }}
+              initialEntities={selectedEntity ? [selectedEntity] : []}
+            />
+          </div>
+        )}
         
         <div className="space-y-3 pt-3">
           <div className="grid grid-cols-2 gap-4">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -27,6 +26,41 @@ interface ReviewFormProps {
   review?: Review;
   isEditMode?: boolean;
 }
+
+const EntityPreviewBox = ({ entity, type, onChange }: { entity: any; type: string; onChange: () => void }) => {
+  if (!entity) return null;
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-medium text-sm">
+          {`Selected ${type}:`}
+        </span>
+        <button
+          type="button"
+          className="text-sm px-2 py-1 border rounded hover:bg-gray-100 focus:outline-none"
+          onClick={onChange}
+        >
+          Change
+        </button>
+      </div>
+      <div className="flex border rounded-lg bg-white p-2 items-center max-w-lg shadow-sm">
+        {entity.image_url && (
+          <img
+            src={entity.image_url}
+            alt={entity.name || 'Preview'}
+            className="w-12 h-12 object-cover rounded mr-3 flex-shrink-0 bg-gray-100"
+          />
+        )}
+        <div>
+          <div className="font-semibold truncate">{entity.name || entity.title}</div>
+          {entity.description && (
+            <div className="text-xs text-gray-600 mt-1 truncate">{entity.description}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ReviewForm = ({
   isOpen,
@@ -62,7 +96,9 @@ const ReviewForm = ({
   const experienceDate = watch('experience_date');
   const [newFoodTag, setNewFoodTag] = useState('');
   const [foodTags, setFoodTags] = useState<string[]>(review?.metadata?.food_tags || []);
-  
+  const [selectedEntity, setSelectedEntity] = useState<any>(null);
+  const [showEntitySearch, setShowEntitySearch] = useState(false);
+
   const commonFoodTags = ["Spicy", "Sweet", "Savory", "Vegetarian", "Vegan", "Gluten-Free", 
                           "Dairy-Free", "Non-Veg", "Dessert", "Breakfast", "Lunch", "Dinner", 
                           "Appetizer", "Main Course", "Large Portion", "Value for Money"];
@@ -103,6 +139,14 @@ const ReviewForm = ({
     }
   }, [review, isEditMode, setValue]);
   
+  useEffect(() => {
+    // Set selectedEntity if entity_id is present (edit mode or selection)
+    if (review?.entity && review.entity_id) {
+      setSelectedEntity(review.entity);
+      setShowEntitySearch(false);
+    }
+  }, [review]);
+
   const handleImageUploadChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -192,6 +236,18 @@ const ReviewForm = ({
     setFoodTags(foodTags.filter(t => t !== tag));
   };
 
+  const handleEntitySelect = (entity: any) => {
+    setSelectedEntity(entity);
+    setShowEntitySearch(false);
+    setValue('title', entity.name);
+    setValue('entity_id', entity.id);
+    if (entity.venue) setValue('venue', entity.venue);
+    if (entity.description) setValue('description', entity.description);
+    if (entity.image_url) {
+      setValue('image_url', entity.image_url);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -207,7 +263,12 @@ const ReviewForm = ({
               control={control}
               render={({ field }) => (
                 <Select 
-                  onValueChange={field.onChange}
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    setSelectedEntity(null);
+                    setShowEntitySearch(false);
+                    setValue('entity_id', '');
+                  }}
                   value={field.value}
                 >
                   <SelectTrigger className="border-brand-orange/30 focus:ring-brand-orange/30">
@@ -225,42 +286,58 @@ const ReviewForm = ({
             />
           </div>
           
-          {!isEditMode && (
-            ['movie', 'book', 'place', 'product'].includes(selectedCategory)
-          ) && (
-            <div className="space-y-2">
-              <Label>Search for {selectedCategory}</Label>
-              <EntitySearch 
-                type={selectedCategory as any}
-                onSelect={(entity) => {
-                  setValue('title', entity.name);
-                  setValue('entity_id', entity.id);
-                  if (entity.venue) setValue('venue', entity.venue);
-                  if (entity.description) setValue('description', entity.description);
-                  if (entity.image_url) {
-                    setValue('image_url', entity.image_url);
-                  }
-                }}
-              />
-            </div>
+          {/* Entity selection/preview */}
+          {['movie', 'book', 'place', 'product'].includes(selectedCategory) && !isEditMode && (
+            <>
+              {selectedEntity && !showEntitySearch ? (
+                <EntityPreviewBox
+                  entity={selectedEntity}
+                  type={selectedCategory}
+                  onChange={() => {
+                    setShowEntitySearch(true);
+                  }}
+                />
+              ) : (
+                <div className="space-y-2">
+                  <Label>Search for {selectedCategory}</Label>
+                  <EntitySearch 
+                    type={selectedCategory as any}
+                    onSelect={handleEntitySelect}
+                  />
+                </div>
+              )}
+            </>
           )}
-          
+
           {/* For Food category, we'll let users search for restaurant using Places API */}
           {!isEditMode && selectedCategory === 'food' && (
-            <div className="space-y-2">
-              <Label>Search for restaurant</Label>
-              <EntitySearch 
-                type="place"
-                onSelect={(entity) => {
-                  // Just fill the venue with the restaurant name/location
-                  setValue('venue', entity.name);
-                  if (entity.description) setValue('description', entity.description);
-                }}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Search for the restaurant or place where you had this food
-              </p>
-            </div>
+            <>
+              {selectedEntity && !showEntitySearch ? (
+                <EntityPreviewBox
+                  entity={selectedEntity}
+                  type="food"
+                  onChange={() => {
+                    setShowEntitySearch(true);
+                  }}
+                />
+              ) : (
+                <div className="space-y-2">
+                  <Label>Search for restaurant</Label>
+                  <EntitySearch 
+                    type="place"
+                    onSelect={(entity) => {
+                      setSelectedEntity(entity);
+                      setShowEntitySearch(false);
+                      setValue('venue', entity.name);
+                      if (entity.description) setValue('description', entity.description);
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Search for the restaurant or place where you had this food
+                  </p>
+                </div>
+              )}
+            </>
           )}
           
           <div className="space-y-2">
