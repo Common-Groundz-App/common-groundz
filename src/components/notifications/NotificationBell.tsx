@@ -1,17 +1,23 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Bell, Check } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useContentViewer } from '@/contexts/ContentViewerContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
 } from '@/components/ui/dropdown-menu';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
+import { EntityType } from '@/services/notificationService';
 
 export const NotificationBell: React.FC = () => {
   const { notifications, unreadCount, markAsRead, loading } = useNotifications();
+  const { openContent } = useContentViewer();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
   const handleDropdownChange = (val: boolean) => {
@@ -22,6 +28,49 @@ export const NotificationBell: React.FC = () => {
       if (unreadIds.length > 0) markAsRead(unreadIds);
     }
   };
+
+  const handleNotificationClick = useCallback((notification: any, event: React.MouseEvent) => {
+    event.preventDefault();
+    setOpen(false);
+    
+    if (!notification.entity_type || !notification.entity_id) {
+      // If there's no entity information, try using the action URL directly
+      if (notification.action_url) {
+        navigate(notification.action_url);
+      } else {
+        toast({
+          description: "This notification doesn't have any associated content"
+        });
+      }
+      return;
+    }
+    
+    // Extract comment ID from metadata if available
+    const commentId = notification.metadata?.comment_id || null;
+    
+    // Handle click based on entity type
+    switch (notification.entity_type as EntityType) {
+      case 'post':
+        openContent('post', notification.entity_id, commentId);
+        break;
+      case 'recommendation':
+        openContent('recommendation', notification.entity_id, commentId);
+        break;
+      case 'profile':
+        // For profiles, navigate directly to the profile page
+        navigate(`/profile/${notification.entity_id}`);
+        break;
+      default:
+        // For other types or if action_url is available, use that
+        if (notification.action_url) {
+          navigate(notification.action_url);
+        } else {
+          toast({
+            description: "This notification doesn't have any associated content"
+          });
+        }
+    }
+  }, [navigate, openContent, toast]);
 
   return (
     <DropdownMenu open={open} onOpenChange={handleDropdownChange}>
@@ -44,8 +93,9 @@ export const NotificationBell: React.FC = () => {
             <p className="text-sm text-muted-foreground">No notifications yet.</p>
           ) : (
             notifications.map((n) => (
-              <Link
-                to={n.action_url || '#'}
+              <a
+                href="#"
+                onClick={(e) => handleNotificationClick(n, e)}
                 key={n.id}
                 className={`flex items-start gap-2 p-2 rounded hover:bg-accent transition relative ${
                   !n.is_read ? 'bg-orange-50' : ''
@@ -65,7 +115,7 @@ export const NotificationBell: React.FC = () => {
                   <div className="text-xs text-gray-400">{new Date(n.created_at).toLocaleString()}</div>
                 </div>
                 {n.is_read && <Check className="w-4 h-4 text-green-400 mt-1" />}
-              </Link>
+              </a>
             ))
           )}
         </div>

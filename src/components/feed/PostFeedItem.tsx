@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -41,6 +40,7 @@ interface PostFeedItemProps {
   onComment?: (id: string) => void;
   onDelete?: (id: string) => void;
   refreshFeed?: () => void;
+  highlightCommentId?: string | null;
 }
 
 export const PostFeedItem: React.FC<PostFeedItemProps> = ({ 
@@ -49,7 +49,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   onSave,
   onComment,
   onDelete,
-  refreshFeed
+  refreshFeed,
+  highlightCommentId = null
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -89,6 +90,12 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       window.removeEventListener('refresh-post-comment-count', handleCommentCountUpdate as EventListener);
     };
   }, [post.id]);
+  
+  useEffect(() => {
+    if (highlightCommentId) {
+      setIsCommentDialogOpen(true);
+    }
+  }, [highlightCommentId]);
   
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -159,15 +166,12 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       description: "Your post has been updated successfully"
     });
     
-    // Add a slight delay before dispatching refresh events
     setTimeout(() => {
       resetBodyPointerEvents();
       
-      // Dispatch global refresh events
       window.dispatchEvent(new CustomEvent('refresh-feed'));
       window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
       
-      // If there's a parent refresh function, call it
       if (refreshFeed) {
         refreshFeed();
       }
@@ -196,28 +200,20 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         description: "Your post has been deleted successfully"
       });
       
-      // First close the dialog to prevent UI lock
       setIsDeleteDialogOpen(false);
       setIsDeleting(false);
       
-      // Explicitly reset pointer-events
       resetBodyPointerEvents();
       
-      // Then update local state and trigger refresh
       if (onDelete) {
         onDelete(post.id);
       }
       
-      // Add a slight delay before dispatching refresh events
-      // This helps ensure the UI remains responsive
       setTimeout(() => {
-        // Explicitly reset pointer-events again after the timeout
         resetBodyPointerEvents();
         
-        // Dispatch global refresh event
         window.dispatchEvent(new CustomEvent('refresh-feed'));
         
-        // If there's a parent refresh function, call it
         if (refreshFeed) {
           refreshFeed();
         }
@@ -352,12 +348,12 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       <CommentDialog 
         isOpen={isCommentDialogOpen} 
         onClose={() => setIsCommentDialogOpen(false)} 
-        itemId={post.id} 
+        itemId={post.id}
         itemType="post" 
         onCommentAdded={handleCommentAdded}
+        highlightCommentId={highlightCommentId}
       />
       
-      {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

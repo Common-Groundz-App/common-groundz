@@ -18,7 +18,10 @@ export interface Notification {
   action_url?: string | null;
   created_at: string;
   updated_at: string;
-  metadata?: any;
+  metadata?: {
+    comment_id?: string;
+    [key: string]: any;
+  };
 }
 
 export const fetchNotifications = async (limit = 20): Promise<Notification[]> => {
@@ -38,4 +41,35 @@ export const markNotificationsAsRead = async (notificationIds: string[]): Promis
 
   if (error) throw error;
   return data || [];
+};
+
+// Helper function to generate content URLs
+export const getContentUrl = (type: EntityType, id: string, commentId?: string): string => {
+  if (!type || !id) return '#';
+  
+  let url = '';
+  
+  switch (type) {
+    case 'post':
+      url = `/post/${id}`;
+      break;
+    case 'recommendation':
+      url = `/recommendation/${id}`;
+      break;
+    case 'review':
+      url = `/review/${id}`;
+      break;
+    case 'profile':
+      url = `/profile/${id}`;
+      break;
+    default:
+      url = '#';
+  }
+  
+  // Add comment ID as a query parameter if provided
+  if (commentId) {
+    url += `?commentId=${commentId}`;
+  }
+  
+  return url;
 };

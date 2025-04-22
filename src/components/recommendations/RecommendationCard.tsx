@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,13 +27,15 @@ interface RecommendationCardProps {
   onLike: (id: string) => void;
   onSave: (id: string) => void;
   onDeleted?: () => void;
+  highlightCommentId?: string | null;
 }
 
 const RecommendationCard = ({ 
   recommendation, 
   onLike, 
   onSave,
-  onDeleted
+  onDeleted,
+  highlightCommentId = null
 }: RecommendationCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -77,6 +78,12 @@ const RecommendationCard = ({
     };
   }, [recommendation.id]);
   
+  useEffect(() => {
+    if (highlightCommentId) {
+      setIsCommentDialogOpen(true);
+    }
+  }, [highlightCommentId]);
+  
   const handleCommentClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -91,7 +98,6 @@ const RecommendationCard = ({
     e.stopPropagation();
     e.preventDefault();
     
-    // Fetch the full recommendation data
     if (user) {
       try {
         const fullRecommendation = await fetchRecommendationById(recommendation.id, user.id);
@@ -130,12 +136,10 @@ const RecommendationCard = ({
       
       setIsDeleteDialogOpen(false);
       
-      // Call onDeleted callback if provided
       if (onDeleted) {
         onDeleted();
       }
       
-      // Force a refresh of component state
       window.dispatchEvent(new CustomEvent('refresh-recommendations'));
     } catch (error) {
       console.error("Error deleting recommendation:", error);
@@ -153,7 +157,6 @@ const RecommendationCard = ({
     if (!user || !editRecommendation) return;
     
     try {
-      // Update the recommendation in the database
       await updateRecommendation(recommendation.id, {
         title: values.title,
         venue: values.venue || null,
@@ -169,15 +172,12 @@ const RecommendationCard = ({
         description: "Your recommendation has been updated successfully"
       });
       
-      // Close the form
       setIsEditing(false);
       
-      // Call onDeleted to refresh the list
       if (onDeleted) {
         onDeleted();
       }
       
-      // Force a refresh of component state
       window.dispatchEvent(new CustomEvent('refresh-recommendations'));
     } catch (error) {
       console.error("Error updating recommendation:", error);
@@ -332,16 +332,15 @@ const RecommendationCard = ({
         </CardContent>
       </Card>
 
-      {/* Comment Dialog */}
       <CommentDialog 
         isOpen={isCommentDialogOpen} 
         onClose={() => setIsCommentDialogOpen(false)} 
         itemId={recommendation.id}
         itemType="recommendation"
         onCommentAdded={handleCommentAdded}
+        highlightCommentId={highlightCommentId}
       />
       
-      {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
@@ -351,7 +350,6 @@ const RecommendationCard = ({
         isLoading={isDeleting}
       />
       
-      {/* Edit Form Dialog */}
       {editRecommendation && (
         <RecommendationForm
           isOpen={isEditing}
@@ -368,7 +366,6 @@ const RecommendationCard = ({
 
 export default RecommendationCard;
 
-// Helper to update a recommendation
 const updateRecommendation = async (id: string, updates: Partial<Recommendation>) => {
   const { supabase } = await import('@/integrations/supabase/client');
   
