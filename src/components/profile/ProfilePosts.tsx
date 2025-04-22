@@ -82,9 +82,9 @@ const ProfilePosts = ({ profileUserId, isOwnProfile, highlightPostId, highlightC
           className={`transition-all duration-300 rounded-lg ${post.id === highlightPostId ? 'bg-accent/30' : ''}`}
         >
           <ProfilePostItem 
-            post={post} 
-            isOwnPost={isOwnProfile}
-            highlightCommentId={post.id === highlightPostId ? highlightCommentId : null} 
+            post={post}
+            onDeleted={(id) => {}}
+            highlightCommentId={post.id === highlightPostId ? highlightCommentId : null}
           />
         </div>
       ))}

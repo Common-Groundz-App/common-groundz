@@ -78,7 +78,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile, highlightReviewId }: Prof
             onLike={() => {}}
             onSave={() => {}}
             refreshReviews={async () => {}}
-            isOwnReview={isOwnProfile}
+            onConvert={review.is_converted ? undefined : () => {}}
           />
         </div>
       ))}

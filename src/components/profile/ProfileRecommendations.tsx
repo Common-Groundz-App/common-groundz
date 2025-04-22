@@ -95,7 +95,7 @@ const ProfileRecommendations = ({
             recommendation={recommendation}
             onLike={() => {}}
             onSave={() => {}}
-            showExpanded={recommendation.id === highlightRecId}
+            onDeleted={() => {}}
             highlightCommentId={recommendation.id === highlightRecId ? highlightCommentId : null}
           />
         </div>
