@@ -98,13 +98,14 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
         // Process tagged entities if any
         let taggedEntities = [];
         try {
-          const { data: entitiesData } = await supabase.rpc(
-            'get_post_entities', 
-            { post_id_input: postId }
-          );
+          // Use direct query instead of RPC function
+          const { data: entityData } = await supabase
+            .from('post_entities')
+            .select('entity_id, entities:entity_id(*)')
+            .eq('post_id', postId);
           
-          if (entitiesData && entitiesData.length > 0) {
-            taggedEntities = entitiesData;
+          if (entityData && entityData.length > 0) {
+            taggedEntities = entityData.map((item: any) => item.entities);
           }
         } catch (err) {
           console.error('Error loading entities:', err);

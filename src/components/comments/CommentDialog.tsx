@@ -22,6 +22,7 @@ interface CommentDialogProps {
   itemId: string;
   itemType: 'recommendation' | 'post';
   onCommentAdded?: () => void;
+  highlightCommentId?: string | null;
 }
 
 // Helper function to reset body pointer events
