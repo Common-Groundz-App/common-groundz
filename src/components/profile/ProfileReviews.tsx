@@ -1,8 +1,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useProfileData } from '@/hooks/use-profile-data';
-import { ReviewCard } from './reviews/ReviewCard';
-import { EmptyReviews } from './reviews/EmptyReviews';
+import ReviewCard from './reviews/ReviewCard';
+import EmptyReviews from './reviews/EmptyReviews';
 import { toast } from '@/hooks/use-toast';
 
 interface ProfileReviewsProps {
@@ -56,7 +56,13 @@ const ProfileReviews = ({ profileUserId, isOwnProfile, highlightReviewId }: Prof
   }
 
   if (!reviews || reviews.length === 0) {
-    return <EmptyReviews isOwnProfile={isOwnProfile} />;
+    return <EmptyReviews 
+      isOwnProfile={isOwnProfile} 
+      onCreateReview={() => {
+        const event = new CustomEvent('open-create-review-dialog');
+        window.dispatchEvent(event);
+      }} 
+    />;
   }
 
   return (
@@ -67,7 +73,13 @@ const ProfileReviews = ({ profileUserId, isOwnProfile, highlightReviewId }: Prof
           ref={review.id === highlightReviewId ? highlightedReviewRef : null}
           className={`transition-all duration-300 rounded-lg ${review.id === highlightReviewId ? 'bg-accent/30' : ''}`}
         >
-          <ReviewCard review={review} isOwnReview={isOwnProfile} />
+          <ReviewCard 
+            review={review} 
+            onLike={() => {}}
+            onSave={() => {}}
+            refreshReviews={async () => {}}
+            isOwnReview={isOwnProfile}
+          />
         </div>
       ))}
     </div>

@@ -1,9 +1,9 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useProfileData } from '@/hooks/use-profile-data';
-import { RecommendationCard } from '@/components/recommendations/RecommendationCard';
-import { RecommendationSkeleton } from '@/components/recommendations/RecommendationSkeleton';
-import { EmptyRecommendations } from '@/components/recommendations/EmptyRecommendations';
+import RecommendationCard from '@/components/recommendations/RecommendationCard';
+import RecommendationSkeleton from '@/components/recommendations/RecommendationSkeleton';
+import EmptyRecommendations from '@/components/recommendations/EmptyRecommendations';
 import { toast } from '@/hooks/use-toast';
 
 interface ProfileRecommendationsProps {
@@ -72,7 +72,15 @@ const ProfileRecommendations = ({
   }
 
   if (!recommendations || recommendations.length === 0) {
-    return <EmptyRecommendations isOwnProfile={isOwnProfile} />;
+    return <EmptyRecommendations 
+      isOwnProfile={isOwnProfile} 
+      hasActiveFilter={false}
+      onClearFilters={() => {}}
+      onAddNew={() => {
+        const event = new CustomEvent('open-create-recommendation-dialog');
+        window.dispatchEvent(event);
+      }}
+    />;
   }
 
   return (
@@ -85,9 +93,10 @@ const ProfileRecommendations = ({
         >
           <RecommendationCard
             recommendation={recommendation}
-            isOwnRecommendation={isOwnProfile}
-            highlightCommentId={recommendation.id === highlightRecId ? highlightCommentId : null}
+            onLike={() => {}}
+            onSave={() => {}}
             showExpanded={recommendation.id === highlightRecId}
+            highlightCommentId={recommendation.id === highlightRecId ? highlightCommentId : null}
           />
         </div>
       ))}

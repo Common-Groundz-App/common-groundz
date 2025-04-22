@@ -1,8 +1,8 @@
 
 import React, { useEffect, useRef } from 'react';
-import { ProfilePostItem } from './ProfilePostItem';
-import { ProfilePostsEmpty } from './ProfilePostsEmpty';
-import { ProfilePostsLoading } from './ProfilePostsLoading';
+import ProfilePostItem from './ProfilePostItem';
+import ProfilePostsEmpty from './ProfilePostsEmpty';
+import ProfilePostsLoading from './ProfilePostsLoading';
 import { useProfileData } from '@/hooks/use-profile-data';
 import { toast } from '@/hooks/use-toast';
 
