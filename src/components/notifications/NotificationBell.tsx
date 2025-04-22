@@ -1,17 +1,18 @@
 
 import React, { useState, useCallback } from 'react';
-import { Bell, Check } from 'lucide-react';
+import { Bell, Check, Loader2 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { EntityType } from '@/services/notificationService';
+import { cn } from '@/lib/utils';
 
 export const NotificationBell: React.FC = () => {
   const { notifications, unreadCount, markAsRead, loading } = useNotifications();
@@ -22,7 +23,7 @@ export const NotificationBell: React.FC = () => {
 
   const handleDropdownChange = (val: boolean) => {
     setOpen(val);
-    if (val) {
+    if (val && unreadCount > 0) {
       // Mark all unread as read when opened
       const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
       if (unreadIds.length > 0) markAsRead(unreadIds);
@@ -78,44 +79,87 @@ export const NotificationBell: React.FC = () => {
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-0 right-0 inline-block h-4 w-4 rounded-full bg-red-500 text-white text-xs text-center leading-4">
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white">
               {unreadCount}
             </span>
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-96 max-h-[400px] overflow-y-auto">
-        <div className="p-2">
-          <h4 className="font-bold mb-2">Notifications</h4>
+      <DropdownMenuContent 
+        align="end" 
+        className="w-80 max-h-[480px] overflow-y-auto backdrop-blur-lg bg-background/95 border border-border/50 shadow-lg animate-in fade-in-0 zoom-in-95"
+      >
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50">
+          <div className="flex items-center justify-between p-4">
+            <h4 className="text-sm font-semibold">Notifications</h4>
+            {notifications.length > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 text-xs"
+                onClick={() => {
+                  const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+                  if (unreadIds.length > 0) markAsRead(unreadIds);
+                }}
+              >
+                Mark all as read
+              </Button>
+            )}
+          </div>
+        </div>
+        
+        <div className="px-2 py-1">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
           ) : notifications.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No notifications yet.</p>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Bell className="h-8 w-8 text-muted-foreground/50 mb-2" />
+              <p className="text-sm text-muted-foreground">No notifications yet</p>
+            </div>
           ) : (
             notifications.map((n) => (
-              <a
-                href="#"
+              <button
                 onClick={(e) => handleNotificationClick(n, e)}
                 key={n.id}
-                className={`flex items-start gap-2 p-2 rounded hover:bg-accent transition relative ${
-                  !n.is_read ? 'bg-orange-50' : ''
-                }`}
-                style={{ textDecoration: 'none' }}
-              >
-                {n.image_url ? (
-                  <img src={n.image_url} className="w-8 h-8 rounded-full object-cover border" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                    <Bell className="w-5 h-5" />
-                  </div>
+                className={cn(
+                  "w-full text-left px-3 py-2.5 rounded-lg transition-all duration-200",
+                  "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                  !n.is_read && "bg-primary/5"
                 )}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground truncate">{n.title}</div>
-                  <div className="text-xs text-muted-foreground break-words">{n.message}</div>
-                  <div className="text-xs text-gray-400">{new Date(n.created_at).toLocaleString()}</div>
+              >
+                <div className="flex items-start gap-3">
+                  {n.image_url ? (
+                    <img 
+                      src={n.image_url} 
+                      className="w-9 h-9 rounded-full object-cover border"
+                      alt=""
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-muted/50 flex items-center justify-center">
+                      <Bell className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className={cn(
+                      "text-sm leading-5 text-foreground",
+                      !n.is_read && "font-medium"
+                    )}>
+                      {n.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                      {n.message}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground/75 mt-1">
+                      {new Date(n.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  {n.is_read && (
+                    <Check className="w-4 h-4 text-primary/50 mt-1 shrink-0" />
+                  )}
                 </div>
-                {n.is_read && <Check className="w-4 h-4 text-green-400 mt-1" />}
-              </a>
+              </button>
             ))
           )}
         </div>
