@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
@@ -14,21 +14,8 @@ import ProfileCard from './ProfileCard';
 
 const ProfileContent = () => {
   const { userId } = useParams();
-  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('posts');
   const cardStyles = useCardStyles();
-  
-  // Extract content parameters from URL
-  const postId = searchParams.get('post');
-  const recId = searchParams.get('rec');
-  const reviewId = searchParams.get('review');
-  const commentId = searchParams.get('comment');
-  
-  // Create refs for scrolling
-  const postsRef = useRef<HTMLDivElement>(null);
-  const recommendationsRef = useRef<HTMLDivElement>(null);
-  const reviewsRef = useRef<HTMLDivElement>(null);
-  
   const { 
     isLoading, 
     error,
@@ -49,18 +36,9 @@ const ProfileContent = () => {
     profileData
   } = useProfileData(userId);
 
-  // Set the active tab based on URL parameters
   useEffect(() => {
-    if (postId) {
-      setActiveTab('posts');
-    } else if (recId) {
-      setActiveTab('recommendations');
-    } else if (reviewId) {
-      setActiveTab('reviews');
-    } else {
-      setActiveTab('posts');
-    }
-  }, [postId, recId, reviewId, userId]);
+    setActiveTab('posts');
+  }, [userId]);
 
   if (isLoading) {
     return (
@@ -128,35 +106,24 @@ const ProfileContent = () => {
                 className="mb-6"
               >
                 <TabsContent value="posts">
-                  <div ref={postsRef}>
-                    <ProfilePosts 
-                      profileUserId={profileData?.id} 
-                      isOwnProfile={isOwnProfile}
-                      highlightPostId={postId}
-                      highlightCommentId={postId ? commentId : undefined}
-                    />
-                  </div>
+                  <ProfilePosts 
+                    profileUserId={profileData?.id} 
+                    isOwnProfile={isOwnProfile} 
+                  />
                 </TabsContent>
                 
                 <TabsContent value="recommendations">
-                  <div ref={recommendationsRef}>
-                    <ProfileRecommendations 
-                      profileUserId={profileData?.id}
-                      isOwnProfile={isOwnProfile}
-                      highlightRecId={recId}
-                      highlightCommentId={recId ? commentId : undefined}
-                    />
-                  </div>
+                  <ProfileRecommendations 
+                    profileUserId={profileData?.id}
+                    isOwnProfile={isOwnProfile}
+                  />
                 </TabsContent>
                 
                 <TabsContent value="reviews">
-                  <div ref={reviewsRef}>
-                    <ProfileReviews 
-                      profileUserId={profileData?.id} 
-                      isOwnProfile={isOwnProfile}
-                      highlightReviewId={reviewId}
-                    />
-                  </div>
+                  <ProfileReviews 
+                    profileUserId={profileData?.id} 
+                    isOwnProfile={isOwnProfile}
+                  />
                 </TabsContent>
                 
                 <TabsContent value="circles">

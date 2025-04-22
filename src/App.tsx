@@ -1,5 +1,5 @@
 
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
@@ -12,13 +12,6 @@ import './App.css';
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from './components/ui/tooltip';
 import { ThemeProvider } from './contexts/ThemeContext';
-
-// Helper component for dynamic redirects
-const OldRecommendationRedirect = () => {
-  const location = useLocation();
-  const recommendationId = location.pathname.split('/').pop();
-  return <Navigate to={`/profile?rec=${recommendationId}`} replace />;
-};
 
 function App() {
   return (
@@ -68,8 +61,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* Redirect old recommendation URLs to profile with recommendation parameter */}
-            <Route path="/recommendations/:id" element={<OldRecommendationRedirect />} />
             {/* Redirect old edit routes to profile */}
             <Route path="/recommendations/edit/:id" element={<Navigate to="/profile" />} />
             <Route path="/posts/edit/:id" element={<Navigate to="/profile" />} />

@@ -21,75 +21,6 @@ export interface Notification {
   metadata?: any;
 }
 
-// Helper function to generate the appropriate action URL based on notification type
-const generateActionUrl = (notification: Notification): string | null => {
-  const { type, entity_type, entity_id, sender_id, metadata } = notification;
-  
-  if (!entity_type || !entity_id) {
-    return null;
-  }
-  
-  switch (type) {
-    case 'like':
-      if (entity_type === 'post') {
-        return `/profile?post=${entity_id}`;
-      } else if (entity_type === 'recommendation') {
-        return `/profile?rec=${entity_id}`;
-      } else if (entity_type === 'review') {
-        return `/profile?review=${entity_id}`;
-      }
-      break;
-      
-    case 'comment':
-      if (entity_type === 'post') {
-        // If we have a comment ID in metadata, include it to scroll to that comment
-        const commentId = metadata?.comment_id;
-        return commentId 
-          ? `/profile?post=${entity_id}&comment=${commentId}`
-          : `/profile?post=${entity_id}`;
-      } else if (entity_type === 'recommendation') {
-        const commentId = metadata?.comment_id;
-        return commentId 
-          ? `/profile?rec=${entity_id}&comment=${commentId}`
-          : `/profile?rec=${entity_id}`;
-      }
-      break;
-      
-    case 'follow':
-      if (sender_id) {
-        return `/profile/${sender_id}`;
-      }
-      break;
-      
-    case 'system':
-      // System notifications might have custom URLs defined already
-      return notification.action_url;
-      
-    default:
-      return null;
-  }
-  
-  return null;
-};
-
-// Helper function to validate notification type
-const validateNotificationType = (type: string): NotificationType => {
-  const validTypes: NotificationType[] = ['like', 'comment', 'follow', 'system'];
-  return validTypes.includes(type as NotificationType) 
-    ? type as NotificationType 
-    : 'system'; // Default to system for unknown types
-};
-
-// Helper function to validate entity type
-const validateEntityType = (type: string | null): EntityType | undefined => {
-  if (!type) return undefined;
-  
-  const validTypes: EntityType[] = ['post', 'recommendation', 'review', 'profile', 'system'];
-  return validTypes.includes(type as EntityType) 
-    ? type as EntityType 
-    : undefined;
-};
-
 export const fetchNotifications = async (limit = 20): Promise<Notification[]> => {
   const { data, error } = await supabase
     .from('notifications')
@@ -98,30 +29,7 @@ export const fetchNotifications = async (limit = 20): Promise<Notification[]> =>
     .limit(limit);
 
   if (error) throw error;
-  
-  // Process notifications to ensure they have the correct action URLs
-  const processedNotifications = data.map(notification => {
-    // Ensure notification type is valid
-    const validatedType = validateNotificationType(notification.type);
-    const validatedEntityType = validateEntityType(notification.entity_type);
-    
-    // Create a properly typed notification object
-    const typedNotification: Notification = {
-      ...notification,
-      type: validatedType,
-      entity_type: validatedEntityType
-    };
-    
-    // Use the database-provided action_url if it exists, otherwise generate one
-    const actionUrl = notification.action_url || generateActionUrl(typedNotification);
-    
-    return {
-      ...typedNotification,
-      action_url: actionUrl
-    };
-  });
-  
-  return processedNotifications;
+  return data as Notification[];
 };
 
 export const markNotificationsAsRead = async (notificationIds: string[]): Promise<string[]> => {

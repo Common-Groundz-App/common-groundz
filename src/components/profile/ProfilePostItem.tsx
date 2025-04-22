@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,10 +46,9 @@ interface Post {
 interface ProfilePostItemProps {
   post: Post;
   onDeleted?: (postId: string) => void;
-  highlightCommentId?: string | null;
 }
 
-const ProfilePostItem = ({ post, onDeleted, highlightCommentId }: ProfilePostItemProps) => {
+const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
