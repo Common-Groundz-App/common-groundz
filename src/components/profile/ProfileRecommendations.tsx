@@ -1,129 +1,98 @@
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { useRecommendations } from '@/hooks/recommendations/use-recommendations';
-import RecommendationForm from '@/components/recommendations/RecommendationForm';
-import RecommendationFilters from '@/components/recommendations/RecommendationFilters';
-import RecommendationCard from '@/components/recommendations/RecommendationCard';
-import RecommendationSkeleton from '@/components/recommendations/RecommendationSkeleton';
-import EmptyRecommendations from '@/components/recommendations/EmptyRecommendations';
+import React, { useEffect, useRef } from 'react';
+import { useProfileData } from '@/hooks/use-profile-data';
+import { RecommendationCard } from '@/components/recommendations/RecommendationCard';
+import { RecommendationSkeleton } from '@/components/recommendations/RecommendationSkeleton';
+import { EmptyRecommendations } from '@/components/recommendations/EmptyRecommendations';
+import { toast } from '@/hooks/use-toast';
 
-type ProfileRecommendationsProps = {
-  profileUserId: string;
-  isOwnProfile?: boolean;
-};
+interface ProfileRecommendationsProps {
+  profileUserId?: string;
+  isOwnProfile: boolean;
+  highlightRecId?: string | null;
+  highlightCommentId?: string | null;
+}
 
-const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: ProfileRecommendationsProps) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  
-  const {
-    recommendations,
-    isLoading,
-    activeFilter,
-    setActiveFilter,
-    sortBy,
-    setSortBy,
-    handleLike,
-    handleSave,
-    handleImageUpload,
-    addRecommendation,
-    clearFilters,
-    refreshRecommendations
-  } = useRecommendations({ 
-    profileUserId
-  });
-  
-  const categories = recommendations.length > 0 
-    ? [...new Set(recommendations.map(item => item.category))] 
-    : [];
-  
+const ProfileRecommendations = ({ 
+  profileUserId, 
+  isOwnProfile,
+  highlightRecId,
+  highlightCommentId
+}: ProfileRecommendationsProps) => {
+  const { recommendations, isLoading } = useProfileData(profileUserId).recommendations;
+  const highlightedRecRef = useRef<HTMLDivElement>(null);
+
+  // Effect to scroll to highlighted recommendation
   useEffect(() => {
-    const handleOpenForm = () => {
-      setIsFormOpen(true);
-    };
-    
-    window.addEventListener('open-recommendation-form', handleOpenForm);
-    return () => {
-      window.removeEventListener('open-recommendation-form', handleOpenForm);
-    };
-  }, []);
-  
-  const handleFormSubmit = async (values: any) => {
-    const result = await addRecommendation({
-      title: values.title,
-      venue: values.venue || null,
-      description: values.description || null,
-      rating: values.rating,
-      image_url: values.image_url,
-      category: values.category,
-      visibility: values.visibility,
-      is_certified: false,
-      view_count: 0,
-      entity_id: values.entity_id || null
-    });
-    
-    if (result) {
-      toast({
-        title: "Recommendation added",
-        description: "Your recommendation has been added successfully"
-      });
-      setIsFormOpen(false);
+    if (highlightRecId && recommendations && recommendations.length > 0 && !isLoading) {
+      // Check if the recommendation exists
+      const recExists = recommendations.some(rec => rec.id === highlightRecId);
+      
+      if (recExists) {
+        // Short delay to ensure DOM is updated
+        setTimeout(() => {
+          if (highlightedRecRef.current) {
+            highlightedRecRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // Add a highlight effect
+            highlightedRecRef.current.classList.add('ring-2', 'ring-primary', 'ring-opacity-50');
+            setTimeout(() => {
+              highlightedRecRef.current?.classList.remove('ring-2', 'ring-primary', 'ring-opacity-50');
+            }, 2000);
+            
+            // If there's a comment to highlight
+            if (highlightCommentId) {
+              toast({
+                title: "Comment found",
+                description: "Scrolling to the specific comment",
+                duration: 2000
+              });
+            }
+          }
+        }, 100);
+      } else {
+        toast({
+          title: "Recommendation not found",
+          description: "The recommendation you're looking for might have been deleted or is not visible.",
+          variant: "destructive",
+          duration: 3000
+        });
+      }
     }
-  };
+  }, [highlightRecId, recommendations, isLoading, highlightCommentId]);
 
-  const handleRecommendationDeleted = () => {
-    refreshRecommendations();
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {[...Array(3)].map((_, i) => (
+          <RecommendationSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+
+  if (!recommendations || recommendations.length === 0) {
+    return <EmptyRecommendations isOwnProfile={isOwnProfile} />;
+  }
 
   return (
-    <div className="space-y-6 mx-0 my-0">
-      <RecommendationFilters 
-        isOwnProfile={isOwnProfile}
-        activeFilter={activeFilter}
-        sortBy={sortBy}
-        categories={categories}
-        onFilterChange={setActiveFilter}
-        onSortChange={setSortBy}
-        onClearFilters={clearFilters}
-        onAddNew={() => setIsFormOpen(true)}
-      />
-      
-      {isLoading ? (
-        <RecommendationSkeleton />
-      ) : recommendations.length === 0 ? (
-        <EmptyRecommendations 
-          isOwnProfile={isOwnProfile}
-          hasActiveFilter={!!activeFilter}
-          onClearFilters={clearFilters}
-          onAddNew={() => setIsFormOpen(true)}
-        />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recommendations.map(item => (
-            <RecommendationCard 
-              key={item.id}
-              recommendation={item}
-              onLike={handleLike}
-              onSave={handleSave}
-              onDeleted={handleRecommendationDeleted}
-            />
-          ))}
+    <div className="space-y-6">
+      {recommendations.map((recommendation) => (
+        <div
+          key={recommendation.id}
+          ref={recommendation.id === highlightRecId ? highlightedRecRef : null}
+          className={`transition-all duration-300 rounded-lg ${recommendation.id === highlightRecId ? 'bg-accent/30' : ''}`}
+        >
+          <RecommendationCard
+            recommendation={recommendation}
+            isOwnRecommendation={isOwnProfile}
+            highlightCommentId={recommendation.id === highlightRecId ? highlightCommentId : null}
+            showExpanded={recommendation.id === highlightRecId}
+          />
         </div>
-      )}
-      
-      {user && (
-        <RecommendationForm
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          onSubmit={handleFormSubmit}
-          onImageUpload={handleImageUpload}
-        />
-      )}
+      ))}
     </div>
   );
-}
+};
 
 export default ProfileRecommendations;

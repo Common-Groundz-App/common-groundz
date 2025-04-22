@@ -1,100 +1,75 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
-import EmptyReviews from './reviews/EmptyReviews';
-import { useReviews } from '@/hooks/use-reviews';
-import ReviewCard from './reviews/ReviewCard';
-import ReviewForm from './reviews/ReviewForm';
+import React, { useEffect, useRef } from 'react';
+import { useProfileData } from '@/hooks/use-profile-data';
+import { ReviewCard } from './reviews/ReviewCard';
+import { EmptyReviews } from './reviews/EmptyReviews';
+import { toast } from '@/hooks/use-toast';
 
 interface ProfileReviewsProps {
-  profileUserId: string;
+  profileUserId?: string; 
   isOwnProfile: boolean;
+  highlightReviewId?: string | null;
 }
 
-const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) => {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  
-  const {
-    reviews,
-    isLoading,
-    error,
-    handleLike,
-    handleSave,
-    refreshReviews,
-    convertToRecommendation,
-  } = useReviews({ profileUserId });
+const ProfileReviews = ({ profileUserId, isOwnProfile, highlightReviewId }: ProfileReviewsProps) => {
+  const { reviews, isLoading } = useProfileData(profileUserId).reviews;
+  const highlightedReviewRef = useRef<HTMLDivElement>(null);
+
+  // Effect to scroll to highlighted review
+  useEffect(() => {
+    if (highlightReviewId && reviews && reviews.length > 0 && !isLoading) {
+      // Check if the review exists
+      const reviewExists = reviews.some(review => review.id === highlightReviewId);
+      
+      if (reviewExists) {
+        // Short delay to ensure DOM is updated
+        setTimeout(() => {
+          if (highlightedReviewRef.current) {
+            highlightedReviewRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // Add a highlight effect
+            highlightedReviewRef.current.classList.add('ring-2', 'ring-primary', 'ring-opacity-50');
+            setTimeout(() => {
+              highlightedReviewRef.current?.classList.remove('ring-2', 'ring-primary', 'ring-opacity-50');
+            }, 2000);
+          }
+        }, 100);
+      } else {
+        toast({
+          title: "Review not found",
+          description: "The review you're looking for might have been deleted or is not visible.",
+          variant: "destructive",
+          duration: 3000
+        });
+      }
+    }
+  }, [highlightReviewId, reviews, isLoading]);
 
   if (isLoading) {
     return (
-      <div className="w-full max-w-4xl mx-auto grid gap-6">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="w-full h-60 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-md"></div>
+      <div className="space-y-6">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-32 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-md"></div>
         ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-destructive">Error loading reviews. Please try again.</p>
       </div>
     );
   }
 
   if (!reviews || reviews.length === 0) {
-    return (
-      <div className="max-w-3xl mx-auto">
-        <EmptyReviews 
-          isOwnProfile={isOwnProfile} 
-          onCreateReview={() => setIsFormOpen(true)} 
-        />
-        {isFormOpen && isOwnProfile && (
-          <ReviewForm 
-            isOpen={isFormOpen} 
-            onClose={() => setIsFormOpen(false)} 
-            onSubmit={refreshReviews}
-          />
-        )}
-      </div>
-    );
+    return <EmptyReviews isOwnProfile={isOwnProfile} />;
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      {isOwnProfile && (
-        <div className="flex justify-end mb-6">
-          <Button 
-            onClick={() => setIsFormOpen(true)} 
-            className="bg-brand-orange hover:bg-brand-orange/90 text-white"
-          >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Review
-          </Button>
+    <div className="space-y-6">
+      {reviews.map((review) => (
+        <div
+          key={review.id}
+          ref={review.id === highlightReviewId ? highlightedReviewRef : null}
+          className={`transition-all duration-300 rounded-lg ${review.id === highlightReviewId ? 'bg-accent/30' : ''}`}
+        >
+          <ReviewCard review={review} isOwnReview={isOwnProfile} />
         </div>
-      )}
-
-      <div className="grid gap-6">
-        {reviews.map(review => (
-          <ReviewCard 
-            key={review.id}
-            review={review}
-            onLike={handleLike}
-            onSave={handleSave}
-            onConvert={isOwnProfile ? convertToRecommendation : undefined}
-            refreshReviews={refreshReviews}
-          />
-        ))}
-      </div>
-      
-      {isFormOpen && isOwnProfile && (
-        <ReviewForm 
-          isOpen={isFormOpen} 
-          onClose={() => setIsFormOpen(false)} 
-          onSubmit={refreshReviews}
-        />
-      )}
+      ))}
     </div>
   );
 };
