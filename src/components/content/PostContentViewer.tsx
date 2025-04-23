@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +22,12 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
   const [showComments, setShowComments] = useState(false);
   const [topComment, setTopComment] = useState<any>(null);
 
+  useEffect(() => {
+    if (highlightCommentId) {
+      setShowComments(true);
+    }
+  }, [highlightCommentId]);
+  
   useEffect(() => {
     const fetchPost = async () => {
       try {
@@ -164,13 +169,6 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
     }
   }, [postId]);
 
-  // Show comments dialog if highlightCommentId exists
-  useEffect(() => {
-    if (highlightCommentId) {
-      setShowComments(true);
-    }
-  }, [highlightCommentId]);
-
   const handlePostLike = async () => {
     if (!user || !post) return;
     
@@ -240,6 +238,10 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
     }
   };
 
+  const handleCommentsClick = () => {
+    setShowComments(true);
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center p-8">
@@ -275,7 +277,7 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
       <CommentsPreview
         topComment={topComment}
         commentCount={post.comment_count}
-        onClick={() => setShowComments(true)}
+        onClick={handleCommentsClick}
       />
 
       {showComments && (

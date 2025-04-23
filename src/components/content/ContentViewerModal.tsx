@@ -58,6 +58,7 @@ const ContentViewerModal = () => {
       <p className="text-muted-foreground">Content not found</p>
     </div>
   );
+  
   if (contentType && contentId) {
     if (contentType === 'post') {
       content = <PostContentViewer postId={contentId} highlightCommentId={commentId} />;

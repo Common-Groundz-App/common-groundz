@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +26,12 @@ const RecommendationContentViewer = ({
   const [topComment, setTopComment] = useState<any>(null);
 
   useEffect(() => {
+    if (highlightCommentId) {
+      setShowComments(true);
+    }
+  }, [highlightCommentId]);
+
+  useEffect(() => {
     const fetchRecommendation = async () => {
       try {
         setLoading(true);
@@ -43,7 +48,6 @@ const RecommendationContentViewer = ({
           return;
         }
         
-        // Fetch user profile for this recommendation
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('username, avatar_url')
@@ -52,13 +56,11 @@ const RecommendationContentViewer = ({
           
         if (profileError) throw profileError;
         
-        // Get like count
         const { count: likeCount } = await supabase
           .from('recommendation_likes')
           .select('*', { count: 'exact', head: true })
           .eq('recommendation_id', recommendationId);
           
-        // Check if user liked this recommendation
         let isLiked = false;
         let isSaved = false;
         
@@ -82,14 +84,12 @@ const RecommendationContentViewer = ({
           isSaved = !!saveData;
         }
         
-        // Get comment count
         const { count: commentCount } = await supabase
           .from('recommendation_comments')
           .select('*', { count: 'exact', head: true })
           .eq('recommendation_id', recommendationId)
           .eq('is_deleted', false);
         
-        // Process entity if available
         let entity = null;
         if (data.entity_id) {
           try {
@@ -105,7 +105,6 @@ const RecommendationContentViewer = ({
           }
         }
         
-        // Combine all data
         const processedRecommendation = {
           ...data,
           username: profileData?.username || 'User',
@@ -160,19 +159,11 @@ const RecommendationContentViewer = ({
     }
   }, [recommendationId]);
 
-  // Show comments dialog if highlightCommentId exists
-  useEffect(() => {
-    if (highlightCommentId) {
-      setShowComments(true);
-    }
-  }, [highlightCommentId]);
-
   const handleRecommendationLike = async () => {
     if (!user || !recommendation) return;
     
     try {
       if (recommendation.isLiked) {
-        // Unlike
         await supabase
           .from('recommendation_likes')
           .delete()
@@ -185,7 +176,6 @@ const RecommendationContentViewer = ({
           likes: recommendation.likes - 1
         });
       } else {
-        // Like
         await supabase
           .from('recommendation_likes')
           .insert({ recommendation_id: recommendation.id, user_id: user.id });
@@ -206,7 +196,6 @@ const RecommendationContentViewer = ({
     
     try {
       if (recommendation.isSaved) {
-        // Unsave
         await supabase
           .from('recommendation_saves')
           .delete()
@@ -218,7 +207,6 @@ const RecommendationContentViewer = ({
           isSaved: false
         });
       } else {
-        // Save
         await supabase
           .from('recommendation_saves')
           .insert({ recommendation_id: recommendation.id, user_id: user.id });
@@ -238,6 +226,10 @@ const RecommendationContentViewer = ({
       setLoading(true);
       setError(null);
     }
+  };
+
+  const handleCommentsClick = () => {
+    setShowComments(true);
   };
 
   if (loading) {
@@ -275,7 +267,7 @@ const RecommendationContentViewer = ({
       <CommentsPreview
         topComment={topComment}
         commentCount={recommendation.comment_count}
-        onClick={() => setShowComments(true)}
+        onClick={handleCommentsClick}
       />
 
       {showComments && (

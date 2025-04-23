@@ -21,6 +21,8 @@ const CommentsPreview: React.FC<CommentsPreviewProps> = ({ topComment, commentCo
           onClick();
         }}
         className="w-full text-left text-muted-foreground hover:underline bg-muted/30 rounded-lg px-3 py-2 mt-2"
+        aria-label="Add a comment" 
+        aria-haspopup="dialog"
       >
         No comments yet. Add one!
       </button>
@@ -37,6 +39,7 @@ const CommentsPreview: React.FC<CommentsPreviewProps> = ({ topComment, commentCo
       }}
       className="w-full text-left bg-muted/30 rounded-lg px-3 py-2 mt-2 hover:bg-muted/60"
       aria-label="See all comments"
+      aria-haspopup="dialog" 
     >
       {topComment ? (
         <span>
