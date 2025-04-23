@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,7 +25,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
   const [topComment, setTopComment] = useState<any>(null);
   const [searchParams] = useSearchParams();
   
-  // Determine if we should auto-open comments based on URL params or highlightCommentId
   useEffect(() => {
     if (highlightCommentId || searchParams.has('commentId')) {
       setShowComments(true);
@@ -150,30 +148,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
     }
   }, [postId, user?.id]);
 
-  const fetchTopComment = async () => {
-    try {
-      const comments = await fetchComments(postId, 'post');
-      if (comments && comments.length > 0) {
-        const firstComment = comments[0];
-        setTopComment({
-          username: firstComment.username || 'User',
-          content: firstComment.content,
-        });
-      } else {
-        setTopComment(null);
-      }
-    } catch (err) {
-      console.error('Error fetching top comment:', err);
-      setTopComment(null);
-    }
-  };
-
-  useEffect(() => {
-    if (postId) {
-      fetchTopComment();
-    }
-  }, [postId]);
-
   const handlePostLike = async () => {
     if (!user || !post) return;
     
@@ -280,7 +254,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
       />
 
       <CommentsPreview
-        topComment={topComment}
         commentCount={post.comment_count}
         onClick={handleCommentsClick}
       />

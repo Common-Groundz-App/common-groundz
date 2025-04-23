@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -271,7 +270,6 @@ const RecommendationContentViewer = ({
       />
 
       <CommentsPreview
-        topComment={topComment}
         commentCount={recommendation.comment_count}
         onClick={handleCommentsClick}
       />
