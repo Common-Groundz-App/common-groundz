@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import PostContentViewer from './PostContentViewer';
@@ -7,7 +6,6 @@ import { X, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
-// This is important! It helps prevent body pointer events issues with nested modals
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
     document.body.style.pointerEvents = '';
@@ -19,16 +17,14 @@ const ContentViewerModal = () => {
   const [mounted, setMounted] = useState(false);
   const navigate = useNavigate();
 
-  // Animation mounting for fade/slide in
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => setMounted(true), 15); // Enable animation after mount
+      setTimeout(() => setMounted(true), 15);
     } else {
       setMounted(false);
     }
   }, [isOpen]);
 
-  // Restore history on close
   useEffect(() => {
     if (isOpen && contentType && contentId) {
       const url = commentId 
@@ -38,26 +34,23 @@ const ContentViewerModal = () => {
     } else if (!isOpen) {
       window.history.back();
     }
-    // eslint-disable-next-line
   }, [isOpen, contentType, contentId, commentId]);
 
-  // Browser back button closes modal
   useEffect(() => {
     const handlePopState = () => {
-      resetBodyPointerEvents(); // Important for nested modals
+      resetBodyPointerEvents();
       closeContent();
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [closeContent]);
 
-  // Prevent background scroll when modal open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
-      resetBodyPointerEvents(); // Ensure pointer events are reset on close
+      resetBodyPointerEvents();
     }
     return () => {
       document.body.style.overflow = '';
@@ -66,19 +59,17 @@ const ContentViewerModal = () => {
   }, [isOpen]);
 
   const handleViewFullPage = () => {
-    // Navigate to the full page view
     const fullPageUrl = commentId 
       ? `/${contentType}/${contentId}?commentId=${commentId}` 
       : `/${contentType}/${contentId}`;
     
-    resetBodyPointerEvents(); // Important when navigating from modal
+    resetBodyPointerEvents();
     closeContent();
     navigate(fullPageUrl);
   };
 
   if (!isOpen) return null;
 
-  // Content logic
   let content = (
     <div className="flex h-full items-center justify-center">
       <p className="text-muted-foreground">Content not found</p>
@@ -99,7 +90,6 @@ const ContentViewerModal = () => {
     }
   }
 
-  // Animations utility classes (fade+scale in)
   const modalAnimationClass = mounted 
     ? 'opacity-100 translate-y-0 scale-100'
     : 'opacity-0 translate-y-6 scale-95';
@@ -115,9 +105,8 @@ const ContentViewerModal = () => {
         animate-fade-in
       "
       onClick={(e) => {
-        // Only close if clicking the backdrop, not the modal content
         if (e.target === e.currentTarget) {
-          resetBodyPointerEvents(); // Important for nested modals
+          resetBodyPointerEvents();
           closeContent();
         }
       }}
@@ -129,12 +118,10 @@ const ContentViewerModal = () => {
         Content viewer modal for {contentType} content
       </div>
       
-      {/* Modal Card */}
       <div
         className={`
           relative bg-background rounded-xl shadow-2xl flex flex-col
           max-w-2xl w-full mx-auto
-          p-0 sm:p-0
           transition-all duration-300
           ${modalAnimationClass}
           h-fit max-h-[96vh]
@@ -144,48 +131,44 @@ const ContentViewerModal = () => {
           transition: 'all 0.3s cubic-bezier(.4,0,.2,1)'
         }}
       >
-        {/* Header actions */}
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-          {/* View full page button */}
-          <Button
-            aria-label="View full page"
-            onClick={handleViewFullPage}
-            className="
-              bg-black/40 hover:bg-black/70 text-white rounded-full p-2
-              transition
-              focus:outline-none focus:ring-2 focus:ring-primary"
-            variant="ghost"
-            size="icon"
-          >
-            <ExternalLink size={18} />
-          </Button>
-          
-          {/* Close button */}
-          <Button
-            aria-label="Close"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              resetBodyPointerEvents(); // Important for nested modals
-              closeContent();
-            }}
-            className="
-              bg-black/40 hover:bg-black/70 text-white rounded-full p-2
-              transition
-              focus:outline-none focus:ring-2 focus:ring-primary"
-            variant="ghost"
-            size="icon"
-          >
-            <X size={22} />
-          </Button>
-        </div>
-        
-        {/* Content */}
+        <button
+          aria-label="Close"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            resetBodyPointerEvents();
+            closeContent();
+          }}
+          className="
+            absolute top-4 right-4 z-10
+            w-8 h-8 rounded-full
+            flex items-center justify-center
+            hover:bg-gray-100 dark:hover:bg-gray-800
+            transition-colors duration-200
+            focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
         <div className="w-full">
           {content}
         </div>
+
+        <div className="
+          border-t border-border mt-4 pt-4
+          flex justify-end
+          space-x-4
+        ">
+          <Button
+            onClick={handleViewFullPage}
+            className="w-full sm:w-auto bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600"
+          >
+            <ExternalLink className="h-4 w-4" />
+            <span className="ml-2">View Full Page</span>
+          </Button>
+        </div>
       </div>
-      {/* Mobile full-screen override */}
+      
       <style>
         {`
         @media (max-width: 640px) {
