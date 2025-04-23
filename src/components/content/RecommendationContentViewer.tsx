@@ -59,7 +59,8 @@ const RecommendationContentViewer = ({
   useEffect(() => {
     const fetchRecommendation = async () => {
       try {
-        const recommendationData = await fetchRecommendationById(recommendationId);
+        // Update to pass both required arguments - recommendationId and user?.id (which might be null)
+        const recommendationData = await fetchRecommendationById(recommendationId, user?.id);
         setRecommendation(recommendationData as ExtendedRecommendation);
         setIsLoading(false);
       } catch (error) {
