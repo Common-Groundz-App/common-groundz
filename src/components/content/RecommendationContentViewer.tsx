@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,15 +8,18 @@ import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { Shell } from 'lucide-react';
 import { fetchComments } from '@/services/commentsService';
+import { useSearchParams } from 'react-router-dom';
 
 interface RecommendationContentViewerProps {
   recommendationId: string;
   highlightCommentId: string | null;
+  isInModal?: boolean;
 }
 
 const RecommendationContentViewer = ({ 
   recommendationId, 
-  highlightCommentId 
+  highlightCommentId,
+  isInModal = false
 }: RecommendationContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -24,12 +28,14 @@ const RecommendationContentViewer = ({
   const [error, setError] = useState<string | null>(null);
   const [showComments, setShowComments] = useState(false);
   const [topComment, setTopComment] = useState<any>(null);
+  const [searchParams] = useSearchParams();
 
+  // Determine if we should auto-open comments based on URL params or highlightCommentId
   useEffect(() => {
-    if (highlightCommentId) {
+    if (highlightCommentId || searchParams.has('commentId')) {
       setShowComments(true);
     }
-  }, [highlightCommentId]);
+  }, [highlightCommentId, searchParams]);
 
   useEffect(() => {
     const fetchRecommendation = async () => {

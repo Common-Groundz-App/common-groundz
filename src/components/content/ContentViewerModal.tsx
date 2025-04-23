@@ -3,11 +3,14 @@ import React, { useEffect, useState } from 'react';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import PostContentViewer from './PostContentViewer';
 import RecommendationContentViewer from './RecommendationContentViewer';
-import { X } from 'lucide-react';
+import { X, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const ContentViewerModal = () => {
   const { isOpen, contentType, contentId, commentId, closeContent } = useContentViewer();
   const [mounted, setMounted] = useState(false);
+  const navigate = useNavigate();
 
   // Animation mounting for fade/slide in
   useEffect(() => {
@@ -22,8 +25,8 @@ const ContentViewerModal = () => {
   useEffect(() => {
     if (isOpen && contentType && contentId) {
       const url = commentId 
-        ? `/${contentType}/${contentId}?commentId=${commentId}` 
-        : `/${contentType}/${contentId}`;
+        ? `/${contentType}/${contentId}?commentId=${commentId}&modal=true` 
+        : `/${contentType}/${contentId}?modal=true`;
       window.history.pushState({}, '', url);
     } else if (!isOpen) {
       window.history.back();
@@ -50,6 +53,16 @@ const ContentViewerModal = () => {
     };
   }, [isOpen]);
 
+  const handleViewFullPage = () => {
+    // Navigate to the full page view
+    const fullPageUrl = commentId 
+      ? `/${contentType}/${contentId}?commentId=${commentId}` 
+      : `/${contentType}/${contentId}`;
+    
+    closeContent();
+    navigate(fullPageUrl);
+  };
+
   if (!isOpen) return null;
 
   // Content logic
@@ -61,9 +74,9 @@ const ContentViewerModal = () => {
   
   if (contentType && contentId) {
     if (contentType === 'post') {
-      content = <PostContentViewer postId={contentId} highlightCommentId={commentId} />;
+      content = <PostContentViewer postId={contentId} highlightCommentId={commentId} isInModal={true} />;
     } else if (contentType === 'recommendation') {
-      content = <RecommendationContentViewer recommendationId={contentId} highlightCommentId={commentId} />;
+      content = <RecommendationContentViewer recommendationId={contentId} highlightCommentId={commentId} isInModal={true} />;
     } else {
       content = (
         <div className="flex h-full items-center justify-center">
@@ -112,22 +125,41 @@ const ContentViewerModal = () => {
           transition: 'all 0.3s cubic-bezier(.4,0,.2,1)'
         }}
       >
-        {/* Close button */}
-        <button
-          aria-label="Close"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            closeContent();
-          }}
-          className="
-            absolute top-4 right-4 z-10
-            bg-black/40 hover:bg-black/70 text-white rounded-full p-2
-            transition
-            focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <X size={22} />
-        </button>
+        {/* Header actions */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          {/* View full page button */}
+          <Button
+            aria-label="View full page"
+            onClick={handleViewFullPage}
+            className="
+              bg-black/40 hover:bg-black/70 text-white rounded-full p-2
+              transition
+              focus:outline-none focus:ring-2 focus:ring-primary"
+            variant="ghost"
+            size="icon"
+          >
+            <ExternalLink size={18} />
+          </Button>
+          
+          {/* Close button */}
+          <Button
+            aria-label="Close"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              closeContent();
+            }}
+            className="
+              bg-black/40 hover:bg-black/70 text-white rounded-full p-2
+              transition
+              focus:outline-none focus:ring-2 focus:ring-primary"
+            variant="ghost"
+            size="icon"
+          >
+            <X size={22} />
+          </Button>
+        </div>
+        
         {/* Content */}
         <div className="w-full">
           {content}
