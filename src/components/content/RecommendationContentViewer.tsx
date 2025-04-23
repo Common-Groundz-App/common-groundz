@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,6 +7,7 @@ import RecommendationCard from '@/components/recommendations/RecommendationCard'
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { Shell } from 'lucide-react';
+import { fetchComments } from '@/services/commentsService';
 
 interface RecommendationContentViewerProps {
   recommendationId: string;
@@ -136,24 +138,12 @@ const RecommendationContentViewer = ({
 
   const fetchTopComment = async () => {
     try {
-      // Using a different approach to join the data that TypeScript can understand
-      const { data, error } = await supabase
-        .from('recommendation_comments')
-        .select(`
-          content, 
-          created_at, 
-          profiles:user_id (username)
-        `)
-        .eq('recommendation_id', recommendationId)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!error && data) {
+      const comments = await fetchComments(recommendationId, 'recommendation');
+      if (comments && comments.length > 0) {
+        const firstComment = comments[0];
         setTopComment({
-          username: data.profiles?.username || 'User',
-          content: data.content,
+          username: firstComment.username || 'User',
+          content: firstComment.content,
         });
       } else {
         setTopComment(null);

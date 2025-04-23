@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,6 +7,7 @@ import PostFeedItem from '@/components/feed/PostFeedItem';
 import { Shell } from 'lucide-react';
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
+import { fetchComments } from '@/services/commentsService';
 
 interface PostContentViewerProps {
   postId: string;
@@ -140,23 +142,12 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
 
   const fetchTopComment = async () => {
     try {
-      const { data, error } = await supabase
-        .from('post_comments')
-        .select(`
-          content, 
-          created_at, 
-          profiles:user_id (username)
-        `)
-        .eq('post_id', postId)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!error && data) {
+      const comments = await fetchComments(postId, 'post');
+      if (comments && comments.length > 0) {
+        const firstComment = comments[0];
         setTopComment({
-          username: data.profiles?.username || 'User',
-          content: data.content,
+          username: firstComment.username || 'User',
+          content: firstComment.content,
         });
       } else {
         setTopComment(null);
