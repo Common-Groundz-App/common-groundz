@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -135,21 +136,31 @@ const RecommendationContentViewer = ({
   }, [recommendationId, user?.id]);
 
   const fetchTopComment = async () => {
-    const { data, error } = await supabase
-      .from('recommendation_comments')
-      .select('content, created_at, user_id, profiles: user_id (username)')
-      .eq('recommendation_id', recommendationId)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    try {
+      // Join recommendation_comments with profiles to get the username
+      const { data, error } = await supabase
+        .from('recommendation_comments')
+        .select(`
+          content, 
+          created_at, 
+          profiles:user_id (username)
+        `)
+        .eq('recommendation_id', recommendationId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (!error && data) {
-      setTopComment({
-        username: data?.profiles?.username || 'User',
-        content: data.content,
-      });
-    } else {
+      if (!error && data) {
+        setTopComment({
+          username: data.profiles?.username || 'User',
+          content: data.content,
+        });
+      } else {
+        setTopComment(null);
+      }
+    } catch (err) {
+      console.error('Error fetching top comment:', err);
       setTopComment(null);
     }
   };
