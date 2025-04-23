@@ -146,27 +146,11 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     );
   };
   
-  const handleCommentClick = (e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
-    
+  const handleCommentClick = () => {
     setIsCommentDialogOpen(true);
     if (onComment) onComment(post.id);
-    
-    if (window.location.search.includes('modal=true')) {
-      document.dispatchEvent(new CustomEvent('content-interaction', { detail: { interacting: true } }));
-    }
   };
   
-  const handleCommentDialogClose = () => {
-    setIsCommentDialogOpen(false);
-    
-    if (window.location.search.includes('modal=true')) {
-      document.dispatchEvent(new CustomEvent('content-interaction', { detail: { interacting: false } }));
-    }
-  };
-
   const handleCommentAdded = () => {
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
@@ -320,10 +304,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               "flex items-center gap-1",
               post.is_liked && "text-red-500"
             )}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onLike) onLike(post.id);
-            }}
+            onClick={() => onLike && onLike(post.id)}
           >
             <Heart 
               size={18} 
@@ -366,7 +347,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       
       <CommentDialog 
         isOpen={isCommentDialogOpen} 
-        onClose={handleCommentDialogClose} 
+        onClose={() => setIsCommentDialogOpen(false)} 
         itemId={post.id}
         itemType="post" 
         onCommentAdded={handleCommentAdded}

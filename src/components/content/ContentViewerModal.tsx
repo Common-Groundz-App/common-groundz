@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import PostContentViewer from './PostContentViewer';
@@ -16,7 +15,6 @@ const ContentViewerModal = () => {
   const { isOpen, contentType, contentId, commentId, closeContent } = useContentViewer();
   const [mounted, setMounted] = useState(false);
   const navigate = useNavigate();
-  const [isInteractingWithContent, setIsInteractingWithContent] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -59,10 +57,7 @@ const ContentViewerModal = () => {
     };
   }, [isOpen]);
 
-  const handleViewFullPage = (e: React.MouseEvent) => {
-    // Don't navigate if the user is interacting with internal components
-    if (isInteractingWithContent) return;
-    
+  const handleViewFullPage = () => {
     const fullPageUrl = commentId 
       ? `/${contentType}/${contentId}?commentId=${commentId}` 
       : `/${contentType}/${contentId}`;
@@ -70,11 +65,6 @@ const ContentViewerModal = () => {
     resetBodyPointerEvents();
     closeContent();
     navigate(fullPageUrl);
-  };
-
-  // Tell parent components that we're currently interacting with content
-  const handleContentInteraction = (interacting: boolean) => {
-    setIsInteractingWithContent(interacting);
   };
 
   if (!isOpen) return null;
@@ -87,19 +77,9 @@ const ContentViewerModal = () => {
   
   if (contentType && contentId) {
     if (contentType === 'post') {
-      content = <PostContentViewer 
-                  postId={contentId} 
-                  highlightCommentId={commentId} 
-                  isInModal={true} 
-                  onInteractionStateChange={handleContentInteraction}
-                />;
+      content = <PostContentViewer postId={contentId} highlightCommentId={commentId} isInModal={true} />;
     } else if (contentType === 'recommendation') {
-      content = <RecommendationContentViewer 
-                  recommendationId={contentId} 
-                  highlightCommentId={commentId} 
-                  isInModal={true} 
-                  onInteractionStateChange={handleContentInteraction} 
-                />;
+      content = <RecommendationContentViewer recommendationId={contentId} highlightCommentId={commentId} isInModal={true} />;
     } else {
       content = (
         <div className="flex h-full items-center justify-center">
@@ -168,7 +148,6 @@ const ContentViewerModal = () => {
             focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
         </button>
 
         <div className="w-full">

@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -12,12 +11,11 @@ import { useSearchParams } from 'react-router-dom';
 
 interface PostContentViewerProps {
   postId: string;
-  highlightCommentId?: string | null;
+  highlightCommentId: string | null;
   isInModal?: boolean;
-  onInteractionStateChange?: (interacting: boolean) => void;
 }
 
-const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onInteractionStateChange }: PostContentViewerProps) => {
+const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [post, setPost] = useState<any>(null);
