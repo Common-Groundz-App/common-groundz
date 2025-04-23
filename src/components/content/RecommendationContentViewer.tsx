@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -137,7 +136,7 @@ const RecommendationContentViewer = ({
 
   const fetchTopComment = async () => {
     try {
-      // Join recommendation_comments with profiles to get the username
+      // Using a different approach to join the data that TypeScript can understand
       const { data, error } = await supabase
         .from('recommendation_comments')
         .select(`

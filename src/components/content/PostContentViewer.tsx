@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,7 +52,6 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
           return;
         }
         
-        // Fetch user profile for this post
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('username, avatar_url')
@@ -62,13 +60,11 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
           
         if (profileError) throw profileError;
         
-        // Get like count
         const { count: likeCount } = await supabase
           .from('post_likes')
           .select('*', { count: 'exact', head: true })
           .eq('post_id', postId);
           
-        // Check if user liked this post
         let isLiked = false;
         let isSaved = false;
         
@@ -92,17 +88,14 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
           isSaved = !!saveData;
         }
         
-        // Get comment count
         const { count: commentCount } = await supabase
           .from('post_comments')
           .select('*', { count: 'exact', head: true })
           .eq('post_id', postId)
           .eq('is_deleted', false);
         
-        // Process tagged entities if any
         let taggedEntities = [];
         try {
-          // Use direct query instead of RPC function
           const { data: entityData } = await supabase
             .from('post_entities')
             .select('entity_id, entities:entity_id(*)')
@@ -115,7 +108,6 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
           console.error('Error loading entities:', err);
         }
         
-        // Combine all data
         const processedPost = {
           ...data,
           username: profileData?.username || 'User',
@@ -148,7 +140,6 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
 
   const fetchTopComment = async () => {
     try {
-      // First join post_comments with profiles to get the username
       const { data, error } = await supabase
         .from('post_comments')
         .select(`
@@ -187,7 +178,6 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
     
     try {
       if (post.is_liked) {
-        // Unlike
         await supabase
           .from('post_likes')
           .delete()
@@ -200,7 +190,6 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
           likes: post.likes - 1
         });
       } else {
-        // Like
         await supabase
           .from('post_likes')
           .insert({ post_id: post.id, user_id: user.id });
@@ -221,7 +210,6 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
     
     try {
       if (post.is_saved) {
-        // Unsave
         await supabase
           .from('post_saves')
           .delete()
@@ -233,7 +221,6 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
           is_saved: false
         });
       } else {
-        // Save
         await supabase
           .from('post_saves')
           .insert({ post_id: post.id, user_id: user.id });
