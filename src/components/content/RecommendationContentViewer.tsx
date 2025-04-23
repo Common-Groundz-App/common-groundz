@@ -160,6 +160,13 @@ const RecommendationContentViewer = ({
     }
   }, [recommendationId]);
 
+  // Show comments dialog if highlightCommentId exists
+  useEffect(() => {
+    if (highlightCommentId) {
+      setShowComments(true);
+    }
+  }, [highlightCommentId]);
+
   const handleRecommendationLike = async () => {
     if (!user || !recommendation) return;
     
@@ -277,6 +284,7 @@ const RecommendationContentViewer = ({
           onClose={() => setShowComments(false)}
           itemId={recommendationId}
           itemType="recommendation"
+          highlightCommentId={highlightCommentId}
         />
       )}
     </div>

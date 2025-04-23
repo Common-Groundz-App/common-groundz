@@ -15,7 +15,11 @@ const CommentsPreview: React.FC<CommentsPreviewProps> = ({ topComment, commentCo
     return (
       <button
         type="button"
-        onClick={onClick}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        }}
         className="w-full text-left text-muted-foreground hover:underline bg-muted/30 rounded-lg px-3 py-2 mt-2"
       >
         No comments yet. Add one!
@@ -26,7 +30,11 @@ const CommentsPreview: React.FC<CommentsPreviewProps> = ({ topComment, commentCo
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      }}
       className="w-full text-left bg-muted/30 rounded-lg px-3 py-2 mt-2 hover:bg-muted/60"
       aria-label="See all comments"
     >

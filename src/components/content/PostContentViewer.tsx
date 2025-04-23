@@ -164,6 +164,13 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
     }
   }, [postId]);
 
+  // Show comments dialog if highlightCommentId exists
+  useEffect(() => {
+    if (highlightCommentId) {
+      setShowComments(true);
+    }
+  }, [highlightCommentId]);
+
   const handlePostLike = async () => {
     if (!user || !post) return;
     
@@ -277,6 +284,7 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
           onClose={() => setShowComments(false)}
           itemId={postId}
           itemType="post"
+          highlightCommentId={highlightCommentId}
         />
       )}
     </div>

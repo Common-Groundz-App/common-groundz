@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
-import { useNavigate } from 'react-router-dom';
 import PostContentViewer from './PostContentViewer';
 import RecommendationContentViewer from './RecommendationContentViewer';
 import { X } from 'lucide-react';
@@ -9,7 +8,6 @@ import { X } from 'lucide-react';
 const ContentViewerModal = () => {
   const { isOpen, contentType, contentId, commentId, closeContent } = useContentViewer();
   const [mounted, setMounted] = useState(false);
-  const navigate = useNavigate();
 
   // Animation mounting for fade/slide in
   useEffect(() => {
@@ -88,6 +86,12 @@ const ContentViewerModal = () => {
         bg-black/40 backdrop-blur-md
         animate-fade-in
       "
+      onClick={(e) => {
+        // Only close if clicking the backdrop, not the modal content
+        if (e.target === e.currentTarget) {
+          closeContent();
+        }
+      }}
       style={{
         transition: 'background 0.3s cubic-bezier(.4,0,.2,1)'
       }}
@@ -110,7 +114,11 @@ const ContentViewerModal = () => {
         {/* Close button */}
         <button
           aria-label="Close"
-          onClick={closeContent}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeContent();
+          }}
           className="
             absolute top-4 right-4 z-10
             bg-black/40 hover:bg-black/70 text-white rounded-full p-2
@@ -119,7 +127,7 @@ const ContentViewerModal = () => {
         >
           <X size={22} />
         </button>
-        {/* Large image at top handled by PostContentViewer/RecommendationContentViewer */}
+        {/* Content */}
         <div className="w-full">
           {content}
         </div>
