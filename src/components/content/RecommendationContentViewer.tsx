@@ -1,9 +1,10 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
+import CommentsPreview from '@/components/comments/CommentsPreview';
+import CommentDialog from '@/components/comments/CommentDialog';
 import { Shell } from 'lucide-react';
 
 interface RecommendationContentViewerProps {
@@ -20,6 +21,8 @@ const RecommendationContentViewer = ({
   const [recommendation, setRecommendation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showComments, setShowComments] = useState(false);
+  const [topComment, setTopComment] = useState<any>(null);
 
   useEffect(() => {
     const fetchRecommendation = async () => {
@@ -131,6 +134,32 @@ const RecommendationContentViewer = ({
     }
   }, [recommendationId, user?.id]);
 
+  const fetchTopComment = async () => {
+    const { data, error } = await supabase
+      .from('recommendation_comments')
+      .select('content, created_at, user_id, profiles: user_id (username)')
+      .eq('recommendation_id', recommendationId)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!error && data) {
+      setTopComment({
+        username: data?.profiles?.username || 'User',
+        content: data.content,
+      });
+    } else {
+      setTopComment(null);
+    }
+  };
+
+  useEffect(() => {
+    if (recommendationId) {
+      fetchTopComment();
+    }
+  }, [recommendationId]);
+
   const handleRecommendationLike = async () => {
     if (!user || !recommendation) return;
     
@@ -235,6 +264,21 @@ const RecommendationContentViewer = ({
         onDeleted={handleRefresh}
         highlightCommentId={highlightCommentId}
       />
+
+      <CommentsPreview
+        topComment={topComment}
+        commentCount={recommendation.comment_count}
+        onClick={() => setShowComments(true)}
+      />
+
+      {showComments && (
+        <CommentDialog
+          isOpen={showComments}
+          onClose={() => setShowComments(false)}
+          itemId={recommendationId}
+          itemType="recommendation"
+        />
+      )}
     </div>
   );
 };

@@ -1,10 +1,11 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import PostFeedItem from '@/components/feed/PostFeedItem';
 import { Shell } from 'lucide-react';
+import CommentsPreview from '@/components/comments/CommentsPreview';
+import CommentDialog from '@/components/comments/CommentDialog';
 
 interface PostContentViewerProps {
   postId: string;
@@ -17,6 +18,8 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showComments, setShowComments] = useState(false);
+  const [topComment, setTopComment] = useState<any>(null);
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -142,6 +145,32 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
     }
   }, [postId, user?.id]);
 
+  const fetchTopComment = async () => {
+    const { data, error } = await supabase
+      .from('post_comments')
+      .select('content, created_at, user_id, profiles: user_id (username)')
+      .eq('post_id', postId)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!error && data) {
+      setTopComment({
+        username: data?.profiles?.username || 'User',
+        content: data.content,
+      });
+    } else {
+      setTopComment(null);
+    }
+  };
+
+  useEffect(() => {
+    if (postId) {
+      fetchTopComment();
+    }
+  }, [postId]);
+
   const handlePostLike = async () => {
     if (!user || !post) return;
     
@@ -246,6 +275,21 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
         onDelete={handleDelete}
         highlightCommentId={highlightCommentId}
       />
+
+      <CommentsPreview
+        topComment={topComment}
+        commentCount={post.comment_count}
+        onClick={() => setShowComments(true)}
+      />
+
+      {showComments && (
+        <CommentDialog
+          isOpen={showComments}
+          onClose={() => setShowComments(false)}
+          itemId={postId}
+          itemType="post"
+        />
+      )}
     </div>
   );
 };
