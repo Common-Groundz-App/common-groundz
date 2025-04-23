@@ -9,11 +9,13 @@ import { Shell } from 'lucide-react';
 interface RecommendationContentViewerProps {
   recommendationId: string;
   highlightCommentId: string | null;
+  isModal?: boolean;
 }
 
 const RecommendationContentViewer = ({ 
   recommendationId, 
-  highlightCommentId 
+  highlightCommentId,
+  isModal = false
 }: RecommendationContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -227,7 +229,7 @@ const RecommendationContentViewer = ({
   }
 
   return (
-    <div className="p-4 sm:p-6 overflow-y-auto max-h-full">
+    <div className={`${isModal ? 'p-4 sm:p-6' : ''} overflow-y-auto max-h-full`}>
       <RecommendationCard 
         recommendation={recommendation}
         onLike={() => handleRecommendationLike()}

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import PostContentViewer from './PostContentViewer';
@@ -14,16 +13,14 @@ const ContentViewerModal = () => {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
 
-  // Animation mounting for fade/slide in
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => setMounted(true), 15); // Enable animation after mount
+      setTimeout(() => setMounted(true), 15);
     } else {
       setMounted(false);
     }
   }, [isOpen]);
 
-  // Prevent background scroll when modal open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -35,7 +32,6 @@ const ContentViewerModal = () => {
     };
   }, [isOpen]);
 
-  // ESC close
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeContent();
@@ -46,12 +42,10 @@ const ContentViewerModal = () => {
     return () => window.removeEventListener('keydown', onEsc);
   }, [isOpen, closeContent]);
 
-  // Click outside to close
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === overlayRef.current) closeContent();
   };
 
-  // Content logic
   let content = (
     <div className="flex h-full items-center justify-center">
       <p className="text-muted-foreground">Content not found</p>
@@ -59,9 +53,9 @@ const ContentViewerModal = () => {
   );
   if (contentType && contentId) {
     if (contentType === 'post') {
-      content = <PostContentViewer postId={contentId} highlightCommentId={commentId} isModal />;
+      content = <PostContentViewer postId={contentId} highlightCommentId={commentId} isModal={true} />;
     } else if (contentType === 'recommendation') {
-      content = <RecommendationContentViewer recommendationId={contentId} highlightCommentId={commentId} isModal />;
+      content = <RecommendationContentViewer recommendationId={contentId} highlightCommentId={commentId} isModal={true} />;
     } else {
       content = (
         <div className="flex h-full items-center justify-center">
@@ -71,21 +65,18 @@ const ContentViewerModal = () => {
     }
   }
 
-  // Modal animation variants for framer-motion
   const modalVariants = {
     hidden: { opacity: 0, scale: 0.95, y: 40 },
     visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] } },
     exit: { opacity: 0, scale: 0.97, y: 30, transition: { duration: 0.18 } }
   };
 
-  // Responsive paddings and rounded for card
   const cardClass =
     "w-full bg-background rounded-xl shadow-2xl flex flex-col h-fit max-h-[96vh] overflow-hidden " +
     "transition-all duration-300 " +
     MODAL_MAX_WIDTH +
     " mx-auto p-0 sm:p-6";
 
-  // Mobile modal class helper
   const mobileModalClass = "sm:rounded-xl sm:max-w-2xl sm:p-6 rounded-none max-w-full h-full min-h-screen p-4";
 
   if (!isOpen) return null;
@@ -131,7 +122,6 @@ const ContentViewerModal = () => {
               maxWidth: '640px',
             }}
           >
-            {/* Close button */}
             <button
               aria-label="Close"
               onClick={closeContent}
@@ -147,12 +137,10 @@ const ContentViewerModal = () => {
             >
               <X size={26} />
             </button>
-            {/* Immersive Content Area (Post or Recommendation) */}
             <div className="w-full">
               {content}
             </div>
           </motion.div>
-          {/* Responsive overrides for mobile modal */}
           <style>
             {`
               @media (max-width: 640px) {
@@ -176,4 +164,3 @@ const ContentViewerModal = () => {
 };
 
 export default ContentViewerModal;
-

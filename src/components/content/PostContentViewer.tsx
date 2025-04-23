@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,9 +8,10 @@ import { Shell } from 'lucide-react';
 interface PostContentViewerProps {
   postId: string;
   highlightCommentId: string | null;
+  isModal?: boolean;
 }
 
-const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProps) => {
+const PostContentViewer = ({ postId, highlightCommentId, isModal = false }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [post, setPost] = useState<any>(null);
@@ -238,7 +238,7 @@ const PostContentViewer = ({ postId, highlightCommentId }: PostContentViewerProp
   }
 
   return (
-    <div className="p-4 sm:p-6 overflow-y-auto max-h-full">
+    <div className={`${isModal ? 'p-4 sm:p-6' : ''} overflow-y-auto max-h-full`}>
       <PostFeedItem 
         post={post} 
         onLike={handlePostLike} 
