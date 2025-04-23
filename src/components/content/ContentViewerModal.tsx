@@ -2,9 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import PostContentViewer from './PostContentViewer';
 import RecommendationContentViewer from './RecommendationContentViewer';
-import { X, ExternalLink } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -121,7 +120,7 @@ const ContentViewerModal = () => {
       <div
         className={`
           relative bg-background rounded-xl shadow-2xl flex flex-col
-          max-w-2xl w-full mx-auto
+          max-w-2xl w-full mx-auto cursor-pointer
           transition-all duration-300
           ${modalAnimationClass}
           h-fit max-h-[96vh]
@@ -130,6 +129,7 @@ const ContentViewerModal = () => {
         style={{
           transition: 'all 0.3s cubic-bezier(.4,0,.2,1)'
         }}
+        onClick={handleViewFullPage}
       >
         <button
           aria-label="Close"
@@ -152,20 +152,6 @@ const ContentViewerModal = () => {
 
         <div className="w-full">
           {content}
-        </div>
-
-        <div className="
-          border-t border-border mt-4 pt-4
-          flex justify-end
-          space-x-4
-        ">
-          <Button
-            onClick={handleViewFullPage}
-            className="w-full sm:w-auto bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600"
-          >
-            <ExternalLink className="h-4 w-4" />
-            <span className="ml-2">View Full Page</span>
-          </Button>
         </div>
       </div>
       
