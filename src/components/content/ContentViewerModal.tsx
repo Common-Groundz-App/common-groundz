@@ -161,10 +161,12 @@ const ContentViewerModal = () => {
         ">
           <Button
             onClick={handleViewFullPage}
-            className="w-full sm:w-auto bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600"
+            variant="ghost"
+            size="icon"
+            className="rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+            aria-label="View full page"
           >
-            <ExternalLink className="h-4 w-4" />
-            <span className="ml-2">View Full Page</span>
+            <ExternalLink className="h-5 w-5" />
           </Button>
         </div>
       </div>
