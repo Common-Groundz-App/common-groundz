@@ -1,288 +1,367 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import { fetchRecommendationById } from '@/services/recommendationService';
+import { RecommendationData } from '@/services/recommendation/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Bookmark, Heart, MessageCircle, ExternalLink } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import RecommendationCard from '@/components/recommendations/RecommendationCard';
-import CommentsPreview from '@/components/comments/CommentsPreview';
+import { toggleRecommendationLike, toggleRecommendationSave } from '@/services/interactionService';
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import CommentDialog from '@/components/comments/CommentDialog';
-import { Shell } from 'lucide-react';
-import { fetchComments } from '@/services/commentsService';
-import { useSearchParams } from 'react-router-dom';
+import { fetchCommentCount } from '@/services/commentsService';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface RecommendationContentViewerProps {
   recommendationId: string;
-  highlightCommentId: string | null;
+  highlightCommentId?: string | null;
   isInModal?: boolean;
+  onInteractionStateChange?: (interacting: boolean) => void;
 }
 
 const RecommendationContentViewer = ({ 
   recommendationId, 
-  highlightCommentId,
-  isInModal = false
+  highlightCommentId = null,
+  isInModal = false,
+  onInteractionStateChange
 }: RecommendationContentViewerProps) => {
+  const [recommendation, setRecommendation] = useState<RecommendationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLiking, setIsLiking] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState<number | null>(null);
+  
   const { user } = useAuth();
   const { toast } = useToast();
-  const [recommendation, setRecommendation] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showComments, setShowComments] = useState(false);
-  const [topComment, setTopComment] = useState<any>(null);
-  const [searchParams] = useSearchParams();
-
-  // Determine if we should auto-open comments based on URL params or highlightCommentId
+  const navigate = useNavigate();
+  
   useEffect(() => {
-    if (highlightCommentId || searchParams.has('commentId')) {
-      setShowComments(true);
-    }
-  }, [highlightCommentId, searchParams]);
-
-  useEffect(() => {
-    const fetchRecommendation = async () => {
+    const loadRecommendation = async () => {
+      setIsLoading(true);
       try {
-        setLoading(true);
+        const data = await fetchRecommendationById(recommendationId);
+        setRecommendation(data);
         
-        const { data, error } = await supabase
-          .from('recommendations')
-          .select('*')
-          .eq('id', recommendationId)
-          .single();
-          
-        if (error) throw error;
-        if (!data) {
-          setError('Recommendation not found or has been deleted');
-          return;
-        }
-        
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('username, avatar_url')
-          .eq('id', data.user_id)
-          .single();
-          
-        if (profileError) throw profileError;
-        
-        const { count: likeCount } = await supabase
-          .from('recommendation_likes')
-          .select('*', { count: 'exact', head: true })
-          .eq('recommendation_id', recommendationId);
-          
-        let isLiked = false;
-        let isSaved = false;
-        
-        if (user) {
-          const { data: likeData } = await supabase
-            .from('recommendation_likes')
-            .select('*')
-            .eq('recommendation_id', recommendationId)
-            .eq('user_id', user.id)
-            .maybeSingle();
-            
-          isLiked = !!likeData;
-          
-          const { data: saveData } = await supabase
-            .from('recommendation_saves')
-            .select('*')
-            .eq('recommendation_id', recommendationId)
-            .eq('user_id', user.id)
-            .maybeSingle();
-            
-          isSaved = !!saveData;
-        }
-        
-        const { count: commentCount } = await supabase
-          .from('recommendation_comments')
-          .select('*', { count: 'exact', head: true })
-          .eq('recommendation_id', recommendationId)
-          .eq('is_deleted', false);
-        
-        let entity = null;
-        if (data.entity_id) {
-          try {
-            const { data: entityData } = await supabase
-              .from('entities')
-              .select('*')
-              .eq('id', data.entity_id)
-              .single();
-              
-            entity = entityData;
-          } catch (err) {
-            console.error('Error loading entity:', err);
-          }
-        }
-        
-        const processedRecommendation = {
-          ...data,
-          username: profileData?.username || 'User',
-          avatar_url: profileData?.avatar_url || null,
-          likes: likeCount || 0,
-          comment_count: commentCount || 0,
-          isLiked: isLiked,
-          isSaved: isSaved,
-          entity: entity
-        };
-        
-        setRecommendation(processedRecommendation);
-      } catch (err) {
-        console.error('Error fetching recommendation:', err);
-        setError('Error loading recommendation');
+        // Get comment count
+        const count = await fetchCommentCount(recommendationId, 'recommendation');
+        setCommentCount(count);
+      } catch (error) {
+        console.error('Error loading recommendation:', error);
         toast({
-          variant: 'destructive',
           title: 'Error',
-          description: 'Failed to load recommendation content'
+          description: 'Failed to load recommendation',
+          variant: 'destructive',
         });
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
     
-    if (recommendationId) {
-      fetchRecommendation();
-    }
-  }, [recommendationId, user?.id]);
-
-  const fetchTopComment = async () => {
-    try {
-      const comments = await fetchComments(recommendationId, 'recommendation');
-      if (comments && comments.length > 0) {
-        const firstComment = comments[0];
-        setTopComment({
-          username: firstComment.username || 'User',
-          content: firstComment.content,
-        });
-      } else {
-        setTopComment(null);
-      }
-    } catch (err) {
-      console.error('Error fetching top comment:', err);
-      setTopComment(null);
-    }
-  };
-
+    loadRecommendation();
+  }, [recommendationId, toast]);
+  
   useEffect(() => {
-    if (recommendationId) {
-      fetchTopComment();
+    if (highlightCommentId) {
+      setIsCommentDialogOpen(true);
     }
+  }, [highlightCommentId]);
+  
+  useEffect(() => {
+    const handleCommentCountUpdate = async (event: CustomEvent) => {
+      if (event.detail.itemId === recommendationId) {
+        const updatedCount = await fetchCommentCount(recommendationId, 'recommendation');
+        setCommentCount(updatedCount);
+      }
+    };
+    
+    window.addEventListener('refresh-recommendation-comment-count', handleCommentCountUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('refresh-recommendation-comment-count', handleCommentCountUpdate as EventListener);
+    };
   }, [recommendationId]);
-
-  const handleRecommendationLike = async () => {
-    if (!user || !recommendation) return;
+  
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     
+    if (!user) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please sign in to like recommendations',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (!recommendation) return;
+    
+    setIsLiking(true);
     try {
-      if (recommendation.isLiked) {
-        await supabase
-          .from('recommendation_likes')
-          .delete()
-          .eq('recommendation_id', recommendation.id)
-          .eq('user_id', user.id);
-        
-        setRecommendation({
-          ...recommendation,
-          isLiked: false,
-          likes: recommendation.likes - 1
-        });
-      } else {
-        await supabase
-          .from('recommendation_likes')
-          .insert({ recommendation_id: recommendation.id, user_id: user.id });
-        
-        setRecommendation({
-          ...recommendation,
-          isLiked: true,
-          likes: recommendation.likes + 1
+      const success = await toggleRecommendationLike(recommendation.id);
+      
+      if (success) {
+        setRecommendation(prev => {
+          if (!prev) return null;
+          
+          const newLikeStatus = !prev.is_liked;
+          const likeDelta = newLikeStatus ? 1 : -1;
+          
+          return {
+            ...prev,
+            is_liked: newLikeStatus,
+            likes: prev.likes + likeDelta
+          };
         });
       }
-    } catch (err) {
-      console.error('Error toggling like:', err);
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update like status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLiking(false);
     }
   };
   
-  const handleRecommendationSave = async () => {
-    if (!user || !recommendation) return;
+  const handleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     
+    if (!user) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please sign in to save recommendations',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (!recommendation) return;
+    
+    setIsSaving(true);
     try {
-      if (recommendation.isSaved) {
-        await supabase
-          .from('recommendation_saves')
-          .delete()
-          .eq('recommendation_id', recommendation.id)
-          .eq('user_id', user.id);
-        
-        setRecommendation({
-          ...recommendation,
-          isSaved: false
+      const success = await toggleRecommendationSave(recommendation.id);
+      
+      if (success) {
+        setRecommendation(prev => {
+          if (!prev) return null;
+          
+          return {
+            ...prev,
+            is_saved: !prev.is_saved
+          };
         });
-      } else {
-        await supabase
-          .from('recommendation_saves')
-          .insert({ recommendation_id: recommendation.id, user_id: user.id });
         
-        setRecommendation({
-          ...recommendation,
-          isSaved: true
+        toast({
+          title: recommendation.is_saved ? 'Removed from saved' : 'Added to saved',
+          description: recommendation.is_saved 
+            ? 'Recommendation removed from your saved items' 
+            : 'Recommendation added to your saved items',
         });
       }
-    } catch (err) {
-      console.error('Error toggling save:', err);
+    } catch (error) {
+      console.error('Error toggling save:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update save status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
   
-  const handleRefresh = () => {
-    if (recommendationId) {
-      setLoading(true);
-      setError(null);
+  const handleCommentClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsCommentDialogOpen(true);
+    
+    if (onInteractionStateChange) {
+      onInteractionStateChange(true);
     }
   };
-
-  const handleCommentsClick = () => {
-    setShowComments(true);
+  
+  const handleCommentDialogClose = () => {
+    setIsCommentDialogOpen(false);
+    
+    if (onInteractionStateChange) {
+      onInteractionStateChange(false);
+    }
   };
-
-  if (loading) {
+  
+  const handleCommentAdded = () => {
+    setCommentCount(prev => (prev !== null ? prev + 1 : 1));
+  };
+  
+  const handleVisitLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!recommendation?.url) return;
+    
+    window.open(recommendation.url, '_blank', 'noopener,noreferrer');
+  };
+  
+  const formatRelativeTime = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
+  };
+  
+  const getInitials = (name: string | null) => {
+    if (!name) return 'U';
+    return name.charAt(0).toUpperCase();
+  };
+  
+  if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-2">
-          <Shell className="h-8 w-8 animate-pulse text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Loading content...</p>
+      <div className="p-4 space-y-4">
+        <div className="flex items-center space-x-4">
+          <Skeleton className="h-12 w-12 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-[200px]" />
+            <Skeleton className="h-4 w-[150px]" />
+          </div>
+        </div>
+        <Skeleton className="h-6 w-3/4" />
+        <Skeleton className="h-24 w-full" />
+        <div className="flex justify-between">
+          <Skeleton className="h-8 w-20" />
+          <Skeleton className="h-8 w-20" />
         </div>
       </div>
     );
   }
-
-  if (error || !recommendation) {
+  
+  if (!recommendation) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="text-center">
-          <h3 className="font-medium mb-2">Content Not Available</h3>
-          <p className="text-muted-foreground text-sm">{error || 'This recommendation is no longer available'}</p>
-        </div>
+      <div className="p-4 text-center">
+        <p className="text-muted-foreground">Recommendation not found</p>
       </div>
     );
   }
-
+  
   return (
-    <div className="p-4 sm:p-6 overflow-y-auto max-h-full">
-      <RecommendationCard 
-        recommendation={recommendation}
-        onLike={() => handleRecommendationLike()}
-        onSave={() => handleRecommendationSave()}
-        onDeleted={handleRefresh}
+    <div 
+      className={cn(
+        "flex flex-col",
+        isInModal ? "p-4" : "p-6 max-w-2xl mx-auto"
+      )}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center space-x-4 mb-4">
+        <Avatar className="h-10 w-10 border">
+          <AvatarImage src={recommendation.avatar_url || undefined} alt={recommendation.username || 'User'} />
+          <AvatarFallback>{getInitials(recommendation.username)}</AvatarFallback>
+        </Avatar>
+        <div className="flex-grow">
+          <UsernameLink 
+            username={recommendation.username} 
+            userId={recommendation.user_id}
+            className="font-medium"
+          />
+          <div className="text-sm text-muted-foreground">
+            {formatRelativeTime(recommendation.created_at)}
+          </div>
+        </div>
+        <Badge variant="outline" className="capitalize">
+          {recommendation.entity_type}
+        </Badge>
+      </div>
+      
+      <h1 className="text-2xl font-bold mb-2">{recommendation.title}</h1>
+      
+      <ScrollArea className={cn(
+        "pr-4 -mr-4",
+        isInModal ? "max-h-[50vh]" : "max-h-none"
+      )}>
+        <div className="mb-6">
+          <RichTextDisplay content={recommendation.content} />
+        </div>
+        
+        {recommendation.url && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="mb-6 flex items-center gap-2"
+            onClick={handleVisitLink}
+          >
+            <ExternalLink size={16} />
+            Visit Link
+          </Button>
+        )}
+      </ScrollArea>
+      
+      <div className="flex justify-between items-center mt-4 pt-4 border-t">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "flex items-center gap-1",
+              recommendation.is_liked && "text-red-500"
+            )}
+            onClick={handleLike}
+            disabled={isLiking}
+          >
+            <Heart 
+              size={18} 
+              className={cn(recommendation.is_liked && "fill-red-500")} 
+            />
+            {recommendation.likes > 0 && (
+              <span>{recommendation.likes}</span>
+            )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={handleCommentClick}
+          >
+            <MessageCircle size={18} />
+            {commentCount !== null && commentCount > 0 && (
+              <span>{commentCount}</span>
+            )}
+          </Button>
+        </div>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "flex items-center gap-1",
+            recommendation.is_saved && "text-brand-orange"
+          )}
+          onClick={handleSave}
+          disabled={isSaving}
+        >
+          <Bookmark 
+            size={18} 
+            className={cn(recommendation.is_saved && "fill-brand-orange")} 
+          />
+          Save
+        </Button>
+      </div>
+      
+      <CommentDialog 
+        isOpen={isCommentDialogOpen} 
+        onClose={handleCommentDialogClose} 
+        itemId={recommendation.id}
+        itemType="recommendation" 
+        onCommentAdded={handleCommentAdded}
         highlightCommentId={highlightCommentId}
       />
-
-      <CommentsPreview
-        commentCount={recommendation.comment_count}
-        onClick={handleCommentsClick}
-      />
-
-      {showComments && (
-        <CommentDialog
-          isOpen={showComments}
-          onClose={() => setShowComments(false)}
-          itemId={recommendationId}
-          itemType="recommendation"
-          highlightCommentId={highlightCommentId}
-        />
-      )}
     </div>
   );
 };
