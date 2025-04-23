@@ -7,6 +7,13 @@ import { X, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
+// This is important! It helps prevent body pointer events issues with nested modals
+const resetBodyPointerEvents = () => {
+  if (document.body.style.pointerEvents === 'none') {
+    document.body.style.pointerEvents = '';
+  }
+};
+
 const ContentViewerModal = () => {
   const { isOpen, contentType, contentId, commentId, closeContent } = useContentViewer();
   const [mounted, setMounted] = useState(false);
@@ -36,7 +43,10 @@ const ContentViewerModal = () => {
 
   // Browser back button closes modal
   useEffect(() => {
-    const handlePopState = () => closeContent();
+    const handlePopState = () => {
+      resetBodyPointerEvents(); // Important for nested modals
+      closeContent();
+    };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [closeContent]);
@@ -47,9 +57,11 @@ const ContentViewerModal = () => {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
+      resetBodyPointerEvents(); // Ensure pointer events are reset on close
     }
     return () => {
       document.body.style.overflow = '';
+      resetBodyPointerEvents();
     };
   }, [isOpen]);
 
@@ -59,6 +71,7 @@ const ContentViewerModal = () => {
       ? `/${contentType}/${contentId}?commentId=${commentId}` 
       : `/${contentType}/${contentId}`;
     
+    resetBodyPointerEvents(); // Important when navigating from modal
     closeContent();
     navigate(fullPageUrl);
   };
@@ -95,14 +108,16 @@ const ContentViewerModal = () => {
     <div
       aria-modal="true"
       role="dialog"
+      aria-describedby="content-viewer-description"
       className="
-        fixed inset-0 z-[100] flex items-center justify-center
+        fixed inset-0 z-[90] flex items-center justify-center
         bg-black/40 backdrop-blur-md
         animate-fade-in
       "
       onClick={(e) => {
         // Only close if clicking the backdrop, not the modal content
         if (e.target === e.currentTarget) {
+          resetBodyPointerEvents(); // Important for nested modals
           closeContent();
         }
       }}
@@ -110,6 +125,10 @@ const ContentViewerModal = () => {
         transition: 'background 0.3s cubic-bezier(.4,0,.2,1)'
       }}
     >
+      <div id="content-viewer-description" className="sr-only">
+        Content viewer modal for {contentType} content
+      </div>
+      
       {/* Modal Card */}
       <div
         className={`
@@ -147,6 +166,7 @@ const ContentViewerModal = () => {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              resetBodyPointerEvents(); // Important for nested modals
               closeContent();
             }}
             className="

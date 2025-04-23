@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,7 @@ const resetBodyPointerEvents = () => {
   }
 };
 
-const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: CommentDialogProps) => {
+const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, highlightCommentId }: CommentDialogProps) => {
   const [comments, setComments] = useState<CommentData[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -51,7 +50,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Load user profile
   useEffect(() => {
     const loadUserProfile = async () => {
       if (user) {
@@ -67,7 +65,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
     loadUserProfile();
   }, [user]);
 
-  // Reset state when dialog is closed
   useEffect(() => {
     if (!isOpen) {
       const timeout = setTimeout(() => {
@@ -82,14 +79,12 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       }, 300);
       return () => clearTimeout(timeout);
     } else {
-      // When dialog opens, reset the initial load flag to ensure we don't have stale data
       if (!initialLoadDone) {
         setInitialLoadDone(false);
       }
     }
   }, [isOpen]);
 
-  // Load comments when dialog opens and itemId is available
   useEffect(() => {
     if (isOpen && itemId && !initialLoadDone) {
       loadComments();
@@ -275,7 +270,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   };
 
   const handleCloseDialog = () => {
-    // Ensure we properly clean up when closing
     resetBodyPointerEvents();
     
     if (isDeleting) {
@@ -293,7 +287,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
       setEditCommentContent('');
     }
     
-    // Reset states before closing
     setInitialLoadDone(false);
     onClose();
   };
@@ -330,7 +323,15 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleCloseDialog}>
-        <DialogContent className="sm:max-w-md md:max-w-lg bg-white rounded-xl border-none shadow-lg max-h-[90vh] flex flex-col">
+        <DialogContent 
+          className="sm:max-w-md md:max-w-lg bg-white rounded-xl border-none shadow-lg max-h-[90vh] flex flex-col z-[101]"
+          aria-describedby="comment-dialog-description"
+          forceMount
+        >
+          <div id="comment-dialog-description" className="sr-only">
+            Add or view comments on this {itemType}
+          </div>
+          
           <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
@@ -493,7 +494,14 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded }: Co
           }
         }}
       >
-        <AlertDialogContent className="bg-white rounded-xl border-none shadow-lg max-w-sm">
+        <AlertDialogContent 
+          className="bg-white rounded-xl border-none shadow-lg max-w-sm z-[102]"
+          aria-describedby="delete-comment-description"
+          forceMount
+        >
+          <div id="delete-comment-description" className="sr-only">
+            Delete comment confirmation dialog
+          </div>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-center">Delete Comment?</AlertDialogTitle>
             <AlertDialogDescription className="text-center">
