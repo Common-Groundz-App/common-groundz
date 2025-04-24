@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
+import { SidebarNavigation } from '@/components/navigation/SidebarNavigation';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
@@ -44,10 +45,7 @@ const Feed = () => {
       
       <div className="flex flex-1">
         {!isMobile && (
-          <VerticalTubelightNavbar 
-            initialActiveTab={getInitialActiveTab()}
-            className="fixed left-0 top-0 h-screen pt-4" 
-          />
+          <SidebarNavigation />
         )}
         
         <div className={cn(
