@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
-import Home from './pages/Home'; // New Home component
+import Feed from './pages/Feed';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Explore from './pages/Explore';
@@ -30,15 +30,7 @@ function App() {
                 path="/feed" 
                 element={
                   <ProtectedRoute>
-                    <Home />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/home" 
-                element={
-                  <ProtectedRoute>
-                    <Home />
+                    <Feed />
                   </ProtectedRoute>
                 } 
               />
