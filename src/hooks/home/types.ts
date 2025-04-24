@@ -7,7 +7,7 @@ import {
 } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 
-export type FeedVisibility = 'for_you' | 'following';
+export type HomeVisibility = 'for_you' | 'following';
 
 export interface FeedItem extends Recommendation {
   likes: number;
@@ -44,7 +44,7 @@ export interface PostFeedItem {
 
 export type CombinedFeedItem = FeedItem | PostFeedItem;
 
-export interface FeedState {
+export interface HomeState {
   items: CombinedFeedItem[];
   isLoading: boolean;
   error: Error | null;
@@ -53,7 +53,7 @@ export interface FeedState {
   isLoadingMore: boolean;
 }
 
-export interface FeedQueryParams {
+export interface HomeQueryParams {
   userId: string;
   page: number;
   itemsPerPage: number;

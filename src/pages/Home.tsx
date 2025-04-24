@@ -22,10 +22,10 @@ const Home = () => {
 
   const handlePostCreated = () => {
     if (activeTab === "for-you") {
-      const event = new CustomEvent('refresh-for-you-feed');
+      const event = new CustomEvent('refresh-for-you-home');
       window.dispatchEvent(event);
     } else {
-      const event = new CustomEvent('refresh-following-feed');
+      const event = new CustomEvent('refresh-following-home');
       window.dispatchEvent(event);
     }
   };
@@ -126,9 +126,9 @@ const Home = () => {
               
               <div className="px-4 mt-6">
                 {activeTab === "for-you" ? (
-                  <FeedForYou />
+                  <ForYouFeed />
                 ) : (
-                  <FeedFollowing />
+                  <FollowingFeed />
                 )}
               </div>
             </div>
