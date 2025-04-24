@@ -1,10 +1,10 @@
+
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
-import { SidebarNavigation } from '@/components/navigation/SidebarNavigation';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
@@ -45,7 +45,10 @@ const Feed = () => {
       
       <div className="flex flex-1">
         {!isMobile && (
-          <SidebarNavigation />
+          <VerticalTubelightNavbar 
+            initialActiveTab={getInitialActiveTab()}
+            className="fixed left-0 top-0 h-screen pt-4" 
+          />
         )}
         
         <div className={cn(
@@ -57,7 +60,7 @@ const Feed = () => {
             <div className="px-4 py-6 md:py-8 mb-2">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-2xl font-bold">Home</h1>
+                  <h1 className="text-2xl font-bold">Feed</h1>
                   <p className="text-muted-foreground">Discover recommendations from the community</p>
                 </div>
                 

@@ -15,7 +15,8 @@ export const BottomNavigation = () => {
   const location = useLocation();
   
   const navItems: NavItem[] = [
-    { name: 'Home', path: '/feed', icon: Home },
+    { name: 'Home', path: '/', icon: Home },
+    { name: 'Feed', path: '/feed', icon: Star },
     { name: 'Add', path: '#add', icon: PlusCircle, primary: true, onClick: () => {
       const event = new CustomEvent('open-recommendation-form');
       window.dispatchEvent(event);
