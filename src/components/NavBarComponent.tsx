@@ -1,3 +1,4 @@
+
 import { Home, Star, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
@@ -15,8 +16,7 @@ export function NavBarComponent() {
   const { user } = useAuth();
   
   const navItems = [
-    { name: 'Home', url: '/', icon: Home },
-    { name: 'Feed', url: '/feed', icon: Star },
+    { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User }
   ];
@@ -33,12 +33,10 @@ export function NavBarComponent() {
   }, []);
   
   useEffect(() => {
-    if (location.pathname === '/') {
+    if (location.pathname === '/home') {
       setActiveTab('Home');
     } else if (location.pathname.startsWith('/profile')) {
       setActiveTab('Profile');
-    } else if (location.pathname === '/feed') {
-      setActiveTab('Feed');
     } else if (location.pathname === '/explore') {
       setActiveTab('Explore');
     }

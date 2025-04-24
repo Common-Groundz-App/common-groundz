@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -11,15 +10,12 @@ import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
 import { CreatePostButton } from '@/components/feed/CreatePostButton';
 
-const Feed = () => {
+const Home = () => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState("for-you");
   
   const getInitialActiveTab = () => {
-    if (location.pathname === '/feed') {
-      return 'Feed';
-    }
     return 'Home';
   };
 
@@ -60,7 +56,7 @@ const Feed = () => {
             <div className="px-4 py-6 md:py-8 mb-2">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-2xl font-bold">Feed</h1>
+                  <h1 className="text-2xl font-bold">Home</h1>
                   <p className="text-muted-foreground">Discover recommendations from the community</p>
                 </div>
                 
@@ -144,4 +140,4 @@ const Feed = () => {
   );
 };
 
-export default Feed;
+export default Home;

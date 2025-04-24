@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
-import Feed from './pages/Feed';
+import Home from './pages/Home';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Explore from './pages/Explore';
@@ -27,11 +27,17 @@ function App() {
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route 
-                path="/feed" 
+                path="/home" 
                 element={
                   <ProtectedRoute>
-                    <Feed />
+                    <Home />
                   </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/feed" 
+                element={
+                  <Navigate to="/home" replace />
                 } 
               />
               <Route 
