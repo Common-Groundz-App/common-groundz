@@ -1,5 +1,5 @@
 
-import { Home, Star, Search, User } from 'lucide-react'
+import { Home, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
 import { useLocation } from 'react-router-dom'
@@ -9,8 +9,20 @@ import { supabase } from '@/integrations/supabase/client'
 import NotificationBell from './notifications/NotificationBell'
 import { useAuth } from '@/contexts/AuthContext'
 
+// Helper function to check if we're in a Router context
+const useIsInRouterContext = () => {
+  try {
+    useLocation();
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
 export function NavBarComponent() {
-  const location = useLocation();
+  const isInRouterContext = useIsInRouterContext();
+  // Only use location if we're in a Router context
+  const location = isInRouterContext ? useLocation() : { pathname: '/' };
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
   const { user } = useAuth();
@@ -33,14 +45,17 @@ export function NavBarComponent() {
   }, []);
   
   useEffect(() => {
-    if (location.pathname === '/home') {
-      setActiveTab('Home');
-    } else if (location.pathname.startsWith('/profile')) {
-      setActiveTab('Profile');
-    } else if (location.pathname === '/explore') {
-      setActiveTab('Explore');
+    // Only update active tab if we're in a Router context
+    if (isInRouterContext) {
+      if (location.pathname === '/home') {
+        setActiveTab('Home');
+      } else if (location.pathname.startsWith('/profile')) {
+        setActiveTab('Profile');
+      } else if (location.pathname === '/explore') {
+        setActiveTab('Explore');
+      }
     }
-  }, [location.pathname]);
+  }, [location.pathname, isInRouterContext]);
 
   return (
     <>
