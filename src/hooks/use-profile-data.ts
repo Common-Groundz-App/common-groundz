@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserProfile, getDisplayName } from '@/services/profileService'; 
+import { fetchUserProfile, getDisplayName, fetchFollowerCount, fetchFollowingCount } from '@/services/profileService'; 
 import { useProfileFollows } from './profile/use-profile-follows';
 import { useProfileImages } from './profile/use-profile-images';
 import { useProfileMetadata } from './profile/use-profile-metadata';
@@ -52,6 +52,14 @@ export const useProfileData = (userId?: string) => {
       setIsOwnProfile(!userId || userId === user.id);
       
       const profile = await fetchUserProfile(viewingUserId);
+      
+      // Fetch follower and following counts
+      const followerCountData = await fetchFollowerCount(viewingUserId);
+      const followingCountData = await fetchFollowingCount(viewingUserId);
+      
+      setFollowerCount(followerCountData);
+      setFollowingCount(followingCountData);
+      
       setProfileData(profile);
       
       if (profile) {

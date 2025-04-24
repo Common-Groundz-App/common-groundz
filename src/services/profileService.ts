@@ -24,34 +24,44 @@ export const fetchUserProfile = async (userId: string) => {
  * Fetches a user's following count
  */
 export const fetchFollowingCount = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('follows')
-    .select('*', { count: 'exact' })
-    .eq('follower_id', userId);
+  try {
+    const { count, error } = await supabase
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('follower_id', userId);
+      
+    if (error) {
+      console.error('Error fetching following count:', error);
+      throw error;
+    }
     
-  if (error) {
-    console.error('Error fetching following count:', error);
-    throw error;
+    return count || 0;
+  } catch (error) {
+    console.error('Error in fetchFollowingCount:', error);
+    return 0;
   }
-  
-  return data?.length || 0;
 };
 
 /**
  * Fetches a user's followers count
  */
 export const fetchFollowerCount = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('follows')
-    .select('*', { count: 'exact' })
-    .eq('following_id', userId);
+  try {
+    const { count, error } = await supabase
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('following_id', userId);
+      
+    if (error) {
+      console.error('Error fetching follower count:', error);
+      throw error;
+    }
     
-  if (error) {
-    console.error('Error fetching follower count:', error);
-    throw error;
+    return count || 0;
+  } catch (error) {
+    console.error('Error in fetchFollowerCount:', error);
+    return 0;
   }
-  
-  return data?.length || 0;
 };
 
 /**
