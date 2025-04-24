@@ -1,12 +1,12 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { HomeQueryParams } from '../types';
-import { FeedItem, RecommendationFeedItem } from '../types';
+import { HomeQueryParams, FeedItem, RecommendationFeedItem } from '../types';
 
 // Fetch recommendations with pagination
 export const fetchRecommendations = async (
   { userId, page, itemsPerPage }: HomeQueryParams,
   followingIds?: string[] // Optional parameter to filter by following users
-): Promise<{ recommendations: RecommendationFeedItem[] }> => {
+): Promise<{ recommendations: any[] }> { // Changed the return type to any[] temporarily
   try {
     const from = page * itemsPerPage;
     const to = from + itemsPerPage - 1;
@@ -92,17 +92,15 @@ export const processRecommendations = async (
     
     // Fetch comment counts for recommendations
     const { data: commentCounts, error: commentCountsError } = await supabase
-      .from('recommendation_comments')
-      .select('recommendation_id, count', { count: 'exact' })
-      .in('recommendation_id', recommendations.map(rec => rec.id))
-      .eq('is_deleted', false)
-      .group('recommendation_id');
+      .rpc('count_comments_by_recommendation', {
+        recommendation_ids: recommendations.map(rec => rec.id)
+      });
       
     if (commentCountsError) {
       console.error("Error fetching comment counts:", commentCountsError);
     }
     
-    const commentCountsMap = new Map(commentCounts?.map(item => [item.recommendation_id, item.count]));
+    const commentCountsMap = new Map(commentCounts?.map(item => [item.recommendation_id, item.count]) || []);
 
     // Combine all the data
     const processedRecommendations: RecommendationFeedItem[] = recommendations.map(rec => {

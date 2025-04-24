@@ -8,6 +8,29 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PostFeedItem as PostItem } from '@/hooks/home/types';
 import { Entity } from '@/services/recommendation/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { fetchCommentCount } from '@/services/commentsService';
+import { supabase } from '@/integrations/supabase/client';
+import UsernameLink from '@/components/common/UsernameLink';
+import { EntityBadge } from '@/components/feed/EntityBadge';
+import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
+import { RichTextDisplay } from '@/components/content/PostContentViewer';
+import CommentDialog from '@/components/comments/CommentDialog';
+import { CreatePostForm } from '@/components/feed/CreatePostForm';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from '@/components/ui/dropdown-menu';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -129,7 +128,7 @@ export const useFeed = (feedType: HomeVisibility) => {
         })
       }));
 
-      await toggleFeedItemLike(item, user.id);
+      await toggleHomeItemLike(item, user.id);
     } catch (err) {
       console.error('Error toggling like:', err);
       toast({
@@ -186,7 +185,7 @@ export const useFeed = (feedType: HomeVisibility) => {
         })
       }));
 
-      await toggleFeedItemSave(item, user.id);
+      await toggleHomeItemSave(item, user.id);
     } catch (err) {
       console.error('Error toggling save:', err);
       toast({
