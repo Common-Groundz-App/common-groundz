@@ -90,17 +90,25 @@ export const processRecommendations = async (
 
     const savedRecommendationIds = new Set(saves.map(save => save.recommendation_id));
     
-    // Fetch comment counts for recommendations
+    // Fix the RPC call - using a raw query since the function isn't registered in TS types
     const { data: commentCounts, error: commentCountsError } = await supabase
-      .rpc('count_comments_by_recommendation', {
-        recommendation_ids: recommendations.map(rec => rec.id)
-      });
+      .from('recommendation_comments')
+      .select('recommendation_id, count(*)')
+      .in('recommendation_id', recommendations.map(rec => rec.id))
+      .eq('is_deleted', false)
+      .group('recommendation_id');
       
     if (commentCountsError) {
       console.error("Error fetching comment counts:", commentCountsError);
     }
     
-    const commentCountsMap = new Map(commentCounts?.map(item => [item.recommendation_id, item.count]) || []);
+    // Fix handling the commentCounts result by checking if it exists before mapping
+    const commentCountsMap = new Map();
+    if (commentCounts) {
+      commentCounts.forEach((item: any) => {
+        commentCountsMap.set(item.recommendation_id, parseInt(item.count));
+      });
+    }
 
     // Combine all the data
     const processedRecommendations: RecommendationFeedItem[] = recommendations.map(rec => {

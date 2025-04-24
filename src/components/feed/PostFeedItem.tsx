@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,7 +16,8 @@ import { supabase } from '@/integrations/supabase/client';
 import UsernameLink from '@/components/common/UsernameLink';
 import { EntityBadge } from '@/components/feed/EntityBadge';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
-import { RichTextDisplay } from '@/components/content/PostContentViewer';
+// Fix the RichTextDisplay import - it's not exported from PostContentViewer
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { CreatePostForm } from '@/components/feed/CreatePostForm';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
