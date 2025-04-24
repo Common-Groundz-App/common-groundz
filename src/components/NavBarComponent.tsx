@@ -1,5 +1,4 @@
-
-import { Home, Search, User } from 'lucide-react'
+import { Home, Star, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
 import { useLocation } from 'react-router-dom'
@@ -9,26 +8,15 @@ import { supabase } from '@/integrations/supabase/client'
 import NotificationBell from './notifications/NotificationBell'
 import { useAuth } from '@/contexts/AuthContext'
 
-// Helper function to check if we're in a Router context
-const useIsInRouterContext = () => {
-  try {
-    useLocation();
-    return true;
-  } catch (error) {
-    return false;
-  }
-};
-
 export function NavBarComponent() {
-  const isInRouterContext = useIsInRouterContext();
-  // Only use location if we're in a Router context
-  const location = isInRouterContext ? useLocation() : { pathname: '/' };
+  const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
   const { user } = useAuth();
   
   const navItems = [
-    { name: 'Home', url: '/home', icon: Home },
+    { name: 'Home', url: '/', icon: Home },
+    { name: 'Feed', url: '/feed', icon: Star },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User }
   ];
@@ -45,17 +33,16 @@ export function NavBarComponent() {
   }, []);
   
   useEffect(() => {
-    // Only update active tab if we're in a Router context
-    if (isInRouterContext) {
-      if (location.pathname === '/home') {
-        setActiveTab('Home');
-      } else if (location.pathname.startsWith('/profile')) {
-        setActiveTab('Profile');
-      } else if (location.pathname === '/explore') {
-        setActiveTab('Explore');
-      }
+    if (location.pathname === '/') {
+      setActiveTab('Home');
+    } else if (location.pathname.startsWith('/profile')) {
+      setActiveTab('Profile');
+    } else if (location.pathname === '/feed') {
+      setActiveTab('Feed');
+    } else if (location.pathname === '/explore') {
+      setActiveTab('Explore');
     }
-  }, [location.pathname, isInRouterContext]);
+  }, [location.pathname]);
 
   return (
     <>

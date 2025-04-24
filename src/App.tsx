@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
-import Home from './pages/Home';
+import Feed from './pages/Feed';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Explore from './pages/Explore';
@@ -27,14 +27,13 @@ function App() {
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route 
-                path="/home" 
+                path="/feed" 
                 element={
                   <ProtectedRoute>
-                    <Home />
+                    <Feed />
                   </ProtectedRoute>
                 } 
               />
-              {/* Removed the /feed route */}
               <Route 
                 path="/profile" 
                 element={
@@ -83,6 +82,9 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
+              {/* Redirect old edit routes to profile */}
+              <Route path="/recommendations/edit/:id" element={<Navigate to="/profile" />} />
+              <Route path="/posts/edit/:id" element={<Navigate to="/profile" />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <Toaster />

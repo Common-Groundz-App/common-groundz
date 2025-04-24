@@ -6,26 +6,29 @@ import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import ForYouFeed from '@/components/home/ForYouFeed';
-import FollowingFeed from '@/components/home/FollowingFeed';
+import FeedForYou from '@/components/feed/FeedForYou';
+import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
 import { CreatePostButton } from '@/components/feed/CreatePostButton';
 
-const Home = () => {
+const Feed = () => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState("for-you");
   
   const getInitialActiveTab = () => {
+    if (location.pathname === '/feed') {
+      return 'Feed';
+    }
     return 'Home';
   };
 
   const handlePostCreated = () => {
     if (activeTab === "for-you") {
-      const event = new CustomEvent('refresh-for-you-home');
+      const event = new CustomEvent('refresh-for-you-feed');
       window.dispatchEvent(event);
     } else {
-      const event = new CustomEvent('refresh-following-home');
+      const event = new CustomEvent('refresh-following-feed');
       window.dispatchEvent(event);
     }
   };
@@ -57,7 +60,7 @@ const Home = () => {
             <div className="px-4 py-6 md:py-8 mb-2">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-2xl font-bold">Home</h1>
+                  <h1 className="text-2xl font-bold">Feed</h1>
                   <p className="text-muted-foreground">Discover recommendations from the community</p>
                 </div>
                 
@@ -126,9 +129,9 @@ const Home = () => {
               
               <div className="px-4 mt-6">
                 {activeTab === "for-you" ? (
-                  <ForYouFeed />
+                  <FeedForYou />
                 ) : (
-                  <FollowingFeed />
+                  <FeedFollowing />
                 )}
               </div>
             </div>
@@ -141,4 +144,4 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default Feed;

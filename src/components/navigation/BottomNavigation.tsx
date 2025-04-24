@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, User, PlusCircle } from 'lucide-react';
+import { Home, Search, User, Star, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -16,12 +15,13 @@ export const BottomNavigation = () => {
   const location = useLocation();
   
   const navItems: NavItem[] = [
-    { name: 'Home', path: '/home', icon: Home },
-    { name: 'Explore', path: '/explore', icon: Search },
+    { name: 'Home', path: '/', icon: Home },
+    { name: 'Feed', path: '/feed', icon: Star },
     { name: 'Add', path: '#add', icon: PlusCircle, primary: true, onClick: () => {
       const event = new CustomEvent('open-recommendation-form');
       window.dispatchEvent(event);
     }},
+    { name: 'Explore', path: '/explore', icon: Search },
     { name: 'Profile', path: '/profile', icon: User }
   ];
   

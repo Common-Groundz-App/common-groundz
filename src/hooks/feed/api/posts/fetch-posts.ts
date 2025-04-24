@@ -1,11 +1,11 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { HomeQueryParams } from '../../types';
+import { FeedQueryParams } from '../../types';
 import { PostsQueryResult } from './types';
 
 // Fetch posts with pagination
 export const fetchPosts = async (
-  { page, itemsPerPage }: HomeQueryParams,
+  { page, itemsPerPage }: FeedQueryParams,
   followingIds?: string[] // Optional parameter to filter by following users
 ): Promise<PostsQueryResult> => {
   try {
