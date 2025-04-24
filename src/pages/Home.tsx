@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -9,7 +8,7 @@ import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import HomeForYou from '@/components/home/HomeForYou';
 import HomeFollowing from '@/components/home/HomeFollowing';
 import { motion } from 'framer-motion';
-import { CreatePostButton } from '@/components/feed/CreatePostButton'; // Kept original import
+import { CreatePostButton } from '@/components/home/CreatePostButton';
 
 const Home = () => {
   const isMobile = useIsMobile();

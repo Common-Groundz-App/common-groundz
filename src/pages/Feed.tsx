@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -9,7 +8,7 @@ import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
-import { CreatePostButton } from '@/components/feed/CreatePostButton';
+import { CreatePostButton } from '@/components/home/CreatePostButton';
 
 const Feed = () => {
   const isMobile = useIsMobile();
