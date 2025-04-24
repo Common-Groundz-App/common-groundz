@@ -1,12 +1,11 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { FeedQueryParams, CombinedFeedItem } from '../types';
+import { HomeQueryParams, CombinedFeedItem } from '../types';
 import { fetchRecommendations, processRecommendations } from './recommendations';
 import { fetchPosts, processPosts } from './posts';
 import { sortItemsByDate } from './utils';
 
 // Fetch for you feed (combines recommendations and posts)
-export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryParams) => {
+export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: HomeQueryParams) => {
   try {
     // Fetch recommendations
     const { recommendations: recsData } = await fetchRecommendations({ userId, page, itemsPerPage });
@@ -38,7 +37,7 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
 };
 
 // Fetch following feed (posts and recommendations from followed users)
-export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQueryParams) => {
+export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: HomeQueryParams) => {
   try {
     // Get user's following list
     const { data: followingData, error: followingError } = await supabase

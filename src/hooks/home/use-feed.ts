@@ -2,17 +2,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { FeedVisibility, FeedState } from './types';
+import { HomeVisibility, HomeState } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
-import { toggleFeedItemLike, toggleFeedItemSave, useInteractions } from './interactions';
+import { toggleHomeItemLike, toggleHomeItemSave, useInteractions } from './interactions';
 import { isItemPost } from './api/utils';
 
 const ITEMS_PER_PAGE = 10;
 
-export const useFeed = (feedType: FeedVisibility) => {
+export const useFeed = (feedType: HomeVisibility) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [state, setState] = useState<FeedState>({
+  const [state, setState] = useState<HomeState>({
     items: [],
     isLoading: true,
     error: null,
@@ -220,14 +220,14 @@ export const useFeed = (feedType: FeedVisibility) => {
 
   useEffect(() => {
     const handleGlobalRefresh = () => {
-      console.log(`Refreshing ${feedType} feed due to global event`);
+      console.log(`Refreshing ${feedType} home due to global event`);
       refreshFeed();
     };
     
-    window.addEventListener('refresh-feed', handleGlobalRefresh);
+    window.addEventListener('refresh-home', handleGlobalRefresh);
     
     return () => {
-      window.removeEventListener('refresh-feed', handleGlobalRefresh);
+      window.removeEventListener('refresh-home', handleGlobalRefresh);
     };
   }, [refreshFeed, feedType]);
 

@@ -1,9 +1,10 @@
+
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useHome } from '@/hooks/home/use-home';
+import { useFeed } from '@/hooks/home/use-feed';
 import FeedItem from '../feed/FeedItem';
 import FeedSkeleton from '../feed/FeedSkeleton';
-import FeedEmptyState from '../feed/FeedEmptyState';
+import FeedEmptyState from './FeedEmptyState';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -18,30 +19,30 @@ const ForYouFeed = () => {
     hasMore, 
     loadMore, 
     isLoadingMore,
-    refreshHome,
+    refreshFeed,
     handleLike,
     handleSave,
     handleDelete
-  } = useHome('for_you');
+  } = useFeed('for_you');
 
   useEffect(() => {
     if (error) {
       toast({
         title: 'Error',
-        description: 'Failed to load home feed. Please try again.',
+        description: 'Failed to load feed. Please try again.',
         variant: 'destructive'
       });
     }
   }, [error, toast]);
 
   useEffect(() => {
-    const handleRefresh = () => refreshHome();
+    const handleRefresh = () => refreshFeed();
     window.addEventListener('refresh-for-you-home', handleRefresh);
     
     return () => {
       window.removeEventListener('refresh-for-you-home', handleRefresh);
     };
-  }, [refreshHome]);
+  }, [refreshFeed]);
 
   return (
     <div className="space-y-6">
@@ -49,7 +50,7 @@ const ForYouFeed = () => {
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={refreshHome}
+          onClick={refreshFeed}
           disabled={isLoading}
           className="flex items-center gap-1"
         >
@@ -67,7 +68,7 @@ const ForYouFeed = () => {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={refreshHome}
+              onClick={refreshFeed}
               className="ml-2"
             >
               Try again
@@ -89,7 +90,7 @@ const ForYouFeed = () => {
                 onSave={handleSave}
                 onComment={(id) => console.log('Comment on', id)}
                 onDelete={handleDelete}
-                refreshFeed={refreshHome}
+                refreshFeed={refreshFeed}
               />
             ))}
           </div>

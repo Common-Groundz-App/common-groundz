@@ -1,8 +1,9 @@
+
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useHome } from '@/hooks/home/use-home';
-import FeedItem from './FeedItem';
-import FeedSkeleton from './FeedSkeleton';
+import { useFeed } from '@/hooks/home/use-feed';
+import FeedItem from '../feed/FeedItem';
+import FeedSkeleton from '../feed/FeedSkeleton';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, UserPlus, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -20,29 +21,29 @@ const FollowingFeed = () => {
     hasMore, 
     loadMore, 
     isLoadingMore,
-    refreshHome,
+    refreshFeed,
     handleLike,
     handleSave
-  } = useHome('following');
+  } = useFeed('following');
 
   useEffect(() => {
     if (error) {
       toast({
         title: 'Error',
-        description: 'Failed to load home feed. Please try again.',
+        description: 'Failed to load feed. Please try again.',
         variant: 'destructive'
       });
     }
   }, [error, toast]);
   
   useEffect(() => {
-    const handleRefresh = () => refreshHome();
+    const handleRefresh = () => refreshFeed();
     window.addEventListener('refresh-following-home', handleRefresh);
     
     return () => {
       window.removeEventListener('refresh-following-home', handleRefresh);
     };
-  }, [refreshHome]);
+  }, [refreshFeed]);
 
   return (
     <div className="space-y-6">
@@ -50,7 +51,7 @@ const FollowingFeed = () => {
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={refreshHome}
+          onClick={refreshFeed}
           disabled={isLoading}
           className="flex items-center gap-1"
         >
@@ -64,11 +65,11 @@ const FollowingFeed = () => {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>
-            There was a problem loading the home feed.
+            There was a problem loading the feed.
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={refreshHome}
+              onClick={refreshFeed}
               className="ml-2"
             >
               Try again
@@ -85,7 +86,7 @@ const FollowingFeed = () => {
             </div>
             <h3 className="text-lg font-medium mb-2">No recommendations yet</h3>
             <p className="text-muted-foreground mb-6 max-w-sm">
-              Follow people to see their recommendations in your home feed
+              Follow people to see their recommendations in your feed
             </p>
             <Button 
               size="lg"
