@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -5,8 +6,8 @@ import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import FeedForYou from '@/components/feed/FeedForYou';
-import FeedFollowing from '@/components/feed/FeedFollowing';
+import ForYouFeed from '@/components/home/ForYouFeed';
+import FollowingFeed from '@/components/home/FollowingFeed';
 import { motion } from 'framer-motion';
 import { CreatePostButton } from '@/components/feed/CreatePostButton';
 

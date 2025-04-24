@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
@@ -22,6 +21,17 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
     };
   }, []);
 
+  const handleSuccess = () => {
+    setIsDialogOpen(false);
+    
+    // Update event names
+    window.dispatchEvent(new CustomEvent('refresh-for-you-home'));
+    window.dispatchEvent(new CustomEvent('refresh-following-home'));
+    window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+    
+    if (onPostCreated) onPostCreated();
+  };
+
   return (
     <>
       <Button
@@ -42,16 +52,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
           </DialogHeader>
           
           <CreatePostForm 
-            onSuccess={() => {
-              setIsDialogOpen(false);
-              
-              // Dispatch events to refresh both feeds and profile posts
-              window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
-              window.dispatchEvent(new CustomEvent('refresh-following-feed'));
-              window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
-              
-              if (onPostCreated) onPostCreated();
-            }}
+            onSuccess={handleSuccess}
             onCancel={() => setIsDialogOpen(false)} 
           />
         </DialogContent>
