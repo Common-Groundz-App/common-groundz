@@ -6,12 +6,21 @@ import { useState, useEffect } from 'react'
 import { SearchDialog } from '@/components/SearchDialog'
 import { supabase } from '@/integrations/supabase/client'
 import NotificationBell from './notifications/NotificationBell'
+import { useAuth } from '@/contexts/AuthContext'
 
 export function NavBarComponent() {
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
+  const { user } = useAuth();
   
+  const navItems = [
+    { name: 'Home', url: '/', icon: Home },
+    { name: 'Feed', url: '/feed', icon: Star },
+    { name: 'Explore', url: '/explore', icon: Search },
+    { name: 'Profile', url: '/profile', icon: User }
+  ];
+
   useEffect(() => {
     const handleOpenSearch = () => {
       setShowSearchDialog(true);
@@ -23,13 +32,6 @@ export function NavBarComponent() {
     };
   }, []);
   
-  const navItems = [
-    { name: 'Home', url: '/', icon: Home },
-    { name: 'Feed', url: '/feed', icon: Star },
-    { name: 'Explore', url: '/explore', icon: Search },
-    { name: 'Profile', url: '/profile', icon: User }
-  ];
-
   useEffect(() => {
     if (location.pathname === '/') {
       setActiveTab('Home');
@@ -48,7 +50,7 @@ export function NavBarComponent() {
         items={navItems} 
         rightSection={
           <div className="flex items-center gap-2">
-            <NotificationBell />
+            {user && <NotificationBell />}
             <UserMenu />
           </div>
         }
