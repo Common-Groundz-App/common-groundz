@@ -2,8 +2,8 @@
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/home/use-feed';
-import FeedItem from './FeedItem';
-import FeedSkeleton from './FeedSkeleton';
+import FeedItem from '../feed/FeedItem';
+import FeedSkeleton from '../feed/FeedSkeleton';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, UserPlus, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
-const FeedFollowing = () => {
+const FollowingFeed = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { 
@@ -38,10 +38,10 @@ const FeedFollowing = () => {
   
   useEffect(() => {
     const handleRefresh = () => refreshFeed();
-    window.addEventListener('refresh-following-feed', handleRefresh);
+    window.addEventListener('refresh-following-home', handleRefresh);
     
     return () => {
-      window.removeEventListener('refresh-following-feed', handleRefresh);
+      window.removeEventListener('refresh-following-home', handleRefresh);
     };
   }, [refreshFeed]);
 
@@ -127,4 +127,4 @@ const FeedFollowing = () => {
   );
 };
 
-export default FeedFollowing;
+export default FollowingFeed;

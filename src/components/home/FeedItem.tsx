@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { CombinedFeedItem } from '@/hooks/home/types';
 import { isItemPost } from '@/hooks/home/api/utils';
-import PostFeedItem from './PostFeedItem';
-import RecommendationFeedItem from './RecommendationFeedItem';
+import PostFeedItem from '../feed/PostFeedItem';
+import RecommendationFeedItem from '../feed/RecommendationFeedItem';
 
 interface FeedItemProps {
   item: CombinedFeedItem;

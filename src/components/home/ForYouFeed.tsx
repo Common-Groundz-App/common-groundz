@@ -2,17 +2,15 @@
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/home/use-feed';
-import FeedItem from './FeedItem';
-import FeedSkeleton from './FeedSkeleton';
+import FeedItem from '../feed/FeedItem';
+import FeedSkeleton from '../feed/FeedSkeleton';
+import FeedEmptyState from './FeedEmptyState';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, UserPlus, AlertCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent } from '@/components/ui/card';
+import { RefreshCw } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
-const FeedFollowing = () => {
-  const { user } = useAuth();
+const ForYouFeed = () => {
   const { toast } = useToast();
   const { 
     items, 
@@ -23,8 +21,9 @@ const FeedFollowing = () => {
     isLoadingMore,
     refreshFeed,
     handleLike,
-    handleSave
-  } = useFeed('following');
+    handleSave,
+    handleDelete
+  } = useFeed('for_you');
 
   useEffect(() => {
     if (error) {
@@ -35,13 +34,13 @@ const FeedFollowing = () => {
       });
     }
   }, [error, toast]);
-  
+
   useEffect(() => {
     const handleRefresh = () => refreshFeed();
-    window.addEventListener('refresh-following-feed', handleRefresh);
+    window.addEventListener('refresh-for-you-home', handleRefresh);
     
     return () => {
-      window.removeEventListener('refresh-following-feed', handleRefresh);
+      window.removeEventListener('refresh-for-you-home', handleRefresh);
     };
   }, [refreshFeed]);
 
@@ -79,24 +78,7 @@ const FeedFollowing = () => {
       ) : isLoading ? (
         <FeedSkeleton />
       ) : items.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="text-center py-12 flex flex-col items-center">
-            <div className="mb-4 p-4 bg-muted rounded-full">
-              <UserPlus size={40} className="text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium mb-2">No recommendations yet</h3>
-            <p className="text-muted-foreground mb-6 max-w-sm">
-              Follow people to see their recommendations in your feed
-            </p>
-            <Button 
-              size="lg"
-              asChild
-              className="px-6"
-            >
-              <Link to={`/profile/${user?.id}`}>Find people to follow</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <FeedEmptyState />
       ) : (
         <>
           <div className="space-y-8">
@@ -106,6 +88,9 @@ const FeedFollowing = () => {
                 item={item} 
                 onLike={handleLike}
                 onSave={handleSave}
+                onComment={(id) => console.log('Comment on', id)}
+                onDelete={handleDelete}
+                refreshFeed={refreshFeed}
               />
             ))}
           </div>
@@ -127,4 +112,4 @@ const FeedFollowing = () => {
   );
 };
 
-export default FeedFollowing;
+export default ForYouFeed;

@@ -1,18 +1,17 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { FeedVisibility, FeedState } from './types';
-import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
-import { toggleFeedItemLike, toggleFeedItemSave, useInteractions } from './interactions';
+import { HomeVisibility, HomeState } from './types';
+import { fetchForYouHome, fetchFollowingHome } from './api/home';
+import { toggleHomeItemLike, toggleHomeItemSave, useInteractions } from './interactions';
 import { isItemPost } from './api/utils';
 
 const ITEMS_PER_PAGE = 10;
 
-export const useFeed = (feedType: FeedVisibility) => {
+export const useHome = (homeType: HomeVisibility) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [state, setState] = useState<FeedState>({
+  const [state, setState] = useState<HomeState>({
     items: [],
     isLoading: true,
     error: null,
@@ -21,9 +20,9 @@ export const useFeed = (feedType: FeedVisibility) => {
     isLoadingMore: false
   });
 
-  const fetchFeed = useCallback(async (page: number = 0, reset: boolean = false) => {
+  const fetchHome = useCallback(async (page: number = 0, reset: boolean = false) => {
     if (!user) {
-      console.log("No user found in useFeed");
+      console.log("No user found in useHome");
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -36,21 +35,21 @@ export const useFeed = (feedType: FeedVisibility) => {
     }
 
     try {
-      console.log(`Fetching ${feedType} feed for page ${page}`);
+      console.log(`Fetching ${homeType} home for page ${page}`);
       setState(prev => ({
         ...prev,
         isLoading: !prev.items.length || reset,
         isLoadingMore: !!prev.items.length && !reset
       }));
       
-      const fetchFunction = feedType === 'for_you' ? fetchForYouFeed : fetchFollowingFeed;
+      const fetchFunction = homeType === 'for_you' ? fetchForYouHome : fetchFollowingHome;
       const { items, hasMore } = await fetchFunction({ 
         userId: user.id, 
         page,
         itemsPerPage: ITEMS_PER_PAGE
       });
       
-      console.log(`Received ${items.length} items for ${feedType} feed`);
+      console.log(`Received ${items.length} items for ${homeType} home`);
       
       setState(prev => ({
         ...prev,
@@ -62,38 +61,38 @@ export const useFeed = (feedType: FeedVisibility) => {
         error: null
       }));
     } catch (error) {
-      console.error(`Error fetching ${feedType} feed:`, error);
+      console.error(`Error fetching ${homeType} home:`, error);
       setState(prev => ({
         ...prev,
         isLoading: false,
         isLoadingMore: false,
-        error: error instanceof Error ? error : new Error('Failed to fetch feed')
+        error: error instanceof Error ? error : new Error('Failed to fetch home')
       }));
       
       toast({
-        title: 'Feed Error',
-        description: error instanceof Error ? error.message : 'Failed to load feed items',
+        title: 'Home Error',
+        description: error instanceof Error ? error.message : 'Failed to load home items',
         variant: 'destructive'
       });
     }
-  }, [user, feedType, toast]);
+  }, [user, homeType, toast]);
 
   useEffect(() => {
     if (user) {
-      console.log(`Setting up initial feed load for ${feedType}`);
-      fetchFeed(0, true);
+      console.log(`Setting up initial home load for ${homeType}`);
+      fetchHome(0, true);
     }
-  }, [fetchFeed, user]);
+  }, [fetchHome, user]);
 
   const loadMore = useCallback(() => {
     if (state.isLoadingMore || !state.hasMore) return;
-    fetchFeed(state.page + 1);
-  }, [state.isLoadingMore, state.hasMore, state.page, fetchFeed]);
+    fetchHome(state.page + 1);
+  }, [state.isLoadingMore, state.hasMore, state.page, fetchHome]);
 
-  const refreshFeed = useCallback(() => {
+  const refreshHome = useCallback(() => {
     setState(prev => ({ ...prev, isLoading: true }));
-    fetchFeed(0, true);
-  }, [fetchFeed]);
+    fetchHome(0, true);
+  }, [fetchHome]);
 
   const { handleLike: interactionLike, handleSave: interactionSave } = useInteractions();
 
@@ -129,7 +128,7 @@ export const useFeed = (feedType: FeedVisibility) => {
         })
       }));
 
-      await toggleFeedItemLike(item, user.id);
+      await toggleHomeItemLike(item, user.id);
     } catch (err) {
       console.error('Error toggling like:', err);
       toast({
@@ -186,7 +185,7 @@ export const useFeed = (feedType: FeedVisibility) => {
         })
       }));
 
-      await toggleFeedItemSave(item, user.id);
+      await toggleHomeItemSave(item, user.id);
     } catch (err) {
       console.error('Error toggling save:', err);
       toast({
@@ -220,21 +219,21 @@ export const useFeed = (feedType: FeedVisibility) => {
 
   useEffect(() => {
     const handleGlobalRefresh = () => {
-      console.log(`Refreshing ${feedType} feed due to global event`);
-      refreshFeed();
+      console.log(`Refreshing ${homeType} home due to global event`);
+      refreshHome();
     };
     
-    window.addEventListener('refresh-feed', handleGlobalRefresh);
+    window.addEventListener('refresh-home', handleGlobalRefresh);
     
     return () => {
-      window.removeEventListener('refresh-feed', handleGlobalRefresh);
+      window.removeEventListener('refresh-home', handleGlobalRefresh);
     };
-  }, [refreshFeed, feedType]);
+  }, [refreshHome, homeType]);
 
   return {
     ...state,
     loadMore,
-    refreshFeed,
+    refreshHome,
     handleLike,
     handleSave,
     handleDelete

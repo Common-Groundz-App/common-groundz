@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -5,8 +6,8 @@ import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import FeedForYou from '@/components/feed/FeedForYou';
-import FeedFollowing from '@/components/feed/FeedFollowing';
+import ForYouFeed from '@/components/home/ForYouFeed';
+import FollowingFeed from '@/components/home/FollowingFeed';
 import { motion } from 'framer-motion';
 import { CreatePostButton } from '@/components/feed/CreatePostButton';
 
@@ -21,10 +22,10 @@ const Home = () => {
 
   const handlePostCreated = () => {
     if (activeTab === "for-you") {
-      const event = new CustomEvent('refresh-for-you-feed');
+      const event = new CustomEvent('refresh-for-you-home');
       window.dispatchEvent(event);
     } else {
-      const event = new CustomEvent('refresh-following-feed');
+      const event = new CustomEvent('refresh-following-home');
       window.dispatchEvent(event);
     }
   };
@@ -125,9 +126,9 @@ const Home = () => {
               
               <div className="px-4 mt-6">
                 {activeTab === "for-you" ? (
-                  <FeedForYou />
+                  <ForYouFeed />
                 ) : (
-                  <FeedFollowing />
+                  <FollowingFeed />
                 )}
               </div>
             </div>
