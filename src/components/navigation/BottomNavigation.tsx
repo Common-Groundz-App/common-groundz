@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Search, User, Star, PlusCircle } from 'lucide-react';
@@ -16,7 +17,7 @@ export const BottomNavigation = () => {
   
   const navItems: NavItem[] = [
     { name: 'Home', path: '/', icon: Home },
-    { name: 'Feed', path: '/feed', icon: Star },
+    { name: 'Home', path: '/home', icon: Star },
     { name: 'Add', path: '#add', icon: PlusCircle, primary: true, onClick: () => {
       const event = new CustomEvent('open-recommendation-form');
       window.dispatchEvent(event);
@@ -31,7 +32,8 @@ export const BottomNavigation = () => {
         {navItems.map((item) => {
           const isActive = location.pathname === item.path || 
                           (item.path === '/profile' && location.pathname.startsWith('/profile')) ||
-                          (item.path === '/explore' && location.pathname.startsWith('/explore'));
+                          (item.path === '/explore' && location.pathname.startsWith('/explore')) || 
+                          (item.path === '/home' && (location.pathname === '/home' || location.pathname === '/feed'));
           
           if (item.path.startsWith('#')) {
             return (
