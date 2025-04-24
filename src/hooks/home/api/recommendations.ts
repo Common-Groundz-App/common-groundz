@@ -6,7 +6,7 @@ import { HomeQueryParams, FeedItem, RecommendationFeedItem } from '../types';
 export const fetchRecommendations = async (
   { userId, page, itemsPerPage }: HomeQueryParams,
   followingIds?: string[] // Optional parameter to filter by following users
-): Promise<{ recommendations: any[] }> { // Changed the return type to any[] temporarily
+): Promise<{ recommendations: any[] }> => { // Fixed the arrow function syntax
   try {
     const from = page * itemsPerPage;
     const to = from + itemsPerPage - 1;
