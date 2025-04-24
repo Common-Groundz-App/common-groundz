@@ -12,7 +12,6 @@ interface CreatePostButtonProps {
 export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Listen for the "open-create-post-dialog" event
   useEffect(() => {
     const handleOpenDialog = () => setIsDialogOpen(true);
     window.addEventListener('open-create-post-dialog', handleOpenDialog);
@@ -45,9 +44,9 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
             onSuccess={() => {
               setIsDialogOpen(false);
               
-              // Dispatch events to refresh both feeds and profile posts
-              window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
-              window.dispatchEvent(new CustomEvent('refresh-following-feed'));
+              // Dispatch events to refresh both feeds
+              window.dispatchEvent(new CustomEvent('refresh-for-you-home'));
+              window.dispatchEvent(new CustomEvent('refresh-following-home'));
               window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
               
               if (onPostCreated) onPostCreated();

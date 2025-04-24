@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, User, Star, PlusCircle } from 'lucide-react';
+import { Home, Search, User, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -17,7 +17,6 @@ export const BottomNavigation = () => {
   
   const navItems: NavItem[] = [
     { name: 'Home', path: '/', icon: Home },
-    { name: 'Home', path: '/home', icon: Star },
     { name: 'Add', path: '#add', icon: PlusCircle, primary: true, onClick: () => {
       const event = new CustomEvent('open-recommendation-form');
       window.dispatchEvent(event);
@@ -33,7 +32,7 @@ export const BottomNavigation = () => {
           const isActive = location.pathname === item.path || 
                           (item.path === '/profile' && location.pathname.startsWith('/profile')) ||
                           (item.path === '/explore' && location.pathname.startsWith('/explore')) || 
-                          (item.path === '/home' && (location.pathname === '/home' || location.pathname === '/feed'));
+                          (item.path === '/' && (location.pathname === '/home' || location.pathname === '/'));
           
           if (item.path.startsWith('#')) {
             return (
@@ -79,4 +78,3 @@ export const BottomNavigation = () => {
       </div>
     </div>
   );
-};
