@@ -59,28 +59,32 @@ export const processPosts = async (posts: any[], userId: string | null) => {
     const usersMap = createMap(usersData || [], 'id');
     
     // Get likes count for each post
-    const { data: likesData } = await supabase.rpc('get_post_likes_by_ids', {
-      p_post_ids: postIds
-    });
+    const { data: likesData } = await supabase
+      .from('post_likes')
+      .select('post_id')
+      .in('post_id', postIds);
     
     // Create map of likes counts
     const likesMap = new Map();
     if (likesData) {
       likesData.forEach((item: any) => {
-        likesMap.set(item.post_id, item.like_count);
+        const postId = item.post_id;
+        likesMap.set(postId, (likesMap.get(postId) || 0) + 1);
       });
     }
     
     // Get comment counts for each post
-    const { data: commentCountsData } = await supabase.rpc('get_post_comment_counts', {
-      p_post_ids: postIds
-    });
+    const { data: commentData } = await supabase
+      .from('post_comments')
+      .select('post_id')
+      .in('post_id', postIds);
     
     // Create map of comment counts
     const commentCountsMap = new Map();
-    if (commentCountsData) {
-      commentCountsData.forEach((item: any) => {
-        commentCountsMap.set(item.post_id, item.comment_count);
+    if (commentData) {
+      commentData.forEach((item: any) => {
+        const postId = item.post_id;
+        commentCountsMap.set(postId, (commentCountsMap.get(postId) || 0) + 1);
       });
     }
     
@@ -103,7 +107,7 @@ export const processPosts = async (posts: any[], userId: string | null) => {
     let userSaves: Record<string, boolean> = {};
     if (userId) {
       const { data: userSavesData } = await supabase
-        .from('saved_posts')
+        .from('post_saves')
         .select('post_id')
         .eq('user_id', userId)
         .in('post_id', postIds);
@@ -115,18 +119,21 @@ export const processPosts = async (posts: any[], userId: string | null) => {
     }
     
     // Fetch tagged entities for these posts
-    const { data: postEntitiesData } = await supabase.rpc('get_post_entities', {
-      p_post_ids: postIds
-    });
+    const { data: entitiesData } = await supabase
+      .from('post_entities')
+      .select('post_id, entity_id, entities:entity_id(*)')
+      .in('post_id', postIds);
     
     // Group entities by post_id
     const postEntitiesMap: Record<string, any[]> = {};
-    if (postEntitiesData) {
-      postEntitiesData.forEach((row: any) => {
+    if (entitiesData) {
+      entitiesData.forEach((row: any) => {
         if (!postEntitiesMap[row.post_id]) {
           postEntitiesMap[row.post_id] = [];
         }
-        postEntitiesMap[row.post_id].push(row.entity);
+        if (row.entities) {
+          postEntitiesMap[row.post_id].push(row.entities);
+        }
       });
     }
     

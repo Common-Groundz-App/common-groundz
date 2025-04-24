@@ -58,38 +58,43 @@ export const processRecommendations = async (recommendations: any[], userId: str
     const usersMap = createMap(usersData || [], 'id');
     
     // Get likes count for each recommendation
-    const { data: likesData } = await supabase.rpc('get_recommendation_likes_by_ids', {
-      p_recommendation_ids: recommendationIds
-    });
+    const { data: likesData } = await supabase
+      .from('recommendation_likes')
+      .select('recommendation_id')
+      .in('recommendation_id', recommendationIds);
     
     // Create map of likes counts
     const likesMap = new Map();
     if (likesData) {
       likesData.forEach((item: any) => {
-        likesMap.set(item.recommendation_id, item.like_count);
+        const recId = item.recommendation_id;
+        likesMap.set(recId, (likesMap.get(recId) || 0) + 1);
       });
     }
     
     // Get comment counts for each recommendation
-    const { data: commentCountsData } = await supabase.rpc('get_recommendation_comment_counts', {
-      p_recommendation_ids: recommendationIds
-    });
+    const { data: commentData } = await supabase
+      .from('recommendation_comments')
+      .select('recommendation_id')
+      .in('recommendation_id', recommendationIds);
     
     // Create map of comment counts
     const commentCountsMap = new Map();
-    if (commentCountsData) {
-      commentCountsData.forEach((item: any) => {
-        commentCountsMap.set(item.recommendation_id, item.comment_count);
+    if (commentData) {
+      commentData.forEach((item: any) => {
+        const recId = item.recommendation_id;
+        commentCountsMap.set(recId, (commentCountsMap.get(recId) || 0) + 1);
       });
     }
     
     // Get user's likes for these recommendations
     let userLikes: Record<string, boolean> = {};
     if (userId) {
-      const { data: userLikesData } = await supabase.rpc('get_user_recommendation_likes', {
-        p_recommendation_ids: recommendationIds,
-        p_user_id: userId
-      });
+      const { data: userLikesData } = await supabase
+        .from('recommendation_likes')
+        .select('recommendation_id')
+        .eq('user_id', userId)
+        .in('recommendation_id', recommendationIds);
       
       userLikes = (userLikesData || []).reduce((acc: Record<string, boolean>, like: any) => {
         acc[like.recommendation_id] = true;
@@ -101,7 +106,7 @@ export const processRecommendations = async (recommendations: any[], userId: str
     let userSaves: Record<string, boolean> = {};
     if (userId) {
       const { data: userSavesData } = await supabase
-        .from('saved_recommendations')
+        .from('recommendation_saves')
         .select('recommendation_id')
         .eq('user_id', userId)
         .in('recommendation_id', recommendationIds);
