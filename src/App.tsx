@@ -34,12 +34,7 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              <Route 
-                path="/feed" 
-                element={
-                  <Navigate to="/home" replace />
-                } 
-              />
+              {/* Removed the /feed route */}
               <Route 
                 path="/profile" 
                 element={
@@ -88,9 +83,6 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              {/* Redirect old edit routes to profile */}
-              <Route path="/recommendations/edit/:id" element={<Navigate to="/profile" />} />
-              <Route path="/posts/edit/:id" element={<Navigate to="/profile" />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <Toaster />
