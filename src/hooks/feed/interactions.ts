@@ -7,8 +7,8 @@ import { isItemPost } from './api/utils';
 import type { CombinedFeedItem } from './types';
 import { useState } from 'react';
 
-// Toggle like for home item (post or recommendation)
-export const toggleHomeItemLike = async (
+// Toggle like for feed item (post or recommendation)
+export const toggleFeedItemLike = async (
   item: CombinedFeedItem, 
   userId: string
 ): Promise<boolean> => {
@@ -21,13 +21,13 @@ export const toggleHomeItemLike = async (
     // Otherwise use recommendation like toggling
     return toggleRecommendationLike(item.id, userId, !!item.is_liked);
   } catch (error) {
-    console.error('Error toggling like for home item:', error);
+    console.error('Error toggling like for feed item:', error);
     throw error;
   }
 };
 
-// Toggle save for home item (post or recommendation)
-export const toggleHomeItemSave = async (
+// Toggle save for feed item (post or recommendation)
+export const toggleFeedItemSave = async (
   item: CombinedFeedItem, 
   userId: string
 ): Promise<boolean> => {
@@ -40,7 +40,7 @@ export const toggleHomeItemSave = async (
     // Otherwise use recommendation save toggling
     return toggleRecommendationSave(item.id, userId, !!item.is_saved);
   } catch (error) {
-    console.error('Error toggling save for home item:', error);
+    console.error('Error toggling save for feed item:', error);
     throw error;
   }
 };

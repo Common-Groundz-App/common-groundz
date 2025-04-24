@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -7,32 +6,26 @@ import { Badge } from '@/components/ui/badge';
 import { Bookmark, Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { PostFeedItem as PostItem } from '@/hooks/home/types';
+import { PostFeedItem as PostItem } from '@/hooks/feed/types';
 import { Entity } from '@/services/recommendation/types';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { fetchCommentCount } from '@/services/commentsService';
-import { supabase } from '@/integrations/supabase/client';
-import UsernameLink from '@/components/common/UsernameLink';
-import { EntityBadge } from '@/components/feed/EntityBadge';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
-// Fix the RichTextDisplay import - it's not exported from PostContentViewer
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
+import { EntityBadge } from '@/components/feed/EntityBadge';
 import CommentDialog from '@/components/comments/CommentDialog';
+import { fetchCommentCount } from '@/services/commentsService';
+import UsernameLink from '@/components/common/UsernameLink';
+import { useAuth } from '@/contexts/AuthContext';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CreatePostForm } from '@/components/feed/CreatePostForm';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem
-} from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
