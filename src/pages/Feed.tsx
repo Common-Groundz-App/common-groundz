@@ -60,8 +60,8 @@ const Feed = () => {
             <div className="px-4 py-6 md:py-8 mb-2">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-2xl font-bold">Feed</h1>
-                  <p className="text-muted-foreground">Discover recommendations from the community</p>
+                  <h1 className="text-2xl font-bold">Home</h1>
+                  <p className="text-muted-foreground">Your personalized recommendations feed</p>
                 </div>
                 
                 <CreatePostButton onPostCreated={handlePostCreated} />
