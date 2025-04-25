@@ -1,3 +1,4 @@
+
 import { Home, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
@@ -32,15 +33,22 @@ export function NavBarComponent() {
   }, []);
   
   useEffect(() => {
+    // The root path "/" should have no active tab
     if (location.pathname === '/') {
       setActiveTab('');
-    } 
-    else if (location.pathname.startsWith('/profile')) {
+      return;
+    }
+    
+    // Set active tab based on path
+    if (location.pathname.startsWith('/profile')) {
       setActiveTab('Profile');
     } else if (location.pathname === '/home' || location.pathname === '/feed') {
       setActiveTab('Home');
     } else if (location.pathname === '/explore') {
       setActiveTab('Explore');
+    } else {
+      // Default to no active tab for unmatched routes
+      setActiveTab('');
     }
   }, [location.pathname]);
 
