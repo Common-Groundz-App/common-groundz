@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -97,7 +96,7 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
           </div>
 
           <div className="flex-1 overflow-auto">
-            <Tabs.Root defaultValue="all">
+            <Tabs defaultValue="all">
               <TabsContent value="all" className="m-0">
                 <div className="px-2 py-1">
                   {loading ? (
@@ -139,7 +138,7 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
                   )}
                 </div>
               </TabsContent>
-            </Tabs.Root>
+            </Tabs>
           </div>
         </div>
       </SheetContent>
