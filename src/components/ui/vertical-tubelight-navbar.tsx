@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { LucideIcon, MoreHorizontal, Settings, Home, Star, Search, User } from "lucide-react";
+import { LucideIcon, MoreHorizontal, Settings, Home, Star, Search, User, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/Logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,12 +18,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { SearchDialog } from "@/components/SearchDialog";
+import { useNotifications } from "@/hooks/useNotifications";
+import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
 
 interface NavItem {
   name: string;
   url: string;
   icon: LucideIcon;
   onClick?: () => void;
+  badge?: number;
 }
 
 interface VerticalNavBarProps {
@@ -40,11 +43,20 @@ export function VerticalTubelightNavbar({
   logoSize = "md"
 }: VerticalNavBarProps) {
   const [showSearchDialog, setShowSearchDialog] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { unreadCount } = useNotifications();
 
   const defaultNavItems: NavItem[] = [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User },
+    { 
+      name: 'Notifications', 
+      url: '#notifications', 
+      icon: Bell,
+      onClick: () => setShowNotifications(true),
+      badge: unreadCount > 0 ? unreadCount : undefined
+    },
     { name: 'Settings', url: '/settings', icon: Settings }
   ];
 
@@ -155,7 +167,7 @@ export function VerticalTubelightNavbar({
               const isActive = activeTab === item.name;
               return (
                 <div 
-                  key={item.name}
+                  key={item.name} 
                   onClick={() => handleNavItemClick(item)}
                   className={cn(
                     "relative cursor-pointer text-sm font-semibold w-full rounded-md transition-colors", 
@@ -165,13 +177,18 @@ export function VerticalTubelightNavbar({
                   {(item.url.startsWith('#') || item.onClick) ? (
                     <button 
                       className={cn(
-                        "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",
+                        "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md relative",
                         isActive && "bg-muted text-primary"
                       )}
                       onClick={item.onClick}
                     >
                       <Icon size={18} strokeWidth={2.5} />
                       <span className="hidden md:inline">{item.name}</span>
+                      {item.badge && (
+                        <span className="absolute right-2 top-2 md:relative md:right-auto md:top-auto md:ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white">
+                          {item.badge}
+                        </span>
+                      )}
                     </button>
                   ) : (
                     <Link 
@@ -245,6 +262,7 @@ export function VerticalTubelightNavbar({
       </div>
 
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
+      <NotificationDrawer open={showNotifications} onOpenChange={setShowNotifications} />
     </>
   );
 }
