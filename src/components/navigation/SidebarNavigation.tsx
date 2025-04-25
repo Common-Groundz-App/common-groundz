@@ -14,6 +14,7 @@ import {
   Home, 
   Search, 
   User, 
+  Star, 
   Settings,
   LogOut,
   MoreHorizontal
@@ -80,7 +81,8 @@ export const SidebarNavigation = () => {
   };
   
   const navItems = [
-    { name: 'Home', path: '/feed', icon: Home },
+    { name: 'Home', path: '/', icon: Home },
+    { name: 'Feed', path: '/feed', icon: Star },
     { name: 'Explore', path: '/explore', icon: Search },
     { name: 'Profile', path: '/profile', icon: User },
     { name: 'Settings', path: '/settings', icon: Settings }
