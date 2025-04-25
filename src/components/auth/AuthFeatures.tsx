@@ -25,11 +25,14 @@ const AuthFeatures = () => {
   return (
     <div className="space-y-6">
       {features.map((feature, index) => (
-        <div key={index} className="flex items-start p-4 rounded-lg bg-white/50 backdrop-blur-sm shadow-sm">
+        <div 
+          key={index} 
+          className="flex items-start p-4 rounded-lg bg-white/50 backdrop-blur-sm shadow-sm dark:bg-background/40 dark:backdrop-blur-md dark:border dark:border-border/10"
+        >
           <div className="mr-4 mt-1">{feature.icon}</div>
           <div className="text-left">
-            <h3 className="font-medium">{feature.title}</h3>
-            <p className="text-sm text-muted-foreground">{feature.description}</p>
+            <h3 className="font-medium text-foreground dark:text-white">{feature.title}</h3>
+            <p className="text-sm text-muted-foreground dark:text-white/70">{feature.description}</p>
           </div>
         </div>
       ))}
