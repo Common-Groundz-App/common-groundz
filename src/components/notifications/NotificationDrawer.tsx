@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -16,13 +17,19 @@ interface NotificationDrawerProps {
 }
 
 export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerProps) {
-  const { notifications, unreadCount, markAsRead, loading } = useNotifications();
+  const { notifications, unreadNotifications, markAsRead, loading } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleNotificationClick = React.useCallback((notification: any, event: React.MouseEvent) => {
+  const handleNotificationClick = React.useCallback(async (notification: any, event: React.MouseEvent) => {
     event.preventDefault();
+    
+    // Mark this notification as read if it isn't already
+    if (!notification.is_read) {
+      await markAsRead([notification.id]);
+    }
+    
     onOpenChange(false);
     
     if (!notification.entity_type || !notification.entity_id) {
@@ -57,15 +64,7 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
           });
         }
     }
-  }, [navigate, openContent, toast, onOpenChange]);
-
-  const handleMarkAllAsRead = () => {
-    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
-    if (unreadIds.length > 0) markAsRead(unreadIds);
-  };
-
-  const unreadNotifications = notifications.filter(n => !n.is_read);
-  const readNotifications = notifications.filter(n => n.is_read);
+  }, [navigate, openContent, toast, onOpenChange, markAsRead]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -79,7 +78,10 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
                   variant="ghost" 
                   size="sm" 
                   className="h-8 text-xs"
-                  onClick={handleMarkAllAsRead}
+                  onClick={() => {
+                    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+                    if (unreadIds.length > 0) markAsRead(unreadIds);
+                  }}
                 >
                   Mark all as read
                 </Button>
@@ -89,7 +91,7 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
               <TabsList className="w-full">
                 <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
                 <TabsTrigger value="unread" className="flex-1">
-                  Unread {unreadCount > 0 && `(${unreadCount})`}
+                  Unread {unreadNotifications.length > 0 && `(${unreadNotifications.length})`}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -98,45 +100,21 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
           <div className="flex-1 overflow-auto">
             <Tabs defaultValue="all">
               <TabsContent value="all" className="m-0">
-                <div className="px-2 py-1">
-                  {loading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : notifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <Bell className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                      <p className="text-sm text-muted-foreground">No notifications yet</p>
-                    </div>
-                  ) : (
-                    notifications.map((n) => (
-                      <NotificationItem 
-                        key={n.id} 
-                        notification={n} 
-                        onClick={handleNotificationClick}
-                      />
-                    ))
-                  )}
-                </div>
+                <NotificationList 
+                  notifications={notifications}
+                  loading={loading}
+                  onNotificationClick={handleNotificationClick}
+                />
               </TabsContent>
 
               <TabsContent value="unread" className="m-0">
-                <div className="px-2 py-1">
-                  {unreadNotifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <Check className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                      <p className="text-sm text-muted-foreground">No unread notifications</p>
-                    </div>
-                  ) : (
-                    unreadNotifications.map((n) => (
-                      <NotificationItem 
-                        key={n.id} 
-                        notification={n} 
-                        onClick={handleNotificationClick}
-                      />
-                    ))
-                  )}
-                </div>
+                <NotificationList 
+                  notifications={unreadNotifications}
+                  loading={loading}
+                  onNotificationClick={handleNotificationClick}
+                  emptyMessage="No unread notifications"
+                  emptyIcon={Check}
+                />
               </TabsContent>
             </Tabs>
           </div>
@@ -146,51 +124,82 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
   );
 }
 
-interface NotificationItemProps {
-  notification: any;
-  onClick: (notification: any, event: React.MouseEvent) => void;
+interface NotificationListProps {
+  notifications: any[];
+  loading: boolean;
+  onNotificationClick: (notification: any, event: React.MouseEvent) => void;
+  emptyMessage?: string;
+  emptyIcon?: React.ElementType;
 }
 
-function NotificationItem({ notification, onClick }: NotificationItemProps) {
-  return (
-    <button
-      onClick={(e) => onClick(notification, e)}
-      className={cn(
-        "w-full text-left px-3 py-2.5 rounded-lg transition-all duration-200",
-        "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-        !notification.is_read && "bg-primary/5"
-      )}
-    >
-      <div className="flex items-start gap-3">
-        {notification.image_url ? (
-          <img 
-            src={notification.image_url} 
-            className="w-9 h-9 rounded-full object-cover border"
-            alt=""
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-muted/50 flex items-center justify-center">
-            <Bell className="w-4 h-4 text-muted-foreground" />
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <p className={cn(
-            "text-sm leading-5 text-foreground",
-            !notification.is_read && "font-medium"
-          )}>
-            {notification.title}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5 break-words">
-            {notification.message}
-          </p>
-          <p className="text-[11px] text-muted-foreground/75 mt-1">
-            {new Date(notification.created_at).toLocaleString()}
-          </p>
-        </div>
-        {notification.is_read && (
-          <Check className="w-4 h-4 text-primary/50 mt-1 shrink-0" />
-        )}
+function NotificationList({ 
+  notifications, 
+  loading, 
+  onNotificationClick,
+  emptyMessage = "No notifications yet",
+  emptyIcon: EmptyIcon = Bell 
+}: NotificationListProps) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
-    </button>
+    );
+  }
+
+  if (notifications.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center">
+        <EmptyIcon className="h-8 w-8 text-muted-foreground/50 mb-2" />
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-2 py-1">
+      {notifications.map((notification) => (
+        <button
+          key={notification.id}
+          onClick={(e) => onNotificationClick(notification, e)}
+          className={cn(
+            "w-full text-left px-3 py-2.5 rounded-lg transition-all duration-200",
+            "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            !notification.is_read && "bg-primary/5"
+          )}
+        >
+          <div className="flex items-start gap-3">
+            {notification.image_url ? (
+              <img 
+                src={notification.image_url} 
+                className="w-9 h-9 rounded-full object-cover border"
+                alt=""
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-muted/50 flex items-center justify-center">
+                <Bell className="w-4 h-4 text-muted-foreground" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className={cn(
+                "text-sm leading-5 text-foreground",
+                !notification.is_read && "font-medium"
+              )}>
+                {notification.title}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                {notification.message}
+              </p>
+              <p className="text-[11px] text-muted-foreground/75 mt-1">
+                {new Date(notification.created_at).toLocaleString()}
+              </p>
+            </div>
+            {notification.is_read && (
+              <Check className="w-4 h-4 text-primary/50 mt-1 shrink-0" />
+            )}
+          </div>
+        </button>
+      ))}
+    </div>
   );
 }

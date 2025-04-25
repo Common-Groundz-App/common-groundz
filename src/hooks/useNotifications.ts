@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchNotifications, markNotificationsAsRead, Notification } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/hooks/use-toast';
 
 export function useNotifications(pollInterval = 10000) {
   const { user } = useAuth();
@@ -17,6 +18,11 @@ export function useNotifications(pollInterval = 10000) {
       setNotifications(data);
     } catch (e) {
       setError(e);
+      toast({
+        title: "Error fetching notifications",
+        description: "Failed to load your notifications",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -33,6 +39,11 @@ export function useNotifications(pollInterval = 10000) {
       );
     } catch (e) {
       setError(e);
+      toast({
+        title: "Error updating notifications",
+        description: "Failed to mark notifications as read",
+        variant: "destructive",
+      });
     }
   };
 
@@ -43,7 +54,16 @@ export function useNotifications(pollInterval = 10000) {
     return () => clearInterval(interval);
   }, [user, fetchAll, pollInterval]);
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const unreadNotifications = notifications.filter((n) => !n.is_read);
+  const unreadCount = unreadNotifications.length;
 
-  return { notifications, unreadCount, markAsRead, loading, error, fetchAll };
+  return { 
+    notifications, 
+    unreadNotifications, 
+    unreadCount, 
+    markAsRead, 
+    loading, 
+    error, 
+    fetchAll 
+  };
 }
