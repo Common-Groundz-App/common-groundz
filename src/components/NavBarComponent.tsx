@@ -1,4 +1,3 @@
-
 import { Home, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
@@ -12,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext'
 export function NavBarComponent() {
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState('Home');
+  const [activeTab, setActiveTab] = useState<string>('');
   const { user } = useAuth();
   
   const navItems = [
@@ -34,8 +33,9 @@ export function NavBarComponent() {
   
   useEffect(() => {
     if (location.pathname === '/') {
-      setActiveTab('Home');
-    } else if (location.pathname.startsWith('/profile')) {
+      setActiveTab('');
+    } 
+    else if (location.pathname.startsWith('/profile')) {
       setActiveTab('Profile');
     } else if (location.pathname === '/home' || location.pathname === '/feed') {
       setActiveTab('Home');
