@@ -99,34 +99,36 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
               )}
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full px-4 pb-2">
+            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full px-4 pb-2">
               <TabsList className="w-full">
                 <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
                 <TabsTrigger value="unread" className="flex-1">
                   Unread {unreadNotifications.length > 0 && `(${unreadNotifications.length})`}
                 </TabsTrigger>
               </TabsList>
+            
+              <TabsContent value="all" className="mt-2">
+                <NotificationList 
+                  notifications={notifications}
+                  loading={loading}
+                  onNotificationClick={handleNotificationClick}
+                />
+              </TabsContent>
+
+              <TabsContent value="unread" className="mt-2">
+                <NotificationList 
+                  notifications={unreadNotifications}
+                  loading={loading}
+                  onNotificationClick={handleNotificationClick}
+                  emptyMessage="No unread notifications"
+                  emptyIcon={Check}
+                />
+              </TabsContent>
             </Tabs>
           </div>
 
           <div className="flex-1 overflow-auto">
-            <TabsContent value="all" className="m-0">
-              <NotificationList 
-                notifications={notifications}
-                loading={loading}
-                onNotificationClick={handleNotificationClick}
-              />
-            </TabsContent>
-
-            <TabsContent value="unread" className="m-0">
-              <NotificationList 
-                notifications={unreadNotifications}
-                loading={loading}
-                onNotificationClick={handleNotificationClick}
-                emptyMessage="No unread notifications"
-                emptyIcon={Check}
-              />
-            </TabsContent>
+            {/* TabsContent moved inside the Tabs component above */}
           </div>
         </div>
       </SheetContent>
@@ -213,3 +215,4 @@ function NotificationList({
     </div>
   );
 }
+
