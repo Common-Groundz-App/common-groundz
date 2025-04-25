@@ -14,7 +14,6 @@ import {
   Home, 
   Search, 
   User, 
-  Star, 
   Settings,
   LogOut,
   MoreHorizontal
@@ -81,8 +80,7 @@ export const SidebarNavigation = () => {
   };
   
   const navItems = [
-    { name: 'Home', path: '/', icon: Home },
-    { name: 'Feed', path: '/feed', icon: Star },
+    { name: 'Home', path: '/home', icon: Home },
     { name: 'Explore', path: '/explore', icon: Search },
     { name: 'Profile', path: '/profile', icon: User },
     { name: 'Settings', path: '/settings', icon: Settings }
@@ -96,7 +94,8 @@ export const SidebarNavigation = () => {
             {navItems.map((item) => {
               const isActive = location.pathname === item.path || 
                               (item.path === '/profile' && location.pathname.startsWith('/profile')) ||
-                              (item.path === '/explore' && location.pathname.startsWith('/explore'));
+                              (item.path === '/explore' && location.pathname.startsWith('/explore')) ||
+                              (item.path === '/home' && (location.pathname === '/home' || location.pathname === '/feed'));
               
               return (
                 <Tooltip key={item.name} delayDuration={300}>

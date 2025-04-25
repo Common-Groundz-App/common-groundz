@@ -42,8 +42,7 @@ export function VerticalTubelightNavbar({
   const [showSearchDialog, setShowSearchDialog] = useState(false);
 
   const defaultNavItems: NavItem[] = [
-    { name: 'Home', url: '/', icon: Home },
-    { name: 'Feed', url: '/feed', icon: Star },
+    { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User },
     { name: 'Settings', url: '/settings', icon: Settings }

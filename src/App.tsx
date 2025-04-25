@@ -35,6 +35,14 @@ function App() {
                 } 
               />
               <Route 
+                path="/home" 
+                element={
+                  <ProtectedRoute>
+                    <Feed />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="/profile" 
                 element={
                   <ProtectedRoute>
