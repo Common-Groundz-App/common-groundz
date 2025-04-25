@@ -20,24 +20,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        console.log('Auth state changed:', event);
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-      }
-    );
+    const setupAuth = async () => {
+      // Set up auth state listener FIRST
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, currentSession) => {
+          console.log('Auth state changed:', event);
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+        }
+      );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      // THEN check for existing session
+      const { data } = await supabase.auth.getSession();
+      const currentSession = data.session;
       console.log('Initial session check:', currentSession ? 'logged in' : 'logged out');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setIsLoading(false);
-    });
 
-    return () => subscription.unsubscribe();
+      return () => subscription.unsubscribe();
+    };
+
+    setupAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {
