@@ -8,11 +8,11 @@ import TestimonialsSection from '@/components/TestimonialsSection';
 import CTASection from '@/components/CTASection';
 import Footer from '@/components/Footer';
 import NavBarComponent from '@/components/NavBarComponent';
+import { NotificationsDrawer } from '@/components/notifications/NotificationsDrawer';
 
 const Index = () => {
   const { user } = useAuth();
 
-  // Redirect to /home if user is logged in
   if (user) {
     return <Navigate to="/home" replace />;
   }
@@ -20,6 +20,7 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <NavBarComponent />
+      <NotificationsDrawer />
       <main>
         <HeroSection />
         <FeaturesSection />
