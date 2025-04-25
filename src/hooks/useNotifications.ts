@@ -8,6 +8,7 @@ export function useNotifications(pollInterval = 10000) {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [markingAsRead, setMarkingAsRead] = useState(false);
   const [error, setError] = useState<any>(null);
 
   const fetchAll = useCallback(async () => {
@@ -30,6 +31,7 @@ export function useNotifications(pollInterval = 10000) {
 
   const markAsRead = async (ids: string[]) => {
     if (!user || !ids.length) return;
+    setMarkingAsRead(true);
     try {
       await markNotificationsAsRead(ids);
       setNotifications((prev) =>
@@ -44,8 +46,16 @@ export function useNotifications(pollInterval = 10000) {
         description: "Failed to mark notifications as read",
         variant: "destructive",
       });
+    } finally {
+      setMarkingAsRead(false);
     }
   };
+
+  // Get unread notifications as a computed property
+  const unreadNotifications = notifications.filter((n) => !n.is_read);
+  
+  // Calculate the count of unread notifications
+  const unreadCount = unreadNotifications.length;
 
   useEffect(() => {
     fetchAll();
@@ -54,15 +64,13 @@ export function useNotifications(pollInterval = 10000) {
     return () => clearInterval(interval);
   }, [user, fetchAll, pollInterval]);
 
-  const unreadNotifications = notifications.filter((n) => !n.is_read);
-  const unreadCount = unreadNotifications.length;
-
   return { 
     notifications, 
     unreadNotifications, 
     unreadCount, 
     markAsRead, 
     loading, 
+    markingAsRead,
     error, 
     fetchAll 
   };

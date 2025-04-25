@@ -11,11 +11,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { EntityType } from '@/services/notificationService';
+import { EntityType, Notification } from '@/services/notificationService';
 import { cn } from '@/lib/utils';
 
 export const NotificationBell: React.FC = () => {
-  const { notifications, unreadCount, markAsRead, loading } = useNotifications();
+  const { notifications, unreadCount, markAsRead, loading, markingAsRead } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -30,9 +30,11 @@ export const NotificationBell: React.FC = () => {
     }
   };
 
-  const handleNotificationClick = useCallback((notification: any, event: React.MouseEvent) => {
+  const handleNotificationClick = useCallback((notification: Notification, event: React.MouseEvent) => {
     event.preventDefault();
     setOpen(false);
+    
+    // No need to mark as read here since we mark all as read when dropdown opens
     
     if (!notification.entity_type || !notification.entity_id) {
       // If there's no entity information, try using the action URL directly
@@ -101,7 +103,11 @@ export const NotificationBell: React.FC = () => {
                   const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
                   if (unreadIds.length > 0) markAsRead(unreadIds);
                 }}
+                disabled={markingAsRead}
               >
+                {markingAsRead ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : null}
                 Mark all as read
               </Button>
             )}

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,7 +8,7 @@ import { Bell, Check, Loader2 } from 'lucide-react';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { EntityType } from '@/services/notificationService';
+import { EntityType, Notification } from '@/services/notificationService';
 import { cn } from '@/lib/utils';
 
 interface NotificationDrawerProps {
@@ -17,12 +17,14 @@ interface NotificationDrawerProps {
 }
 
 export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerProps) {
-  const { notifications, unreadNotifications, markAsRead, loading } = useNotifications();
+  const { notifications, unreadNotifications, markAsRead, loading, markingAsRead } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("all");
 
-  const handleNotificationClick = React.useCallback(async (notification: any, event: React.MouseEvent) => {
+  // Handle marking specific notification as read when clicked
+  const handleNotificationClick = React.useCallback(async (notification: Notification, event: React.MouseEvent) => {
     event.preventDefault();
     
     // Mark this notification as read if it isn't already
@@ -66,6 +68,14 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
     }
   }, [navigate, openContent, toast, onOpenChange, markAsRead]);
 
+  // Handle marking all unread notifications as read
+  const handleMarkAllAsRead = () => {
+    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+    if (unreadIds.length > 0) {
+      markAsRead(unreadIds);
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-[400px] p-0">
@@ -73,21 +83,23 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
           <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50">
             <div className="flex items-center justify-between p-4">
               <h4 className="text-sm font-semibold">Notifications</h4>
-              {notifications.length > 0 && (
+              {notifications.length > 0 && unreadNotifications.length > 0 && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className="h-8 text-xs"
-                  onClick={() => {
-                    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
-                    if (unreadIds.length > 0) markAsRead(unreadIds);
-                  }}
+                  onClick={handleMarkAllAsRead}
+                  disabled={markingAsRead}
                 >
+                  {markingAsRead ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : null}
                   Mark all as read
                 </Button>
               )}
             </div>
-            <Tabs defaultValue="all" className="w-full px-4 pb-2">
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full px-4 pb-2">
               <TabsList className="w-full">
                 <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
                 <TabsTrigger value="unread" className="flex-1">
@@ -98,25 +110,23 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
           </div>
 
           <div className="flex-1 overflow-auto">
-            <Tabs defaultValue="all">
-              <TabsContent value="all" className="m-0">
-                <NotificationList 
-                  notifications={notifications}
-                  loading={loading}
-                  onNotificationClick={handleNotificationClick}
-                />
-              </TabsContent>
+            <TabsContent value="all" className="m-0">
+              <NotificationList 
+                notifications={notifications}
+                loading={loading}
+                onNotificationClick={handleNotificationClick}
+              />
+            </TabsContent>
 
-              <TabsContent value="unread" className="m-0">
-                <NotificationList 
-                  notifications={unreadNotifications}
-                  loading={loading}
-                  onNotificationClick={handleNotificationClick}
-                  emptyMessage="No unread notifications"
-                  emptyIcon={Check}
-                />
-              </TabsContent>
-            </Tabs>
+            <TabsContent value="unread" className="m-0">
+              <NotificationList 
+                notifications={unreadNotifications}
+                loading={loading}
+                onNotificationClick={handleNotificationClick}
+                emptyMessage="No unread notifications"
+                emptyIcon={Check}
+              />
+            </TabsContent>
           </div>
         </div>
       </SheetContent>
@@ -125,9 +135,9 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
 }
 
 interface NotificationListProps {
-  notifications: any[];
+  notifications: Notification[];
   loading: boolean;
-  onNotificationClick: (notification: any, event: React.MouseEvent) => void;
+  onNotificationClick: (notification: Notification, event: React.MouseEvent) => void;
   emptyMessage?: string;
   emptyIcon?: React.ElementType;
 }
