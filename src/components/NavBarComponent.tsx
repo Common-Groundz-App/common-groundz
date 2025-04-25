@@ -1,26 +1,23 @@
-import { Home, Search, User, BellDot } from 'lucide-react'
+
+import { Home, Search, User } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import { UserMenu } from './UserMenu'
 import { useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { SearchDialog } from '@/components/SearchDialog'
+import { supabase } from '@/integrations/supabase/client'
+import NotificationBell from './notifications/NotificationBell'
 import { useAuth } from '@/contexts/AuthContext'
-import { useNotifications } from '@/hooks/useNotifications'
 
 export function NavBarComponent() {
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
   const { user } = useAuth();
-  const { unreadCount } = useNotifications();
   
   const navItems = [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
-    { name: 'Notifications', url: '#', icon: BellDot, badge: unreadCount, onClick: () => {
-      const event = new CustomEvent('open-notifications-drawer');
-      window.dispatchEvent(event);
-    }},
     { name: 'Profile', url: '/profile', icon: User }
   ];
 
@@ -53,6 +50,7 @@ export function NavBarComponent() {
         items={navItems} 
         rightSection={
           <div className="flex items-center gap-2">
+            {user && <NotificationBell />}
             <UserMenu />
           </div>
         }
