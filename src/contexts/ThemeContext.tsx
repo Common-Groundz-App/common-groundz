@@ -22,8 +22,8 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       return savedTheme;
     }
     
-    // Fallback to system preference
-    return 'system';
+    // Fallback to light mode instead of system
+    return 'light';
   });
 
   // Track the resolved theme (what's actually applied)
