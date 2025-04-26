@@ -20,12 +20,20 @@ const ProfileContent = () => {
     isLoading, 
     error,
     coverImage,
-    profileData,
+    profileImage,
+    username,
+    bio,
+    location,
+    memberSince,
+    followingCount,
+    followerCount,
     hasChanges,
     isOwnProfile,
+    handleProfileImageChange,
     handleCoverImageChange,
     handleCoverImageUpdated,
-    handleSaveChanges
+    handleSaveChanges,
+    profileData
   } = useProfileData(userId);
 
   useEffect(() => {
@@ -72,7 +80,21 @@ const ProfileContent = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-10">
         <div className="flex flex-col md:flex-row gap-6">
           <div className="w-full md:w-[300px] flex-shrink-0">
-            <ProfileCard profileUserId={userId} />
+            <ProfileCard 
+              username={username || ''}
+              bio={bio || ''}
+              location={location || ''}
+              memberSince={memberSince || ''}
+              followingCount={followingCount}
+              followerCount={followerCount}
+              profileImage={profileImage}
+              isLoading={isLoading}
+              onProfileImageChange={handleProfileImageChange}
+              hasChanges={hasChanges}
+              onSaveChanges={handleSaveChanges}
+              isOwnProfile={isOwnProfile}
+              profileUserId={profileData?.id}
+            />
           </div>
           
           <div className="w-full md:flex-1 min-w-0">

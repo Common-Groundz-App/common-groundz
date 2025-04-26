@@ -1,200 +1,195 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import ProfileEditForm from './ProfileEditForm';
 import ProfileAvatar from './ProfileAvatar';
 import ProfileActions from './ProfileActions';
 import ProfileInfo from './ProfileInfo';
 import ProfileUserInfo from './ProfileUserInfo';
 import ProfileBadges from './ProfileBadges';
-import { useViewedProfile } from '@/hooks/profile/use-viewed-profile';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useProfileCardState } from './hooks/useProfileCardState';
+import { useProfileSaveHandler } from './ProfileSaveHandler';
+import { getFormattedDisplayName } from './ProfileDisplayHelper';
 
 interface ProfileCardProps {
+  username: string;
+  bio: string;
+  location: string;
+  memberSince: string;
+  followingCount: number;
+  followerCount?: number;
+  profileImage: string;
+  isLoading: boolean;
+  onProfileImageChange?: (url: string) => void;
+  hasChanges: boolean;
+  onSaveChanges?: () => void;
+  isOwnProfile: boolean;
   profileUserId?: string;
+  otherUserProfile?: any;
 }
 
-const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
-  const {
-    profile,
-    isLoading,
-    error,
-    isOwnProfile,
-    followerCount,
+const ProfileCard = (props: ProfileCardProps) => {
+  const { 
+    username, 
+    bio, 
+    location, 
+    memberSince, 
     followingCount,
-    setFollowerCount,
-    setFollowingCount
-  } = useViewedProfile(profileUserId);
+    followerCount = 0, 
+    profileImage,
+    isLoading,
+    onProfileImageChange,
+    hasChanges,
+    onSaveChanges,
+    isOwnProfile,
+    profileUserId,
+    otherUserProfile
+  } = props;
 
-  const [hasChanges, setHasChanges] = useState(false);
-  const [tempProfileImage, setTempProfileImage] = useState<string | null>(null);
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [uploading, setUploading] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
 
-  const handleProfileImageChange = (url: string) => {
-    setTempProfileImage(url);
-    setHasChanges(true);
-  };
+  const {
+    currentUsername,
+    currentBio,
+    currentLocation,
+    databaseUsername,
+    setDatabaseUsername,
+    tempProfileImage,
+    setTempProfileImage,
+    localHasChanges,
+    setLocalHasChanges,
+    handleProfileUpdate
+  } = useProfileCardState({
+    username,
+    bio,
+    location,
+    firstName,
+    lastName,
+    profileImage
+  });
 
-  const handleSaveChanges = async () => {
-    if (!user || !profile) return;
+  const { handleSaveChanges } = useProfileSaveHandler({
+    userId: user?.id,
+    tempProfileImage,
+    setTempProfileImage,
+    setLocalHasChanges,
+    hasChanges,
+    onSaveChanges
+  });
 
-    try {
-      setUploading(true);
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!profileUserId) return;
 
-      // If there's a temporary profile image, upload it and get the URL
-      let avatar_url = profile.avatar_url;
-      if (tempProfileImage) {
-        const fileExt = tempProfileImage.split('.').pop();
-        const filePath = `${user.id}/avatar.${fileExt}`;
-        const file = await fetch(tempProfileImage).then(r => r.blob());
-
-        const { error: uploadError } = await supabase.storage
-          .from('profile_images')
-          .upload(filePath, file, { upsert: true });
-
-        if (uploadError) {
-          toast({
-            title: 'Upload failed',
-            description: uploadError.message,
-            variant: 'destructive'
-          });
+      try {
+        if (!isOwnProfile && otherUserProfile) {
+          setDatabaseUsername(otherUserProfile.username || '');
           return;
         }
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('profile_images')
-          .getPublicUrl(filePath);
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', profileUserId)
+          .single();
 
-        avatar_url = publicUrl;
-      }
-
-      // Update the profile in the database - fix the type issue by converting Date to ISO string
-      const updates = {
-        id: user.id,
-        username: profile.username,
-        bio: profile.bio,
-        location: profile.location,
-        avatar_url,
-        updated_at: new Date().toISOString() // Convert Date to string for Supabase
-      };
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert(updates, { onConflict: 'id' }); // Remove 'returning: 'minimal'' option
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // Update user metadata if necessary
-      const metadataUpdates: { [key: string]: any } = {};
-      const displayNameParts = profile.displayName.split(' ');
-      
-      if (user.user_metadata.first_name !== displayNameParts[0]) {
-        metadataUpdates.first_name = displayNameParts[0];
-      }
-      
-      if (displayNameParts.length > 1 && user.user_metadata.last_name !== displayNameParts.slice(1).join(' ')) {
-        metadataUpdates.last_name = displayNameParts.slice(1).join(' ');
-      }
-
-      if (Object.keys(metadataUpdates).length > 0) {
-        const { error: metadataError } = await supabase.auth.updateUser({
-          data: metadataUpdates
-        });
-
-        if (metadataError) {
-          throw metadataError;
+        if (error) {
+          console.error('Error fetching username:', error);
+          return;
         }
+
+        if (data && data.username) {
+          setDatabaseUsername(data.username);
+        }
+        
+        if (user && isOwnProfile) {
+          const userMetadata = user.user_metadata;
+          setFirstName(userMetadata?.first_name || '');
+          setLastName(userMetadata?.last_name || '');
+        }
+      } catch (error) {
+        console.error('Error:', error);
       }
+    };
 
-      toast({
-        title: 'Profile updated!',
-        description: 'Your profile has been updated successfully.',
-      });
-      setHasChanges(false);
-      setTempProfileImage(null);
-    } catch (err: any) {
-      console.error('Error updating profile:', err);
-      toast({
-        title: 'Something went wrong',
-        description: err.message || 'Failed to update profile. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
+    fetchUserData();
+  }, [profileUserId, user, isOwnProfile, otherUserProfile]);
 
-  if (error) {
-    return (
-      <Card className="relative shadow-lg rounded-lg overflow-hidden">
-        <div className="p-6 text-center text-red-500">
-          Failed to load profile data
-        </div>
-      </Card>
-    );
-  }
+  const formattedUsername = databaseUsername 
+    ? `@${databaseUsername}` 
+    : '';
 
-  if (!profile || isLoading) {
-    return (
-      <Card className="relative shadow-lg rounded-lg overflow-hidden">
-        <div className="p-6 animate-pulse">
-          <div className="flex flex-col items-center">
-            <div className="w-24 h-24 rounded-full bg-gray-200 mb-4" />
-            <div className="h-6 w-32 bg-gray-200 mb-2" />
-            <div className="h-4 w-24 bg-gray-200 mb-4" />
-          </div>
-        </div>
-      </Card>
-    );
-  }
+  const combinedHasChanges = hasChanges || localHasChanges;
+
+  const displayName = getFormattedDisplayName(
+    isOwnProfile, 
+    firstName, 
+    lastName, 
+    currentUsername, 
+    otherUserProfile
+  );
 
   return (
-    <Card className="relative shadow-lg rounded-lg overflow-hidden">
-      <div className="p-6 flex flex-col items-center">
-        <ProfileAvatar 
-          username={profile.displayName}
-          profileImage={tempProfileImage || profile.avatar_url || ''}
-          isLoading={isLoading}
-          onProfileImageChange={isOwnProfile ? handleProfileImageChange : undefined}
-          onImageSelected={setTempProfileImage}
-          isEditable={isOwnProfile}
-        />
+    <>
+      <Card className="relative shadow-lg rounded-lg overflow-hidden">
+        <div className="p-6 flex flex-col items-center">
+          <ProfileAvatar 
+            username={displayName}
+            profileImage={profileImage}
+            isLoading={isLoading}
+            onProfileImageChange={onProfileImageChange}
+            onImageSelected={setTempProfileImage}
+            isEditable={isOwnProfile}
+          />
+          
+          <ProfileUserInfo 
+            username={displayName}
+            bio={currentBio}
+            isOwnProfile={isOwnProfile}
+            formattedUsername={formattedUsername}
+            onEditClick={isOwnProfile ? () => setIsEditModalOpen(true) : undefined}
+          />
+          
+          <ProfileBadges isOwnProfile={isOwnProfile} />
+          
+          <ProfileActions 
+            hasChanges={combinedHasChanges}
+            isLoading={isLoading}
+            uploading={false}
+            onSaveChanges={handleSaveChanges}
+            profileUserId={profileUserId}
+            isOwnProfile={isOwnProfile}
+          />
+          
+          <ProfileInfo 
+            location={currentLocation}
+            memberSince={memberSince}
+            followingCount={followingCount}
+            followerCount={followerCount}
+            profileUserId={profileUserId}
+            isOwnProfile={isOwnProfile}
+          />
+        </div>
+      </Card>
 
-        <ProfileUserInfo 
-          username={profile.displayName}
-          bio={profile.bio || ''}
-          isOwnProfile={isOwnProfile}
-          formattedUsername={profile.username ? `@${profile.username}` : ''}
-          onEditClick={isOwnProfile ? () => {} : undefined}
-          isVerified={false}
+      {isOwnProfile && (
+        <ProfileEditForm 
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          username={databaseUsername || currentUsername}
+          bio={currentBio}
+          location={currentLocation}
+          firstName={firstName}
+          lastName={lastName}
+          onProfileUpdate={handleProfileUpdate}
         />
-
-        <ProfileBadges isOwnProfile={isOwnProfile} />
-
-        <ProfileActions 
-          hasChanges={hasChanges}
-          isLoading={isLoading}
-          uploading={uploading}
-          onSaveChanges={handleSaveChanges}
-          profileUserId={profileUserId}
-          isOwnProfile={isOwnProfile}
-        />
-
-        <ProfileInfo 
-          location={profile.location || ''}
-          memberSince={profile.created_at}
-          followingCount={followingCount}
-          followerCount={followerCount}
-          profileUserId={profileUserId}
-          isOwnProfile={isOwnProfile}
-        />
-      </div>
-    </Card>
+      )}
+    </>
   );
 };
 
