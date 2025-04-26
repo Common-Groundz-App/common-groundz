@@ -83,7 +83,7 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
 
       const { error: updateError } = await supabase
         .from('profiles')
-        .upsert(updates, { returning: 'minimal' });
+        .upsert(updates, { onConflict: 'id' }); // Remove 'returning: 'minimal'' option
 
       if (updateError) {
         throw updateError;
