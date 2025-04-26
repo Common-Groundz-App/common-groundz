@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -28,10 +28,12 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Track the resolved theme (what's actually applied)
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(
-    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const root = window.document.documentElement;
     
     // Remove any previous class
@@ -53,11 +55,13 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Listen for system theme changes
   useEffect(() => {
-    if (theme !== 'system') return;
+    if (typeof window === 'undefined' || theme !== 'system') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const handleChange = () => {
+      if (typeof window === 'undefined') return;
+      
       const root = window.document.documentElement;
       root.classList.remove('light', 'dark');
       const newTheme = mediaQuery.matches ? 'dark' : 'light';

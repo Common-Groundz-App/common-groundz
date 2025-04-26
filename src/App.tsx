@@ -16,6 +16,7 @@ import { TooltipProvider } from './components/ui/tooltip';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ContentViewerProvider } from './contexts/ContentViewerContext';
 import ContentViewerModal from './components/content/ContentViewerModal';
+import React from 'react';
 
 function App() {
   return (
