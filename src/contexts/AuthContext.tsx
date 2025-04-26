@@ -1,16 +1,9 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as React from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-
-type AuthContextType = {
-  user: User | null;
-  session: Session | null;
-  isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, userData?: { firstName?: string, lastName?: string, username?: string }) => Promise<{ error: Error | null, user: User | null }>;
-  signOut: () => Promise<void>;
-};
+import { AuthContextType } from '@/types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -21,47 +14,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const setupAuth = async () => {
-      // Set up auth state listener FIRST
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (event, currentSession) => {
-          console.log('Auth state changed:', event);
-          setSession(currentSession);
-          setUser(currentSession?.user ?? null);
-        }
-      );
+      try {
+        // Set up auth state listener FIRST
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          (_event, currentSession) => {
+            setSession(currentSession);
+            setUser(currentSession?.user ?? null);
+          }
+        );
 
-      // THEN check for existing session
-      const { data } = await supabase.auth.getSession();
-      const currentSession = data.session;
-      console.log('Initial session check:', currentSession ? 'logged in' : 'logged out');
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      setIsLoading(false);
+        // THEN check for existing session
+        const { data } = await supabase.auth.getSession();
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+        setIsLoading(false);
 
-      return () => subscription.unsubscribe();
+        return () => subscription.unsubscribe();
+      } catch (error) {
+        console.error('Error setting up auth:', error);
+        setIsLoading(false);
+      }
     };
 
     setupAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return { error };
+    } catch (error) {
+      return { error: error as Error };
+    }
   };
 
-  const signUp = async (email: string, password: string, userData?: { firstName?: string, lastName?: string, username?: string }) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: userData?.firstName || '',
-          last_name: userData?.lastName || '',
-          username: userData?.username || '',
+  const signUp = async (email: string, password: string, userData?: { 
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+  }) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: userData?.firstName || '',
+            last_name: userData?.lastName || '',
+            username: userData?.username || '',
+          }
         }
-      }
-    });
-    return { error, user: data?.user || null };
+      });
+      return { error, user: data?.user || null };
+    } catch (error) {
+      return { error: error as Error, user: null };
+    }
   };
 
   const signOut = async () => {
