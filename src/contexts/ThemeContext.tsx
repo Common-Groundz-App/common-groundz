@@ -1,4 +1,5 @@
 
+import * as React from 'react';
 import { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
@@ -15,39 +16,53 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [theme, setTheme] = useState<Theme>(() => {
-    // Check localStorage first
-    const savedTheme = localStorage.getItem('theme') as Theme;
-    if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
-      return savedTheme;
-    }
-    
-    // Fallback to light mode instead of system
-    return 'light';
-  });
-
-  // Track the resolved theme (what's actually applied)
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(
-    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  );
-
+  // Use safer initialization that won't break SSR or during initial render
+  const [theme, setTheme] = useState<Theme>('light');
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+  
+  // Initialize theme from localStorage and system preference
   useEffect(() => {
-    const root = window.document.documentElement;
-    
-    // Remove any previous class
-    root.classList.remove('light', 'dark');
-    
-    // Save to localStorage
-    localStorage.setItem('theme', theme);
+    try {
+      // Check localStorage first
+      const savedTheme = localStorage.getItem('theme') as Theme;
+      if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
+        setTheme(savedTheme);
+      }
+      
+      // Apply initial resolved theme
+      if (savedTheme === 'system' || !savedTheme) {
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setResolvedTheme(systemPrefersDark ? 'dark' : 'light');
+      } else {
+        setResolvedTheme(savedTheme === 'dark' ? 'dark' : 'light');
+      }
+    } catch (error) {
+      console.error('Error initializing theme:', error);
+    }
+  }, []);
 
-    // Apply theme
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      root.classList.add(systemTheme);
-      setResolvedTheme(systemTheme);
-    } else {
-      root.classList.add(theme);
-      setResolvedTheme(theme);
+  // Apply theme to document when theme changes
+  useEffect(() => {
+    try {
+      const root = window.document.documentElement;
+      
+      // Remove any previous class
+      root.classList.remove('light', 'dark');
+      
+      // Save to localStorage
+      localStorage.setItem('theme', theme);
+
+      // Apply theme
+      if (theme === 'system') {
+        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        root.classList.add(systemTheme);
+        setResolvedTheme(systemTheme);
+      } else {
+        root.classList.add(theme);
+        setResolvedTheme(theme);
+      }
+    } catch (error) {
+      console.error('Error applying theme:', error);
     }
   }, [theme]);
 
@@ -55,18 +70,26 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (theme !== 'system') return;
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
-    const handleChange = () => {
-      const root = window.document.documentElement;
-      root.classList.remove('light', 'dark');
-      const newTheme = mediaQuery.matches ? 'dark' : 'light';
-      root.classList.add(newTheme);
-      setResolvedTheme(newTheme);
-    };
-    
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    try {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      
+      const handleChange = () => {
+        try {
+          const root = window.document.documentElement;
+          root.classList.remove('light', 'dark');
+          const newTheme = mediaQuery.matches ? 'dark' : 'light';
+          root.classList.add(newTheme);
+          setResolvedTheme(newTheme);
+        } catch (error) {
+          console.error('Error handling theme change:', error);
+        }
+      };
+      
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } catch (error) {
+      console.error('Error setting up system theme listener:', error);
+    }
   }, [theme]);
 
   // Utility function to get the correct value based on current theme
