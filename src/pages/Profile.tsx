@@ -5,7 +5,6 @@ import { Navigate, useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import ProfileContent from '@/components/profile/ProfileContent';
 import Footer from '@/components/Footer';
-import { useProfileData } from '@/hooks/use-profile-data';
 
 const Profile = () => {
   const { user } = useAuth();
@@ -19,7 +18,7 @@ const Profile = () => {
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
       <div className="flex-1">
-        <ProfileContent userId={userId || user.id} />
+        <ProfileContent />
       </div>
       <Footer />
     </div>

@@ -3,11 +3,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { updateUserProfile } from '@/services/profileService';
 
-interface UseProfileImagesProps {
-  defaultCoverImage: string;
-}
-
-export const useProfileImages = ({ defaultCoverImage }: UseProfileImagesProps) => {
+export const useProfileImages = (defaultCoverImage: string) => {
   const [coverImage, setCoverImage] = useState<string>(defaultCoverImage);
   const [profileImage, setProfileImage] = useState<string>('');
   const [tempCoverImage, setTempCoverImage] = useState<string | null>(null);

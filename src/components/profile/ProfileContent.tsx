@@ -1,4 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
@@ -10,11 +12,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCardStyles } from '@/utils/theme-utils';
 import ProfileCard from './ProfileCard';
 
-interface ProfileContentProps {
-  userId?: string;
-}
-
-const ProfileContent = ({ userId }: ProfileContentProps) => {
+const ProfileContent = () => {
+  const { userId } = useParams();
   const [activeTab, setActiveTab] = useState('posts');
   const cardStyles = useCardStyles();
   const { 
@@ -82,10 +81,10 @@ const ProfileContent = ({ userId }: ProfileContentProps) => {
         <div className="flex flex-col md:flex-row gap-6">
           <div className="w-full md:w-[300px] flex-shrink-0">
             <ProfileCard 
-              username={username}
-              bio={bio}
-              location={location}
-              memberSince={memberSince}
+              username={username || ''}
+              bio={bio || ''}
+              location={location || ''}
+              memberSince={memberSince || ''}
               followingCount={followingCount}
               followerCount={followerCount}
               profileImage={profileImage}
@@ -95,7 +94,6 @@ const ProfileContent = ({ userId }: ProfileContentProps) => {
               onSaveChanges={handleSaveChanges}
               isOwnProfile={isOwnProfile}
               profileUserId={profileData?.id}
-              otherUserProfile={!isOwnProfile ? profileData : undefined}
             />
           </div>
           
