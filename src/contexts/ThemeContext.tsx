@@ -15,23 +15,27 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  // Initialize with a default theme first
+  // Initialize with default values that don't depend on browser APIs
   const [theme, setTheme] = useState<Theme>('light');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
 
-  // Now safely load the saved theme after initial render
+  // Load saved theme after component mounts
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Check localStorage for saved theme
-    const savedTheme = localStorage.getItem('theme') as Theme;
-    if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
-      setTheme(savedTheme);
-    }
-    
-    // Check system preference for initial resolved theme
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setResolvedTheme('dark');
+    try {
+      // Check localStorage for saved theme
+      const savedTheme = localStorage.getItem('theme') as Theme;
+      if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
+        setTheme(savedTheme);
+      }
+      
+      // Check system preference for initial resolved theme
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        setResolvedTheme('dark');
+      }
+    } catch (error) {
+      console.error("Error accessing browser APIs:", error);
     }
   }, []);
 
@@ -39,22 +43,26 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const root = window.document.documentElement;
-    
-    // Remove any previous class
-    root.classList.remove('light', 'dark');
-    
-    // Save to localStorage
-    localStorage.setItem('theme', theme);
+    try {
+      const root = window.document.documentElement;
+      
+      // Remove any previous class
+      root.classList.remove('light', 'dark');
+      
+      // Save to localStorage
+      localStorage.setItem('theme', theme);
 
-    // Apply theme
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      root.classList.add(systemTheme);
-      setResolvedTheme(systemTheme);
-    } else {
-      root.classList.add(theme);
-      setResolvedTheme(theme);
+      // Apply theme
+      if (theme === 'system') {
+        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        root.classList.add(systemTheme);
+        setResolvedTheme(systemTheme);
+      } else {
+        root.classList.add(theme);
+        setResolvedTheme(theme);
+      }
+    } catch (error) {
+      console.error("Error applying theme:", error);
     }
   }, [theme]);
 
@@ -62,20 +70,24 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (typeof window === 'undefined' || theme !== 'system') return;
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
-    const handleChange = () => {
-      if (typeof window === 'undefined') return;
+    try {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       
-      const root = window.document.documentElement;
-      root.classList.remove('light', 'dark');
-      const newTheme = mediaQuery.matches ? 'dark' : 'light';
-      root.classList.add(newTheme);
-      setResolvedTheme(newTheme);
-    };
-    
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+      const handleChange = () => {
+        if (typeof window === 'undefined') return;
+        
+        const root = window.document.documentElement;
+        root.classList.remove('light', 'dark');
+        const newTheme = mediaQuery.matches ? 'dark' : 'light';
+        root.classList.add(newTheme);
+        setResolvedTheme(newTheme);
+      };
+      
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } catch (error) {
+      console.error("Error setting up media query listener:", error);
+    }
   }, [theme]);
 
   // Utility function to get the correct value based on current theme
