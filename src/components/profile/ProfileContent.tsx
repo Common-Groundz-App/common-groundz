@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import ProfileHeader from './ProfileHeader';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
@@ -83,10 +82,10 @@ const ProfileContent = ({ userId }: ProfileContentProps) => {
         <div className="flex flex-col md:flex-row gap-6">
           <div className="w-full md:w-[300px] flex-shrink-0">
             <ProfileCard 
-              username={username || ''}
-              bio={bio || ''}
-              location={location || ''}
-              memberSince={memberSince || ''}
+              username={username}
+              bio={bio}
+              location={location}
+              memberSince={memberSince}
               followingCount={followingCount}
               followerCount={followerCount}
               profileImage={profileImage}

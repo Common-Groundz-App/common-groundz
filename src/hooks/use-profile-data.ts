@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserProfile, getDisplayName, fetchFollowerCount, fetchFollowingCount } from '@/services/profileService'; 
+import { fetchUserProfile, fetchFollowerCount, fetchFollowingCount } from '@/services/profileService'; 
 import { useProfileFollows } from './profile/use-profile-follows';
 import { useProfileImages } from './profile/use-profile-images';
 import { useProfileMetadata } from './profile/use-profile-metadata';
@@ -19,7 +19,8 @@ export const useProfileData = (userId?: string) => {
     followerCount,
     followingCount,
     setFollowerCount,
-    setFollowingCount
+    setFollowingCount,
+    refreshCounts
   } = useProfileFollows(userId);
 
   const {
@@ -32,15 +33,18 @@ export const useProfileData = (userId?: string) => {
     handleCoverImageUpdated,
     handleSaveChanges,
     setInitialImages
-  } = useProfileImages(defaultCoverImage);
+  } = useProfileImages({ defaultCoverImage });
 
   const {
     username,
     setUsername,
     bio,
+    setBio,
     location,
+    setLocation,
     memberSince,
-    setProfileMetadata
+    setProfileMetadata,
+    updateCounts
   } = useProfileMetadata();
 
   // Reset state when profile userId changes
@@ -49,6 +53,8 @@ export const useProfileData = (userId?: string) => {
     setError(null);
     setFollowerCount(0);
     setFollowingCount(0);
+    setBio('');
+    setLocation('');
   }, [userId]);
 
   const loadProfileData = async () => {
@@ -59,28 +65,23 @@ export const useProfileData = (userId?: string) => {
       setError(null);
       
       const viewingUserId = userId;
-      setIsOwnProfile(!userId || userId === user?.id);
+      const isOwn = !userId || userId === user?.id;
+      setIsOwnProfile(isOwn);
       
       const profile = await fetchUserProfile(viewingUserId);
       
-      // Fetch follower and following counts for the viewed profile
-      const followerCountData = await fetchFollowerCount(viewingUserId);
-      const followingCountData = await fetchFollowingCount(viewingUserId);
+      // Fetch follower and following counts
+      const [followerCountData, followingCountData] = await Promise.all([
+        fetchFollowerCount(viewingUserId),
+        fetchFollowingCount(viewingUserId)
+      ]);
       
-      setFollowerCount(followerCountData);
-      setFollowingCount(followingCountData);
-      
+      updateCounts(followingCountData, followerCountData);
       setProfileData(profile);
       
       if (profile) {
-        // For own profile, use user metadata. For other profiles, use profile data
-        const displayName = isOwnProfile 
-          ? getDisplayName(user, profile)
-          : profile.username || 'User';
-          
-        setUsername(displayName);
-        setProfileMetadata(isOwnProfile ? user?.user_metadata : null, profile);
         setInitialImages(profile);
+        setProfileMetadata(isOwn ? user?.user_metadata : null, profile);
       }
     } catch (err) {
       console.error('Error:', err);
@@ -93,6 +94,30 @@ export const useProfileData = (userId?: string) => {
   useEffect(() => {
     loadProfileData();
   }, [user, userId]);
+
+  useEffect(() => {
+    // Listen for follow/unfollow events to update counts
+    const handleFollowStatusChange = (event: CustomEvent) => {
+      if (!userId) return;
+      
+      const { follower, following, action } = event.detail;
+      
+      if (userId === following) {
+        const change = action === 'follow' ? 1 : -1;
+        setFollowerCount(prev => Math.max(0, prev + change));
+      }
+      
+      if (userId === follower) {
+        refreshCounts();
+      }
+    };
+
+    window.addEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
+    };
+  }, [userId, refreshCounts]);
 
   return {
     isLoading,

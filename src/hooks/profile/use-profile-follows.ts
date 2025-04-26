@@ -1,57 +1,39 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { fetchFollowerCount, fetchFollowingCount } from '@/services/profileService';
+import { useToast } from '@/hooks/use-toast';
 
 export const useProfileFollows = (userId?: string) => {
   const [followerCount, setFollowerCount] = useState<number>(0);
   const [followingCount, setFollowingCount] = useState<number>(0);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const handleFollowStatusChange = async (event: CustomEvent) => {
-      if (!userId) return;
+  const refreshCounts = useCallback(async () => {
+    if (!userId) return;
+
+    try {
+      const [newFollowerCount, newFollowingCount] = await Promise.all([
+        fetchFollowerCount(userId),
+        fetchFollowingCount(userId)
+      ]);
       
-      const { follower, following, action } = event.detail;
-      
-      if (userId === following) {
-        const updatedFollowerCount = action === 'follow' 
-          ? followerCount + 1 
-          : Math.max(0, followerCount - 1);
-        setFollowerCount(updatedFollowerCount);
-      }
-      
-      if (userId === follower) {
-        const followingData = await fetchFollowingCount(userId);
-        setFollowingCount(followingData);
-      }
-    };
-
-    const handleFollowerCountChanged = (event: CustomEvent) => {
-      if (event.detail && typeof event.detail.count === 'number') {
-        setFollowerCount(event.detail.count);
-      }
-    };
-
-    const handleFollowingCountChanged = (event: CustomEvent) => {
-      if (event.detail && typeof event.detail.count === 'number') {
-        setFollowingCount(event.detail.count);
-      }
-    };
-
-    window.addEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
-    window.addEventListener('profile-follower-count-changed', handleFollowerCountChanged as EventListener);
-    window.addEventListener('profile-following-count-changed', handleFollowingCountChanged as EventListener);
-    
-    return () => {
-      window.removeEventListener('follow-status-changed', handleFollowStatusChange as EventListener);
-      window.removeEventListener('profile-follower-count-changed', handleFollowerCountChanged as EventListener);
-      window.removeEventListener('profile-following-count-changed', handleFollowingCountChanged as EventListener);
-    };
-  }, [userId, followerCount]);
+      setFollowerCount(newFollowerCount);
+      setFollowingCount(newFollowingCount);
+    } catch (error) {
+      console.error('Error refreshing follow counts:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update follow counts',
+        variant: 'destructive',
+      });
+    }
+  }, [userId]);
 
   return {
     followerCount,
     followingCount,
     setFollowerCount,
-    setFollowingCount
+    setFollowingCount,
+    refreshCounts
   };
 };

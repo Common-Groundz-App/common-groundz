@@ -8,20 +8,22 @@ export const getFormattedDisplayName = (
 ): string => {
   // For other user's profile, prioritize their profile data
   if (!isOwnProfile && otherUserProfile) {
-    // Use full name from profile if available
-    if (otherUserProfile.first_name || otherUserProfile.last_name) {
-      return `${otherUserProfile.first_name || ''} ${otherUserProfile.last_name || ''}`.trim();
+    // First try to use username from the profile
+    if (otherUserProfile.username) {
+      return otherUserProfile.username;
     }
-    // Fallback to username from profile
-    return otherUserProfile.username || username;
   }
 
-  // For own profile, use first/last name if available
+  // For own profile
   if (isOwnProfile) {
-    return firstName || lastName 
-      ? `${firstName} ${lastName}`.trim() 
-      : username;
+    // Use first/last name if available
+    if (firstName || lastName) {
+      return `${firstName || ''} ${lastName || ''}`.trim();
+    }
+    // Fall back to username
+    return username;
   }
-  
-  return username;
+
+  // Final fallback to username
+  return username || 'User';
 };
