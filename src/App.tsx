@@ -14,15 +14,15 @@ import RecommendationView from './pages/RecommendationView';
 import './App.css';
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from './components/ui/tooltip';
-import { ThemeProvider } from './contexts/ThemeContext';
 import { ContentViewerProvider } from './contexts/ContentViewerContext';
 import ContentViewerModal from './components/content/ContentViewerModal';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 function App() {
   return (
-    <ThemeProvider>
-      <ContentViewerProvider>
-        <BrowserRouter>
+    <BrowserRouter>
+      <ThemeProvider>
+        <ContentViewerProvider>
           <TooltipProvider>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -99,9 +99,9 @@ function App() {
             <Toaster />
             <ContentViewerModal />
           </TooltipProvider>
-        </BrowserRouter>
-      </ContentViewerProvider>
-    </ThemeProvider>
+        </ContentViewerProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 }
 

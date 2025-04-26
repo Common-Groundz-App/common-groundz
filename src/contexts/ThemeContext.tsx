@@ -1,5 +1,6 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as React from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -16,11 +17,11 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   // Initialize with default values that don't depend on browser APIs
-  const [theme, setTheme] = useState<Theme>('light');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = React.useState<Theme>('light');
+  const [resolvedTheme, setResolvedTheme] = React.useState<'light' | 'dark'>('light');
 
   // Load saved theme after component mounts
-  useEffect(() => {
+  React.useEffect(() => {
     if (typeof window === 'undefined') return;
     
     try {
@@ -40,7 +41,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   // Apply theme to document
-  useEffect(() => {
+  React.useEffect(() => {
     if (typeof window === 'undefined') return;
     
     try {
@@ -67,7 +68,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   }, [theme]);
 
   // Listen for system theme changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (typeof window === 'undefined' || theme !== 'system') return;
 
     try {
@@ -116,7 +117,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useTheme = () => {
-  const context = useContext(ThemeContext);
+  const context = React.useContext(ThemeContext);
   if (context === undefined) {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
