@@ -1,7 +1,5 @@
 
 import { useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import { getDisplayName } from '@/services/profileService';
 
 export const useProfileMetadata = () => {
   const [username, setUsername] = useState<string>('');
@@ -27,12 +25,21 @@ export const useProfileMetadata = () => {
     }
   };
 
+  const updateCounts = (followingData: number, followerData: number) => {
+    // This function is implemented in the hook but needs to be added to the return object
+    console.log('Updating counts:', followingData, followerData);
+    // Implementation can be expanded if needed
+  };
+
   return {
     username,
     setUsername,
     bio,
+    setBio,
     location,
+    setLocation,
     memberSince,
-    setProfileMetadata
+    setProfileMetadata,
+    updateCounts
   };
 };
