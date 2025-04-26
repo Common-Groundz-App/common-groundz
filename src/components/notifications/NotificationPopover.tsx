@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { Bell, Check, Loader2 } from 'lucide-react';
@@ -10,16 +11,17 @@ import { useToast } from '@/hooks/use-toast';
 import { EntityType, Notification } from '@/services/notificationService';
 import { cn } from '@/lib/utils';
 
-interface NotificationDrawerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface NotificationPopoverProps {
+  trigger: React.ReactNode;
+  align?: "start" | "center" | "end";
 }
 
-export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerProps) {
+export function NotificationPopover({ trigger, align = "end" }: NotificationPopoverProps) {
   const { notifications, unreadNotifications, markAsRead, loading, markingAsRead } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
 
   // Handle marking specific notification as read when clicked
@@ -31,7 +33,7 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
       await markAsRead([notification.id]);
     }
     
-    onOpenChange(false);
+    setOpen(false);
     
     if (!notification.entity_type || !notification.entity_id) {
       if (notification.action_url) {
@@ -65,7 +67,7 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
           });
         }
     }
-  }, [navigate, openContent, toast, onOpenChange, markAsRead]);
+  }, [navigate, openContent, toast, markAsRead]);
 
   // Handle marking all unread notifications as read
   const handleMarkAllAsRead = () => {
@@ -76,62 +78,62 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-[400px] p-0">
-        <div className="flex h-full flex-col">
-          <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50">
-            <div className="flex items-center justify-between p-4">
-              <h4 className="text-sm font-semibold">Notifications</h4>
-              {notifications.length > 0 && unreadNotifications.length > 0 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 text-xs"
-                  onClick={handleMarkAllAsRead}
-                  disabled={markingAsRead}
-                >
-                  {markingAsRead ? (
-                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  ) : null}
-                  Mark all as read
-                </Button>
-              )}
-            </div>
-
-            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full px-4 pb-2">
-              <TabsList className="w-full">
-                <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
-                <TabsTrigger value="unread" className="flex-1">
-                  Unread {unreadNotifications.length > 0 && `(${unreadNotifications.length})`}
-                </TabsTrigger>
-              </TabsList>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {trigger}
+      </PopoverTrigger>
+      <PopoverContent 
+        className="w-80 max-h-[480px] overflow-y-auto p-0 backdrop-blur-lg bg-background/95 border border-border/50 shadow-lg"
+        align={align}
+      >
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50">
+          <div className="flex items-center justify-between p-4">
+            <h4 className="text-sm font-semibold">Notifications</h4>
+            {notifications.length > 0 && unreadNotifications.length > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 text-xs"
+                onClick={handleMarkAllAsRead}
+                disabled={markingAsRead}
+              >
+                {markingAsRead ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : null}
+                Mark all as read
+              </Button>
+            )}
+          </div>
+          
+          <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full px-4 pb-2">
+            <TabsList className="w-full">
+              <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
+              <TabsTrigger value="unread" className="flex-1">
+                Unread {unreadNotifications.length > 0 && `(${unreadNotifications.length})`}
+              </TabsTrigger>
+            </TabsList>
             
-              <TabsContent value="all" className="mt-2">
-                <NotificationList 
-                  notifications={notifications}
-                  loading={loading}
-                  onNotificationClick={handleNotificationClick}
-                />
-              </TabsContent>
+            <TabsContent value="all" className="mt-2">
+              <NotificationList 
+                notifications={notifications}
+                loading={loading}
+                onNotificationClick={handleNotificationClick}
+              />
+            </TabsContent>
 
-              <TabsContent value="unread" className="mt-2">
-                <NotificationList 
-                  notifications={unreadNotifications}
-                  loading={loading}
-                  onNotificationClick={handleNotificationClick}
-                  emptyMessage="No unread notifications"
-                  emptyIcon={Check}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          <div className="flex-1 overflow-auto">
-            {/* TabsContent moved inside the Tabs component above */}
-          </div>
+            <TabsContent value="unread" className="mt-2">
+              <NotificationList 
+                notifications={unreadNotifications}
+                loading={loading}
+                onNotificationClick={handleNotificationClick}
+                emptyMessage="No unread notifications"
+                emptyIcon={Check}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
-      </SheetContent>
-    </Sheet>
+      </PopoverContent>
+    </Popover>
   );
 }
 
