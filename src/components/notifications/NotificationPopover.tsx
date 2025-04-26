@@ -181,7 +181,7 @@ function NotificationList({
           <div className="flex items-start gap-3">
             <UserAvatar
               imageUrl={notification.image_url}
-              username={notification.title.split(' ')[0]}
+              username={notification.title}
               className="w-9 h-9"
             />
             <div className="flex-1 min-w-0">
