@@ -15,22 +15,27 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [theme, setTheme] = useState<Theme>(() => {
-    // Check localStorage first
+  // Initialize with a default theme first
+  const [theme, setTheme] = useState<Theme>('light');
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+
+  // Now safely load the saved theme after initial render
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Check localStorage for saved theme
     const savedTheme = localStorage.getItem('theme') as Theme;
     if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
-      return savedTheme;
+      setTheme(savedTheme);
     }
     
-    // Fallback to light mode instead of system
-    return 'light';
-  });
+    // Check system preference for initial resolved theme
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setResolvedTheme('dark');
+    }
+  }, []);
 
-  // Track the resolved theme (what's actually applied)
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(
-    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  );
-
+  // Apply theme to document
   useEffect(() => {
     if (typeof window === 'undefined') return;
     

@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Index from './pages/Index';
@@ -16,7 +17,6 @@ import { TooltipProvider } from './components/ui/tooltip';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ContentViewerProvider } from './contexts/ContentViewerContext';
 import ContentViewerModal from './components/content/ContentViewerModal';
-import React from 'react';
 
 function App() {
   return (
