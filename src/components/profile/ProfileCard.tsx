@@ -26,6 +26,14 @@ interface ProfileCardProps {
   isOwnProfile: boolean;
 }
 
+interface ProfileUpdates {
+  username?: string;
+  bio?: string;
+  location?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 const ProfileCard = (props: ProfileCardProps) => {
   const { 
     profileData,
@@ -48,13 +56,7 @@ const ProfileCard = (props: ProfileCardProps) => {
   const [localHasChanges, setLocalHasChanges] = useState(false);
   const [updatingProfile, setUpdatingProfile] = useState(false);
 
-  const handleProfileUpdate = async (updates: {
-    username?: string;
-    bio?: string;
-    location?: string;
-    firstName?: string;
-    lastName?: string;
-  }) => {
+  const handleProfileUpdate = async (updates: ProfileUpdates) => {
     if (!user) return;
     
     try {
