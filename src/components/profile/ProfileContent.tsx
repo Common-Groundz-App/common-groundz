@@ -1,40 +1,37 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileReviews from './ProfileReviews';
 import ProfileCircles from './ProfileCircles';
-import { useProfileData } from '@/hooks/use-profile-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCardStyles } from '@/utils/theme-utils';
 import ProfileCard from './ProfileCard';
+import { useViewedProfile } from '@/hooks/use-viewed-profile';
 
-const ProfileContent = () => {
-  const { userId } = useParams();
+interface ProfileContentProps {
+  userId: string;
+}
+
+const DEFAULT_COVER_IMAGE = '/placeholder.svg';
+
+const ProfileContent = ({ userId }: ProfileContentProps) => {
   const [activeTab, setActiveTab] = useState('posts');
   const cardStyles = useCardStyles();
-  const { 
-    isLoading, 
+  
+  const {
+    profileData,
+    isLoading,
     error,
-    coverImage,
-    profileImage,
-    username,
-    bio,
-    location,
-    memberSince,
-    followingCount,
     followerCount,
-    hasChanges,
+    followingCount,
     isOwnProfile,
-    handleProfileImageChange,
-    handleCoverImageChange,
-    handleCoverImageUpdated,
-    handleSaveChanges,
-    profileData
-  } = useProfileData(userId);
+    displayName,
+    formattedUsername,
+    memberSince
+  } = useViewedProfile(userId);
 
   useEffect(() => {
     setActiveTab('posts');
@@ -71,29 +68,28 @@ const ProfileContent = () => {
   return (
     <div className="pb-12">
       <ProfileHeader 
-        coverImage={coverImage}
+        coverImage={profileData.cover_url || DEFAULT_COVER_IMAGE}
         isLoading={isLoading}
-        onCoverImageChange={handleCoverImageChange}
-        onCoverImageUpdated={handleCoverImageUpdated} 
+        onCoverImageChange={() => {}}
+        onCoverImageUpdated={() => {}}
+        isOwnProfile={isOwnProfile}
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-10">
         <div className="flex flex-col md:flex-row gap-6">
           <div className="w-full md:w-[300px] flex-shrink-0">
             <ProfileCard 
-              username={username || ''}
-              bio={bio || ''}
-              location={location || ''}
-              memberSince={memberSince || ''}
+              profileData={profileData}
+              username={displayName}
+              formattedUsername={formattedUsername}
+              bio={profileData.bio || ''}
+              location={profileData.location || ''}
+              memberSince={memberSince}
               followingCount={followingCount}
               followerCount={followerCount}
-              profileImage={profileImage}
+              profileImage={profileData.avatar_url || ''}
               isLoading={isLoading}
-              onProfileImageChange={handleProfileImageChange}
-              hasChanges={hasChanges}
-              onSaveChanges={handleSaveChanges}
               isOwnProfile={isOwnProfile}
-              profileUserId={profileData?.id}
             />
           </div>
           
@@ -107,28 +103,28 @@ const ProfileContent = () => {
               >
                 <TabsContent value="posts">
                   <ProfilePosts 
-                    profileUserId={profileData?.id} 
+                    profileUserId={profileData.id} 
                     isOwnProfile={isOwnProfile} 
                   />
                 </TabsContent>
                 
                 <TabsContent value="recommendations">
                   <ProfileRecommendations 
-                    profileUserId={profileData?.id}
+                    profileUserId={profileData.id}
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
                 
                 <TabsContent value="reviews">
                   <ProfileReviews 
-                    profileUserId={profileData?.id} 
+                    profileUserId={profileData.id} 
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
                 
                 <TabsContent value="circles">
                   <ProfileCircles 
-                    profileUserId={profileData?.id} 
+                    profileUserId={profileData.id} 
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>

@@ -19,7 +19,7 @@ const ProfileAvatar = ({
   isLoading, 
   onProfileImageChange,
   onImageSelected,
-  isEditable = true
+  isEditable = false
 }: ProfileAvatarProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -39,7 +39,7 @@ const ProfileAvatar = ({
 
   const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user || !onProfileImageChange) return;
+    if (!file || !user) return;
     
     try {
       setUploading(true);
@@ -66,16 +66,17 @@ const ProfileAvatar = ({
         .from('profile_images')
         .getPublicUrl(filePath);
       
-      // Add a timestamp to force refresh
-      const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
-      
       // Store the image URL in temporary state
       if (onImageSelected) {
         onImageSelected(publicUrl);
       }
       
       // Update the visual display
-      onProfileImageChange(urlWithTimestamp);
+      if (onProfileImageChange) {
+        // Add a timestamp to force refresh
+        const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
+        onProfileImageChange(urlWithTimestamp);
+      }
       
     } catch (error) {
       console.error('Error uploading profile image:', error);
@@ -109,7 +110,7 @@ const ProfileAvatar = ({
         )}
       </div>
       
-      {isEditable && onProfileImageChange && (
+      {isEditable && user && (
         <>
           <label 
             htmlFor="profile-upload" 

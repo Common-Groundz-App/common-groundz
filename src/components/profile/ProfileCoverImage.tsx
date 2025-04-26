@@ -1,43 +1,36 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Camera, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProfileCoverImageProps {
   coverImage: string;
   isLoading: boolean;
-  onCoverImageChange?: (url: string) => void;
-  onCoverImageUpdated?: (url: string | null) => void;
-  isEditable?: boolean;
+  onCoverImageChange: (url: string) => void;
+  onCoverImageUpdated: (url: string | null) => void;
+  isOwnProfile: boolean;
 }
 
 const ProfileCoverImage = ({ 
   coverImage, 
-  isLoading,
-  onCoverImageChange,
+  isLoading, 
+  onCoverImageChange, 
   onCoverImageUpdated,
-  isEditable = true
+  isOwnProfile
 }: ProfileCoverImageProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [showRemoveButton, setShowRemoveButton] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleCoverImageClick = () => {
-    if (isEditable && onCoverImageChange && fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleCoverImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user || !onCoverImageChange) return;
+  const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !isOwnProfile) return;
     
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     try {
-      setUploading(true);
+      setIsUploading(true);
       
       // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop();
@@ -51,7 +44,7 @@ const ProfileCoverImage = ({
         toast({
           title: 'Upload failed',
           description: uploadError.message,
-          variant: 'destructive'
+          variant: 'destructive',
         });
         return;
       }
@@ -61,100 +54,59 @@ const ProfileCoverImage = ({
         .from('profile_images')
         .getPublicUrl(filePath);
       
-      // Add a timestamp to force refresh
+      // Add timestamp to force browser to reload the image
       const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
       
-      // Update the visual display
+      // Update UI with new image
       onCoverImageChange(urlWithTimestamp);
       
-      // Store the image URL to be saved later
-      if (onCoverImageUpdated) {
-        onCoverImageUpdated(publicUrl);
-      }
+      // Store the new URL for saving later
+      onCoverImageUpdated(publicUrl);
       
       toast({
         title: 'Cover image uploaded',
-        description: 'Remember to save your changes.',
+        description: 'Don\'t forget to save your changes',
       });
+      
     } catch (error) {
       console.error('Error uploading cover image:', error);
       toast({
         title: 'Something went wrong',
         description: 'Please try again later.',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
-      setUploading(false);
+      setIsUploading(false);
     }
   };
 
-  const handleRemoveCoverImage = () => {
-    if (!onCoverImageChange || !onCoverImageUpdated) return;
-    
-    // Default cover image
-    const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80';
-    
-    // Update the visual display
-    onCoverImageChange(defaultCoverImage);
-    
-    // Store null to indicate that the cover image should be removed
-    onCoverImageUpdated(null);
-    
-    setShowRemoveButton(false);
-    
-    toast({
-      title: 'Cover image removed',
-      description: 'Remember to save your changes.',
-    });
-  };
-
   return (
-    <div 
-      className="w-full h-48 md:h-64 bg-cover bg-center relative group z-0"
-      style={{ 
-        backgroundImage: `url(${coverImage || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80'})`,
-        cursor: isEditable ? 'pointer' : 'default'
-      }}
-      onClick={handleCoverImageClick}
-      onMouseEnter={() => setShowRemoveButton(true)}
-      onMouseLeave={() => setShowRemoveButton(false)}
-    >
-      {isEditable && onCoverImageChange && (
-        <>
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
-            {!uploading && !isLoading && (
-              <div className="bg-black bg-opacity-70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300">
-                <Camera size={24} />
-              </div>
-            )}
-            {(uploading || isLoading) && (
-              <div className="bg-black bg-opacity-70 text-white p-3 rounded-lg">
-                Loading...
-              </div>
-            )}
-          </div>
-          
-          <input 
-            ref={fileInputRef}
-            type="file" 
-            className="hidden" 
+    <div className="w-full h-64 md:h-80 bg-gray-200 dark:bg-gray-800 relative overflow-hidden">
+      {/* Cover Image */}
+      <img 
+        src={coverImage} 
+        alt="Cover"
+        className="w-full h-full object-cover"
+      />
+      
+      {/* Upload Button (Only for own profile) */}
+      {isOwnProfile && !isLoading && (
+        <div className="absolute bottom-4 right-4">
+          <label 
+            htmlFor="cover-image-upload"
+            className="flex items-center justify-center h-10 px-4 bg-brand-orange text-white rounded-md shadow-md cursor-pointer hover:bg-brand-orange/90 transition-all font-medium"
+          >
+            {isUploading ? 'Uploading...' : 'Change Cover'}
+          </label>
+          <input
+            id="cover-image-upload"
+            type="file"
             accept="image/*"
-            onChange={handleCoverImageChange}
-            disabled={uploading || isLoading}
+            className="hidden"
+            onChange={handleCoverImageUpload}
+            disabled={isUploading}
           />
-          
-          {coverImage && coverImage !== 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80' && showRemoveButton && !uploading && !isLoading && (
-            <button 
-              className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-2 rounded-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRemoveCoverImage();
-              }}
-            >
-              <X size={16} />
-            </button>
-          )}
-        </>
+        </div>
       )}
     </div>
   );

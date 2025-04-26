@@ -7,25 +7,15 @@ interface ProfileHeaderProps {
   isLoading: boolean;
   onCoverImageChange: (url: string) => void;
   onCoverImageUpdated: (url: string | null) => void;
-  username?: string;
-  bio?: string;
-  location?: string;
-  memberSince?: string;
-  followingCount?: number;
-  followerCount?: number;
-  profileImage?: string;
-  onProfileImageChange?: (url: string) => void;
-  hasChanges?: boolean;
-  onSaveChanges?: () => void;
-  isOwnProfile?: boolean;
-  profileUserId?: string;
+  isOwnProfile: boolean;
 }
 
 const ProfileHeader = ({
   coverImage,
   isLoading,
   onCoverImageChange,
-  onCoverImageUpdated
+  onCoverImageUpdated,
+  isOwnProfile
 }: ProfileHeaderProps) => {
   return (
     <div className="relative">
@@ -34,6 +24,7 @@ const ProfileHeader = ({
         isLoading={isLoading} 
         onCoverImageChange={onCoverImageChange} 
         onCoverImageUpdated={onCoverImageUpdated} 
+        isOwnProfile={isOwnProfile}
       />
     </div>
   );
