@@ -1,5 +1,4 @@
 
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Index from './pages/Index';
@@ -14,15 +13,15 @@ import RecommendationView from './pages/RecommendationView';
 import './App.css';
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from './components/ui/tooltip';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ContentViewerProvider } from './contexts/ContentViewerContext';
 import ContentViewerModal from './components/content/ContentViewerModal';
-import { ThemeProvider } from './contexts/ThemeContext';
 
 function App() {
   return (
-    <BrowserRouter>
-      <ThemeProvider>
-        <ContentViewerProvider>
+    <ThemeProvider>
+      <ContentViewerProvider>
+        <BrowserRouter>
           <TooltipProvider>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -99,9 +98,9 @@ function App() {
             <Toaster />
             <ContentViewerModal />
           </TooltipProvider>
-        </ContentViewerProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+        </BrowserRouter>
+      </ContentViewerProvider>
+    </ThemeProvider>
   );
 }
 

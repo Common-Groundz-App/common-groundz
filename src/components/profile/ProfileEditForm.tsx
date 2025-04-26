@@ -11,14 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { validateUsernameFormat, checkUsernameUniqueness } from '@/utils/usernameValidation';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface ProfileUpdates {
-  username?: string;
-  bio?: string;
-  location?: string;
-  firstName?: string;
-  lastName?: string;
-}
-
 interface ProfileEditFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -27,7 +19,7 @@ interface ProfileEditFormProps {
   location: string;
   firstName: string;
   lastName: string;
-  onProfileUpdate: (updates: ProfileUpdates) => void;
+  onProfileUpdate: (username: string, bio: string, location: string, firstName: string, lastName: string) => void;
 }
 
 interface FormValues {
@@ -150,13 +142,7 @@ const ProfileEditForm = ({
       if (userError) throw userError;
 
       // Update local state
-      onProfileUpdate({
-        username: data.username,
-        bio: data.bio,
-        location: data.location,
-        firstName: data.firstName,
-        lastName: data.lastName
-      });
+      onProfileUpdate(data.username, data.bio, data.location, data.firstName, data.lastName);
       
       toast({
         title: 'Profile updated',

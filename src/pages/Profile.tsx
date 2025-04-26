@@ -18,7 +18,7 @@ const Profile = () => {
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
       <div className="flex-1">
-        <ProfileContent userId={userId || user.id} />
+        <ProfileContent />
       </div>
       <Footer />
     </div>
