@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import ProfileAvatar from './ProfileAvatar';
@@ -70,14 +71,14 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
         avatar_url = publicUrl;
       }
 
-      // Update the profile in the database
+      // Update the profile in the database - fix the type issue by converting Date to ISO string
       const updates = {
         id: user.id,
         username: profile.username,
         bio: profile.bio,
         location: profile.location,
         avatar_url,
-        updated_at: new Date(),
+        updated_at: new Date().toISOString() // Convert Date to string for Supabase
       };
 
       const { error: updateError } = await supabase
@@ -90,11 +91,14 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
 
       // Update user metadata if necessary
       const metadataUpdates: { [key: string]: any } = {};
-      if (user.user_metadata.first_name !== profile.displayName.split(' ')[0]) {
-        metadataUpdates.first_name = profile.displayName.split(' ')[0];
+      const displayNameParts = profile.displayName.split(' ');
+      
+      if (user.user_metadata.first_name !== displayNameParts[0]) {
+        metadataUpdates.first_name = displayNameParts[0];
       }
-      if (user.user_metadata.last_name !== profile.displayName.split(' ')[1]) {
-        metadataUpdates.last_name = profile.displayName.split(' ')[1];
+      
+      if (displayNameParts.length > 1 && user.user_metadata.last_name !== displayNameParts.slice(1).join(' ')) {
+        metadataUpdates.last_name = displayNameParts.slice(1).join(' ');
       }
 
       if (Object.keys(metadataUpdates).length > 0) {
