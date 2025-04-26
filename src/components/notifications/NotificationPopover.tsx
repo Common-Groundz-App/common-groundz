@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { EntityType, Notification } from '@/services/notificationService';
 import { cn } from '@/lib/utils';
+import { UserAvatar } from '@/components/ui/user-avatar';
 
 interface NotificationPopoverProps {
   trigger: React.ReactNode;
@@ -24,11 +24,9 @@ export function NotificationPopover({ trigger, align = "end" }: NotificationPopo
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
 
-  // Handle marking specific notification as read when clicked
   const handleNotificationClick = React.useCallback(async (notification: Notification, event: React.MouseEvent) => {
     event.preventDefault();
     
-    // Mark this notification as read if it isn't already
     if (!notification.is_read) {
       await markAsRead([notification.id]);
     }
@@ -69,7 +67,6 @@ export function NotificationPopover({ trigger, align = "end" }: NotificationPopo
     }
   }, [navigate, openContent, toast, markAsRead]);
 
-  // Handle marking all unread notifications as read
   const handleMarkAllAsRead = () => {
     const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
     if (unreadIds.length > 0) {
@@ -182,17 +179,11 @@ function NotificationList({
           )}
         >
           <div className="flex items-start gap-3">
-            {notification.image_url ? (
-              <img 
-                src={notification.image_url} 
-                className="w-9 h-9 rounded-full object-cover border"
-                alt=""
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-muted/50 flex items-center justify-center">
-                <Bell className="w-4 h-4 text-muted-foreground" />
-              </div>
-            )}
+            <UserAvatar
+              imageUrl={notification.image_url}
+              username={notification.title.split(' ')[0]}
+              className="w-9 h-9"
+            />
             <div className="flex-1 min-w-0">
               <p className={cn(
                 "text-sm leading-5 text-foreground",
