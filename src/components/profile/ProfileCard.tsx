@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
@@ -94,14 +93,11 @@ const ProfileCard = (props: ProfileCardProps) => {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, avatar_url')
           .eq('id', profileUserId)
           .single();
 
-        if (error) {
-          console.error('Error fetching username:', error);
-          return;
-        }
+        if (error) throw error;
 
         if (data && data.username) {
           setDatabaseUsername(data.username);
@@ -121,7 +117,7 @@ const ProfileCard = (props: ProfileCardProps) => {
   }, [profileUserId, user, isOwnProfile, otherUserProfile]);
 
   const formattedUsername = databaseUsername 
-    ? `@${databaseUsername}` 
+    ? `@${databaseUsername.toLowerCase()}` 
     : '';
 
   const combinedHasChanges = hasChanges || localHasChanges;

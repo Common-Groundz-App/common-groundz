@@ -43,17 +43,27 @@ export const useProfileData = (userId?: string) => {
     setProfileMetadata
   } = useProfileMetadata();
 
+  // Reset state when profile userId changes
+  useEffect(() => {
+    setProfileData(null);
+    setError(null);
+    setFollowerCount(0);
+    setFollowingCount(0);
+  }, [userId]);
+
   const loadProfileData = async () => {
-    if (!user) return;
+    if (!userId) return;
     
     try {
       setIsLoading(true);
-      const viewingUserId = userId || user.id;
-      setIsOwnProfile(!userId || userId === user.id);
+      setError(null);
+      
+      const viewingUserId = userId;
+      setIsOwnProfile(!userId || userId === user?.id);
       
       const profile = await fetchUserProfile(viewingUserId);
       
-      // Fetch follower and following counts
+      // Fetch follower and following counts for the viewed profile
       const followerCountData = await fetchFollowerCount(viewingUserId);
       const followingCountData = await fetchFollowingCount(viewingUserId);
       
@@ -63,9 +73,13 @@ export const useProfileData = (userId?: string) => {
       setProfileData(profile);
       
       if (profile) {
-        const displayName = getDisplayName(user, profile);
+        // For own profile, use user metadata. For other profiles, use profile data
+        const displayName = isOwnProfile 
+          ? getDisplayName(user, profile)
+          : profile.username || 'User';
+          
         setUsername(displayName);
-        setProfileMetadata(user.user_metadata, profile);
+        setProfileMetadata(isOwnProfile ? user?.user_metadata : null, profile);
         setInitialImages(profile);
       }
     } catch (err) {
