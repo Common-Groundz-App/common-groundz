@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
@@ -12,8 +11,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCardStyles } from '@/utils/theme-utils';
 import ProfileCard from './ProfileCard';
 
-const ProfileContent = () => {
-  const { userId } = useParams();
+interface ProfileContentProps {
+  userId?: string;
+}
+
+const ProfileContent = ({ userId }: ProfileContentProps) => {
   const [activeTab, setActiveTab] = useState('posts');
   const cardStyles = useCardStyles();
   const { 
@@ -94,6 +96,7 @@ const ProfileContent = () => {
               onSaveChanges={handleSaveChanges}
               isOwnProfile={isOwnProfile}
               profileUserId={profileData?.id}
+              otherUserProfile={!isOwnProfile ? profileData : undefined}
             />
           </div>
           
