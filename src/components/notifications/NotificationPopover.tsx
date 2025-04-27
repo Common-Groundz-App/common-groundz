@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -81,10 +82,11 @@ export function NotificationPopover({ trigger, align = "end" }: NotificationPopo
       <PopoverContent 
         className="w-80 max-h-[480px] overflow-y-auto p-0 backdrop-blur-lg bg-background/95 border border-border/50 shadow-lg"
         align={align}
+        aria-label="Notifications popover"
       >
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50">
           <div className="flex items-center justify-between p-4">
-            <h4 className="text-sm font-semibold">Notifications</h4>
+            <h4 className="text-sm font-semibold" id="notifications-title">Notifications</h4>
             {notifications.length > 0 && unreadNotifications.length > 0 && (
               <Button 
                 variant="ghost" 

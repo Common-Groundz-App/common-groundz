@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { Check, Loader2 } from 'lucide-react';
@@ -76,26 +77,27 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-[400px] p-0">
         <div className="flex h-full flex-col">
-          <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50">
-            <div className="flex items-center justify-between p-4">
-              <h4 className="text-sm font-semibold">Notifications</h4>
-              {notifications.length > 0 && unreadNotifications.length > 0 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 text-xs"
-                  onClick={handleMarkAllAsRead}
-                  disabled={markingAsRead}
-                >
-                  {markingAsRead ? (
-                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  ) : null}
-                  Mark all as read
-                </Button>
-              )}
-            </div>
+          <SheetHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50 p-4">
+            <SheetTitle className="text-sm font-semibold">Notifications</SheetTitle>
+            <SheetDescription className="sr-only">View and manage your notifications</SheetDescription>
+            {notifications.length > 0 && unreadNotifications.length > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 text-xs absolute top-4 right-8"
+                onClick={handleMarkAllAsRead}
+                disabled={markingAsRead}
+              >
+                {markingAsRead ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : null}
+                Mark all as read
+              </Button>
+            )}
+          </SheetHeader>
 
-            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full px-4 pb-2">
+          <div className="px-4 pb-2">
+            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="w-full">
                 <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
                 <TabsTrigger value="unread" className="flex-1">
@@ -121,10 +123,6 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
                 />
               </TabsContent>
             </Tabs>
-          </div>
-
-          <div className="flex-1 overflow-auto">
-            {/* TabsContent moved inside the Tabs component above */}
           </div>
         </div>
       </SheetContent>
