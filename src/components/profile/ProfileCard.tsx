@@ -41,6 +41,7 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
     tempProfileImage,
     setTempProfileImage,
     localHasChanges,
+    setLocalHasChanges,
     handleProfileUpdate
   } = useProfileCardState({
     username: username || '',

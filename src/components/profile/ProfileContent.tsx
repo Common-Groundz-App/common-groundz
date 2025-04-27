@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
@@ -23,7 +24,9 @@ const ProfileContent = () => {
     handleProfileImageChange,
     handleCoverImageChange,
     handleCoverImageUpdated,
-    handleSaveChanges
+    handleSaveChanges,
+    isOwnProfile,
+    profileData
   } = useProfileData(userId);
 
   useEffect(() => {
@@ -40,7 +43,7 @@ const ProfileContent = () => {
     );
   }
 
-  if (error || !profileData) {
+  if (error) {
     return (
       <div className="container mx-auto py-12 px-4 text-center">
         <h2 className="text-xl font-bold text-red-500 mb-2">Error Loading Profile</h2>
@@ -83,28 +86,28 @@ const ProfileContent = () => {
               >
                 <TabsContent value="posts">
                   <ProfilePosts 
-                    profileUserId={profileData?.id} 
+                    profileUserId={userId} 
                     isOwnProfile={isOwnProfile} 
                   />
                 </TabsContent>
                 
                 <TabsContent value="recommendations">
                   <ProfileRecommendations 
-                    profileUserId={profileData?.id}
+                    profileUserId={userId}
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
                 
                 <TabsContent value="reviews">
                   <ProfileReviews 
-                    profileUserId={profileData?.id} 
+                    profileUserId={userId} 
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
                 
                 <TabsContent value="circles">
                   <ProfileCircles 
-                    profileUserId={profileData?.id} 
+                    profileUserId={userId} 
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
