@@ -68,31 +68,45 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
           return;
         }
         
-        // Get recommendation counts
+        // Get recommendation counts - direct query instead of using non-existent RPC
         const userIds = data.map(user => user.id);
+        let recommendationCountsMap = new Map();
+        let followerCountsMap = new Map();
+        let followingData: any[] = [];
         
-        // Get recommendation counts using count()
-        const { data: recommendationCounts, error: recError } = await supabase
+        // Get recommendation counts
+        const { data: recommendationData, error: recError } = await supabase
           .from('recommendations')
-          .select('user_id, count', { count: 'exact' })
+          .select('user_id, id')
           .in('user_id', userIds);
           
         if (recError) {
-          console.error('Error fetching recommendation counts:', recError);
+          console.error('Error fetching recommendations:', recError);
+        } else if (recommendationData) {
+          // Count recommendations by user
+          recommendationData.forEach(item => {
+            const count = recommendationCountsMap.get(item.user_id) || 0;
+            recommendationCountsMap.set(item.user_id, count + 1);
+          });
         }
         
-        // Get follower counts using count()
-        const { data: followerCounts, error: followError } = await supabase
+        // Get follower counts directly - don't use the RPC that's causing issues
+        const { data: followerData, error: followerError } = await supabase
           .from('follows')
-          .select('following_id, count', { count: 'exact' })
+          .select('following_id')
           .in('following_id', userIds);
           
-        if (followError) {
-          console.error('Error fetching follower counts:', followError);
+        if (followerError) {
+          console.error('Error fetching followers:', followerError);
+        } else if (followerData) {
+          // Count followers by user
+          followerData.forEach(item => {
+            const count = followerCountsMap.get(item.following_id) || 0;
+            followerCountsMap.set(item.following_id, count + 1);
+          });
         }
         
         // Check who current user is following
-        let followingData: any[] = [];
         if (currentUser) {
           const { data: following, error: followingError } = await supabase
             .from('follows')
@@ -107,22 +121,10 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
           }
         }
         
-        // Process recommendations data
-        const recCountMap = new Map();
-        recommendationCounts?.forEach((item: any) => {
-          recCountMap.set(item.user_id, parseInt(item.count) || 0);
-        });
-        
-        // Process followers data
-        const followerCountMap = new Map();
-        followerCounts?.forEach((item: any) => {
-          followerCountMap.set(item.following_id, parseInt(item.count) || 0);
-        });
-        
         // Combine all data
         const enhancedUsers = data.map(user => {
-          const recCount = recCountMap.get(user.id) || 0;
-          const followers = followerCountMap.get(user.id) || 0;
+          const recCount = recommendationCountsMap.get(user.id) || 0;
+          const followers = followerCountsMap.get(user.id) || 0;
           const isFollowing = followingData.some(f => f.following_id === user.id);
           
           return {
@@ -162,9 +164,9 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
     if (!currentUser) return;
     
     try {
-      // Call the useFollow hook's handleFollowToggle method
-      const { handleFollowToggle } = useFollow(userId);
-      await handleFollowToggle();
+      // Use the useFollow hook
+      const followHook = useFollow(userId);
+      await followHook.handleFollowToggle();
       
       // Update local state
       setUsers(prev => 

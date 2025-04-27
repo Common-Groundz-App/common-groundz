@@ -40,7 +40,8 @@ export const getRecommendationLikeCounts = async (recommendationIds: string[]): 
   try {
     const { data: likesData, error } = await supabase
       .from('recommendation_likes')
-      .select('recommendation_id');
+      .select('recommendation_id')
+      .in('recommendation_id', recommendationIds);
     
     if (error) throw error;
     
@@ -71,7 +72,8 @@ export const getUserRecommendationLikes = async (recommendationIds: string[], us
     const { data: userLikesData, error } = await supabase
       .from('recommendation_likes')
       .select('recommendation_id')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .in('recommendation_id', recommendationIds);
     
     if (error) throw error;
     
@@ -98,7 +100,8 @@ export const getUserRecommendationSaves = async (recommendationIds: string[], us
     const { data: userSavesData, error } = await supabase
       .from('recommendation_saves')
       .select('recommendation_id')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .in('recommendation_id', recommendationIds);
     
     if (error) throw error;
     
