@@ -7,7 +7,23 @@ export const useProfileFollows = (userId?: string) => {
   const [followingCount, setFollowingCount] = useState<number>(0);
 
   useEffect(() => {
-    const handleFollowStatusChange = async (event: CustomEvent) => {
+    const fetchCounts = async () => {
+      if (userId) {
+        try {
+          const followerData = await fetchFollowerCount(userId);
+          const followingData = await fetchFollowingCount(userId);
+          
+          setFollowerCount(followerData);
+          setFollowingCount(followingData);
+        } catch (error) {
+          console.error('Error fetching follow counts:', error);
+        }
+      }
+    };
+    
+    fetchCounts();
+
+    const handleFollowStatusChange = (event: CustomEvent) => {
       if (!userId) return;
       
       const { follower, following, action } = event.detail;
@@ -20,8 +36,7 @@ export const useProfileFollows = (userId?: string) => {
       }
       
       if (userId === follower) {
-        const followingData = await fetchFollowingCount(userId);
-        setFollowingCount(followingData);
+        fetchFollowingCount(userId).then(count => setFollowingCount(count));
       }
     };
 
