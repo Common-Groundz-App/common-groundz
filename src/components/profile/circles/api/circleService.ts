@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { UserProfile } from '../types';
 
 /**
- * Fetch followers for a profile user
+ * Fetch followers for a profile user - returns ALL followers
  */
 export const fetchFollowers = async (profileUserId: string, currentUserId?: string) => {
   try {
@@ -29,7 +29,7 @@ export const fetchFollowers = async (profileUserId: string, currentUserId?: stri
       if (profilesError) throw profilesError;
       
       if (profilesData) {
-        // If the current user is viewing the profile, check which users they follow
+        // If the current user is logged in, check which users they follow
         let userFollowingIds: string[] = [];
         if (currentUserId) {
           const { data: userFollowing, error: userFollowingError } = await supabase
@@ -42,7 +42,7 @@ export const fetchFollowers = async (profileUserId: string, currentUserId?: stri
           }
         }
         
-        // Process the profiles
+        // Process the profiles - include all followers regardless of mutual follow status
         profilesData.forEach(profile => {
           followerProfiles.push({
             id: profile.id,
@@ -62,7 +62,7 @@ export const fetchFollowers = async (profileUserId: string, currentUserId?: stri
 };
 
 /**
- * Fetch following for a profile user
+ * Fetch following for a profile user - returns ALL users they follow
  */
 export const fetchFollowing = async (profileUserId: string, currentUserId?: string) => {
   try {
@@ -88,7 +88,7 @@ export const fetchFollowing = async (profileUserId: string, currentUserId?: stri
       if (profilesError) throw profilesError;
       
       if (profilesData) {
-        // If the current user is viewing the profile, check which users they follow
+        // If the current user is logged in, check which users they follow
         let userFollowingIds: string[] = [];
         if (currentUserId) {
           const { data: userFollowing, error: userFollowingError } = await supabase
@@ -101,7 +101,7 @@ export const fetchFollowing = async (profileUserId: string, currentUserId?: stri
           }
         }
         
-        // Process the profiles
+        // Process the profiles - include all users regardless of mutual follow status
         profilesData.forEach(profile => {
           followingProfiles.push({
             id: profile.id,

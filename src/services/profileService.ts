@@ -21,7 +21,7 @@ export const fetchUserProfile = async (userId: string) => {
 };
 
 /**
- * Fetches a user's following count
+ * Fetches a user's following count (how many users they follow)
  */
 export const fetchFollowingCount = async (userId: string) => {
   try {
@@ -43,7 +43,8 @@ export const fetchFollowingCount = async (userId: string) => {
 };
 
 /**
- * Fetches a user's followers count
+ * Fetches a user's followers count (how many users follow them)
+ * This returns the total number of followers without any filtering
  */
 export const fetchFollowerCount = async (userId: string) => {
   try {

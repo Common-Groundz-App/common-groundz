@@ -25,6 +25,8 @@ export const useCircleData = (profileUserId: string, currentUserId?: string) => 
           fetchFollowing(profileUserId, currentUserId)
         ]);
         
+        console.log(`[useCircleData] Fetched ${followerProfiles.length} followers and ${followingProfiles.length} following for ${profileUserId}`);
+        
         setFollowers(followerProfiles);
         setFollowing(followingProfiles);
       } catch (error) {
@@ -60,7 +62,39 @@ export const useCircleData = (profileUserId: string, currentUserId?: string) => 
 
   // Wrapper for follow toggle functionality
   const handleFollowToggle = async (targetUserId: string, currentlyFollowing: boolean) => {
+    // Update local state immediately for better UX
+    if (currentlyFollowing) {
+      updateFollowers(targetUserId, false);
+      updateFollowing(targetUserId, false);
+    } else {
+      updateFollowers(targetUserId, true);
+      updateFollowing(targetUserId, true);
+    }
+    
+    // Perform the actual follow/unfollow action
     await toggleFollow(targetUserId, currentlyFollowing, updateFollowers, updateFollowing);
+    
+    // Dispatch event to update follower/following counts in profile view
+    const isActionFollow = !currentlyFollowing;
+    const isActionUnfollow = currentlyFollowing;
+    
+    if (currentUserId === profileUserId) {
+      // If user is on their own profile and follows/unfollows someone
+      window.dispatchEvent(new CustomEvent('profile-following-count-changed', { 
+        detail: { 
+          countChange: isActionFollow ? 1 : -1
+        } 
+      }));
+    }
+    
+    if (targetUserId === profileUserId) {
+      // If the user follows/unfollows the profile they're viewing
+      window.dispatchEvent(new CustomEvent('profile-follower-count-changed', { 
+        detail: { 
+          countChange: isActionFollow ? 1 : -1
+        } 
+      }));
+    }
   };
 
   return {

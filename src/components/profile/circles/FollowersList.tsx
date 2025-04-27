@@ -4,7 +4,6 @@ import UserCard from './UserCard';
 import UserCardSkeleton from './UserCardSkeleton';
 import EmptyState from './EmptyState';
 import { UserProfile } from './types';
-import { Separator } from '@/components/ui/separator';
 
 interface FollowersListProps {
   followers: UserProfile[];
@@ -49,11 +48,11 @@ const FollowersList = ({
             avatarUrl={follower.avatar_url}
             isFollowing={follower.isFollowing}
             relationshipType="follower"
-            onFollowToggle={onFollowToggle}
+            onFollowToggle={() => onFollowToggle(follower.id, follower.isFollowing)}
             isLoading={actionLoading === follower.id}
             isOwnProfile={isOwnProfile}
             currentUserId={currentUserId}
-            onNavigate={onNavigate}
+            onNavigate={onNavigate ? () => onNavigate(follower.id) : undefined}
           />
         </div>
       ))}

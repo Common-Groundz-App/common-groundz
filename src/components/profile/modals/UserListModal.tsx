@@ -10,7 +10,6 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { fetchFollowers, fetchFollowing } from '@/components/profile/circles/api/circleService';
 import { useFollowActions } from '@/components/profile/circles/hooks/useFollowActions';
 import { UserProfile } from '@/components/profile/circles/types';
@@ -50,6 +49,7 @@ const UserListModal = ({
           ? await fetchFollowers(profileUserId, user?.id)
           : await fetchFollowing(profileUserId, user?.id);
         
+        console.log(`Fetched ${userData.length} ${listType} for user ${profileUserId}`);
         setUsers(userData);
       } catch (error) {
         console.error(`Error fetching ${listType}:`, error);
@@ -65,6 +65,16 @@ const UserListModal = ({
     const isActionFollow = !isFollowing;
     const isActionUnfollow = isFollowing;
     
+    // First update the local UI state
+    setUsers(prev => 
+      prev.map(user => 
+        user.id === userId 
+          ? {...user, isFollowing: !isFollowing} 
+          : user
+      )
+    );
+    
+    // Then perform the actual follow/unfollow action
     const wasSuccessful = await toggleFollow(userId, isFollowing, 
       // Update followers state
       (targetUserId, newFollowStatus) => {
@@ -112,17 +122,15 @@ const UserListModal = ({
         }));
       }
       
-      // If another user's profile, update the following count
-      if (!isOwnProfile && user?.id !== profileUserId) {
-        // Only update if the user is following/unfollowing the profile owner
-        if (userId === profileUserId) {
-          window.dispatchEvent(new CustomEvent('profile-follower-count-changed', { 
-            detail: { 
-              countChange: isActionFollow ? 1 : -1,
-              immediate: true
-            } 
-          }));
-        }
+      // If the user follows/unfollows a profile's owner
+      if (userId === profileUserId) {
+        // Update follower count when the viewed profile is followed/unfollowed
+        window.dispatchEvent(new CustomEvent('profile-follower-count-changed', { 
+          detail: { 
+            countChange: isActionFollow ? 1 : -1,
+            immediate: true
+          } 
+        }));
       }
     }
   };
@@ -167,7 +175,7 @@ const UserListModal = ({
                     avatarUrl={userProfile.avatar_url}
                     isFollowing={userProfile.isFollowing}
                     relationshipType={listType === 'followers' ? 'follower' : 'following'}
-                    onFollowToggle={handleFollowToggle}
+                    onFollowToggle={() => handleFollowToggle(userProfile.id, userProfile.isFollowing)}
                     isLoading={actionLoading === userProfile.id}
                     isOwnProfile={isOwnProfile}
                     currentUserId={user?.id}
