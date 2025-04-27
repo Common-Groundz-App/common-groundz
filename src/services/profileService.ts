@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 
@@ -5,18 +6,23 @@ import { User } from '@supabase/supabase-js';
  * Fetches a user's profile data from Supabase
  */
 export const fetchUserProfile = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+      
+    if (error) {
+      console.error('Error fetching profile:', error);
+      throw error;
+    }
     
-  if (error) {
-    console.error('Error fetching profile:', error);
+    return data;
+  } catch (error) {
+    console.error('Error in fetchUserProfile:', error);
     throw error;
   }
-  
-  return data;
 };
 
 /**
@@ -31,7 +37,7 @@ export const fetchFollowingCount = async (userId: string) => {
       
     if (error) {
       console.error('Error fetching following count:', error);
-      throw error;
+      return 0;
     }
     
     return data || 0;
@@ -53,7 +59,7 @@ export const fetchFollowerCount = async (userId: string) => {
       
     if (error) {
       console.error('Error fetching follower count:', error);
-      throw error;
+      return 0;
     }
     
     return data || 0;

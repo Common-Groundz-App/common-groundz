@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile } from '../types';
 
@@ -14,7 +15,7 @@ export const fetchFollowers = async (profileUserId: string, currentUserId?: stri
     
     if (followersError) {
       console.error('Error fetching followers:', followersError);
-      throw followersError;
+      return [];
     }
     
     return followersData || [];
@@ -37,7 +38,7 @@ export const fetchFollowing = async (profileUserId: string, currentUserId?: stri
     
     if (followingError) {
       console.error('Error fetching following:', followingError);
-      throw followingError;
+      return [];
     }
     
     return followingData || [];
@@ -55,26 +56,31 @@ export const toggleFollowStatus = async (
   targetUserId: string, 
   currentlyFollowing: boolean
 ) => {
-  if (currentlyFollowing) {
-    // Unfollow
-    const { error } = await supabase
-      .from('follows')
-      .delete()
-      .eq('follower_id', currentUserId)
-      .eq('following_id', targetUserId);
-    
-    if (error) throw error;
-    return false; // Not following anymore
-  } else {
-    // Follow
-    const { error } = await supabase
-      .from('follows')
-      .insert({
-        follower_id: currentUserId,
-        following_id: targetUserId
-      });
-    
-    if (error) throw error;
-    return true; // Now following
+  try {
+    if (currentlyFollowing) {
+      // Unfollow
+      const { error } = await supabase
+        .from('follows')
+        .delete()
+        .eq('follower_id', currentUserId)
+        .eq('following_id', targetUserId);
+      
+      if (error) throw error;
+      return false; // Not following anymore
+    } else {
+      // Follow
+      const { error } = await supabase
+        .from('follows')
+        .insert({
+          follower_id: currentUserId,
+          following_id: targetUserId
+        });
+      
+      if (error) throw error;
+      return true; // Now following
+    }
+  } catch (error) {
+    console.error('Error in toggleFollowStatus:', error);
+    throw error;
   }
 };
