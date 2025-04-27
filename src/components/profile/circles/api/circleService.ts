@@ -1,122 +1,49 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile } from '../types';
 
 /**
- * Fetch followers for a profile user - returns ALL followers
+ * Fetch followers for a profile user using RPC
  */
-export const fetchFollowers = async (profileUserId: string, currentUserId?: string) => {
+export const fetchFollowers = async (profileUserId: string, currentUserId?: string): Promise<UserProfile[]> => {
   try {
-    // Fetch followers (people who follow the profile user)
     const { data: followersData, error: followersError } = await supabase
-      .from('follows')
-      .select('follower_id')
-      .eq('following_id', profileUserId);
+      .rpc('get_followers_with_profiles', {
+        profile_user_id: profileUserId,
+        current_user_id: currentUserId || null
+      });
     
-    if (followersError) throw followersError;
-    
-    // Fetch the profile data for each follower
-    const followerProfiles: UserProfile[] = [];
-    
-    if (followersData && followersData.length > 0) {
-      const followerIds = followersData.map(item => item.follower_id);
-      
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .in('id', followerIds);
-      
-      if (profilesError) throw profilesError;
-      
-      if (profilesData) {
-        // If the current user is logged in, check which users they follow
-        let userFollowingIds: string[] = [];
-        if (currentUserId) {
-          const { data: userFollowing, error: userFollowingError } = await supabase
-            .from('follows')
-            .select('following_id')
-            .eq('follower_id', currentUserId);
-          
-          if (!userFollowingError && userFollowing) {
-            userFollowingIds = userFollowing.map(f => f.following_id);
-          }
-        }
-        
-        // Process the profiles - include all followers regardless of mutual follow status
-        profilesData.forEach(profile => {
-          followerProfiles.push({
-            id: profile.id,
-            username: profile.username,
-            avatar_url: profile.avatar_url,
-            isFollowing: userFollowingIds.includes(profile.id)
-          });
-        });
-      }
+    if (followersError) {
+      console.error('Error fetching followers:', followersError);
+      throw followersError;
     }
     
-    return followerProfiles;
+    return followersData || [];
   } catch (error) {
-    console.error('Error fetching followers:', error);
-    throw error;
+    console.error('Error in fetchFollowers:', error);
+    return [];
   }
 };
 
 /**
- * Fetch following for a profile user - returns ALL users they follow
+ * Fetch following for a profile user using RPC
  */
-export const fetchFollowing = async (profileUserId: string, currentUserId?: string) => {
+export const fetchFollowing = async (profileUserId: string, currentUserId?: string): Promise<UserProfile[]> => {
   try {
-    // Fetch following (people the profile user follows)
     const { data: followingData, error: followingError } = await supabase
-      .from('follows')
-      .select('following_id')
-      .eq('follower_id', profileUserId);
+      .rpc('get_following_with_profiles', {
+        profile_user_id: profileUserId,
+        current_user_id: currentUserId || null
+      });
     
-    if (followingError) throw followingError;
-    
-    // Fetch the profile data for each following
-    const followingProfiles: UserProfile[] = [];
-    
-    if (followingData && followingData.length > 0) {
-      const followingIds = followingData.map(item => item.following_id);
-      
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .in('id', followingIds);
-      
-      if (profilesError) throw profilesError;
-      
-      if (profilesData) {
-        // If the current user is logged in, check which users they follow
-        let userFollowingIds: string[] = [];
-        if (currentUserId) {
-          const { data: userFollowing, error: userFollowingError } = await supabase
-            .from('follows')
-            .select('following_id')
-            .eq('follower_id', currentUserId);
-          
-          if (!userFollowingError && userFollowing) {
-            userFollowingIds = userFollowing.map(f => f.following_id);
-          }
-        }
-        
-        // Process the profiles - include all users regardless of mutual follow status
-        profilesData.forEach(profile => {
-          followingProfiles.push({
-            id: profile.id,
-            username: profile.username,
-            avatar_url: profile.avatar_url,
-            isFollowing: userFollowingIds.includes(profile.id)
-          });
-        });
-      }
+    if (followingError) {
+      console.error('Error fetching following:', followingError);
+      throw followingError;
     }
     
-    return followingProfiles;
+    return followingData || [];
   } catch (error) {
-    console.error('Error fetching following:', error);
-    throw error;
+    console.error('Error in fetchFollowing:', error);
+    return [];
   }
 };
 

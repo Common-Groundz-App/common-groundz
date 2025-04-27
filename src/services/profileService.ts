@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 
@@ -21,21 +20,21 @@ export const fetchUserProfile = async (userId: string) => {
 };
 
 /**
- * Fetches a user's following count (how many users they follow)
+ * Fetches a user's following count using RPC
  */
 export const fetchFollowingCount = async (userId: string) => {
   try {
-    const { count, error } = await supabase
-      .from('follows')
-      .select('*', { count: 'exact', head: true })
-      .eq('follower_id', userId);
+    const { data, error } = await supabase
+      .rpc('get_following_count_by_user_id', {
+        user_id: userId
+      });
       
     if (error) {
       console.error('Error fetching following count:', error);
       throw error;
     }
     
-    return count || 0;
+    return data || 0;
   } catch (error) {
     console.error('Error in fetchFollowingCount:', error);
     return 0;
@@ -43,22 +42,21 @@ export const fetchFollowingCount = async (userId: string) => {
 };
 
 /**
- * Fetches a user's followers count (how many users follow them)
- * This returns the total number of followers without any filtering
+ * Fetches a user's followers count using RPC
  */
 export const fetchFollowerCount = async (userId: string) => {
   try {
-    const { count, error } = await supabase
-      .from('follows')
-      .select('*', { count: 'exact', head: true })
-      .eq('following_id', userId);
+    const { data, error } = await supabase
+      .rpc('get_follower_count_by_user_id', {
+        user_id: userId
+      });
       
     if (error) {
       console.error('Error fetching follower count:', error);
       throw error;
     }
     
-    return count || 0;
+    return data || 0;
   } catch (error) {
     console.error('Error in fetchFollowerCount:', error);
     return 0;

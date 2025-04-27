@@ -750,6 +750,32 @@ export type Database = {
           avatar_url: string
         }[]
       }
+      get_follower_count_by_user_id: {
+        Args: { user_id: string }
+        Returns: number
+      }
+      get_followers_with_profiles: {
+        Args: { profile_user_id: string; current_user_id: string }
+        Returns: {
+          id: string
+          username: string
+          avatar_url: string
+          is_following: boolean
+        }[]
+      }
+      get_following_count_by_user_id: {
+        Args: { user_id: string }
+        Returns: number
+      }
+      get_following_with_profiles: {
+        Args: { profile_user_id: string; current_user_id: string }
+        Returns: {
+          id: string
+          username: string
+          avatar_url: string
+          is_following: boolean
+        }[]
+      }
       get_post_likes_by_posts: {
         Args: { p_post_ids: string[] }
         Returns: {

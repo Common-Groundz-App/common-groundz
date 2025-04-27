@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,8 +36,7 @@ export const useViewedProfile = (profileUserId?: string) => {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        // If no profileUserId is provided, use the current user's ID
-        const viewingUserId = profileUserId || (user?.id || '');
+        const viewingUserId = profileUserId || user?.id;
         const isOwnProfile = !profileUserId || (user && profileUserId === user.id);
         
         if (!viewingUserId) {
@@ -51,7 +49,6 @@ export const useViewedProfile = (profileUserId?: string) => {
           return;
         }
 
-        // Fetch profile data
         const { data: profileData, error } = await supabase
           .from('profiles')
           .select('*')
@@ -60,7 +57,6 @@ export const useViewedProfile = (profileUserId?: string) => {
 
         if (error) throw error;
 
-        // Fetch follower and following counts in parallel
         const [followerCountData, followingCountData] = await Promise.all([
           fetchFollowerCount(viewingUserId),
           fetchFollowingCount(viewingUserId)
@@ -68,9 +64,7 @@ export const useViewedProfile = (profileUserId?: string) => {
         
         console.log(`Fetched counts for ${viewingUserId}: followers=${followerCountData}, following=${followingCountData}`);
 
-        // If viewing own profile, use auth metadata for name
         let displayName = profileData?.username || 'User';
-
         if (isOwnProfile && user?.user_metadata) {
           const { first_name, last_name } = user.user_metadata;
           if (first_name || last_name) {
@@ -114,7 +108,6 @@ export const useViewedProfile = (profileUserId?: string) => {
     }
   }, [profileUserId, user]);
 
-  // Listen for follow status changes
   useEffect(() => {
     const handleFollowStatusChange = async (event: CustomEvent) => {
       if (!profileUserId) return;
@@ -122,7 +115,6 @@ export const useViewedProfile = (profileUserId?: string) => {
       const { follower, following, action } = event.detail;
       
       if (profileUserId === following) {
-        // When someone follows/unfollows the viewed profile
         const updatedCount = action === 'follow' 
           ? profile.followerCount + 1 
           : Math.max(0, profile.followerCount - 1);
@@ -136,7 +128,6 @@ export const useViewedProfile = (profileUserId?: string) => {
       }
       
       if (profileUserId === follower) {
-        // When the viewed profile follows/unfollows someone
         const followingCount = await fetchFollowingCount(profileUserId);
         
         console.log(`Profile following someone: updating following count to ${followingCount}`);
@@ -148,7 +139,6 @@ export const useViewedProfile = (profileUserId?: string) => {
       }
     };
 
-    // Handle explicit follower count changes (for the modal actions)
     const handleFollowerCountChanged = (event: CustomEvent) => {
       if (event.detail && typeof event.detail.count === 'number') {
         console.log(`Follower count explicitly updated to: ${event.detail.count}`);
