@@ -43,21 +43,21 @@ export const useViewedProfile = (profileUserId?: string) => {
 
   useEffect(() => {
     const fetchProfileData = async () => {
-      // If no profileUserId is provided, use the current user's ID
-      const viewingUserId = profileUserId || (user?.id || '');
-      const isOwnProfile = !profileUserId || (user && profileUserId === user.id);
-      
-      if (!viewingUserId) {
-        setProfile(prev => ({
-          ...prev,
-          isLoading: false,
-          error: new Error('User ID is missing'),
-          isOwnProfile: false
-        }));
-        return;
-      }
-
       try {
+        // If no profileUserId is provided, use the current user's ID
+        const viewingUserId = profileUserId || (user?.id || '');
+        const isOwnProfile = !profileUserId || (user && profileUserId === user.id);
+        
+        if (!viewingUserId) {
+          setProfile(prev => ({
+            ...prev,
+            isLoading: false,
+            error: new Error('User ID is missing'),
+            isOwnProfile: false
+          }));
+          return;
+        }
+
         const { data: profileData, error } = await supabase
           .from('profiles')
           .select('*')
@@ -95,13 +95,21 @@ export const useViewedProfile = (profileUserId?: string) => {
           ...prev,
           isLoading: false,
           error: error as Error,
-          isOwnProfile
+          isOwnProfile: !profileUserId || (user && profileUserId === user?.id) || false
         }));
       }
     };
 
-    setProfile(prev => ({ ...prev, isLoading: true }));
-    fetchProfileData();
+    if (user) {
+      setProfile(prev => ({ ...prev, isLoading: true }));
+      fetchProfileData();
+    } else {
+      setProfile(prev => ({ 
+        ...prev, 
+        isLoading: false,
+        error: new Error('User not authenticated')
+      }));
+    }
   }, [profileUserId, user, followerCount, followingCount]);
 
   return {
