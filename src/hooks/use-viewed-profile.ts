@@ -15,6 +15,7 @@ interface ViewedProfile {
   followingCount: number;
   isLoading: boolean;
   error: Error | null;
+  isOwnProfile: boolean;
 }
 
 export const useViewedProfile = (profileUserId?: string) => {
@@ -29,7 +30,8 @@ export const useViewedProfile = (profileUserId?: string) => {
     followerCount: 0,
     followingCount: 0,
     isLoading: true,
-    error: null
+    error: null,
+    isOwnProfile: false
   });
 
   const {
@@ -41,19 +43,29 @@ export const useViewedProfile = (profileUserId?: string) => {
 
   useEffect(() => {
     const fetchProfileData = async () => {
-      if (!profileUserId) return;
+      // If no profileUserId is provided, use the current user's ID
+      const viewingUserId = profileUserId || (user?.id || '');
+      const isOwnProfile = !profileUserId || (user && profileUserId === user.id);
+      
+      if (!viewingUserId) {
+        setProfile(prev => ({
+          ...prev,
+          isLoading: false,
+          error: new Error('User ID is missing')
+        }));
+        return;
+      }
 
       try {
         const { data: profileData, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', profileUserId)
+          .eq('id', viewingUserId)
           .single();
 
         if (error) throw error;
 
         // If viewing own profile, use auth metadata for name
-        const isOwnProfile = user?.id === profileUserId;
         let displayName = profileData?.username || 'User';
 
         if (isOwnProfile && user?.user_metadata) {
@@ -73,9 +85,11 @@ export const useViewedProfile = (profileUserId?: string) => {
           followerCount,
           followingCount,
           isLoading: false,
-          error: null
+          error: null,
+          isOwnProfile
         });
       } catch (error) {
+        console.error('Error fetching profile:', error);
         setProfile(prev => ({
           ...prev,
           isLoading: false,
@@ -89,7 +103,6 @@ export const useViewedProfile = (profileUserId?: string) => {
   }, [profileUserId, user, followerCount, followingCount]);
 
   return {
-    ...profile,
-    isOwnProfile: user?.id === profileUserId
+    ...profile
   };
 };

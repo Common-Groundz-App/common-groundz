@@ -25,8 +25,7 @@ const ProfileContent = () => {
     handleCoverImageChange,
     handleCoverImageUpdated,
     handleSaveChanges,
-    isOwnProfile,
-    profileData
+    isOwnProfile
   } = useProfileData(userId);
 
   useEffect(() => {
