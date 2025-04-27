@@ -63,7 +63,7 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
   if (error) {
     return (
       <Card className="p-6 text-center">
-        <p className="text-red-500">Error loading profile</p>
+        <p className="text-red-500">Error loading profile: {error.message}</p>
       </Card>
     );
   }

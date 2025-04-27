@@ -51,7 +51,8 @@ export const useViewedProfile = (profileUserId?: string) => {
         setProfile(prev => ({
           ...prev,
           isLoading: false,
-          error: new Error('User ID is missing')
+          error: new Error('User ID is missing'),
+          isOwnProfile: false
         }));
         return;
       }
@@ -93,7 +94,8 @@ export const useViewedProfile = (profileUserId?: string) => {
         setProfile(prev => ({
           ...prev,
           isLoading: false,
-          error: error as Error
+          error: error as Error,
+          isOwnProfile
         }));
       }
     };
