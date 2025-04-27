@@ -21,6 +21,7 @@ import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import RecommendationForm from './RecommendationForm';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
@@ -212,7 +213,7 @@ const RecommendationCard = ({
             </div>
           )}
           <div className="h-48 relative overflow-hidden group">
-            <img 
+            <ImageWithFallback 
               src={recommendation.image_url || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07'} 
               alt={recommendation.title} 
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 

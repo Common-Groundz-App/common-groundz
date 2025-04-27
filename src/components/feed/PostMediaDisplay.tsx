@@ -2,12 +2,13 @@
 import React from 'react';
 import { MediaItem } from '@/types/media';
 import { MediaGallery } from '@/components/media/MediaGallery';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { 
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious
+  CarouselPrevious,
 } from '@/components/ui/carousel';
 
 interface PostMediaDisplayProps {
@@ -36,7 +37,7 @@ export function PostMediaDisplay({
               <CarouselItem key={item.id || index}>
                 <div className="p-1">
                   {item.type === 'image' ? (
-                    <img 
+                    <ImageWithFallback 
                       src={item.url} 
                       alt={item.alt || item.caption || `Media ${index + 1}`}
                       className="w-full h-64 object-contain"
@@ -75,3 +76,4 @@ export function PostMediaDisplay({
     />
   );
 }
+
