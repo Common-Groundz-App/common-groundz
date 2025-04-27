@@ -1,76 +1,54 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
 import ProfileEditForm from './ProfileEditForm';
 import ProfileAvatar from './ProfileAvatar';
 import ProfileActions from './ProfileActions';
 import ProfileInfo from './ProfileInfo';
 import ProfileUserInfo from './ProfileUserInfo';
 import ProfileBadges from './ProfileBadges';
+import { useViewedProfile } from '@/hooks/use-viewed-profile';
 import { useProfileCardState } from './hooks/useProfileCardState';
 import { useProfileSaveHandler } from './ProfileSaveHandler';
-import { getFormattedDisplayName } from './ProfileDisplayHelper';
 
 interface ProfileCardProps {
-  username: string;
-  bio: string;
-  location: string;
-  memberSince: string;
-  followingCount: number;
-  followerCount?: number;
-  profileImage: string;
-  isLoading: boolean;
-  onProfileImageChange?: (url: string) => void;
-  hasChanges: boolean;
-  onSaveChanges?: () => void;
-  isOwnProfile: boolean;
   profileUserId?: string;
-  otherUserProfile?: any;
 }
 
-const ProfileCard = (props: ProfileCardProps) => {
-  const { 
-    username, 
-    bio, 
-    location, 
-    memberSince, 
-    followingCount,
-    followerCount = 0, 
-    profileImage,
-    isLoading,
-    onProfileImageChange,
-    hasChanges,
-    onSaveChanges,
-    isOwnProfile,
-    profileUserId,
-    otherUserProfile
-  } = props;
-
+const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
   const { user } = useAuth();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  
+  const {
+    username,
+    bio,
+    location,
+    avatarUrl,
+    createdAt,
+    displayName,
+    followerCount,
+    followingCount,
+    isLoading,
+    error,
+    isOwnProfile
+  } = useViewedProfile(profileUserId);
 
   const {
     currentUsername,
     currentBio,
     currentLocation,
-    databaseUsername,
-    setDatabaseUsername,
     tempProfileImage,
     setTempProfileImage,
     localHasChanges,
-    setLocalHasChanges,
     handleProfileUpdate
   } = useProfileCardState({
-    username,
-    bio,
-    location,
-    firstName,
-    lastName,
-    profileImage
+    username: username || '',
+    bio: bio || '',
+    location: location || '',
+    firstName: user?.user_metadata?.first_name || '',
+    lastName: user?.user_metadata?.last_name || '',
+    profileImage: avatarUrl || ''
   });
 
   const { handleSaveChanges } = useProfileSaveHandler({
@@ -78,61 +56,23 @@ const ProfileCard = (props: ProfileCardProps) => {
     tempProfileImage,
     setTempProfileImage,
     setLocalHasChanges,
-    hasChanges,
-    onSaveChanges
+    hasChanges: localHasChanges,
   });
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!profileUserId) return;
+  if (error) {
+    return (
+      <Card className="p-6 text-center">
+        <p className="text-red-500">Error loading profile</p>
+      </Card>
+    );
+  }
 
-      try {
-        if (!isOwnProfile && otherUserProfile) {
-          setDatabaseUsername(otherUserProfile.username || '');
-          return;
-        }
+  const memberSince = new Date(createdAt).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long'
+  });
 
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', profileUserId)
-          .single();
-
-        if (error) {
-          console.error('Error fetching username:', error);
-          return;
-        }
-
-        if (data && data.username) {
-          setDatabaseUsername(data.username);
-        }
-        
-        if (user && isOwnProfile) {
-          const userMetadata = user.user_metadata;
-          setFirstName(userMetadata?.first_name || '');
-          setLastName(userMetadata?.last_name || '');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    };
-
-    fetchUserData();
-  }, [profileUserId, user, isOwnProfile, otherUserProfile]);
-
-  const formattedUsername = databaseUsername 
-    ? `@${databaseUsername}` 
-    : '';
-
-  const combinedHasChanges = hasChanges || localHasChanges;
-
-  const displayName = getFormattedDisplayName(
-    isOwnProfile, 
-    firstName, 
-    lastName, 
-    currentUsername, 
-    otherUserProfile
-  );
+  const formattedUsername = username ? `@${username}` : '';
 
   return (
     <>
@@ -140,9 +80,9 @@ const ProfileCard = (props: ProfileCardProps) => {
         <div className="p-6 flex flex-col items-center">
           <ProfileAvatar 
             username={displayName}
-            profileImage={profileImage}
+            profileImage={avatarUrl || ''}
             isLoading={isLoading}
-            onProfileImageChange={onProfileImageChange}
+            onProfileImageChange={isOwnProfile ? handleSaveChanges : undefined}
             onImageSelected={setTempProfileImage}
             isEditable={isOwnProfile}
           />
@@ -158,7 +98,7 @@ const ProfileCard = (props: ProfileCardProps) => {
           <ProfileBadges isOwnProfile={isOwnProfile} />
           
           <ProfileActions 
-            hasChanges={combinedHasChanges}
+            hasChanges={localHasChanges}
             isLoading={isLoading}
             uploading={false}
             onSaveChanges={handleSaveChanges}
@@ -181,11 +121,11 @@ const ProfileCard = (props: ProfileCardProps) => {
         <ProfileEditForm 
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          username={databaseUsername || currentUsername}
+          username={username || currentUsername}
           bio={currentBio}
           location={currentLocation}
-          firstName={firstName}
-          lastName={lastName}
+          firstName={user?.user_metadata?.first_name || ''}
+          lastName={user?.user_metadata?.last_name || ''}
           onProfileUpdate={handleProfileUpdate}
         />
       )}

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
@@ -20,20 +19,11 @@ const ProfileContent = () => {
     isLoading, 
     error,
     coverImage,
-    profileImage,
-    username,
-    bio,
-    location,
-    memberSince,
-    followingCount,
-    followerCount,
     hasChanges,
-    isOwnProfile,
     handleProfileImageChange,
     handleCoverImageChange,
     handleCoverImageUpdated,
-    handleSaveChanges,
-    profileData
+    handleSaveChanges
   } = useProfileData(userId);
 
   useEffect(() => {
@@ -80,21 +70,7 @@ const ProfileContent = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-10">
         <div className="flex flex-col md:flex-row gap-6">
           <div className="w-full md:w-[300px] flex-shrink-0">
-            <ProfileCard 
-              username={username || ''}
-              bio={bio || ''}
-              location={location || ''}
-              memberSince={memberSince || ''}
-              followingCount={followingCount}
-              followerCount={followerCount}
-              profileImage={profileImage}
-              isLoading={isLoading}
-              onProfileImageChange={handleProfileImageChange}
-              hasChanges={hasChanges}
-              onSaveChanges={handleSaveChanges}
-              isOwnProfile={isOwnProfile}
-              profileUserId={profileData?.id}
-            />
+            <ProfileCard profileUserId={userId} />
           </div>
           
           <div className="w-full md:flex-1 min-w-0">
