@@ -7,7 +7,7 @@ export const fetchPostEntities = async (postIds: string[]): Promise<EntitiesByPo
   if (!postIds.length) return {};
   
   try {
-    // Use direct query instead of RPC function to avoid type issues
+    // Use direct query instead of RPC function that doesn't exist
     const { data: entityData, error: entityError } = await supabase
       .from('post_entities')
       .select('post_id, entity_id, entities:entity_id(*)')

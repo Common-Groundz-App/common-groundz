@@ -33,27 +33,29 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
 
     if (error) throw error;
     
-    // Fetch entities for all posts using our custom function
+    // Fetch entities for all posts using direct query instead of RPC function
     const postIds = (postsData || []).map(post => post.id);
     
     if (postIds.length > 0) {
       const entitiesByPostId: Record<string, Entity[]> = {};
       
-      // Cast supabase to any to bypass TypeScript's type checking
-      const supabaseAny = supabase as any;
-      
-      const { data: entityData } = await supabaseAny
-        .rpc('get_post_entities', {
-          post_ids: postIds
-        });
-      
-      if (entityData) {
+      // Direct query to get post entities instead of using RPC
+      const { data: entityData, error: entityError } = await supabase
+        .from('post_entities')
+        .select('post_id, entity_id, entities:entity_id(*)')
+        .in('post_id', postIds);
+        
+      if (entityError) {
+        console.error('Error fetching post entities:', entityError);
+      } else if (entityData) {
         // Process the relationships
         entityData.forEach((item: any) => {
           if (!entitiesByPostId[item.post_id]) {
             entitiesByPostId[item.post_id] = [];
           }
-          entitiesByPostId[item.post_id].push(item.entity);
+          if (item.entities) {
+            entitiesByPostId[item.post_id].push(item.entities);
+          }
         });
       }
       
