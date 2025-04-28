@@ -31,7 +31,7 @@ const Explore = () => {
   const { results, isLoading } = useSearch(searchQuery);
   
   const getInitialActiveTab = () => {
-    return 'People';
+    return 'Explore';  // Changed from 'People' to 'Explore'
   };
 
   if (!user) {
