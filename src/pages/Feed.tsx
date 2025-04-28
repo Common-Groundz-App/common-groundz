@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -10,7 +9,6 @@ import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
 import { CreatePostButton } from '@/components/feed/CreatePostButton';
-import { SidebarNavigation } from '@/components/navigation/SidebarNavigation';
 import { Bell, Heart, Bookmark, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -79,7 +77,12 @@ const Feed = () => {
       
       <div className="flex flex-1">
         {/* Left Sidebar - Only visible on desktop */}
-        {!isMobile && <SidebarNavigation />}
+        {!isMobile && (
+          <VerticalTubelightNavbar 
+            initialActiveTab={getInitialActiveTab()}
+            className="fixed left-0 top-0 h-screen pt-4" 
+          />
+        )}
         
         <div className={cn(
           "flex-1 flex flex-col",
@@ -94,7 +97,7 @@ const Feed = () => {
             {/* Left Column for Navigation on Smaller Desktop */}
             {!isMobile && (
               <div className="hidden lg:block col-span-1">
-                {/* This is just a spacer since SidebarNavigation is fixed */}
+                {/* This is just a spacer since VerticalTubelightNavbar is fixed */}
               </div>
             )}
             

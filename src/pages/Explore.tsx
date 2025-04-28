@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
@@ -10,18 +9,6 @@ import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
 import { Filter, Users, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { useSearch } from '@/hooks/use-search';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Link } from 'react-router-dom';
 
 const Explore = () => {
   const { user } = useAuth();
@@ -30,7 +17,6 @@ const Explore = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const { results, isLoading } = useSearch(searchQuery);
   
-  // Using the getInitialActiveTab similar to Feed page
   const getInitialActiveTab = () => {
     return 'People';
   };
@@ -89,7 +75,6 @@ const Explore = () => {
               </DropdownMenu>
             </div>
             
-            {/* Search Bar */}
             <div className="relative mb-6">
               <div className="flex items-center border rounded-lg overflow-hidden bg-background">
                 <div className="pl-3 text-muted-foreground">
@@ -104,7 +89,6 @@ const Explore = () => {
                 />
               </div>
               
-              {/* Search Results */}
               {searchQuery && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-72 overflow-y-auto">
                   {isLoading && (
@@ -159,4 +143,3 @@ const Explore = () => {
 };
 
 export default Explore;
-
