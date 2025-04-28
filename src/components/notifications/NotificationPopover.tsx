@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, X } from 'lucide-react';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -87,20 +86,10 @@ export function NotificationPopover({ trigger, align = "end" }: NotificationPopo
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50">
           <div className="flex items-center justify-between p-4">
             <h4 className="text-sm font-semibold" id="notifications-title">Notifications</h4>
-            {notifications.length > 0 && unreadNotifications.length > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 text-xs"
-                onClick={handleMarkAllAsRead}
-                disabled={markingAsRead}
-              >
-                {markingAsRead ? (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                ) : null}
-                Mark all as read
-              </Button>
-            )}
+            <X 
+              className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setOpen(false)}
+            />
           </div>
           
           <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full px-4 pb-2">

@@ -78,7 +78,13 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
       <SheetContent side="right" className="w-full sm:max-w-[400px] p-0">
         <div className="flex h-full flex-col">
           <SheetHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50 p-4">
-            <SheetTitle className="text-sm font-semibold">Notifications</SheetTitle>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="text-sm font-semibold">Notifications</SheetTitle>
+              <X 
+                className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" 
+                onClick={() => onOpenChange(false)}
+              />
+            </div>
             <SheetDescription className="sr-only">View and manage your notifications</SheetDescription>
             {notifications.length > 0 && unreadNotifications.length > 0 && (
               <Button 
