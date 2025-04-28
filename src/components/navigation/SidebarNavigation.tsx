@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -67,6 +68,17 @@ export const SidebarNavigation = () => {
     
     fetchProfileData();
   }, [user]);
+
+  useEffect(() => {
+    const handleOpenNotifications = () => {
+      setShowNotifications(true);
+    };
+    
+    window.addEventListener('open-notifications', handleOpenNotifications);
+    return () => {
+      window.removeEventListener('open-notifications', handleOpenNotifications);
+    };
+  }, []);
   
   const getInitials = () => {
     if (profileData.fullName) {

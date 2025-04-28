@@ -1,8 +1,10 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, User, PlusCircle } from 'lucide-react';
+import { Home, Search, User, PlusCircle, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NavItem {
   name: string;
@@ -10,18 +12,37 @@ interface NavItem {
   icon: React.ElementType;
   onClick?: () => void;
   primary?: boolean;
+  badge?: number;
 }
 
 export const BottomNavigation = () => {
   const location = useLocation();
+  const { unreadCount } = useNotifications();
+  const { user } = useAuth();
   
   const navItems: NavItem[] = [
     { name: 'Home', path: '/home', icon: Home },
-    { name: 'Add', path: '#add', icon: PlusCircle, primary: true, onClick: () => {
-      const event = new CustomEvent('open-recommendation-form');
-      window.dispatchEvent(event);
-    }},
     { name: 'Explore', path: '/explore', icon: Search },
+    { 
+      name: 'Add', 
+      path: '#add', 
+      icon: PlusCircle, 
+      primary: true, 
+      onClick: () => {
+        const event = new CustomEvent('open-recommendation-form');
+        window.dispatchEvent(event);
+      }
+    },
+    { 
+      name: 'Notifications', 
+      path: '#notifications', 
+      icon: Bell, 
+      badge: unreadCount > 0 ? unreadCount : undefined,
+      onClick: () => {
+        const event = new CustomEvent('open-notifications');
+        window.dispatchEvent(event);
+      }
+    },
     { name: 'Profile', path: '/profile', icon: User }
   ];
   
@@ -40,7 +61,7 @@ export const BottomNavigation = () => {
                 key={item.name}
                 onClick={item.onClick}
                 className={cn(
-                  "flex flex-col items-center justify-center w-1/5 h-full",
+                  "flex flex-col items-center justify-center w-1/5 h-full relative",
                   item.primary 
                     ? "text-brand-orange" 
                     : isActive 
@@ -55,6 +76,11 @@ export const BottomNavigation = () => {
                     "h-5 w-5 mb-1",
                     item.primary && "text-brand-orange"
                   )} />
+                  {item.badge && item.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs">{item.name}</span>
               </button>

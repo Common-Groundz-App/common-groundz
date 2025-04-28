@@ -40,14 +40,14 @@ export function PostMediaDisplay({
                     <ImageWithFallback 
                       src={item.url} 
                       alt={item.alt || item.caption || `Media ${index + 1}`}
-                      className="w-full h-64 object-contain"
+                      className="w-full h-64 object-contain rounded-md"
                     />
                   ) : (
                     <video 
                       src={item.url}
                       poster={item.thumbnail_url}
                       controls
-                      className="w-full h-64 object-contain"
+                      className="w-full h-64 object-contain rounded-md"
                     >
                       Your browser does not support the video tag.
                     </video>
@@ -76,4 +76,3 @@ export function PostMediaDisplay({
     />
   );
 }
-
