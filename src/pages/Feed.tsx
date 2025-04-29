@@ -14,6 +14,7 @@ import { Bell, Heart, Bookmark, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { FixedWidthLayout } from '@/components/layout/FixedWidthLayout';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Define CSS variables for consistent column widths
 const SIDEBAR_WIDTH = "275px";
@@ -82,28 +83,30 @@ const Feed = () => {
         </div>
       )}
       
-      <FixedWidthLayout className="flex-1">
-        <div className="flex flex-1">
+      <FixedWidthLayout>
+        <div className="flex">
           {/* Left Sidebar - Only visible on desktop */}
           {!isMobile && (
-            <VerticalTubelightNavbar 
-              initialActiveTab={getInitialActiveTab()}
-              className="fixed left-1/2 -translate-x-[calc(50%+275px/2+300px)] top-0 h-screen pt-4 w-[275px]" 
-            />
+            <div className="w-[275px] pl-4">
+              <div className="fixed h-screen overflow-y-auto">
+                <ScrollArea className="h-screen pt-4 pr-4">
+                  <VerticalTubelightNavbar 
+                    initialActiveTab={getInitialActiveTab()}
+                    className="pt-4" 
+                  />
+                </ScrollArea>
+              </div>
+            </div>
           )}
           
           <div className={cn(
             "flex-1 flex flex-col",
-            !isMobile && "md:ml-[84px] lg:ml-[275px]", // Account for collapsed and expanded sidebar
             isMobile && "pt-16" // Account for mobile header
           )}>
             {/* Main Content Area - Fixed Width Layout */}
-            <div className="flex w-full">
+            <div className="flex gap-x-4">
               {/* Middle Column - Feed Content */}
-              <div className={cn(
-                "w-full md:w-[600px] border-x",
-                isMobile && "px-0" // Full width on mobile
-              )}>
+              <div className="w-[600px] border-x">
                 {/* Feed Header */}
                 <div className="px-4 py-6 md:py-4 mb-2">
                   <div className="flex justify-between items-center">
@@ -189,7 +192,7 @@ const Feed = () => {
               
               {/* Right Column - Trending & Recommendations - Desktop Only */}
               {!isMobile && (
-                <div className="hidden lg:block w-[350px] pl-6">
+                <div className="w-[350px]">
                   <div className="sticky top-4 space-y-4">
                     {/* Search */}
                     <div className="bg-background rounded-xl border p-4">
@@ -258,3 +261,4 @@ const Feed = () => {
 };
 
 export default Feed;
+

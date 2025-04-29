@@ -10,7 +10,7 @@ interface FixedWidthLayoutProps {
 export function FixedWidthLayout({ children, className }: FixedWidthLayoutProps) {
   return (
     <div className={cn(
-      "w-full max-w-screen-xl mx-auto flex",
+      "w-full max-w-screen-xl mx-auto",
       className
     )}>
       {children}
