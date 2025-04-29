@@ -84,10 +84,10 @@ const Feed = () => {
       )}
       
       <FixedWidthLayout>
-        <div className="flex">
+        <div className="flex justify-center">
           {/* Left Sidebar - Only visible on desktop */}
           {!isMobile && (
-            <div className="w-[275px] pl-4">
+            <div className="w-[275px] pl-6">
               <div className="fixed h-screen overflow-y-auto">
                 <ScrollArea className="h-screen pt-4 pr-4">
                   <VerticalTubelightNavbar 
@@ -261,4 +261,3 @@ const Feed = () => {
 };
 
 export default Feed;
-
