@@ -14,6 +14,7 @@ import { Bell, Search, RefreshCw, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const Feed = () => {
   const isMobile = useIsMobile();
@@ -23,10 +24,15 @@ const Feed = () => {
   const { unreadCount } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);
+  const [pullIntent, setPullIntent] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   const [startY, setStartY] = useState(0);
   const [newContentAvailable, setNewContentAvailable] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const pullThreshold = 80; // Pixels needed to pull down to trigger refresh
+  const startThreshold = 10; // Minimum drag distance before showing pull UI
+  const lastUpdateTime = useRef(0);
+  const frameId = useRef(0);
   
   const getInitialActiveTab = () => {
     if (location.pathname === '/home' || location.pathname === '/feed') {
@@ -54,6 +60,8 @@ const Feed = () => {
   }, [checkForNewContent]);
 
   const handleRefresh = useCallback(() => {
+    if (refreshing) return; // Prevent multiple refreshes
+    
     setRefreshing(true);
     setNewContentAvailable(false);
     
@@ -69,30 +77,102 @@ const Feed = () => {
     setTimeout(() => {
       setRefreshing(false);
     }, 1000);
-  }, [activeTab]);
+  }, [activeTab, refreshing]);
   
-  // Handle pull-to-refresh events
-  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    setStartY(clientY);
+  // Throttle function to limit update frequency
+  const throttlePullProgress = (progress: number) => {
+    const now = Date.now();
+    if (now - lastUpdateTime.current > 16) { // ~60fps
+      lastUpdateTime.current = now;
+      setPullProgress(progress);
+    }
   };
+
+  // Check if we're actually at the top of the scroll area
+  const isScrollAtTop = useCallback(() => {
+    if (feedRef.current) {
+      // Allow a small buffer (1px) for browser rounding errors
+      return feedRef.current.scrollTop <= 1;
+    }
+    return false;
+  }, []);
   
-  const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (feedRef.current && feedRef.current.scrollTop === 0) {
+  // Handle touch/mouse start event with improved intent detection
+  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    // Ignore if already refreshing
+    if (refreshing) return;
+    
+    // For mouse events, only track if left button is pressed
+    if ('buttons' in e && e.buttons !== 1) return;
+    
+    if (isScrollAtTop()) {
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-      const diff = clientY - startY;
+      setStartY(clientY);
+      setIsActive(true);
+      setPullIntent(false); // Reset pull intent
       
-      if (diff > 0) {
-        const progress = Math.min(diff * 0.5, pullThreshold);
-        setPullProgress(progress);
+      // Cancel any existing animation frame
+      if (frameId.current) {
+        cancelAnimationFrame(frameId.current);
       }
     }
   };
   
+  // Handle touch/mouse move with animation frame for smoother updates
+  const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+    // If not active or already refreshing, ignore
+    if (!isActive || refreshing) return;
+    
+    // For mouse events, check if left button is still pressed
+    if ('buttons' in e && e.buttons !== 1) {
+      handleTouchEnd();
+      return;
+    }
+    
+    // If scroll is not at top anymore, cancel pull
+    if (!isScrollAtTop()) {
+      setPullProgress(0);
+      setIsActive(false);
+      return;
+    }
+    
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const diff = clientY - startY;
+    
+    // Only start showing pull UI after exceeding minimum threshold
+    if (diff > startThreshold) {
+      setPullIntent(true);
+      const progress = Math.min(diff * 0.5, pullThreshold);
+      
+      // Use requestAnimationFrame for smoother updates
+      if (frameId.current) {
+        cancelAnimationFrame(frameId.current);
+      }
+      
+      frameId.current = requestAnimationFrame(() => {
+        throttlePullProgress(progress);
+      });
+    } else {
+      setPullIntent(false);
+      setPullProgress(0);
+    }
+  };
+  
   const handleTouchEnd = () => {
-    if (pullProgress >= pullThreshold) {
+    // Cancel any existing animation frame
+    if (frameId.current) {
+      cancelAnimationFrame(frameId.current);
+      frameId.current = 0;
+    }
+    
+    // Only trigger refresh if we had pull intent and exceeded threshold
+    if (pullIntent && pullProgress >= pullThreshold) {
       handleRefresh();
     }
+    
+    // Reset states
+    setIsActive(false);
+    setPullIntent(false);
     setPullProgress(0);
   };
 
@@ -247,10 +327,10 @@ const Feed = () => {
                   </div>
                 </div>
                 
-                {/* Pull-to-Refresh Indicator */}
+                {/* Pull-to-Refresh Indicator - Only show when pulling with intent */}
                 <motion.div 
                   className="flex justify-center items-center overflow-hidden"
-                  style={{ height: pullProgress }}
+                  style={{ height: pullIntent ? pullProgress : 0 }}
                 >
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     {pullProgress >= pullThreshold ? (
@@ -281,6 +361,7 @@ const Feed = () => {
                   onMouseMove={handleTouchMove}
                   onMouseUp={handleTouchEnd}
                   onMouseLeave={handleTouchEnd}
+                  style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}
                 >
                   {activeTab === "for-you" ? (
                     <FeedForYou refreshing={refreshing} />

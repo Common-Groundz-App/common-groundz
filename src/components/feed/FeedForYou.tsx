@@ -6,7 +6,6 @@ import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
 import FeedEmptyState from './FeedEmptyState';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
