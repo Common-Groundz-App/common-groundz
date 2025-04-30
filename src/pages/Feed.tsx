@@ -430,7 +430,10 @@ const Feed = () => {
                 <AnimatePresence>
                   {showNewPosts && newContentAvailable && (
                     <motion.div 
-                      className="sticky top-0 z-10 py-2 px-4 flex justify-center"
+                      className={cn(
+                        "sticky z-30 py-2 px-4 flex justify-center",
+                        isMobile ? "top-16" : "top-0" // Position below mobile header when on mobile
+                      )}
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
