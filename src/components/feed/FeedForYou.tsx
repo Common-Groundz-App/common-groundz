@@ -7,7 +7,8 @@ import FeedSkeleton from './FeedSkeleton';
 import FeedEmptyState from './FeedEmptyState';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader } from "lucide-react";
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FeedForYouProps {
   refreshing?: boolean;
@@ -78,7 +79,25 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
         <FeedEmptyState />
       ) : (
         <>
-          <div className="space-y-8">
+          <AnimatePresence>
+            {refreshing && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="w-full py-2 flex justify-center items-center gap-2 text-brand-orange"
+              >
+                <Loader className="animate-spin" size={18} />
+                <span className="text-sm font-medium">Refreshing your feed...</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <motion.div 
+            className="space-y-8"
+            animate={{ opacity: refreshing ? 0.7 : 1 }}
+            transition={{ duration: 0.2 }}
+          >
             {items.map(item => (
               <FeedItem 
                 key={item.id} 
@@ -90,7 +109,7 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
                 refreshFeed={refreshFeed}
               />
             ))}
-          </div>
+          </motion.div>
           
           {hasMore && (
             <div className="pt-6 flex justify-center">
@@ -98,8 +117,16 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
                 variant="outline" 
                 onClick={loadMore} 
                 disabled={isLoadingMore}
+                className="flex items-center gap-2"
               >
-                {isLoadingMore ? 'Loading...' : 'Load more'}
+                {isLoadingMore ? (
+                  <>
+                    <Loader className="h-4 w-4 animate-spin" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  'Load more'
+                )}
               </Button>
             </div>
           )}

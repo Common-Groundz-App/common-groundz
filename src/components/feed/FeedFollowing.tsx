@@ -5,11 +5,12 @@ import { useFeed } from '@/hooks/feed/use-feed';
 import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
 import { Button } from '@/components/ui/button';
-import { UserPlus, AlertCircle } from 'lucide-react';
+import { UserPlus, AlertCircle, Loader } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FeedFollowingProps {
   refreshing?: boolean;
@@ -97,7 +98,25 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
         </Card>
       ) : (
         <>
-          <div className="space-y-8">
+          <AnimatePresence>
+            {refreshing && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="w-full py-2 flex justify-center items-center gap-2 text-brand-orange"
+              >
+                <Loader className="animate-spin" size={18} />
+                <span className="text-sm font-medium">Refreshing your feed...</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <motion.div 
+            className="space-y-8"
+            animate={{ opacity: refreshing ? 0.7 : 1 }}
+            transition={{ duration: 0.2 }}
+          >
             {items.map(item => (
               <FeedItem 
                 key={item.id} 
@@ -106,7 +125,7 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
                 onSave={handleSave}
               />
             ))}
-          </div>
+          </motion.div>
           
           {hasMore && (
             <div className="pt-6 flex justify-center">
@@ -114,8 +133,16 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
                 variant="outline" 
                 onClick={loadMore} 
                 disabled={isLoadingMore}
+                className="flex items-center gap-2"
               >
-                {isLoadingMore ? 'Loading...' : 'Load more'}
+                {isLoadingMore ? (
+                  <>
+                    <Loader className="h-4 w-4 animate-spin" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  'Load more'
+                )}
               </Button>
             </div>
           )}

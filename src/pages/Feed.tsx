@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -8,7 +7,7 @@ import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navb
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CreatePostButton } from '@/components/feed/CreatePostButton';
 import { Bell, Search, RefreshCw, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -70,6 +69,11 @@ const Feed = () => {
     } else {
       const event = new CustomEvent('refresh-following-feed');
       window.dispatchEvent(event);
+    }
+    
+    // Provide haptic feedback on supported devices
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
     }
     
     // Simulate network delay
@@ -244,19 +248,43 @@ const Feed = () => {
       )}
       
       {/* Pull-to-Refresh Indicator - Fixed at top of viewport */}
-      <motion.div 
-        className="fixed top-0 left-0 right-0 z-50 flex justify-center items-center overflow-hidden bg-background/50"
-        style={{ height: pullIntent ? pullProgress : 0 }}
-      >
-        <div className="flex flex-col items-center justify-center text-muted-foreground">
-          {pullProgress >= pullThreshold ? (
-            <span className="text-xs">Release to refresh</span>
-          ) : (
-            <span className="text-xs">Pull down to refresh</span>
-          )}
-          <ChevronDown size={16} className={pullProgress >= pullThreshold ? "animate-bounce" : ""} />
-        </div>
-      </motion.div>
+      <AnimatePresence>
+        {pullIntent && (
+          <motion.div 
+            className="fixed top-0 left-0 right-0 z-50 flex justify-center items-center overflow-hidden bg-background/70 backdrop-blur-sm"
+            initial={{ height: 0 }}
+            animate={{ height: pullProgress }}
+            exit={{ height: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          >
+            <div className="flex flex-col items-center justify-center text-muted-foreground">
+              <motion.div
+                animate={{
+                  rotate: pullProgress >= pullThreshold ? 180 : (pullProgress / pullThreshold) * 180,
+                  scale: pullProgress >= pullThreshold ? 1.2 : 1,
+                }}
+                transition={{ type: "spring" }}
+              >
+                <ChevronDown 
+                  size={24} 
+                  className={cn(
+                    "text-brand-orange transition-transform",
+                    pullProgress >= pullThreshold ? "text-brand-orange" : "text-muted-foreground"
+                  )}
+                />
+              </motion.div>
+              <motion.span 
+                className={cn(
+                  "text-sm mt-1 font-medium",
+                  pullProgress >= pullThreshold ? "text-brand-orange" : "text-muted-foreground"
+                )}
+              >
+                {pullProgress >= pullThreshold ? "Release to refresh" : "Pull down to refresh"}
+              </motion.span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       <div className="flex flex-1">
         {/* Left Sidebar - Only visible on desktop */}
@@ -361,13 +389,34 @@ const Feed = () => {
                   </div>
                 </div>
                 
-                {/* New Content Available Notification */}
-                {newContentAvailable && (
-                  <div className="sticky top-0 z-10 bg-primary/10 text-primary py-2 px-4 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors" onClick={handleRefresh}>
-                    <RefreshCw size={14} className="mr-2" />
-                    <span className="text-sm font-medium">New content available</span>
-                  </div>
-                )}
+                {/* New Posts Button - Fixed position */}
+                <AnimatePresence>
+                  {newContentAvailable && (
+                    <motion.div 
+                      className="sticky top-0 z-10 py-2 px-4 flex justify-center"
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    >
+                      <motion.button
+                        onClick={handleRefresh}
+                        className="bg-brand-orange text-white py-2 px-6 rounded-full font-medium flex items-center justify-center gap-2 shadow-md hover:bg-brand-orange/90 transition-colors w-full max-w-xs"
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        animate={{ 
+                          boxShadow: ["0 2px 10px rgba(249, 115, 22, 0.2)", "0 4px 12px rgba(249, 115, 22, 0.4)", "0 2px 10px rgba(249, 115, 22, 0.2)"],
+                        }}
+                        transition={{ 
+                          boxShadow: { repeat: Infinity, duration: 2 },
+                        }}
+                      >
+                        <RefreshCw size={16} className="animate-spin" />
+                        <span>New Posts</span>
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 
                 {/* Feed Content - No overflow or height constraints */}
                 <div className="px-4">
