@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -27,6 +28,10 @@ const Feed = () => {
   const [isActive, setIsActive] = useState(false);
   const [startY, setStartY] = useState(0);
   const [newContentAvailable, setNewContentAvailable] = useState(false);
+  const [newPostCount, setNewPostCount] = useState(0);
+  const [showNewPosts, setShowNewPosts] = useState(false);
+  const [hasScrolledDown, setHasScrolledDown] = useState(false);
+  const lastScrollTop = useRef(0);
   const pullThreshold = 80; // Pixels needed to pull down to trigger refresh
   const startThreshold = 10; // Minimum drag distance before showing pull UI
   const lastUpdateTime = useRef(0);
@@ -39,12 +44,40 @@ const Feed = () => {
     return 'Home';
   };
 
+  // Check for scroll direction
+  useEffect(() => {
+    const handleScroll = () => {
+      const st = window.scrollY;
+      
+      // Detect if user has scrolled down at all
+      if (st > 50) {
+        setHasScrolledDown(true);
+      }
+      
+      // Show button when scrolling up and new posts available
+      if (st < lastScrollTop.current && newContentAvailable && hasScrolledDown) {
+        setShowNewPosts(true);
+      } else if (st > lastScrollTop.current + 50) {
+        // Hide when scrolling down significantly
+        setShowNewPosts(false);
+      }
+      
+      lastScrollTop.current = st <= 0 ? 0 : st;
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [newContentAvailable, hasScrolledDown]);
+
   const checkForNewContent = useCallback(() => {
     // In a real implementation, this would check the API for new content
     // For now, we'll simulate new content being available randomly
     const hasNewContent = Math.random() > 0.5;
     if (hasNewContent && !newContentAvailable) {
       setNewContentAvailable(true);
+      setNewPostCount(Math.floor(Math.random() * 5) + 1); // Random number of new posts (1-5)
     }
   }, [newContentAvailable]);
 
@@ -62,6 +95,8 @@ const Feed = () => {
     
     setRefreshing(true);
     setNewContentAvailable(false);
+    setShowNewPosts(false);
+    setNewPostCount(0);
     
     if (activeTab === "for-you") {
       const event = new CustomEvent('refresh-for-you-feed');
@@ -79,6 +114,8 @@ const Feed = () => {
     // Simulate network delay
     setTimeout(() => {
       setRefreshing(false);
+      // Scroll to top after refresh
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 1000);
   }, [activeTab, refreshing]);
   
@@ -389,9 +426,9 @@ const Feed = () => {
                   </div>
                 </div>
                 
-                {/* New Posts Button - Fixed position */}
+                {/* New Posts Button - Fixed position with improved design */}
                 <AnimatePresence>
-                  {newContentAvailable && (
+                  {showNewPosts && newContentAvailable && (
                     <motion.div 
                       className="sticky top-0 z-10 py-2 px-4 flex justify-center"
                       initial={{ opacity: 0, y: -20 }}
@@ -401,18 +438,14 @@ const Feed = () => {
                     >
                       <motion.button
                         onClick={handleRefresh}
-                        className="bg-brand-orange text-white py-2 px-6 rounded-full font-medium flex items-center justify-center gap-2 shadow-md hover:bg-brand-orange/90 transition-colors w-full max-w-xs"
+                        className="bg-brand-orange text-white py-1.5 px-4 rounded-full font-medium flex items-center justify-center gap-2 shadow-sm hover:bg-brand-orange/90 transition-colors"
                         whileHover={{ scale: 1.03 }}
                         whileTap={{ scale: 0.97 }}
-                        animate={{ 
-                          boxShadow: ["0 2px 10px rgba(249, 115, 22, 0.2)", "0 4px 12px rgba(249, 115, 22, 0.4)", "0 2px 10px rgba(249, 115, 22, 0.2)"],
-                        }}
-                        transition={{ 
-                          boxShadow: { repeat: Infinity, duration: 2 },
-                        }}
                       >
-                        <RefreshCw size={16} className="animate-spin" />
-                        <span>New Posts</span>
+                        <RefreshCw size={14} />
+                        <span>
+                          {newPostCount > 1 ? `${newPostCount} New Posts` : "New Posts"}
+                        </span>
                       </motion.button>
                     </motion.div>
                   )}
