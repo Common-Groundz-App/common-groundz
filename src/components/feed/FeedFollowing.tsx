@@ -1,16 +1,21 @@
+
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/feed/use-feed';
 import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, UserPlus, AlertCircle } from 'lucide-react';
+import { UserPlus, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
-const FeedFollowing = () => {
+interface FeedFollowingProps {
+  refreshing?: boolean;
+}
+
+const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { 
@@ -44,21 +49,15 @@ const FeedFollowing = () => {
     };
   }, [refreshFeed]);
 
+  // Handle refreshing prop changes
+  useEffect(() => {
+    if (refreshing) {
+      refreshFeed();
+    }
+  }, [refreshing, refreshFeed]);
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={refreshFeed}
-          disabled={isLoading}
-          className="flex items-center gap-1"
-        >
-          <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-          Refresh
-        </Button>
-      </div>
-      
       {error ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />

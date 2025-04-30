@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
@@ -9,9 +10,10 @@ import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion } from 'framer-motion';
 import { CreatePostButton } from '@/components/feed/CreatePostButton';
-import { Bell, Heart, Bookmark, Search } from 'lucide-react';
+import { Bell, Search, RefreshCw, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Toaster } from '@/components/ui/toaster';
 
 const Feed = () => {
   const isMobile = useIsMobile();
@@ -19,12 +21,79 @@ const Feed = () => {
   const [activeTab, setActiveTab] = React.useState("for-you");
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullProgress, setPullProgress] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [newContentAvailable, setNewContentAvailable] = useState(false);
+  const feedRef = useRef<HTMLDivElement>(null);
+  const pullThreshold = 80; // Pixels needed to pull down to trigger refresh
   
   const getInitialActiveTab = () => {
     if (location.pathname === '/home' || location.pathname === '/feed') {
       return 'Home';
     }
     return 'Home';
+  };
+
+  const checkForNewContent = useCallback(() => {
+    // In a real implementation, this would check the API for new content
+    // For now, we'll simulate new content being available randomly
+    const hasNewContent = Math.random() > 0.5;
+    if (hasNewContent && !newContentAvailable) {
+      setNewContentAvailable(true);
+    }
+  }, [newContentAvailable]);
+
+  // Set up automatic refresh interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkForNewContent();
+    }, 3 * 60 * 1000); // Check every 3 minutes
+    
+    return () => clearInterval(interval);
+  }, [checkForNewContent]);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    setNewContentAvailable(false);
+    
+    if (activeTab === "for-you") {
+      const event = new CustomEvent('refresh-for-you-feed');
+      window.dispatchEvent(event);
+    } else {
+      const event = new CustomEvent('refresh-following-feed');
+      window.dispatchEvent(event);
+    }
+    
+    // Simulate network delay
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, [activeTab]);
+  
+  // Handle pull-to-refresh events
+  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setStartY(clientY);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (feedRef.current && feedRef.current.scrollTop === 0) {
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const diff = clientY - startY;
+      
+      if (diff > 0) {
+        const progress = Math.min(diff * 0.5, pullThreshold);
+        setPullProgress(progress);
+      }
+    }
+  };
+  
+  const handleTouchEnd = () => {
+    if (pullProgress >= pullThreshold) {
+      handleRefresh();
+    }
+    setPullProgress(0);
   };
 
   const handlePostCreated = () => {
@@ -80,7 +149,7 @@ const Feed = () => {
         {!isMobile && (
           <VerticalTubelightNavbar 
             initialActiveTab={getInitialActiveTab()}
-            className="fixed left-0 top-0 h-screen pt-4" 
+            className="fixed left-0 top-0 h-screen pt-4 pl-4" 
           />
         )}
         
@@ -91,7 +160,7 @@ const Feed = () => {
         )}>
           {/* Main Content Area - Three Column Layout on Desktop */}
           <div className={cn(
-            "w-full mx-auto grid",
+            "w-full mx-auto grid justify-center",
             !isMobile && "grid-cols-1 lg:grid-cols-7 xl:grid-cols-7 gap-4 px-4 py-6"
           )}>
             {/* Left Column for Navigation on Smaller Desktop */}
@@ -178,12 +247,45 @@ const Feed = () => {
                   </div>
                 </div>
                 
-                {/* Feed Content */}
-                <div className="px-4">
+                {/* Pull-to-Refresh Indicator */}
+                <motion.div 
+                  className="flex justify-center items-center overflow-hidden"
+                  style={{ height: pullProgress }}
+                >
+                  <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    {pullProgress >= pullThreshold ? (
+                      <span className="text-xs">Release to refresh</span>
+                    ) : (
+                      <span className="text-xs">Pull down to refresh</span>
+                    )}
+                    <ChevronDown size={16} className={pullProgress >= pullThreshold ? "animate-bounce" : ""} />
+                  </div>
+                </motion.div>
+                
+                {/* New Content Available Notification */}
+                {newContentAvailable && (
+                  <div className="sticky top-0 z-10 bg-primary/10 text-primary py-2 px-4 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors" onClick={handleRefresh}>
+                    <RefreshCw size={14} className="mr-2" />
+                    <span className="text-sm font-medium">New content available</span>
+                  </div>
+                )}
+                
+                {/* Feed Content with Pull-to-Refresh */}
+                <div 
+                  className="px-4"
+                  ref={feedRef}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onMouseDown={handleTouchStart}
+                  onMouseMove={handleTouchMove}
+                  onMouseUp={handleTouchEnd}
+                  onMouseLeave={handleTouchEnd}
+                >
                   {activeTab === "for-you" ? (
-                    <FeedForYou />
+                    <FeedForYou refreshing={refreshing} />
                   ) : (
-                    <FeedFollowing />
+                    <FeedFollowing refreshing={refreshing} />
                   )}
                 </div>
               </div>
@@ -254,6 +356,7 @@ const Feed = () => {
       
       {/* Mobile Bottom Navigation */}
       {isMobile && <BottomNavigation />}
+      <Toaster />
     </div>
   );
 };
