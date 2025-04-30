@@ -28,7 +28,6 @@ const Feed = () => {
   const [isActive, setIsActive] = useState(false);
   const [startY, setStartY] = useState(0);
   const [newContentAvailable, setNewContentAvailable] = useState(false);
-  const feedRef = useRef<HTMLDivElement>(null);
   const pullThreshold = 80; // Pixels needed to pull down to trigger refresh
   const startThreshold = 10; // Minimum drag distance before showing pull UI
   const lastUpdateTime = useRef(0);
@@ -79,6 +78,11 @@ const Feed = () => {
     }, 1000);
   }, [activeTab, refreshing]);
   
+  // Check if we're at the top of the window
+  const isScrollAtTop = useCallback(() => {
+    return window.scrollY <= 1;
+  }, []);
+  
   // Throttle function to limit update frequency
   const throttlePullProgress = (progress: number) => {
     const now = Date.now();
@@ -87,18 +91,9 @@ const Feed = () => {
       setPullProgress(progress);
     }
   };
-
-  // Check if we're actually at the top of the scroll area
-  const isScrollAtTop = useCallback(() => {
-    if (feedRef.current) {
-      // Allow a small buffer (1px) for browser rounding errors
-      return feedRef.current.scrollTop <= 1;
-    }
-    return false;
-  }, []);
   
   // Handle touch/mouse start event with improved intent detection
-  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleTouchStart = (e: TouchEvent | MouseEvent) => {
     // Ignore if already refreshing
     if (refreshing) return;
     
@@ -119,7 +114,7 @@ const Feed = () => {
   };
   
   // Handle touch/mouse move with animation frame for smoother updates
-  const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleTouchMove = (e: TouchEvent | MouseEvent) => {
     // If not active or already refreshing, ignore
     if (!isActive || refreshing) return;
     
@@ -185,10 +180,34 @@ const Feed = () => {
       window.dispatchEvent(event);
     }
   };
+
+  // Attach pull-to-refresh handlers at document level
+  useEffect(() => {
+    // Add event listeners to document instead of a specific div
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+    
+    document.addEventListener('mousedown', handleTouchStart);
+    document.addEventListener('mousemove', handleTouchMove);
+    document.addEventListener('mouseup', handleTouchEnd);
+    document.addEventListener('mouseleave', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+      
+      document.removeEventListener('mousedown', handleTouchStart);
+      document.removeEventListener('mousemove', handleTouchMove);
+      document.removeEventListener('mouseup', handleTouchEnd);
+      document.removeEventListener('mouseleave', handleTouchEnd);
+    };
+  }, [refreshing, isActive, startY, pullIntent, pullProgress]);
   
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Mobile Header */}
+      {/* Mobile Header - Fixed Position */}
       {isMobile && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
           <div className="container p-3 mx-auto flex justify-between items-center">
@@ -224,6 +243,21 @@ const Feed = () => {
         </div>
       )}
       
+      {/* Pull-to-Refresh Indicator - Fixed at top of viewport */}
+      <motion.div 
+        className="fixed top-0 left-0 right-0 z-50 flex justify-center items-center overflow-hidden bg-background/50"
+        style={{ height: pullIntent ? pullProgress : 0 }}
+      >
+        <div className="flex flex-col items-center justify-center text-muted-foreground">
+          {pullProgress >= pullThreshold ? (
+            <span className="text-xs">Release to refresh</span>
+          ) : (
+            <span className="text-xs">Pull down to refresh</span>
+          )}
+          <ChevronDown size={16} className={pullProgress >= pullThreshold ? "animate-bounce" : ""} />
+        </div>
+      </motion.div>
+      
       <div className="flex flex-1">
         {/* Left Sidebar - Only visible on desktop */}
         {!isMobile && (
@@ -255,7 +289,7 @@ const Feed = () => {
               "col-span-1 lg:col-span-4 xl:col-span-4 max-w-2xl w-full mx-auto",
               isMobile && "px-0" // Full width on mobile
             )}>
-              {/* Feed Header */}
+              {/* Feed Header - Part of normal document flow */}
               <div className="px-4 py-6 md:py-4 mb-2">
                 <div className="flex justify-between items-center">
                   <div>
@@ -267,7 +301,7 @@ const Feed = () => {
                 </div>
               </div>
               
-              {/* Feed Tabs */}
+              {/* Feed Tabs - Part of normal document flow */}
               <div className="w-full">
                 <div className="flex items-center w-full text-muted-foreground bg-background border-b">
                   <div 
@@ -327,21 +361,6 @@ const Feed = () => {
                   </div>
                 </div>
                 
-                {/* Pull-to-Refresh Indicator - Only show when pulling with intent */}
-                <motion.div 
-                  className="flex justify-center items-center overflow-hidden"
-                  style={{ height: pullIntent ? pullProgress : 0 }}
-                >
-                  <div className="flex flex-col items-center justify-center text-muted-foreground">
-                    {pullProgress >= pullThreshold ? (
-                      <span className="text-xs">Release to refresh</span>
-                    ) : (
-                      <span className="text-xs">Pull down to refresh</span>
-                    )}
-                    <ChevronDown size={16} className={pullProgress >= pullThreshold ? "animate-bounce" : ""} />
-                  </div>
-                </motion.div>
-                
                 {/* New Content Available Notification */}
                 {newContentAvailable && (
                   <div className="sticky top-0 z-10 bg-primary/10 text-primary py-2 px-4 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors" onClick={handleRefresh}>
@@ -350,19 +369,8 @@ const Feed = () => {
                   </div>
                 )}
                 
-                {/* Feed Content with Pull-to-Refresh */}
-                <div 
-                  className="px-4"
-                  ref={feedRef}
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                  onMouseDown={handleTouchStart}
-                  onMouseMove={handleTouchMove}
-                  onMouseUp={handleTouchEnd}
-                  onMouseLeave={handleTouchEnd}
-                  style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}
-                >
+                {/* Feed Content - No overflow or height constraints */}
+                <div className="px-4">
                   {activeTab === "for-you" ? (
                     <FeedForYou refreshing={refreshing} />
                   ) : (
