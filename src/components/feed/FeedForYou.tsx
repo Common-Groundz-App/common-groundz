@@ -7,7 +7,7 @@ import FeedSkeleton from './FeedSkeleton';
 import FeedEmptyState from './FeedEmptyState';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 
 interface FeedForYouProps {
   refreshing?: boolean;
@@ -73,11 +73,26 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
           </AlertDescription>
         </Alert>
       ) : isLoading ? (
-        <FeedSkeleton />
+        <div>
+          {refreshing ? (
+            <div className="flex justify-center items-center py-4">
+              <RefreshCw size={24} className="animate-spin mr-2 text-primary" />
+              <span className="text-sm text-muted-foreground">Refreshing feed...</span>
+            </div>
+          ) : (
+            <FeedSkeleton />
+          )}
+        </div>
       ) : items.length === 0 ? (
         <FeedEmptyState />
       ) : (
         <>
+          {refreshing && (
+            <div className="flex justify-center items-center py-2 text-primary/70 text-sm">
+              <RefreshCw size={14} className="animate-spin mr-2" />
+              <span>Refreshing...</span>
+            </div>
+          )}
           <div className="space-y-8">
             {items.map(item => (
               <FeedItem 
