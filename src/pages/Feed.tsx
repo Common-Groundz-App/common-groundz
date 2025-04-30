@@ -15,11 +15,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useHasTouchScreen } from '@/hooks/use-has-touch-screen';
 
 const Feed = () => {
   const isMobile = useIsMobile();
-  const hasTouchScreen = useHasTouchScreen();
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState("for-you");
   const { user } = useAuth();
@@ -34,7 +32,6 @@ const Feed = () => {
   const startThreshold = 10; // Minimum drag distance before showing pull UI
   const lastUpdateTime = useRef(0);
   const frameId = useRef(0);
-  const touchStartY = useRef(0);
   
   const getInitialActiveTab = () => {
     if (location.pathname === '/home' || location.pathname === '/feed') {
@@ -78,13 +75,8 @@ const Feed = () => {
     // Simulate network delay
     setTimeout(() => {
       setRefreshing(false);
-      
-      // Trigger haptic feedback on supported devices
-      if (hasTouchScreen && navigator.vibrate) {
-        navigator.vibrate(50); // Short vibration
-      }
     }, 1000);
-  }, [activeTab, refreshing, hasTouchScreen]);
+  }, [activeTab, refreshing]);
   
   // Check if we're at the top of the window
   const isScrollAtTop = useCallback(() => {
@@ -100,24 +92,17 @@ const Feed = () => {
     }
   };
   
-  // Handle touch start event with improved touch detection
+  // Handle touch/mouse start event with improved intent detection
   const handleTouchStart = (e: TouchEvent | MouseEvent) => {
     // Ignore if already refreshing
     if (refreshing) return;
     
-    // Store touch vs mouse event information
-    const isTouchEvent = 'touches' in e;
-    
     // For mouse events, only track if left button is pressed
-    if (!isTouchEvent && ('buttons' in e && e.buttons !== 1)) return;
-    
-    // On non-touch devices, only proceed if touch screen is detected
-    if (!isTouchEvent && !hasTouchScreen) return;
+    if ('buttons' in e && e.buttons !== 1) return;
     
     if (isScrollAtTop()) {
-      const clientY = isTouchEvent ? e.touches[0].clientY : e.clientY;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
       setStartY(clientY);
-      touchStartY.current = clientY;
       setIsActive(true);
       setPullIntent(false); // Reset pull intent
       
@@ -128,23 +113,15 @@ const Feed = () => {
     }
   };
   
-  // Handle touch move with improved behavior detection
+  // Handle touch/mouse move with animation frame for smoother updates
   const handleTouchMove = (e: TouchEvent | MouseEvent) => {
     // If not active or already refreshing, ignore
     if (!isActive || refreshing) return;
     
-    // Determine if this is a touch or mouse event
-    const isTouchEvent = 'touches' in e;
-    
-    // For mouse events, ensure left button is still pressed
-    if (!isTouchEvent && ('buttons' in e && e.buttons !== 1)) {
+    // For mouse events, check if left button is still pressed
+    if ('buttons' in e && e.buttons !== 1) {
       handleTouchEnd();
       return;
-    }
-    
-    // Prevent default browser behavior for touch pulls
-    if (isTouchEvent && isScrollAtTop()) {
-      e.preventDefault();
     }
     
     // If scroll is not at top anymore, cancel pull
@@ -154,17 +131,13 @@ const Feed = () => {
       return;
     }
     
-    const clientY = isTouchEvent ? e.touches[0].clientY : e.clientY;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const diff = clientY - startY;
     
     // Only start showing pull UI after exceeding minimum threshold
     if (diff > startThreshold) {
       setPullIntent(true);
-      
-      // Apply resistance factor for more natural feel
-      // The further you pull, the harder it gets
-      const resistance = 0.5 - Math.min(0.3, (diff / 500));
-      const progress = Math.min(diff * resistance, pullThreshold);
+      const progress = Math.min(diff * 0.5, pullThreshold);
       
       // Use requestAnimationFrame for smoother updates
       if (frameId.current) {
@@ -210,34 +183,27 @@ const Feed = () => {
 
   // Attach pull-to-refresh handlers at document level
   useEffect(() => {
-    // Add event listeners conditionally based on device capabilities
-    const touchOptions = { passive: false }; // Allow preventDefault() to work
+    // Add event listeners to document instead of a specific div
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
     
-    if (hasTouchScreen) {
-      document.addEventListener('touchstart', handleTouchStart, touchOptions);
-      document.addEventListener('touchmove', handleTouchMove, touchOptions);
-      document.addEventListener('touchend', handleTouchEnd);
-    }
-    
-    // Add mouse handlers for touch-enabled laptops and desktops
     document.addEventListener('mousedown', handleTouchStart);
     document.addEventListener('mousemove', handleTouchMove);
     document.addEventListener('mouseup', handleTouchEnd);
     document.addEventListener('mouseleave', handleTouchEnd);
 
     return () => {
-      if (hasTouchScreen) {
-        document.removeEventListener('touchstart', handleTouchStart);
-        document.removeEventListener('touchmove', handleTouchMove);
-        document.removeEventListener('touchend', handleTouchEnd);
-      }
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
       
       document.removeEventListener('mousedown', handleTouchStart);
       document.removeEventListener('mousemove', handleTouchMove);
       document.removeEventListener('mouseup', handleTouchEnd);
       document.removeEventListener('mouseleave', handleTouchEnd);
     };
-  }, [refreshing, isActive, startY, pullIntent, pullProgress, hasTouchScreen]);
+  }, [refreshing, isActive, startY, pullIntent, pullProgress]);
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -278,45 +244,19 @@ const Feed = () => {
       )}
       
       {/* Pull-to-Refresh Indicator - Fixed at top of viewport */}
-      {hasTouchScreen && (
-        <motion.div 
-          className="fixed top-0 left-0 right-0 z-50 flex justify-center items-center overflow-hidden bg-background/50 backdrop-blur-sm"
-          style={{ height: pullIntent ? pullProgress : 0 }}
-          initial={{ opacity: 0 }}
-          animate={{ 
-            opacity: pullIntent ? 1 : 0,
-            y: pullIntent ? 0 : -10
-          }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="flex flex-col items-center justify-center text-primary">
-            <motion.div
-              animate={{ 
-                rotate: refreshing ? 360 : 0,
-                scale: pullProgress >= pullThreshold ? 1.2 : 1
-              }}
-              transition={{ 
-                rotate: { duration: refreshing ? 1 : 0, repeat: refreshing ? Infinity : 0, ease: "linear" },
-                scale: { duration: 0.2 }
-              }}
-              className="mb-1"
-            >
-              {refreshing ? (
-                <RefreshCw size={24} />
-              ) : (
-                <ChevronDown 
-                  size={24}
-                  className={pullProgress >= pullThreshold ? "animate-bounce" : ""}
-                />
-              )}
-            </motion.div>
-            <span className="text-xs font-medium">
-              {refreshing ? "Refreshing..." : 
-                pullProgress >= pullThreshold ? "Release to refresh" : "Pull down to refresh"}
-            </span>
-          </div>
-        </motion.div>
-      )}
+      <motion.div 
+        className="fixed top-0 left-0 right-0 z-50 flex justify-center items-center overflow-hidden bg-background/50"
+        style={{ height: pullIntent ? pullProgress : 0 }}
+      >
+        <div className="flex flex-col items-center justify-center text-muted-foreground">
+          {pullProgress >= pullThreshold ? (
+            <span className="text-xs">Release to refresh</span>
+          ) : (
+            <span className="text-xs">Pull down to refresh</span>
+          )}
+          <ChevronDown size={16} className={pullProgress >= pullThreshold ? "animate-bounce" : ""} />
+        </div>
+      </motion.div>
       
       <div className="flex flex-1">
         {/* Left Sidebar - Only visible on desktop */}
@@ -423,17 +363,10 @@ const Feed = () => {
                 
                 {/* New Content Available Notification */}
                 {newContentAvailable && (
-                  <motion.div 
-                    className="sticky top-0 z-10 bg-primary/10 text-primary py-2 px-4 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors" 
-                    onClick={handleRefresh}
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <RefreshCw size={14} className="mr-2 animate-pulse" />
+                  <div className="sticky top-0 z-10 bg-primary/10 text-primary py-2 px-4 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors" onClick={handleRefresh}>
+                    <RefreshCw size={14} className="mr-2" />
                     <span className="text-sm font-medium">New content available</span>
-                  </motion.div>
+                  </div>
                 )}
                 
                 {/* Feed Content - No overflow or height constraints */}

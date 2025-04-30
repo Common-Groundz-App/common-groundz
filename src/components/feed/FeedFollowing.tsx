@@ -5,7 +5,7 @@ import { useFeed } from '@/hooks/feed/use-feed';
 import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
 import { Button } from '@/components/ui/button';
-import { UserPlus, AlertCircle, RefreshCw } from 'lucide-react';
+import { UserPlus, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -75,16 +75,7 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
           </AlertDescription>
         </Alert>
       ) : isLoading ? (
-        <div>
-          {refreshing ? (
-            <div className="flex justify-center items-center py-4">
-              <RefreshCw size={24} className="animate-spin mr-2 text-primary" />
-              <span className="text-sm text-muted-foreground">Refreshing feed...</span>
-            </div>
-          ) : (
-            <FeedSkeleton />
-          )}
-        </div>
+        <FeedSkeleton />
       ) : items.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="text-center py-12 flex flex-col items-center">
@@ -106,12 +97,6 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
         </Card>
       ) : (
         <>
-          {refreshing && (
-            <div className="flex justify-center items-center py-2 text-primary/70 text-sm">
-              <RefreshCw size={14} className="animate-spin mr-2" />
-              <span>Refreshing...</span>
-            </div>
-          )}
           <div className="space-y-8">
             {items.map(item => (
               <FeedItem 
