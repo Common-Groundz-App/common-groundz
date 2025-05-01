@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -70,6 +69,8 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
   const isEditMode = !!postToEdit;
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(postToEdit?.tagged_entities?.[0] || null);
   const [showEntitySelector, setShowEntitySelector] = useState(false);
+  // Store the HTML string content separately
+  const [contentHtml, setContentHtml] = useState<string>('');
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -100,6 +101,11 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         media: postToEdit.media || [],
       });
       
+      // When editing, we need to set the content HTML as well
+      if (postToEdit.content) {
+        setContentHtml(postToEdit.content);
+      }
+      
       if (postToEdit.tagged_entities) {
         setSelectedEntities(postToEdit.tagged_entities);
       }
@@ -117,6 +123,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     console.log('Starting form submission with data:', data);
     console.log('Selected entities:', selectedEntities);
     console.log('Media items:', mediaItems);
+    console.log('Content HTML:', contentHtml);
     
     try {
       // Create a clean version of mediaItems for database storage
@@ -133,9 +140,10 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
       
       console.log('Cleaned media items for storage:', mediaToSave);
       
+      // Use the HTML string content from our state
       const postData = {
         title: data.title,
-        content: data.content,
+        content: contentHtml, // Use the HTML string instead of complex object
         post_type: data.post_type,
         visibility: data.visibility,
         media: mediaToSave,
@@ -145,6 +153,8 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
       console.log('Post data being sent to database:', postData);
       
       if (isEditMode) {
+        // ... keep existing code (post update logic)
+        
         const { error } = await supabase
           .from('posts')
           .update(postData)
@@ -192,7 +202,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         });
       } else {
         // Create new post
-        console.log('Creating new post');
+        console.log('Creating new post with content type:', typeof postData.content);
         const { data: newPost, error } = await supabase
           .from('posts')
           .insert(postData)
@@ -299,7 +309,12 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
               <FormLabel>Content</FormLabel>
               <FormControl>
                 <RichTextEditor
-                  onChange={field.onChange}
+                  onChange={(json, html) => {
+                    // Store the HTML string for submission
+                    setContentHtml(html);
+                    // Keep the form field value in sync
+                    field.onChange(html);
+                  }}
                   value={field.value}
                   placeholder="What's on your mind?"
                 />
