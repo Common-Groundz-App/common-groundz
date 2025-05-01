@@ -63,7 +63,8 @@ interface CreatePostFormProps {
 
 // Helper function to simplify entity objects for storage
 const cleanEntityForStorage = (entity: Entity) => {
-  return {
+  // Create a simplified version of the entity with only the basic fields
+  const cleanedEntity = {
     id: entity.id,
     name: entity.name,
     type: entity.type || null,
@@ -71,6 +72,10 @@ const cleanEntityForStorage = (entity: Entity) => {
     description: entity.description || null,
     image_url: entity.image_url || null,
   };
+  
+  // Ensure we're not including any complex objects that can't be stringified
+  // This is especially important for metadata from Google Places API
+  return JSON.parse(JSON.stringify(cleanedEntity));
 };
 
 export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFormProps) {
@@ -150,6 +155,8 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         user_id: user.id,
       };
       
+      console.log("Selected entities before submission:", selectedEntities);
+      
       if (isEditMode) {
         const { error } = await supabase
           .from('posts')
@@ -157,7 +164,10 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           .eq('id', postToEdit.id)
           .eq('user_id', user.id);
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error updating post:", error);
+          throw error;
+        }
         
         if (selectedEntities.length > 0) {
           const { error: deleteError } = await supabase
@@ -165,11 +175,15 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
             .delete()
             .eq('post_id', postToEdit.id);
             
-          if (deleteError) throw deleteError;
+          if (deleteError) {
+            console.error("Error deleting old entities:", deleteError);
+            throw deleteError;
+          }
           
           for (const entity of selectedEntities) {
-            // Clean the entity object before inserting
+            // Clean the entity object before inserting - prevent circular references
             const cleanEntity = cleanEntityForStorage(entity);
+            console.log("Cleaned entity for insertion:", cleanEntity);
             
             const { error: insertError } = await supabase
               .from('post_entities')
@@ -178,7 +192,10 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
                 entity_id: cleanEntity.id
               });
               
-            if (insertError) throw insertError;
+            if (insertError) {
+              console.error("Error inserting entity:", insertError);
+              throw insertError;
+            }
           }
         }
         
@@ -193,12 +210,16 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           .select()
           .single();
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error creating post:", error);
+          throw error;
+        }
         
         if (selectedEntities.length > 0 && newPost) {
           for (const entity of selectedEntities) {
-            // Clean the entity object before inserting
+            // Clean the entity object before inserting - prevent circular references
             const cleanEntity = cleanEntityForStorage(entity);
+            console.log("Cleaned entity for insertion:", cleanEntity);
             
             const { error: entityError } = await supabase
               .from('post_entities')
@@ -207,7 +228,10 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
                 entity_id: cleanEntity.id
               });
               
-            if (entityError) throw entityError;
+            if (entityError) {
+              console.error("Error inserting entity:", entityError);
+              throw entityError;
+            }
           }
         }
         
@@ -302,7 +326,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         <div className="space-y-3">
           <FormLabel>Media</FormLabel>
           
-          {/* Media Uploader comes FIRST as requested */}
+          {/* Media Uploader comes FIRST */}
           <MediaUploader
             sessionId={sessionId}
             onMediaUploaded={handleMediaUploaded}
