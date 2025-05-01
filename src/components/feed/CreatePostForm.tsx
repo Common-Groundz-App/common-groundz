@@ -61,6 +61,18 @@ interface CreatePostFormProps {
   postToEdit?: PostToEdit;
 }
 
+// Helper function to simplify entity objects for storage
+const cleanEntityForStorage = (entity: Entity) => {
+  return {
+    id: entity.id,
+    name: entity.name,
+    type: entity.type || null,
+    venue: entity.venue || null,
+    description: entity.description || null,
+    image_url: entity.image_url || null,
+  };
+};
+
 export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -117,8 +129,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     setIsSubmitting(true);
     
     try {
-      // Prepare media items for storage
-      // Make sure we're sending a clean JSON structure without circular references
+      // Prepare media items for storage - clean structure without circular references
       const cleanMediaItems = mediaItems.map(item => ({
         url: item.url,
         type: item.type,
@@ -157,11 +168,14 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           if (deleteError) throw deleteError;
           
           for (const entity of selectedEntities) {
+            // Clean the entity object before inserting
+            const cleanEntity = cleanEntityForStorage(entity);
+            
             const { error: insertError } = await supabase
               .from('post_entities')
               .insert({
                 post_id: postToEdit.id,
-                entity_id: entity.id
+                entity_id: cleanEntity.id
               });
               
             if (insertError) throw insertError;
@@ -183,11 +197,14 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         
         if (selectedEntities.length > 0 && newPost) {
           for (const entity of selectedEntities) {
+            // Clean the entity object before inserting
+            const cleanEntity = cleanEntityForStorage(entity);
+            
             const { error: entityError } = await supabase
               .from('post_entities')
               .insert({
                 post_id: newPost.id,
-                entity_id: entity.id
+                entity_id: cleanEntity.id
               });
               
             if (entityError) throw entityError;
@@ -284,8 +301,16 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         
         <div className="space-y-3">
           <FormLabel>Media</FormLabel>
+          
+          {/* Media Uploader comes FIRST as requested */}
+          <MediaUploader
+            sessionId={sessionId}
+            onMediaUploaded={handleMediaUploaded}
+          />
+          
+          {/* Media Previews BELOW the uploader */}
           {mediaItems.length > 0 && (
-            <div className="mb-4">
+            <div className="mt-4">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {mediaItems.map((item, index) => (
                   <div key={index} className="relative border rounded-md overflow-hidden group">
@@ -320,11 +345,6 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
               </div>
             </div>
           )}
-          
-          <MediaUploader
-            sessionId={sessionId}
-            onMediaUploaded={handleMediaUploaded}
-          />
         </div>
         
         {(selectedEntity && !showEntitySelector) ? (
