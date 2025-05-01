@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,6 +31,8 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Json } from '@/integrations/supabase/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { X, Trash2 } from 'lucide-react';
 
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required' }).max(100),
@@ -114,14 +117,25 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     setIsSubmitting(true);
     
     try {
-      const mediaJson = JSON.parse(JSON.stringify(mediaItems)) as Json;
+      // Prepare media items for storage
+      // Make sure we're sending a clean JSON structure without circular references
+      const cleanMediaItems = mediaItems.map(item => ({
+        url: item.url,
+        type: item.type,
+        caption: item.caption || '',
+        alt: item.alt || '',
+        order: item.order || 0,
+        thumbnail_url: item.thumbnail_url || '',
+        session_id: item.session_id || '',
+        id: item.id || generateUUID()
+      }));
       
       const postData = {
         title: data.title,
         content: data.content,
         post_type: data.post_type,
         visibility: data.visibility,
-        media: mediaJson,
+        media: cleanMediaItems,
         user_id: user.id,
       };
       
@@ -209,6 +223,19 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     });
   };
 
+  const handleRemoveMedia = (indexToRemove: number) => {
+    setMediaItems(prev => {
+      // Remove the item at the specified index
+      const newMediaItems = prev.filter((_, index) => index !== indexToRemove);
+      
+      // Re-order the remaining items
+      return newMediaItems.map((item, index) => ({
+        ...item,
+        order: index
+      }));
+    });
+  };
+
   const handleEntitiesChange = (entities: Entity[]) => {
     setSelectedEntities(entities);
   };
@@ -255,23 +282,45 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           )}
         />
         
-        <div>
-          {isEditMode && mediaItems.length > 0 && (
+        <div className="space-y-3">
+          <FormLabel>Media</FormLabel>
+          {mediaItems.length > 0 && (
             <div className="mb-4">
-              <p className="text-sm font-medium mb-2">Current Media</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {mediaItems.map((item, index) => (
-                  <div key={index} className="relative border rounded overflow-hidden">
+                  <div key={index} className="relative border rounded-md overflow-hidden group">
                     {item.type === 'image' ? (
-                      <img src={item.url} alt={item.alt || `Image ${index + 1}`} className="w-full h-40 object-cover" />
+                      <div className="aspect-video relative">
+                        <ImageWithFallback 
+                          src={item.url} 
+                          alt={item.alt || `Image ${index + 1}`} 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                     ) : (
-                      <video src={item.url} className="w-full h-40 object-cover" />
+                      <div className="aspect-video relative">
+                        <video 
+                          src={item.url} 
+                          className="w-full h-full object-cover" 
+                          controls 
+                        />
+                      </div>
                     )}
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleRemoveMedia(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
             </div>
           )}
+          
           <MediaUploader
             sessionId={sessionId}
             onMediaUploaded={handleMediaUploaded}
