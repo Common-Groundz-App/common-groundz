@@ -114,19 +114,35 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     if (!user) return;
     
     setIsSubmitting(true);
+    console.log('Starting form submission with data:', data);
+    console.log('Selected entities:', selectedEntities);
+    console.log('Media items:', mediaItems);
     
     try {
       // Create a clean version of mediaItems for database storage
-      const mediaJson = JSON.parse(JSON.stringify(mediaItems)) as Json;
+      // Using direct serialization to avoid circular references
+      const mediaToSave = mediaItems.map(item => ({
+        id: item.id || generateUUID(),
+        url: item.url,
+        type: item.type,
+        caption: item.caption || '',
+        alt: item.alt || '',
+        order: item.order,
+        thumbnail_url: item.thumbnail_url || item.url
+      }));
+      
+      console.log('Cleaned media items for storage:', mediaToSave);
       
       const postData = {
         title: data.title,
         content: data.content,
         post_type: data.post_type,
         visibility: data.visibility,
-        media: mediaJson,
+        media: mediaToSave,
         user_id: user.id,
       };
+      
+      console.log('Post data being sent to database:', postData);
       
       if (isEditMode) {
         const { error } = await supabase
@@ -135,7 +151,10 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           .eq('id', postToEdit.id)
           .eq('user_id', user.id);
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating post:', error);
+          throw error;
+        }
         
         if (selectedEntities.length > 0) {
           // Delete existing entity relationships
@@ -144,7 +163,12 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
             .delete()
             .eq('post_id', postToEdit.id);
             
-          if (deleteError) throw deleteError;
+          if (deleteError) {
+            console.error('Error deleting existing entity relationships:', deleteError);
+            throw deleteError;
+          }
+          
+          console.log('Adding entity relationships for entities:', selectedEntities.map(e => e.id));
           
           // Re-add entity relationships with just the entity ID
           for (const entity of selectedEntities) {
@@ -155,7 +179,10 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
                 entity_id: entity.id
               });
               
-            if (insertError) throw insertError;
+            if (insertError) {
+              console.error('Error inserting entity relationship:', insertError);
+              throw insertError;
+            }
           }
         }
         
@@ -165,17 +192,27 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         });
       } else {
         // Create new post
+        console.log('Creating new post');
         const { data: newPost, error } = await supabase
           .from('posts')
           .insert(postData)
           .select()
           .single();
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error creating post:', error);
+          throw error;
+        }
+        
+        console.log('New post created:', newPost);
         
         // Add entity relationships with just the entity ID
         if (selectedEntities.length > 0 && newPost) {
+          console.log('Adding entity relationships for new post');
+          
           for (const entity of selectedEntities) {
+            console.log('Adding relationship for entity:', entity.id);
+            
             const { error: entityError } = await supabase
               .from('post_entities')
               .insert({
@@ -183,7 +220,10 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
                 entity_id: entity.id
               });
               
-            if (entityError) throw entityError;
+            if (entityError) {
+              console.error('Error creating entity relationship:', entityError);
+              throw entityError;
+            }
           }
         }
         
@@ -207,6 +247,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
   };
 
   const handleMediaUploaded = (media: MediaItem) => {
+    console.log('Media uploaded:', media);
     setMediaItems(prev => {
       const newMedia = {
         ...media,
@@ -217,10 +258,12 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
   };
 
   const handleEntitiesChange = (entities: Entity[]) => {
+    console.log('Entities changed:', entities);
     setSelectedEntities(entities);
   };
 
   const handleRemoveMedia = (mediaToRemove: MediaItem) => {
+    console.log('Removing media:', mediaToRemove);
     setMediaItems(prev => prev.filter(media => media.id !== mediaToRemove.id));
   };
 
@@ -310,6 +353,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           <div>
             <EntityTagSelector
               onEntitiesChange={(entities) => {
+                console.log('EntityTagSelector selected entities:', entities);
                 setSelectedEntities(entities);
                 setSelectedEntity(entities[0]);
                 setShowEntitySelector(false);
