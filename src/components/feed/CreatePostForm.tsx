@@ -63,8 +63,8 @@ interface CreatePostFormProps {
 
 // Helper function to simplify entity objects for storage
 const cleanEntityForStorage = (entity: Entity) => {
-  // Create a simplified version of the entity with only the basic fields
-  const cleanedEntity = {
+  // First, extract only the basic fields we need to avoid circular references
+  const basicEntity = {
     id: entity.id,
     name: entity.name,
     type: entity.type || null,
@@ -73,9 +73,9 @@ const cleanEntityForStorage = (entity: Entity) => {
     image_url: entity.image_url || null,
   };
   
-  // Ensure we're not including any complex objects that can't be stringified
-  // This is especially important for metadata from Google Places API
-  return JSON.parse(JSON.stringify(cleanedEntity));
+  // We don't need to return the whole entity object for post_entities table
+  // Since we only need the ID for the relationship
+  return basicEntity.id;
 };
 
 export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFormProps) {
@@ -180,16 +180,17 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
             throw deleteError;
           }
           
+          // Process each entity one by one
           for (const entity of selectedEntities) {
-            // Clean the entity object before inserting - prevent circular references
-            const cleanEntity = cleanEntityForStorage(entity);
-            console.log("Cleaned entity for insertion:", cleanEntity);
+            // Get only the entity ID for insertion
+            const entityId = cleanEntityForStorage(entity);
+            console.log("Using entity ID for insertion:", entityId);
             
             const { error: insertError } = await supabase
               .from('post_entities')
               .insert({
                 post_id: postToEdit.id,
-                entity_id: cleanEntity.id
+                entity_id: entityId
               });
               
             if (insertError) {
@@ -216,16 +217,17 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         }
         
         if (selectedEntities.length > 0 && newPost) {
+          // Process each entity one by one
           for (const entity of selectedEntities) {
-            // Clean the entity object before inserting - prevent circular references
-            const cleanEntity = cleanEntityForStorage(entity);
-            console.log("Cleaned entity for insertion:", cleanEntity);
+            // Get only the entity ID for insertion
+            const entityId = cleanEntityForStorage(entity);
+            console.log("Using entity ID for insertion:", entityId);
             
             const { error: entityError } = await supabase
               .from('post_entities')
               .insert({
                 post_id: newPost.id,
-                entity_id: cleanEntity.id
+                entity_id: entityId
               });
               
             if (entityError) {
