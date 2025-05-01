@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -31,8 +30,6 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Json } from '@/integrations/supabase/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { X, Trash2 } from 'lucide-react';
 
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required' }).max(100),
@@ -60,23 +57,6 @@ interface CreatePostFormProps {
   onCancel: () => void;
   postToEdit?: PostToEdit;
 }
-
-// Helper function to simplify entity objects for storage
-const cleanEntityForStorage = (entity: Entity) => {
-  // First, extract only the basic fields we need to avoid circular references
-  const basicEntity = {
-    id: entity.id,
-    name: entity.name,
-    type: entity.type || null,
-    venue: entity.venue || null,
-    description: entity.description || null,
-    image_url: entity.image_url || null,
-  };
-  
-  // We don't need to return the whole entity object for post_entities table
-  // Since we only need the ID for the relationship
-  return basicEntity.id;
-};
 
 export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFormProps) {
   const { user } = useAuth();
@@ -134,28 +114,16 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     setIsSubmitting(true);
     
     try {
-      // Prepare media items for storage - clean structure without circular references
-      const cleanMediaItems = mediaItems.map(item => ({
-        url: item.url,
-        type: item.type,
-        caption: item.caption || '',
-        alt: item.alt || '',
-        order: item.order || 0,
-        thumbnail_url: item.thumbnail_url || '',
-        session_id: item.session_id || '',
-        id: item.id || generateUUID()
-      }));
+      const mediaJson = JSON.parse(JSON.stringify(mediaItems)) as Json;
       
       const postData = {
         title: data.title,
         content: data.content,
         post_type: data.post_type,
         visibility: data.visibility,
-        media: cleanMediaItems,
+        media: mediaJson,
         user_id: user.id,
       };
-      
-      console.log("Selected entities before submission:", selectedEntities);
       
       if (isEditMode) {
         const { error } = await supabase
@@ -164,10 +132,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           .eq('id', postToEdit.id)
           .eq('user_id', user.id);
           
-        if (error) {
-          console.error("Error updating post:", error);
-          throw error;
-        }
+        if (error) throw error;
         
         if (selectedEntities.length > 0) {
           const { error: deleteError } = await supabase
@@ -175,28 +140,17 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
             .delete()
             .eq('post_id', postToEdit.id);
             
-          if (deleteError) {
-            console.error("Error deleting old entities:", deleteError);
-            throw deleteError;
-          }
+          if (deleteError) throw deleteError;
           
-          // Process each entity one by one
           for (const entity of selectedEntities) {
-            // Get only the entity ID for insertion
-            const entityId = cleanEntityForStorage(entity);
-            console.log("Using entity ID for insertion:", entityId);
-            
             const { error: insertError } = await supabase
               .from('post_entities')
               .insert({
                 post_id: postToEdit.id,
-                entity_id: entityId
+                entity_id: entity.id
               });
               
-            if (insertError) {
-              console.error("Error inserting entity:", insertError);
-              throw insertError;
-            }
+            if (insertError) throw insertError;
           }
         }
         
@@ -211,29 +165,18 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           .select()
           .single();
           
-        if (error) {
-          console.error("Error creating post:", error);
-          throw error;
-        }
+        if (error) throw error;
         
         if (selectedEntities.length > 0 && newPost) {
-          // Process each entity one by one
           for (const entity of selectedEntities) {
-            // Get only the entity ID for insertion
-            const entityId = cleanEntityForStorage(entity);
-            console.log("Using entity ID for insertion:", entityId);
-            
             const { error: entityError } = await supabase
               .from('post_entities')
               .insert({
                 post_id: newPost.id,
-                entity_id: entityId
+                entity_id: entity.id
               });
               
-            if (entityError) {
-              console.error("Error inserting entity:", entityError);
-              throw entityError;
-            }
+            if (entityError) throw entityError;
           }
         }
         
@@ -263,19 +206,6 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         order: prev.length
       };
       return [...prev, newMedia];
-    });
-  };
-
-  const handleRemoveMedia = (indexToRemove: number) => {
-    setMediaItems(prev => {
-      // Remove the item at the specified index
-      const newMediaItems = prev.filter((_, index) => index !== indexToRemove);
-      
-      // Re-order the remaining items
-      return newMediaItems.map((item, index) => ({
-        ...item,
-        order: index
-      }));
     });
   };
 
@@ -325,52 +255,27 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           )}
         />
         
-        <div className="space-y-3">
-          <FormLabel>Media</FormLabel>
-          
-          {/* Media Uploader comes FIRST */}
-          <MediaUploader
-            sessionId={sessionId}
-            onMediaUploaded={handleMediaUploaded}
-          />
-          
-          {/* Media Previews BELOW the uploader */}
-          {mediaItems.length > 0 && (
-            <div className="mt-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div>
+          {isEditMode && mediaItems.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm font-medium mb-2">Current Media</p>
+              <div className="grid grid-cols-2 gap-2">
                 {mediaItems.map((item, index) => (
-                  <div key={index} className="relative border rounded-md overflow-hidden group">
+                  <div key={index} className="relative border rounded overflow-hidden">
                     {item.type === 'image' ? (
-                      <div className="aspect-video relative">
-                        <ImageWithFallback 
-                          src={item.url} 
-                          alt={item.alt || `Image ${index + 1}`} 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                      <img src={item.url} alt={item.alt || `Image ${index + 1}`} className="w-full h-40 object-cover" />
                     ) : (
-                      <div className="aspect-video relative">
-                        <video 
-                          src={item.url} 
-                          className="w-full h-full object-cover" 
-                          controls 
-                        />
-                      </div>
+                      <video src={item.url} className="w-full h-40 object-cover" />
                     )}
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleRemoveMedia(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
                   </div>
                 ))}
               </div>
             </div>
           )}
+          <MediaUploader
+            sessionId={sessionId}
+            onMediaUploaded={handleMediaUploaded}
+          />
         </div>
         
         {(selectedEntity && !showEntitySelector) ? (
