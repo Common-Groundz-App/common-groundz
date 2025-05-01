@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,6 +31,7 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Json } from '@/integrations/supabase/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
+import { X } from 'lucide-react';
 
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required' }).max(100),
@@ -114,6 +116,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     setIsSubmitting(true);
     
     try {
+      // Create a clean version of mediaItems for database storage
       const mediaJson = JSON.parse(JSON.stringify(mediaItems)) as Json;
       
       const postData = {
@@ -135,6 +138,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         if (error) throw error;
         
         if (selectedEntities.length > 0) {
+          // Delete existing entity relationships
           const { error: deleteError } = await supabase
             .from('post_entities')
             .delete()
@@ -142,6 +146,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
             
           if (deleteError) throw deleteError;
           
+          // Re-add entity relationships with just the entity ID
           for (const entity of selectedEntities) {
             const { error: insertError } = await supabase
               .from('post_entities')
@@ -159,6 +164,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           description: 'Your post has been updated successfully.',
         });
       } else {
+        // Create new post
         const { data: newPost, error } = await supabase
           .from('posts')
           .insert(postData)
@@ -167,6 +173,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           
         if (error) throw error;
         
+        // Add entity relationships with just the entity ID
         if (selectedEntities.length > 0 && newPost) {
           for (const entity of selectedEntities) {
             const { error: entityError } = await supabase
@@ -213,6 +220,10 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     setSelectedEntities(entities);
   };
 
+  const handleRemoveMedia = (mediaToRemove: MediaItem) => {
+    setMediaItems(prev => prev.filter(media => media.id !== mediaToRemove.id));
+  };
+
   function getEntityTypeLabel(entity: Entity | null): string {
     if (!entity) return "place";
     if ((entity as any).entity_type) return (entity as any).entity_type;
@@ -256,26 +267,37 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
         />
         
         <div>
-          {isEditMode && mediaItems.length > 0 && (
-            <div className="mb-4">
-              <p className="text-sm font-medium mb-2">Current Media</p>
+          <MediaUploader
+            sessionId={sessionId}
+            onMediaUploaded={handleMediaUploaded}
+          />
+          
+          {/* Media Preview Section */}
+          {mediaItems.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium mb-2">Media Preview</p>
               <div className="grid grid-cols-2 gap-2">
                 {mediaItems.map((item, index) => (
-                  <div key={index} className="relative border rounded overflow-hidden">
+                  <div key={item.id || index} className="relative border rounded overflow-hidden group">
                     {item.type === 'image' ? (
                       <img src={item.url} alt={item.alt || `Image ${index + 1}`} className="w-full h-40 object-cover" />
                     ) : (
                       <video src={item.url} className="w-full h-40 object-cover" />
                     )}
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100"
+                      onClick={() => handleRemoveMedia(item)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
             </div>
           )}
-          <MediaUploader
-            sessionId={sessionId}
-            onMediaUploaded={handleMediaUploaded}
-          />
         </div>
         
         {(selectedEntity && !showEntitySelector) ? (
@@ -288,6 +310,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           <div>
             <EntityTagSelector
               onEntitiesChange={(entities) => {
+                setSelectedEntities(entities);
                 setSelectedEntity(entities[0]);
                 setShowEntitySelector(false);
                 form.setValue('tagged_entities', entities);
