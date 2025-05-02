@@ -21,6 +21,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
   const { user } = useAuth();
+  const [showRecLoading, setShowRecLoading] = useState(false);
 
   // Listen for the "open-create-post-dialog" event
   useEffect(() => {
@@ -92,6 +93,19 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
     setIsDialogOpen(true);
   };
 
+  const handleRecommendationSelect = () => {
+    // Show loading state
+    setShowRecLoading(true);
+    setIsDialogOpen(true);
+    
+    // Use setTimeout to trigger the recommendation form event after a short delay
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('open-recommendation-form'));
+      setIsDialogOpen(false);
+      setShowRecLoading(false);
+    }, 100);
+  };
+
   return (
     <>
       <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
@@ -139,7 +153,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               </button>
               <button
                 className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
-                onClick={() => handleContentTypeSelect('recommendation')}
+                onClick={handleRecommendationSelect}
               >
                 <Tag size={16} className="text-red-500" />
                 <span>Recommendation</span>
@@ -184,14 +198,9 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
             />
           )}
           
-          {selectedContentType === 'recommendation' && (
+          {selectedContentType === 'recommendation' && showRecLoading && (
             <div className="p-4 text-center text-muted-foreground">
               <p>Opening recommendation form...</p>
-              {/* This will trigger the recommendation form to open via event */}
-              {setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('open-recommendation-form'));
-                setIsDialogOpen(false);
-              }, 100)}
             </div>
           )}
           
