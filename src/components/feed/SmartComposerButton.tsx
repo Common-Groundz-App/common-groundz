@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Star, Book, Tag, FileText, Eye } from 'lucide-react';
@@ -162,6 +161,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               What would you like to create?
             </div>
             <div className="py-1">
+              {/* Rearranged order of content type options */}
               <button
                 className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
                 onClick={() => handleContentTypeSelect('post')}
@@ -178,6 +178,13 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               </button>
               <button
                 className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
+                onClick={handleRecommendationSelect}
+              >
+                <Tag size={16} className="text-red-500" />
+                <span>Recommendation</span>
+              </button>
+              <button
+                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
                 onClick={() => handleContentTypeSelect('journal')}
               >
                 <Book size={16} className="text-green-500" />
@@ -189,13 +196,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               >
                 <Eye size={16} className="text-purple-500" />
                 <span>Currently Watching/Using</span>
-              </button>
-              <button
-                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
-                onClick={handleRecommendationSelect}
-              >
-                <Tag size={16} className="text-red-500" />
-                <span>Recommendation</span>
               </button>
             </div>
           </div>
