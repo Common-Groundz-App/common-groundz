@@ -16,7 +16,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
   const [searchQuery, setSearchQuery] = useState('');
   const [entityType, setEntityType] = useState<EntityType>('place');
   
-  const { localResults, externalResults, isLoading, handleSearch } = useEntitySearch(entityType);
+  const { localResults, externalResults, isLoading, handleSearch, createEntityFromExternal } = useEntitySearch(entityType);
 
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -37,8 +37,14 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     }
   };
 
-  // Combine local and external results
-  const results = [...localResults, ...externalResults];
+  // Handle external result selection
+  const handleExternalResultSelect = async (result: any) => {
+    // Create an entity from the external result
+    const entity = await createEntityFromExternal(result);
+    if (entity) {
+      handleEntitySelect(entity);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -77,24 +83,49 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
           <div className="border rounded-md max-h-40 overflow-y-auto">
             {isLoading ? (
               <div className="p-2 text-sm text-center">Loading...</div>
-            ) : results.length > 0 ? (
-              <div className="divide-y">
-                {results.map((entity) => (
-                  <Button
-                    key={entity.id}
-                    type="button"
-                    variant="ghost"
-                    className="w-full justify-start text-left h-auto py-2 px-3"
-                    onClick={() => handleEntitySelect(entity)}
-                  >
-                    <span className="truncate">{entity.name}</span>
-                  </Button>
-                ))}
-              </div>
             ) : (
-              <div className="p-2 text-sm text-center text-muted-foreground">
-                No results found
-              </div>
+              <>
+                {/* Local Results Section */}
+                {localResults.length > 0 && (
+                  <div className="divide-y">
+                    {localResults.map((entity) => (
+                      <Button
+                        key={entity.id}
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start text-left h-auto py-2 px-3"
+                        onClick={() => handleEntitySelect(entity)}
+                      >
+                        <span className="truncate">{entity.name}</span>
+                      </Button>
+                    ))}
+                  </div>
+                )}
+                
+                {/* External Results Section */}
+                {externalResults.length > 0 && (
+                  <div className="divide-y">
+                    {externalResults.map((result, index) => (
+                      <Button
+                        key={`external-${index}-${result.name}`}
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start text-left h-auto py-2 px-3"
+                        onClick={() => handleExternalResultSelect(result)}
+                      >
+                        <span className="truncate">{result.name}</span>
+                      </Button>
+                    ))}
+                  </div>
+                )}
+                
+                {/* No Results Message */}
+                {localResults.length === 0 && externalResults.length === 0 && (
+                  <div className="p-2 text-sm text-center text-muted-foreground">
+                    No results found
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
