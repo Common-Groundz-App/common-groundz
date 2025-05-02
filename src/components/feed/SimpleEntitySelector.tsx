@@ -16,14 +16,14 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
   const [searchQuery, setSearchQuery] = useState('');
   const [entityType, setEntityType] = useState<EntityType>('place');
   
-  const { results, isLoading, search } = useEntitySearch(entityType);
+  const { localResults, externalResults, isLoading, handleSearch } = useEntitySearch(entityType);
 
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
     if (query.length >= 2) {
-      search(query);
+      handleSearch(query);
     }
   };
   
@@ -36,6 +36,9 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
       setSearchQuery('');
     }
   };
+
+  // Combine local and external results
+  const results = [...localResults, ...externalResults];
 
   return (
     <div className="space-y-3">

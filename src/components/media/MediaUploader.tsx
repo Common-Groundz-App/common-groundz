@@ -15,9 +15,16 @@ interface MediaUploaderProps {
   onMediaUploaded: (media: MediaItem) => void;
   initialMedia?: MediaItem[];
   className?: string;
+  customButton?: React.ReactNode;
 }
 
-export function MediaUploader({ sessionId, onMediaUploaded, initialMedia = [], className }: MediaUploaderProps) {
+export function MediaUploader({ 
+  sessionId, 
+  onMediaUploaded, 
+  initialMedia = [], 
+  className,
+  customButton 
+}: MediaUploaderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploads, setUploads] = useState<MediaUploadState[]>([]);
@@ -106,6 +113,60 @@ export function MediaUploader({ sessionId, onMediaUploaded, initialMedia = [], c
   const cancelUpload = (uploadToCancel: MediaUploadState) => {
     setUploads(prev => prev.filter(upload => upload !== uploadToCancel));
   };
+  
+  // If a custom button is provided, render it with the file selector logic
+  if (customButton) {
+    return (
+      <div className={className}>
+        <div onClick={() => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.multiple = true;
+          input.accept = ALLOWED_MEDIA_TYPES.join(',');
+          input.onchange = (e) => handleFileSelect((e.target as HTMLInputElement).files);
+          input.click();
+        }}>
+          {customButton}
+        </div>
+        
+        {uploads.length > 0 && (
+          <div className="space-y-2 mt-2">
+            {uploads.map((upload, index) => (
+              <div key={index} className="flex items-center space-x-2 border rounded-md p-2">
+                <div className="flex-shrink-0">
+                  {upload.file.type.startsWith('image/') ? (
+                    <ImageIcon size={20} className="text-blue-500" />
+                  ) : (
+                    <Film size={20} className="text-purple-500" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate">{upload.file.name}</p>
+                  <Progress value={upload.progress} className="h-1 mt-1" />
+                </div>
+                <div className="flex-shrink-0">
+                  {upload.status === 'success' ? (
+                    <div className="text-green-500 text-sm">✓</div>
+                  ) : upload.status === 'error' ? (
+                    <div className="text-red-500 text-sm">✗</div>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6"
+                      onClick={() => cancelUpload(upload)}
+                    >
+                      <X size={14} />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
   
   return (
     <div className={cn("space-y-4", className)}>
