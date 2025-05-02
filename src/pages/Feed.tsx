@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -362,7 +361,7 @@ const Feed = () => {
                     <p className="text-muted-foreground">Your personalized feed</p>
                   </div>
                   
-                  <SmartComposerButton onPostCreated={handlePostCreated} />
+                  <SmartComposerButton onContentCreated={handlePostCreated} />
                 </div>
               </div>
               

@@ -11,11 +11,12 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface SmartComposerButtonProps {
   onContentCreated?: () => void;
+  onPostCreated?: () => void; // Add compatibility with old prop name
 }
 
 type ContentType = 'post' | 'review' | 'journal' | 'recommendation' | 'watching';
 
-export function SmartComposerButton({ onContentCreated }: SmartComposerButtonProps) {
+export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartComposerButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
   const { user } = useAuth();
@@ -53,7 +54,9 @@ export function SmartComposerButton({ onContentCreated }: SmartComposerButtonPro
     window.dispatchEvent(new CustomEvent('refresh-following-feed'));
     window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
     
+    // Call both callback props for compatibility
     if (onContentCreated) onContentCreated();
+    if (onPostCreated) onPostCreated();
   };
   
   const getDialogTitle = () => {
@@ -151,7 +154,7 @@ export function SmartComposerButton({ onContentCreated }: SmartComposerButtonPro
               <CreatePostForm 
                 onSuccess={handleContentCreated}
                 onCancel={() => setIsDialogOpen(false)}
-                defaultPostType="journal"
+                defaultPostType="note"
               />
             </TabsContent>
             
@@ -172,11 +175,11 @@ export function SmartComposerButton({ onContentCreated }: SmartComposerButtonPro
             </TabsContent>
             
             <TabsContent value="watching" className={cn(selectedContentType !== 'watching' && 'hidden')}>
-              {/* For now, we'll reuse the CreatePostForm but with watching type */}
+              {/* For now, we'll reuse the CreatePostForm but with note type */}
               <CreatePostForm 
                 onSuccess={handleContentCreated}
                 onCancel={() => setIsDialogOpen(false)}
-                defaultPostType="watching"
+                defaultPostType="note"
               />
             </TabsContent>
           </Tabs>
@@ -185,3 +188,4 @@ export function SmartComposerButton({ onContentCreated }: SmartComposerButtonPro
     </>
   );
 }
+

@@ -32,10 +32,24 @@ import { Json } from '@/integrations/supabase/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import { X } from 'lucide-react';
 
+// Define valid database post types
+type DatabasePostType = 'story' | 'routine' | 'project' | 'note';
+// Define all UI post types
+type UIPostType = DatabasePostType | 'journal' | 'watching';
+
+// Map UI post types to database post types
+const mapPostTypeToDatabase = (uiType: UIPostType): DatabasePostType => {
+  switch (uiType) {
+    case 'journal': return 'note';  // Map journal to note
+    case 'watching': return 'note'; // Map watching to note
+    default: return uiType as DatabasePostType;
+  }
+};
+
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required' }).max(100),
   content: z.string().min(1, { message: 'Content is required' }),
-  post_type: z.enum(['story', 'routine', 'project', 'note', 'journal', 'watching']),
+  post_type: z.enum(['story', 'routine', 'project', 'note', 'journal', 'watching'] as const),
   visibility: z.enum(['public', 'circle_only', 'private']),
   media: z.array(z.any()).optional(),
   tagged_entities: z.array(z.any()).optional(),
@@ -47,7 +61,7 @@ interface PostToEdit {
   id: string;
   title: string;
   content: string;
-  post_type: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching';
+  post_type: UIPostType;
   visibility: 'public' | 'circle_only' | 'private';
   tagged_entities?: Entity[];
   media?: MediaItem[];
@@ -57,7 +71,7 @@ interface CreatePostFormProps {
   onSuccess: () => void;
   onCancel: () => void;
   postToEdit?: PostToEdit;
-  defaultPostType?: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching';
+  defaultPostType?: UIPostType;
 }
 
 export function CreatePostForm({ 
@@ -149,11 +163,14 @@ export function CreatePostForm({
       
       console.log('Cleaned media items for storage:', mediaToSave);
       
+      // Map UI post type to valid database post type
+      const databasePostType = mapPostTypeToDatabase(data.post_type);
+      
       // Use the HTML string content from our state
       const postData = {
         title: data.title,
         content: contentHtml, // Use the HTML string instead of complex object
-        post_type: data.post_type,
+        post_type: databasePostType, // Use the mapped database-compatible post type
         visibility: data.visibility,
         media: mediaToSave,
         user_id: user.id,
