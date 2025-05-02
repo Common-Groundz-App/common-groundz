@@ -35,7 +35,7 @@ import { X } from 'lucide-react';
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required' }).max(100),
   content: z.string().min(1, { message: 'Content is required' }),
-  post_type: z.enum(['story', 'routine', 'project', 'note']),
+  post_type: z.enum(['story', 'routine', 'project', 'note', 'journal', 'watching']),
   visibility: z.enum(['public', 'circle_only', 'private']),
   media: z.array(z.any()).optional(),
   tagged_entities: z.array(z.any()).optional(),
@@ -47,7 +47,7 @@ interface PostToEdit {
   id: string;
   title: string;
   content: string;
-  post_type: 'story' | 'routine' | 'project' | 'note';
+  post_type: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching';
   visibility: 'public' | 'circle_only' | 'private';
   tagged_entities?: Entity[];
   media?: MediaItem[];
@@ -57,9 +57,15 @@ interface CreatePostFormProps {
   onSuccess: () => void;
   onCancel: () => void;
   postToEdit?: PostToEdit;
+  defaultPostType?: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching';
 }
 
-export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFormProps) {
+export function CreatePostForm({ 
+  onSuccess, 
+  onCancel, 
+  postToEdit,
+  defaultPostType = 'story' 
+}: CreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,7 +83,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     defaultValues: {
       title: '',
       content: '',
-      post_type: 'story',
+      post_type: defaultPostType,
       visibility: 'public',
       media: [],
       tagged_entities: [],
@@ -113,8 +119,11 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
       if (postToEdit.media) {
         setMediaItems(postToEdit.media);
       }
+    } else {
+      // For new posts, set the default post type
+      form.setValue('post_type', defaultPostType);
     }
-  }, [postToEdit, form]);
+  }, [postToEdit, form, defaultPostType]);
 
   const onSubmit = async (data: FormData) => {
     if (!user) return;
@@ -284,6 +293,48 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
     return "place";
   }
 
+  // Get placeholder text based on post type
+  const getPlaceholderText = () => {
+    const postType = form.watch('post_type');
+    switch (postType) {
+      case 'journal':
+        return "Share your journey, progress, or experiences...";
+      case 'watching':
+        return "What are you currently watching, reading, or doing?";
+      case 'story':
+        return "Share your story with the community...";
+      case 'routine':
+        return "Share your routine or process...";
+      case 'project':
+        return "Tell us about your project...";
+      case 'note':
+        return "What's on your mind?";
+      default:
+        return "What's on your mind?";
+    }
+  };
+
+  // Get title label based on post type
+  const getTitleLabel = () => {
+    const postType = form.watch('post_type');
+    switch (postType) {
+      case 'journal':
+        return "Journal Title";
+      case 'watching':
+        return "What are you watching/doing?";
+      case 'story':
+        return "Story Title";
+      case 'routine':
+        return "Routine Name";
+      case 'project':
+        return "Project Name";
+      case 'note':
+        return "Title";
+      default:
+        return "Title";
+    }
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
@@ -292,9 +343,9 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           name="title"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Title</FormLabel>
+              <FormLabel>{getTitleLabel()}</FormLabel>
               <FormControl>
-                <Input placeholder="Add a title..." {...field} />
+                <Input placeholder={`Add a title...`} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -316,7 +367,7 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
                     field.onChange(html);
                   }}
                   value={field.value}
-                  placeholder="What's on your mind?"
+                  placeholder={getPlaceholderText()}
                 />
               </FormControl>
               <FormMessage />
@@ -324,39 +375,32 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
           )}
         />
         
-        <div>
-          <MediaUploader
-            sessionId={sessionId}
-            onMediaUploaded={handleMediaUploaded}
-          />
-          
-          {/* Media Preview Section */}
-          {mediaItems.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm font-medium mb-2">Media Preview</p>
-              <div className="grid grid-cols-2 gap-2">
-                {mediaItems.map((item, index) => (
-                  <div key={item.id || index} className="relative border rounded overflow-hidden group">
-                    {item.type === 'image' ? (
-                      <img src={item.url} alt={item.alt || `Image ${index + 1}`} className="w-full h-40 object-cover" />
-                    ) : (
-                      <video src={item.url} className="w-full h-40 object-cover" />
-                    )}
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100"
-                      onClick={() => handleRemoveMedia(item)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+        {/* Media Preview Section */}
+        {mediaItems.length > 0 && (
+          <div className="mt-4">
+            <p className="text-sm font-medium mb-2">Media Preview</p>
+            <div className="grid grid-cols-2 gap-2">
+              {mediaItems.map((item, index) => (
+                <div key={item.id || index} className="relative border rounded overflow-hidden group">
+                  {item.type === 'image' ? (
+                    <img src={item.url} alt={item.alt || `Image ${index + 1}`} className="w-full h-40 object-cover" />
+                  ) : (
+                    <video src={item.url} className="w-full h-40 object-cover" />
+                  )}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100"
+                    onClick={() => handleRemoveMedia(item)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
         
         {(selectedEntity && !showEntitySelector) ? (
           <EntityPreviewCard
@@ -397,6 +441,8 @@ export function CreatePostForm({ onSuccess, onCancel, postToEdit }: CreatePostFo
                       <SelectItem value="story">Story</SelectItem>
                       <SelectItem value="routine">Routine</SelectItem>
                       <SelectItem value="project">Project</SelectItem>
+                      <SelectItem value="journal">Journal</SelectItem>
+                      <SelectItem value="watching">Currently Watching/Doing</SelectItem>
                       <SelectItem value="note">Note</SelectItem>
                     </SelectContent>
                   </Select>

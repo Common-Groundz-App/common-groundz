@@ -9,7 +9,7 @@ import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreatePostButton } from '@/components/feed/CreatePostButton';
+import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
 import { Bell, Search, RefreshCw, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -362,7 +362,7 @@ const Feed = () => {
                     <p className="text-muted-foreground">Your personalized feed</p>
                   </div>
                   
-                  <CreatePostButton onPostCreated={handlePostCreated} />
+                  <SmartComposerButton onPostCreated={handlePostCreated} />
                 </div>
               </div>
               

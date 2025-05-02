@@ -24,12 +24,15 @@ export const BottomNavigation = () => {
     { name: 'Home', path: '/home', icon: Home },
     { name: 'Explore', path: '/explore', icon: Search },
     { 
-      name: 'Add', 
-      path: '#add', 
+      name: 'Create', 
+      path: '#create', 
       icon: PlusCircle, 
       primary: true, 
       onClick: () => {
-        const event = new CustomEvent('open-recommendation-form');
+        // Open the smart composer with the default post type
+        const event = new CustomEvent('open-create-post-dialog', {
+          detail: { contentType: 'post' }
+        });
         window.dispatchEvent(event);
       }
     },
