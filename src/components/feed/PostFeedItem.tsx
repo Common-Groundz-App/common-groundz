@@ -21,11 +21,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CreatePostForm } from '@/components/feed/CreatePostForm';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { ModernCreatePostForm } from '@/components/feed/ModernCreatePostForm';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getPostTypeLabel } from './utils/postUtils';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -115,16 +116,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       return `${diffInDays} days ago`;
     } else {
       return format(date, 'MMM d, yyyy');
-    }
-  };
-
-  const getPostTypeLabel = (type: string) => {
-    switch(type) {
-      case 'story': return 'Story';
-      case 'routine': return 'Routine';
-      case 'project': return 'Project';
-      case 'note': return 'Note';
-      default: return type;
     }
   };
 
@@ -356,10 +347,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Post</DialogTitle>
-          </DialogHeader>
-          <CreatePostForm 
+          <ModernCreatePostForm 
             postToEdit={post}
             onSuccess={handleEditSuccess}
             onCancel={() => setIsEditDialogOpen(false)}

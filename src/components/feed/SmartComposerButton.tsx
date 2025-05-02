@@ -1,11 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Star, Book, Tag, FileText, Eye } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { CreatePostForm } from './CreatePostForm';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { ModernCreatePostForm } from './ModernCreatePostForm';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from "@/lib/utils";
 import { useAuth } from '@/contexts/AuthContext';
 import RecommendationForm from '@/components/recommendations/RecommendationForm';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
@@ -68,28 +68,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
     if (onPostCreated) onPostCreated();
   };
   
-  const getDialogTitle = () => {
-    switch (selectedContentType) {
-      case 'post': return 'Create New Post';
-      case 'review': return 'Add New Review';
-      case 'journal': return 'Create Journal Entry';
-      case 'recommendation': return 'Add Recommendation';
-      case 'watching': return 'Share What You\'re Watching/Doing';
-      default: return 'Create New Content';
-    }
-  };
-  
-  const getDialogDescription = () => {
-    switch (selectedContentType) {
-      case 'post': return 'Share your thoughts, stories, or recommendations with your community.';
-      case 'review': return 'Share your detailed review and rating of a place, product, or experience.';
-      case 'journal': return 'Document your journey, progress, or experiences.';
-      case 'recommendation': return 'Recommend something you think others would enjoy or find valuable.';
-      case 'watching': return 'Let others know what you\'re currently watching, reading, or doing.';
-      default: return 'Create and share with your community.';
-    }
-  };
-
   const handleContentTypeSelect = (type: ContentType) => {
     setSelectedContentType(type);
     setIsPopoverOpen(false);
@@ -204,15 +182,8 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{getDialogTitle()}</DialogTitle>
-            <DialogDescription>
-              {getDialogDescription()}
-            </DialogDescription>
-          </DialogHeader>
-          
           {selectedContentType === 'post' && (
-            <CreatePostForm 
+            <ModernCreatePostForm 
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)} 
             />
@@ -230,7 +201,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
           )}
           
           {selectedContentType === 'journal' && (
-            <CreatePostForm 
+            <ModernCreatePostForm 
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="journal"
@@ -238,7 +209,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
           )}
           
           {selectedContentType === 'watching' && (
-            <CreatePostForm 
+            <ModernCreatePostForm 
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="watching"
