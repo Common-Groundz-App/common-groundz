@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Star, Book, Tag, Video } from 'lucide-react';
+import { PlusCircle, Star, Book, Tag, FileText, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { CreatePostForm } from './CreatePostForm';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from "@/lib/utils";
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SmartComposerButtonProps {
@@ -18,6 +18,7 @@ type ContentType = 'post' | 'review' | 'journal' | 'recommendation' | 'watching'
 
 export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartComposerButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
   const { user } = useAuth();
 
@@ -28,15 +29,19 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
       const customEvent = event as CustomEvent;
       if (customEvent.detail && customEvent.detail.contentType) {
         setSelectedContentType(customEvent.detail.contentType as ContentType);
+        setIsPopoverOpen(false);
+        setIsDialogOpen(true);
       } else {
         setSelectedContentType('post');
+        setIsPopoverOpen(false);
+        setIsDialogOpen(true);
       }
-      setIsDialogOpen(true);
     };
     
     window.addEventListener('open-create-post-dialog', handleOpenDialog);
     window.addEventListener('open-recommendation-form', () => {
       setSelectedContentType('recommendation');
+      setIsPopoverOpen(false);
       setIsDialogOpen(true);
     });
     
@@ -81,17 +86,68 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
     }
   };
 
+  const handleContentTypeSelect = (type: ContentType) => {
+    setSelectedContentType(type);
+    setIsPopoverOpen(false);
+    setIsDialogOpen(true);
+  };
+
   return (
     <>
-      <div className="relative">
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          className="bg-brand-orange hover:bg-brand-orange/90 gap-2"
-        >
-          <PlusCircle size={18} />
-          Create
-        </Button>
-      </div>
+      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            className="bg-brand-orange hover:bg-brand-orange/90 gap-2"
+          >
+            <PlusCircle size={18} />
+            Create
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-0" align="end">
+          <div className="bg-popover rounded-md shadow-md">
+            <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">
+              What would you like to create?
+            </div>
+            <div className="py-1">
+              <button
+                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
+                onClick={() => handleContentTypeSelect('post')}
+              >
+                <FileText size={16} className="text-blue-500" />
+                <span>Post</span>
+              </button>
+              <button
+                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
+                onClick={() => handleContentTypeSelect('review')}
+              >
+                <Star size={16} className="text-yellow-500" />
+                <span>Review</span>
+              </button>
+              <button
+                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
+                onClick={() => handleContentTypeSelect('journal')}
+              >
+                <Book size={16} className="text-green-500" />
+                <span>Journal</span>
+              </button>
+              <button
+                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
+                onClick={() => handleContentTypeSelect('watching')}
+              >
+                <Eye size={16} className="text-purple-500" />
+                <span>Currently Watching/Using</span>
+              </button>
+              <button
+                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
+                onClick={() => handleContentTypeSelect('recommendation')}
+              >
+                <Tag size={16} className="text-red-500" />
+                <span>Recommendation</span>
+              </button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
@@ -102,90 +158,52 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
             </DialogDescription>
           </DialogHeader>
           
-          <Tabs 
-            defaultValue="post" 
-            value={selectedContentType}
-            onValueChange={(value) => setSelectedContentType(value as ContentType)}
-            className="w-full"
-          >
-            <TabsList className="grid grid-cols-5 mb-4">
-              <TabsTrigger value="post" className="flex flex-col items-center gap-1">
-                <PlusCircle size={16} />
-                <span className="text-xs">Post</span>
-              </TabsTrigger>
-              <TabsTrigger value="review" className="flex flex-col items-center gap-1">
-                <Star size={16} />
-                <span className="text-xs">Review</span>
-              </TabsTrigger>
-              <TabsTrigger value="journal" className="flex flex-col items-center gap-1">
-                <Book size={16} />
-                <span className="text-xs">Journal</span>
-              </TabsTrigger>
-              <TabsTrigger value="recommendation" className="flex flex-col items-center gap-1">
-                <Tag size={16} />
-                <span className="text-xs">Rec</span>
-              </TabsTrigger>
-              <TabsTrigger value="watching" className="flex flex-col items-center gap-1">
-                <Video size={16} />
-                <span className="text-xs">Watching</span>
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="post" className={cn(selectedContentType !== 'post' && 'hidden')}>
-              <CreatePostForm 
-                onSuccess={handleContentCreated}
-                onCancel={() => setIsDialogOpen(false)} 
-              />
-            </TabsContent>
-            
-            <TabsContent value="review" className={cn(selectedContentType !== 'review' && 'hidden')}>
-              <ReviewForm
-                isOpen={selectedContentType === 'review'} 
-                onClose={() => setIsDialogOpen(false)}
-                onSubmit={async () => {
-                  handleContentCreated();
-                  return Promise.resolve();
-                }}
-              />
-            </TabsContent>
-            
-            <TabsContent value="journal" className={cn(selectedContentType !== 'journal' && 'hidden')}>
-              {/* For now, we'll reuse the CreatePostForm but with journal type */}
-              <CreatePostForm 
-                onSuccess={handleContentCreated}
-                onCancel={() => setIsDialogOpen(false)}
-                defaultPostType="note"
-              />
-            </TabsContent>
-            
-            <TabsContent value="recommendation" className={cn(selectedContentType !== 'recommendation' && 'hidden')}>
-              {/* Use the existing recommendation form */}
-              <div className="p-4 text-center text-muted-foreground">
-                <p>Recommendation form is typically loaded in a separate dialog.</p>
-                <Button 
-                  onClick={() => {
-                    // Dispatch the open recommendation form event
-                    window.dispatchEvent(new CustomEvent('open-recommendation-form'));
-                  }}
-                  className="mt-2"
-                >
-                  Open Recommendation Form
-                </Button>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="watching" className={cn(selectedContentType !== 'watching' && 'hidden')}>
-              {/* For now, we'll reuse the CreatePostForm but with note type */}
-              <CreatePostForm 
-                onSuccess={handleContentCreated}
-                onCancel={() => setIsDialogOpen(false)}
-                defaultPostType="note"
-              />
-            </TabsContent>
-          </Tabs>
+          {selectedContentType === 'post' && (
+            <CreatePostForm 
+              onSuccess={handleContentCreated}
+              onCancel={() => setIsDialogOpen(false)} 
+            />
+          )}
+          
+          {selectedContentType === 'review' && (
+            <ReviewForm
+              isOpen={isDialogOpen} 
+              onClose={() => setIsDialogOpen(false)}
+              onSubmit={async () => {
+                handleContentCreated();
+                return Promise.resolve();
+              }}
+            />
+          )}
+          
+          {selectedContentType === 'journal' && (
+            <CreatePostForm 
+              onSuccess={handleContentCreated}
+              onCancel={() => setIsDialogOpen(false)}
+              defaultPostType="journal"
+            />
+          )}
+          
+          {selectedContentType === 'recommendation' && (
+            <div className="p-4 text-center text-muted-foreground">
+              <p>Opening recommendation form...</p>
+              {/* This will trigger the recommendation form to open via event */}
+              {setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('open-recommendation-form'));
+                setIsDialogOpen(false);
+              }, 100)}
+            </div>
+          )}
+          
+          {selectedContentType === 'watching' && (
+            <CreatePostForm 
+              onSuccess={handleContentCreated}
+              onCancel={() => setIsDialogOpen(false)}
+              defaultPostType="watching"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>
   );
 }
-

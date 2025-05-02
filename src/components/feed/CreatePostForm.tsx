@@ -444,32 +444,6 @@ export function CreatePostForm({
           <div className="grid grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="post_type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="story">Story</SelectItem>
-                      <SelectItem value="routine">Routine</SelectItem>
-                      <SelectItem value="project">Project</SelectItem>
-                      <SelectItem value="journal">Journal</SelectItem>
-                      <SelectItem value="watching">Currently Watching/Doing</SelectItem>
-                      <SelectItem value="note">Note</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
               name="visibility"
               render={({ field }) => (
                 <FormItem>
