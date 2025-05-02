@@ -8,6 +8,10 @@ import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from "@/lib/utils";
 import { useAuth } from '@/contexts/AuthContext';
+import RecommendationForm from '@/components/recommendations/RecommendationForm';
+import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
+import { useToast } from '@/hooks/use-toast';
+import { createRecommendation } from '@/services/recommendation/crudOperations';
 
 interface SmartComposerButtonProps {
   onContentCreated?: () => void;
@@ -20,8 +24,10 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
+  const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const { user } = useAuth();
-  const [showRecLoading, setShowRecLoading] = useState(false);
+  const { handleImageUpload } = useRecommendationUploads();
+  const { toast } = useToast();
 
   // Listen for the "open-create-post-dialog" event
   useEffect(() => {
@@ -41,9 +47,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
     
     window.addEventListener('open-create-post-dialog', handleOpenDialog);
     window.addEventListener('open-recommendation-form', () => {
-      setSelectedContentType('recommendation');
-      setIsPopoverOpen(false);
-      setIsDialogOpen(true);
+      setIsRecommendationFormOpen(true);
     });
     
     return () => {
@@ -94,16 +98,51 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
   };
 
   const handleRecommendationSelect = () => {
-    // Show loading state
-    setShowRecLoading(true);
-    setIsDialogOpen(true);
+    setIsRecommendationFormOpen(true);
+    setIsPopoverOpen(false);
+  };
+
+  const handleRecommendationSubmit = async (values: any) => {
+    if (!user) return;
     
-    // Use setTimeout to trigger the recommendation form event after a short delay
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('open-recommendation-form'));
-      setIsDialogOpen(false);
-      setShowRecLoading(false);
-    }, 100);
+    try {
+      await createRecommendation({
+        title: values.title,
+        venue: values.venue || null,
+        description: values.description || null,
+        rating: values.rating,
+        image_url: values.image_url || null,
+        category: values.category,
+        visibility: values.visibility,
+        is_certified: false,
+        view_count: 0,
+        user_id: user.id,
+        entity_id: values.entity_id || null
+      });
+      
+      toast({
+        title: "Recommendation added",
+        description: "Your recommendation has been added successfully"
+      });
+      
+      setIsRecommendationFormOpen(false);
+      
+      // Dispatch events to refresh feeds
+      window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
+      window.dispatchEvent(new CustomEvent('refresh-following-feed'));
+      window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+      
+      // Call callback functions
+      if (onContentCreated) onContentCreated();
+      if (onPostCreated) onPostCreated();
+    } catch (error) {
+      console.error("Error adding recommendation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add recommendation",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -198,12 +237,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
             />
           )}
           
-          {selectedContentType === 'recommendation' && showRecLoading && (
-            <div className="p-4 text-center text-muted-foreground">
-              <p>Opening recommendation form...</p>
-            </div>
-          )}
-          
           {selectedContentType === 'watching' && (
             <CreatePostForm 
               onSuccess={handleContentCreated}
@@ -213,6 +246,16 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Directly render the RecommendationForm component instead of relying on events */}
+      {user && (
+        <RecommendationForm
+          isOpen={isRecommendationFormOpen}
+          onClose={() => setIsRecommendationFormOpen(false)}
+          onSubmit={handleRecommendationSubmit}
+          onImageUpload={handleImageUpload}
+        />
+      )}
     </>
   );
 }
