@@ -12,6 +12,7 @@ import RecommendationForm from '@/components/recommendations/RecommendationForm'
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import { useToast } from '@/hooks/use-toast';
 import { createRecommendation } from '@/services/recommendation/crudOperations';
+import { fetchUserProfile } from '@/services/profileService';
 
 interface SmartComposerButtonProps {
   onContentCreated?: () => void;
@@ -25,9 +26,28 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
+  const [profileData, setProfileData] = useState<any>(null);
   const { user } = useAuth();
   const { handleImageUpload } = useRecommendationUploads();
   const { toast } = useToast();
+
+  // Fetch the user's profile data when needed
+  useEffect(() => {
+    const loadProfileData = async () => {
+      if (user && (isDialogOpen || isRecommendationFormOpen)) {
+        try {
+          const profile = await fetchUserProfile(user.id);
+          setProfileData(profile);
+        } catch (err) {
+          console.error('Error fetching profile data:', err);
+        }
+      }
+    };
+
+    if (isDialogOpen || isRecommendationFormOpen) {
+      loadProfileData();
+    }
+  }, [user, isDialogOpen, isRecommendationFormOpen]);
 
   // Listen for the "open-create-post-dialog" event
   useEffect(() => {
@@ -185,6 +205,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           {selectedContentType === 'post' && (
             <EnhancedCreatePostForm 
+              profileData={profileData}
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)} 
             />
@@ -203,6 +224,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
           
           {selectedContentType === 'journal' && (
             <ModernCreatePostForm 
+              profileData={profileData}
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="journal"
@@ -211,6 +233,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
           
           {selectedContentType === 'watching' && (
             <ModernCreatePostForm 
+              profileData={profileData}
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="watching"

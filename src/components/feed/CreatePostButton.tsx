@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { EnhancedCreatePostForm } from './EnhancedCreatePostForm';
+import { useAuth } from '@/contexts/AuthContext';
+import { fetchUserProfile } from '@/services/profileService';
+import { useToast } from '@/hooks/use-toast';
 
 interface CreatePostButtonProps {
   onPostCreated?: () => void;
@@ -11,6 +14,32 @@ interface CreatePostButtonProps {
 
 export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [profileData, setProfileData] = useState<any>(null);
+
+  // Fetch user profile data when needed
+  useEffect(() => {
+    const loadProfileData = async () => {
+      if (user && isDialogOpen) {
+        try {
+          const profile = await fetchUserProfile(user.id);
+          setProfileData(profile);
+        } catch (err) {
+          console.error('Error fetching profile data:', err);
+          toast({
+            title: 'Could not load profile data',
+            description: 'Your post will use default profile information',
+            variant: 'destructive',
+          });
+        }
+      }
+    };
+
+    if (isDialogOpen) {
+      loadProfileData();
+    }
+  }, [user, isDialogOpen, toast]);
 
   // Listen for the "open-create-post-dialog" event
   useEffect(() => {
@@ -35,6 +64,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto p-0">
           <EnhancedCreatePostForm 
+            profileData={profileData}
             onSuccess={() => {
               setIsDialogOpen(false);
               

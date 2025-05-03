@@ -10,19 +10,21 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Badge } from '@/components/ui/badge';
 import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users } from 'lucide-react';
-import { generateUUID } from '@/lib/uuid';
+import { generateUUID } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { getDisplayName } from '@/services/profileService';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
   onCancel: () => void;
+  profileData?: any;
 }
 
 type VisibilityOption = 'public' | 'private' | 'circle';
 
-export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePostFormProps) {
+export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: EnhancedCreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [content, setContent] = useState('');
@@ -220,8 +222,14 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
 
   const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
   
-  // Get user email as fallback for display
-  const userDisplayName = user?.email ? user.email.split('@')[0] : 'User';
+  // Get user display name using the profileData or fallback to user metadata
+  const userDisplayName = user ? (
+    profileData ? getDisplayName(user, profileData) : 
+    (user.user_metadata?.username || user.email?.split('@')[0] || 'User')
+  ) : 'User';
+
+  // Get avatar URL from profileData
+  const avatarUrl = profileData?.avatar_url || null;
 
   return (
     <div 
@@ -232,11 +240,11 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
       <div className="flex gap-3">
         <UserAvatar 
           username={userDisplayName} 
-          imageUrl={null}
+          imageUrl={avatarUrl}
           className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity"
         />
         <div className="flex-1 space-y-1">
-          <p className="text-sm font-medium">{userDisplayName || 'User'}</p>
+          <p className="text-sm font-medium">{userDisplayName}</p>
           <Textarea
             ref={textareaRef}
             placeholder="What do you want to share today?"

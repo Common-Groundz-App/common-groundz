@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useIsMobile } from '@/hooks/use-mobile';
 import { mapPostTypeToDatabase } from './utils/postUtils';
 import { SimpleEntitySelector } from './SimpleEntitySelector';
+import { getDisplayName } from '@/services/profileService';
 
 const formSchema = z.object({
   content: z.string().min(1, { message: 'Content is required' }),
@@ -46,13 +47,15 @@ interface ModernCreatePostFormProps {
   onCancel: () => void;
   postToEdit?: PostToEdit;
   defaultPostType?: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching';
+  profileData?: any;
 }
 
 export function ModernCreatePostForm({ 
   onSuccess, 
   onCancel, 
   postToEdit,
-  defaultPostType = 'story' 
+  defaultPostType = 'story',
+  profileData
 }: ModernCreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -275,9 +278,14 @@ export function ModernCreatePostForm({
     }
   };
   
-  // Get user profile data from user object
-  const userAvatarUrl = user?.user_metadata?.avatar_url || '';
-  const userUsername = user?.user_metadata?.username || user?.email?.split('@')[0] || 'User';
+  // Get user display name using the profileData or fallback to user metadata
+  const userDisplayName = user ? (
+    profileData ? getDisplayName(user, profileData) : 
+    (user.user_metadata?.username || user.email?.split('@')[0] || 'User')
+  ) : 'User';
+
+  // Get avatar URL from profileData
+  const avatarUrl = profileData?.avatar_url || null;
   
   return (
     <Form {...form}>
@@ -285,8 +293,8 @@ export function ModernCreatePostForm({
         <div className="flex gap-3 items-start">
           {/* User Avatar */}
           <Avatar className="h-10 w-10 mt-1">
-            <AvatarImage src={userAvatarUrl} alt={userUsername} />
-            <AvatarFallback>{userUsername.charAt(0).toUpperCase()}</AvatarFallback>
+            <AvatarImage src={avatarUrl} alt={userDisplayName} />
+            <AvatarFallback>{userDisplayName.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           
           {/* Content Area */}
