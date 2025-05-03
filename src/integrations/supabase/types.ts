@@ -808,28 +808,16 @@ export type Database = {
           recommendation_id: string
         }[]
       }
-      gtrgm_compress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_decompress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_in: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_options: {
-        Args: { "": unknown }
+      increment_comment_count: {
+        Args: { table_name: string; item_id: string }
         Returns: undefined
-      }
-      gtrgm_out: {
-        Args: { "": unknown }
-        Returns: unknown
       }
       increment_recommendation_view: {
         Args: { rec_id: string; viewer_id: string }
+        Returns: undefined
+      }
+      insert_post_entity: {
+        Args: { p_post_id: string; p_entity_id: string }
         Returns: undefined
       }
       insert_post_like: {
@@ -842,18 +830,6 @@ export type Database = {
       }
       mark_notifications_as_read: {
         Args: { notification_ids: string[] }
-        Returns: string[]
-      }
-      set_limit: {
-        Args: { "": number }
-        Returns: number
-      }
-      show_limit: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      show_trgm: {
-        Args: { "": string }
         Returns: string[]
       }
       toggle_post_like: {
