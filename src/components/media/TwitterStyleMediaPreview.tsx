@@ -7,14 +7,16 @@ import { cn } from '@/lib/utils';
 
 interface TwitterStyleMediaPreviewProps {
   media: MediaItem[];
-  onRemove: (item: MediaItem) => void;
+  onRemove?: (item: MediaItem) => void;
   className?: string;
+  readOnly?: boolean;
 }
 
 export function TwitterStyleMediaPreview({
   media,
   onRemove,
-  className
+  className,
+  readOnly = false
 }: TwitterStyleMediaPreviewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,46 +70,75 @@ export function TwitterStyleMediaPreview({
   
   if (media.length === 0) return null;
   
-  // Different layout strategies based on image count
-  const getMediaLayout = () => {
-    if (media.length === 1) {
-      return "twitter-media-single";
-    } else if (media.length === 2) {
-      return "twitter-media-two";
-    } else if (media.length === 3) {
-      return "twitter-media-three";
-    } else {
-      return "twitter-media-four";
-    }
-  };
+  // Handle different layout strategies based on the number of images
+  if (media.length === 1) {
+    // Single image view
+    return (
+      <div 
+        ref={containerRef}
+        className={cn("relative mt-3 overflow-hidden rounded-xl", className)}
+      >
+        <div className="w-full h-80 relative">
+          {media[0].type === 'image' ? (
+            <img 
+              src={media[0].url} 
+              alt={media[0].alt || "Image"} 
+              className="w-full h-full object-cover bg-black/5 rounded-xl"
+            />
+          ) : (
+            <video 
+              src={media[0].url} 
+              poster={media[0].thumbnail_url}
+              controls
+              className="w-full h-full object-contain rounded-xl"
+            />
+          )}
+          
+          {/* Remove button for single image */}
+          {!readOnly && onRemove && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              className="absolute top-2 right-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white"
+              onClick={() => onRemove(media[0])}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
   
-  return (
-    <div 
-      ref={containerRef}
-      className={cn(
-        "relative mt-3 overflow-hidden rounded-xl", 
-        getMediaLayout(),
-        className
-      )}
-      onTouchStart={handleSwipe}
-    >
-      {media.length > 1 ? (
-        // Carousel view for multiple images
-        <div className="relative h-80 w-full bg-black/5">
-          <div 
-            className="absolute inset-0 transition-transform duration-300 ease-in-out flex items-center justify-center"
-            style={{ transform: `translateX(${-100 * currentIndex}%)` }}
-          >
+  if (media.length > 1) {
+    return (
+      <div 
+        ref={containerRef} 
+        className={cn(
+          "relative mt-3 overflow-hidden rounded-xl",
+          className
+        )}
+        onTouchStart={handleSwipe}
+      >
+        {/* Multiple images - showing as carousel for editing view */}
+        <div className="relative h-80 w-full bg-black/5 rounded-xl">
+          {/* Media items container */}
+          <div className="flex h-full transition-transform duration-300 ease-in-out">
             {media.map((item, index) => (
               <div 
                 key={item.id || index}
-                className="min-w-full h-full flex-shrink-0 relative"
+                className={cn(
+                  "min-w-full h-full flex-shrink-0 flex items-center justify-center transition-opacity duration-300",
+                  currentIndex === index ? "opacity-100" : "opacity-0 hidden"
+                )}
+                style={{ transform: `translateX(${(index - currentIndex) * 100}%)` }}
               >
                 {item.type === 'image' ? (
                   <img 
                     src={item.url} 
-                    alt={item.alt || `Image ${index + 1}`} 
-                    className="w-full h-full object-contain"
+                    alt={item.alt || item.caption || `Image ${index + 1}`} 
+                    className="w-full h-full object-cover"
                   />
                 ) : (
                   <video 
@@ -115,22 +146,26 @@ export function TwitterStyleMediaPreview({
                     poster={item.thumbnail_url}
                     controls
                     className="w-full h-full object-contain"
-                  />
+                  >
+                    Your browser does not support the video tag.
+                  </video>
                 )}
                 
                 {/* Remove button for each item */}
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-2 right-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove(item);
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                {!readOnly && onRemove && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(item);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
@@ -142,8 +177,11 @@ export function TwitterStyleMediaPreview({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white"
-                onClick={prevImage}
+                className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  prevImage();
+                }}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -151,24 +189,29 @@ export function TwitterStyleMediaPreview({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white"
-                onClick={nextImage}
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  nextImage();
+                }}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
               
               {/* Image counter and navigation dots */}
-              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1 items-center">
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 items-center z-10">
                 {media.map((_, idx) => (
-                  <div 
+                  <button 
                     key={idx} 
                     className={cn(
-                      "h-1.5 rounded-full transition-all",
-                      idx === currentIndex ? "w-6 bg-white" : "w-1.5 bg-white/60"
+                      "h-2 rounded-full transition-all focus:outline-none",
+                      idx === currentIndex ? "w-6 bg-white" : "w-2 bg-white/60"
                     )}
                     onClick={() => setCurrentIndex(idx)}
+                    aria-label={`Go to image ${idx + 1}`}
                   />
                 ))}
+                
                 <span className="text-xs text-white bg-black/40 px-2 py-0.5 rounded-full ml-2">
                   {currentIndex + 1}/{media.length}
                 </span>
@@ -176,36 +219,40 @@ export function TwitterStyleMediaPreview({
             </>
           )}
         </div>
-      ) : (
-        // Single image view
-        <div className="w-full h-80 relative">
-          {media[0].type === 'image' ? (
-            <img 
-              src={media[0].url} 
-              alt={media[0].alt || "Image"} 
-              className="w-full h-full object-contain bg-black/5"
-            />
-          ) : (
-            <video 
-              src={media[0].url} 
-              poster={media[0].thumbnail_url}
-              controls
-              className="w-full h-full object-contain"
-            />
-          )}
-          
-          {/* Remove button for single image */}
-          <Button
-            type="button"
-            variant="destructive"
-            size="icon"
-            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white"
-            onClick={() => onRemove(media[0])}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+        
+        {/* Grid preview for multiple images */}
+        <div className={cn(
+          "grid gap-1 mt-1 h-20",
+          media.length === 2 ? "grid-cols-2" : 
+          media.length === 3 ? "grid-cols-3" : 
+          "grid-cols-4"
+        )}>
+          {media.map((item, index) => (
+            <button
+              key={item.id || index}
+              className={cn(
+                "h-full w-full relative rounded-md overflow-hidden",
+                currentIndex === index ? "border-2 border-primary" : "border border-transparent opacity-70"
+              )}
+              onClick={() => setCurrentIndex(index)}
+            >
+              {item.type === 'image' ? (
+                <img 
+                  src={item.url} 
+                  alt={`Thumbnail ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-black/10 flex items-center justify-center">
+                  <span className="text-xs">Video</span>
+                </div>
+              )}
+            </button>
+          ))}
         </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+  
+  return null;
 }

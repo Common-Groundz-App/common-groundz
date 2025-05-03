@@ -41,7 +41,7 @@ export function PostMediaDisplay({
     return (
       <TwitterStyleMediaPreview
         media={validMedia}
-        onRemove={() => {}} // Read-only version so no removal needed
+        readOnly={true}
         className={className}
       />
     );

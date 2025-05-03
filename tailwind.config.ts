@@ -125,7 +125,11 @@ export default {
 					gridTemplateColumns: 'repeat(2, 1fr)',
 					gap: '2px',
 					borderRadius: '0.75rem',
-					overflow: 'hidden'
+					overflow: 'hidden',
+					'& > *': {
+						aspectRatio: '1 / 1',
+						objectFit: 'cover'
+					}
 				},
 				'.twitter-media-three': {
 					width: '100%',
@@ -135,6 +139,10 @@ export default {
 					gap: '2px',
 					borderRadius: '0.75rem',
 					overflow: 'hidden',
+					'& > *': {
+						aspectRatio: '1 / 1',
+						objectFit: 'cover'
+					},
 					'& > *:first-child': {
 						gridRow: 'span 2',
 						height: '100%'
@@ -147,7 +155,11 @@ export default {
 					gridTemplateRows: 'repeat(2, 1fr)',
 					gap: '2px',
 					borderRadius: '0.75rem',
-					overflow: 'hidden'
+					overflow: 'hidden',
+					'& > *': {
+						aspectRatio: '1 / 1',
+						objectFit: 'cover'
+					}
 				},
 			};
 			addUtilities(newUtilities);
