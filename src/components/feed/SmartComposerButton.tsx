@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, Star, Book, Tag, FileText, Eye } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ModernCreatePostForm } from './ModernCreatePostForm';
+import { EnhancedCreatePostForm } from './EnhancedCreatePostForm';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
@@ -183,7 +184,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           {selectedContentType === 'post' && (
-            <ModernCreatePostForm 
+            <EnhancedCreatePostForm 
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)} 
             />
