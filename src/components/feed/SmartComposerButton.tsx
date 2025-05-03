@@ -9,9 +9,10 @@ import { cn } from '@/lib/utils';
 
 interface SmartComposerButtonProps {
   className?: string;
+  onContentCreated?: () => void;
 }
 
-export function SmartComposerButton({ className }: SmartComposerButtonProps) {
+export function SmartComposerButton({ className, onContentCreated }: SmartComposerButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { user } = useAuth();
   
@@ -42,6 +43,11 @@ export function SmartComposerButton({ className }: SmartComposerButtonProps) {
               window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
               window.dispatchEvent(new CustomEvent('refresh-following-feed'));
               window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+              
+              // Call the onContentCreated callback if provided
+              if (onContentCreated) {
+                onContentCreated();
+              }
             }}
             onCancel={() => setIsDialogOpen(false)} 
           />
