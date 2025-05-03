@@ -16,6 +16,7 @@ interface MediaUploaderProps {
   initialMedia?: MediaItem[];
   className?: string;
   customButton?: React.ReactNode;
+  maxMediaCount?: number;
 }
 
 export function MediaUploader({ 
@@ -23,17 +24,46 @@ export function MediaUploader({
   onMediaUploaded, 
   initialMedia = [], 
   className,
-  customButton 
+  customButton,
+  maxMediaCount = 4  // Default to 4 max images
 }: MediaUploaderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploads, setUploads] = useState<MediaUploadState[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [currentMediaCount, setCurrentMediaCount] = useState(initialMedia.length);
+  
+  useEffect(() => {
+    setCurrentMediaCount(initialMedia.length);
+  }, [initialMedia]);
   
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || !user) return;
     
-    Array.from(files).forEach(file => {
+    const remainingSlots = maxMediaCount - currentMediaCount;
+    
+    if (remainingSlots <= 0) {
+      toast({
+        title: 'Media limit reached',
+        description: `You can only upload up to ${maxMediaCount} media items`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Only process up to the remaining slots
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    
+    // Show warning if some files were not processed
+    if (files.length > remainingSlots) {
+      toast({
+        title: 'Too many files selected',
+        description: `Only the first ${remainingSlots} files will be processed. Max limit is ${maxMediaCount} media items.`,
+        variant: 'warning',
+      });
+    }
+    
+    filesToProcess.forEach(file => {
       const { valid, error } = validateMediaFile(file);
       
       if (!valid) {
@@ -77,6 +107,7 @@ export function MediaUploader({
           );
           
           onMediaUploaded(mediaItem);
+          setCurrentMediaCount(prev => prev + 1);
           
           // Clean up upload after a delay
           setTimeout(() => {
@@ -119,6 +150,15 @@ export function MediaUploader({
     return (
       <div className={className}>
         <div onClick={() => {
+          if (currentMediaCount >= maxMediaCount) {
+            toast({
+              title: 'Media limit reached',
+              description: `You can only upload up to ${maxMediaCount} media items`,
+              variant: 'destructive',
+            });
+            return;
+          }
+          
           const input = document.createElement('input');
           input.type = 'file';
           input.multiple = true;
@@ -174,11 +214,21 @@ export function MediaUploader({
         className={cn(
           "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all",
           isDragging ? "border-primary bg-primary/10" : "border-gray-300 hover:border-primary/50",
+          currentMediaCount >= maxMediaCount && "opacity-50 cursor-not-allowed"
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => {
+          if (currentMediaCount >= maxMediaCount) {
+            toast({
+              title: 'Media limit reached',
+              description: `You can only upload up to ${maxMediaCount} media items`,
+              variant: 'destructive',
+            });
+            return;
+          }
+          
           const input = document.createElement('input');
           input.type = 'file';
           input.multiple = true;
@@ -195,6 +245,9 @@ export function MediaUploader({
             <p className="font-medium">Click to upload or drag and drop</p>
             <p className="text-sm text-muted-foreground">
               Images (JPG, PNG, GIF, WebP) and videos (MP4, WebM) up to 10MB
+            </p>
+            <p className="text-xs font-medium mt-1">
+              {currentMediaCount}/{maxMediaCount} media items used
             </p>
           </div>
         </div>

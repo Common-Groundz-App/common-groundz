@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,12 +26,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { EntityTagSelector } from './EntityTagSelector';
-import { generateUUID } from '@/lib/uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Json } from '@/integrations/supabase/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import { X } from 'lucide-react';
+import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
 
 // Define valid database post types
 type DatabasePostType = 'story' | 'routine' | 'project' | 'note';
@@ -85,12 +87,13 @@ export function CreatePostForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>([]);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const sessionId = useState<string>(() => generateUUID())[0];
+  const sessionId = useState<string>(() => uuidv4())[0];
   const isEditMode = !!postToEdit;
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(postToEdit?.tagged_entities?.[0] || null);
   const [showEntitySelector, setShowEntitySelector] = useState(false);
   // Store the HTML string content separately
   const [contentHtml, setContentHtml] = useState<string>('');
+  const MAX_MEDIA_COUNT = 4;
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -152,7 +155,7 @@ export function CreatePostForm({
       // Create a clean version of mediaItems for database storage
       // Using direct serialization to avoid circular references
       const mediaToSave = mediaItems.map(item => ({
-        id: item.id || generateUUID(),
+        id: item.id || uuidv4(),
         url: item.url,
         type: item.type,
         caption: item.caption || '',
@@ -283,13 +286,21 @@ export function CreatePostForm({
 
   const handleMediaUploaded = (media: MediaItem) => {
     console.log('Media uploaded:', media);
-    setMediaItems(prev => {
-      const newMedia = {
-        ...media,
-        order: prev.length
-      };
-      return [...prev, newMedia];
-    });
+    if (mediaItems.length < MAX_MEDIA_COUNT) {
+      setMediaItems(prev => {
+        const newMedia = {
+          ...media,
+          order: prev.length
+        };
+        return [...prev, newMedia];
+      });
+    } else {
+      toast({
+        title: 'Media limit reached',
+        description: `You can only upload up to ${MAX_MEDIA_COUNT} media items`,
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleEntitiesChange = (entities: Entity[]) => {
@@ -391,31 +402,12 @@ export function CreatePostForm({
           )}
         />
         
-        {/* Media Preview Section */}
+        {/* Twitter Style Media Preview */}
         {mediaItems.length > 0 && (
-          <div className="mt-4">
-            <p className="text-sm font-medium mb-2">Media Preview</p>
-            <div className="grid grid-cols-2 gap-2">
-              {mediaItems.map((item, index) => (
-                <div key={item.id || index} className="relative border rounded overflow-hidden group">
-                  {item.type === 'image' ? (
-                    <img src={item.url} alt={item.alt || `Image ${index + 1}`} className="w-full h-40 object-cover" />
-                  ) : (
-                    <video src={item.url} className="w-full h-40 object-cover" />
-                  )}
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100"
-                    onClick={() => handleRemoveMedia(item)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
+          <TwitterStyleMediaPreview
+            media={mediaItems}
+            onRemove={handleRemoveMedia}
+          />
         )}
         
         {(selectedEntity && !showEntitySelector) ? (
@@ -464,6 +456,17 @@ export function CreatePostForm({
               )}
             />
           </div>
+        </div>
+        
+        {/* Media Upload Button */}
+        <div className="pt-3">
+          <MediaUploader
+            sessionId={sessionId}
+            onMediaUploaded={handleMediaUploaded}
+            initialMedia={mediaItems}
+            maxMediaCount={MAX_MEDIA_COUNT}
+            className="w-full"
+          />
         </div>
         
         <div className="flex justify-end space-x-2 pt-3">

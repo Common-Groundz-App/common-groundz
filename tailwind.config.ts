@@ -109,5 +109,48 @@ export default {
 			}
 		}
 	},
-	plugins: [require("tailwindcss-animate")],
+	plugins: [
+		require("tailwindcss-animate"),
+		function({ addUtilities }: { addUtilities: Function }) {
+			const newUtilities = {
+				// Twitter-style layouts for media grid
+				'.twitter-media-single': {
+					width: '100%',
+					borderRadius: '0.75rem',
+					overflow: 'hidden'
+				},
+				'.twitter-media-two': {
+					width: '100%',
+					display: 'grid',
+					gridTemplateColumns: 'repeat(2, 1fr)',
+					gap: '2px',
+					borderRadius: '0.75rem',
+					overflow: 'hidden'
+				},
+				'.twitter-media-three': {
+					width: '100%',
+					display: 'grid',
+					gridTemplateColumns: '1fr 1fr',
+					gridTemplateRows: '1fr 1fr',
+					gap: '2px',
+					borderRadius: '0.75rem',
+					overflow: 'hidden',
+					'& > *:first-child': {
+						gridRow: 'span 2',
+						height: '100%'
+					}
+				},
+				'.twitter-media-four': {
+					width: '100%',
+					display: 'grid',
+					gridTemplateColumns: 'repeat(2, 1fr)',
+					gridTemplateRows: 'repeat(2, 1fr)',
+					gap: '2px',
+					borderRadius: '0.75rem',
+					overflow: 'hidden'
+				},
+			};
+			addUtilities(newUtilities);
+		},
+	],
 } satisfies Config;

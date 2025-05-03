@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,11 +9,12 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Badge } from '@/components/ui/badge';
 import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users } from 'lucide-react';
-import { generateUUID } from '@/lib/uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
+import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -37,7 +37,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const [location, setLocation] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
-  const sessionId = useRef(generateUUID()).current;
+  const sessionId = useRef(uuidv4()).current;
+  const MAX_MEDIA_COUNT = 4;
   
   // Auto-resize textarea as content changes
   useEffect(() => {
@@ -109,12 +110,12 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   }, []);
 
   const handleMediaUpload = (mediaItem: MediaItem) => {
-    if (media.length < 4) {
+    if (media.length < MAX_MEDIA_COUNT) {
       setMedia((prev) => [...prev, { ...mediaItem, order: prev.length }]);
     } else {
       toast({
         title: 'Media limit reached',
-        description: 'You can only upload up to 4 media items',
+        description: `You can only upload up to ${MAX_MEDIA_COUNT} media items`,
         variant: 'destructive',
       });
     }
@@ -255,40 +256,12 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         </div>
       </div>
 
-      {/* Media Upload Preview */}
+      {/* Twitter Style Media Preview */}
       {media.length > 0 && (
-        <div className="mt-4 overflow-x-auto">
-          <div className="flex gap-2 pb-2 scrollbar-hide">
-            {media.map((item) => (
-              <div 
-                key={item.url} 
-                className="relative rounded-lg overflow-hidden shrink-0 w-[150px] h-[150px] bg-muted"
-              >
-                {item.type === 'image' ? (
-                  <img 
-                    src={item.url} 
-                    alt={item.alt || 'Uploaded media'} 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <video 
-                    src={item.url} 
-                    controls={false} 
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100"
-                  onClick={() => removeMedia(item)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
+        <TwitterStyleMediaPreview
+          media={media}
+          onRemove={removeMedia}
+        />
       )}
 
       {/* Entity Tags */}
@@ -355,17 +328,23 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             sessionId={sessionId}
             onMediaUploaded={handleMediaUpload}
             initialMedia={media}
+            maxMediaCount={MAX_MEDIA_COUNT}
             customButton={
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
-                  media.length >= 4 && "opacity-50 cursor-not-allowed"
+                  media.length >= MAX_MEDIA_COUNT && "opacity-50 cursor-not-allowed"
                 )}
-                disabled={media.length >= 4}
+                disabled={media.length >= MAX_MEDIA_COUNT}
               >
                 <Image className="h-5 w-5" />
+                {media.length > 0 && (
+                  <span className="ml-1 text-xs font-medium">
+                    {media.length}/{MAX_MEDIA_COUNT}
+                  </span>
+                )}
               </Button>
             }
           />
