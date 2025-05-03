@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { EnhancedCreatePostForm } from './EnhancedCreatePostForm';
+import { CreatePostForm } from './CreatePostForm';
+import { ModernCreatePostForm } from './ModernCreatePostForm';
 
 interface CreatePostButtonProps {
   onPostCreated?: () => void;
@@ -34,7 +35,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
-          <EnhancedCreatePostForm 
+          <ModernCreatePostForm 
             onSuccess={() => {
               setIsDialogOpen(false);
               
