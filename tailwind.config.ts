@@ -113,11 +113,16 @@ export default {
 		require("tailwindcss-animate"),
 		function({ addUtilities }: { addUtilities: Function }) {
 			const newUtilities = {
-				// Twitter-style layouts for media grid
+				// Twitter-style layouts for media grid with object-contain
 				'.twitter-media-single': {
 					width: '100%',
 					borderRadius: '0.75rem',
-					overflow: 'hidden'
+					overflow: 'hidden',
+					'& > *': {
+						objectFit: 'contain',
+						maxHeight: '100%',
+						maxWidth: '100%'
+					}
 				},
 				'.twitter-media-two': {
 					width: '100%',
@@ -128,7 +133,7 @@ export default {
 					overflow: 'hidden',
 					'& > *': {
 						aspectRatio: '1 / 1',
-						objectFit: 'cover'
+						objectFit: 'contain'
 					}
 				},
 				'.twitter-media-three': {
@@ -141,7 +146,7 @@ export default {
 					overflow: 'hidden',
 					'& > *': {
 						aspectRatio: '1 / 1',
-						objectFit: 'cover'
+						objectFit: 'contain'
 					},
 					'& > *:first-child': {
 						gridRow: 'span 2',
@@ -158,9 +163,22 @@ export default {
 					overflow: 'hidden',
 					'& > *': {
 						aspectRatio: '1 / 1',
-						objectFit: 'cover'
+						objectFit: 'contain'
 					}
 				},
+				// Additional utility for media containers
+				'.media-container': {
+					display: 'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+					overflow: 'hidden',
+					position: 'relative',
+					'& img, & video': {
+						maxWidth: '100%',
+						maxHeight: '100%',
+						objectFit: 'contain'
+					}
+				}
 			};
 			addUtilities(newUtilities);
 		},

@@ -78,12 +78,12 @@ export function TwitterStyleMediaPreview({
         ref={containerRef}
         className={cn("relative mt-3 overflow-hidden rounded-xl", className)}
       >
-        <div className="w-full h-80 relative">
+        <div className="w-full h-80 relative bg-black/5">
           {media[0].type === 'image' ? (
             <img 
               src={media[0].url} 
               alt={media[0].alt || "Image"} 
-              className="w-full h-full object-cover bg-black/5 rounded-xl"
+              className="w-full h-full object-contain bg-black/5 rounded-xl"
             />
           ) : (
             <video 
@@ -121,31 +121,30 @@ export function TwitterStyleMediaPreview({
         )}
         onTouchStart={handleSwipe}
       >
-        {/* Multiple images - showing as carousel for editing view */}
-        <div className="relative h-80 w-full bg-black/5 rounded-xl">
+        {/* Multiple images carousel view */}
+        <div className="relative h-80 w-full bg-black/5 rounded-xl overflow-hidden">
           {/* Media items container */}
-          <div className="flex h-full transition-transform duration-300 ease-in-out">
+          <div className="h-full w-full">
             {media.map((item, index) => (
               <div 
                 key={item.id || index}
                 className={cn(
-                  "min-w-full h-full flex-shrink-0 flex items-center justify-center transition-opacity duration-300",
-                  currentIndex === index ? "opacity-100" : "opacity-0 hidden"
+                  "absolute top-0 left-0 w-full h-full flex items-center justify-center transition-opacity duration-300",
+                  currentIndex === index ? "opacity-100 z-10" : "opacity-0 z-0"
                 )}
-                style={{ transform: `translateX(${(index - currentIndex) * 100}%)` }}
               >
                 {item.type === 'image' ? (
                   <img 
                     src={item.url} 
                     alt={item.alt || item.caption || `Image ${index + 1}`} 
-                    className="w-full h-full object-cover"
+                    className="max-w-full max-h-full object-contain"
                   />
                 ) : (
                   <video 
                     src={item.url} 
                     poster={item.thumbnail_url}
                     controls
-                    className="w-full h-full object-contain"
+                    className="max-w-full max-h-full object-contain"
                   >
                     Your browser does not support the video tag.
                   </video>
@@ -157,7 +156,7 @@ export function TwitterStyleMediaPreview({
                     type="button"
                     variant="destructive"
                     size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white"
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20"
                     onClick={(e) => {
                       e.stopPropagation();
                       onRemove(item);
@@ -177,7 +176,7 @@ export function TwitterStyleMediaPreview({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-10"
+                className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20"
                 onClick={(e) => {
                   e.stopPropagation();
                   prevImage();
@@ -189,7 +188,7 @@ export function TwitterStyleMediaPreview({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-10"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20"
                 onClick={(e) => {
                   e.stopPropagation();
                   nextImage();
@@ -199,7 +198,7 @@ export function TwitterStyleMediaPreview({
               </Button>
               
               {/* Image counter and navigation dots */}
-              <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 items-center z-10">
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 items-center z-20">
                 {media.map((_, idx) => (
                   <button 
                     key={idx} 
@@ -220,7 +219,7 @@ export function TwitterStyleMediaPreview({
           )}
         </div>
         
-        {/* Grid preview for multiple images */}
+        {/* Grid preview for thumbnails navigation */}
         <div className={cn(
           "grid gap-1 mt-1 h-20",
           media.length === 2 ? "grid-cols-2" : 
