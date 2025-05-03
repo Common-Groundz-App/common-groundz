@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -33,8 +34,9 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [location, setLocation] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(generateUUID()).current;
-
+  
   // Auto-resize textarea as content changes
   useEffect(() => {
     if (textareaRef.current) {
@@ -42,6 +44,67 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [content]);
+
+  // Handle keyboard shortcut for posting (Cmd/Ctrl + Enter)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !isPostButtonDisabled) {
+        handleSubmit();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [content, media, isSubmitting]);
+
+  // Handle drag and drop for the entire form
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      if (formRef.current) {
+        formRef.current.classList.add('bg-accent/20');
+      }
+    };
+    
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      if (formRef.current) {
+        formRef.current.classList.remove('bg-accent/20');
+      }
+    };
+    
+    const handleDrop = async (e: DragEvent) => {
+      e.preventDefault();
+      if (formRef.current) {
+        formRef.current.classList.remove('bg-accent/20');
+      }
+      
+      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+          // Handle file upload logic here if you have direct access
+          // For now, we'll let the MediaUploader handle it
+        }
+      }
+    };
+    
+    const currentRef = formRef.current;
+    if (currentRef) {
+      currentRef.addEventListener('dragover', handleDragOver);
+      currentRef.addEventListener('dragleave', handleDragLeave);
+      currentRef.addEventListener('drop', handleDrop);
+    }
+    
+    return () => {
+      if (currentRef) {
+        currentRef.removeEventListener('dragover', handleDragOver);
+        currentRef.removeEventListener('dragleave', handleDragLeave);
+        currentRef.removeEventListener('drop', handleDrop);
+      }
+    };
+  }, []);
 
   const handleMediaUpload = (mediaItem: MediaItem) => {
     if (media.length < 4) {
@@ -103,7 +166,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
         location: location || null,
       };
 
-      // Here we would normally submit the post data
       console.log('Submitting post:', postData);
       
       // Mock submission delay
@@ -142,17 +204,17 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
   const getEntityIcon = (type: string) => {
     switch (type) {
       case 'place':
-        return <MapPin className="h-3 w-3" />;
+        return '🏠';
       case 'food':
-        return <span className="text-xs">🍟</span>;
+        return '🍽️';
       case 'movie':
-        return <span className="text-xs">🎬</span>;
+        return '🎬';
       case 'book':
-        return <span className="text-xs">📚</span>;
+        return '📚';
       case 'product':
-        return <span className="text-xs">💄</span>;
+        return '💄';
       default:
-        return <Tag className="h-3 w-3" />;
+        return '🏷️';
     }
   };
 
@@ -162,13 +224,16 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
   const userDisplayName = user?.email ? user.email.split('@')[0] : 'User';
 
   return (
-    <div className="bg-background rounded-2xl shadow-md p-4 space-y-4">
-      {/* Section 1: User Info + Text Input */}
+    <div 
+      ref={formRef} 
+      className="bg-background rounded-xl shadow-sm p-5 transition-all"
+    >
+      {/* User Info + Text Input */}
       <div className="flex gap-3">
         <UserAvatar 
           username={userDisplayName} 
           imageUrl={null}
-          className="h-10 w-10"
+          className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity"
         />
         <div className="flex-1 space-y-1">
           <p className="text-sm font-medium">{userDisplayName || 'User'}</p>
@@ -182,50 +247,52 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
         </div>
       </div>
 
-      {/* Section 2: Media Upload Preview */}
+      {/* Media Upload Preview */}
       {media.length > 0 && (
-        <div className="grid grid-cols-2 gap-2">
-          {media.map((item) => (
-            <div 
-              key={item.url} 
-              className="relative rounded-lg overflow-hidden aspect-video bg-muted"
-            >
-              {item.type === 'image' ? (
-                <img 
-                  src={item.url} 
-                  alt={item.alt || 'Uploaded media'} 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <video 
-                  src={item.url} 
-                  controls={false} 
-                  className="w-full h-full object-cover"
-                />
-              )}
-              <Button
-                variant="destructive"
-                size="icon"
-                className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100"
-                onClick={() => removeMedia(item)}
+        <div className="mt-4 overflow-x-auto">
+          <div className="flex gap-2 pb-2 scrollbar-hide">
+            {media.map((item) => (
+              <div 
+                key={item.url} 
+                className="relative rounded-lg overflow-hidden shrink-0 w-[150px] h-[150px] bg-muted"
               >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
+                {item.type === 'image' ? (
+                  <img 
+                    src={item.url} 
+                    alt={item.alt || 'Uploaded media'} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <video 
+                    src={item.url} 
+                    controls={false} 
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100"
+                  onClick={() => removeMedia(item)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Section 3: Entity Tags */}
+      {/* Entity Tags */}
       {entities.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1 mt-3">
           {entities.map((entity) => (
             <Badge 
               key={entity.id} 
               variant="outline" 
-              className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs"
+              className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
             >
-              {getEntityIcon(entity.type)}
+              <span>{getEntityIcon(entity.type)}</span>
               <span>{entity.name}</span>
               <Button
                 variant="ghost"
@@ -242,7 +309,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
 
       {/* Entity Selector (only shown when tag button is clicked) */}
       {entitySelectorVisible && (
-        <div className="mt-2 p-3 border rounded-lg bg-background">
+        <div className="mt-3 p-3 border rounded-lg bg-background animate-fade-in">
           <SimpleEntitySelector 
             onEntitiesChange={handleEntitiesChange}
             initialEntities={entities}
@@ -252,7 +319,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
 
       {/* Location Input (only shown when location button is clicked) */}
       {showLocationInput && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mt-3 animate-fade-in">
           <MapPin className="h-4 w-4 text-muted-foreground" />
           <input
             type="text"
@@ -272,8 +339,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
         </div>
       )}
 
-      {/* Section 4 & 5 & 6: Bottom Toolbar + Visibility + Post Actions */}
-      <div className="flex items-center justify-between border-t pt-3">
+      {/* Bottom Toolbar */}
+      <div className="flex items-center justify-between mt-4 pt-3 border-t">
         {/* Left: Toolbar */}
         <div className="flex items-center gap-1">
           <MediaUploader
@@ -372,21 +439,31 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
             </SelectContent>
           </Select>
           
-          <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          <Button 
+            variant="outline" 
+            onClick={onCancel} 
+            disabled={isSubmitting}
+            className="hover:bg-accent/50"
+          >
             Cancel
           </Button>
           
           <Button 
-            className="bg-brand-orange hover:bg-brand-orange/90"
+            className={cn(
+              "bg-brand-orange hover:bg-brand-orange/90 transition-all",
+              (!isPostButtonDisabled && !isSubmitting) && "animate-fade-in"
+            )}
             onClick={handleSubmit} 
             disabled={isPostButtonDisabled}
           >
             {isSubmitting ? (
               <div className="flex items-center gap-2">
                 <div className="h-4 w-4 border-2 border-t-transparent rounded-full animate-spin" /> 
-                Posting...
+                <span>Posting...</span>
               </div>
-            ) : 'Post'}
+            ) : (
+              <span>Post</span>
+            )}
           </Button>
         </div>
       </div>
