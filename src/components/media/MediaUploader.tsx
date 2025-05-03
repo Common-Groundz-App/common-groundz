@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -59,7 +58,7 @@ export function MediaUploader({
       toast({
         title: 'Too many files selected',
         description: `Only the first ${remainingSlots} files will be processed. Max limit is ${maxMediaCount} media items.`,
-        variant: 'warning',
+        variant: 'default',
       });
     }
     
