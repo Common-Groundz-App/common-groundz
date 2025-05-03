@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Badge } from '@/components/ui/badge';
 import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import { generateUUID } from '@/lib/uuid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -34,7 +33,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [location, setLocation] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const sessionId = useRef(uuidv4()).current;
+  const sessionId = useRef(generateUUID()).current;
 
   // Auto-resize textarea as content changes
   useEffect(() => {
