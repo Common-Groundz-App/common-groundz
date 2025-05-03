@@ -1,27 +1,25 @@
 
 import React from 'react';
 import { MediaItem } from '@/types/media';
-import { MediaGallery } from '@/components/media/MediaGallery';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
-import { 
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '@/components/ui/carousel';
+import { cn } from '@/lib/utils';
 
 interface PostMediaDisplayProps {
   media?: MediaItem[];
   className?: string;
   displayType?: 'grid' | 'carousel' | 'twitter';
+  maxHeight?: string;
+  aspectRatio?: 'maintain' | '16:9' | '4:5' | '1:1';
+  objectFit?: 'contain' | 'cover';
 }
 
 export function PostMediaDisplay({ 
   media, 
   className,
-  displayType = 'twitter'
+  displayType = 'twitter',
+  maxHeight = 'h-80',
+  aspectRatio = 'maintain',
+  objectFit = 'contain'
 }: PostMediaDisplayProps) {
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
     return null;
@@ -36,61 +34,15 @@ export function PostMediaDisplay({
     return null;
   }
   
-  // Use the TwitterStyleMediaPreview component for twitter style display
-  if (displayType === 'twitter') {
-    return (
-      <TwitterStyleMediaPreview
-        media={validMedia}
-        readOnly={true}
-        className={className}
-      />
-    );
-  }
-  
-  if (displayType === 'carousel' && media.length > 1) {
-    return (
-      <Carousel className={className}>
-        <CarouselContent>
-          {validMedia.map((item, index) => (
-            <CarouselItem key={item.id || index}>
-              <div className="p-1 flex items-center justify-center">
-                {item.type === 'image' ? (
-                  <ImageWithFallback 
-                    src={item.url} 
-                    alt={item.alt || item.caption || `Media ${index + 1}`}
-                    className="max-w-full h-64 object-contain rounded-md"
-                  />
-                ) : (
-                  <video 
-                    src={item.url}
-                    poster={item.thumbnail_url}
-                    controls
-                    className="max-w-full h-64 object-contain rounded-md"
-                  >
-                    Your browser does not support the video tag.
-                  </video>
-                )}
-                {(item.caption || item.alt) && (
-                  <div className="p-2 text-center text-sm text-muted-foreground">
-                    {item.caption || item.alt}
-                  </div>
-                )}
-              </div>
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        <CarouselPrevious className="left-2" />
-        <CarouselNext className="right-2" />
-      </Carousel>
-    );
-  }
-  
-  // Default to grid display
+  // Use the TwitterStyleMediaPreview component for all media display
   return (
-    <MediaGallery 
-      media={validMedia} 
-      editable={false}
-      className={className}
+    <TwitterStyleMediaPreview
+      media={validMedia}
+      readOnly={true}
+      className={cn("mt-3", className)}
+      maxHeight={maxHeight}
+      aspectRatio={aspectRatio}
+      objectFit={objectFit}
     />
   );
 }

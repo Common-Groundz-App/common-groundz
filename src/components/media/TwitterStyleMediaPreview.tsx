@@ -10,13 +10,19 @@ interface TwitterStyleMediaPreviewProps {
   onRemove?: (item: MediaItem) => void;
   className?: string;
   readOnly?: boolean;
+  maxHeight?: string; // Allow custom height constraints
+  aspectRatio?: 'maintain' | '16:9' | '4:5' | '1:1'; // Different aspect ratio options
+  objectFit?: 'contain' | 'cover'; // Allow choosing between object-fit styles
 }
 
 export function TwitterStyleMediaPreview({
   media,
   onRemove,
   className,
-  readOnly = false
+  readOnly = false,
+  maxHeight = 'h-80',
+  aspectRatio = 'maintain',
+  objectFit = 'contain'
 }: TwitterStyleMediaPreviewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,6 +126,16 @@ export function TwitterStyleMediaPreview({
   
   if (media.length === 0) return null;
   
+  // Set aspect ratio class based on the prop
+  const getAspectRatioClass = () => {
+    switch (aspectRatio) {
+      case '16:9': return 'aspect-video';
+      case '4:5': return 'aspect-4/5';
+      case '1:1': return 'aspect-square';
+      default: return '';
+    }
+  };
+
   // Handle different layout strategies based on the number of images
   if (media.length === 1) {
     // Single image view
@@ -128,19 +144,29 @@ export function TwitterStyleMediaPreview({
         ref={containerRef}
         className={cn("relative mt-3 overflow-hidden rounded-xl", className)}
       >
-        <div className="w-full h-80 relative bg-black/5 flex items-center justify-center">
+        <div className={cn(
+          "w-full relative bg-black/5 flex items-center justify-center",
+          maxHeight,
+          getAspectRatioClass()
+        )}>
           {media[0].type === 'image' ? (
             <img 
               src={media[0].url} 
               alt={media[0].alt || "Image"} 
-              className="max-w-full max-h-full object-contain"
+              className={cn(
+                "max-w-full max-h-full", 
+                objectFit === 'contain' ? "object-contain" : "object-cover"
+              )}
             />
           ) : (
             <video 
               src={media[0].url} 
               poster={media[0].thumbnail_url}
               controls
-              className="max-w-full max-h-full object-contain"
+              className={cn(
+                "max-w-full max-h-full",
+                objectFit === 'contain' ? "object-contain" : "object-cover"
+              )}
             />
           )}
           
@@ -173,7 +199,10 @@ export function TwitterStyleMediaPreview({
         onMouseDown={handleSwipeStart}
       >
         {/* Multiple images carousel view */}
-        <div className="relative h-80 w-full bg-black/5 rounded-xl overflow-hidden flex items-center justify-center">
+        <div className={cn(
+          "relative w-full bg-black/5 rounded-xl overflow-hidden flex items-center justify-center",
+          maxHeight
+        )}>
           {/* Media items container */}
           <div className="h-full w-full relative overflow-x-hidden">
             {media.map((item, index) => (
@@ -194,14 +223,20 @@ export function TwitterStyleMediaPreview({
                   <img 
                     src={item.url} 
                     alt={item.alt || item.caption || `Image ${index + 1}`} 
-                    className="max-w-full max-h-full object-contain"
+                    className={cn(
+                      "max-w-full max-h-full",
+                      objectFit === 'contain' ? "object-contain" : "object-cover"
+                    )}
                   />
                 ) : (
                   <video 
                     src={item.url} 
                     poster={item.thumbnail_url}
                     controls
-                    className="max-w-full max-h-full object-contain"
+                    className={cn(
+                      "max-w-full max-h-full",
+                      objectFit === 'contain' ? "object-contain" : "object-cover"
+                    )}
                   >
                     Your browser does not support the video tag.
                   </video>

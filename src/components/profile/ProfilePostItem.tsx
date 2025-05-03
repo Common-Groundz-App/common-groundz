@@ -206,11 +206,14 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           <RichTextDisplay content={post.content} />
         </div>
         
+        {/* Update to use our standardized media display component */}
         {post.media && post.media.length > 0 && (
           <div className="mt-4">
             <PostMediaDisplay 
               media={post.media}
-              displayType={post.media.length > 1 ? 'carousel' : 'grid'} 
+              maxHeight="h-80"
+              aspectRatio="maintain"
+              objectFit="contain" 
             />
           </div>
         )}
