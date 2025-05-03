@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -95,8 +97,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
     
     const currentRef = formRef.current;
     if (currentRef) {
-      currentRef.addEventListener('dragover', handleDragOver);
-      currentRef.addEventListener('dragleave', handleDragLeave);
+      currentRef.addEventListener('dragover', handleDragOver, { passive: true });
+      currentRef.addEventListener('dragleave', handleDragLeave, { passive: true });
       currentRef.addEventListener('drop', handleDrop);
     }
     
@@ -160,24 +162,72 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
     try {
       setIsSubmitting(true);
 
-      // Prepare post data
+      // Map visibility to database enum type
+      const dbVisibility = visibility === 'public' ? 'public' : 
+                           visibility === 'private' ? 'private' : 'circle_only';
+      
+      // Clean media items for database
+      const mediaToSave = media.map(item => ({
+        id: item.id || uuidv4(),
+        url: item.url,
+        type: item.type,
+        caption: item.caption || '',
+        alt: item.alt || '',
+        order: item.order,
+        is_deleted: false,
+        thumbnail_url: item.thumbnail_url || item.url
+      }));
+
+      // Prepare post data for database
       const postData = {
         content,
-        media,
-        entities: entities.map(entity => entity.id),
-        visibility,
+        media: mediaToSave,
+        visibility: dbVisibility,
+        user_id: user.id,
+        post_type: 'story',
         location: location || null,
       };
 
       console.log('Submitting post:', postData);
       
-      // Mock submission delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Save to database
+      const { data: newPost, error } = await supabase
+        .from('posts')
+        .insert(postData)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log('Post created:', newPost);
+      
+      // Add entity relationships if any
+      if (entities.length > 0 && newPost) {
+        for (const entity of entities) {
+          const { error: entityError } = await supabase
+            .from('post_entities')
+            .insert({
+              post_id: newPost.id,
+              entity_id: entity.id
+            });
+            
+          if (entityError) {
+            console.error('Error saving entity relationship:', entityError);
+          }
+        }
+      }
       
       toast({
         title: 'Post created',
         description: 'Your post has been published successfully',
       });
+
+      // Trigger refresh events for various parts of the app
+      window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
+      window.dispatchEvent(new CustomEvent('refresh-following-feed'));
+      window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
 
       // Reset form and notify parent
       onSuccess();
@@ -456,4 +506,45 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       </div>
     </div>
   );
+
+  // Helper functions
+  function getVisibilityIcon() {
+    switch (visibility) {
+      case 'private':
+        return <Lock className="h-4 w-4" />;
+      case 'circle':
+        return <Users className="h-4 w-4" />;
+      default:
+        return <Globe className="h-4 w-4" />;
+    }
+  }
+
+  function getEntityIcon(type: string) {
+    switch (type) {
+      case 'place':
+        return '🏠';
+      case 'food':
+        return '🍽️';
+      case 'movie':
+        return '🎬';
+      case 'book':
+        return '📚';
+      case 'product':
+        return '💄';
+      default:
+        return '🏷️';
+    }
+  }
+
+  // Computed properties
+  const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
+  
+  // Get user display name using the profileData or fallback to user metadata
+  const userDisplayName = user ? (
+    profileData ? getDisplayName(user, profileData) : 
+    (user.user_metadata?.username || user.email?.split('@')[0] || 'User')
+  ) : 'User';
+
+  // Get avatar URL from profileData
+  const avatarUrl = profileData?.avatar_url || null;
 }

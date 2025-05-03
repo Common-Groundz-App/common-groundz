@@ -40,10 +40,14 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   // Refresh posts when a new post is created or posts are updated or deleted
   useEffect(() => {
     const handleRefreshPosts = () => loadPosts();
+    
+    // Listen for both the current event and the new event name for better compatibility
     window.addEventListener('refresh-profile-posts', handleRefreshPosts);
+    window.addEventListener('refresh-posts', handleRefreshPosts);
     
     return () => {
       window.removeEventListener('refresh-profile-posts', handleRefreshPosts);
+      window.removeEventListener('refresh-posts', handleRefreshPosts);
     };
   }, []);
 
