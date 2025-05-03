@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -65,6 +66,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   const isOwner = user?.id === post.user_id;
   const CONTENT_LIMIT = 280;
@@ -185,7 +187,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     if (navigator.share) {
       navigator.share({
         title: post.title || 'Check out this post!',
-        text: post.content ? truncateText(post.content, 50) : 'Read more...',
+        text: post.content ? post.content.substring(0, 50) + (post.content.length > 50 ? '...' : '') : 'Read more...',
         url: `${window.location.origin}/post/${post.id}`,
       }).then(() => {
         console.log('Successful share');
@@ -298,19 +300,16 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         {/* User Info and Post Meta */}
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
-            <UsernameLink 
-              userId={post.user_id}
-              className="hover:opacity-80 transition-opacity"
-            >
-              <Avatar className="h-10 w-10 border">
-                <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
-                <AvatarFallback>{(post.username || 'U')[0].toUpperCase()}</AvatarFallback>
-              </Avatar>
-            </UsernameLink>
+            <Avatar className="h-10 w-10 border">
+              <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
+              <AvatarFallback>{(post.username || 'U')[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
             <div>
-              <UsernameLink userId={post.user_id}>
-                <p className="font-medium hover:underline">{post.username}</p>
-              </UsernameLink>
+              <UsernameLink 
+                userId={post.user_id} 
+                username={post.username}
+                className="hover:underline"
+              />
               <div className="flex items-center text-muted-foreground text-xs gap-1">
                 <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
                 <span>·</span>
@@ -400,7 +399,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               variant="ghost"
               size="sm" 
               className="flex items-center gap-1 py-0 px-2 sm:px-4"
-              onClick={handleCommentsClick}
+              onClick={handleCommentClick}
             >
               <MessageCircle className="h-5 w-5" />
               <span>{displayCommentCount || 0}</span>
@@ -439,13 +438,19 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           itemId={post.id}
           itemType="post"
           highlightCommentId={highlightCommentId}
-          onCommentPosted={() => {
-            if (typeof localCommentCount === 'number') {
-              setLocalCommentCount(localCommentCount + 1);
-            }
-          }}
         />
       )}
+      
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <ModernCreatePostForm 
+            postToEdit={post}
+            onSuccess={handleEditSuccess}
+            onCancel={() => setIsEditDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
       
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog

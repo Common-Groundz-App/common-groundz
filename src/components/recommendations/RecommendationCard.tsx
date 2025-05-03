@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -152,9 +153,7 @@ const RecommendationCard = ({
               </Avatar>
             </UsernameLink>
             <div>
-              <UsernameLink userId={recommendation.user_id}>
-                <p className="font-medium hover:underline">{recommendation.username}</p>
-              </UsernameLink>
+              <UsernameLink userId={recommendation.user_id} username={recommendation.username} className="font-medium hover:underline" />
               <div className="flex items-center gap-1 text-muted-foreground text-xs">
                 <span>{format(new Date(recommendation.created_at), 'MMM d, yyyy')}</span>
                 <span>·</span>
