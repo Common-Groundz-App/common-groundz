@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -189,14 +188,22 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         thumbnail_url: item.thumbnail_url || item.url
       }));
 
+      // Store location in media metadata if it exists
+      let postMetadata = {};
+      if (location) {
+        postMetadata = { location };
+      }
+
       // Prepare post data for database - explicitly type the post_type
+      // IMPORTANT: Remove location field as it doesn't exist in the database schema
       const postData = {
         content,
         media: mediaToSave,
         visibility: dbVisibility,
         user_id: user.id,
         post_type: 'story' as 'story' | 'routine' | 'project' | 'note', // Explicit type casting
-        location: location || null,
+        // We can optionally store location in tags or metadata if needed
+        tags: location ? [location] : undefined,
       };
 
       console.log('Submitting post:', postData);
