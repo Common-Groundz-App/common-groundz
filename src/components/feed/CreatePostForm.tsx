@@ -179,8 +179,7 @@ export function CreatePostForm({
       console.log('Post data being sent to database:', postData);
       
       if (isEditMode) {
-        // ... keep existing code (post update logic)
-        
+        // Update existing post
         const { error } = await supabase
           .from('posts')
           .update(postData)
