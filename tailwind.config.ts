@@ -116,8 +116,13 @@ export default {
 				// Twitter-style layouts for media grid with object-contain
 				'.twitter-media-single': {
 					width: '100%',
+					maxWidth: '100%',
 					borderRadius: '0.75rem',
 					overflow: 'hidden',
+					display: 'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+					position: 'relative',
 					'& > *': {
 						objectFit: 'contain',
 						maxHeight: '100%',
@@ -133,7 +138,10 @@ export default {
 					overflow: 'hidden',
 					'& > *': {
 						aspectRatio: '1 / 1',
-						objectFit: 'contain'
+						objectFit: 'contain',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center'
 					}
 				},
 				'.twitter-media-three': {
@@ -146,7 +154,10 @@ export default {
 					overflow: 'hidden',
 					'& > *': {
 						aspectRatio: '1 / 1',
-						objectFit: 'contain'
+						objectFit: 'contain',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center'
 					},
 					'& > *:first-child': {
 						gridRow: 'span 2',
@@ -163,7 +174,10 @@ export default {
 					overflow: 'hidden',
 					'& > *': {
 						aspectRatio: '1 / 1',
-						objectFit: 'contain'
+						objectFit: 'contain',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center'
 					}
 				},
 				// Additional utility for media containers

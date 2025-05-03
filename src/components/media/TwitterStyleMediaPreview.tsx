@@ -21,7 +21,11 @@ export function TwitterStyleMediaPreview({
   const [currentIndex, setCurrentIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showNavigation, setShowNavigation] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [dragDelta, setDragDelta] = useState(0);
   
+  // Determine if we should show navigation elements
   useEffect(() => {
     // Only show navigation arrows if we have multiple images
     setShowNavigation(media.length > 1);
@@ -39,34 +43,80 @@ export function TwitterStyleMediaPreview({
     setCurrentIndex(prev => (prev - 1 + media.length) % media.length);
   };
   
-  const handleSwipe = (e: React.TouchEvent) => {
+  // Enhanced swipe handling for mobile
+  const handleSwipeStart = (e: React.TouchEvent | React.MouseEvent) => {
     if (!containerRef.current || media.length <= 1) return;
     
-    const touchStart = e.touches[0].clientX;
+    setIsDragging(true);
     
-    const handleTouchMove = (moveEvent: TouchEvent) => {
-      moveEvent.preventDefault();
-    };
-    
-    const handleTouchEnd = (endEvent: TouchEvent) => {
-      const touchEnd = endEvent.changedTouches[0].clientX;
-      const diff = touchStart - touchEnd;
+    // Get the starting position
+    if ('touches' in e) {
+      setDragStartX(e.touches[0].clientX);
+    } else {
+      setDragStartX(e.clientX);
       
-      if (Math.abs(diff) > 50) { // Minimum swipe distance
-        if (diff > 0) {
-          nextImage(); // Swipe left, go to next image
-        } else {
-          prevImage(); // Swipe right, go to previous image
-        }
+      // Add mouse event listeners for desktop dragging
+      document.addEventListener('mousemove', handleSwipeMove);
+      document.addEventListener('mouseup', handleSwipeEnd);
+    }
+  };
+  
+  const handleSwipeMove = (e: TouchEvent | MouseEvent) => {
+    if (!isDragging) return;
+    
+    e.preventDefault();
+    
+    // Calculate how far we've dragged
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const delta = clientX - dragStartX;
+    
+    setDragDelta(delta);
+  };
+  
+  const handleSwipeEnd = (e: TouchEvent | MouseEvent) => {
+    if (!isDragging) return;
+    
+    setIsDragging(false);
+    
+    // Determine if the swipe was significant enough to change images
+    const threshold = 50; // Minimum distance to trigger a swipe
+    
+    if (Math.abs(dragDelta) > threshold) {
+      if (dragDelta > 0) {
+        prevImage(); // Swipe right, go to previous image
+      } else {
+        nextImage(); // Swipe left, go to next image
+      }
+    }
+    
+    // Reset the drag delta
+    setDragDelta(0);
+    
+    // Remove mouse event listeners
+    document.removeEventListener('mousemove', handleSwipeMove);
+    document.removeEventListener('mouseup', handleSwipeEnd);
+  };
+  
+  // Set up touch event handlers
+  useEffect(() => {
+    const currentContainer = containerRef.current;
+    
+    if (currentContainer) {
+      currentContainer.addEventListener('touchmove', handleSwipeMove, { passive: false });
+      currentContainer.addEventListener('touchend', handleSwipeEnd);
+    }
+    
+    return () => {
+      if (currentContainer) {
+        currentContainer.removeEventListener('touchmove', handleSwipeMove);
+        currentContainer.removeEventListener('touchend', handleSwipeEnd);
       }
       
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
+      // Also clean up any mouse event listeners
+      document.removeEventListener('mousemove', handleSwipeMove);
+      document.removeEventListener('mouseup', handleSwipeEnd);
     };
-    
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd, { once: true });
-  };
+  }, [isDragging, dragStartX]);
   
   if (media.length === 0) return null;
   
@@ -78,19 +128,19 @@ export function TwitterStyleMediaPreview({
         ref={containerRef}
         className={cn("relative mt-3 overflow-hidden rounded-xl", className)}
       >
-        <div className="w-full h-80 relative bg-black/5">
+        <div className="w-full h-80 relative bg-black/5 flex items-center justify-center">
           {media[0].type === 'image' ? (
             <img 
               src={media[0].url} 
               alt={media[0].alt || "Image"} 
-              className="w-full h-full object-contain bg-black/5 rounded-xl"
+              className="max-w-full max-h-full object-contain"
             />
           ) : (
             <video 
               src={media[0].url} 
               poster={media[0].thumbnail_url}
               controls
-              className="w-full h-full object-contain rounded-xl"
+              className="max-w-full max-h-full object-contain"
             />
           )}
           
@@ -119,19 +169,26 @@ export function TwitterStyleMediaPreview({
           "relative mt-3 overflow-hidden rounded-xl",
           className
         )}
-        onTouchStart={handleSwipe}
+        onTouchStart={handleSwipeStart}
+        onMouseDown={handleSwipeStart}
       >
         {/* Multiple images carousel view */}
-        <div className="relative h-80 w-full bg-black/5 rounded-xl overflow-hidden">
+        <div className="relative h-80 w-full bg-black/5 rounded-xl overflow-hidden flex items-center justify-center">
           {/* Media items container */}
-          <div className="h-full w-full">
+          <div className="h-full w-full relative overflow-x-hidden">
             {media.map((item, index) => (
               <div 
                 key={item.id || index}
                 className={cn(
-                  "absolute top-0 left-0 w-full h-full flex items-center justify-center transition-opacity duration-300",
-                  currentIndex === index ? "opacity-100 z-10" : "opacity-0 z-0"
+                  "absolute top-0 left-0 w-full h-full flex items-center justify-center transition-all duration-300",
+                  currentIndex === index ? "opacity-100 z-10" : "opacity-0 z-0",
+                  isDragging && currentIndex === index && "transition-transform"
                 )}
+                style={
+                  currentIndex === index && isDragging 
+                    ? { transform: `translateX(${dragDelta}px)` } 
+                    : undefined
+                }
               >
                 {item.type === 'image' ? (
                   <img 
@@ -176,25 +233,25 @@ export function TwitterStyleMediaPreview({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20"
+                className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-gray-800/60 hover:bg-gray-800 hover:scale-105 transition-all text-white z-20"
                 onClick={(e) => {
                   e.stopPropagation();
                   prevImage();
                 }}
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-6 w-6" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-gray-800/60 hover:bg-gray-800 hover:scale-105 transition-all text-white z-20"
                 onClick={(e) => {
                   e.stopPropagation();
                   nextImage();
                 }}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-6 w-6" />
               </Button>
               
               {/* Image counter and navigation dots */}
@@ -204,14 +261,16 @@ export function TwitterStyleMediaPreview({
                     key={idx} 
                     className={cn(
                       "h-2 rounded-full transition-all focus:outline-none",
-                      idx === currentIndex ? "w-6 bg-white" : "w-2 bg-white/60"
+                      idx === currentIndex 
+                        ? "w-6 bg-brand-orange" 
+                        : "w-2 bg-white opacity-70 hover:opacity-100"
                     )}
                     onClick={() => setCurrentIndex(idx)}
                     aria-label={`Go to image ${idx + 1}`}
                   />
                 ))}
                 
-                <span className="text-xs text-white bg-black/40 px-2 py-0.5 rounded-full ml-2">
+                <span className="text-xs text-white bg-black/60 px-2 py-0.5 rounded-full ml-2">
                   {currentIndex + 1}/{media.length}
                 </span>
               </div>
@@ -219,9 +278,9 @@ export function TwitterStyleMediaPreview({
           )}
         </div>
         
-        {/* Grid preview for thumbnails navigation */}
+        {/* Grid preview for thumbnails navigation - with increased spacing */}
         <div className={cn(
-          "grid gap-1 mt-1 h-20",
+          "grid gap-1 mt-3 h-20 overflow-x-hidden",
           media.length === 2 ? "grid-cols-2" : 
           media.length === 3 ? "grid-cols-3" : 
           "grid-cols-4"
@@ -230,8 +289,10 @@ export function TwitterStyleMediaPreview({
             <button
               key={item.id || index}
               className={cn(
-                "h-full w-full relative rounded-md overflow-hidden",
-                currentIndex === index ? "border-2 border-primary" : "border border-transparent opacity-70"
+                "h-full w-full relative rounded-md overflow-hidden transition-all",
+                currentIndex === index 
+                  ? "border-2 border-brand-orange" 
+                  : "border border-transparent opacity-70 hover:opacity-100"
               )}
               onClick={() => setCurrentIndex(index)}
             >

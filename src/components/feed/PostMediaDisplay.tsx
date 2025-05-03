@@ -53,19 +53,19 @@ export function PostMediaDisplay({
         <CarouselContent>
           {validMedia.map((item, index) => (
             <CarouselItem key={item.id || index}>
-              <div className="p-1">
+              <div className="p-1 flex items-center justify-center">
                 {item.type === 'image' ? (
                   <ImageWithFallback 
                     src={item.url} 
                     alt={item.alt || item.caption || `Media ${index + 1}`}
-                    className="w-full h-64 object-contain rounded-md"
+                    className="max-w-full h-64 object-contain rounded-md"
                   />
                 ) : (
                   <video 
                     src={item.url}
                     poster={item.thumbnail_url}
                     controls
-                    className="w-full h-64 object-contain rounded-md"
+                    className="max-w-full h-64 object-contain rounded-md"
                   >
                     Your browser does not support the video tag.
                   </video>
