@@ -10,7 +10,7 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Badge } from '@/components/ui/badge';
 import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users } from 'lucide-react';
-import { generateUUID } from '@/lib/utils';
+import { generateUUID } from '@/lib/uuid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
