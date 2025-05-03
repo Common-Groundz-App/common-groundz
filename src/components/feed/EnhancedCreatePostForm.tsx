@@ -26,6 +26,16 @@ interface EnhancedCreatePostFormProps {
 
 type VisibilityOption = 'public' | 'private' | 'circle';
 
+// Map UI visibility types to database visibility types
+const mapVisibilityToDatabase = (visibility: VisibilityOption): 'public' | 'private' | 'circle_only' => {
+  switch (visibility) {
+    case 'public': return 'public';
+    case 'private': return 'private';
+    case 'circle': return 'circle_only';
+    default: return 'public';
+  }
+};
+
 export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: EnhancedCreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -52,6 +62,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
 
   // Handle keyboard shortcut for posting (Cmd/Ctrl + Enter)
   useEffect(() => {
+    const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !isPostButtonDisabled) {
         handleSubmit();
@@ -163,8 +175,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       setIsSubmitting(true);
 
       // Map visibility to database enum type
-      const dbVisibility = visibility === 'public' ? 'public' : 
-                           visibility === 'private' ? 'private' : 'circle_only';
+      const dbVisibility = mapVisibilityToDatabase(visibility);
       
       // Clean media items for database
       const mediaToSave = media.map(item => ({
@@ -178,13 +189,13 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         thumbnail_url: item.thumbnail_url || item.url
       }));
 
-      // Prepare post data for database
+      // Prepare post data for database - explicitly type the post_type
       const postData = {
         content,
         media: mediaToSave,
         visibility: dbVisibility,
         user_id: user.id,
-        post_type: 'story',
+        post_type: 'story' as 'story' | 'routine' | 'project' | 'note', // Explicit type casting
         location: location || null,
       };
 
@@ -228,6 +239,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
       window.dispatchEvent(new CustomEvent('refresh-following-feed'));
       window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+      window.dispatchEvent(new CustomEvent('refresh-posts'));
 
       // Reset form and notify parent
       onSuccess();
@@ -243,7 +255,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
     }
   };
 
-  const getVisibilityIcon = () => {
+  function getVisibilityIcon() {
     switch (visibility) {
       case 'private':
         return <Lock className="h-4 w-4" />;
@@ -252,9 +264,9 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       default:
         return <Globe className="h-4 w-4" />;
     }
-  };
+  }
 
-  const getEntityIcon = (type: string) => {
+  function getEntityIcon(type: string) {
     switch (type) {
       case 'place':
         return '🏠';
@@ -269,8 +281,9 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       default:
         return '🏷️';
     }
-  };
+  }
 
+  // Computed properties
   const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
   
   // Get user display name using the profileData or fallback to user metadata
@@ -506,45 +519,4 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       </div>
     </div>
   );
-
-  // Helper functions
-  function getVisibilityIcon() {
-    switch (visibility) {
-      case 'private':
-        return <Lock className="h-4 w-4" />;
-      case 'circle':
-        return <Users className="h-4 w-4" />;
-      default:
-        return <Globe className="h-4 w-4" />;
-    }
-  }
-
-  function getEntityIcon(type: string) {
-    switch (type) {
-      case 'place':
-        return '🏠';
-      case 'food':
-        return '🍽️';
-      case 'movie':
-        return '🎬';
-      case 'book':
-        return '📚';
-      case 'product':
-        return '💄';
-      default:
-        return '🏷️';
-    }
-  }
-
-  // Computed properties
-  const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
-  
-  // Get user display name using the profileData or fallback to user metadata
-  const userDisplayName = user ? (
-    profileData ? getDisplayName(user, profileData) : 
-    (user.user_metadata?.username || user.email?.split('@')[0] || 'User')
-  ) : 'User';
-
-  // Get avatar URL from profileData
-  const avatarUrl = profileData?.avatar_url || null;
 }
