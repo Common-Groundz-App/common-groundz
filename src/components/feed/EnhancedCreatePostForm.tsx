@@ -158,18 +158,21 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel }: EnhancedCreatePo
   };
 
   const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
+  
+  // Get user email as fallback for display
+  const userDisplayName = user?.email ? user.email.split('@')[0] : 'User';
 
   return (
     <div className="bg-background rounded-2xl shadow-md p-4 space-y-4">
       {/* Section 1: User Info + Text Input */}
       <div className="flex gap-3">
         <UserAvatar 
-          username={user?.username} 
-          imageUrl={user?.avatar_url}
+          username={userDisplayName} 
+          imageUrl={null}
           className="h-10 w-10"
         />
         <div className="flex-1 space-y-1">
-          <p className="text-sm font-medium">{user?.username || 'User'}</p>
+          <p className="text-sm font-medium">{userDisplayName || 'User'}</p>
           <Textarea
             ref={textareaRef}
             placeholder="What do you want to share today?"
