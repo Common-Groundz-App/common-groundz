@@ -5,13 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { useEntitySearch } from '@/hooks/use-entity-search';
 import { SelectValue, SelectTrigger, SelectContent, Select, SelectItem } from '@/components/ui/select';
+import { MapPin, Book, Film, ShoppingBag, Coffee } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface SimpleEntitySelectorProps {
   onEntitiesChange: (entities: Entity[]) => void;
   initialEntities?: Entity[];
+  className?: string;
 }
 
-export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }: SimpleEntitySelectorProps) {
+export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], className }: SimpleEntitySelectorProps) {
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState('');
   const [entityType, setEntityType] = useState<EntityType>('place');
@@ -46,8 +49,20 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     }
   };
 
+  // Get icon for entity type
+  const getEntityTypeIcon = (type: EntityType) => {
+    switch(type) {
+      case 'place': return <MapPin size={14} />;
+      case 'book': return <Book size={14} />;
+      case 'movie': return <Film size={14} />;
+      case 'product': return <ShoppingBag size={14} />;
+      case 'food': return <Coffee size={14} />;
+      default: return null;
+    }
+  };
+
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", className)}>
       <h4 className="text-sm font-medium">Tag a place, product, or media</h4>
       
       <div className="space-y-2">
@@ -60,11 +75,36 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="place">Place</SelectItem>
-              <SelectItem value="food">Food</SelectItem>
-              <SelectItem value="movie">Movie</SelectItem>
-              <SelectItem value="book">Book</SelectItem>
-              <SelectItem value="product">Product</SelectItem>
+              <SelectItem value="place" className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <MapPin size={14} />
+                  <span>Place</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="food" className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Coffee size={14} />
+                  <span>Food</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="movie" className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Film size={14} />
+                  <span>Movie</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="book" className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Book size={14} />
+                  <span>Book</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="product" className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag size={14} />
+                  <span>Product</span>
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
           
@@ -96,7 +136,10 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                         className="w-full justify-start text-left h-auto py-2 px-3"
                         onClick={() => handleEntitySelect(entity)}
                       >
-                        <span className="truncate">{entity.name}</span>
+                        <div className="flex items-center gap-2">
+                          {getEntityTypeIcon((entity as any).type || entityType)}
+                          <span className="truncate">{entity.name}</span>
+                        </div>
                       </Button>
                     ))}
                   </div>
@@ -113,7 +156,10 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                         className="w-full justify-start text-left h-auto py-2 px-3"
                         onClick={() => handleExternalResultSelect(result)}
                       >
-                        <span className="truncate">{result.name}</span>
+                        <div className="flex items-center gap-2">
+                          {getEntityTypeIcon(entityType)}
+                          <span className="truncate">{result.name}</span>
+                        </div>
                       </Button>
                     ))}
                   </div>
