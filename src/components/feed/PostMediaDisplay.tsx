@@ -8,7 +8,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 interface PostMediaDisplayProps {
   media?: MediaItem[];
   className?: string;
-  displayType?: 'grid' | 'carousel' | 'twitter';
+  displayType?: 'grid' | 'carousel';
   maxHeight?: string;
   aspectRatio?: 'maintain' | '16:9' | '4:5' | '1:1';
   objectFit?: 'contain' | 'cover';
