@@ -8,7 +8,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 interface PostMediaDisplayProps {
   media?: MediaItem[];
   className?: string;
-  displayType?: 'grid' | 'carousel';
+  displayType?: 'grid' | 'carousel' | 'linkedin';
   maxHeight?: string;
   aspectRatio?: 'maintain' | '16:9' | '4:5' | '1:1';
   objectFit?: 'contain' | 'cover';
@@ -20,7 +20,7 @@ interface PostMediaDisplayProps {
 export function PostMediaDisplay({ 
   media, 
   className,
-  displayType = 'grid',
+  displayType = 'linkedin',
   maxHeight,
   aspectRatio = 'maintain',
   objectFit = 'contain',

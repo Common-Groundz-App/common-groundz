@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
-import { ChevronLeft, ChevronRight, X, Loader2, Maximize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Loader2, Maximize2, Images } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
@@ -17,7 +16,7 @@ interface TwitterStyleMediaPreviewProps {
   enableBackground?: boolean;
   thumbnailDisplay?: 'always' | 'hover' | 'none';
   enableLazyLoading?: boolean;
-  displayMode?: 'grid' | 'carousel';
+  displayMode?: 'grid' | 'carousel' | 'linkedin';
   onImageClick?: (index: number) => void;
   currentIndex?: number; // Add this line to accept initial index
 }
@@ -39,7 +38,7 @@ export function TwitterStyleMediaPreview({
 }: TwitterStyleMediaPreviewProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(currentIndex);
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
-  const [viewMode, setViewMode] = useState<'grid' | 'carousel'>(displayMode);
+  const [viewMode, setViewMode] = useState<'grid' | 'carousel' | 'linkedin'>(displayMode);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showNavigation, setShowNavigation] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -51,6 +50,11 @@ export function TwitterStyleMediaPreview({
   useEffect(() => {
     setCurrentImageIndex(currentIndex);
   }, [currentIndex]);
+  
+  // Update viewMode when displayMode prop changes
+  useEffect(() => {
+    setViewMode(displayMode);
+  }, [displayMode]);
   
   // Determine image orientation for the current image
   const determineOrientation = (mediaItem: MediaItem): 'portrait' | 'landscape' | 'square' => {
@@ -313,7 +317,162 @@ export function TwitterStyleMediaPreview({
     );
   }
   
-  // Grid view for multiple images
+  // LinkedIn-style layout for multiple images
+  if (media.length > 1 && viewMode === 'linkedin') {
+    return (
+      <div 
+        ref={containerRef}
+        className={cn(
+          "relative mt-3 overflow-hidden rounded-xl",
+          className
+        )}
+      >
+        <div className={cn(
+          media.length === 2 ? 'linkedin-media-two' :
+          media.length === 3 ? 'linkedin-media-three' :
+          'linkedin-media-four',
+          "max-h-[500px]"
+        )}>
+          {/* First image is always shown and larger */}
+          {media.length > 0 && (
+            <div 
+              className={cn(
+                "relative overflow-hidden cursor-pointer bg-gray-100 dark:bg-gray-800/30",
+                "first-media-item"
+              )}
+              onClick={() => handleImageClick(0)}
+            >
+              {!loaded[media[0].id || '0'] && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/70" />
+                </div>
+              )}
+              
+              {media[0].type === 'image' ? (
+                <img 
+                  src={media[0].url} 
+                  alt={media[0].alt || "Image 1"} 
+                  loading={enableLazyLoading ? "lazy" : "eager"}
+                  className={cn(
+                    "w-full h-full transition-opacity duration-300",
+                    objectFit === 'cover' ? "object-cover" : "object-contain",
+                    loaded[media[0].id || '0'] ? "opacity-100" : "opacity-0"
+                  )}
+                  onLoad={() => handleImageLoad(media[0].id || '0')}
+                />
+              ) : (
+                <div className="relative w-full h-full">
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                    <Maximize2 className="h-6 w-6 text-white" />
+                  </div>
+                  <img 
+                    src={media[0].thumbnail_url || media[0].url} 
+                    alt={"Video thumbnail"}
+                    className="w-full h-full object-cover"
+                    onLoad={() => handleImageLoad(media[0].id || '0')}
+                  />
+                </div>
+              )}
+              
+              {!readOnly && onRemove && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20 shadow-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(media[0]);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
+          
+          {/* Other images shown in a grid */}
+          {media.slice(1, 4).map((item, index) => {
+            const actualIndex = index + 1; // Actual index in the media array
+            const isLoaded = loaded[item.id || actualIndex.toString()];
+            const isLastVisible = actualIndex === 3 || actualIndex === media.length - 1;
+            const showMoreOverlay = isLastVisible && media.length > 4;
+            
+            return (
+              <div 
+                key={item.id || actualIndex} 
+                className={cn(
+                  "relative overflow-hidden cursor-pointer",
+                  getBackgroundColor()
+                )}
+                onClick={() => handleImageClick(actualIndex)}
+              >
+                {/* Loading indicator */}
+                {!isLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/70" />
+                  </div>
+                )}
+                
+                {item.type === 'image' ? (
+                  <img 
+                    src={item.url} 
+                    alt={item.alt || `Image ${actualIndex + 1}`} 
+                    loading={enableLazyLoading ? "lazy" : "eager"}
+                    className={cn(
+                      "w-full h-full transition-opacity duration-300",
+                      isLoaded ? "opacity-100" : "opacity-0",
+                      objectFit === 'cover' ? "object-cover" : "object-contain"
+                    )}
+                    onLoad={() => handleImageLoad(item.id || actualIndex.toString())}
+                  />
+                ) : (
+                  <div className="relative w-full h-full">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                      <Maximize2 className="h-6 w-6 text-white" />
+                    </div>
+                    <img 
+                      src={item.thumbnail_url || item.url} 
+                      alt={`Video thumbnail ${actualIndex + 1}`}
+                      className="w-full h-full object-cover"
+                      onLoad={() => handleImageLoad(item.id || actualIndex.toString())}
+                    />
+                  </div>
+                )}
+                
+                {/* Show +X more overlay on the last visible image if there are more than 4 images */}
+                {showMoreOverlay && (
+                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                    <Images className="h-8 w-8 text-white mb-1" />
+                    <span className="text-white font-medium text-lg">+{media.length - 4}</span>
+                    <span className="text-white/80 text-sm">more</span>
+                  </div>
+                )}
+                
+                {/* Remove button for each media item */}
+                {!readOnly && onRemove && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-6 w-6 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20 shadow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(item);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  
+  // Standard grid view for multiple images
   if (media.length > 1 && viewMode === 'grid') {
     // Get the appropriate grid class based on the number of media items
     const getGridClass = () => {
@@ -415,7 +574,7 @@ export function TwitterStyleMediaPreview({
     );
   }
   
-  // Carousel view for multiple images
+  // Enhanced carousel view for multiple images
   if (media.length > 1 && viewMode === 'carousel') {
     const currentItem = media[currentImageIndex];
     const isLoaded = loaded[currentItem.id || currentImageIndex.toString()];

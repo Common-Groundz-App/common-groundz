@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -185,6 +186,56 @@ export default {
 						alignItems: 'center'
 					}
 				},
+				
+				// LinkedIn-style layouts for media grid
+				'.linkedin-media-two': {
+					width: '100%',
+					display: 'grid',
+					gridTemplateColumns: '1fr',
+					gridTemplateRows: 'auto auto',
+					gap: '2px',
+					borderRadius: '0.75rem',
+					overflow: 'hidden',
+					'& > .first-media-item': {
+						height: '300px',
+					},
+					'& > *:not(.first-media-item)': {
+						height: '200px',
+					}
+				},
+				'.linkedin-media-three': {
+					width: '100%',
+					display: 'grid',
+					gridTemplateColumns: '1fr 1fr',
+					gridTemplateRows: 'auto auto',
+					gap: '2px',
+					borderRadius: '0.75rem',
+					overflow: 'hidden',
+					'& > .first-media-item': {
+						gridColumn: 'span 2',
+						height: '280px',
+					},
+					'& > *:not(.first-media-item)': {
+						height: '160px',
+					}
+				},
+				'.linkedin-media-four': {
+					width: '100%',
+					display: 'grid',
+					gridTemplateColumns: '1fr 1fr',
+					gridTemplateRows: 'auto auto auto',
+					gap: '2px',
+					borderRadius: '0.75rem',
+					overflow: 'hidden',
+					'& > .first-media-item': {
+						gridColumn: 'span 2',
+						height: '240px',
+					},
+					'& > *:not(.first-media-item)': {
+						height: '120px',
+					}
+				},
+				
 				// Smart media containers that adapt to image orientation
 				'.media-container-portrait': {
 					maxWidth: '80%',
