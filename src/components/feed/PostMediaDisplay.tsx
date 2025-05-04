@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { MediaItem } from '@/types/media';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 interface PostMediaDisplayProps {
   media?: MediaItem[];
@@ -19,7 +20,7 @@ interface PostMediaDisplayProps {
 export function PostMediaDisplay({ 
   media, 
   className,
-  displayType = 'twitter',
+  displayType = 'grid',
   maxHeight,
   aspectRatio = 'maintain',
   objectFit = 'contain',
@@ -27,6 +28,9 @@ export function PostMediaDisplay({
   thumbnailDisplay = 'always',
   enableLazyLoading = true
 }: PostMediaDisplayProps) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
     return null;
   }
@@ -71,18 +75,42 @@ export function PostMediaDisplay({
     return 'h-auto max-h-[500px]';
   };
   
-  // Use the TwitterStyleMediaPreview component for all media display
+  const handleImageClick = (index: number) => {
+    setActiveImageIndex(index);
+    setLightboxOpen(true);
+  };
+  
   return (
-    <TwitterStyleMediaPreview
-      media={validMedia}
-      readOnly={true}
-      className={cn("mt-3", className)}
-      maxHeight={adaptiveMaxHeight()}
-      aspectRatio={aspectRatio}
-      objectFit={objectFit}
-      enableBackground={enableBackground}
-      thumbnailDisplay={thumbnailDisplay}
-      enableLazyLoading={enableLazyLoading}
-    />
+    <>
+      <TwitterStyleMediaPreview
+        media={validMedia}
+        readOnly={true}
+        className={cn("mt-3", className)}
+        maxHeight={adaptiveMaxHeight()}
+        aspectRatio={aspectRatio}
+        objectFit={objectFit}
+        enableBackground={enableBackground}
+        thumbnailDisplay={thumbnailDisplay}
+        enableLazyLoading={enableLazyLoading}
+        displayMode={displayType}
+        onImageClick={handleImageClick}
+      />
+      
+      {/* Lightbox for full-screen image viewing */}
+      <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+        <DialogContent className="max-w-6xl w-full p-0 bg-transparent border-none shadow-none">
+          <TwitterStyleMediaPreview
+            media={validMedia}
+            readOnly={true}
+            displayMode="carousel"
+            currentIndex={activeImageIndex}
+            objectFit="contain"
+            enableBackground={false}
+            thumbnailDisplay="always"
+            className="max-h-[90vh]"
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

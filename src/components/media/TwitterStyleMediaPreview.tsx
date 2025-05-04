@@ -1,7 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
-import { ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Loader2, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
@@ -16,6 +17,9 @@ interface TwitterStyleMediaPreviewProps {
   enableBackground?: boolean;
   thumbnailDisplay?: 'always' | 'hover' | 'none';
   enableLazyLoading?: boolean;
+  displayMode?: 'grid' | 'carousel';
+  onImageClick?: (index: number) => void;
+  currentIndex?: number; // Add this line to accept initial index
 }
 
 export function TwitterStyleMediaPreview({
@@ -28,16 +32,25 @@ export function TwitterStyleMediaPreview({
   objectFit = 'contain',
   enableBackground = true,
   thumbnailDisplay = 'always',
-  enableLazyLoading = true
+  enableLazyLoading = true,
+  displayMode = 'grid',
+  onImageClick,
+  currentIndex = 0 // Initialize with default value
 }: TwitterStyleMediaPreviewProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(currentIndex);
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
+  const [viewMode, setViewMode] = useState<'grid' | 'carousel'>(displayMode);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showNavigation, setShowNavigation] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
   const [dragDelta, setDragDelta] = useState(0);
   const [showThumbnails, setShowThumbnails] = useState(thumbnailDisplay === 'always');
+  
+  // Update currentImageIndex when currentIndex prop changes
+  useEffect(() => {
+    setCurrentImageIndex(currentIndex);
+  }, [currentIndex]);
   
   // Determine image orientation for the current image
   const determineOrientation = (mediaItem: MediaItem): 'portrait' | 'landscape' | 'square' => {
@@ -55,8 +68,8 @@ export function TwitterStyleMediaPreview({
   
   // Get orientation for the current media item
   const getCurrentOrientation = (): 'portrait' | 'landscape' | 'square' => {
-    if (!media[currentIndex]) return 'landscape';
-    return determineOrientation(media[currentIndex]);
+    if (!media[currentImageIndex]) return 'landscape';
+    return determineOrientation(media[currentImageIndex]);
   };
   
   const currentOrientation = getCurrentOrientation();
@@ -68,11 +81,11 @@ export function TwitterStyleMediaPreview({
   
   // Determine if we should show navigation elements
   useEffect(() => {
-    // Only show navigation arrows if we have multiple images
-    setShowNavigation(media.length > 1);
+    // Only show navigation arrows if we have multiple images and we're in carousel mode
+    setShowNavigation(media.length > 1 && viewMode === 'carousel');
     // Reset the current index if it's now out of bounds
-    if (currentIndex >= media.length) {
-      setCurrentIndex(Math.max(0, media.length - 1));
+    if (currentImageIndex >= media.length) {
+      setCurrentImageIndex(Math.max(0, media.length - 1));
     }
     
     // Show thumbnails based on the prop
@@ -81,7 +94,7 @@ export function TwitterStyleMediaPreview({
     } else if (thumbnailDisplay === 'none') {
       setShowThumbnails(false);
     }
-  }, [media, currentIndex, thumbnailDisplay]);
+  }, [media, currentImageIndex, thumbnailDisplay, viewMode]);
   
   // Handle hover for thumbnails
   useEffect(() => {
@@ -102,16 +115,25 @@ export function TwitterStyleMediaPreview({
   }, [thumbnailDisplay]);
   
   const nextImage = () => {
-    setCurrentIndex(prev => (prev + 1) % media.length);
+    setCurrentImageIndex(prev => (prev + 1) % media.length);
   };
   
   const prevImage = () => {
-    setCurrentIndex(prev => (prev - 1 + media.length) % media.length);
+    setCurrentImageIndex(prev => (prev - 1 + media.length) % media.length);
+  };
+  
+  const handleImageClick = (index: number) => {
+    if (onImageClick) {
+      onImageClick(index);
+    } else {
+      setCurrentImageIndex(index);
+      setViewMode('carousel');
+    }
   };
   
   // Enhanced swipe handling for mobile
   const handleSwipeStart = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!containerRef.current || media.length <= 1) return;
+    if (!containerRef.current || media.length <= 1 || viewMode !== 'carousel') return;
     
     setIsDragging(true);
     
@@ -167,7 +189,7 @@ export function TwitterStyleMediaPreview({
   useEffect(() => {
     const currentContainer = containerRef.current;
     
-    if (currentContainer) {
+    if (currentContainer && viewMode === 'carousel') {
       currentContainer.addEventListener('touchmove', handleSwipeMove, { passive: false });
       currentContainer.addEventListener('touchend', handleSwipeEnd);
     }
@@ -182,7 +204,7 @@ export function TwitterStyleMediaPreview({
       document.removeEventListener('mousemove', handleSwipeMove);
       document.removeEventListener('mouseup', handleSwipeEnd);
     };
-  }, [isDragging, dragStartX]);
+  }, [isDragging, dragStartX, viewMode]);
   
   if (media.length === 0) return null;
 
@@ -218,19 +240,6 @@ export function TwitterStyleMediaPreview({
     return 'bg-gray-100 dark:bg-gray-800/30';
   };
   
-  // Get width class based on orientation for portrait images
-  const getWidthClass = () => {
-    if (currentOrientation === 'portrait' && aspectRatio === 'maintain') {
-      return 'max-w-[80%] mx-auto'; // Portrait images are narrower
-    }
-    return 'w-full'; // Full width for landscape and square
-  };
-  
-  // Get container padding based on orientation
-  const getContainerPadding = () => {
-    return currentOrientation === 'portrait' ? 'px-4' : '';
-  };
-  
   // Single image view with enhanced styling
   if (media.length === 1) {
     const item = media[0];
@@ -246,7 +255,6 @@ export function TwitterStyleMediaPreview({
           "w-full relative flex items-center justify-center",
           getBackgroundColor(),
           getOrientationStyles(),
-          getContainerPadding(),
           "transition-all duration-300"
         )}>
           <div className={cn(
@@ -272,6 +280,7 @@ export function TwitterStyleMediaPreview({
                   objectFit === 'contain' ? "object-contain" : "object-cover"
                 )}
                 onLoad={() => handleImageLoad(item.id || '0')}
+                onClick={() => onImageClick && onImageClick(0)}
               />
             ) : (
               <video 
@@ -304,10 +313,112 @@ export function TwitterStyleMediaPreview({
     );
   }
   
-  // Multiple images carousel view with enhanced styling
-  if (media.length > 1) {
-    const currentItem = media[currentIndex];
-    const isLoaded = loaded[currentItem.id || currentIndex.toString()];
+  // Grid view for multiple images
+  if (media.length > 1 && viewMode === 'grid') {
+    // Get the appropriate grid class based on the number of media items
+    const getGridClass = () => {
+      switch (media.length) {
+        case 2:
+          return 'twitter-media-two';
+        case 3:
+          return 'twitter-media-three';
+        case 4:
+        default:
+          return 'twitter-media-four'; // Use a 2x2 grid for 4 or more images
+      }
+    };
+    
+    return (
+      <div 
+        ref={containerRef}
+        className={cn(
+          "relative mt-3 overflow-hidden rounded-xl",
+          className
+        )}
+      >
+        <div className={cn(
+          getGridClass(),
+          "h-auto max-h-[500px]"
+        )}>
+          {media.slice(0, 4).map((item, index) => {
+            const isLoaded = loaded[item.id || index.toString()];
+            
+            return (
+              <div 
+                key={item.id || index} 
+                className={cn(
+                  "relative overflow-hidden cursor-pointer",
+                  getBackgroundColor()
+                )}
+                onClick={() => handleImageClick(index)}
+              >
+                {/* Loading indicator */}
+                {!isLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/70" />
+                  </div>
+                )}
+                
+                {item.type === 'image' ? (
+                  <img 
+                    src={item.url} 
+                    alt={item.alt || `Image ${index + 1}`} 
+                    loading={enableLazyLoading ? "lazy" : "eager"}
+                    className={cn(
+                      "w-full h-full transition-opacity duration-300",
+                      isLoaded ? "opacity-100" : "opacity-0",
+                      objectFit === 'cover' ? "object-cover" : "object-contain"
+                    )}
+                    onLoad={() => handleImageLoad(item.id || index.toString())}
+                  />
+                ) : (
+                  <div className="relative w-full h-full">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                      <Maximize2 className="h-6 w-6 text-white" />
+                    </div>
+                    <img 
+                      src={item.thumbnail_url || item.url} 
+                      alt={`Video thumbnail ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      onLoad={() => handleImageLoad(item.id || index.toString())}
+                    />
+                  </div>
+                )}
+                
+                {/* Show +X more overlay on the 4th image if there are more than 4 images */}
+                {index === 3 && media.length > 4 && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <span className="text-white font-medium text-xl">+{media.length - 4}</span>
+                  </div>
+                )}
+                
+                {/* Remove button for each media item */}
+                {!readOnly && onRemove && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20 shadow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(item);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  
+  // Carousel view for multiple images
+  if (media.length > 1 && viewMode === 'carousel') {
+    const currentItem = media[currentImageIndex];
+    const isLoaded = loaded[currentItem.id || currentImageIndex.toString()];
     
     return (
       <div 
@@ -333,12 +444,11 @@ export function TwitterStyleMediaPreview({
                   key={item.id || index}
                   className={cn(
                     "absolute top-0 left-0 w-full h-full flex items-center justify-center transition-all duration-300",
-                    currentIndex === index ? "opacity-100 z-10" : "opacity-0 z-0",
-                    isDragging && currentIndex === index && "transition-transform",
-                    getContainerPadding()
+                    currentImageIndex === index ? "opacity-100 z-10" : "opacity-0 z-0",
+                    isDragging && currentImageIndex === index && "transition-transform"
                   )}
                   style={
-                    currentIndex === index && isDragging 
+                    currentImageIndex === index && isDragging 
                       ? { transform: `translateX(${dragDelta}px)` } 
                       : undefined
                   }
@@ -349,7 +459,7 @@ export function TwitterStyleMediaPreview({
                     "transition-all duration-200"
                   )}>
                     {/* Loading indicator */}
-                    {currentIndex === index && !loaded[item.id || index.toString()] && (
+                    {currentImageIndex === index && !loaded[item.id || index.toString()] && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/70" />
                       </div>
@@ -362,7 +472,7 @@ export function TwitterStyleMediaPreview({
                         loading={enableLazyLoading ? "lazy" : "eager"}
                         className={cn(
                           "max-w-full max-h-full rounded-md shadow-sm transition-opacity duration-300",
-                          (currentIndex === index && loaded[item.id || index.toString()]) ? "opacity-100" : "opacity-0",
+                          (currentImageIndex === index && loaded[item.id || index.toString()]) ? "opacity-100" : "opacity-0",
                           objectFit === 'contain' ? "object-contain" : "object-cover"
                         )}
                         onLoad={() => handleImageLoad(item.id || index.toString())}
@@ -403,6 +513,24 @@ export function TwitterStyleMediaPreview({
             })}
           </div>
           
+          {/* Back to grid button if we're in expanded view */}
+          {onImageClick && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 left-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20 shadow-md"
+              onClick={() => setViewMode('grid')}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+              </svg>
+            </Button>
+          )}
+          
           {/* Navigation controls */}
           {showNavigation && (
             <>
@@ -438,17 +566,17 @@ export function TwitterStyleMediaPreview({
                     key={idx} 
                     className={cn(
                       "h-2 rounded-full transition-all focus:outline-none shadow-sm",
-                      idx === currentIndex 
+                      idx === currentImageIndex 
                         ? "w-6 bg-brand-orange" 
                         : "w-2 bg-white opacity-70 hover:opacity-100"
                     )}
-                    onClick={() => setCurrentIndex(idx)}
+                    onClick={() => setCurrentImageIndex(idx)}
                     aria-label={`Go to image ${idx + 1}`}
                   />
                 ))}
                 
                 <span className="text-xs text-white bg-black/60 px-2 py-0.5 rounded-full ml-2 shadow-sm">
-                  {currentIndex + 1}/{media.length}
+                  {currentImageIndex + 1}/{media.length}
                 </span>
               </div>
             </>
@@ -468,11 +596,11 @@ export function TwitterStyleMediaPreview({
                 key={item.id || index}
                 className={cn(
                   "h-full w-full relative rounded-md overflow-hidden transition-all",
-                  currentIndex === index 
+                  currentImageIndex === index 
                     ? "border-2 border-brand-orange shadow-md" 
                     : "border border-transparent opacity-70 hover:opacity-100"
                 )}
-                onClick={() => setCurrentIndex(index)}
+                onClick={() => setCurrentImageIndex(index)}
               >
                 {item.type === 'image' ? (
                   <img 
