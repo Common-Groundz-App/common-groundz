@@ -11,6 +11,9 @@ interface PostMediaDisplayProps {
   maxHeight?: string;
   aspectRatio?: 'maintain' | '16:9' | '4:5' | '1:1';
   objectFit?: 'contain' | 'cover';
+  enableBackground?: boolean;
+  thumbnailDisplay?: 'always' | 'hover' | 'none';
+  enableLazyLoading?: boolean;
 }
 
 export function PostMediaDisplay({ 
@@ -19,7 +22,10 @@ export function PostMediaDisplay({
   displayType = 'twitter',
   maxHeight = 'h-80',
   aspectRatio = 'maintain',
-  objectFit = 'contain'
+  objectFit = 'contain',
+  enableBackground = true,
+  thumbnailDisplay = 'always',
+  enableLazyLoading = true
 }: PostMediaDisplayProps) {
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
     return null;
@@ -43,6 +49,9 @@ export function PostMediaDisplay({
       maxHeight={maxHeight}
       aspectRatio={aspectRatio}
       objectFit={objectFit}
+      enableBackground={enableBackground}
+      thumbnailDisplay={thumbnailDisplay}
+      enableLazyLoading={enableLazyLoading}
     />
   );
 }

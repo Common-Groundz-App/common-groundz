@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -205,7 +204,7 @@ const RecommendationCard = ({
           </div>
         </div>
         
-        {/* Media - Using updated PostMediaDisplay */}
+        {/* Media - Using enhanced PostMediaDisplay */}
         {recommendation.image_url && (
           <div className="mt-3">
             <PostMediaDisplay 
@@ -215,10 +214,12 @@ const RecommendationCard = ({
                 order: 0, 
                 id: recommendation.id
               }]} 
-              className="mt-2"
+              className="mt-2 mb-3"
               maxHeight="h-64"
               aspectRatio="maintain"
               objectFit="contain"
+              enableBackground={true}
+              thumbnailDisplay="none"
             />
           </div>
         )}

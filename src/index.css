@@ -157,6 +157,27 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;  /* Chrome, Safari, Opera */
   }
+  
+  /* Image display utilities */
+  .img-container-portrait {
+    @apply max-w-[70%] mx-auto;
+  }
+  
+  .img-container-landscape {
+    @apply w-full;
+  }
+  
+  .img-container-square {
+    @apply max-w-[85%] mx-auto;
+  }
+  
+  .media-bg-light {
+    @apply bg-gray-100;
+  }
+  
+  .media-bg-dark {
+    @apply dark:bg-gray-800/30;
+  }
 }
 
 /* Add animation for fade-in effect */
