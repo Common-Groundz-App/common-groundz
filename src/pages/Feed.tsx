@@ -9,7 +9,7 @@ import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
-import { Bell, Search, RefreshCw, ChevronDown } from 'lucide-react';
+import { Bell, Search, ChevronDown, ArrowUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
@@ -444,10 +444,8 @@ const Feed = () => {
                         whileHover={{ scale: 1.03 }}
                         whileTap={{ scale: 0.97 }}
                       >
-                        <RefreshCw size={14} />
-                        <span>
-                          {newPostCount > 1 ? `${newPostCount} New Posts` : "New Posts"}
-                        </span>
+                        <ArrowUp size={14} />
+                        <span>New Posts</span>
                       </motion.button>
                     </motion.div>
                   )}
