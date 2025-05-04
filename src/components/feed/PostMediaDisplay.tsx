@@ -71,7 +71,16 @@ export function PostMediaDisplay({
       return 'h-auto max-h-[400px]'; // square
     }
     
-    // Multiple images are limited to a standard height
+    // Multiple images - adjust based on first image orientation for LinkedIn layout
+    if (displayType === 'linkedin' && validMedia.length > 1) {
+      const firstImage = validMedia[0];
+      const orientation = firstImage.orientation || 'landscape';
+      
+      if (orientation === 'portrait') return 'h-auto max-h-[560px]'; // Taller for portrait first
+      return 'h-auto max-h-[480px]'; // Standard height for landscape first
+    }
+    
+    // Default for multiple images
     return 'h-auto max-h-[500px]';
   };
   

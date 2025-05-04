@@ -236,6 +236,41 @@ export default {
 					}
 				},
 				
+				// New orientation-specific LinkedIn layouts
+				'.linkedin-portrait-first': {
+					width: '100%',
+					display: 'grid',
+					gridTemplateColumns: '1fr 1fr',
+					gridTemplateRows: 'auto',
+					gap: '2px',
+					borderRadius: '0.75rem',
+					overflow: 'hidden',
+					'& > .first-media-item': {
+						gridRow: 'span 2',
+						height: '100%',
+						minHeight: '360px',
+					},
+					'& > *:not(.first-media-item)': {
+						height: '180px',
+					}
+				},
+				'.linkedin-landscape-first': {
+					width: '100%',
+					display: 'grid',
+					gridTemplateColumns: '1fr 1fr',
+					gridTemplateRows: 'auto auto',
+					gap: '2px',
+					borderRadius: '0.75rem',
+					overflow: 'hidden',
+					'& > .first-media-item': {
+						gridColumn: 'span 2',
+						height: '280px',
+					},
+					'& > *:not(.first-media-item)': {
+						height: '160px',
+					}
+				},
+				
 				// Smart media containers that adapt to image orientation
 				'.media-container-portrait': {
 					maxWidth: '80%',
