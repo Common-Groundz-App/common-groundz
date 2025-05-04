@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
@@ -57,17 +56,18 @@ export function TwitterStyleMediaPreview({
     setViewMode(displayMode);
   }, [displayMode]);
   
-  // Determine image orientation for the current image
+  // Enhanced orientation detection for better accuracy
   const determineOrientation = (mediaItem: MediaItem): 'portrait' | 'landscape' | 'square' => {
     // If the media item already has orientation defined, use it
     if (mediaItem.orientation) return mediaItem.orientation;
     
-    // For simplicity, we're assuming square if we don't have dimension info
-    if (!mediaItem.width || !mediaItem.height) return 'square';
+    // For simplicity, we're assuming landscape if we don't have dimension info
+    if (!mediaItem.width || !mediaItem.height) return 'landscape';
     
+    // More accurate ratio calculations with clearer thresholds
     const ratio = mediaItem.width / mediaItem.height;
-    if (ratio > 1.2) return 'landscape';
-    if (ratio < 0.8) return 'portrait';
+    if (ratio > 1.1) return 'landscape';
+    if (ratio < 0.9) return 'portrait';
     return 'square';
   };
   
@@ -252,7 +252,7 @@ export function TwitterStyleMediaPreview({
     return 'bg-gray-100 dark:bg-gray-800/30';
   };
   
-  // Single image view with enhanced styling
+  // Enhanced single image view with better styling
   if (media.length === 1) {
     const item = media[0];
     const imageOrientation = determineOrientation(item);
@@ -325,18 +325,16 @@ export function TwitterStyleMediaPreview({
     );
   }
   
-  // LinkedIn-style layout for multiple images
+  // Enhanced LinkedIn-style layout for multiple images
   if (media.length > 1 && viewMode === 'linkedin') {
     // Determine which LinkedIn layout to use based on first image orientation
     const getLinkedinLayoutClass = () => {
-      if (media.length === 2) {
-        return firstImageOrientation === 'portrait' ? 'linkedin-portrait-first' : 'linkedin-landscape-first';
-      } else if (media.length === 3) {
-        return firstImageOrientation === 'portrait' ? 'linkedin-portrait-first' : 'linkedin-landscape-first';
-      } else {
-        return firstImageOrientation === 'portrait' ? 'linkedin-portrait-first' : 'linkedin-landscape-first';
-      }
+      // Force layout based on first image orientation
+      return firstImageOrientation === 'portrait' ? 'linkedin-portrait-first' : 'linkedin-landscape-first';
     };
+
+    // Log the orientation being used for debugging
+    console.log('LinkedIn layout using orientation:', firstImageOrientation);
 
     return (
       <div 
@@ -348,7 +346,7 @@ export function TwitterStyleMediaPreview({
       >
         <div className={cn(
           getLinkedinLayoutClass(),
-          "max-h-[500px]"
+          "max-h-[560px]"
         )}>
           {/* First image is always shown and takes prominence */}
           {media.length > 0 && (
@@ -412,10 +410,15 @@ export function TwitterStyleMediaPreview({
           {media.slice(1, 4).map((item, index) => {
             const actualIndex = index + 1; // Actual index in the media array
             const isLoaded = loaded[item.id || actualIndex.toString()];
+            
+            // Determine if this is the last visible image for overlay purposes
             const isLastVisible = (firstImageOrientation === 'portrait' && actualIndex === 2) || 
                                  (firstImageOrientation !== 'portrait' && actualIndex === 3) || 
                                  actualIndex === media.length - 1;
-            const showMoreOverlay = isLastVisible && media.length > 4;
+                                 
+            // Only show the "more" overlay if we have more than what's currently shown
+            const hasMoreImages = media.length > (firstImageOrientation === 'portrait' ? 3 : 4);
+            const showMoreOverlay = isLastVisible && hasMoreImages;
             
             return (
               <div 
@@ -459,9 +462,9 @@ export function TwitterStyleMediaPreview({
                   </div>
                 )}
                 
-                {/* Show +X more overlay on the last visible image if there are more than shown images */}
+                {/* Enhanced "more" overlay with improved styling */}
                 {showMoreOverlay && (
-                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center media-more-overlay">
                     <Images className="h-8 w-8 text-white mb-1" />
                     <span className="text-white font-medium text-lg">+{media.length - (firstImageOrientation === 'portrait' ? 3 : 4)}</span>
                     <span className="text-white/80 text-sm">more</span>

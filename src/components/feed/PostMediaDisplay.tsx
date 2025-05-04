@@ -40,16 +40,20 @@ export function PostMediaDisplay({
     .filter(item => !item.is_deleted)
     .sort((a, b) => a.order - b.order)
     .map(item => {
-      // Ensure each media item has an orientation
+      // Enhanced orientation detection - ensure each media item has accurate orientation
       if (!item.orientation && item.width && item.height) {
         const ratio = item.width / item.height;
         let orientation: 'portrait' | 'landscape' | 'square';
         
-        if (ratio > 1.2) orientation = 'landscape';
-        else if (ratio < 0.8) orientation = 'portrait';
+        // More precise thresholds for orientation detection
+        if (ratio > 1.1) orientation = 'landscape';
+        else if (ratio < 0.9) orientation = 'portrait';
         else orientation = 'square';
         
         return { ...item, orientation };
+      } else if (!item.orientation) {
+        // Default to landscape if we have no dimensions
+        return { ...item, orientation: 'landscape' as const };
       }
       
       return item;
@@ -59,24 +63,23 @@ export function PostMediaDisplay({
     return null;
   }
   
-  // Determine appropriate maxHeight based on content
+  // Determine appropriate maxHeight based on content and first image orientation
   const adaptiveMaxHeight = () => {
     if (maxHeight) return maxHeight;
     
-    // Single image handling
+    // Get first image orientation for better layout decisions
+    const firstImageOrientation = validMedia[0].orientation || 'landscape';
+    
+    // Single image handling with orientation awareness
     if (validMedia.length === 1) {
-      const item = validMedia[0];
-      if (item.orientation === 'portrait') return 'h-auto max-h-[600px]';
-      if (item.orientation === 'landscape') return 'h-auto max-h-[400px]';
+      if (firstImageOrientation === 'portrait') return 'h-auto max-h-[600px]';
+      if (firstImageOrientation === 'landscape') return 'h-auto max-h-[400px]';
       return 'h-auto max-h-[400px]'; // square
     }
     
-    // Multiple images - adjust based on first image orientation for LinkedIn layout
+    // Multiple images with LinkedIn layout - adjust based on first image orientation
     if (displayType === 'linkedin' && validMedia.length > 1) {
-      const firstImage = validMedia[0];
-      const orientation = firstImage.orientation || 'landscape';
-      
-      if (orientation === 'portrait') return 'h-auto max-h-[560px]'; // Taller for portrait first
+      if (firstImageOrientation === 'portrait') return 'h-auto max-h-[560px]'; // Taller for portrait first
       return 'h-auto max-h-[480px]'; // Standard height for landscape first
     }
     

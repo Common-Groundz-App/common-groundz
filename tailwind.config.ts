@@ -236,22 +236,29 @@ export default {
 					}
 				},
 				
-				// New orientation-specific LinkedIn layouts
+				// Enhanced orientation-specific LinkedIn layouts with better ratios
 				'.linkedin-portrait-first': {
 					width: '100%',
 					display: 'grid',
 					gridTemplateColumns: '1fr 1fr',
-					gridTemplateRows: 'auto',
-					gap: '2px',
+					gridTemplateRows: 'repeat(2, 1fr)',
+					gap: '3px',
 					borderRadius: '0.75rem',
 					overflow: 'hidden',
 					'& > .first-media-item': {
 						gridRow: 'span 2',
+						minHeight: '380px',
 						height: '100%',
-						minHeight: '360px',
 					},
 					'& > *:not(.first-media-item)': {
-						height: '180px',
+						height: '190px',
+						objectFit: 'cover',
+					},
+					'& > *:nth-child(2)': { // Apply to the first image on right side
+						// Styling for the second image
+					},
+					'& > *:nth-child(3)': { // Apply to the second image on right side
+						// Styling for the third image
 					}
 				},
 				'.linkedin-landscape-first': {
@@ -259,16 +266,31 @@ export default {
 					display: 'grid',
 					gridTemplateColumns: '1fr 1fr',
 					gridTemplateRows: 'auto auto',
-					gap: '2px',
+					gap: '3px',
 					borderRadius: '0.75rem',
 					overflow: 'hidden',
 					'& > .first-media-item': {
 						gridColumn: 'span 2',
-						height: '280px',
+						height: '300px',
 					},
 					'& > *:not(.first-media-item)': {
-						height: '160px',
+						height: '175px',
+						objectFit: 'cover',
 					}
+				},
+				
+				// Improved overlay for +more images
+				'.media-more-overlay': {
+					position: 'absolute', 
+					inset: '0',
+					backgroundColor: 'rgba(0,0,0,0.6)',
+					display: 'flex',
+					flexDirection: 'column',
+					alignItems: 'center',
+					justifyContent: 'center',
+					color: 'white',
+					fontSize: '1.25rem',
+					fontWeight: '600',
 				},
 				
 				// Smart media containers that adapt to image orientation
