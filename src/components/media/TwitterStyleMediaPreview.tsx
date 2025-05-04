@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
@@ -55,6 +56,15 @@ export function TwitterStyleMediaPreview({
   useEffect(() => {
     setViewMode(displayMode);
   }, [displayMode]);
+  
+  // Force re-render at least once to ensure media layouts apply properly
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // This forces a re-render after initial mount
+      setLoaded(prev => ({...prev}));
+    }, 10);
+    return () => clearTimeout(timer);
+  }, []);
   
   // Enhanced orientation detection for better accuracy
   const determineOrientation = (mediaItem: MediaItem): 'portrait' | 'landscape' | 'square' => {
@@ -329,12 +339,11 @@ export function TwitterStyleMediaPreview({
   if (media.length > 1 && viewMode === 'linkedin') {
     // Determine which LinkedIn layout to use based on first image orientation
     const getLinkedinLayoutClass = () => {
-      // Force layout based on first image orientation
+      // This key check ensures the component applies the right style
+      const orientationKey = firstImageOrientation === 'portrait' ? 'portrait' : 'landscape';
+      console.log('Using LinkedIn layout:', `linkedin-${orientationKey}-first`, 'for orientation:', firstImageOrientation);
       return firstImageOrientation === 'portrait' ? 'linkedin-portrait-first' : 'linkedin-landscape-first';
     };
-
-    // Log the orientation being used for debugging
-    console.log('LinkedIn layout using orientation:', firstImageOrientation);
 
     return (
       <div 
@@ -352,8 +361,7 @@ export function TwitterStyleMediaPreview({
           {media.length > 0 && (
             <div 
               className={cn(
-                "relative overflow-hidden cursor-pointer bg-gray-100 dark:bg-gray-800/30",
-                "first-media-item"
+                "relative overflow-hidden cursor-pointer bg-gray-100 dark:bg-gray-800/30 first-media-item",
               )}
               onClick={() => handleImageClick(0)}
             >
@@ -466,8 +474,8 @@ export function TwitterStyleMediaPreview({
                 {showMoreOverlay && (
                   <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center media-more-overlay">
                     <Images className="h-8 w-8 text-white mb-1" />
-                    <span className="text-white font-medium text-lg">+{media.length - (firstImageOrientation === 'portrait' ? 3 : 4)}</span>
-                    <span className="text-white/80 text-sm">more</span>
+                    <span className="text-white font-semibold text-xl">+{media.length - (firstImageOrientation === 'portrait' ? 3 : 4)}</span>
+                    <span className="text-white/80 text-base">more</span>
                   </div>
                 )}
                 
@@ -568,8 +576,10 @@ export function TwitterStyleMediaPreview({
                 
                 {/* Show +X more overlay on the 4th image if there are more than 4 images */}
                 {index === 3 && media.length > 4 && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <span className="text-white font-medium text-xl">+{media.length - 4}</span>
+                  <div className="media-more-overlay">
+                    <Images className="h-8 w-8 text-white mb-1" />
+                    <span className="text-white font-semibold text-xl">+{media.length - 4}</span>
+                    <span className="text-white/80 text-base">more</span>
                   </div>
                 )}
                 
@@ -636,7 +646,8 @@ export function TwitterStyleMediaPreview({
                 >
                   <div className={cn(
                     "relative flex items-center justify-center h-full",
-                    itemOrientation === 'portrait' ? 'max-w-[80%] mx-auto' : 'w-full',
+                    itemOrientation === 'portrait' ? 'media-container-portrait' : 
+                    itemOrientation === 'landscape' ? 'media-container-landscape' : 'media-container-square',
                     "transition-all duration-200"
                   )}>
                     {/* Loading indicator */}
@@ -654,7 +665,8 @@ export function TwitterStyleMediaPreview({
                         className={cn(
                           "max-w-full max-h-full rounded-md shadow-sm transition-opacity duration-300",
                           (currentImageIndex === index && loaded[item.id || index.toString()]) ? "opacity-100" : "opacity-0",
-                          objectFit === 'contain' ? "object-contain" : "object-cover"
+                          objectFit === 'contain' ? "object-contain" : "object-cover",
+                          "lightbox-image"
                         )}
                         onLoad={() => handleImageLoad(item.id || index.toString())}
                       />
@@ -665,7 +677,8 @@ export function TwitterStyleMediaPreview({
                         controls
                         className={cn(
                           "max-w-full max-h-full rounded-md shadow-md",
-                          objectFit === 'contain' ? "object-contain" : "object-cover"
+                          objectFit === 'contain' ? "object-contain" : "object-cover",
+                          "lightbox-image"
                         )}
                         onLoadedData={() => handleImageLoad(item.id || index.toString())}
                       >
@@ -701,7 +714,10 @@ export function TwitterStyleMediaPreview({
               variant="ghost"
               size="icon"
               className="absolute top-2 left-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20 shadow-md"
-              onClick={() => setViewMode('grid')}
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewMode('grid');
+              }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" />
@@ -712,32 +728,34 @@ export function TwitterStyleMediaPreview({
             </Button>
           )}
           
-          {/* Navigation controls */}
+          {/* Enhanced navigation controls */}
           {showNavigation && (
             <>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-gray-800/60 hover:bg-gray-800 hover:scale-105 transition-all text-white z-20 shadow-md"
+                className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-gray-800/70 hover:bg-gray-800 hover:scale-105 transition-all text-white z-20 shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
                   prevImage();
                 }}
               >
                 <ChevronLeft className="h-6 w-6" />
+                <span className="sr-only">Previous image</span>
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-gray-800/60 hover:bg-gray-800 hover:scale-105 transition-all text-white z-20 shadow-md"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-gray-800/70 hover:bg-gray-800 hover:scale-105 transition-all text-white z-20 shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
                   nextImage();
                 }}
               >
                 <ChevronRight className="h-6 w-6" />
+                <span className="sr-only">Next image</span>
               </Button>
               
               {/* Image counter and navigation dots */}
@@ -751,7 +769,10 @@ export function TwitterStyleMediaPreview({
                         ? "w-6 bg-brand-orange" 
                         : "w-2 bg-white opacity-70 hover:opacity-100"
                     )}
-                    onClick={() => setCurrentImageIndex(idx)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentImageIndex(idx);
+                    }}
                     aria-label={`Go to image ${idx + 1}`}
                   />
                 ))}
@@ -781,7 +802,10 @@ export function TwitterStyleMediaPreview({
                     ? "border-2 border-brand-orange shadow-md" 
                     : "border border-transparent opacity-70 hover:opacity-100"
                 )}
-                onClick={() => setCurrentImageIndex(index)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex(index);
+                }}
               >
                 {item.type === 'image' ? (
                   <img 

@@ -187,20 +187,22 @@ export default {
 					}
 				},
 				
-				// LinkedIn-style layouts for media grid
+				// LinkedIn-style layouts - revised with better orientation handling
 				'.linkedin-media-two': {
 					width: '100%',
 					display: 'grid',
 					gridTemplateColumns: '1fr',
 					gridTemplateRows: 'auto auto',
-					gap: '2px',
+					gap: '3px',
 					borderRadius: '0.75rem',
 					overflow: 'hidden',
 					'& > .first-media-item': {
 						height: '300px',
+						minHeight: '300px',
 					},
 					'& > *:not(.first-media-item)': {
 						height: '200px',
+						minHeight: '200px',
 					}
 				},
 				'.linkedin-media-three': {
@@ -208,15 +210,17 @@ export default {
 					display: 'grid',
 					gridTemplateColumns: '1fr 1fr',
 					gridTemplateRows: 'auto auto',
-					gap: '2px',
+					gap: '3px',
 					borderRadius: '0.75rem',
 					overflow: 'hidden',
 					'& > .first-media-item': {
 						gridColumn: 'span 2',
 						height: '280px',
+						minHeight: '280px',
 					},
 					'& > *:not(.first-media-item)': {
 						height: '160px',
+						minHeight: '160px',
 					}
 				},
 				'.linkedin-media-four': {
@@ -224,24 +228,26 @@ export default {
 					display: 'grid',
 					gridTemplateColumns: '1fr 1fr',
 					gridTemplateRows: 'auto auto auto',
-					gap: '2px',
+					gap: '3px',
 					borderRadius: '0.75rem',
 					overflow: 'hidden',
 					'& > .first-media-item': {
 						gridColumn: 'span 2',
 						height: '240px',
+						minHeight: '240px',
 					},
 					'& > *:not(.first-media-item)': {
 						height: '120px',
+						minHeight: '120px',
 					}
 				},
 				
-				// Enhanced orientation-specific LinkedIn layouts with better ratios
+				// Revised orientation-specific LinkedIn layouts
 				'.linkedin-portrait-first': {
 					width: '100%',
 					display: 'grid',
 					gridTemplateColumns: '1fr 1fr',
-					gridTemplateRows: 'repeat(2, 1fr)',
+					gridTemplateRows: 'minmax(380px, 1fr) minmax(190px, 0.5fr)',
 					gap: '3px',
 					borderRadius: '0.75rem',
 					overflow: 'hidden',
@@ -251,31 +257,26 @@ export default {
 						height: '100%',
 					},
 					'& > *:not(.first-media-item)': {
+						minHeight: '190px',
 						height: '190px',
-						objectFit: 'cover',
-					},
-					'& > *:nth-child(2)': { // Apply to the first image on right side
-						// Styling for the second image
-					},
-					'& > *:nth-child(3)': { // Apply to the second image on right side
-						// Styling for the third image
 					}
 				},
 				'.linkedin-landscape-first': {
 					width: '100%',
 					display: 'grid',
 					gridTemplateColumns: '1fr 1fr',
-					gridTemplateRows: 'auto auto',
+					gridTemplateRows: 'minmax(300px, auto) minmax(175px, auto)',
 					gap: '3px',
 					borderRadius: '0.75rem',
 					overflow: 'hidden',
 					'& > .first-media-item': {
 						gridColumn: 'span 2',
+						minHeight: '300px',
 						height: '300px',
 					},
 					'& > *:not(.first-media-item)': {
+						minHeight: '175px',
 						height: '175px',
-						objectFit: 'cover',
 					}
 				},
 				
@@ -283,7 +284,7 @@ export default {
 				'.media-more-overlay': {
 					position: 'absolute', 
 					inset: '0',
-					backgroundColor: 'rgba(0,0,0,0.6)',
+					backgroundColor: 'rgba(0,0,0,0.7)',
 					display: 'flex',
 					flexDirection: 'column',
 					alignItems: 'center',
@@ -291,6 +292,10 @@ export default {
 					color: 'white',
 					fontSize: '1.25rem',
 					fontWeight: '600',
+					transition: 'all 0.2s ease',
+					'&:hover': {
+						backgroundColor: 'rgba(0,0,0,0.8)',
+					}
 				},
 				
 				// Smart media containers that adapt to image orientation
@@ -343,6 +348,32 @@ export default {
 						maxWidth: '100%',
 						maxHeight: '100%',
 						objectFit: 'contain'
+					}
+				},
+				// Improved image preview utilities
+				'.lightbox-image': {
+					maxWidth: '100%',
+					maxHeight: '90vh',
+					margin: '0 auto',
+					display: 'block',
+				},
+				'.preview-navigation': {
+					position: 'absolute',
+					top: '50%',
+					transform: 'translateY(-50%)',
+					width: '40px',
+					height: '40px',
+					borderRadius: '50%',
+					backgroundColor: 'rgba(0,0,0,0.5)',
+					color: 'white',
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					cursor: 'pointer',
+					zIndex: '50',
+					transition: 'all 0.2s ease',
+					'&:hover': {
+						backgroundColor: 'rgba(0,0,0,0.8)',
 					}
 				}
 			};

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { MediaItem } from '@/types/media';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 interface PostMediaDisplayProps {
   media?: MediaItem[];
@@ -108,9 +108,11 @@ export function PostMediaDisplay({
         onImageClick={handleImageClick}
       />
       
-      {/* Lightbox for full-screen image viewing */}
+      {/* Lightbox for full-screen image viewing with proper accessibility */}
       <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
-        <DialogContent className="max-w-6xl w-full p-0 bg-transparent border-none shadow-none">
+        <DialogContent className="max-w-6xl w-full p-0 bg-black/95 border-none shadow-none">
+          {/* Adding DialogTitle for accessibility, but visually hiding it */}
+          <DialogTitle className="sr-only">Media Preview</DialogTitle>
           <TwitterStyleMediaPreview
             media={validMedia}
             readOnly={true}
@@ -119,7 +121,7 @@ export function PostMediaDisplay({
             objectFit="contain"
             enableBackground={false}
             thumbnailDisplay="always"
-            className="max-h-[90vh]"
+            className="max-h-[90vh] w-full"
           />
         </DialogContent>
       </Dialog>
