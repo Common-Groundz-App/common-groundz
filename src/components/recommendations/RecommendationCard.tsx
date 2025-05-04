@@ -215,7 +215,6 @@ const RecommendationCard = ({
                 id: recommendation.id
               }]} 
               className="mt-2 mb-3"
-              maxHeight="h-64"
               aspectRatio="maintain"
               objectFit="contain"
               enableBackground={true}

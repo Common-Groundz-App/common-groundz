@@ -160,15 +160,15 @@
   
   /* Image display utilities */
   .img-container-portrait {
-    @apply max-w-[70%] mx-auto;
+    @apply max-w-[80%] mx-auto h-full flex items-center justify-center;
   }
   
   .img-container-landscape {
-    @apply w-full;
+    @apply w-full h-full flex items-center justify-center;
   }
   
   .img-container-square {
-    @apply max-w-[85%] mx-auto;
+    @apply max-w-[85%] mx-auto h-full flex items-center justify-center;
   }
   
   .media-bg-light {
@@ -177,6 +177,14 @@
   
   .media-bg-dark {
     @apply dark:bg-gray-800/30;
+  }
+  
+  /* Dynamic media containers */
+  .media-orientation-detect {
+    @apply relative rounded-xl overflow-hidden;
+    & img, & video {
+      @apply max-w-full max-h-full rounded-md;
+    }
   }
 }
 

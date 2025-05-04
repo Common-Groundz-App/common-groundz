@@ -11,6 +11,7 @@ export interface MediaItem {
   id?: string;
   width?: number;
   height?: number;
+  orientation?: 'portrait' | 'landscape' | 'square';
 }
 
 export type MediaUploadStatus = 'idle' | 'uploading' | 'success' | 'error';

@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -73,6 +72,12 @@ export default {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
+			},
+			aspectRatio: {
+				'4/5': '4 / 5',
+				'3/4': '3 / 4',
+				'3/2': '3 / 2',
+				'9/16': '9 / 16',
 			},
 			keyframes: {
 				'accordion-down': {
@@ -178,6 +183,45 @@ export default {
 						display: 'flex',
 						justifyContent: 'center',
 						alignItems: 'center'
+					}
+				},
+				// Smart media containers that adapt to image orientation
+				'.media-container-portrait': {
+					maxWidth: '80%',
+					margin: '0 auto',
+					display: 'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+					height: '100%',
+					'& img, & video': {
+						maxWidth: '100%',
+						maxHeight: '100%',
+						objectFit: 'contain'
+					}
+				},
+				'.media-container-landscape': {
+					width: '100%',
+					display: 'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+					height: '100%',
+					'& img, & video': {
+						maxWidth: '100%',
+						maxHeight: '100%',
+						objectFit: 'contain'
+					}
+				},
+				'.media-container-square': {
+					maxWidth: '85%',
+					margin: '0 auto',
+					display: 'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+					height: '100%',
+					'& img, & video': {
+						maxWidth: '100%',
+						maxHeight: '100%',
+						objectFit: 'contain'
 					}
 				},
 				// Additional utility for media containers

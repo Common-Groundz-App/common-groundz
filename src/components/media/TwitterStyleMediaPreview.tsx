@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
 import { ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 interface TwitterStyleMediaPreviewProps {
   media: MediaItem[];
@@ -39,19 +40,26 @@ export function TwitterStyleMediaPreview({
   const [showThumbnails, setShowThumbnails] = useState(thumbnailDisplay === 'always');
   
   // Determine image orientation for the current image
-  const getImageOrientation = (index: number): 'portrait' | 'landscape' | 'square' => {
-    if (!media[index]) return 'landscape';
+  const determineOrientation = (mediaItem: MediaItem): 'portrait' | 'landscape' | 'square' => {
+    // If the media item already has orientation defined, use it
+    if (mediaItem.orientation) return mediaItem.orientation;
     
     // For simplicity, we're assuming square if we don't have dimension info
-    if (!media[index].width || !media[index].height) return 'square';
+    if (!mediaItem.width || !mediaItem.height) return 'square';
     
-    const ratio = media[index].width / media[index].height;
+    const ratio = mediaItem.width / mediaItem.height;
     if (ratio > 1.2) return 'landscape';
     if (ratio < 0.8) return 'portrait';
     return 'square';
   };
   
-  const currentOrientation = getImageOrientation(currentIndex);
+  // Get orientation for the current media item
+  const getCurrentOrientation = (): 'portrait' | 'landscape' | 'square' => {
+    if (!media[currentIndex]) return 'landscape';
+    return determineOrientation(media[currentIndex]);
+  };
+  
+  const currentOrientation = getCurrentOrientation();
   
   // Handle image loaded event
   const handleImageLoad = (id: string) => {
@@ -177,14 +185,28 @@ export function TwitterStyleMediaPreview({
   }, [isDragging, dragStartX]);
   
   if (media.length === 0) return null;
-  
-  // Set aspect ratio class based on the prop
-  const getAspectRatioClass = () => {
-    switch (aspectRatio) {
-      case '16:9': return 'aspect-video';
-      case '4:5': return 'aspect-4/5';
-      case '1:1': return 'aspect-square';
-      default: return '';
+
+  // Get dynamic styles based on orientation
+  const getOrientationStyles = () => {
+    // If using forced aspect ratio, return that
+    if (aspectRatio !== 'maintain') {
+      switch (aspectRatio) {
+        case '16:9': return 'aspect-video';
+        case '4:5': return 'aspect-4/5';
+        case '1:1': return 'aspect-square';
+      }
+    }
+    
+    // Otherwise, use orientation-based styling
+    switch (currentOrientation) {
+      case 'portrait':
+        return 'max-h-[600px] md:max-h-[800px]'; // Taller for portrait
+      case 'landscape':
+        return 'max-h-[400px] md:max-h-[500px]'; // Not as tall for landscape
+      case 'square':
+        return 'max-h-[400px] md:max-h-[600px]'; // Medium height for square
+      default:
+        return maxHeight; // Default to maxHeight prop
     }
   };
 
@@ -199,14 +221,20 @@ export function TwitterStyleMediaPreview({
   // Get width class based on orientation for portrait images
   const getWidthClass = () => {
     if (currentOrientation === 'portrait' && aspectRatio === 'maintain') {
-      return 'max-w-[70%] mx-auto'; // Limit width for portrait images
+      return 'max-w-[80%] mx-auto'; // Portrait images are narrower
     }
-    return 'w-full';
+    return 'w-full'; // Full width for landscape and square
   };
-
+  
+  // Get container padding based on orientation
+  const getContainerPadding = () => {
+    return currentOrientation === 'portrait' ? 'px-4' : '';
+  };
+  
   // Single image view with enhanced styling
   if (media.length === 1) {
     const item = media[0];
+    const imageOrientation = determineOrientation(item);
     const isLoaded = loaded[item.id || '0'];
     
     return (
@@ -217,13 +245,14 @@ export function TwitterStyleMediaPreview({
         <div className={cn(
           "w-full relative flex items-center justify-center",
           getBackgroundColor(),
-          maxHeight,
-          getAspectRatioClass()
+          getOrientationStyles(),
+          getContainerPadding(),
+          "transition-all duration-300"
         )}>
           <div className={cn(
-            "relative flex items-center justify-center",
-            getWidthClass(),
-            "h-full transition-all duration-200"
+            "relative flex items-center justify-center h-full",
+            imageOrientation === 'portrait' ? 'max-w-[80%] mx-auto' : 'w-full',
+            "transition-all duration-200"
           )}>
             {/* Loading indicator */}
             {!isLoaded && (
@@ -238,7 +267,7 @@ export function TwitterStyleMediaPreview({
                 alt={item.alt || "Image"} 
                 loading={enableLazyLoading ? "lazy" : "eager"}
                 className={cn(
-                  "max-w-full max-h-full transition-opacity duration-300", 
+                  "max-w-full max-h-full rounded-md transition-opacity duration-300 shadow-sm", 
                   isLoaded ? "opacity-100" : "opacity-0",
                   objectFit === 'contain' ? "object-contain" : "object-cover"
                 )}
@@ -250,7 +279,7 @@ export function TwitterStyleMediaPreview({
                 poster={item.thumbnail_url}
                 controls
                 className={cn(
-                  "max-w-full max-h-full shadow-sm",
+                  "max-w-full max-h-full rounded-md shadow-md",
                   objectFit === 'contain' ? "object-contain" : "object-cover"
                 )}
                 onLoadedData={() => handleImageLoad(item.id || '0')}
@@ -293,81 +322,85 @@ export function TwitterStyleMediaPreview({
         <div className={cn(
           "relative w-full rounded-xl overflow-hidden flex items-center justify-center",
           getBackgroundColor(),
-          maxHeight
+          getOrientationStyles()
         )}>
           {/* Media items container */}
           <div className="h-full w-full relative overflow-x-hidden">
-            {media.map((item, index) => (
-              <div 
-                key={item.id || index}
-                className={cn(
-                  "absolute top-0 left-0 w-full h-full flex items-center justify-center transition-all duration-300",
-                  currentIndex === index ? "opacity-100 z-10" : "opacity-0 z-0",
-                  isDragging && currentIndex === index && "transition-transform"
-                )}
-                style={
-                  currentIndex === index && isDragging 
-                    ? { transform: `translateX(${dragDelta}px)` } 
-                    : undefined
-                }
-              >
-                <div className={cn(
-                  "relative flex items-center justify-center",
-                  getImageOrientation(index) === 'portrait' && aspectRatio === 'maintain' ? "max-w-[70%]" : "max-w-full",
-                  "h-full transition-all duration-200"
-                )}>
-                  {/* Loading indicator */}
-                  {currentIndex === index && !loaded[item.id || index.toString()] && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/70" />
-                    </div>
+            {media.map((item, index) => {
+              const itemOrientation = determineOrientation(item);
+              return (
+                <div 
+                  key={item.id || index}
+                  className={cn(
+                    "absolute top-0 left-0 w-full h-full flex items-center justify-center transition-all duration-300",
+                    currentIndex === index ? "opacity-100 z-10" : "opacity-0 z-0",
+                    isDragging && currentIndex === index && "transition-transform",
+                    getContainerPadding()
                   )}
+                  style={
+                    currentIndex === index && isDragging 
+                      ? { transform: `translateX(${dragDelta}px)` } 
+                      : undefined
+                  }
+                >
+                  <div className={cn(
+                    "relative flex items-center justify-center h-full",
+                    itemOrientation === 'portrait' ? 'max-w-[80%] mx-auto' : 'w-full',
+                    "transition-all duration-200"
+                  )}>
+                    {/* Loading indicator */}
+                    {currentIndex === index && !loaded[item.id || index.toString()] && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/70" />
+                      </div>
+                    )}
+                    
+                    {item.type === 'image' ? (
+                      <img 
+                        src={item.url} 
+                        alt={item.alt || item.caption || `Image ${index + 1}`} 
+                        loading={enableLazyLoading ? "lazy" : "eager"}
+                        className={cn(
+                          "max-w-full max-h-full rounded-md shadow-sm transition-opacity duration-300",
+                          (currentIndex === index && loaded[item.id || index.toString()]) ? "opacity-100" : "opacity-0",
+                          objectFit === 'contain' ? "object-contain" : "object-cover"
+                        )}
+                        onLoad={() => handleImageLoad(item.id || index.toString())}
+                      />
+                    ) : (
+                      <video 
+                        src={item.url} 
+                        poster={item.thumbnail_url}
+                        controls
+                        className={cn(
+                          "max-w-full max-h-full rounded-md shadow-md",
+                          objectFit === 'contain' ? "object-contain" : "object-cover"
+                        )}
+                        onLoadedData={() => handleImageLoad(item.id || index.toString())}
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                    )}
+                  </div>
                   
-                  {item.type === 'image' ? (
-                    <img 
-                      src={item.url} 
-                      alt={item.alt || item.caption || `Image ${index + 1}`} 
-                      loading={enableLazyLoading ? "lazy" : "eager"}
-                      className={cn(
-                        "max-w-full max-h-full shadow-sm transition-opacity duration-300",
-                        (currentIndex === index && loaded[item.id || index.toString()]) ? "opacity-100" : "opacity-0",
-                        objectFit === 'contain' ? "object-contain" : "object-cover"
-                      )}
-                      onLoad={() => handleImageLoad(item.id || index.toString())}
-                    />
-                  ) : (
-                    <video 
-                      src={item.url} 
-                      poster={item.thumbnail_url}
-                      controls
-                      className={cn(
-                        "max-w-full max-h-full shadow-sm",
-                        objectFit === 'contain' ? "object-contain" : "object-cover"
-                      )}
-                      onLoadedData={() => handleImageLoad(item.id || index.toString())}
+                  {/* Remove button for each item */}
+                  {!readOnly && onRemove && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20 shadow-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove(item);
+                      }}
                     >
-                      Your browser does not support the video tag.
-                    </video>
+                      <X className="h-4 w-4" />
+                    </Button>
                   )}
                 </div>
-                
-                {/* Remove button for each item */}
-                {!readOnly && onRemove && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 rounded-full bg-gray-800/60 hover:bg-gray-800 text-white z-20 shadow-sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemove(item);
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
           
           {/* Navigation controls */}
