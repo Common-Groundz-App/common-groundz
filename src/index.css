@@ -127,6 +127,25 @@
   }
 }
 
+/* Emoji picker scrollable styles */
+.emoji-picker-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #999 transparent;
+}
+
+.emoji-picker-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.emoji-picker-wrapper::-webkit-scrollbar-thumb {
+  background-color: #999;
+  border-radius: 4px;
+}
+
+.emoji-mart * {
+  cursor: pointer !important;
+}
+
 /* Utility classes for theming */
 @layer utilities {
   .theme-card {

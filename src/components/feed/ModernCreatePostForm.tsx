@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,6 +22,61 @@ import { SimpleEntitySelector } from './SimpleEntitySelector';
 import { getDisplayName } from '@/services/profileService';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
+
+// Add custom styles for emoji picker with improved scrolling
+const emojiPickerStyles = `
+  .emoji-picker-wrapper {
+    scrollbar-width: thin;
+    scrollbar-color: #999 transparent;
+    cursor: pointer !important;
+  }
+  
+  .emoji-picker-wrapper::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .emoji-picker-wrapper::-webkit-scrollbar-thumb {
+    background-color: #999;
+    border-radius: 4px;
+  }
+  
+  .emoji-mart {
+    box-sizing: border-box;
+    z-index: 100;
+  }
+  
+  .emoji-mart * {
+    box-sizing: border-box;
+    cursor: pointer !important;
+  }
+  
+  .emoji-mart-emoji {
+    cursor: pointer !important;
+  }
+  
+  .emoji-mart-scroll {
+    overflow-y: auto;
+    height: 270px;
+    padding: 0 6px 6px 6px;
+    will-change: transform;
+  }
+  
+  .emoji-mart-search {
+    margin-top: 6px;
+    padding: 0 6px;
+    position: relative;
+  }
+  
+  .emoji-mart-category-label {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0 6px;
+    font-weight: 500;
+    font-size: 14px;
+    background: var(--background);
+  }
+`;
 
 const formSchema = z.object({
   content: z.string().min(1, { message: 'Content is required' }),
@@ -355,6 +409,9 @@ export function ModernCreatePostForm({
   
   return (
     <Form {...form}>
+      {/* Add the emoji picker styles to the DOM */}
+      <style>{emojiPickerStyles}</style>
+      
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="flex gap-3 items-start">
           {/* User Avatar */}
@@ -486,7 +543,7 @@ export function ModernCreatePostForm({
                   </PopoverContent>
                 </Popover>
                 
-                {/* Emoji Button with inline picker instead of Popover */}
+                {/* Emoji Button with improved scrollable picker */}
                 <div className="relative">
                   <Button
                     type="button"
@@ -511,6 +568,10 @@ export function ModernCreatePostForm({
                         e.stopPropagation();
                         e.preventDefault();
                       }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
                       onMouseDown={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -522,27 +583,60 @@ export function ModernCreatePostForm({
                           e.stopPropagation();
                           e.preventDefault();
                         }}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
                         onMouseDown={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
                         }}
                       >
-                        <Picker 
-                          data={data}
-                          onEmojiSelect={handleEmojiSelect}
-                          theme="light"
-                          previewPosition="none"
-                          set="native"
-                          skinTonePosition="none"
-                          emojiSize={20}
-                          emojiButtonSize={28}
-                          maxFrequentRows={2}
-                          modal={false}
-                          style={{ 
-                            border: 'none',
-                            boxShadow: 'none',
+                        {/* New wrapper div for scrolling */}
+                        <div 
+                          className="emoji-picker-wrapper"
+                          style={{
+                            maxHeight: '300px',
+                            overflowY: 'auto',
+                            overflowX: 'hidden',
+                            zIndex: 9999
                           }}
-                        />
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                          }}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                          }}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                          }}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onScroll={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          <Picker 
+                            data={data}
+                            onEmojiSelect={handleEmojiSelect}
+                            theme="light"
+                            previewPosition="none"
+                            set="native"
+                            skinTonePosition="none"
+                            emojiSize={20}
+                            emojiButtonSize={28}
+                            maxFrequentRows={2}
+                            modal={false}
+                            style={{ 
+                              border: 'none',
+                              boxShadow: 'none',
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}

@@ -48,7 +48,8 @@ const DialogContent = React.forwardRef<
             target.closest('.emoji-mart') || 
             target.closest('.emoji-mart-emoji') ||
             target.closest('.emoji-picker') ||
-            target.closest('[data-emoji-set]')) {
+            target.closest('[data-emoji-set]') ||
+            target.closest('.emoji-picker-wrapper')) {
           e.preventDefault();
           e.stopPropagation();
         }
@@ -58,7 +59,14 @@ const DialogContent = React.forwardRef<
         const target = e.target as HTMLElement;
         if (target.closest('.emoji-mart') || 
             target.closest('.emoji-mart-emoji') ||
-            target.closest('[data-emoji-set]')) {
+            target.closest('[data-emoji-set]') ||
+            target.closest('.emoji-picker-wrapper')) {
+          e.stopPropagation();
+        }
+      }}
+      onScroll={(e) => {
+        // Allow scrolling within the dialog without issues
+        if (e.target !== e.currentTarget) {
           e.stopPropagation();
         }
       }}

@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 
@@ -16,10 +15,28 @@ const ScrollArea = React.forwardRef<
     <ScrollAreaPrimitive.Viewport 
       className="h-full w-full rounded-[inherit]"
       onScroll={(e) => {
-        // Ensure scrolling doesn't propagate beyond this component
-        e.stopPropagation();
+        // Allow scrolling within emoji picker components to work
+        const target = e.target as HTMLElement;
+        if (target.closest('.emoji-mart') || 
+            target.closest('.emoji-mart-emoji') || 
+            target.closest('.emoji-picker-wrapper')) {
+          return;
+        }
+        
+        // Otherwise ensure scrolling doesn't propagate beyond this component
+        if (e.target !== e.currentTarget) {
+          e.stopPropagation();
+        }
       }}
       onClick={(e) => {
+        // Allow clicks on emoji picker components
+        const target = e.target as HTMLElement;
+        if (target.closest('.emoji-mart') || 
+            target.closest('.emoji-mart-emoji') || 
+            target.closest('.emoji-picker-wrapper')) {
+          return;
+        }
+        
         // Prevent click events from propagating through the scroll area
         if (e.target === e.currentTarget) {
           e.stopPropagation();

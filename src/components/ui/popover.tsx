@@ -22,13 +22,45 @@ const PopoverContent = React.forwardRef<
         className
       )}
       // Prevent clicks inside popover content from bubbling up
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.emoji-mart') || 
+            target.closest('.emoji-mart-emoji') || 
+            target.closest('.emoji-picker-wrapper')) {
+          e.preventDefault();
+        }
+        e.stopPropagation();
+      }}
       // Prevent mousedown from stealing focus
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.emoji-mart') || 
+            target.closest('.emoji-mart-emoji') || 
+            target.closest('.emoji-picker-wrapper')) {
+          e.preventDefault();
+        }
+        e.preventDefault();
+      }}
       // Prevent scroll events from propagating
-      onScroll={(e) => e.stopPropagation()}
+      onScroll={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.emoji-mart') || 
+            target.closest('.emoji-mart-emoji') || 
+            target.closest('.emoji-picker-wrapper')) {
+          return;
+        }
+        e.stopPropagation();
+      }}
       // Prevent other pointer events that could interfere with picker
-      onPointerDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.emoji-mart') || 
+            target.closest('.emoji-mart-emoji') || 
+            target.closest('.emoji-picker-wrapper')) {
+          e.preventDefault();
+        }
+        e.stopPropagation();
+      }}
       {...props}
     />
   </PopoverPrimitive.Portal>

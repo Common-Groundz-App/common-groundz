@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -69,7 +68,8 @@ const SheetContent = React.forwardRef<
             target.closest('.emoji-mart') || 
             target.closest('.emoji-mart-emoji') ||
             target.closest('.emoji-picker') ||
-            target.closest('[data-emoji-set]')) {
+            target.closest('[data-emoji-set]') ||
+            target.closest('.emoji-picker-wrapper')) {
           e.preventDefault();
           e.stopPropagation();
         }
@@ -79,7 +79,22 @@ const SheetContent = React.forwardRef<
         const target = e.target as HTMLElement;
         if (target.closest('.emoji-mart') || 
             target.closest('.emoji-mart-emoji') ||
-            target.closest('[data-emoji-set]')) {
+            target.closest('[data-emoji-set]') ||
+            target.closest('.emoji-picker-wrapper')) {
+          e.stopPropagation();
+        }
+      }}
+      onScroll={(e) => {
+        // Allow scrolling within emoji picker components
+        const target = e.target as HTMLElement;
+        if (target.closest('.emoji-mart') || 
+            target.closest('.emoji-mart-emoji') || 
+            target.closest('.emoji-picker-wrapper')) {
+          return;
+        }
+        
+        // Otherwise ensure scrolling behaves properly
+        if (e.target !== e.currentTarget) {
           e.stopPropagation();
         }
       }}

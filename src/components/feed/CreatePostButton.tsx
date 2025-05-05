@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
 
-// Add custom styles for emoji picker to fix interaction issues
+// Add enhanced emoji picker styles to fix interaction issues
 const emojiPickerStyles = `
   .emoji-mart {
     box-sizing: border-box;
@@ -29,6 +29,24 @@ const emojiPickerStyles = `
     height: 270px;
     padding: 0 6px 6px 6px;
     will-change: transform;
+  }
+  
+  .emoji-picker-wrapper {
+    scrollbar-width: thin;
+    scrollbar-color: #999 transparent;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 9999;
+  }
+  
+  .emoji-picker-wrapper::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .emoji-picker-wrapper::-webkit-scrollbar-thumb {
+    background-color: #999;
+    border-radius: 4px;
   }
   
   .emoji-mart-search {
@@ -138,7 +156,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
         }}
       >
         <DialogContent 
-          className="sm:max-w-xl max-h-[90vh] overflow-y-auto p-0"
+          className="sm:max-w-xl max-h-[90vh] overflow-visible p-0"
           onOpenAutoFocus={(e) => {
             // Prevent auto-focus behavior that might interfere with emoji picking
             e.preventDefault();
@@ -148,7 +166,8 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
             const target = e.target as HTMLElement;
             if (target.closest('.emoji-mart') || 
                 target.closest('.emoji-mart-emoji') || 
-                target.closest('[data-emoji-set]')) {
+                target.closest('[data-emoji-set]') ||
+                target.closest('.emoji-picker-wrapper')) {
               e.preventDefault();
             }
           }}
@@ -157,7 +176,8 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
             const target = e.target as HTMLElement;
             if (target.closest('.emoji-mart') || 
                 target.closest('.emoji-mart-emoji') || 
-                target.closest('[data-emoji-set]')) {
+                target.closest('[data-emoji-set]') ||
+                target.closest('.emoji-picker-wrapper')) {
               e.stopPropagation();
             }
           }}
