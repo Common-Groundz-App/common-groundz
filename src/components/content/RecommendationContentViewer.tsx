@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -22,11 +23,11 @@ const RecommendationContentViewer = ({
 }: RecommendationContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [recommendation, setRecommendation] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showComments, setShowComments] = useState(false);
-  const [topComment, setTopComment] = useState<any>(null);
+  const [recommendation, setRecommendation] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [showComments, setShowComments] = React.useState(false);
+  const [topComment, setTopComment] = React.useState<any>(null);
   const [searchParams] = useSearchParams();
 
   // Determine if we should auto-open comments based on URL params or highlightCommentId

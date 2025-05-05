@@ -7,8 +7,8 @@ import { toast } from '@/hooks/use-toast';
 export function useNotifications(pollInterval = 10000) {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [markingAsRead, setMarkingAsRead] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [markingAsRead, setMarkingAsRead] = useState<boolean>(false);
   const [error, setError] = useState<any>(null);
 
   const fetchAll = useCallback(async () => {

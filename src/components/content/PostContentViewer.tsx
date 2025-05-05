@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -18,14 +19,14 @@ interface PostContentViewerProps {
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [post, setPost] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showComments, setShowComments] = useState(false);
-  const [topComment, setTopComment] = useState<any>(null);
+  const [post, setPost] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [showComments, setShowComments] = React.useState(false);
+  const [topComment, setTopComment] = React.useState<any>(null);
   const [searchParams] = useSearchParams();
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (highlightCommentId || searchParams.has('commentId')) {
       setShowComments(true);
     }

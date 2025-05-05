@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserProfile, getDisplayName, fetchFollowerCount, fetchFollowingCount } from '@/services/profileService'; 
@@ -10,10 +9,10 @@ const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5
 
 export const useProfileData = (userId?: string) => {
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
-  const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [isOwnProfile, setIsOwnProfile] = useState<boolean>(false);
 
   const {
     followerCount,

@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -13,13 +12,13 @@ interface CreatePostButtonProps {
 }
 
 export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
-  const [profileData, setProfileData] = useState<any>(null);
+  const [profileData, setProfileData] = React.useState<any>(null);
 
   // Fetch user profile data when needed
-  useEffect(() => {
+  React.useEffect(() => {
     const loadProfileData = async () => {
       if (user && isDialogOpen) {
         try {
@@ -42,7 +41,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
   }, [user, isDialogOpen, toast]);
 
   // Listen for the "open-create-post-dialog" event
-  useEffect(() => {
+  React.useEffect(() => {
     const handleOpenDialog = () => setIsDialogOpen(true);
     window.addEventListener('open-create-post-dialog', handleOpenDialog);
     
