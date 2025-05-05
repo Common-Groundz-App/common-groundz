@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -474,7 +473,7 @@ export function ModernCreatePostForm({
                   </PopoverContent>
                 </Popover>
                 
-                {/* Emoji Button */}
+                {/* Emoji Button - Updated with stopPropagation */}
                 <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -486,8 +485,17 @@ export function ModernCreatePostForm({
                       <Smile size={20} className="text-muted-foreground" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0 border-none" align="start" side={isMobile ? "top" : "bottom"}>
-                    <div className="emoji-mart-container overflow-hidden rounded-md border shadow-md">
+                  <PopoverContent 
+                    className="w-full p-0 border-none" 
+                    align="start" 
+                    side={isMobile ? "top" : "bottom"}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div 
+                      className="emoji-mart-container overflow-hidden rounded-md border shadow-md"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
                       <Picker 
                         data={data}
                         onEmojiSelect={handleEmojiSelect}

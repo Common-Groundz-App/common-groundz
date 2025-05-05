@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -473,7 +472,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             }
           />
           
-          {/* Emoji Picker Button */}
+          {/* Emoji Picker Button - Updated with stopPropagation */}
           <Popover open={emojiPickerVisible} onOpenChange={setEmojiPickerVisible}>
             <PopoverTrigger asChild>
               <Button
@@ -487,8 +486,17 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                 <Smile className="h-5 w-5" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full sm:w-auto p-0 border shadow-lg" align="start" sideOffset={5}>
-              <div className="emoji-mart-container rounded-md overflow-hidden">
+            <PopoverContent 
+              className="w-full sm:w-auto p-0 border shadow-lg" 
+              align="start" 
+              sideOffset={5}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div 
+                className="emoji-mart-container rounded-md overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.preventDefault()}
+              >
                 <Picker 
                   data={data}
                   onEmojiSelect={handleEmojiSelect}
