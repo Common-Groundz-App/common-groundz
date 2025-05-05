@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import PostContentViewer from './PostContentViewer';
 import RecommendationContentViewer from './RecommendationContentViewer';
@@ -14,10 +14,10 @@ const resetBodyPointerEvents = () => {
 
 const ContentViewerModal = () => {
   const { isOpen, contentType, contentId, commentId, closeContent } = useContentViewer();
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = React.useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (isOpen) {
       setTimeout(() => setMounted(true), 15);
     } else {
@@ -25,7 +25,7 @@ const ContentViewerModal = () => {
     }
   }, [isOpen]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (isOpen && contentType && contentId) {
       const url = commentId 
         ? `/${contentType}/${contentId}?commentId=${commentId}&modal=true` 
@@ -36,7 +36,7 @@ const ContentViewerModal = () => {
     }
   }, [isOpen, contentType, contentId, commentId]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handlePopState = () => {
       resetBodyPointerEvents();
       closeContent();
@@ -45,7 +45,7 @@ const ContentViewerModal = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [closeContent]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {

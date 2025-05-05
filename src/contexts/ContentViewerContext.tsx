@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import * as React from 'react';
 
 export type ContentType = 'post' | 'recommendation' | 'review' | null;
 
@@ -12,13 +12,13 @@ interface ContentViewerContextType {
   closeContent: () => void;
 }
 
-const ContentViewerContext = createContext<ContentViewerContextType | undefined>(undefined);
+const ContentViewerContext = React.createContext<ContentViewerContextType | undefined>(undefined);
 
-export const ContentViewerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [contentType, setContentType] = useState<ContentType>(null);
-  const [contentId, setContentId] = useState<string | null>(null);
-  const [commentId, setCommentId] = useState<string | null>(null);
+export const ContentViewerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [contentType, setContentType] = React.useState<ContentType>(null);
+  const [contentId, setContentId] = React.useState<string | null>(null);
+  const [commentId, setCommentId] = React.useState<string | null>(null);
 
   const openContent = (type: ContentType, id: string, commentId: string | null = null) => {
     setContentType(type);
@@ -48,7 +48,7 @@ export const ContentViewerProvider: React.FC<{ children: ReactNode }> = ({ child
 };
 
 export const useContentViewer = () => {
-  const context = useContext(ContentViewerContext);
+  const context = React.useContext(ContentViewerContext);
   if (context === undefined) {
     throw new Error('useContentViewer must be used within a ContentViewerProvider');
   }
