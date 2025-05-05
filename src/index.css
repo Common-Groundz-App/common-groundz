@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -127,30 +128,57 @@
   }
 }
 
-/* Emoji picker scrollable styles - improved */
+/* Enhanced Emoji Picker Styles */
 .emoji-picker-wrapper {
   position: relative;
   z-index: 9999;
 }
 
 .emoji-mart {
-  border-radius: 10px !important;
-  border: 1px solid hsl(var(--border)) !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-  background-color: hsl(var(--background)) !important;
+  background: white !important;
+  border: 1px solid #ddd !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border-radius: 12px !important;
+  padding: 8px !important;
+  margin: 0 !important;
+  z-index: 9999 !important;
   overflow: visible !important;
+  font-family: inherit;
+}
+
+.dark .emoji-mart {
+  background: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--card-foreground)) !important;
 }
 
 .emoji-mart * {
+  box-sizing: border-box;
   cursor: pointer !important;
+}
+
+.emoji-mart-emoji {
+  cursor: pointer !important;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.emoji-mart-emoji:hover,
+.emoji-mart-emoji:focus {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.dark .emoji-mart-emoji:hover,
+.dark .emoji-mart-emoji:focus {
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .emoji-mart-scroll {
   height: 250px !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
-  scrollbar-width: thin !important;
-  scrollbar-color: #999 transparent !important;
+  padding: 0 6px 6px 6px !important;
+  will-change: transform;
 }
 
 .emoji-mart-scroll::-webkit-scrollbar {
@@ -158,27 +186,44 @@
 }
 
 .emoji-mart-scroll::-webkit-scrollbar-thumb {
-  background-color: #999 !important;
+  background: #ccc !important;
   border-radius: 4px !important;
+}
+
+.dark .emoji-mart-scroll::-webkit-scrollbar-thumb {
+  background: #555 !important;
+}
+
+.emoji-mart-search {
+  margin-top: 6px;
+  padding: 0 6px;
+  position: relative;
 }
 
 .emoji-mart-category-label {
   position: sticky !important;
   top: 0 !important;
   z-index: 2 !important;
-  background-color: hsl(var(--background)) !important;
+  padding: 0 6px;
+  font-weight: 500;
+  font-size: 14px;
+  background: white !important;
+}
+
+.dark .emoji-mart-category-label {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+}
+
+.emoji-mart-category-list {
+  margin: 0;
+  padding: 0;
 }
 
 /* Make sure picker doesn't get clipped */
 .emoji-mart-container {
   position: relative !important;
   z-index: 9999 !important;
-}
-
-.emoji-mart-emoji:hover,
-.emoji-mart-emoji:focus {
-  background-color: hsl(var(--accent)) !important;
-  border-radius: 4px !important;
 }
 
 /* Utility classes for theming */

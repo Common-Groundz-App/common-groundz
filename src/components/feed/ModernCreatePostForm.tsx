@@ -23,57 +23,7 @@ import { getDisplayName } from '@/services/profileService';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 
-// Add custom styles for emoji picker with improved scrolling
-const emojiPickerStyles = `
-  .emoji-picker-wrapper {
-    position: relative;
-    z-index: 9999;
-  }
-  
-  .emoji-mart {
-    border-radius: 10px !important;
-    border: 1px solid hsl(var(--border)) !important;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-    background-color: hsl(var(--background)) !important;
-    overflow: visible !important;
-  }
-  
-  .emoji-mart * {
-    box-sizing: border-box;
-    cursor: pointer !important;
-  }
-  
-  .emoji-mart-emoji {
-    cursor: pointer !important;
-  }
-  
-  .emoji-mart-scroll {
-    height: 250px !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    scrollbar-width: thin !important;
-    scrollbar-color: #999 transparent !important;
-  }
-  
-  .emoji-mart-scroll::-webkit-scrollbar {
-    width: 6px !important;
-  }
-  
-  .emoji-mart-scroll::-webkit-scrollbar-thumb {
-    background-color: #999 !important;
-    border-radius: 4px !important;
-  }
-  
-  .emoji-mart-category-label {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    padding: 0 6px;
-    font-weight: 500;
-    font-size: 14px;
-    background: var(--background);
-  }
-`;
+// Emoji picker styles are now in global CSS (index.css)
 
 const formSchema = z.object({
   content: z.string().min(1, { message: 'Content is required' }),
@@ -236,6 +186,9 @@ export function ModernCreatePostForm({
         }
       }, 10);
     }
+    
+    // Close emoji picker after selection
+    setIsEmojiPickerOpen(false);
   };
 
   const onSubmit = async (data: FormData) => {
@@ -406,9 +359,6 @@ export function ModernCreatePostForm({
   
   return (
     <Form {...form}>
-      {/* Add the emoji picker styles to the DOM */}
-      <style>{emojiPickerStyles}</style>
-      
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="flex gap-3 items-start">
           {/* User Avatar */}
@@ -540,7 +490,7 @@ export function ModernCreatePostForm({
                   </PopoverContent>
                 </Popover>
                 
-                {/* Emoji Button with improved scrollable picker */}
+                {/* Emoji Button with improved implementation */}
                 <div className="relative">
                   <Button
                     type="button"
@@ -573,6 +523,9 @@ export function ModernCreatePostForm({
                         e.stopPropagation();
                         e.preventDefault();
                       }}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                      }}
                     >
                       <Picker 
                         data={data}
@@ -584,7 +537,8 @@ export function ModernCreatePostForm({
                         emojiSize={20}
                         emojiButtonSize={28}
                         maxFrequentRows={2}
-                        modal={false}
+                        modalish={false}
+                        showSkinTones={false}
                       />
                     </div>
                   )}

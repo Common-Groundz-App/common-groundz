@@ -44,10 +44,8 @@ const DialogContent = React.forwardRef<
         // Prevent pointer down outside from closing the dialog if it's coming from inside
         // an emoji picker or other interactive UI element
         const target = e.target as HTMLElement;
-        if (target.closest('.emoji-mart-container') || 
-            target.closest('.emoji-mart') || 
-            target.closest('.emoji-mart-emoji') ||
-            target.closest('.emoji-picker') ||
+        if (target.closest('.emoji-mart') || 
+            target.closest('.emoji-mart-emoji') || 
             target.closest('[data-emoji-set]') ||
             target.closest('.emoji-picker-wrapper')) {
           e.preventDefault();

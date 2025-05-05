@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
@@ -7,69 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
 
-// Add enhanced emoji picker styles to fix interaction issues
-const emojiPickerStyles = `
-  .emoji-mart {
-    border-radius: 10px !important;
-    border: 1px solid hsl(var(--border)) !important;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-    background-color: hsl(var(--background)) !important;
-    box-sizing: border-box;
-    z-index: 100;
-    overflow: visible !important;
-  }
-  
-  .emoji-mart * {
-    box-sizing: border-box;
-    cursor: pointer !important;
-  }
-  
-  .emoji-mart-emoji {
-    cursor: pointer !important;
-  }
-  
-  .emoji-mart-scroll {
-    height: 250px !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    padding: 0 6px 6px 6px;
-    will-change: transform;
-    scrollbar-width: thin !important;
-    scrollbar-color: #999 transparent !important;
-  }
-  
-  .emoji-mart-scroll::-webkit-scrollbar {
-    width: 6px !important;
-  }
-  
-  .emoji-mart-scroll::-webkit-scrollbar-thumb {
-    background-color: #999 !important;
-    border-radius: 4px !important;
-  }
-  
-  .emoji-mart-search {
-    margin-top: 6px;
-    padding: 0 6px;
-    position: relative;
-  }
-  
-  .emoji-mart-category-label {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    padding: 0 6px;
-    font-weight: 500;
-    font-size: 14px;
-    background: var(--background);
-  }
-  
-  /* Ensure emoji picker components have proper cursor */
-  .emoji-mart button,
-  .emoji-mart-emoji span,
-  .emoji-mart-emoji-native {
-    cursor: pointer !important;
-  }
-`;
+// Enhanced emoji picker styles removed (now in index.css)
 
 interface CreatePostButtonProps {
   onPostCreated?: () => void;
@@ -116,9 +55,6 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
 
   return (
     <>
-      {/* Add style element for emoji picker styles */}
-      <style>{emojiPickerStyles}</style>
-      
       <Button
         onClick={() => setIsDialogOpen(true)}
         className="bg-brand-orange hover:bg-brand-orange/90 gap-2"

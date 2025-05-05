@@ -20,57 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 
-// Add custom styles for emoji picker with improved scrolling
-const emojiPickerStyles = `
-  .emoji-picker-wrapper {
-    position: relative;
-    z-index: 9999;
-  }
-  
-  .emoji-mart {
-    border-radius: 10px !important;
-    border: 1px solid hsl(var(--border)) !important;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-    background-color: hsl(var(--background)) !important;
-    overflow: visible !important;
-  }
-  
-  .emoji-mart * {
-    box-sizing: border-box;
-    cursor: pointer !important;
-  }
-  
-  .emoji-mart-emoji {
-    cursor: pointer !important;
-  }
-  
-  .emoji-mart-scroll {
-    height: 250px !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    scrollbar-width: thin !important;
-    scrollbar-color: #999 transparent !important;
-  }
-  
-  .emoji-mart-scroll::-webkit-scrollbar {
-    width: 6px !important;
-  }
-  
-  .emoji-mart-scroll::-webkit-scrollbar-thumb {
-    background-color: #999 !important;
-    border-radius: 4px !important;
-  }
-  
-  .emoji-mart-category-label {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    padding: 0 6px;
-    font-weight: 500;
-    font-size: 14px;
-    background: var(--background);
-  }
-`;
+// Emoji picker styles are now in global CSS (index.css)
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -424,9 +374,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       ref={formRef} 
       className="bg-background rounded-xl shadow-sm p-5 transition-all"
     >
-      {/* Add the emoji picker styles to the DOM */}
-      <style>{emojiPickerStyles}</style>
-      
       {/* User Info + Text Input */}
       <div className="flex gap-3">
         <UserAvatar 
@@ -542,7 +489,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             }
           />
           
-          {/* Emoji Button - Updated with better scrolling and event capture */}
+          {/* Emoji Button - Improved implementation */}
           <div className="relative">
             <Button
               type="button"
@@ -578,6 +525,9 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                   e.stopPropagation();
                   e.preventDefault();
                 }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                }}
               >
                 <Picker 
                   data={data}
@@ -589,7 +539,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                   emojiSize={20}
                   emojiButtonSize={28}
                   maxFrequentRows={2}
-                  modal={false}
+                  modalish={false}
+                  showSkinTones={false}
                 />
               </div>
             )}
