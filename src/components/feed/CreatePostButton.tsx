@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
@@ -11,8 +10,13 @@ import { useToast } from '@/hooks/use-toast';
 // Add enhanced emoji picker styles to fix interaction issues
 const emojiPickerStyles = `
   .emoji-mart {
+    border-radius: 10px !important;
+    border: 1px solid hsl(var(--border)) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+    background-color: hsl(var(--background)) !important;
     box-sizing: border-box;
     z-index: 100;
+    overflow: visible !important;
   }
   
   .emoji-mart * {
@@ -25,28 +29,22 @@ const emojiPickerStyles = `
   }
   
   .emoji-mart-scroll {
-    overflow-y: auto;
-    height: 270px;
+    height: 250px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     padding: 0 6px 6px 6px;
     will-change: transform;
+    scrollbar-width: thin !important;
+    scrollbar-color: #999 transparent !important;
   }
   
-  .emoji-picker-wrapper {
-    scrollbar-width: thin;
-    scrollbar-color: #999 transparent;
-    max-height: 300px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    z-index: 9999;
+  .emoji-mart-scroll::-webkit-scrollbar {
+    width: 6px !important;
   }
   
-  .emoji-picker-wrapper::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  .emoji-picker-wrapper::-webkit-scrollbar-thumb {
-    background-color: #999;
-    border-radius: 4px;
+  .emoji-mart-scroll::-webkit-scrollbar-thumb {
+    background-color: #999 !important;
+    border-radius: 4px !important;
   }
   
   .emoji-mart-search {
@@ -70,23 +68,6 @@ const emojiPickerStyles = `
   .emoji-mart-emoji span,
   .emoji-mart-emoji-native {
     cursor: pointer !important;
-  }
-  
-  /* Fix scrolling issues */
-  .emoji-mart-scroll::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  
-  .emoji-mart-scroll::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
-  }
-  
-  /* Ensure emoji picker stays within dialog */
-  .emoji-picker-container {
-    position: relative !important;
-    z-index: 9999;
   }
 `;
 

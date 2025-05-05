@@ -26,23 +26,16 @@ import Picker from '@emoji-mart/react';
 // Add custom styles for emoji picker with improved scrolling
 const emojiPickerStyles = `
   .emoji-picker-wrapper {
-    scrollbar-width: thin;
-    scrollbar-color: #999 transparent;
-    cursor: pointer !important;
-  }
-  
-  .emoji-picker-wrapper::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  .emoji-picker-wrapper::-webkit-scrollbar-thumb {
-    background-color: #999;
-    border-radius: 4px;
+    position: relative;
+    z-index: 9999;
   }
   
   .emoji-mart {
-    box-sizing: border-box;
-    z-index: 100;
+    border-radius: 10px !important;
+    border: 1px solid hsl(var(--border)) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+    background-color: hsl(var(--background)) !important;
+    overflow: visible !important;
   }
   
   .emoji-mart * {
@@ -55,16 +48,20 @@ const emojiPickerStyles = `
   }
   
   .emoji-mart-scroll {
-    overflow-y: auto;
-    height: 270px;
-    padding: 0 6px 6px 6px;
-    will-change: transform;
+    height: 250px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #999 transparent !important;
   }
   
-  .emoji-mart-search {
-    margin-top: 6px;
-    padding: 0 6px;
-    position: relative;
+  .emoji-mart-scroll::-webkit-scrollbar {
+    width: 6px !important;
+  }
+  
+  .emoji-mart-scroll::-webkit-scrollbar-thumb {
+    background-color: #999 !important;
+    border-radius: 4px !important;
   }
   
   .emoji-mart-category-label {
@@ -577,67 +574,18 @@ export function ModernCreatePostForm({
                         e.preventDefault();
                       }}
                     >
-                      <div 
-                        className="bg-background rounded-md overflow-hidden border shadow-md"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                        }}
-                        onPointerDown={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                        }}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                        }}
-                      >
-                        {/* New wrapper div for scrolling */}
-                        <div 
-                          className="emoji-picker-wrapper"
-                          style={{
-                            maxHeight: '300px',
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            zIndex: 9999
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                          }}
-                          onPointerDown={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                          }}
-                          onMouseDown={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                          }}
-                          onKeyDown={(e) => {
-                            e.stopPropagation();
-                          }}
-                          onScroll={(e) => {
-                            e.stopPropagation();
-                          }}
-                        >
-                          <Picker 
-                            data={data}
-                            onEmojiSelect={handleEmojiSelect}
-                            theme="light"
-                            previewPosition="none"
-                            set="native"
-                            skinTonePosition="none"
-                            emojiSize={20}
-                            emojiButtonSize={28}
-                            maxFrequentRows={2}
-                            modal={false}
-                            style={{ 
-                              border: 'none',
-                              boxShadow: 'none',
-                            }}
-                          />
-                        </div>
-                      </div>
+                      <Picker 
+                        data={data}
+                        onEmojiSelect={handleEmojiSelect}
+                        theme="light"
+                        previewPosition="none"
+                        set="native"
+                        skinTonePosition="none"
+                        emojiSize={20}
+                        emojiButtonSize={28}
+                        maxFrequentRows={2}
+                        modal={false}
+                      />
                     </div>
                   )}
                 </div>
