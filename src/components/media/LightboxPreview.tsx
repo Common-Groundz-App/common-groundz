@@ -4,6 +4,7 @@ import { MediaItem } from '@/types/media';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface LightboxPreviewProps {
   media: MediaItem[];
@@ -21,6 +22,7 @@ export function LightboxPreview({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const mediaRef = useRef<MediaItem[]>([]);
+  const isMobile = useIsMobile();
   
   // Track if the media array has changed
   useEffect(() => {
@@ -110,21 +112,41 @@ export function LightboxPreview({
   const imageKey = getImageKey(currentItem, currentIndex);
   const isLoaded = loaded[imageKey];
   
+  // Determine orientation class for responsive styling
+  const getOrientationClass = (item: MediaItem) => {
+    if (!item.orientation && item.width && item.height) {
+      const ratio = item.width / item.height;
+      if (ratio > 1.05) return 'landscape';
+      if (ratio < 0.95) return 'portrait';
+      return 'square';
+    }
+    return item.orientation || 'landscape';
+  };
+  
+  const orientation = getOrientationClass(currentItem);
+  const isLandscape = orientation === 'landscape';
+  
   return (
     <div className={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/95", className)}>
-      {/* Close button */}
+      {/* Close button - smaller on mobile */}
       <Button 
-        className="absolute right-4 top-4 z-50 h-10 w-10 rounded-full bg-gray-800/70 hover:bg-gray-700"
+        className={cn(
+          "absolute right-4 z-50 rounded-full bg-gray-800/70 hover:bg-gray-700",
+          isMobile ? "right-2 top-2 h-8 w-8" : "right-4 top-4 h-10 w-10"
+        )}
         size="icon"
         variant="ghost"
         onClick={onClose}
       >
-        <X className="h-6 w-6 text-white" />
+        <X className={cn("text-white", isMobile ? "h-5 w-5" : "h-6 w-6")} />
         <span className="sr-only">Close</span>
       </Button>
       
-      {/* Main image container */}
-      <div className="relative flex h-full w-full items-center justify-center px-12">
+      {/* Main image container - reduced padding on mobile */}
+      <div className={cn(
+        "relative flex h-full w-full items-center justify-center",
+        isMobile ? "px-2" : "px-12"
+      )}>
         {/* Current media item */}
         <div className="relative flex h-full max-h-[90vh] w-full items-center justify-center">
           {currentItem.type === 'image' ? (
@@ -134,9 +156,14 @@ export function LightboxPreview({
                 src={currentItem.url} 
                 alt={currentItem.alt || currentItem.caption || `Image ${currentIndex + 1}`}
                 className={cn(
-                  "max-h-[90vh] max-w-full object-contain transition-opacity duration-300",
-                  isLoaded ? "opacity-100" : "opacity-0"
+                  "transition-opacity duration-300",
+                  isLoaded ? "opacity-100" : "opacity-0",
+                  // Orientation-specific styles
+                  isMobile && isLandscape 
+                    ? "h-auto w-full object-contain"
+                    : "max-h-[90vh] max-w-full object-contain"
                 )}
+                style={isMobile && isLandscape ? { maxHeight: '85vh' } : undefined}
                 onLoad={() => handleImageLoad(currentItem, currentIndex)}
               />
               {/* Only show loading spinner if the image hasn't loaded yet */}
@@ -152,7 +179,11 @@ export function LightboxPreview({
               src={currentItem.url} 
               poster={currentItem.thumbnail_url}
               controls
-              className="max-h-[90vh] max-w-full object-contain"
+              className={cn(
+                isMobile && isLandscape 
+                  ? "h-auto w-full object-contain" 
+                  : "max-h-[90vh] max-w-full object-contain"
+              )}
               onLoadedData={() => handleImageLoad(currentItem, currentIndex)}
             />
           )}
@@ -161,40 +192,53 @@ export function LightboxPreview({
         {/* Navigation controls - only shown when there are multiple items */}
         {media.length > 1 && (
           <>
-            {/* Previous button */}
+            {/* Previous button - smaller on mobile */}
             <Button
-              className="absolute left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-gray-800/70 hover:bg-gray-700"
+              className={cn(
+                "absolute top-1/2 -translate-y-1/2 rounded-full bg-gray-800/70 hover:bg-gray-700",
+                isMobile 
+                  ? "left-1 h-8 w-8" 
+                  : "left-4 h-12 w-12"
+              )}
               size="icon"
               variant="ghost"
               onClick={prevImage}
             >
-              <ChevronLeft className="h-8 w-8 text-white" />
+              <ChevronLeft className={cn("text-white", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               <span className="sr-only">Previous image</span>
             </Button>
             
-            {/* Next button */}
+            {/* Next button - smaller on mobile */}
             <Button
-              className="absolute right-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-gray-800/70 hover:bg-gray-700"
+              className={cn(
+                "absolute top-1/2 -translate-y-1/2 rounded-full bg-gray-800/70 hover:bg-gray-700",
+                isMobile 
+                  ? "right-1 h-8 w-8" 
+                  : "right-4 h-12 w-12"
+              )}
               size="icon"
               variant="ghost"
               onClick={nextImage}
             >
-              <ChevronRight className="h-8 w-8 text-white" />
+              <ChevronRight className={cn("text-white", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               <span className="sr-only">Next image</span>
             </Button>
             
-            {/* Image counter */}
+            {/* Image counter - more compact on mobile */}
             <div className="absolute bottom-6 left-0 right-0 flex justify-center">
-              <div className="flex items-center gap-2">
-                {/* Navigation dots */}
-                <div className="flex gap-2">
+              <div className={cn(
+                "flex items-center gap-2",
+                isMobile && "scale-90"
+              )}>
+                {/* Navigation dots - simplified on mobile */}
+                <div className={cn("flex gap-2", isMobile && "gap-1")}>
                   {media.map((item, idx) => (
                     <button
                       key={getImageKey(item, idx)}
                       className={cn(
                         "h-2 rounded-full transition-all focus:outline-none",
                         idx === currentIndex 
-                          ? "w-8 bg-brand-orange" 
+                          ? isMobile ? "w-6 bg-brand-orange" : "w-8 bg-brand-orange"
                           : "w-2 bg-white opacity-70 hover:opacity-100"
                       )}
                       onClick={() => setCurrentIndex(idx)}
@@ -203,8 +247,11 @@ export function LightboxPreview({
                   ))}
                 </div>
                 
-                {/* Image counter text */}
-                <span className="ml-4 rounded-full bg-black/60 px-3 py-1 text-sm text-white">
+                {/* Image counter text - more compact on mobile */}
+                <span className={cn(
+                  "ml-4 rounded-full bg-black/60 px-3 py-1 text-white",
+                  isMobile ? "text-xs" : "text-sm"
+                )}>
                   {currentIndex + 1} / {media.length}
                 </span>
               </div>

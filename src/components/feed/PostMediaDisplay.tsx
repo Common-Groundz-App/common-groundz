@@ -1,9 +1,7 @@
-
 import React, { useState } from 'react';
 import { MediaItem } from '@/types/media';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 
 interface PostMediaDisplayProps {
@@ -47,8 +45,8 @@ export function PostMediaDisplay({
         let orientation: 'portrait' | 'landscape' | 'square';
         
         // More precise thresholds for orientation detection
-        if (ratio > 1.1) orientation = 'landscape';
-        else if (ratio < 0.9) orientation = 'portrait';
+        if (ratio > 1.05) orientation = 'landscape';
+        else if (ratio < 0.95) orientation = 'portrait';
         else orientation = 'square';
         
         return { ...item, orientation };
