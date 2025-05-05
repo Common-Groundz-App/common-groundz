@@ -64,7 +64,7 @@ export function ModernCreatePostForm({
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>(postToEdit?.tagged_entities || []);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>(postToEdit?.media || []);
   const [isEntitySelectorOpen, setIsEntitySelectorOpen] = useState(false);
-  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isEmojiPickerVisible, setIsEmojiPickerOpen] = useState(false);
   const [contentHtml, setContentHtml] = useState<string>(postToEdit?.content || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useState<string>(() => generateUUID())[0];
@@ -473,16 +473,20 @@ export function ModernCreatePostForm({
                   </PopoverContent>
                 </Popover>
                 
-                {/* Emoji Button - Updated with stopPropagation */}
-                <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+                {/* Emoji Button - Updated with improved event handling */}
+                <Popover open={isEmojiPickerVisible} onOpenChange={setIsEmojiPickerOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="rounded-full"
+                      className="rounded-full p-2 hover:bg-accent hover:text-accent-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        saveCursorPosition();
+                      }}
                     >
-                      <Smile size={20} className="text-muted-foreground" />
+                      <Smile className="h-5 w-5" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent 
@@ -490,11 +494,20 @@ export function ModernCreatePostForm({
                     align="start" 
                     side={isMobile ? "top" : "bottom"}
                     onClick={(e) => e.stopPropagation()}
+                    onPointerDownCapture={(e) => e.stopPropagation()}
                   >
                     <div 
                       className="emoji-mart-container overflow-hidden rounded-md border shadow-md"
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                      onScroll={(e) => e.stopPropagation()}
+                      style={{ cursor: 'default' }}
                     >
                       <Picker 
                         data={data}
@@ -506,6 +519,7 @@ export function ModernCreatePostForm({
                         emojiSize={20}
                         emojiButtonSize={28}
                         maxFrequentRows={2}
+                        style={{ cursor: 'pointer' }}
                       />
                     </div>
                   </PopoverContent>

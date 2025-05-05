@@ -61,6 +61,16 @@ const SheetContent = React.forwardRef<
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
+      onPointerDownOutside={(e) => {
+        // Prevent pointer down outside from closing the sheet if it's coming from inside
+        // an emoji picker or other interactive UI element that might be in a portal
+        const target = e.target as HTMLElement;
+        if (target.closest('.emoji-mart-container') || 
+            target.closest('.emoji-mart') || 
+            target.closest('.emoji-picker')) {
+          e.preventDefault();
+        }
+      }}
       {...props}
     >
       {children}

@@ -472,30 +472,41 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             }
           />
           
-          {/* Emoji Picker Button - Updated with stopPropagation */}
+          {/* Emoji Button - Updated with improved event handling */}
           <Popover open={emojiPickerVisible} onOpenChange={setEmojiPickerVisible}>
             <PopoverTrigger asChild>
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
                   emojiPickerVisible && "bg-accent/50 text-accent-foreground"
                 )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  saveCursorPosition();
+                }}
               >
                 <Smile className="h-5 w-5" />
               </Button>
             </PopoverTrigger>
             <PopoverContent 
-              className="w-full sm:w-auto p-0 border shadow-lg" 
+              className="w-full sm:w-auto p-0 border-none shadow-lg" 
               align="start" 
               sideOffset={5}
               onClick={(e) => e.stopPropagation()}
+              onPointerDownCapture={(e) => e.stopPropagation()}
             >
               <div 
-                className="emoji-mart-container rounded-md overflow-hidden"
+                className="emoji-mart-container rounded-md overflow-hidden border shadow-md"
                 onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.preventDefault()}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onScroll={(e) => e.stopPropagation()}
+                style={{ cursor: 'default' }}
               >
                 <Picker 
                   data={data}
@@ -507,6 +518,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                   emojiSize={20}
                   emojiButtonSize={28}
                   maxFrequentRows={2}
+                  style={{ cursor: 'pointer' }}
                 />
               </div>
             </PopoverContent>

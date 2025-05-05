@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
@@ -6,6 +7,46 @@ import { EnhancedCreatePostForm } from './EnhancedCreatePostForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
+
+// Add custom styles for emoji picker to fix interaction issues
+const emojiPickerStyles = `
+  .emoji-mart {
+    box-sizing: border-box;
+    z-index: 100;
+  }
+  
+  .emoji-mart * {
+    box-sizing: border-box;
+    cursor: pointer;
+  }
+  
+  .emoji-mart-emoji {
+    cursor: pointer !important;
+  }
+  
+  .emoji-mart-scroll {
+    overflow-y: auto;
+    height: 270px;
+    padding: 0 6px 6px 6px;
+    will-change: transform;
+  }
+  
+  .emoji-mart-search {
+    margin-top: 6px;
+    padding: 0 6px;
+    position: relative;
+  }
+  
+  .emoji-mart-category-label {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0 6px;
+    font-weight: 500;
+    font-size: 14px;
+    background: var(--background);
+  }
+`;
 
 interface CreatePostButtonProps {
   onPostCreated?: () => void;
@@ -52,6 +93,9 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
 
   return (
     <>
+      {/* Add style element for emoji picker styles */}
+      <style>{emojiPickerStyles}</style>
+      
       <Button
         onClick={() => setIsDialogOpen(true)}
         className="bg-brand-orange hover:bg-brand-orange/90 gap-2"
@@ -61,7 +105,13 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
       </Button>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent 
+          className="sm:max-w-xl max-h-[90vh] overflow-y-auto p-0"
+          onOpenAutoFocus={(e) => {
+            // Prevent auto-focus behavior that might interfere with emoji picking
+            e.preventDefault();
+          }}
+        >
           <EnhancedCreatePostForm 
             profileData={profileData}
             onSuccess={() => {
