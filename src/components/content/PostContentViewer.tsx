@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,7 +31,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
     }
   }, [highlightCommentId, searchParams]);
   
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchPost = async () => {
       try {
         setLoading(true);

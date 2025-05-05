@@ -31,13 +31,13 @@ const RecommendationContentViewer = ({
   const [searchParams] = useSearchParams();
 
   // Determine if we should auto-open comments based on URL params or highlightCommentId
-  useEffect(() => {
+  React.useEffect(() => {
     if (highlightCommentId || searchParams.has('commentId')) {
       setShowComments(true);
     }
   }, [highlightCommentId, searchParams]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchRecommendation = async () => {
       try {
         setLoading(true);
@@ -159,7 +159,7 @@ const RecommendationContentViewer = ({
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (recommendationId) {
       fetchTopComment();
     }
