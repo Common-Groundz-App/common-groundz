@@ -510,7 +510,7 @@ export function ModernCreatePostForm({
                   {isEmojiPickerVisible && (
                     <div 
                       ref={emojiPickerRef}
-                      className="absolute z-50 bottom-full mb-2 left-0" 
+                      className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper" 
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
