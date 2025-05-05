@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -71,6 +72,7 @@ export function ModernCreatePostForm({
   const isEditMode = !!postToEdit;
   const isMobile = useIsMobile();
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number } | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -124,6 +126,20 @@ export function ModernCreatePostForm({
     }
   }, [postToEdit, form]);
 
+  // Handle click outside for emoji picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isEmojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setIsEmojiPickerOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isEmojiPickerVisible]);
+
   // Save cursor position when textarea is focused or clicked
   const saveCursorPosition = () => {
     if (textareaRef.current) {
@@ -169,9 +185,6 @@ export function ModernCreatePostForm({
         }
       }, 10);
     }
-    
-    // Close emoji picker after selection
-    setIsEmojiPickerOpen(false);
   };
 
   const onSubmit = async (data: FormData) => {
@@ -473,31 +486,27 @@ export function ModernCreatePostForm({
                   </PopoverContent>
                 </Popover>
                 
-                {/* Emoji Button - Updated with improved event handling */}
-                <Popover open={isEmojiPickerVisible} onOpenChange={setIsEmojiPickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="rounded-full p-2 hover:bg-accent hover:text-accent-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        saveCursorPosition();
-                      }}
-                    >
-                      <Smile className="h-5 w-5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent 
-                    className="w-full p-0 border-none" 
-                    align="start" 
-                    side={isMobile ? "top" : "bottom"}
-                    onClick={(e) => e.stopPropagation()}
-                    onPointerDownCapture={(e) => e.stopPropagation()}
+                {/* Emoji Button with inline picker instead of Popover */}
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full p-2 hover:bg-accent hover:text-accent-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      saveCursorPosition();
+                      setIsEmojiPickerOpen(!isEmojiPickerVisible);
+                    }}
                   >
+                    <Smile className="h-5 w-5" />
+                  </Button>
+                  
+                  {isEmojiPickerVisible && (
                     <div 
-                      className="emoji-mart-container overflow-hidden rounded-md border shadow-md"
+                      ref={emojiPickerRef}
+                      className="absolute z-50 bottom-full mb-2 left-0" 
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -506,24 +515,38 @@ export function ModernCreatePostForm({
                         e.stopPropagation();
                         e.preventDefault();
                       }}
-                      onScroll={(e) => e.stopPropagation()}
-                      style={{ cursor: 'default' }}
                     >
-                      <Picker 
-                        data={data}
-                        onEmojiSelect={handleEmojiSelect}
-                        theme="light"
-                        previewPosition="none"
-                        set="native"
-                        skinTonePosition="none"
-                        emojiSize={20}
-                        emojiButtonSize={28}
-                        maxFrequentRows={2}
-                        style={{ cursor: 'pointer' }}
-                      />
+                      <div 
+                        className="bg-background rounded-md overflow-hidden border shadow-md"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                      >
+                        <Picker 
+                          data={data}
+                          onEmojiSelect={handleEmojiSelect}
+                          theme="light"
+                          previewPosition="none"
+                          set="native"
+                          skinTonePosition="none"
+                          emojiSize={20}
+                          emojiButtonSize={28}
+                          maxFrequentRows={2}
+                          modal={false}
+                          style={{ 
+                            border: 'none',
+                            boxShadow: 'none',
+                          }}
+                        />
+                      </div>
                     </div>
-                  </PopoverContent>
-                </Popover>
+                  )}
+                </div>
               </div>
               
               {/* Post/Cancel Buttons */}

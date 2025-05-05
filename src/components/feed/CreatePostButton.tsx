@@ -17,7 +17,7 @@ const emojiPickerStyles = `
   
   .emoji-mart * {
     box-sizing: border-box;
-    cursor: pointer;
+    cursor: pointer !important;
   }
   
   .emoji-mart-emoji {
@@ -45,6 +45,30 @@ const emojiPickerStyles = `
     font-weight: 500;
     font-size: 14px;
     background: var(--background);
+  }
+  
+  /* Ensure emoji picker components have proper cursor */
+  .emoji-mart button,
+  .emoji-mart-emoji span,
+  .emoji-mart-emoji-native {
+    cursor: pointer !important;
+  }
+  
+  /* Fix scrolling issues */
+  .emoji-mart-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .emoji-mart-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+  
+  /* Ensure emoji picker stays within dialog */
+  .emoji-picker-container {
+    position: relative !important;
+    z-index: 9999;
   }
 `;
 
@@ -104,12 +128,38 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
         Create Post
       </Button>
       
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog 
+        open={isDialogOpen} 
+        onOpenChange={(open) => {
+          // Only close if explicitly setting to false to prevent emoji clicks from closing
+          if (open === false) {
+            setIsDialogOpen(false);
+          }
+        }}
+      >
         <DialogContent 
           className="sm:max-w-xl max-h-[90vh] overflow-y-auto p-0"
           onOpenAutoFocus={(e) => {
             // Prevent auto-focus behavior that might interfere with emoji picking
             e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            // Prevent emoji picker clicks from closing the dialog
+            const target = e.target as HTMLElement;
+            if (target.closest('.emoji-mart') || 
+                target.closest('.emoji-mart-emoji') || 
+                target.closest('[data-emoji-set]')) {
+              e.preventDefault();
+            }
+          }}
+          onClick={(e) => {
+            // Prevent event propagation from within emoji picker
+            const target = e.target as HTMLElement;
+            if (target.closest('.emoji-mart') || 
+                target.closest('.emoji-mart-emoji') || 
+                target.closest('[data-emoji-set]')) {
+              e.stopPropagation();
+            }
           }}
         >
           <EnhancedCreatePostForm 

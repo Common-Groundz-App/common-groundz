@@ -19,6 +19,12 @@ const ScrollArea = React.forwardRef<
         // Ensure scrolling doesn't propagate beyond this component
         e.stopPropagation();
       }}
+      onClick={(e) => {
+        // Prevent click events from propagating through the scroll area
+        if (e.target === e.currentTarget) {
+          e.stopPropagation();
+        }
+      }}
     >
       {children}
     </ScrollAreaPrimitive.Viewport>

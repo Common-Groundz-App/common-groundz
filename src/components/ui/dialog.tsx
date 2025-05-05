@@ -42,12 +42,24 @@ const DialogContent = React.forwardRef<
       )}
       onPointerDownOutside={(e) => {
         // Prevent pointer down outside from closing the dialog if it's coming from inside
-        // an emoji picker or other interactive UI element that might be in a portal
+        // an emoji picker or other interactive UI element
         const target = e.target as HTMLElement;
         if (target.closest('.emoji-mart-container') || 
             target.closest('.emoji-mart') || 
-            target.closest('.emoji-picker')) {
+            target.closest('.emoji-mart-emoji') ||
+            target.closest('.emoji-picker') ||
+            target.closest('[data-emoji-set]')) {
           e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+      onClick={(e) => {
+        // Prevent event propagation from emoji picker clicks
+        const target = e.target as HTMLElement;
+        if (target.closest('.emoji-mart') || 
+            target.closest('.emoji-mart-emoji') ||
+            target.closest('[data-emoji-set]')) {
+          e.stopPropagation();
         }
       }}
       {...props}

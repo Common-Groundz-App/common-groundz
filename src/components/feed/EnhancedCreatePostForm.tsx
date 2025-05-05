@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const MAX_MEDIA_COUNT = 4;
   
   // Auto-resize textarea as content changes
@@ -63,6 +65,20 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [content]);
+
+  // Handle click outside for emoji picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setEmojiPickerVisible(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [emojiPickerVisible]);
 
   // Save cursor position when textarea is focused or clicked
   const saveCursorPosition = () => {
@@ -472,57 +488,70 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             }
           />
           
-          {/* Emoji Button - Updated with improved event handling */}
-          <Popover open={emojiPickerVisible} onOpenChange={setEmojiPickerVisible}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
-                  emojiPickerVisible && "bg-accent/50 text-accent-foreground"
-                )}
+          {/* Emoji Button - Direct render instead of Popover */}
+          <div className="relative">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
+                emojiPickerVisible && "bg-accent/50 text-accent-foreground"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                saveCursorPosition();
+                setEmojiPickerVisible(!emojiPickerVisible);
+              }}
+            >
+              <Smile className="h-5 w-5" />
+            </Button>
+            
+            {emojiPickerVisible && (
+              <div 
+                ref={emojiPickerRef}
+                className="absolute z-50 bottom-full mb-2 left-0"
                 onClick={(e) => {
                   e.stopPropagation();
-                  saveCursorPosition();
+                  e.preventDefault();
                 }}
-              >
-                <Smile className="h-5 w-5" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent 
-              className="w-full sm:w-auto p-0 border-none shadow-lg" 
-              align="start" 
-              sideOffset={5}
-              onClick={(e) => e.stopPropagation()}
-              onPointerDownCapture={(e) => e.stopPropagation()}
-            >
-              <div 
-                className="emoji-mart-container rounded-md overflow-hidden border shadow-md"
-                onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
                 }}
-                onScroll={(e) => e.stopPropagation()}
-                style={{ cursor: 'default' }}
               >
-                <Picker 
-                  data={data}
-                  onEmojiSelect={handleEmojiSelect}
-                  theme="light"
-                  previewPosition="none"
-                  set="native"
-                  skinTonePosition="none"
-                  emojiSize={20}
-                  emojiButtonSize={28}
-                  maxFrequentRows={2}
-                  style={{ cursor: 'pointer' }}
-                />
+                <div 
+                  className="bg-background rounded-md overflow-hidden border shadow-md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
+                >
+                  <Picker 
+                    data={data}
+                    onEmojiSelect={handleEmojiSelect}
+                    theme="light"
+                    previewPosition="none"
+                    set="native"
+                    skinTonePosition="none"
+                    emojiSize={20}
+                    emojiButtonSize={28}
+                    maxFrequentRows={2}
+                    modal={false}
+                    style={{ 
+                      border: 'none',
+                      boxShadow: 'none',
+                    }}
+                  />
+                </div>
               </div>
-            </PopoverContent>
-          </Popover>
+            )}
+          </div>
           
           <Button
             variant="ghost"

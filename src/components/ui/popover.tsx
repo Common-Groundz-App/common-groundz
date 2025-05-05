@@ -25,6 +25,10 @@ const PopoverContent = React.forwardRef<
       onClick={(e) => e.stopPropagation()}
       // Prevent mousedown from stealing focus
       onMouseDown={(e) => e.preventDefault()}
+      // Prevent scroll events from propagating
+      onScroll={(e) => e.stopPropagation()}
+      // Prevent other pointer events that could interfere with picker
+      onPointerDown={(e) => e.stopPropagation()}
       {...props}
     />
   </PopoverPrimitive.Portal>
