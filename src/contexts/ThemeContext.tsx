@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as React from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -12,15 +12,15 @@ interface ThemeContextType {
   isDarkMode: boolean;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   // Use safer initialization that won't break SSR or during initial render
-  const [theme, setTheme] = useState<Theme>('light');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = React.useState<Theme>('light');
+  const [resolvedTheme, setResolvedTheme] = React.useState<'light' | 'dark'>('light');
   
   // Initialize theme from localStorage and system preference
-  useEffect(() => {
+  React.useEffect(() => {
     try {
       // Check localStorage first
       const savedTheme = localStorage.getItem('theme') as Theme;
@@ -41,7 +41,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   // Apply theme to document when theme changes
-  useEffect(() => {
+  React.useEffect(() => {
     try {
       const root = window.document.documentElement;
       
@@ -66,7 +66,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   }, [theme]);
 
   // Listen for system theme changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (theme !== 'system') return;
 
     try {
@@ -117,7 +117,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useTheme = () => {
-  const context = useContext(ThemeContext);
+  const context = React.useContext(ThemeContext);
   if (context === undefined) {
     throw new Error('useTheme must be used within a ThemeProvider');
   }

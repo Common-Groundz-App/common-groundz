@@ -1,18 +1,18 @@
 
-import { Home, Search, User } from 'lucide-react'
-import { NavBar } from "@/components/ui/tubelight-navbar"
-import { UserMenu } from './UserMenu'
-import { useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { SearchDialog } from '@/components/SearchDialog'
-import { supabase } from '@/integrations/supabase/client'
-import NotificationBell from './notifications/NotificationBell'
-import { useAuth } from '@/contexts/AuthContext'
+import * as React from 'react';
+import { Home, Search, User } from 'lucide-react';
+import { NavBar } from "@/components/ui/tubelight-navbar";
+import { UserMenu } from './UserMenu';
+import { useLocation } from 'react-router-dom';
+import { SearchDialog } from '@/components/SearchDialog';
+import { supabase } from '@/integrations/supabase/client';
+import NotificationBell from './notifications/NotificationBell';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function NavBarComponent() {
   const location = useLocation();
-  const [showSearchDialog, setShowSearchDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState('Home');
+  const [showSearchDialog, setShowSearchDialog] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState('Home');
   const { user } = useAuth();
   
   const navItems = [
@@ -21,7 +21,7 @@ export function NavBarComponent() {
     { name: 'Profile', url: '/profile', icon: User }
   ];
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleOpenSearch = () => {
       setShowSearchDialog(true);
     };
@@ -32,7 +32,7 @@ export function NavBarComponent() {
     };
   }, []);
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (location.pathname === '/') {
       setActiveTab('Home');
     } else if (location.pathname.startsWith('/profile')) {
@@ -59,7 +59,7 @@ export function NavBarComponent() {
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>
-  )
+  );
 }
 
 export default NavBarComponent;
