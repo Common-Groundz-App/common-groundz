@@ -4,6 +4,7 @@ import { MediaItem } from '@/types/media';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { LightboxPreview } from '@/components/media/LightboxPreview';
 
 interface PostMediaDisplayProps {
   media?: MediaItem[];
@@ -108,23 +109,14 @@ export function PostMediaDisplay({
         onImageClick={handleImageClick}
       />
       
-      {/* Lightbox for full-screen image viewing with proper accessibility */}
-      <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
-        <DialogContent className="max-w-6xl w-full p-0 bg-black/95 border-none shadow-none">
-          {/* Adding DialogTitle for accessibility, but visually hiding it */}
-          <DialogTitle className="sr-only">Media Preview</DialogTitle>
-          <TwitterStyleMediaPreview
-            media={validMedia}
-            readOnly={true}
-            displayMode="carousel"
-            currentIndex={activeImageIndex}
-            objectFit="contain"
-            enableBackground={false}
-            thumbnailDisplay="always"
-            className="max-h-[90vh] w-full"
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Replace Dialog with a direct render of LightboxPreview when lightbox is open */}
+      {lightboxOpen && (
+        <LightboxPreview
+          media={validMedia}
+          initialIndex={activeImageIndex}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </>
   );
 }
