@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,9 @@ import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
 import { supabase } from '@/integrations/supabase/client';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -43,12 +47,14 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [entitySelectorVisible, setEntitySelectorVisible] = useState(false);
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [visibility, setVisibility] = useState<VisibilityOption>('public');
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [location, setLocation] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
+  const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
   const MAX_MEDIA_COUNT = 4;
   
   // Auto-resize textarea as content changes
@@ -58,6 +64,51 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [content]);
+
+  // Save cursor position when textarea is focused or clicked
+  const saveCursorPosition = () => {
+    if (textareaRef.current) {
+      setCursorPosition({
+        start: textareaRef.current.selectionStart,
+        end: textareaRef.current.selectionEnd
+      });
+    }
+  };
+
+  // Handle emoji selection and insertion
+  const handleEmojiSelect = (emoji: any) => {
+    if (textareaRef.current) {
+      const start = cursorPosition.start;
+      const end = cursorPosition.end;
+      
+      // Insert emoji at cursor position
+      const newContent = 
+        content.substring(0, start) + 
+        emoji.native + 
+        content.substring(end);
+      
+      setContent(newContent);
+      
+      // Update cursor position for next insertion
+      const newPosition = start + emoji.native.length;
+      setCursorPosition({ start: newPosition, end: newPosition });
+      
+      // Focus back on textarea and set cursor position
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(newPosition, newPosition);
+          
+          // Ensure textarea height is adjusted
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+      }, 10);
+    }
+    
+    // Close emoji picker after selection
+    setEmojiPickerVisible(false);
+  };
 
   // Handle keyboard shortcut for posting (Cmd/Ctrl + Enter)
   useEffect(() => {
@@ -322,6 +373,9 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             value={content}
             onChange={(e) => setContent(e.target.value)}
             className="min-h-[100px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/70"
+            onClick={saveCursorPosition}
+            onKeyUp={saveCursorPosition}
+            onFocus={saveCursorPosition}
           />
         </div>
       </div>
@@ -418,13 +472,38 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
               </Button>
             }
           />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-full p-2 hover:bg-accent hover:text-accent-foreground"
-          >
-            <Smile className="h-5 w-5" />
-          </Button>
+          
+          {/* Emoji Picker Button */}
+          <Popover open={emojiPickerVisible} onOpenChange={setEmojiPickerVisible}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
+                  emojiPickerVisible && "bg-accent/50 text-accent-foreground"
+                )}
+              >
+                <Smile className="h-5 w-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full sm:w-auto p-0 border shadow-lg" align="start" sideOffset={5}>
+              <div className="emoji-mart-container rounded-md overflow-hidden">
+                <Picker 
+                  data={data}
+                  onEmojiSelect={handleEmojiSelect}
+                  theme="light"
+                  previewPosition="none"
+                  set="native"
+                  skinTonePosition="none"
+                  emojiSize={20}
+                  emojiButtonSize={28}
+                  maxFrequentRows={2}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+          
           <Button
             variant="ghost"
             size="sm"

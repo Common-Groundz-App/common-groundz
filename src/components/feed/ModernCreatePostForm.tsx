@@ -21,6 +21,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { mapPostTypeToDatabase } from './utils/postUtils';
 import { SimpleEntitySelector } from './SimpleEntitySelector';
 import { getDisplayName } from '@/services/profileService';
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
 
 const formSchema = z.object({
   content: z.string().min(1, { message: 'Content is required' }),
@@ -63,11 +65,13 @@ export function ModernCreatePostForm({
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>(postToEdit?.tagged_entities || []);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>(postToEdit?.media || []);
   const [isEntitySelectorOpen, setIsEntitySelectorOpen] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [contentHtml, setContentHtml] = useState<string>(postToEdit?.content || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useState<string>(() => generateUUID())[0];
   const isEditMode = !!postToEdit;
   const isMobile = useIsMobile();
+  const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number } | null>(null);
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -120,6 +124,56 @@ export function ModernCreatePostForm({
       }
     }
   }, [postToEdit, form]);
+
+  // Save cursor position when textarea is focused or clicked
+  const saveCursorPosition = () => {
+    if (textareaRef.current) {
+      const start = textareaRef.current.selectionStart;
+      const end = textareaRef.current.selectionEnd;
+      setCursorPosition({ start, end });
+    }
+  };
+
+  // Handle emoji selection
+  const handleEmojiSelect = (emoji: any) => {
+    if (textareaRef.current) {
+      const textarea = textareaRef.current;
+      const currentContent = form.getValues('content');
+      let start = textarea.selectionStart;
+      let end = textarea.selectionEnd;
+      
+      // Use saved cursor position if textarea lost focus (e.g. when clicking emoji)
+      if (document.activeElement !== textarea && cursorPosition) {
+        start = cursorPosition.start;
+        end = cursorPosition.end;
+      }
+      
+      // Insert emoji at cursor position
+      const newContent = 
+        currentContent.substring(0, start) + 
+        emoji.native + 
+        currentContent.substring(end);
+      
+      // Update form value and content HTML
+      form.setValue('content', newContent);
+      setContentHtml(newContent);
+      
+      // Update cursor position for next insertion
+      const newPosition = start + emoji.native.length;
+      setCursorPosition({ start: newPosition, end: newPosition });
+      
+      // Optional: Focus back on textarea after emoji insertion
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(newPosition, newPosition);
+        }
+      }, 10);
+    }
+    
+    // Close emoji picker after selection
+    setIsEmojiPickerOpen(false);
+  };
 
   const onSubmit = async (data: FormData) => {
     if (!user) return;
@@ -309,6 +363,9 @@ export function ModernCreatePostForm({
                 form.setValue('content', e.target.value);
                 setContentHtml(e.target.value);
               }}
+              onClick={saveCursorPosition}
+              onKeyUp={saveCursorPosition}
+              onFocus={saveCursorPosition}
             />
             
             {/* Media Preview */}
@@ -417,16 +474,34 @@ export function ModernCreatePostForm({
                   </PopoverContent>
                 </Popover>
                 
-                {/* Emoji Button (placeholder) */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full"
-                  onClick={() => toast({ title: "Coming soon", description: "Emoji picker will be available soon!" })}
-                >
-                  <Smile size={20} className="text-muted-foreground" />
-                </Button>
+                {/* Emoji Button */}
+                <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full"
+                    >
+                      <Smile size={20} className="text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0 border-none" align="start" side={isMobile ? "top" : "bottom"}>
+                    <div className="emoji-mart-container overflow-hidden rounded-md border shadow-md">
+                      <Picker 
+                        data={data}
+                        onEmojiSelect={handleEmojiSelect}
+                        theme="light"
+                        previewPosition="none"
+                        set="native"
+                        skinTonePosition="none"
+                        emojiSize={20}
+                        emojiButtonSize={28}
+                        maxFrequentRows={2}
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               
               {/* Post/Cancel Buttons */}
