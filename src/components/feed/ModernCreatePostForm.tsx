@@ -22,6 +22,7 @@ import { SimpleEntitySelector } from './SimpleEntitySelector';
 import { getDisplayName } from '@/services/profileService';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
+import * as Portal from '@radix-ui/react-portal';
 
 // Emoji picker styles are now in global CSS (index.css)
 
@@ -69,11 +70,13 @@ export function ModernCreatePostForm({
   const [isEmojiPickerVisible, setIsEmojiPickerOpen] = useState(false);
   const [contentHtml, setContentHtml] = useState<string>(postToEdit?.content || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const sessionId = useState<string>(() => generateUUID())[0];
   const isEditMode = !!postToEdit;
   const isMobile = useIsMobile();
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number } | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 });
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -85,6 +88,17 @@ export function ModernCreatePostForm({
       tagged_entities: [],
     },
   });
+
+  // Update emoji picker position when button is clicked
+  const updateEmojiPickerPosition = () => {
+    if (emojiButtonRef.current) {
+      const rect = emojiButtonRef.current.getBoundingClientRect();
+      setEmojiPickerPosition({
+        top: rect.top - 350, // Position above the button
+        left: rect.left - 200, // Adjust horizontal position
+      });
+    }
+  };
 
   // Auto grow textarea
   useEffect(() => {
@@ -493,6 +507,7 @@ export function ModernCreatePostForm({
                 {/* Emoji Button with improved implementation */}
                 <div className="relative">
                   <Button
+                    ref={emojiButtonRef}
                     type="button"
                     variant="ghost"
                     size="sm"
@@ -501,6 +516,7 @@ export function ModernCreatePostForm({
                       e.stopPropagation();
                       e.preventDefault();
                       saveCursorPosition();
+                      updateEmojiPickerPosition();
                       setIsEmojiPickerOpen(!isEmojiPickerVisible);
                     }}
                   >
@@ -510,7 +526,11 @@ export function ModernCreatePostForm({
                   {isEmojiPickerVisible && (
                     <div 
                       ref={emojiPickerRef}
-                      className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper" 
+                      className="emoji-picker-wrapper fixed z-[9999]"
+                      style={{
+                        top: `${emojiPickerPosition.top}px`,
+                        left: `${emojiPickerPosition.left}px`,
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -523,9 +543,6 @@ export function ModernCreatePostForm({
                         e.stopPropagation();
                         e.preventDefault();
                       }}
-                      onKeyDown={(e) => {
-                        e.stopPropagation();
-                      }}
                     >
                       <Picker 
                         data={data}
@@ -537,8 +554,6 @@ export function ModernCreatePostForm({
                         emojiSize={20}
                         emojiButtonSize={28}
                         maxFrequentRows={2}
-                        modalish={false}
-                        showSkinTones={false}
                       />
                     </div>
                   )}
@@ -576,6 +591,44 @@ export function ModernCreatePostForm({
           </div>
         </div>
       </form>
+      
+      {/* Emoji Picker Portal - Rendered at the end of document */}
+      {isEmojiPickerVisible && (
+        <Portal.Root>
+          <div 
+            ref={emojiPickerRef}
+            className="emoji-picker-wrapper fixed z-[9999]"
+            style={{
+              top: `${emojiPickerPosition.top}px`,
+              left: `${emojiPickerPosition.left}px`,
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+          >
+            <Picker 
+              data={data}
+              onEmojiSelect={handleEmojiSelect}
+              theme="light"
+              previewPosition="none"
+              set="native"
+              skinTonePosition="none"
+              emojiSize={20}
+              emojiButtonSize={28}
+              maxFrequentRows={2}
+            />
+          </div>
+        </Portal.Root>
+      )}
     </Form>
   );
 }

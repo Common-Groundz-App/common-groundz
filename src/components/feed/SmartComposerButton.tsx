@@ -202,7 +202,13 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
       </Popover>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent 
+          className="sm:max-w-xl max-h-[90vh] overflow-y-auto"
+          style={{
+            overflow: 'visible',
+            position: 'relative',
+          }}
+        >
           {selectedContentType === 'post' && (
             <EnhancedCreatePostForm 
               profileData={profileData}
