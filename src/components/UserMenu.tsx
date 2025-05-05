@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import * as React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,9 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState<string>('');
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
+  const [displayName, setDisplayName] = React.useState<string>('');
 
   // Function to fetch the avatar and user data
   const fetchUserData = async () => {
@@ -61,14 +61,14 @@ export function UserMenu() {
   };
 
   // Initial fetch when component mounts or user changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (user) {
       fetchUserData();
     }
   }, [user]);
 
   // Listen for profile update events
-  useEffect(() => {
+  React.useEffect(() => {
     const handleProfileUpdate = () => {
       fetchUserData();
     };
