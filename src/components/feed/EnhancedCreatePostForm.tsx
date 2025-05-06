@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -20,8 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
-
-// Emoji picker styles are now in global CSS (index.css)
+import { createPortal } from 'react-dom';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -81,7 +79,10 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    if (emojiPickerVisible) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -470,6 +471,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       <div className="flex items-center justify-between mt-4 pt-3 border-t">
         {/* Left: Toolbar */}
         <div className="flex items-center gap-1">
+          {/* Media Uploader */}
           <MediaUploader
             sessionId={sessionId}
             onMediaUploaded={handleMediaUpload}
@@ -495,8 +497,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             }
           />
           
-          {/* Emoji Button - Fixed positioning implementation */}
-          <div className="relative">
+          {/* Emoji Button - Improved popup implementation */}
+          <div className="emoji-button-container">
             <Button
               ref={emojiButtonRef}
               type="button"
@@ -517,32 +519,45 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             </Button>
             
             {emojiPickerVisible && (
-              <div 
-                ref={emojiPickerRef}
-                className="emoji-picker-dropdown"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-              >
-                <Picker 
-                  data={data}
-                  onEmojiSelect={handleEmojiSelect}
-                  theme="light"
-                  previewPosition="none"
-                  modal={false}
-                  set="native"
-                  skinTonePosition="none"
-                  emojiSize={20}
-                  emojiButtonSize={28}
-                  maxFrequentRows={2}
-                  showSkinTones={false}
+              <>
+                {/* Invisible backdrop to capture clicks outside */}
+                <div 
+                  className="emoji-picker-backdrop"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setEmojiPickerVisible(false);
+                  }}
                 />
-              </div>
+                
+                {/* Emoji Picker Dropdown */}
+                <div 
+                  ref={emojiPickerRef}
+                  className="emoji-picker-dropdown"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
+                >
+                  <Picker 
+                    data={data}
+                    onEmojiSelect={handleEmojiSelect}
+                    theme="light"
+                    previewPosition="none"
+                    modal={false}
+                    set="native"
+                    skinTonePosition="none"
+                    emojiSize={20}
+                    emojiButtonSize={28}
+                    maxFrequentRows={2}
+                    showSkinTones={false}
+                  />
+                </div>
+              </>
             )}
           </div>
           

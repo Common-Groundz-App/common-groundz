@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -141,7 +140,10 @@ export function ModernCreatePostForm({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    if (isEmojiPickerVisible) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -496,8 +498,8 @@ export function ModernCreatePostForm({
                   </PopoverContent>
                 </Popover>
                 
-                {/* Emoji Button with improved implementation */}
-                <div className="relative">
+                {/* Emoji Button with improved popup-style implementation */}
+                <div className="emoji-button-container">
                   <Button
                     ref={emojiButtonRef}
                     type="button"
@@ -515,32 +517,45 @@ export function ModernCreatePostForm({
                   </Button>
                   
                   {isEmojiPickerVisible && (
-                    <div 
-                      ref={emojiPickerRef}
-                      className="emoji-picker-dropdown"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                      }}
-                    >
-                      <Picker 
-                        data={data}
-                        onEmojiSelect={handleEmojiSelect}
-                        theme="light"
-                        previewPosition="none"
-                        modal={false}
-                        set="native"
-                        skinTonePosition="none"
-                        emojiSize={20}
-                        emojiButtonSize={28}
-                        maxFrequentRows={2}
-                        showSkinTones={false}
+                    <>
+                      {/* Invisible backdrop to capture clicks outside */}
+                      <div 
+                        className="emoji-picker-backdrop"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setIsEmojiPickerOpen(false);
+                        }}
                       />
-                    </div>
+                      
+                      {/* Emoji Picker Dropdown */}
+                      <div 
+                        ref={emojiPickerRef}
+                        className="emoji-picker-dropdown"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                      >
+                        <Picker 
+                          data={data}
+                          onEmojiSelect={handleEmojiSelect}
+                          theme="light"
+                          previewPosition="none"
+                          modal={false}
+                          set="native"
+                          skinTonePosition="none"
+                          emojiSize={20}
+                          emojiButtonSize={28}
+                          maxFrequentRows={2}
+                          showSkinTones={false}
+                        />
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
