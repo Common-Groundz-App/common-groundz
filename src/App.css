@@ -94,7 +94,7 @@ body, html {
   animation-delay: 2s; /* This creates the alternating effect */
 }
 
-/* Location search styling */
+/* Location search styling - improved Z-index and visibility */
 .location-search-wrapper {
   position: relative;
   z-index: 100;
@@ -102,17 +102,26 @@ body, html {
 
 .location-search-dropdown {
   position: absolute;
-  z-index: 100;
+  z-index: 101; /* Higher z-index to appear above other elements */
   background-color: var(--background);
   border-radius: 0.375rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-/* Ensures the location search input is above other UI elements */
-.location-search-active .bottom-toolbar,
+/* Improved handling of UI elements when location search is active */
+.location-search-active .bottom-toolbar {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
 .location-search-active .emoji-picker-wrapper {
-  visibility: hidden;
+  display: none;
   opacity: 0;
   transition: opacity 0.2s;
 }
 
+/* Ensure emoji picker has proper z-index */
+.emoji-picker-wrapper {
+  z-index: 100;
+}

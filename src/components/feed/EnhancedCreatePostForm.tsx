@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -259,18 +260,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         thumbnail_url: item.thumbnail_url || item.url
       }));
 
-      // Store location in post metadata if it exists
-      let postMetadata: any = {};
-      if (location) {
-        postMetadata = { 
-          location: {
-            name: location.name,
-            address: location.address,
-            place_id: location.placeId,
-            coordinates: location.coordinates
-          }
-        };
-      }
+      // Store location as a tag if it exists, instead of in metadata
+      const tags = location ? [location.name] : [];
 
       // Prepare post data for database - explicitly type the post_type
       const postData = {
@@ -279,8 +270,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         visibility: dbVisibility,
         user_id: user.id,
         post_type: 'story' as 'story' | 'routine' | 'project' | 'note', // Explicit type casting
-        metadata: postMetadata,
-        tags: location ? [location.name] : undefined,
+        tags: tags, // Use the tags field instead of the non-existent metadata field
       };
 
       console.log('Submitting post:', postData);
