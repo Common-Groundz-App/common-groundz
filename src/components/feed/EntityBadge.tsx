@@ -2,7 +2,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Entity } from '@/services/recommendation/types';
-import { Book, Film, Home, ShoppingBag, Utensils } from 'lucide-react';
+import { Book, Clapperboard, MapPin, ShoppingBag, Utensils } from 'lucide-react';
 
 interface EntityBadgeProps {
   entity: Entity;
@@ -24,11 +24,11 @@ export const EntityBadge: React.FC<EntityBadgeProps> = ({ entity, className, onC
 
   const getEntityIcon = (type: string) => {
     switch(type) {
-      case 'book': return <Book size={14} className="w-3.5 h-3.5" />;
-      case 'movie': return <Film size={14} className="w-3.5 h-3.5" />;
-      case 'place': return <Home size={14} className="w-3.5 h-3.5" />;
-      case 'product': return <ShoppingBag size={14} className="w-3.5 h-3.5" />;
-      case 'food': return <Utensils size={14} className="w-3.5 h-3.5" />;
+      case 'book': return <Book className="w-3.5 h-3.5" />;
+      case 'movie': return <Clapperboard className="w-3.5 h-3.5" />; // Changed from Film to Clapperboard
+      case 'place': return <MapPin className="w-3.5 h-3.5" />; // Changed from Home to MapPin
+      case 'product': return <ShoppingBag className="w-3.5 h-3.5" />;
+      case 'food': return <Utensils className="w-3.5 h-3.5" />;
       default: return null;
     }
   };
@@ -39,7 +39,7 @@ export const EntityBadge: React.FC<EntityBadgeProps> = ({ entity, className, onC
         "inline-flex items-center gap-1.5 px-3 py-1 rounded-full", 
         "border border-transparent shadow-sm",
         "font-medium text-sm transition-all duration-200",
-        onClick ? "cursor-pointer transform hover:scale-105" : "",
+        onClick ? "cursor-pointer transform hover:scale-105 hover:bg-opacity-90" : "",
         getEntityTypeColor(entity.type), 
         className
       )}

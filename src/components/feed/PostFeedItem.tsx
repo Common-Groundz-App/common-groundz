@@ -252,11 +252,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     
     return (
       <div className="mt-4">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-          <Tag size={14} className="stroke-muted-foreground" />
-          <span>Tagged</span>
-        </div>
-        <div className="flex flex-wrap gap-1.5 mb-1">
+        <div className="flex flex-wrap gap-2">
           {entities.map(entity => (
             <TagBadge
               key={entity.id}
@@ -279,11 +275,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     
     return (
       <div className="mt-4">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-          <MapPin size={14} className="stroke-muted-foreground" />
-          <span>Location</span>
-        </div>
-        <div className="flex flex-wrap gap-1.5 mb-1">
+        <div className="flex flex-wrap gap-2">
           {tags.map((tag, index) => (
             <TagBadge
               key={index}
@@ -422,7 +414,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         )}
         
         {/* Tag Groups - Updated layout with improved styling */}
-        <div className="space-y-2 mt-4">
+        <div className="space-y-3 mt-4">
           {/* Render location tags */}
           {post.tags && renderLocationTags(post.tags)}
           

@@ -219,14 +219,10 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           </div>
         )}
         
-        {/* Location Tags - Added support */}
+        {/* Location Tags - Updated with simplified display */}
         {post.tags && post.tags.length > 0 && (
           <div className="mt-4">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-              <MapPin size={14} className="stroke-muted-foreground" />
-              <span>Location</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5 mb-1">
+            <div className="flex flex-wrap gap-2">
               {post.tags.map((tag, index) => (
                 <TagBadge
                   key={index}
@@ -238,14 +234,10 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           </div>
         )}
         
-        {/* Tagged Entities - Updated styling */}
+        {/* Tagged Entities - Updated with simplified display */}
         {post.tagged_entities && post.tagged_entities.length > 0 && (
           <div className="mt-4">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-              <Tag size={14} className="stroke-muted-foreground" />
-              <span>Tagged</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {post.tagged_entities.map(entity => (
                 <TagBadge
                   key={entity.id}

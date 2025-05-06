@@ -1,3 +1,4 @@
+
 /* Reset default margin and padding */
 body, html {
   margin: 0;
@@ -125,7 +126,7 @@ body, html {
   z-index: 100;
 }
 
-/* Enhanced styling for tags and badges */
+/* Enhanced styling for badges */
 .badge {
   transition: all 0.2s ease;
 }
@@ -135,7 +136,7 @@ body, html {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* Enhanced tag badges for feed items */
+/* Enhanced tag badges for feed items - now with improved styling */
 .tag-badge {
   display: inline-flex;
   align-items: center;
@@ -144,12 +145,15 @@ body, html {
   border-radius: 9999px;
   font-size: 0.875rem;
   font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   transition: all 0.2s ease;
+  border: 1px solid rgba(0,0,0,0.05);
 }
 
 .tag-badge:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  opacity: 0.9;
 }
 
 .tag-badge-icon {

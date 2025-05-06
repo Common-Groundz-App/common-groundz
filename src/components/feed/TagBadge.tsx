@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MapPin, Tag, Video } from 'lucide-react';
+import { Clapperboard, MapPin, Tag, Book, ShoppingBag, Utensils } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type TagType = 'entity' | 'location';
@@ -44,11 +44,11 @@ export const TagBadge: React.FC<TagBadgeProps> = ({
     
     // For entity types
     switch(entityType) {
-      case 'book': return <Tag className="w-3.5 h-3.5" />;
-      case 'movie': return <Video className="w-3.5 h-3.5" />;
+      case 'book': return <Book className="w-3.5 h-3.5" />;
+      case 'movie': return <Clapperboard className="w-3.5 h-3.5" />; // Changed from Video to Clapperboard
       case 'place': return <MapPin className="w-3.5 h-3.5" />;
-      case 'product': return <Tag className="w-3.5 h-3.5" />;
-      case 'food': return <Tag className="w-3.5 h-3.5" />;
+      case 'product': return <ShoppingBag className="w-3.5 h-3.5" />;
+      case 'food': return <Utensils className="w-3.5 h-3.5" />;
       default: return <Tag className="w-3.5 h-3.5" />;
     }
   };
@@ -59,7 +59,7 @@ export const TagBadge: React.FC<TagBadgeProps> = ({
         "inline-flex items-center gap-1.5 px-3 py-1 rounded-full",
         "border border-transparent shadow-sm",
         "font-medium text-sm transition-all duration-200",
-        "cursor-pointer transform hover:scale-105",
+        "cursor-pointer transform hover:scale-105 hover:bg-opacity-90",
         getTagBackground(),
         className
       )}
