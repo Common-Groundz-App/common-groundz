@@ -491,7 +491,7 @@ export function ModernCreatePostForm({
                 </Popover>
                 
                 {/* Emoji Button with improved implementation */}
-                <div className="relative">
+                <div className="relative emoji-button-container">
                   <Button
                     type="button"
                     variant="ghost"
@@ -510,7 +510,7 @@ export function ModernCreatePostForm({
                   {isEmojiPickerVisible && (
                     <div 
                       ref={emojiPickerRef}
-                      className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper" 
+                      className="emoji-picker-dropdown" 
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -537,7 +537,6 @@ export function ModernCreatePostForm({
                         emojiSize={20}
                         emojiButtonSize={28}
                         maxFrequentRows={2}
-                        modalish={false}
                         showSkinTones={false}
                       />
                     </div>

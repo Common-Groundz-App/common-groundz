@@ -8,8 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
 
-// Enhanced emoji picker styles removed (now in index.css)
-
 interface CreatePostButtonProps {
   onPostCreated?: () => void;
 }
@@ -66,7 +64,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
       <Dialog 
         open={isDialogOpen} 
         onOpenChange={(open) => {
-          // Only close if explicitly setting to false to prevent emoji clicks from closing
+          // Only close if explicitly setting to false
           if (open === false) {
             setIsDialogOpen(false);
           }
@@ -77,26 +75,6 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
           onOpenAutoFocus={(e) => {
             // Prevent auto-focus behavior that might interfere with emoji picking
             e.preventDefault();
-          }}
-          onPointerDownOutside={(e) => {
-            // Prevent emoji picker clicks from closing the dialog
-            const target = e.target as HTMLElement;
-            if (target.closest('.emoji-mart') || 
-                target.closest('.emoji-mart-emoji') || 
-                target.closest('[data-emoji-set]') ||
-                target.closest('.emoji-picker-wrapper')) {
-              e.preventDefault();
-            }
-          }}
-          onClick={(e) => {
-            // Prevent event propagation from within emoji picker
-            const target = e.target as HTMLElement;
-            if (target.closest('.emoji-mart') || 
-                target.closest('.emoji-mart-emoji') || 
-                target.closest('[data-emoji-set]') ||
-                target.closest('.emoji-picker-wrapper')) {
-              e.stopPropagation();
-            }
           }}
         >
           <EnhancedCreatePostForm 

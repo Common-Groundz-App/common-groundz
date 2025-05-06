@@ -489,8 +489,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             }
           />
           
-          {/* Emoji Button - Improved implementation */}
-          <div className="relative">
+          {/* Emoji Button - Fixed positioning implementation */}
+          <div className="relative emoji-button-container">
             <Button
               type="button"
               variant="ghost"
@@ -512,7 +512,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             {emojiPickerVisible && (
               <div 
                 ref={emojiPickerRef}
-                className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper"
+                className="emoji-picker-dropdown"
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
@@ -539,7 +539,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                   emojiSize={20}
                   emojiButtonSize={28}
                   maxFrequentRows={2}
-                  modalish={false}
                   showSkinTones={false}
                 />
               </div>
