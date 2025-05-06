@@ -19,7 +19,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
-import * as Portal from '@radix-ui/react-portal';
 
 // Emoji picker styles are now in global CSS (index.css)
 
@@ -54,24 +53,11 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [location, setLocation] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
   const emojiPickerRef = useRef<HTMLDivElement>(null);
-  const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 });
   const MAX_MEDIA_COUNT = 4;
-  
-  // Update emoji picker position when button is clicked
-  const updateEmojiPickerPosition = () => {
-    if (emojiButtonRef.current) {
-      const rect = emojiButtonRef.current.getBoundingClientRect();
-      setEmojiPickerPosition({
-        top: rect.top - 350, // Position above the button
-        left: rect.left - 200, // Adjust horizontal position
-      });
-    }
-  };
   
   // Auto-resize textarea as content changes
   useEffect(() => {
@@ -506,7 +492,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
           {/* Emoji Button - Improved implementation */}
           <div className="relative">
             <Button
-              ref={emojiButtonRef}
               type="button"
               variant="ghost"
               size="sm"
@@ -518,12 +503,47 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                 e.stopPropagation();
                 e.preventDefault();
                 saveCursorPosition();
-                updateEmojiPickerPosition();
                 setEmojiPickerVisible(!emojiPickerVisible);
               }}
             >
               <Smile className="h-5 w-5" />
             </Button>
+            
+            {emojiPickerVisible && (
+              <div 
+                ref={emojiPickerRef}
+                className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <Picker 
+                  data={data}
+                  onEmojiSelect={handleEmojiSelect}
+                  theme="light"
+                  previewPosition="none"
+                  set="native"
+                  skinTonePosition="none"
+                  emojiSize={20}
+                  emojiButtonSize={28}
+                  maxFrequentRows={2}
+                  modalish={false}
+                  showSkinTones={false}
+                />
+              </div>
+            )}
           </div>
           
           <Button
@@ -625,44 +645,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
           </Button>
         </div>
       </div>
-      
-      {/* Emoji Picker Portal - Rendered at the end of document */}
-      {emojiPickerVisible && (
-        <Portal.Root>
-          <div 
-            ref={emojiPickerRef}
-            className="emoji-picker-wrapper fixed z-[9999]"
-            style={{
-              top: `${emojiPickerPosition.top}px`,
-              left: `${emojiPickerPosition.left}px`,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-          >
-            <Picker 
-              data={data}
-              onEmojiSelect={handleEmojiSelect}
-              theme="light"
-              previewPosition="none"
-              set="native"
-              skinTonePosition="none"
-              emojiSize={20}
-              emojiButtonSize={28}
-              maxFrequentRows={2}
-            />
-          </div>
-        </Portal.Root>
-      )}
     </div>
   );
 }

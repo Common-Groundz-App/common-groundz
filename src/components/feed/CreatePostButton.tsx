@@ -8,6 +8,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
 
+// Enhanced emoji picker styles removed (now in index.css)
+
 interface CreatePostButtonProps {
   onPostCreated?: () => void;
 }
@@ -71,11 +73,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
         }}
       >
         <DialogContent 
-          className="sm:max-w-xl max-h-[90vh] p-0"
-          style={{
-            overflow: 'visible',
-            position: 'relative',
-          }}
+          className="sm:max-w-xl max-h-[90vh] overflow-visible p-0"
           onOpenAutoFocus={(e) => {
             // Prevent auto-focus behavior that might interfere with emoji picking
             e.preventDefault();
