@@ -382,7 +382,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   return (
     <div 
       ref={formRef} 
-      className="bg-background rounded-xl shadow-sm p-5 transition-all"
+      className={`bg-background rounded-xl shadow-sm p-5 transition-all ${showLocationInput ? 'location-search-active' : ''}`}
     >
       {/* User Info + Text Input */}
       <div className="flex gap-3">
@@ -474,7 +474,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
 
       {/* Location Search Input (only shown when location button is clicked) */}
       {showLocationInput && !location && (
-        <div className="mt-3 animate-fade-in">
+        <div className="mt-3 animate-fade-in location-search-wrapper">
           <LocationSearchInput
             onLocationSelect={(selectedLocation) => {
               setLocation(selectedLocation);
@@ -486,7 +486,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       )}
 
       {/* Bottom Toolbar */}
-      <div className="flex items-center justify-between mt-4 pt-3 border-t">
+      <div className={`flex items-center justify-between mt-4 pt-3 border-t bottom-toolbar ${showLocationInput ? 'opacity-50 pointer-events-none' : ''}`}>
         {/* Left: Toolbar */}
         <div className="flex items-center gap-1">
           <MediaUploader
@@ -529,12 +529,16 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                 e.preventDefault();
                 saveCursorPosition();
                 setEmojiPickerVisible(!emojiPickerVisible);
+                if (!emojiPickerVisible) {
+                  setShowLocationInput(false);
+                }
               }}
+              disabled={showLocationInput}
             >
               <Smile className="h-5 w-5" />
             </Button>
             
-            {emojiPickerVisible && (
+            {emojiPickerVisible && !showLocationInput && (
               <div 
                 ref={emojiPickerRef}
                 className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper"
@@ -578,7 +582,14 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
               "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
               entitySelectorVisible && "bg-accent/50 text-accent-foreground"
             )}
-            onClick={() => setEntitySelectorVisible(!entitySelectorVisible)}
+            onClick={() => {
+              setEntitySelectorVisible(!entitySelectorVisible);
+              if (!entitySelectorVisible) {
+                setShowLocationInput(false);
+                setEmojiPickerVisible(false);
+              }
+            }}
+            disabled={showLocationInput}
           >
             <Tag className="h-5 w-5" />
           </Button>
@@ -589,7 +600,13 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
               "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
               showLocationInput && "bg-accent/50 text-accent-foreground"
             )}
-            onClick={() => setShowLocationInput(!showLocationInput)}
+            onClick={() => {
+              setShowLocationInput(!showLocationInput);
+              if (!showLocationInput) {
+                setEmojiPickerVisible(false);
+                setEntitySelectorVisible(false);
+              }
+            }}
           >
             <MapPin className="h-5 w-5" />
           </Button>
@@ -597,6 +614,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             variant="ghost"
             size="sm"
             className="rounded-full p-2 hover:bg-accent hover:text-accent-foreground"
+            disabled={showLocationInput}
           >
             <MoreHorizontal className="h-5 w-5" />
           </Button>
@@ -607,6 +625,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
           <Select
             value={visibility}
             onValueChange={(value: VisibilityOption) => setVisibility(value)}
+            disabled={showLocationInput}
           >
             <SelectTrigger className="w-[130px] h-9 border-none">
               <SelectValue>
@@ -645,7 +664,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
           <Button 
             variant="outline" 
             onClick={onCancel} 
-            disabled={isSubmitting}
+            disabled={isSubmitting || showLocationInput}
             className="hover:bg-accent/50"
           >
             Cancel
@@ -657,7 +676,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
               (!isPostButtonDisabled && !isSubmitting) && "animate-fade-in"
             )}
             onClick={handleSubmit} 
-            disabled={isPostButtonDisabled}
+            disabled={isPostButtonDisabled || showLocationInput}
           >
             {isSubmitting ? (
               <div className="flex items-center gap-2">

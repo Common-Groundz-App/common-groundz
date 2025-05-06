@@ -152,7 +152,7 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
       </div>
       
       {showResults && results.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto bg-background border rounded-md shadow-lg">
+        <div className="absolute z-[100] mt-1 w-full max-h-60 overflow-auto bg-background border rounded-md shadow-lg location-search-dropdown">
           {results.map((result, index) => (
             <div
               key={result.api_ref || index}

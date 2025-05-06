@@ -480,7 +480,7 @@ export function ModernCreatePostForm({
             
             {/* Location Search */}
             {isLocationSelectorOpen && !location && (
-              <div className="rounded-md border p-3 animate-fade-in">
+              <div className="rounded-md border p-3 animate-fade-in location-search-wrapper">
                 <LocationSearchInput
                   onLocationSelect={(selectedLocation) => {
                     setLocation(selectedLocation);
@@ -492,7 +492,7 @@ export function ModernCreatePostForm({
             )}
             
             {/* Actions Bar */}
-            <div className="flex items-center justify-between border-t pt-3">
+            <div className={`flex items-center justify-between border-t pt-3 ${isLocationSelectorOpen ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-2">
                 {/* Media Upload Button */}
                 <MediaUploader
@@ -581,7 +581,7 @@ export function ModernCreatePostForm({
                     <Smile className="h-5 w-5" />
                   </Button>
                   
-                  {isEmojiPickerVisible && (
+                  {isEmojiPickerVisible && !isLocationSelectorOpen && (
                     <div 
                       ref={emojiPickerRef}
                       className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper" 

@@ -83,7 +83,8 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
                 target.closest('.emoji-mart-emoji') || 
                 target.closest('[data-emoji-set]') ||
                 target.closest('.emoji-picker-wrapper') ||
-                target.closest('.emoji-picker-dropdown')) {
+                target.closest('.emoji-picker-dropdown') ||
+                target.closest('.location-search-dropdown')) {
               e.preventDefault();
             }
           }}
@@ -94,7 +95,8 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
                 target.closest('.emoji-mart-emoji') || 
                 target.closest('[data-emoji-set]') ||
                 target.closest('.emoji-picker-wrapper') ||
-                target.closest('.emoji-picker-dropdown')) {
+                target.closest('.emoji-picker-dropdown') ||
+                target.closest('.location-search-dropdown')) {
               e.stopPropagation();
             }
           }}
