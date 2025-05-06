@@ -22,6 +22,7 @@ import { SimpleEntitySelector } from './SimpleEntitySelector';
 import { getDisplayName } from '@/services/profileService';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
+import { DialogPortal } from '@/components/ui/dialog';
 
 // Emoji picker styles are now in global CSS (index.css)
 
