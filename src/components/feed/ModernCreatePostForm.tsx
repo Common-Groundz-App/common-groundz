@@ -69,11 +69,13 @@ export function ModernCreatePostForm({
   const [isEmojiPickerVisible, setIsEmojiPickerOpen] = useState(false);
   const [contentHtml, setContentHtml] = useState<string>(postToEdit?.content || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const sessionId = useState<string>(() => generateUUID())[0];
   const isEditMode = !!postToEdit;
   const isMobile = useIsMobile();
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number } | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 });
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -127,10 +129,22 @@ export function ModernCreatePostForm({
     }
   }, [postToEdit, form]);
 
+  // Calculate emoji picker position when button is clicked
+  useEffect(() => {
+    if (isEmojiPickerVisible && emojiButtonRef.current) {
+      const rect = emojiButtonRef.current.getBoundingClientRect();
+      setEmojiPickerPosition({
+        top: rect.top - 320, // Position above the button
+        left: rect.left - 170, // Align with left side, adjust as needed
+      });
+    }
+  }, [isEmojiPickerVisible]);
+
   // Handle click outside for emoji picker
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isEmojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+      if (isEmojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node) && 
+          emojiButtonRef.current && !emojiButtonRef.current.contains(event.target as Node)) {
         setIsEmojiPickerOpen(false);
       }
     };
@@ -493,6 +507,7 @@ export function ModernCreatePostForm({
                 {/* Emoji Button with improved implementation */}
                 <div className="relative">
                   <Button
+                    ref={emojiButtonRef}
                     type="button"
                     variant="ghost"
                     size="sm"
@@ -506,42 +521,6 @@ export function ModernCreatePostForm({
                   >
                     <Smile className="h-5 w-5" />
                   </Button>
-                  
-                  {isEmojiPickerVisible && (
-                    <div 
-                      ref={emojiPickerRef}
-                      className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                      }}
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                      }}
-                      onKeyDown={(e) => {
-                        e.stopPropagation();
-                      }}
-                    >
-                      <Picker 
-                        data={data}
-                        onEmojiSelect={handleEmojiSelect}
-                        theme="light"
-                        previewPosition="none"
-                        set="native"
-                        skinTonePosition="none"
-                        emojiSize={20}
-                        emojiButtonSize={28}
-                        maxFrequentRows={2}
-                        modalish={false}
-                        showSkinTones={false}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
               
@@ -576,6 +555,49 @@ export function ModernCreatePostForm({
           </div>
         </div>
       </form>
+
+      {/* Portaled Emoji Picker */}
+      {isEmojiPickerVisible && (
+        <DialogPortal>
+          <div 
+            ref={emojiPickerRef}
+            className="fixed z-[100] emoji-picker-wrapper" 
+            style={{
+              top: `${emojiPickerPosition.top}px`,
+              left: `${emojiPickerPosition.left}px`,
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <Picker 
+              data={data}
+              onEmojiSelect={handleEmojiSelect}
+              theme="light"
+              previewPosition="none"
+              set="native"
+              skinTonePosition="none"
+              emojiSize={20}
+              emojiButtonSize={28}
+              maxFrequentRows={2}
+              modalish={false}
+              showSkinTones={false}
+            />
+          </div>
+        </DialogPortal>
+      )}
     </Form>
   );
 }

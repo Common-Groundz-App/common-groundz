@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
+import { DialogPortal } from '@/components/ui/dialog';
 
 // Emoji picker styles are now in global CSS (index.css)
 
@@ -54,9 +55,11 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const [location, setLocation] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const sessionId = useRef(uuidv4()).current;
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 });
   const MAX_MEDIA_COUNT = 4;
   
   // Auto-resize textarea as content changes
@@ -67,10 +70,22 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
     }
   }, [content]);
 
+  // Calculate emoji picker position when button is clicked
+  useEffect(() => {
+    if (emojiPickerVisible && emojiButtonRef.current) {
+      const rect = emojiButtonRef.current.getBoundingClientRect();
+      setEmojiPickerPosition({
+        top: rect.top - 320, // Position above the button
+        left: rect.left - 170, // Align with left side, adjust as needed
+      });
+    }
+  }, [emojiPickerVisible]);
+
   // Handle click outside for emoji picker
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (emojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+      if (emojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node) && 
+          emojiButtonRef.current && !emojiButtonRef.current.contains(event.target as Node)) {
         setEmojiPickerVisible(false);
       }
     };
@@ -492,6 +507,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
           {/* Emoji Button - Improved implementation */}
           <div className="relative">
             <Button
+              ref={emojiButtonRef}
               type="button"
               variant="ghost"
               size="sm"
@@ -508,42 +524,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             >
               <Smile className="h-5 w-5" />
             </Button>
-            
-            {emojiPickerVisible && (
-              <div 
-                ref={emojiPickerRef}
-                className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <Picker 
-                  data={data}
-                  onEmojiSelect={handleEmojiSelect}
-                  theme="light"
-                  previewPosition="none"
-                  set="native"
-                  skinTonePosition="none"
-                  emojiSize={20}
-                  emojiButtonSize={28}
-                  maxFrequentRows={2}
-                  modalish={false}
-                  showSkinTones={false}
-                />
-              </div>
-            )}
           </div>
           
           <Button
@@ -645,6 +625,49 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
           </Button>
         </div>
       </div>
+
+      {/* Portaled Emoji Picker */}
+      {emojiPickerVisible && (
+        <DialogPortal>
+          <div 
+            ref={emojiPickerRef}
+            className="fixed z-[100] emoji-picker-wrapper"
+            style={{
+              top: `${emojiPickerPosition.top}px`,
+              left: `${emojiPickerPosition.left}px`,
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <Picker 
+              data={data}
+              onEmojiSelect={handleEmojiSelect}
+              theme="light"
+              previewPosition="none"
+              set="native"
+              skinTonePosition="none"
+              emojiSize={20}
+              emojiButtonSize={28}
+              maxFrequentRows={2}
+              modalish={false}
+              showSkinTones={false}
+            />
+          </div>
+        </DialogPortal>
+      )}
     </div>
   );
 }
