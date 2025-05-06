@@ -74,10 +74,29 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   useEffect(() => {
     if (emojiPickerVisible && emojiButtonRef.current) {
       const rect = emojiButtonRef.current.getBoundingClientRect();
+      console.log("Enhanced form: Emoji button position:", rect);
+      
+      // Calculate position based on viewport
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      // Determine if picker should appear above or below the button
+      let top;
+      if (spaceBelow >= 320 || spaceBelow > spaceAbove) {
+        // Show below the button
+        top = rect.bottom + 5;
+      } else {
+        // Show above the button
+        top = rect.top - 320 - 5;
+      }
+      
       setEmojiPickerPosition({
-        top: rect.top - 320, // Position above the button
-        left: rect.left - 170, // Align with left side, adjust as needed
+        top: top,
+        left: Math.max(10, rect.left - 170), // Keep within viewport
       });
+      
+      console.log("Enhanced form: Emoji picker position set to:", { top, left: Math.max(10, rect.left - 170) });
     }
   }, [emojiPickerVisible]);
 
@@ -86,6 +105,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node) && 
           emojiButtonRef.current && !emojiButtonRef.current.contains(event.target as Node)) {
+        console.log("Enhanced form: Clicked outside emoji picker, closing");
         setEmojiPickerVisible(false);
       }
     };
@@ -108,6 +128,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
 
   // Handle emoji selection and insertion
   const handleEmojiSelect = (emoji: any) => {
+    console.log("Enhanced form: Emoji selected:", emoji);
+    
     if (textareaRef.current) {
       const start = cursorPosition.start;
       const end = cursorPosition.end;
@@ -139,6 +161,15 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
     
     // Close emoji picker after selection
     setEmojiPickerVisible(false);
+  };
+
+  // Toggle emoji picker with proper logging
+  const toggleEmojiPicker = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    saveCursorPosition();
+    console.log("Enhanced form: Toggle emoji picker, current state:", emojiPickerVisible);
+    setEmojiPickerVisible(prevState => !prevState);
   };
 
   // Handle keyboard shortcut for posting (Cmd/Ctrl + Enter)
@@ -383,6 +414,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
 
   // Get avatar URL from profileData
   const avatarUrl = profileData?.avatar_url || null;
+  
+  console.log("Rendering EnhancedCreatePostForm, emoji picker visible:", emojiPickerVisible);
 
   return (
     <div 
@@ -515,12 +548,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                 "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
                 emojiPickerVisible && "bg-accent/50 text-accent-foreground"
               )}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                saveCursorPosition();
-                setEmojiPickerVisible(!emojiPickerVisible);
-              }}
+              onClick={toggleEmojiPicker}
             >
               <Smile className="h-5 w-5" />
             </Button>
@@ -626,15 +654,16 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         </div>
       </div>
 
-      {/* Portaled Emoji Picker */}
+      {/* Fixed Emoji Picker with absolute positioning */}
       {emojiPickerVisible && (
         <DialogPortal>
           <div 
             ref={emojiPickerRef}
-            className="fixed z-[100] emoji-picker-wrapper"
+            className="fixed z-[100] emoji-picker-wrapper shadow-lg"
             style={{
               top: `${emojiPickerPosition.top}px`,
               left: `${emojiPickerPosition.left}px`,
+              position: 'fixed',
             }}
             onClick={(e) => {
               e.stopPropagation();

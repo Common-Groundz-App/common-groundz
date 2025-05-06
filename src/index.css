@@ -2,57 +2,54 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+ 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --foreground: 224 71.4% 4.1%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 224 71.4% 4.1%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 24.6 95% 53.1%; /* Changed to brand-orange */
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --popover-foreground: 224 71.4% 4.1%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220.9 39.3% 11%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 24.6 95% 53.1%; /* Changed to brand-orange */
+    --destructive-foreground: 210 20% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262.1 83.3% 57.8%;
     --radius: 0.5rem;
-    --brand-orange: 24.6 95% 53.1%;
-    --brand-orange-light: 27.6 100% 71.4%;
-    --brand-orange-dark: 21.3 83.3% 31.6%;
   }
-
+  
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 24.6 95% 53.1%; /* Changed to brand-orange */
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
+    --background: 224 71.4% 4.1%;
+    --foreground: 210 20% 98%;
+    --card: 224 71.4% 4.1%;
+    --card-foreground: 210 20% 98%;
+    --popover: 224 71.4% 4.1%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 263.4 70% 50.4%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 215 27.9% 16.9%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    --accent: 215 27.9% 16.9%;
+    --accent-foreground: 210 20% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 24.6 95% 53.1%; /* Changed to brand-orange */
+    --destructive-foreground: 210 20% 98%;
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 263.4 70% 50.4%;
   }
 }
-
+ 
 @layer base {
   * {
     @apply border-border;
@@ -61,274 +58,53 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-
-  /* TipTap Styles */
-  .ProseMirror:focus {
-    outline: none;
-  }
-
-  .ProseMirror p {
-    margin-bottom: 1em;
-  }
-
-  .ProseMirror h1 {
-    font-size: 1.75rem;
-    font-weight: 700;
-    line-height: 1.2;
-    margin-bottom: 0.75em;
-  }
-
-  .ProseMirror h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    line-height: 1.3;
-    margin-bottom: 0.75em;
-  }
-
-  .ProseMirror h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    line-height: 1.4;
-    margin-bottom: 0.5em;
-  }
-
-  .ProseMirror ul {
-    list-style: disc;
-    padding-left: 1.5em;
-    margin-bottom: 1em;
-  }
-
-  .ProseMirror ol {
-    list-style: decimal;
-    padding-left: 1.5em;
-    margin-bottom: 1em;
-  }
-
-  .ProseMirror a {
-    color: hsl(var(--primary));
-    text-decoration: underline;
-  }
-
-  .ProseMirror blockquote {
-    border-left: 4px solid hsl(var(--muted));
-    padding-left: 1em;
-    margin-left: 0;
-    margin-right: 0;
-    font-style: italic;
-  }
-
-  /* Dark Mode TipTap Overrides */
-  .dark .ProseMirror a {
-    color: hsl(var(--primary));
-  }
-
-  .dark .ProseMirror blockquote {
-    border-left-color: hsl(var(--muted));
-    color: hsl(var(--foreground));
-  }
 }
 
-/* Enhanced Emoji Picker Styles */
+/* Custom styles for the emoji picker component */
 .emoji-picker-wrapper {
-  position: relative;
-  z-index: 9999;
-}
-
-.emoji-mart {
-  background: white !important;
-  border: 1px solid #ddd !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-  border-radius: 12px !important;
-  padding: 8px !important;
-  margin: 0 !important;
   z-index: 9999 !important;
-  overflow: visible !important;
-  font-family: inherit;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
 }
 
-.dark .emoji-mart {
-  background: hsl(var(--card)) !important;
-  border-color: hsl(var(--border)) !important;
-  color: hsl(var(--card-foreground)) !important;
+/* Dark mode support for emoji picker */
+.dark .emoji-picker-wrapper {
+  background: #1e1e2f;
 }
 
-.emoji-mart * {
-  box-sizing: border-box;
-  cursor: pointer !important;
+/* Fix for emoji picker buttons */
+.emoji-mart button {
+  cursor: pointer;
 }
 
-.emoji-mart-emoji {
-  cursor: pointer !important;
-  border-radius: 4px;
-  padding: 2px;
-}
-
-.emoji-mart-emoji:hover,
-.emoji-mart-emoji:focus {
-  background-color: rgba(0, 0, 0, 0.05) !important;
-}
-
-.dark .emoji-mart-emoji:hover,
-.dark .emoji-mart-emoji:focus {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-.emoji-mart-scroll {
-  height: 250px !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  padding: 0 6px 6px 6px !important;
-  will-change: transform;
-}
-
-.emoji-mart-scroll::-webkit-scrollbar {
-  width: 6px !important;
-}
-
-.emoji-mart-scroll::-webkit-scrollbar-thumb {
-  background: #ccc !important;
-  border-radius: 4px !important;
-}
-
-.dark .emoji-mart-scroll::-webkit-scrollbar-thumb {
-  background: #555 !important;
-}
-
-.emoji-mart-search {
-  margin-top: 6px;
-  padding: 0 6px;
-  position: relative;
-}
-
+/* Fix for emoji categories */
 .emoji-mart-category-label {
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 2 !important;
-  padding: 0 6px;
-  font-weight: 500;
-  font-size: 14px;
-  background: white !important;
+  font-weight: bold;
 }
 
-.dark .emoji-mart-category-label {
-  background: hsl(var(--card)) !important;
-  color: hsl(var(--card-foreground)) !important;
+/* Fix for emoji search */
+.emoji-mart-search input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
 }
 
-.emoji-mart-category-list {
-  margin: 0;
-  padding: 0;
+/* Fix for emoji preview */
+.emoji-mart-preview {
+  height: auto !important;
 }
 
-/* Make sure picker doesn't get clipped */
-.emoji-mart-container {
-  position: relative !important;
-  z-index: 9999 !important;
-}
-
-/* Utility classes for theming */
-@layer utilities {
-  .theme-card {
-    @apply bg-card text-card-foreground;
-  }
-  
-  .theme-accent {
-    @apply bg-accent text-accent-foreground;
-  }
-  
-  .theme-secondary {
-    @apply bg-secondary text-secondary-foreground;
-  }
-  
-  .theme-glass {
-    @apply bg-background/80 backdrop-blur-md border border-border;
-  }
-  
-  .theme-card-hover {
-    @apply hover:bg-accent/50 transition-colors;
-  }
-  
-  .scrollbar-hide {
-    -ms-overflow-style: none;  /* Internet Explorer and Edge */
-    scrollbar-width: none;  /* Firefox */
-  }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;  /* Chrome, Safari, Opera */
-  }
-  
-  /* Image display utilities */
-  .img-container-portrait {
-    @apply max-w-[80%] mx-auto h-full flex items-center justify-center;
-  }
-  
-  .img-container-landscape {
-    @apply w-full h-full flex items-center justify-center;
-  }
-  
-  .img-container-square {
-    @apply max-w-[85%] mx-auto h-full flex items-center justify-center;
-  }
-  
-  .media-bg-light {
-    @apply bg-gray-100;
-  }
-  
-  .media-bg-dark {
-    @apply dark:bg-gray-800/30;
-  }
-  
-  /* Dynamic media containers */
-  .media-orientation-detect {
-    @apply relative rounded-xl overflow-hidden;
-    & img, & video {
-      @apply max-w-full max-h-full rounded-md;
-    }
-  }
-}
-
-/* Add animation for fade-in effect */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
-}
-
-/* Enhanced glow pulse animation */
-@keyframes glow-pulse {
-  0% {
-    opacity: 0.4;
-    transform: scale(0.9);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.1);
-  }
-  100% {
-    opacity: 0.4;
-    transform: scale(0.9);
-  }
-}
-
-.animate-pulse {
-  animation: glow-pulse 4s ease-in-out infinite;
-}
-
-/* Alternating pulse animations with different delays */
-.animate-pulse-delay-0 {
-  animation: glow-pulse 4s ease-in-out infinite;
-}
-
-.animate-pulse-delay-2 {
-  animation: glow-pulse 4s ease-in-out infinite;
-  animation-delay: 2s; /* This creates the alternating effect */
+/* Force visibility to ensure the picker is always shown */
+.emoji-picker-wrapper, 
+.emoji-mart,
+.emoji-mart-anchors,
+.emoji-mart-search,
+.emoji-mart-scroll,
+.emoji-mart-category {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }

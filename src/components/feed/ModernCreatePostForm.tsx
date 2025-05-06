@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -134,10 +135,29 @@ export function ModernCreatePostForm({
   useEffect(() => {
     if (isEmojiPickerVisible && emojiButtonRef.current) {
       const rect = emojiButtonRef.current.getBoundingClientRect();
+      console.log("Emoji button position:", rect);
+      
+      // Calculate position based on viewport
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      // Determine if picker should appear above or below the button
+      let top;
+      if (spaceBelow >= 320 || spaceBelow > spaceAbove) {
+        // Show below the button
+        top = rect.bottom + 5;
+      } else {
+        // Show above the button
+        top = rect.top - 320 - 5;
+      }
+      
       setEmojiPickerPosition({
-        top: rect.top - 320, // Position above the button
-        left: rect.left - 170, // Align with left side, adjust as needed
+        top: top,
+        left: Math.max(10, rect.left - 170), // Keep within viewport
       });
+      
+      console.log("Emoji picker position set to:", { top, left: Math.max(10, rect.left - 170) });
     }
   }, [isEmojiPickerVisible]);
 
@@ -146,6 +166,7 @@ export function ModernCreatePostForm({
     const handleClickOutside = (event: MouseEvent) => {
       if (isEmojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node) && 
           emojiButtonRef.current && !emojiButtonRef.current.contains(event.target as Node)) {
+        console.log("Clicked outside emoji picker, closing");
         setIsEmojiPickerOpen(false);
       }
     };
@@ -167,6 +188,8 @@ export function ModernCreatePostForm({
 
   // Handle emoji selection
   const handleEmojiSelect = (emoji: any) => {
+    console.log("Emoji selected:", emoji);
+    
     if (textareaRef.current) {
       const textarea = textareaRef.current;
       const currentContent = form.getValues('content');
@@ -204,6 +227,15 @@ export function ModernCreatePostForm({
     
     // Close emoji picker after selection
     setIsEmojiPickerOpen(false);
+  };
+
+  // Toggle emoji picker visibility with proper logging
+  const toggleEmojiPicker = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    saveCursorPosition();
+    console.log("Toggle emoji picker, current state:", isEmojiPickerVisible);
+    setIsEmojiPickerOpen(prevState => !prevState);
   };
 
   const onSubmit = async (data: FormData) => {
@@ -372,6 +404,8 @@ export function ModernCreatePostForm({
   // Get avatar URL from profileData
   const avatarUrl = profileData?.avatar_url || null;
   
+  console.log("Rendering ModernCreatePostForm, emoji picker visible:", isEmojiPickerVisible);
+  
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -513,12 +547,7 @@ export function ModernCreatePostForm({
                     variant="ghost"
                     size="sm"
                     className="rounded-full p-2 hover:bg-accent hover:text-accent-foreground"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      saveCursorPosition();
-                      setIsEmojiPickerOpen(!isEmojiPickerVisible);
-                    }}
+                    onClick={toggleEmojiPicker}
                   >
                     <Smile className="h-5 w-5" />
                   </Button>
@@ -557,15 +586,16 @@ export function ModernCreatePostForm({
         </div>
       </form>
 
-      {/* Portaled Emoji Picker */}
+      {/* Fixed Emoji Picker with absolute positioning */}
       {isEmojiPickerVisible && (
         <DialogPortal>
           <div 
             ref={emojiPickerRef}
-            className="fixed z-[100] emoji-picker-wrapper" 
+            className="fixed z-[100] emoji-picker-wrapper shadow-lg" 
             style={{
               top: `${emojiPickerPosition.top}px`,
               left: `${emojiPickerPosition.left}px`,
+              position: 'fixed',
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -578,9 +608,6 @@ export function ModernCreatePostForm({
             onMouseDown={(e) => {
               e.stopPropagation();
               e.preventDefault();
-            }}
-            onKeyDown={(e) => {
-              e.stopPropagation();
             }}
           >
             <Picker 
