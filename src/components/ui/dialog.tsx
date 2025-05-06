@@ -50,7 +50,6 @@ const DialogContent = React.forwardRef<
             target.closest('.emoji-picker-wrapper')) {
           e.preventDefault();
           e.stopPropagation();
-          console.log("Prevented DialogContent close from emoji picker interaction");
         }
       }}
       onClick={(e) => {
@@ -61,7 +60,6 @@ const DialogContent = React.forwardRef<
             target.closest('[data-emoji-set]') ||
             target.closest('.emoji-picker-wrapper')) {
           e.stopPropagation();
-          console.log("Stopped event propagation from emoji picker click");
         }
       }}
       onScroll={(e) => {
