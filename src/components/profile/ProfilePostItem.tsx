@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Tag, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Clock, Tag, MoreVertical, Pencil, Trash2, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
@@ -22,6 +21,7 @@ import { CreatePostForm } from '@/components/feed/CreatePostForm';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import TagBadge from '@/components/feed/TagBadge';
 
 // Helper function to reset pointer-events on body if they're set to none
 const resetBodyPointerEvents = () => {
@@ -41,6 +41,7 @@ interface Post {
   tagged_entities?: Entity[];
   media?: MediaItem[];
   user_id?: string;
+  tags?: string[];
 }
 
 interface ProfilePostItemProps {
@@ -218,21 +219,40 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           </div>
         )}
         
+        {/* Location Tags - Added support */}
+        {post.tags && post.tags.length > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+              <MapPin size={14} className="stroke-muted-foreground" />
+              <span>Location</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mb-1">
+              {post.tags.map((tag, index) => (
+                <TagBadge
+                  key={index}
+                  type="location"
+                  label={tag}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Tagged Entities - Updated styling */}
         {post.tagged_entities && post.tagged_entities.length > 0 && (
           <div className="mt-4">
-            <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-              <Tag size={14} />
-              <span>Tagged:</span>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+              <Tag size={14} className="stroke-muted-foreground" />
+              <span>Tagged</span>
             </div>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {post.tagged_entities.map(entity => (
-                <Badge
+                <TagBadge
                   key={entity.id}
-                  className={cn("font-normal", getEntityTypeColor(entity.type))}
-                  variant="outline"
-                >
-                  {entity.name}
-                </Badge>
+                  type="entity"
+                  label={entity.name}
+                  entityType={entity.type as any}
+                />
               ))}
             </div>
           </div>

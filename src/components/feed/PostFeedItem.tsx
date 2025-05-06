@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share2, Globe, Lock, Users, ChevronDown, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -10,7 +9,6 @@ import { PostFeedItem as PostItem } from '@/hooks/feed/types';
 import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
-import { EntityBadge } from '@/components/feed/EntityBadge';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
@@ -27,6 +25,7 @@ import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDial
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getPostTypeLabel } from './utils/postUtils';
+import TagBadge from './TagBadge';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -252,14 +251,23 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     if (!entities || entities.length === 0) return null;
     
     return (
-      <div className="mt-3">
-        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-          <Tag size={14} />
-          <span>Tagged:</span>
+      <div className="mt-4">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+          <Tag size={14} className="stroke-muted-foreground" />
+          <span>Tagged</span>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5 mb-1">
           {entities.map(entity => (
-            <EntityBadge key={entity.id} entity={entity} />
+            <TagBadge
+              key={entity.id}
+              type="entity"
+              label={entity.name}
+              entityType={entity.type as any}
+              onClick={() => {
+                // Optional: Navigate to entity view
+                // history.push(`/entities/${entity.id}`);
+              }}
+            />
           ))}
         </div>
       </div>
@@ -270,21 +278,22 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     if (!tags || tags.length === 0) return null;
     
     return (
-      <div className="mt-3">
-        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-          <MapPin size={14} />
-          <span>Location:</span>
+      <div className="mt-4">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+          <MapPin size={14} className="stroke-muted-foreground" />
+          <span>Location</span>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5 mb-1">
           {tags.map((tag, index) => (
-            <Badge 
+            <TagBadge
               key={index}
-              className="bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300 font-normal flex items-center gap-1.5"
-              variant="outline"
-            >
-              <MapPin size={12} className="text-cyan-700 dark:text-cyan-400" />
-              {tag}
-            </Badge>
+              type="location"
+              label={tag}
+              onClick={() => {
+                // Optional: Navigate to location view or search
+                // history.push(`/search?location=${encodeURIComponent(tag)}`);
+              }}
+            />
           ))}
         </div>
       </div>
@@ -412,11 +421,14 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           />
         )}
         
-        {/* Render location tags */}
-        {post.tags && renderLocationTags(post.tags)}
-        
-        {/* Render entity tags */}
-        {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
+        {/* Tag Groups - Updated layout with improved styling */}
+        <div className="space-y-2 mt-4">
+          {/* Render location tags */}
+          {post.tags && renderLocationTags(post.tags)}
+          
+          {/* Render entity tags */}
+          {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
+        </div>
 
         {/* Social Actions */}
         <div className="flex items-center justify-between mt-4 pt-4 border-t">
