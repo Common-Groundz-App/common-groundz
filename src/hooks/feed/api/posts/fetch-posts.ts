@@ -26,7 +26,8 @@ export const fetchPosts = async (
         media,
         view_count,
         status,
-        is_deleted
+        is_deleted,
+        tags
       `)
       .eq('visibility', 'public')
       .eq('is_deleted', false)

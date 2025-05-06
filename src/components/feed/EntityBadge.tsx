@@ -3,6 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Entity } from '@/services/recommendation/types';
+import { Book, Film, Home, ShoppingBag, Utensils } from 'lucide-react';
 
 interface EntityBadgeProps {
   entity: Entity;
@@ -21,11 +22,27 @@ export const EntityBadge: React.FC<EntityBadgeProps> = ({ entity, className }) =
     }
   };
 
+  const getEntityIcon = (type: string) => {
+    switch(type) {
+      case 'book': return <Book size={12} className="text-blue-700 dark:text-blue-400" />;
+      case 'movie': return <Film size={12} className="text-purple-700 dark:text-purple-400" />;
+      case 'place': return <Home size={12} className="text-green-700 dark:text-green-400" />;
+      case 'product': return <ShoppingBag size={12} className="text-yellow-700 dark:text-yellow-400" />;
+      case 'food': return <Utensils size={12} className="text-red-700 dark:text-red-400" />;
+      default: return null;
+    }
+  };
+
   return (
     <Badge
-      className={cn("font-normal", getEntityTypeColor(entity.type), className)}
+      className={cn(
+        "font-normal flex items-center gap-1.5", 
+        getEntityTypeColor(entity.type), 
+        className
+      )}
       variant="outline"
     >
+      {getEntityIcon(entity.type)}
       {entity.name}
     </Badge>
   );

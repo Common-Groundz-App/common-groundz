@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share2, Globe, Lock, Users, ChevronDown } from 'lucide-react';
+import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share2, Globe, Lock, Users, ChevronDown, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
@@ -238,6 +237,17 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }
   };
 
+  const getEntityTypeColor = (type: string): string => {
+    switch(type) {
+      case 'book': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'movie': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+      case 'place': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'product': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'food': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default: return '';
+    }
+  };
+
   const renderTaggedEntities = (entities: Entity[]) => {
     if (!entities || entities.length === 0) return null;
     
@@ -255,7 +265,32 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       </div>
     );
   };
-  
+
+  const renderLocationTags = (tags: string[] | null) => {
+    if (!tags || tags.length === 0) return null;
+    
+    return (
+      <div className="mt-3">
+        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
+          <MapPin size={14} />
+          <span>Location:</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {tags.map((tag, index) => (
+            <Badge 
+              key={index}
+              className="bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300 font-normal flex items-center gap-1.5"
+              variant="outline"
+            >
+              <MapPin size={12} className="text-cyan-700 dark:text-cyan-400" />
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const handleCommentClick = () => {
     setIsCommentDialogOpen(true);
     if (onComment) onComment(post.id);
@@ -366,7 +401,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           )}
         </div>
 
-        {/* Media Content - using our updated PostMediaDisplay component */}
+        {/* Media Content */}
         {post.media && post.media.length > 0 && (
           <PostMediaDisplay 
             media={post.media} 
@@ -377,6 +412,10 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           />
         )}
         
+        {/* Render location tags */}
+        {post.tags && renderLocationTags(post.tags)}
+        
+        {/* Render entity tags */}
         {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
 
         {/* Social Actions */}
