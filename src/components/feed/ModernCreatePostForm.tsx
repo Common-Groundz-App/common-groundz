@@ -73,7 +73,6 @@ export function ModernCreatePostForm({
   const isEditMode = !!postToEdit;
   const isMobile = useIsMobile();
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number } | null>(null);
-  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   
   const form = useForm<FormData>({
@@ -131,19 +130,12 @@ export function ModernCreatePostForm({
   // Handle click outside for emoji picker
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isEmojiPickerVisible && 
-          emojiPickerRef.current && 
-          emojiButtonRef.current && 
-          !emojiPickerRef.current.contains(event.target as Node) &&
-          !emojiButtonRef.current.contains(event.target as Node)) {
+      if (isEmojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
         setIsEmojiPickerOpen(false);
       }
     };
 
-    if (isEmojiPickerVisible) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -498,10 +490,9 @@ export function ModernCreatePostForm({
                   </PopoverContent>
                 </Popover>
                 
-                {/* Emoji Button with improved popup-style implementation */}
-                <div className="emoji-button-container">
+                {/* Emoji Button with improved implementation */}
+                <div className="relative">
                   <Button
-                    ref={emojiButtonRef}
                     type="button"
                     variant="ghost"
                     size="sm"
@@ -517,45 +508,39 @@ export function ModernCreatePostForm({
                   </Button>
                   
                   {isEmojiPickerVisible && (
-                    <>
-                      {/* Invisible backdrop to capture clicks outside */}
-                      <div 
-                        className="emoji-picker-backdrop"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          setIsEmojiPickerOpen(false);
-                        }}
+                    <div 
+                      ref={emojiPickerRef}
+                      className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
+                      <Picker 
+                        data={data}
+                        onEmojiSelect={handleEmojiSelect}
+                        theme="light"
+                        previewPosition="none"
+                        set="native"
+                        skinTonePosition="none"
+                        emojiSize={20}
+                        emojiButtonSize={28}
+                        maxFrequentRows={2}
+                        modalish={false}
+                        showSkinTones={false}
                       />
-                      
-                      {/* Emoji Picker Dropdown */}
-                      <div 
-                        ref={emojiPickerRef}
-                        className="emoji-picker-dropdown"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                        }}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                        }}
-                      >
-                        <Picker 
-                          data={data}
-                          onEmojiSelect={handleEmojiSelect}
-                          theme="light"
-                          previewPosition="none"
-                          modal={false}
-                          set="native"
-                          skinTonePosition="none"
-                          emojiSize={20}
-                          emojiButtonSize={28}
-                          maxFrequentRows={2}
-                          showSkinTones={false}
-                        />
-                      </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
