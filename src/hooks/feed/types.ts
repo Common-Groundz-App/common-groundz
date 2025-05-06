@@ -40,6 +40,7 @@ export interface PostFeedItem {
   tagged_entities?: Entity[];
   media?: MediaItem[];
   status?: 'draft' | 'published' | 'failed';
+  tags?: string[]; // Adding the tags property which was missing
 }
 
 export type CombinedFeedItem = FeedItem | PostFeedItem;
