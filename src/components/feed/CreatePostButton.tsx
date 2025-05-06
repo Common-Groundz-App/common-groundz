@@ -71,7 +71,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
         }}
       >
         <DialogContent 
-          className="sm:max-w-xl max-h-[90vh] overflow-visible p-0"
+          className="sm:max-w-xl overflow-hidden p-0"
           onOpenAutoFocus={(e) => {
             // Prevent auto-focus behavior that might interfere with emoji picking
             e.preventDefault();

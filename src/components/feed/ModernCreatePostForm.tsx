@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -73,6 +74,7 @@ export function ModernCreatePostForm({
   const isEditMode = !!postToEdit;
   const isMobile = useIsMobile();
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number } | null>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   
   const form = useForm<FormData>({
@@ -130,7 +132,11 @@ export function ModernCreatePostForm({
   // Handle click outside for emoji picker
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isEmojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+      if (isEmojiPickerVisible && 
+          emojiPickerRef.current && 
+          emojiButtonRef.current && 
+          !emojiPickerRef.current.contains(event.target as Node) &&
+          !emojiButtonRef.current.contains(event.target as Node)) {
         setIsEmojiPickerOpen(false);
       }
     };
@@ -491,8 +497,9 @@ export function ModernCreatePostForm({
                 </Popover>
                 
                 {/* Emoji Button with improved implementation */}
-                <div className="relative emoji-button-container">
+                <div className="relative">
                   <Button
+                    ref={emojiButtonRef}
                     type="button"
                     variant="ghost"
                     size="sm"
@@ -510,12 +517,8 @@ export function ModernCreatePostForm({
                   {isEmojiPickerVisible && (
                     <div 
                       ref={emojiPickerRef}
-                      className="emoji-picker-dropdown" 
+                      className="emoji-picker-dropdown"
                       onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                      }}
-                      onPointerDown={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
                       }}
@@ -523,15 +526,13 @@ export function ModernCreatePostForm({
                         e.stopPropagation();
                         e.preventDefault();
                       }}
-                      onKeyDown={(e) => {
-                        e.stopPropagation();
-                      }}
                     >
                       <Picker 
                         data={data}
                         onEmojiSelect={handleEmojiSelect}
                         theme="light"
                         previewPosition="none"
+                        modal={false}
                         set="native"
                         skinTonePosition="none"
                         emojiSize={20}

@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const MAX_MEDIA_COUNT = 4;
   
@@ -70,7 +72,11 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   // Handle click outside for emoji picker
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (emojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+      if (emojiPickerVisible && 
+          emojiPickerRef.current && 
+          emojiButtonRef.current &&
+          !emojiPickerRef.current.contains(event.target as Node) &&
+          !emojiButtonRef.current.contains(event.target as Node)) {
         setEmojiPickerVisible(false);
       }
     };
@@ -490,8 +496,9 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
           />
           
           {/* Emoji Button - Fixed positioning implementation */}
-          <div className="relative emoji-button-container">
+          <div className="relative">
             <Button
+              ref={emojiButtonRef}
               type="button"
               variant="ghost"
               size="sm"
@@ -517,16 +524,9 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                   e.stopPropagation();
                   e.preventDefault();
                 }}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
                 onMouseDown={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
-                }}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
                 }}
               >
                 <Picker 
@@ -534,6 +534,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
                   onEmojiSelect={handleEmojiSelect}
                   theme="light"
                   previewPosition="none"
+                  modal={false}
                   set="native"
                   skinTonePosition="none"
                   emojiSize={20}
