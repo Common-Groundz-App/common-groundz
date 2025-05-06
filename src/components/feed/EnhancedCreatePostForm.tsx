@@ -19,8 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
-
-// Emoji picker styles are now in global CSS (index.css)
+import { LocationSearchInput } from './LocationSearchInput';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -51,7 +50,12 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [visibility, setVisibility] = useState<VisibilityOption>('public');
   const [showLocationInput, setShowLocationInput] = useState(false);
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState<{
+    name: string;
+    address: string;
+    placeId: string;
+    coordinates: { lat: number; lng: number };
+  } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
@@ -255,22 +259,28 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         thumbnail_url: item.thumbnail_url || item.url
       }));
 
-      // Store location in media metadata if it exists
-      let postMetadata = {};
+      // Store location in post metadata if it exists
+      let postMetadata: any = {};
       if (location) {
-        postMetadata = { location };
+        postMetadata = { 
+          location: {
+            name: location.name,
+            address: location.address,
+            place_id: location.placeId,
+            coordinates: location.coordinates
+          }
+        };
       }
 
       // Prepare post data for database - explicitly type the post_type
-      // IMPORTANT: Remove location field as it doesn't exist in the database schema
       const postData = {
         content,
         media: mediaToSave,
         visibility: dbVisibility,
         user_id: user.id,
         post_type: 'story' as 'story' | 'routine' | 'project' | 'note', // Explicit type casting
-        // We can optionally store location in tags or metadata if needed
-        tags: location ? [location] : undefined,
+        metadata: postMetadata,
+        tags: location ? [location.name] : undefined,
       };
 
       console.log('Submitting post:', postData);
@@ -428,6 +438,30 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         </div>
       )}
 
+      {/* Location Tag */}
+      {location && (
+        <div className="flex items-center gap-1 mt-3">
+          <Badge 
+            variant="outline" 
+            className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
+          >
+            <MapPin className="h-3 w-3" />
+            <span>{location.name}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-4 w-4 p-0 rounded-full hover:bg-muted"
+              onClick={() => setLocation(null)}
+            >
+              <X size={10} />
+            </Button>
+          </Badge>
+          {location.address && (
+            <span className="text-xs text-muted-foreground">{location.address}</span>
+          )}
+        </div>
+      )}
+
       {/* Entity Selector (only shown when tag button is clicked) */}
       {entitySelectorVisible && (
         <div className="mt-3 p-3 border rounded-lg bg-background animate-fade-in">
@@ -438,25 +472,16 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         </div>
       )}
 
-      {/* Location Input (only shown when location button is clicked) */}
-      {showLocationInput && (
-        <div className="flex items-center gap-2 mt-3 animate-fade-in">
-          <MapPin className="h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Add location"
-            className="flex-1 border-b bg-transparent text-sm py-1 focus:outline-none"
+      {/* Location Search Input (only shown when location button is clicked) */}
+      {showLocationInput && !location && (
+        <div className="mt-3 animate-fade-in">
+          <LocationSearchInput
+            onLocationSelect={(selectedLocation) => {
+              setLocation(selectedLocation);
+              setShowLocationInput(false);
+            }}
+            onClear={() => setShowLocationInput(false)}
           />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowLocationInput(false)}
-            className="h-6 w-6 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
       )}
 

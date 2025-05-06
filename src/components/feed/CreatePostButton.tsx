@@ -8,8 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
 
-// Enhanced emoji picker styles removed (now in index.css)
-
 interface CreatePostButtonProps {
   onPostCreated?: () => void;
 }
@@ -84,7 +82,8 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
             if (target.closest('.emoji-mart') || 
                 target.closest('.emoji-mart-emoji') || 
                 target.closest('[data-emoji-set]') ||
-                target.closest('.emoji-picker-wrapper')) {
+                target.closest('.emoji-picker-wrapper') ||
+                target.closest('.emoji-picker-dropdown')) {
               e.preventDefault();
             }
           }}
@@ -94,7 +93,8 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
             if (target.closest('.emoji-mart') || 
                 target.closest('.emoji-mart-emoji') || 
                 target.closest('[data-emoji-set]') ||
-                target.closest('.emoji-picker-wrapper')) {
+                target.closest('.emoji-picker-wrapper') ||
+                target.closest('.emoji-picker-dropdown')) {
               e.stopPropagation();
             }
           }}

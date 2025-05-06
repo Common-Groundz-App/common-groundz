@@ -130,8 +130,9 @@
 
 /* Enhanced Emoji Picker Styles */
 .emoji-picker-wrapper {
-  position: relative;
+  position: absolute;
   z-index: 9999;
+  overflow: visible;
 }
 
 .emoji-mart {
@@ -224,6 +225,48 @@
 .emoji-mart-container {
   position: relative !important;
   z-index: 9999 !important;
+}
+
+/* Location search dropdown styles */
+.location-search-dropdown {
+  position: absolute;
+  z-index: 50;
+  width: 100%;
+  max-height: 240px;
+  overflow-y: auto;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 4px;
+}
+
+.dark .location-search-dropdown {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+}
+
+.location-search-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.location-search-item:hover {
+  background-color: hsl(var(--accent));
+}
+
+.location-search-item-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.location-search-item-address {
+  font-size: 0.8rem;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Utility classes for theming */

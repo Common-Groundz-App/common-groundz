@@ -6,7 +6,7 @@ import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Image, Video, X, AtSign, Smile } from 'lucide-react';
+import { PlusCircle, Image, Video, X, AtSign, Smile, MapPin } from 'lucide-react';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,6 +22,7 @@ import { SimpleEntitySelector } from './SimpleEntitySelector';
 import { getDisplayName } from '@/services/profileService';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
+import { LocationSearchInput } from './LocationSearchInput';
 
 // Emoji picker styles are now in global CSS (index.css)
 
@@ -67,6 +68,13 @@ export function ModernCreatePostForm({
   const [mediaItems, setMediaItems] = useState<MediaItem[]>(postToEdit?.media || []);
   const [isEntitySelectorOpen, setIsEntitySelectorOpen] = useState(false);
   const [isEmojiPickerVisible, setIsEmojiPickerOpen] = useState(false);
+  const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false);
+  const [location, setLocation] = useState<{
+    name: string;
+    address: string;
+    placeId: string;
+    coordinates: { lat: number; lng: number };
+  } | null>(null);
   const [contentHtml, setContentHtml] = useState<string>(postToEdit?.content || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useState<string>(() => generateUUID())[0];
@@ -214,6 +222,19 @@ export function ModernCreatePostForm({
       // Use the form's content or contentHtml
       const content = data.content || contentHtml;
       
+      // Store location data in metadata if available
+      let postMetadata: any = {};
+      if (location) {
+        postMetadata = {
+          location: {
+            name: location.name,
+            address: location.address,
+            place_id: location.placeId,
+            coordinates: location.coordinates
+          }
+        };
+      }
+      
       const postData = {
         title: data.title || getAutoTitleFromContent(content),
         content: content,
@@ -221,6 +242,8 @@ export function ModernCreatePostForm({
         visibility: data.visibility,
         media: mediaToSave,
         user_id: user.id,
+        metadata: postMetadata,
+        tags: location ? [location.name] : undefined,
       };
       
       if (isEditMode) {
@@ -431,6 +454,43 @@ export function ModernCreatePostForm({
               </div>
             )}
             
+            {/* Location Tag */}
+            {location && (
+              <div className="flex items-center gap-1">
+                <div className="bg-accent/20 text-sm px-2 py-1 rounded-full flex items-center gap-1">
+                  <MapPin size={12} />
+                  <span>{location.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0 rounded-full"
+                    onClick={() => setLocation(null)}
+                  >
+                    <X size={10} />
+                  </Button>
+                </div>
+                {location.address && (
+                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                    {location.address}
+                  </span>
+                )}
+              </div>
+            )}
+            
+            {/* Location Search */}
+            {isLocationSelectorOpen && !location && (
+              <div className="rounded-md border p-3 animate-fade-in">
+                <LocationSearchInput
+                  onLocationSelect={(selectedLocation) => {
+                    setLocation(selectedLocation);
+                    setIsLocationSelectorOpen(false);
+                  }}
+                  onClear={() => setIsLocationSelectorOpen(false)}
+                />
+              </div>
+            )}
+            
             {/* Actions Bar */}
             <div className="flex items-center justify-between border-t pt-3">
               <div className="flex items-center gap-2">
@@ -489,6 +549,20 @@ export function ModernCreatePostForm({
                     />
                   </PopoverContent>
                 </Popover>
+                
+                {/* Location Button */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "rounded-full",
+                    isLocationSelectorOpen && "bg-accent/50"
+                  )}
+                  onClick={() => setIsLocationSelectorOpen(!isLocationSelectorOpen)}
+                >
+                  <MapPin size={20} className="text-muted-foreground" />
+                </Button>
                 
                 {/* Emoji Button with improved implementation */}
                 <div className="relative">
