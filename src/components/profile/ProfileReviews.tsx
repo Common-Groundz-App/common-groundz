@@ -29,7 +29,10 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     return (
       <div className="w-full max-w-4xl mx-auto grid gap-6">
         {[1, 2, 3].map(i => (
-          <div key={i} className="w-full h-60 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-md"></div>
+          <div 
+            key={i} 
+            className="w-full h-60 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800/50 dark:to-gray-800/30 animate-pulse rounded-xl shadow-sm"
+          ></div>
         ))}
       </div>
     );
@@ -37,7 +40,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
 
   if (error) {
     return (
-      <div className="text-center py-8">
+      <div className="text-center py-8 rounded-xl bg-destructive/5 p-6">
         <p className="text-destructive">Error loading reviews. Please try again.</p>
       </div>
     );
@@ -67,9 +70,9 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
         <div className="flex justify-end mb-6">
           <Button 
             onClick={() => setIsFormOpen(true)} 
-            className="bg-brand-orange hover:bg-brand-orange/90 text-white"
+            className="bg-gradient-to-r from-brand-orange to-brand-orange/90 text-white hover:shadow-md transition-all duration-200 flex items-center gap-2"
           >
-            <PlusCircle className="mr-2 h-4 w-4" />
+            <PlusCircle className="h-4 w-4" />
             Add Review
           </Button>
         </div>
