@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Star, Loader2, Calendar, Tag as TagIcon, Plus, Clock, Camera } from "lucide-react";
+import { Star, Loader2, Calendar, Tag as TagIcon, Plus, Clock, Camera, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import { useAuth } from '@/contexts/AuthContext';
