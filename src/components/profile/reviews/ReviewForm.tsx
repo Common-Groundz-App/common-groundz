@@ -15,6 +15,7 @@ import { createReview, updateReview, Review } from '@/services/reviewService';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import EntitySearch from '@/components/recommendations/EntitySearch';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
+import { Entity } from '@/services/recommendation/types';
 
 // Import our custom components
 import RatingStarsEnhanced from './RatingStarsEnhanced';
@@ -108,6 +109,16 @@ const ReviewForm = ({
       setShowEntitySearch(false);
     }
   }, [review]);
+
+  // Add the missing handleEntitySelect function
+  const handleEntitySelect = (entity: Entity) => {
+    setSelectedEntity(entity);
+    setShowEntitySearch(false);
+    setValue('entity_id', entity.id);
+    if (entity.name) setValue('title', entity.name);
+    if (entity.venue) setValue('venue', entity.venue);
+    if (entity.description) setValue('description', entity.description);
+  };
 
   const handleImageUploadChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -296,12 +307,7 @@ const ReviewForm = ({
                   </Label>
                   <EntitySearch 
                     type="place"
-                    onSelect={(entity) => {
-                      setSelectedEntity(entity);
-                      setShowEntitySearch(false);
-                      setValue('venue', entity.name);
-                      if (entity.description) setValue('description', entity.description);
-                    }}
+                    onSelect={handleEntitySelect}
                   />
                   <p className="text-xs text-muted-foreground mt-2 italic">
                     Or just type the restaurant name below
@@ -512,4 +518,3 @@ const ReviewForm = ({
 };
 
 export default ReviewForm;
-
