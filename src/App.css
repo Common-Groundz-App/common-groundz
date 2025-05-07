@@ -176,3 +176,50 @@ body, html {
 .tag-badge-animate {
   animation: tag-badge-appear 0.3s ease-out forwards;
 }
+
+/* Review form styling enhancements */
+.review-star {
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.review-star:hover {
+  transform: scale(1.15);
+}
+
+.review-tag {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.review-tag:hover {
+  transform: translateY(-2px);
+}
+
+.review-tag.selected {
+  background-color: rgba(var(--brand-orange-rgb), 0.2);
+  border-color: rgba(var(--brand-orange-rgb), 0.4);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+
+.review-image-upload {
+  transition: all 0.3s ease;
+}
+
+.review-image-upload:hover {
+  background-color: rgba(var(--brand-orange-rgb), 0.05);
+}
+

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Star, Loader2 } from "lucide-react";
+import { Star, Loader2, Camera, MapPin, Tag as TagIcon, Clapperboard, Book, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import EntitySearch from './EntitySearch';
@@ -46,6 +46,7 @@ const RecommendationForm = ({
   const selectedCategory = watch('category');
   const [selectedImage, setSelectedImage] = useState<string | null>(recommendation?.image_url || null);
   const [isUploading, setIsUploading] = useState(false);
+  const [hoverRating, setHoverRating] = useState(0);
   
   // Listen for custom event to open the form
   useEffect(() => {
@@ -112,43 +113,126 @@ const RecommendationForm = ({
     }
   };
 
+  const getCategoryEmoji = (category: string) => {
+    switch(category) {
+      case 'food': return '🍽️';
+      case 'movie': return '🎬';
+      case 'book': return '📚';
+      case 'place': return '📍';
+      case 'product': return '🛍️';
+      default: return '✨';
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch(category) {
+      case 'food': return <MapPin className="h-5 w-5" />;
+      case 'movie': return <Clapperboard className="h-5 w-5" />;
+      case 'book': return <Book className="h-5 w-5" />;
+      case 'place': return <MapPin className="h-5 w-5" />;
+      case 'product': return <ShoppingBag className="h-5 w-5" />;
+      default: return <TagIcon className="h-5 w-5" />;
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? 'Edit Recommendation' : 'Add New Recommendation'}</DialogTitle>
+          <DialogTitle className="text-xl flex items-center gap-2">
+            <span>{getCategoryEmoji(selectedCategory)}</span>
+            <span>{isEditMode ? 'Edit recommendation' : 'Share a recommendation'}</span>
+          </DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
+          {/* Rating Stars - Moved to top and made bigger */}
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <div className="flex flex-col items-center p-4 rounded-xl bg-accent/20">
+              <p className="text-center mb-3 text-lg font-medium">How would you rate it?</p>
+              <Controller
+                name="rating"
+                control={control}
+                rules={{ required: "Please give a rating" }}
+                render={({ field }) => (
+                  <div className="flex items-center justify-center mb-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Button
+                        type="button"
+                        key={star}
+                        variant="ghost"
+                        className="p-1 hover:bg-transparent"
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => field.onChange(star)}
+                      >
+                        <Star
+                          className={cn(
+                            "h-8 w-8 review-star",
+                            (star <= (hoverRating || field.value)) 
+                              ? "fill-brand-orange text-brand-orange" 
+                              : "text-gray-300 dark:text-gray-600"
+                          )}
+                        />
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              />
+              <span className="text-sm text-muted-foreground">
+                {watch('rating') === 0 
+                  ? "Tap to rate" 
+                  : watch('rating') === 5 
+                    ? "Love it!" 
+                    : watch('rating') === 4 
+                      ? "Really good" 
+                      : watch('rating') === 3 
+                        ? "It's okay" 
+                        : watch('rating') === 2 
+                          ? "Not great" 
+                          : "Don't recommend"}
+              </span>
+              {errors.rating && (
+                <p className="text-destructive text-sm mt-1">{errors.rating.message?.toString()}</p>
+              )}
+            </div>
+          </div>
+          
+          {/* Category Selection */}
+          <div className="grid grid-cols-5 gap-2">
             <Controller
               name="category"
               control={control}
               render={({ field }) => (
-                <Select 
-                  onValueChange={field.onChange}
-                  value={field.value}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="food">Food</SelectItem>
-                    <SelectItem value="movie">Movie</SelectItem>
-                    <SelectItem value="book">Book</SelectItem>
-                    <SelectItem value="place">Place</SelectItem>
-                    <SelectItem value="product">Product</SelectItem>
-                  </SelectContent>
-                </Select>
+                <>
+                  {['food', 'movie', 'book', 'place', 'product'].map((category) => (
+                    <Button
+                      key={category}
+                      type="button"
+                      variant={field.value === category ? "default" : "outline"}
+                      className={cn(
+                        "flex flex-col items-center justify-center h-20 gap-1 p-2",
+                        field.value === category ? "bg-brand-orange text-white" : "",
+                        "transition-all duration-200 hover:scale-105"
+                      )}
+                      onClick={() => field.onChange(category)}
+                    >
+                      <span className="text-lg">{getCategoryEmoji(category)}</span>
+                      <span className="capitalize text-xs">{category}</span>
+                    </Button>
+                  ))}
+                </>
               )}
             />
           </div>
           
-          {!isEditMode && (selectedCategory === 'movie' || selectedCategory === 'book' || 
-            selectedCategory === 'place' || selectedCategory === 'product') && (
-            <div className="space-y-2">
-              <Label>Search for {selectedCategory}</Label>
+          {/* Entity search */}
+          {!isEditMode && (
+            <div className="space-y-2 p-4 border border-dashed border-muted-foreground/30 rounded-lg">
+              <Label className="flex items-center gap-2">
+                {getCategoryIcon(selectedCategory)}
+                <span>Search for {selectedCategory}</span>
+              </Label>
               <EntitySearch 
                 type={selectedCategory as any}
                 onSelect={(entity) => {
@@ -162,170 +246,186 @@ const RecommendationForm = ({
                   }
                 }}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Can't find what you're looking for? You can just type the details below
+              </p>
             </div>
           )}
           
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input 
-              id="title"
-              {...register('title', { required: "Title is required" })}
-              placeholder={`What are you recommending?`}
-              className={errors.title ? "border-red-500" : ""}
-            />
-            {errors.title && (
-              <p className="text-red-500 text-xs">{errors.title.message?.toString()}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="venue">
-              {selectedCategory === 'food' ? 'Restaurant/Source' : 
-                selectedCategory === 'movie' ? 'Director/Studio' : 
-                selectedCategory === 'book' ? 'Author/Publisher' : 
-                selectedCategory === 'place' ? 'Location/Address' : 'Brand/Manufacturer'}
-            </Label>
-            <Input 
-              id="venue"
-              {...register('venue')}
-              placeholder={`Where can this ${selectedCategory} be found?`}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
-            <Textarea 
-              id="description"
-              {...register('description')}
-              placeholder="Share your experience..."
-              rows={3}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Rating</Label>
-            <div className="flex items-center">
-              <Controller
-                name="rating"
-                control={control}
-                rules={{ required: "Please provide a rating" }}
-                render={({ field }) => (
-                  <div className="flex items-center">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Button
-                        type="button"
-                        key={star}
-                        variant="ghost"
-                        className="p-1 hover:bg-transparent"
-                        onClick={() => field.onChange(star)}
-                      >
-                        <Star
-                          className={cn(
-                            "h-6 w-6",
-                            star <= field.value ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                          )}
-                        />
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              />
-              <span className="ml-2 text-sm">
-                {watch('rating') === 0 ? 'Select a rating' : `${watch('rating')} out of 5`}
-              </span>
-            </div>
-            {errors.rating && (
-              <p className="text-red-500 text-xs">{errors.rating.message?.toString()}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Add Image (optional)</Label>
-            <div className="flex items-center gap-4">
-              <div>
-                <Input
-                  type="file"
-                  id="image"
-                  accept="image/*"
-                  onChange={handleImageUploadChange}
-                  className="hidden"
-                />
-                <Label
-                  htmlFor="image"
-                  className="cursor-pointer inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                >
-                  {isUploading ? "Uploading..." : "Choose File"}
+          <div className="grid md:grid-cols-2 gap-5">
+            {/* Left Column */}
+            <div className="space-y-5">
+              {/* Title */}
+              <div className="space-y-2">
+                <Label htmlFor="title" className="flex items-center gap-2">
+                  <span className="text-lg">{getCategoryEmoji(selectedCategory)}</span>
+                  <span>What are you recommending?</span>
                 </Label>
+                <Input 
+                  id="title"
+                  {...register('title', { required: "Title is required" })}
+                  placeholder={`Name of the ${selectedCategory}`}
+                  className={cn(errors.title ? "border-red-500" : "border-brand-orange/30 focus:ring-brand-orange/30")}
+                />
+                {errors.title && (
+                  <p className="text-red-500 text-xs">{errors.title.message?.toString()}</p>
+                )}
               </div>
               
-              {selectedImage && (
-                <div className="relative h-16 w-16">
-                  <img
-                    src={selectedImage}
-                    alt="Preview"
-                    className="h-full w-full object-cover rounded"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-gray-800/80 text-white hover:bg-gray-900"
-                    onClick={() => {
-                      setValue('image_url', '');
-                      setSelectedImage(null);
-                    }}
-                  >
-                    ×
-                  </Button>
-                </div>
-              )}
+              {/* Venue / Location */}
+              <div className="space-y-2">
+                <Label htmlFor="venue" className="flex items-center gap-2">
+                  {selectedCategory === 'food' ? (
+                    <>
+                      <span className="text-lg">🏠</span>
+                      <span>Restaurant name</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-lg">{
+                        selectedCategory === 'movie' ? '🎬' : 
+                        selectedCategory === 'book' ? '✍️' : 
+                        selectedCategory === 'place' ? '📍' : '🏢'
+                      }</span>
+                      <span>{
+                        selectedCategory === 'movie' ? 'Director/Studio' : 
+                        selectedCategory === 'book' ? 'Author/Publisher' : 
+                        selectedCategory === 'place' ? 'Location' : 'Brand'
+                      }</span>
+                    </>
+                  )}
+                </Label>
+                <Input 
+                  id="venue"
+                  {...register('venue')}
+                  placeholder={
+                    selectedCategory === 'food' ? "Where can people find this?" : 
+                    selectedCategory === 'movie' ? "Who made this movie?" : 
+                    selectedCategory === 'book' ? "Who wrote this book?" : 
+                    selectedCategory === 'place' ? "Address or location" : "Who makes this product?"
+                  }
+                  className="border-brand-orange/30 focus:ring-brand-orange/30"
+                />
+              </div>
+              
+              {/* Visibility */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span className="text-lg">👁️</span>
+                  <span>Who can see this?</span>
+                </Label>
+                <Controller
+                  name="visibility"
+                  control={control}
+                  render={({ field }) => (
+                    <RadioGroup
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      className="grid grid-cols-3 gap-2"
+                    >
+                      <div className="flex flex-col items-center space-y-1 border border-brand-orange/30 p-3 rounded-lg hover:bg-brand-orange/5 transition-colors">
+                        <RadioGroupItem value="public" id="public" className="text-brand-orange" />
+                        <Label htmlFor="public" className="cursor-pointer text-xs">Everyone</Label>
+                      </div>
+                      <div className="flex flex-col items-center space-y-1 border border-brand-orange/30 p-3 rounded-lg hover:bg-brand-orange/5 transition-colors">
+                        <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" />
+                        <Label htmlFor="circle" className="cursor-pointer text-xs">My Circle</Label>
+                      </div>
+                      <div className="flex flex-col items-center space-y-1 border border-brand-orange/30 p-3 rounded-lg hover:bg-brand-orange/5 transition-colors">
+                        <RadioGroupItem value="private" id="private" className="text-brand-orange" />
+                        <Label htmlFor="private" className="cursor-pointer text-xs">Just Me</Label>
+                      </div>
+                    </RadioGroup>
+                  )}
+                />
+              </div>
             </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Visibility</Label>
-            <Controller
-              name="visibility"
-              control={control}
-              render={({ field }) => (
-                <RadioGroup
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  className="grid grid-cols-3 gap-2"
-                >
-                  <div className="flex items-center space-x-2 border p-3 rounded-lg">
-                    <RadioGroupItem value="public" id="public" />
-                    <Label htmlFor="public">Public</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border p-3 rounded-lg">
-                    <RadioGroupItem value="circle_only" id="circle" />
-                    <Label htmlFor="circle">Circle Only</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border p-3 rounded-lg">
-                    <RadioGroupItem value="private" id="private" />
-                    <Label htmlFor="private">Private</Label>
-                  </div>
-                </RadioGroup>
-              )}
-            />
+            
+            {/* Right Column */}
+            <div className="space-y-5">
+              {/* Add Photo */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-brand-orange" />
+                  <span>Add a photo</span>
+                </Label>
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-brand-orange/30 rounded-lg p-4 review-image-upload">
+                  {selectedImage ? (
+                    <div className="relative w-full h-40">
+                      <img
+                        src={selectedImage}
+                        alt="Preview"
+                        className="h-full w-full object-cover rounded-md mx-auto"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-gray-800/80 text-white hover:bg-gray-900"
+                        onClick={() => {
+                          setValue('image_url', '');
+                          setSelectedImage(null);
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Input
+                        type="file"
+                        id="image"
+                        accept="image/*"
+                        onChange={handleImageUploadChange}
+                        className="hidden"
+                      />
+                      <Label
+                        htmlFor="image"
+                        className="cursor-pointer flex flex-col items-center text-muted-foreground"
+                      >
+                        <Camera className="h-12 w-12 mb-2 text-brand-orange/50" />
+                        <span className="text-sm">{isUploading ? "Uploading..." : "Tap to add photo"}</span>
+                        <span className="text-xs mt-1">Share your recommendation visually</span>
+                      </Label>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="description" className="flex items-center gap-2">
+                  <span className="text-lg">💬</span>
+                  <span>Why do you recommend it?</span>
+                </Label>
+                <Textarea 
+                  id="description"
+                  {...register('description')}
+                  placeholder="Tell others why they should try this..."
+                  rows={5}
+                  className="border-brand-orange/30 focus:ring-brand-orange/30 resize-none"
+                />
+              </div>
+            </div>
           </div>
           
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}>
+            <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}
+                    className="border-brand-orange/30 hover:text-brand-orange">
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={isSubmitting || isUploading}
-              className="bg-brand-orange hover:bg-brand-orange/90"
+              className="bg-brand-orange hover:bg-brand-orange/90 text-white"
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEditMode ? "Updating..." : "Saving..."}
+                  {isEditMode ? "Saving changes..." : "Share recommendation"}
                 </>
               ) : (
-                isEditMode ? "Update Recommendation" : "Save Recommendation"
+                isEditMode ? "Save changes" : "Share recommendation"
               )}
             </Button>
           </div>

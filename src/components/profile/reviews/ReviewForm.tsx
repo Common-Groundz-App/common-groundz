@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Star, Loader2, Calendar, Tag as TagIcon, Plus } from "lucide-react";
+import { Star, Loader2, Calendar, Tag as TagIcon, Plus, Clock, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,10 +65,19 @@ const ReviewForm = ({
   const [foodTags, setFoodTags] = useState<string[]>(review?.metadata?.food_tags || []);
   const [selectedEntity, setSelectedEntity] = useState<any>(null);
   const [showEntitySearch, setShowEntitySearch] = useState(false);
+  const [hoverRating, setHoverRating] = useState(0);
 
   const commonFoodTags = ["Spicy", "Sweet", "Savory", "Vegetarian", "Vegan", "Gluten-Free", 
                           "Dairy-Free", "Non-Veg", "Dessert", "Breakfast", "Lunch", "Dinner", 
                           "Appetizer", "Main Course", "Large Portion", "Value for Money"];
+
+  // Time period options for when you experienced this
+  const timePeriods = [
+    { label: "Today", value: new Date() },
+    { label: "Yesterday", value: new Date(Date.now() - 86400000) },
+    { label: "Last week", value: new Date(Date.now() - 7 * 86400000) },
+    { label: "Last month", value: new Date(Date.now() - 30 * 86400000) },
+  ];
 
   useEffect(() => {
     if (watchImageUrl !== selectedImage) {
@@ -220,40 +230,114 @@ const ReviewForm = ({
     }
   };
 
+  const getCategoryEmoji = () => {
+    switch(selectedCategory) {
+      case 'food': return '🍽️';
+      case 'movie': return '🎬';
+      case 'book': return '📚';
+      case 'place': return '📍';
+      case 'product': return '🛍️';
+      default: return '✨';
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? 'Edit Review' : 'Add New Review'}</DialogTitle>
+          <DialogTitle className="text-xl flex items-center gap-2">
+            <span>{getCategoryEmoji()}</span>
+            <span>{isEditMode ? 'Edit your review' : `What did you think of this ${selectedCategory}?`}</span>
+          </DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
+          {/* Rating Stars - Moved to top and made bigger */}
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <div className="flex flex-col items-center p-4 rounded-xl bg-accent/20">
+              <p className="text-center mb-3 text-lg font-medium">How would you rate it?</p>
+              <Controller
+                name="rating"
+                control={control}
+                rules={{ required: "Please give a rating" }}
+                render={({ field }) => (
+                  <div className="flex items-center justify-center mb-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Button
+                        type="button"
+                        key={star}
+                        variant="ghost"
+                        className="p-1 hover:bg-transparent"
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => field.onChange(star)}
+                      >
+                        <Star
+                          className={cn(
+                            "h-8 w-8 review-star",
+                            (star <= (hoverRating || field.value)) 
+                              ? "fill-brand-orange text-brand-orange" 
+                              : "text-gray-300 dark:text-gray-600"
+                          )}
+                        />
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              />
+              <span className="text-sm text-muted-foreground">
+                {watch('rating') === 0 
+                  ? "Tap to rate" 
+                  : watch('rating') === 5 
+                    ? "Loved it!" 
+                    : watch('rating') === 4 
+                      ? "Really good" 
+                      : watch('rating') === 3 
+                        ? "It's okay" 
+                        : watch('rating') === 2 
+                          ? "Not great" 
+                          : "Didn't like it"}
+              </span>
+              {errors.rating && (
+                <p className="text-destructive text-sm mt-1">{errors.rating.message?.toString()}</p>
+              )}
+            </div>
+          </div>
+          
+          {/* Category Selection */}
+          <div className="grid grid-cols-5 gap-2">
             <Controller
               name="category"
               control={control}
               render={({ field }) => (
-                <Select 
-                  onValueChange={(val) => {
-                    field.onChange(val);
-                    setSelectedEntity(null);
-                    setShowEntitySearch(false);
-                    setValue('entity_id', '');
-                  }}
-                  value={field.value}
-                >
-                  <SelectTrigger className="border-brand-orange/30 focus:ring-brand-orange/30">
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="food">Food</SelectItem>
-                    <SelectItem value="movie">Movie</SelectItem>
-                    <SelectItem value="book">Book</SelectItem>
-                    <SelectItem value="place">Place</SelectItem>
-                    <SelectItem value="product">Product</SelectItem>
-                  </SelectContent>
-                </Select>
+                <>
+                  {['food', 'movie', 'book', 'place', 'product'].map((category) => (
+                    <Button
+                      key={category}
+                      type="button"
+                      variant={field.value === category ? "default" : "outline"}
+                      className={cn(
+                        "flex flex-col items-center justify-center h-20 gap-1 p-2",
+                        field.value === category ? "bg-brand-orange text-white" : "",
+                        "transition-all duration-200 hover:scale-105"
+                      )}
+                      onClick={() => {
+                        field.onChange(category);
+                        setSelectedEntity(null);
+                        setShowEntitySearch(false);
+                        setValue('entity_id', '');
+                      }}
+                    >
+                      <span className="text-lg">
+                        {category === 'food' ? '🍽️' : 
+                         category === 'movie' ? '🎬' : 
+                         category === 'book' ? '📚' : 
+                         category === 'place' ? '📍' : '🛍️'}
+                      </span>
+                      <span className="capitalize text-xs">{category}</span>
+                    </Button>
+                  ))}
+                </>
               )}
             />
           </div>
@@ -268,18 +352,24 @@ const ReviewForm = ({
                   onChange={() => setShowEntitySearch(true)}
                 />
               ) : (
-                <div className="space-y-2">
-                  <Label>Search for {selectedCategory}</Label>
+                <div className="space-y-2 p-4 border border-dashed border-muted-foreground/30 rounded-lg">
+                  <Label className="flex items-center gap-2">
+                    <TagIcon className="h-4 w-4 text-brand-orange" />
+                    <span>Search for {selectedCategory}</span>
+                  </Label>
                   <EntitySearch 
                     type={selectedCategory as any}
                     onSelect={handleEntitySelect}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Can't find what you're looking for? You can just type the details below
+                  </p>
                 </div>
               )}
             </>
           )}
 
-          {/* For Food category, we'll let users search for restaurant using Places API */}
+          {/* For Food category, search for restaurant */}
           {!isEditMode && selectedCategory === 'food' && (
             <>
               {selectedEntity && !showEntitySearch ? (
@@ -289,8 +379,11 @@ const ReviewForm = ({
                   onChange={() => setShowEntitySearch(true)}
                 />
               ) : (
-                <div className="space-y-2">
-                  <Label>Search for restaurant</Label>
+                <div className="space-y-2 p-4 border border-dashed border-muted-foreground/30 rounded-lg">
+                  <Label className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-brand-orange" />
+                    <span>Where did you eat?</span>
+                  </Label>
                   <EntitySearch 
                     type="place"
                     onSelect={(entity) => {
@@ -301,15 +394,41 @@ const ReviewForm = ({
                     }}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Search for the restaurant or place where you had this food
+                    Or just type the restaurant name below
                   </p>
                 </div>
               )}
             </>
           )}
           
-          <div className="space-y-2">
-            <Label htmlFor="experience_date">When did you experience this? (optional)</Label>
+          {/* When did you experience this? */}
+          <div className="flex flex-col space-y-2">
+            <Label className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-brand-orange" />
+              <span>When did you experience this?</span>
+            </Label>
+            
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              {timePeriods.map((period) => (
+                <Button
+                  key={period.label}
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    "h-auto py-2 px-3",
+                    experienceDate && format(experienceDate, 'yyyy-MM-dd') === format(period.value, 'yyyy-MM-dd')
+                      ? "bg-brand-orange/10 border-brand-orange/30 text-brand-orange"
+                      : ""
+                  )}
+                  onClick={() => {
+                    setValue('experience_date', period.value);
+                  }}
+                >
+                  {period.label}
+                </Button>
+              ))}
+            </div>
+            
             <Controller
               name="experience_date"
               control={control}
@@ -325,10 +444,10 @@ const ReviewForm = ({
                       )}
                     >
                       <Calendar className="mr-2 h-4 w-4 text-brand-orange" />
-                      {field.value ? format(field.value, "PPP") : "Pick a date"}
+                      {field.value ? format(field.value, "PPP") : "Or pick a specific date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 z-50" align="start">
+                  <PopoverContent className="w-auto p-0 z-50 pointer-events-auto" align="start">
                     <CalendarComponent
                       mode="single"
                       selected={field.value}
@@ -338,6 +457,7 @@ const ReviewForm = ({
                       }}
                       disabled={(date) => date > new Date()}
                       initialFocus
+                      className="p-3"
                     />
                   </PopoverContent>
                 </Popover>
@@ -345,220 +465,222 @@ const ReviewForm = ({
             />
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="title">
-              {selectedCategory === 'food' ? 'Dish Name' : 'Title'}
-            </Label>
-            <Input 
-              id="title"
-              {...register('title', { required: "Title is required" })}
-              placeholder={selectedCategory === 'food' ? "What dish did you have?" : "What are you reviewing?"}
-              className={cn(errors.title ? "border-red-500" : "border-brand-orange/30 focus:ring-brand-orange/30")}
-            />
-            {errors.title && (
-              <p className="text-red-500 text-xs">{errors.title.message?.toString()}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="venue">
-              {selectedCategory === 'food' ? 'Restaurant/Source' : 
-                selectedCategory === 'movie' ? 'Director/Studio' : 
-                selectedCategory === 'book' ? 'Author/Publisher' : 
-                selectedCategory === 'place' ? 'Location/Address' : 'Brand/Manufacturer'}
-            </Label>
-            <Input 
-              id="venue"
-              {...register('venue')}
-              placeholder={`Where can this ${selectedCategory} be found?`}
-              className="border-brand-orange/30 focus:ring-brand-orange/30"
-            />
-          </div>
-          
-          {/* Add food tags section */}
-          {selectedCategory === 'food' && (
-            <div className="space-y-2">
-              <Label>Add Tags</Label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {foodTags.map((tag) => (
-                  <Badge 
-                    key={tag} 
-                    variant="secondary"
-                    className="flex items-center gap-1 bg-brand-orange/20"
-                  >
-                    {tag}
-                    <button 
-                      type="button"
-                      className="ml-1 hover:text-red-500 focus:outline-none"
-                      onClick={() => removeTag(tag)}
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              
-              <div className="flex gap-2">
-                <Input
-                  value={newFoodTag}
-                  onChange={(e) => setNewFoodTag(e.target.value)}
-                  placeholder="Add a tag (e.g., Spicy, Vegan)"
-                  className="border-brand-orange/30 focus:ring-brand-orange/30"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addFoodTag();
-                    }
-                  }}
+          <div className="grid md:grid-cols-2 gap-5">
+            {/* Left Column */}
+            <div className="space-y-5">
+              {/* What did you have? / Title */}
+              <div className="space-y-2">
+                <Label htmlFor="title" className="flex items-center gap-2">
+                  {selectedCategory === 'food' ? (
+                    <>
+                      <span className="text-lg">🍴</span>
+                      <span>What did you eat?</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-lg">{getCategoryEmoji()}</span>
+                      <span>Name</span>
+                    </>
+                  )}
+                </Label>
+                <Input 
+                  id="title"
+                  {...register('title', { required: "Required" })}
+                  placeholder={selectedCategory === 'food' ? "E.g. Pad Thai, Cheeseburger..." : "Title"}
+                  className={cn(errors.title ? "border-red-500" : "border-brand-orange/30 focus:ring-brand-orange/30")}
                 />
-                <Button 
-                  type="button" 
-                  onClick={addFoodTag}
-                  variant="outline"
-                  className="border-brand-orange/30 hover:bg-brand-orange/10"
-                >
-                  <Plus className="h-4 w-4 mr-1" /> Add
-                </Button>
+                {errors.title && (
+                  <p className="text-red-500 text-xs">{errors.title.message?.toString()}</p>
+                )}
               </div>
               
-              <div className="mt-2">
-                <p className="text-sm font-medium mb-1">Common tags:</p>
-                <div className="flex flex-wrap gap-1">
-                  {commonFoodTags.map((tag) => (
-                    <Badge 
-                      key={tag}
-                      variant="outline" 
-                      className={cn(
-                        "cursor-pointer hover:bg-brand-orange/10 transition-colors",
-                        foodTags.includes(tag) ? "bg-brand-orange/20" : ""
-                      )}
-                      onClick={() => addCommonTag(tag)}
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
+              {/* Location/Venue */}
+              <div className="space-y-2">
+                <Label htmlFor="venue" className="flex items-center gap-2">
+                  {selectedCategory === 'food' ? (
+                    <>
+                      <span className="text-lg">🏠</span>
+                      <span>Restaurant name</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-lg">{
+                        selectedCategory === 'movie' ? '🎬' : 
+                        selectedCategory === 'book' ? '✍️' : 
+                        selectedCategory === 'place' ? '📍' : '🏢'
+                      }</span>
+                      <span>{
+                        selectedCategory === 'movie' ? 'Director/Studio' : 
+                        selectedCategory === 'book' ? 'Author/Publisher' : 
+                        selectedCategory === 'place' ? 'Location' : 'Brand'
+                      }</span>
+                    </>
+                  )}
+                </Label>
+                <Input 
+                  id="venue"
+                  {...register('venue')}
+                  placeholder={
+                    selectedCategory === 'food' ? "Where did you eat this?" : 
+                    selectedCategory === 'movie' ? "Who made this movie?" : 
+                    selectedCategory === 'book' ? "Who wrote this book?" : 
+                    selectedCategory === 'place' ? "Address or location" : "Who made this product?"
+                  }
+                  className="border-brand-orange/30 focus:ring-brand-orange/30"
+                />
               </div>
-            </div>
-          )}
-          
-          <div className="space-y-2">
-            <Label htmlFor="description">Review (optional)</Label>
-            <Textarea 
-              id="description"
-              {...register('description')}
-              placeholder="Share your honest thoughts and experience..."
-              rows={3}
-              className="border-brand-orange/30 focus:ring-brand-orange/30"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Rating</Label>
-            <div className="flex items-center">
-              <Controller
-                name="rating"
-                control={control}
-                rules={{ required: "Please provide a rating" }}
-                render={({ field }) => (
-                  <div className="flex items-center">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Button
-                        type="button"
-                        key={star}
-                        variant="ghost"
-                        className="p-1 hover:bg-transparent"
-                        onClick={() => field.onChange(star)}
+              
+              {/* Food tags if category is food */}
+              {selectedCategory === 'food' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <TagIcon className="h-4 w-4 text-brand-orange" />
+                    <span>Add tags</span>
+                  </Label>
+                  
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {commonFoodTags.map((tag) => (
+                      <Badge 
+                        key={tag}
+                        variant="outline" 
+                        className={cn(
+                          "cursor-pointer hover:bg-brand-orange/10 transition-colors review-tag",
+                          foodTags.includes(tag) ? "bg-brand-orange/20 border-brand-orange/40" : ""
+                        )}
+                        onClick={() => foodTags.includes(tag) ? removeTag(tag) : addCommonTag(tag)}
                       >
-                        <Star
-                          className={cn(
-                            "h-6 w-6",
-                            star <= field.value ? "fill-brand-orange text-brand-orange" : "text-gray-300"
-                          )}
-                        />
-                      </Button>
+                        {tag}
+                        {foodTags.includes(tag) && (
+                          <span className="ml-1 text-xs cursor-pointer">×</span>
+                        )}
+                      </Badge>
                     ))}
                   </div>
-                )}
-              />
-              <span className="ml-2 text-sm">
-                {watch('rating') === 0 ? 'Select a rating' : `${watch('rating')} out of 5`}
-              </span>
-            </div>
-            {errors.rating && (
-              <p className="text-red-500 text-xs">{errors.rating.message?.toString()}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Add Image (optional)</Label>
-            <div className="flex items-center gap-4">
-              <div>
-                <Input
-                  type="file"
-                  id="image"
-                  accept="image/*"
-                  onChange={handleImageUploadChange}
-                  className="hidden"
-                />
-                <Label
-                  htmlFor="image"
-                  className="cursor-pointer inline-flex items-center px-3 py-2 border border-brand-orange/30 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-orange"
-                >
-                  {isUploading ? "Uploading..." : "Choose File"}
-                </Label>
-              </div>
-              
-              {selectedImage && (
-                <div className="relative h-16 w-16">
-                  <img
-                    src={selectedImage}
-                    alt="Preview"
-                    className="h-full w-full object-cover rounded"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-gray-800/80 text-white hover:bg-gray-900"
-                    onClick={() => {
-                      setValue('image_url', '');
-                      setSelectedImage(null);
-                    }}
-                  >
-                    ×
-                  </Button>
+                  
+                  <div className="flex gap-2">
+                    <Input
+                      value={newFoodTag}
+                      onChange={(e) => setNewFoodTag(e.target.value)}
+                      placeholder="Add a custom tag"
+                      className="border-brand-orange/30 focus:ring-brand-orange/30"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addFoodTag();
+                        }
+                      }}
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={addFoodTag}
+                      variant="outline"
+                      className="border-brand-orange/30 hover:bg-brand-orange/10"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Visibility</Label>
-            <Controller
-              name="visibility"
-              control={control}
-              render={({ field }) => (
-                <RadioGroup
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  className="grid grid-cols-3 gap-2"
-                >
-                  <div className="flex items-center space-x-2 border border-brand-orange/30 p-3 rounded-lg">
-                    <RadioGroupItem value="public" id="public" className="text-brand-orange" />
-                    <Label htmlFor="public">Public</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border border-brand-orange/30 p-3 rounded-lg">
-                    <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" />
-                    <Label htmlFor="circle">Circle Only</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border border-brand-orange/30 p-3 rounded-lg">
-                    <RadioGroupItem value="private" id="private" className="text-brand-orange" />
-                    <Label htmlFor="private">Private</Label>
-                  </div>
-                </RadioGroup>
-              )}
-            />
+            
+            {/* Right Column */}
+            <div className="space-y-5">
+              {/* Add Photo */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-brand-orange" />
+                  <span>Add a photo</span>
+                </Label>
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-brand-orange/30 rounded-lg p-4 review-image-upload">
+                  {selectedImage ? (
+                    <div className="relative w-full h-40">
+                      <img
+                        src={selectedImage}
+                        alt="Preview"
+                        className="h-full w-full object-cover rounded-md mx-auto"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-gray-800/80 text-white hover:bg-gray-900"
+                        onClick={() => {
+                          setValue('image_url', '');
+                          setSelectedImage(null);
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Input
+                        type="file"
+                        id="image"
+                        accept="image/*"
+                        onChange={handleImageUploadChange}
+                        className="hidden"
+                      />
+                      <Label
+                        htmlFor="image"
+                        className="cursor-pointer flex flex-col items-center text-muted-foreground"
+                      >
+                        <Camera className="h-12 w-12 mb-2 text-brand-orange/50" />
+                        <span className="text-sm">{isUploading ? "Uploading..." : "Tap to add photo"}</span>
+                        <span className="text-xs mt-1">Share your experience visually</span>
+                      </Label>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Your Review */}
+              <div className="space-y-2">
+                <Label htmlFor="description" className="flex items-center gap-2">
+                  <span className="text-lg">💬</span>
+                  <span>Your thoughts? (optional)</span>
+                </Label>
+                <Textarea 
+                  id="description"
+                  {...register('description')}
+                  placeholder="Tell us what you liked or didn't like..."
+                  rows={4}
+                  className="border-brand-orange/30 focus:ring-brand-orange/30 resize-none"
+                />
+              </div>
+              
+              {/* Visibility */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span className="text-lg">👁️</span>
+                  <span>Who can see this review?</span>
+                </Label>
+                <Controller
+                  name="visibility"
+                  control={control}
+                  render={({ field }) => (
+                    <RadioGroup
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      className="grid grid-cols-3 gap-2"
+                    >
+                      <div className="flex flex-col items-center space-y-1 border border-brand-orange/30 p-3 rounded-lg hover:bg-brand-orange/5 transition-colors">
+                        <RadioGroupItem value="public" id="public" className="text-brand-orange" />
+                        <Label htmlFor="public" className="cursor-pointer text-xs">Everyone</Label>
+                      </div>
+                      <div className="flex flex-col items-center space-y-1 border border-brand-orange/30 p-3 rounded-lg hover:bg-brand-orange/5 transition-colors">
+                        <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" />
+                        <Label htmlFor="circle" className="cursor-pointer text-xs">My Circle</Label>
+                      </div>
+                      <div className="flex flex-col items-center space-y-1 border border-brand-orange/30 p-3 rounded-lg hover:bg-brand-orange/5 transition-colors">
+                        <RadioGroupItem value="private" id="private" className="text-brand-orange" />
+                        <Label htmlFor="private" className="cursor-pointer text-xs">Just Me</Label>
+                      </div>
+                    </RadioGroup>
+                  )}
+                />
+              </div>
+            </div>
           </div>
           
           <div className="flex justify-end gap-2 pt-4">
@@ -574,10 +696,10 @@ const ReviewForm = ({
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEditMode ? "Updating..." : "Saving..."}
+                  {isEditMode ? "Saving changes..." : "Share review"}
                 </>
               ) : (
-                isEditMode ? "Update Review" : "Save Review"
+                isEditMode ? "Save changes" : "Share review"
               )}
             </Button>
           </div>
