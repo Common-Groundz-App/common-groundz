@@ -23,36 +23,58 @@ const ConnectedRingsRating = ({
   showLabel = false
 }: ConnectedRingsRatingProps) => {
   const [hoverRating, setHoverRating] = useState(0);
-  const isReadOnly = !onChange;
   
   const sizeConfig = {
     sm: {
-      svgSize: 120,
+      svgSize: 150,
+      ringSize: 20,
       textClass: 'text-xs',
-      ringSize: 12,
-      spacing: 1,
-      textOffset: 25
+      textOffset: 30,
+      overlapOffset: 15
     },
     md: {
-      svgSize: 180,
+      svgSize: 200,
+      ringSize: 28,
       textClass: 'text-sm',
-      ringSize: 18,
-      spacing: 2,
-      textOffset: 35
+      textOffset: 40,
+      overlapOffset: 20
     },
     lg: {
-      svgSize: 240,
+      svgSize: 250,
+      ringSize: 36,
       textClass: 'text-base',
-      ringSize: 24,
-      spacing: 3,
-      textOffset: 45
+      textOffset: 50,
+      overlapOffset: 25
     }
   };
   
-  const { svgSize, textClass, ringSize, spacing, textOffset } = sizeConfig[size];
+  const { svgSize, ringSize, textClass, overlapOffset } = sizeConfig[size];
   const effectiveRating = hoverRating || value;
-  const bgClass = useThemedClass('bg-gradient-to-r from-amber-50 to-orange-50', 'bg-gradient-to-r from-orange-950/30 to-amber-950/30');
+  const isCertified = value >= 4.5;
   
+  // Calculate positions for the 5 interlinking rings in a row
+  const calculateRingPositions = () => {
+    const rings = [];
+    const verticalCenter = svgSize / 2;
+    // Start position from the left with some padding
+    let horizontalPosition = ringSize + 10;
+    
+    // Create 5 rings in a row with overlap
+    for (let i = 0; i < 5; i++) {
+      rings.push({
+        cx: horizontalPosition,
+        cy: verticalCenter,
+        value: i + 1 // Rating value 1-5
+      });
+      // Move horizontally with overlap
+      horizontalPosition += (ringSize * 2) - overlapOffset;
+    }
+    
+    return rings;
+  };
+  
+  const ringPositions = calculateRingPositions();
+
   const getRatingText = (rating: number) => {
     if (rating === 0) return "Tap to rate";
     if (rating === 5) return "Loved it! 😍";
@@ -62,64 +84,6 @@ const ConnectedRingsRating = ({
     return "Didn't like it 😕";
   };
   
-  const isCertified = value >= 4.5;
-
-  // Calculate positions for the 5 rings
-  const calculateRingPositions = () => {
-    const center = svgSize / 2;
-    const radius = center - ringSize - spacing;
-    
-    // Calculate positions in a circular pattern
-    const rings = [];
-    
-    // First ring at the center
-    rings.push({ cx: center, cy: center });
-    
-    // Calculate positions for 4 rings around the center
-    const angleStep = (2 * Math.PI) / 4; // Divide the circle into 4 parts
-    for (let i = 0; i < 4; i++) {
-      const angle = i * angleStep;
-      const x = center + radius * Math.cos(angle);
-      const y = center + radius * Math.sin(angle);
-      rings.push({ cx: x, cy: y });
-    }
-    
-    return rings;
-  };
-  
-  const ringPositions = calculateRingPositions();
-  
-  // Generate connection lines between rings
-  const generateConnections = () => {
-    const connections = [];
-    const centerRingIndex = 0;
-    
-    // Connect center ring to all other rings
-    for (let i = 1; i < ringPositions.length; i++) {
-      connections.push({
-        x1: ringPositions[centerRingIndex].cx,
-        y1: ringPositions[centerRingIndex].cy,
-        x2: ringPositions[i].cx,
-        y2: ringPositions[i].cy,
-      });
-    }
-    
-    // Connect outer rings to each other in a circular pattern
-    for (let i = 1; i < ringPositions.length; i++) {
-      const nextIndex = i === ringPositions.length - 1 ? 1 : i + 1;
-      connections.push({
-        x1: ringPositions[i].cx,
-        y1: ringPositions[i].cy,
-        x2: ringPositions[nextIndex].cx,
-        y2: ringPositions[nextIndex].cy,
-      });
-    }
-    
-    return connections;
-  };
-  
-  const connections = generateConnections();
-
   // Handle ring click
   const handleRingClick = (ringValue: number) => {
     if (isInteractive && onChange) {
@@ -143,57 +107,42 @@ const ConnectedRingsRating = ({
           viewBox={`0 0 ${svgSize} ${svgSize}`}
           className="transform transition-transform duration-300 hover:scale-105"
         >
-          {/* Connection lines */}
-          {connections.map((conn, i) => (
-            <line
-              key={`conn-${i}`}
-              x1={conn.x1}
-              y1={conn.y1}
-              x2={conn.x2}
-              y2={conn.y2}
-              stroke={`url(#${effectiveRating >= (i % 4) + 2 ? 'activeGradient' : 'inactiveGradient'})`}
-              strokeWidth={spacing * 2}
-              strokeLinecap="round"
-              className="transition-all duration-300"
-            />
-          ))}
-          
-          {/* Rings */}
-          {ringPositions.map((pos, i) => {
-            const ringValue = i === 0 ? 1 : i + 1; // Center is 1, then 2-5 clockwise
-            const isActive = effectiveRating >= ringValue;
+          {/* Interlinking rings */}
+          {ringPositions.map((ring, i) => {
+            const isActive = effectiveRating >= ring.value;
             
             return (
-              <g key={`ring-${i}`} className="transition-all duration-300">
-                {/* Outer circle (always visible) */}
+              <g 
+                key={`ring-${i}`} 
+                className="transition-all duration-300"
+                onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
+                onClick={() => handleRingClick(ring.value)}
+              >
+                {/* Ring outline */}
                 <circle
-                  cx={pos.cx}
-                  cy={pos.cy}
+                  cx={ring.cx}
+                  cy={ring.cy}
                   r={ringSize}
                   stroke={isActive ? "#F97316" : "gray"}
-                  strokeWidth="1.5"
+                  strokeWidth="2"
                   fill="transparent"
                   className="transition-all duration-300"
                 />
                 
-                {/* Inner filled circle (visible when active) */}
+                {/* Ring fill with gradient */}
                 <circle
-                  cx={pos.cx}
-                  cy={pos.cy}
+                  cx={ring.cx}
+                  cy={ring.cy}
                   r={ringSize - 2}
                   fill={`url(#${isActive ? 'activeGradient' : 'inactiveGradient'})`}
-                  className={cn(
-                    "transition-all duration-300",
-                    !isActive && "opacity-40"
-                  )}
-                  onMouseEnter={() => isInteractive && setHoverRating(ringValue)}
-                  onClick={() => handleRingClick(ringValue)}
+                  fillOpacity={isActive ? "0.9" : "0.2"}
+                  className="transition-all duration-300"
                 />
                 
                 {/* Ring number */}
                 <text
-                  x={pos.cx}
-                  y={pos.cy}
+                  x={ring.cx}
+                  y={ring.cy}
                   textAnchor="middle"
                   dominantBaseline="central"
                   fill={isActive ? "white" : "currentColor"}
@@ -202,7 +151,7 @@ const ConnectedRingsRating = ({
                     size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'
                   )}
                 >
-                  {ringValue}
+                  {ring.value}
                 </text>
               </g>
             );
