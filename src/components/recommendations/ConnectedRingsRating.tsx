@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { cn } from "@/lib/utils";
 import { useThemedClass } from '@/utils/theme-utils';
@@ -66,9 +65,9 @@ const ConnectedRingsRating = ({
   const calculateSvgWidth = () => {
     // Calculate the total width needed for 5 rings with overlap
     // First ring position + width of all 5 rings with overlap + extra padding
-    const firstRingPosition = ringSize + 10;
+    const firstRingPosition = ringSize;
     const totalRingsWidth = ((ringSize * 2) * 5) - (overlapOffset * 4);
-    const rightPadding = ringSize + 10;
+    const rightPadding = ringSize;
     
     return firstRingPosition + totalRingsWidth + rightPadding;
   };
@@ -77,12 +76,15 @@ const ConnectedRingsRating = ({
   const svgWidth = calculateSvgWidth();
   const svgHeight = sizeConfig[size].svgSize;
   
-  // Calculate positions for the 5 interlinking rings in a row
+  // Calculate positions for the 5 interlinking rings in a row with centered distribution
   const calculateRingPositions = () => {
     const rings = [];
     const verticalCenter = svgHeight / 2;
-    // Start position from the left with padding
-    let horizontalPosition = ringSize + 10;
+    
+    // Total width of all rings with overlap
+    const totalWidth = ((ringSize * 2) * 5) - (overlapOffset * 4);
+    // Start position should center the entire set of rings
+    let horizontalPosition = ringSize;
     
     // Create 5 rings in a row with overlap
     for (let i = 0; i < 5; i++) {
@@ -160,126 +162,128 @@ const ConnectedRingsRating = ({
 
   return (
     <TooltipProvider>
-      <div className={cn("flex flex-col items-center", className)}>
-        {/* Center the SVG container horizontally */}
-        <div
-          className={cn(
-            "relative flex justify-center", // Added justify-center for centering
-            isInteractive && "cursor-pointer",
-            isCertified && "animate-pulse"
-          )}
-          onMouseLeave={() => isInteractive && setHoverRating(0)}
-        >
-          <svg
-            width={svgWidth}
-            height={svgHeight}
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            className="transform transition-transform duration-300"
-            style={{ overflow: 'visible' }}
+      <div className={cn("flex flex-col items-center w-full", className)}>
+        {/* Center the SVG container horizontally with proper alignment */}
+        <div className="w-full flex justify-center">
+          <div
+            className={cn(
+              "relative",
+              isInteractive && "cursor-pointer",
+              isCertified && "animate-pulse"
+            )}
+            onMouseLeave={() => isInteractive && setHoverRating(0)}
           >
-            {/* Gradient definitions for sentiment colors */}
-            <defs>
-              <linearGradient id="sentimentGradientRed" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#ea384c" />
-                <stop offset="100%" stopColor="#f87171" />
-              </linearGradient>
-              <linearGradient id="sentimentGradientOrange" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#F97316" />
-                <stop offset="100%" stopColor="#FB923C" />
-              </linearGradient>
-              <linearGradient id="sentimentGradientYellow" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#FEC006" />
-                <stop offset="100%" stopColor="#FEF08A" />
-              </linearGradient>
-              <linearGradient id="sentimentGradientLightGreen" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#84cc16" />
-                <stop offset="100%" stopColor="#bef264" />
-              </linearGradient>
-              <linearGradient id="sentimentGradientGreen" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#22c55e" />
-                <stop offset="100%" stopColor="#86efac" />
-              </linearGradient>
-            </defs>
-            
-            {/* Interlinking donut rings */}
-            {ringPositions.map((ring, i) => {
-              const isActive = effectiveRating >= ring.value;
-              const ringRadius = ringSize - strokeWidth / 2;
-              const circumference = calculateStrokeDashArray(ringRadius);
-              const activePercentage = isActive ? 100 : 0;
-              const dashOffset = circumference - (circumference * activePercentage) / 100;
-              const isAnimating = animateRing === ring.value;
+            <svg
+              width={svgWidth}
+              height={svgHeight}
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+              className="transform transition-transform duration-300 mx-auto"
+              style={{ overflow: 'visible' }}
+            >
+              {/* Gradient definitions for sentiment colors */}
+              <defs>
+                <linearGradient id="sentimentGradientRed" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#ea384c" />
+                  <stop offset="100%" stopColor="#f87171" />
+                </linearGradient>
+                <linearGradient id="sentimentGradientOrange" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#F97316" />
+                  <stop offset="100%" stopColor="#FB923C" />
+                </linearGradient>
+                <linearGradient id="sentimentGradientYellow" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#FEC006" />
+                  <stop offset="100%" stopColor="#FEF08A" />
+                </linearGradient>
+                <linearGradient id="sentimentGradientLightGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#84cc16" />
+                  <stop offset="100%" stopColor="#bef264" />
+                </linearGradient>
+                <linearGradient id="sentimentGradientGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#22c55e" />
+                  <stop offset="100%" stopColor="#86efac" />
+                </linearGradient>
+              </defs>
               
-              return (
-                <Tooltip key={`ring-${i}`}>
-                  <TooltipTrigger asChild>
-                    <g 
-                      className={cn(
-                        "transition-all duration-300 hover:scale-105 group",
-                        isAnimating && "animate-[bounce_0.5s_ease-in-out]"
-                      )}
-                      onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
-                      onClick={() => handleRingClick(ring.value)}
-                    >
-                      {/* Ring outline (always visible) */}
-                      <circle
-                        cx={ring.cx}
-                        cy={ring.cy}
-                        r={ringRadius}
-                        stroke={isActive ? sentimentColor : "gray"}
-                        strokeWidth={strokeWidth}
-                        fill="transparent"
-                        className="transition-all duration-300"
-                      />
-                      
-                      {/* Animated fill stroke */}
-                      <circle
-                        cx={ring.cx}
-                        cy={ring.cy}
-                        r={ringRadius}
-                        stroke={`url(#${getSentimentGradientId(effectiveRating)})`}
-                        strokeWidth={strokeWidth}
-                        fill="transparent"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={isActive ? 0 : circumference}
-                        strokeLinecap="round"
-                        className="transition-all duration-500 ease-out"
-                        style={{ 
-                          transform: 'rotate(-90deg)', 
-                          transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                          opacity: isActive ? 1 : 0
-                        }}
-                      />
-                      
-                      {/* Hover glow effect */}
-                      {isInteractive && (
+              {/* Interlinking donut rings */}
+              {ringPositions.map((ring, i) => {
+                const isActive = effectiveRating >= ring.value;
+                const ringRadius = ringSize - strokeWidth / 2;
+                const circumference = calculateStrokeDashArray(ringRadius);
+                const activePercentage = isActive ? 100 : 0;
+                const dashOffset = circumference - (circumference * activePercentage) / 100;
+                const isAnimating = animateRing === ring.value;
+                
+                return (
+                  <Tooltip key={`ring-${i}`}>
+                    <TooltipTrigger asChild>
+                      <g 
+                        className={cn(
+                          "transition-all duration-300 hover:scale-105 group",
+                          isAnimating && "animate-[bounce_0.5s_ease-in-out]"
+                        )}
+                        onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
+                        onClick={() => handleRingClick(ring.value)}
+                      >
+                        {/* Ring outline (always visible) */}
                         <circle
                           cx={ring.cx}
                           cy={ring.cy}
-                          r={ringRadius + 2}
-                          stroke={sentimentColor}
-                          strokeWidth={2}
+                          r={ringRadius}
+                          stroke={isActive ? sentimentColor : "gray"}
+                          strokeWidth={strokeWidth}
                           fill="transparent"
-                          opacity="0"
-                          className="group-hover:opacity-30 transition-opacity duration-300"
+                          className="transition-all duration-300"
                         />
-                      )}
-                    </g>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="bg-popover/90 backdrop-blur-sm">
-                    {getRatingText(ring.value)}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </svg>
+                        
+                        {/* Animated fill stroke */}
+                        <circle
+                          cx={ring.cx}
+                          cy={ring.cy}
+                          r={ringRadius}
+                          stroke={`url(#${getSentimentGradientId(effectiveRating)})`}
+                          strokeWidth={strokeWidth}
+                          fill="transparent"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={isActive ? 0 : circumference}
+                          strokeLinecap="round"
+                          className="transition-all duration-500 ease-out"
+                          style={{ 
+                            transform: 'rotate(-90deg)', 
+                            transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                            opacity: isActive ? 1 : 0
+                          }}
+                        />
+                        
+                        {/* Hover glow effect */}
+                        {isInteractive && (
+                          <circle
+                            cx={ring.cx}
+                            cy={ring.cy}
+                            r={ringRadius + 2}
+                            stroke={sentimentColor}
+                            strokeWidth={2}
+                            fill="transparent"
+                            opacity="0"
+                            className="group-hover:opacity-30 transition-opacity duration-300"
+                          />
+                        )}
+                      </g>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-popover/90 backdrop-blur-sm">
+                      {getRatingText(ring.value)}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </svg>
 
-          {/* Circle Certified Badge - show only for high ratings */}
-          {isCertified && (
-            <div className="absolute -right-2 -top-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
-              Circle Certified
-            </div>
-          )}
+            {/* Circle Certified Badge - show only for high ratings */}
+            {isCertified && (
+              <div className="absolute -right-2 -top-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
+                Circle Certified
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Rating value and text */}
