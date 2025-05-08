@@ -29,6 +29,7 @@ const ConnectedRingsRating = ({
   showLabel = false
 }: ConnectedRingsRatingProps) => {
   const [hoverRating, setHoverRating] = useState(0);
+  const [animateRing, setAnimateRing] = useState<number | null>(null);
   
   const sizeConfig = {
     sm: {
@@ -84,19 +85,53 @@ const ConnectedRingsRating = ({
   
   const ringPositions = calculateRingPositions();
 
-  const getRatingText = (rating: number) => {
-    if (rating === 0) return "Tap to rate";
-    if (rating === 5) return "Loved it! 😍";
-    if (rating === 4) return "Really good 👍";
-    if (rating === 3) return "It's okay 😊";
-    if (rating === 2) return "Not great 😐";
-    return "Didn't like it 😕";
+  // Get sentiment color based on rating
+  const getSentimentColor = (rating: number) => {
+    if (rating < 2) return "#ea384c"; // Red for 1.0-1.9
+    if (rating < 3) return "#F97316"; // Orange for 2.0-2.9
+    if (rating < 4) return "#FEC006"; // Yellow for 3.0-3.9
+    if (rating < 4.5) return "#84cc16"; // Light green for 4.0-4.4
+    return "#22c55e"; // Green for 4.5-5.0
   };
   
-  // Handle ring click
+  // Get sentiment gradient ID based on rating
+  const getSentimentGradientId = (rating: number) => {
+    if (rating < 2) return "sentimentGradientRed";
+    if (rating < 3) return "sentimentGradientOrange";
+    if (rating < 4) return "sentimentGradientYellow";
+    if (rating < 4.5) return "sentimentGradientLightGreen";
+    return "sentimentGradientGreen";
+  };
+
+  // Get emoji and text based on rating
+  const getRatingText = (rating: number) => {
+    if (rating === 0) return "Tap to rate";
+    if (rating < 2) return "Didn't like it 😕";
+    if (rating < 3) return "Below average 😐";
+    if (rating < 4) return "It was okay 🙂";
+    if (rating < 4.5) return "Liked it 😄";
+    return "Loved it! 🤩";
+  };
+  
+  // Get emoji only based on rating
+  const getRatingEmoji = (rating: number) => {
+    if (rating < 2) return "😕";
+    if (rating < 3) return "😐";
+    if (rating < 4) return "🙂";
+    if (rating < 4.5) return "😄";
+    return "🤩";
+  };
+  
+  // Handle ring click with animation
   const handleRingClick = (ringValue: number) => {
     if (isInteractive && onChange) {
+      setAnimateRing(ringValue);
       onChange(ringValue);
+      
+      // Reset animation state after animation completes
+      setTimeout(() => {
+        setAnimateRing(null);
+      }, 500);
     }
   };
 
@@ -105,6 +140,8 @@ const ConnectedRingsRating = ({
     const circumference = 2 * Math.PI * radius;
     return circumference;
   };
+
+  const sentimentColor = getSentimentColor(effectiveRating);
 
   return (
     <TooltipProvider>
@@ -123,6 +160,30 @@ const ConnectedRingsRating = ({
             viewBox={`0 0 ${svgSize} ${svgSize}`}
             className="transform transition-transform duration-300"
           >
+            {/* Gradient definitions for sentiment colors */}
+            <defs>
+              <linearGradient id="sentimentGradientRed" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#ea384c" />
+                <stop offset="100%" stopColor="#f87171" />
+              </linearGradient>
+              <linearGradient id="sentimentGradientOrange" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#F97316" />
+                <stop offset="100%" stopColor="#FB923C" />
+              </linearGradient>
+              <linearGradient id="sentimentGradientYellow" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#FEC006" />
+                <stop offset="100%" stopColor="#FEF08A" />
+              </linearGradient>
+              <linearGradient id="sentimentGradientLightGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#84cc16" />
+                <stop offset="100%" stopColor="#bef264" />
+              </linearGradient>
+              <linearGradient id="sentimentGradientGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#22c55e" />
+                <stop offset="100%" stopColor="#86efac" />
+              </linearGradient>
+            </defs>
+            
             {/* Interlinking donut rings */}
             {ringPositions.map((ring, i) => {
               const isActive = effectiveRating >= ring.value;
@@ -130,12 +191,16 @@ const ConnectedRingsRating = ({
               const circumference = calculateStrokeDashArray(ringRadius);
               const activePercentage = isActive ? 100 : 0;
               const dashOffset = circumference - (circumference * activePercentage) / 100;
+              const isAnimating = animateRing === ring.value;
               
               return (
                 <Tooltip key={`ring-${i}`}>
                   <TooltipTrigger asChild>
                     <g 
-                      className="transition-all duration-300 hover:scale-105 group"
+                      className={cn(
+                        "transition-all duration-300 hover:scale-105 group",
+                        isAnimating && "animate-[bounce_0.5s_ease-in-out]"
+                      )}
                       onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
                       onClick={() => handleRingClick(ring.value)}
                     >
@@ -144,7 +209,7 @@ const ConnectedRingsRating = ({
                         cx={ring.cx}
                         cy={ring.cy}
                         r={ringRadius}
-                        stroke={isActive ? "#F97316" : "gray"}
+                        stroke={isActive ? sentimentColor : "gray"}
                         strokeWidth={strokeWidth}
                         fill="transparent"
                         className="transition-all duration-300"
@@ -155,7 +220,7 @@ const ConnectedRingsRating = ({
                         cx={ring.cx}
                         cy={ring.cy}
                         r={ringRadius}
-                        stroke="url(#activeGradient)"
+                        stroke={`url(#${getSentimentGradientId(effectiveRating)})`}
                         strokeWidth={strokeWidth}
                         fill="transparent"
                         strokeDasharray={circumference}
@@ -175,7 +240,7 @@ const ConnectedRingsRating = ({
                           cx={ring.cx}
                           cy={ring.cy}
                           r={ringRadius + 2}
-                          stroke="#F97316"
+                          stroke={sentimentColor}
                           strokeWidth={2}
                           fill="transparent"
                           opacity="0"
@@ -190,19 +255,11 @@ const ConnectedRingsRating = ({
                 </Tooltip>
               );
             })}
-            
-            {/* Gradients definitions */}
-            <defs>
-              <linearGradient id="activeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#F97316" />
-                <stop offset="100%" stopColor="#FB923C" />
-              </linearGradient>
-            </defs>
           </svg>
 
           {/* Circle Certified Badge - show only for high ratings */}
           {isCertified && (
-            <div className="absolute -right-2 -top-2 bg-gradient-to-r from-brand-orange to-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
+            <div className="absolute -right-2 -top-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
               Circle Certified
             </div>
           )}
@@ -212,16 +269,23 @@ const ConnectedRingsRating = ({
         <div className="mt-2 flex flex-col items-center">
           {showValue && (
             <span className={cn("font-bold", textClass)}>
-              {value.toFixed(1)}
-              <span className="text-brand-orange ml-1">•</span> 
+              <span className="mr-1" style={{ color: sentimentColor }}>{value.toFixed(1)}</span>
+              <span className="text-brand-orange">•</span> 
               <span className="text-muted-foreground font-normal ml-1">Groundz Score</span>
             </span>
           )}
           
-          {showLabel && isInteractive && (
-            <span className={cn("text-center mt-1", textClass)}>
-              {getRatingText(Math.round(effectiveRating))}
-            </span>
+          {showLabel && (
+            <div 
+              className={cn(
+                "text-center mt-1 transition-all duration-300 flex items-center gap-1", 
+                textClass
+              )}
+              style={{ color: sentimentColor }}
+            >
+              <span className="text-lg">{getRatingEmoji(Math.round(effectiveRating))}</span>
+              <span>{getRatingText(Math.round(effectiveRating)).split(' ').slice(0, -1).join(' ')}</span>
+            </div>
           )}
         </div>
       </div>
