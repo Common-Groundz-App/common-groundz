@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import EntitySearch from './EntitySearch';
 import { RecommendationCategory, RecommendationVisibility, Recommendation } from '@/services/recommendationService';
+import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 
 interface RecommendationFormProps {
   isOpen: boolean;
@@ -146,7 +146,7 @@ const RecommendationForm = ({
         </DialogHeader>
         
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
-          {/* Rating Stars - Moved to top and made bigger */}
+          {/* Rating - Use our new connected rings component */}
           <div className="space-y-2">
             <div className="flex flex-col items-center p-4 rounded-xl bg-accent/20">
               <p className="text-center mb-3 text-lg font-medium">How would you rate it?</p>
@@ -155,43 +155,17 @@ const RecommendationForm = ({
                 control={control}
                 rules={{ required: "Please give a rating" }}
                 render={({ field }) => (
-                  <div className="flex items-center justify-center mb-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Button
-                        type="button"
-                        key={star}
-                        variant="ghost"
-                        className="p-1 hover:bg-transparent"
-                        onMouseEnter={() => setHoverRating(star)}
-                        onMouseLeave={() => setHoverRating(0)}
-                        onClick={() => field.onChange(star)}
-                      >
-                        <Star
-                          className={cn(
-                            "h-8 w-8 review-star",
-                            (star <= (hoverRating || field.value)) 
-                              ? "fill-brand-orange text-brand-orange" 
-                              : "text-gray-300 dark:text-gray-600"
-                          )}
-                        />
-                      </Button>
-                    ))}
-                  </div>
+                  <ConnectedRingsRating
+                    value={field.value}
+                    onChange={field.onChange}
+                    size="md"
+                    showValue={true}
+                    isInteractive={true}
+                    showLabel={true}
+                    className="transition-all duration-300"
+                  />
                 )}
               />
-              <span className="text-sm text-muted-foreground">
-                {watch('rating') === 0 
-                  ? "Tap to rate" 
-                  : watch('rating') === 5 
-                    ? "Love it!" 
-                    : watch('rating') === 4 
-                      ? "Really good" 
-                      : watch('rating') === 3 
-                        ? "It's okay" 
-                        : watch('rating') === 2 
-                          ? "Not great" 
-                          : "Don't recommend"}
-              </span>
               {errors.rating && (
                 <p className="text-destructive text-sm mt-1">{errors.rating.message?.toString()}</p>
               )}

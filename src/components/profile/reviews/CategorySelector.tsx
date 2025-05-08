@@ -28,7 +28,9 @@ const CategorySelector = ({ selected, onChange }: CategorySelectorProps) => {
             "flex flex-col items-center justify-center h-20 gap-1 p-2 transition-all duration-200",
             selected === category.value 
               ? "bg-gradient-to-r from-brand-orange to-brand-orange/90 text-white scale-105 shadow-md" 
-              : "hover:bg-accent/40 hover:scale-105",
+              : "hover:bg-accent/40 hover:border-brand-orange/50 hover:scale-105",
+            "border-2",
+            selected === category.value ? "border-brand-orange" : "border-transparent"
           )}
           onClick={() => onChange(category.value)}
         >

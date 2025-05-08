@@ -70,7 +70,8 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
         <div className="flex justify-end mb-6">
           <Button 
             onClick={() => setIsFormOpen(true)} 
-            className="bg-gradient-to-r from-brand-orange to-brand-orange/90 text-white hover:shadow-md transition-all duration-200 flex items-center gap-2"
+            variant="gradient"
+            className="flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
           >
             <PlusCircle className="h-4 w-4" />
             Add Review
