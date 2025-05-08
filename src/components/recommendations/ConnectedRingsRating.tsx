@@ -61,32 +61,35 @@ const ConnectedRingsRating = ({
   const effectiveRating = hoverRating || value;
   const isCertified = value >= 4.5;
   
-  // Calculate the actual width needed to display all 5 rings properly
+  // Calculate the actual width needed to display all 5 rings properly with even padding
   const calculateSvgWidth = () => {
     // Calculate the total width needed for 5 rings with overlap
-    // First ring position + width of all 5 rings with overlap + extra padding
-    const firstRingPosition = ringSize;
     const totalRingsWidth = ((ringSize * 2) * 5) - (overlapOffset * 4);
-    const rightPadding = ringSize;
     
-    return firstRingPosition + totalRingsWidth + rightPadding;
+    // Add equal padding on both sides
+    const sidePadding = ringSize;
+    
+    return totalRingsWidth + (sidePadding * 2);
   };
   
   // Calculate the viewBox size dynamically
   const svgWidth = calculateSvgWidth();
   const svgHeight = sizeConfig[size].svgSize;
   
-  // Calculate positions for the 5 interlinking rings in a row with centered distribution
+  // Calculate positions for the 5 interlinking rings with centered distribution
   const calculateRingPositions = () => {
     const rings = [];
     const verticalCenter = svgHeight / 2;
     
-    // Total width of all rings with overlap
-    const totalWidth = ((ringSize * 2) * 5) - (overlapOffset * 4);
-    // Start position should center the entire set of rings
-    let horizontalPosition = ringSize;
+    // Calculate the total width of all 5 rings with overlap
+    const totalRingsWidth = ((ringSize * 2) * 5) - (overlapOffset * 4);
     
-    // Create 5 rings in a row with overlap
+    // Calculate the starting position to center the rings within the SVG
+    const startX = (svgWidth - totalRingsWidth) / 2 + ringSize;
+    
+    let horizontalPosition = startX;
+    
+    // Create 5 rings in a row with overlap, centered in the SVG
     for (let i = 0; i < 5; i++) {
       rings.push({
         cx: horizontalPosition,
@@ -167,7 +170,7 @@ const ConnectedRingsRating = ({
         <div className="w-full flex justify-center">
           <div
             className={cn(
-              "relative",
+              "relative flex justify-center",
               isInteractive && "cursor-pointer",
               isCertified && "animate-pulse"
             )}
@@ -177,7 +180,7 @@ const ConnectedRingsRating = ({
               width={svgWidth}
               height={svgHeight}
               viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-              className="transform transition-transform duration-300 mx-auto"
+              className="transform transition-transform duration-300"
               style={{ overflow: 'visible' }}
             >
               {/* Gradient definitions for sentiment colors */}
