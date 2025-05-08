@@ -58,15 +58,30 @@ const ConnectedRingsRating = ({
     }
   };
   
-  const { svgSize, ringSize, strokeWidth, textClass, overlapOffset } = sizeConfig[size];
+  const { ringSize, strokeWidth, textClass, overlapOffset } = sizeConfig[size];
   const effectiveRating = hoverRating || value;
   const isCertified = value >= 4.5;
+  
+  // Calculate the actual width needed to display all 5 rings properly
+  const calculateSvgWidth = () => {
+    // Calculate the total width needed for 5 rings with overlap
+    // First ring position + width of all 5 rings with overlap + extra padding
+    const firstRingPosition = ringSize + 10;
+    const totalRingsWidth = ((ringSize * 2) * 5) - (overlapOffset * 4);
+    const rightPadding = ringSize + 10;
+    
+    return firstRingPosition + totalRingsWidth + rightPadding;
+  };
+  
+  // Calculate the viewBox size dynamically
+  const svgWidth = calculateSvgWidth();
+  const svgHeight = sizeConfig[size].svgSize;
   
   // Calculate positions for the 5 interlinking rings in a row
   const calculateRingPositions = () => {
     const rings = [];
-    const verticalCenter = svgSize / 2;
-    // Start position from the left with some padding
+    const verticalCenter = svgHeight / 2;
+    // Start position from the left with padding
     let horizontalPosition = ringSize + 10;
     
     // Create 5 rings in a row with overlap
@@ -155,10 +170,11 @@ const ConnectedRingsRating = ({
           onMouseLeave={() => isInteractive && setHoverRating(0)}
         >
           <svg
-            width={svgSize}
-            height={svgSize}
-            viewBox={`0 0 ${svgSize} ${svgSize}`}
+            width={svgWidth}
+            height={svgHeight}
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
             className="transform transition-transform duration-300"
+            style={{ overflow: 'visible' }}
           >
             {/* Gradient definitions for sentiment colors */}
             <defs>
