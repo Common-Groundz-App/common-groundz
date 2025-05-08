@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import EntitySearch from './EntitySearch';
 import { RecommendationCategory, RecommendationVisibility, Recommendation } from '@/services/recommendationService';
-import { ConnectedRingsRating } from "@/components/ui/connected-rings";
+import ConnectedRingsRating from './ConnectedRingsRating';
 
 interface RecommendationFormProps {
   isOpen: boolean;
