@@ -35,7 +35,7 @@ const ConnectedRingsRating = ({
     sm: {
       svgSize: 150,
       ringSize: 20,
-      strokeWidth: 3.5, // Increased from 2.5
+      strokeWidth: 4, // Increased from 3.5
       textClass: 'text-xs',
       textOffset: 30,
       overlapOffset: 15
@@ -43,7 +43,7 @@ const ConnectedRingsRating = ({
     md: {
       svgSize: 200,
       ringSize: 28,
-      strokeWidth: 4, // Increased from 3
+      strokeWidth: 4.5, // Increased from 4
       textClass: 'text-sm',
       textOffset: 40,
       overlapOffset: 20
@@ -51,7 +51,7 @@ const ConnectedRingsRating = ({
     lg: {
       svgSize: 250,
       ringSize: 36,
-      strokeWidth: 4.5, // Increased from 3.5
+      strokeWidth: 5, // Increased from 4.5
       textClass: 'text-base',
       textOffset: 50,
       overlapOffset: 25
