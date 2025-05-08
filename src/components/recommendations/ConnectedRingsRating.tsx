@@ -2,6 +2,12 @@
 import React, { useState } from 'react';
 import { cn } from "@/lib/utils";
 import { useThemedClass } from '@/utils/theme-utils';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ConnectedRingsRatingProps {
   value: number;
@@ -28,6 +34,7 @@ const ConnectedRingsRating = ({
     sm: {
       svgSize: 150,
       ringSize: 20,
+      strokeWidth: 2.5,
       textClass: 'text-xs',
       textOffset: 30,
       overlapOffset: 15
@@ -35,6 +42,7 @@ const ConnectedRingsRating = ({
     md: {
       svgSize: 200,
       ringSize: 28,
+      strokeWidth: 3,
       textClass: 'text-sm',
       textOffset: 40,
       overlapOffset: 20
@@ -42,13 +50,14 @@ const ConnectedRingsRating = ({
     lg: {
       svgSize: 250,
       ringSize: 36,
+      strokeWidth: 3.5,
       textClass: 'text-base',
       textOffset: 50,
       overlapOffset: 25
     }
   };
   
-  const { svgSize, ringSize, textClass, overlapOffset } = sizeConfig[size];
+  const { svgSize, ringSize, strokeWidth, textClass, overlapOffset } = sizeConfig[size];
   const effectiveRating = hoverRating || value;
   const isCertified = value >= 4.5;
   
@@ -91,110 +100,132 @@ const ConnectedRingsRating = ({
     }
   };
 
-  return (
-    <div className={cn("flex flex-col items-center", className)}>
-      <div
-        className={cn(
-          "relative",
-          isInteractive && "cursor-pointer",
-          isCertified && "animate-pulse"
-        )}
-        onMouseLeave={() => isInteractive && setHoverRating(0)}
-      >
-        <svg
-          width={svgSize}
-          height={svgSize}
-          viewBox={`0 0 ${svgSize} ${svgSize}`}
-          className="transform transition-transform duration-300 hover:scale-105"
-        >
-          {/* Interlinking rings */}
-          {ringPositions.map((ring, i) => {
-            const isActive = effectiveRating >= ring.value;
-            
-            return (
-              <g 
-                key={`ring-${i}`} 
-                className="transition-all duration-300"
-                onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
-                onClick={() => handleRingClick(ring.value)}
-              >
-                {/* Ring outline */}
-                <circle
-                  cx={ring.cx}
-                  cy={ring.cy}
-                  r={ringSize}
-                  stroke={isActive ? "#F97316" : "gray"}
-                  strokeWidth="2"
-                  fill="transparent"
-                  className="transition-all duration-300"
-                />
-                
-                {/* Ring fill with gradient */}
-                <circle
-                  cx={ring.cx}
-                  cy={ring.cy}
-                  r={ringSize - 2}
-                  fill={`url(#${isActive ? 'activeGradient' : 'inactiveGradient'})`}
-                  fillOpacity={isActive ? "0.9" : "0.2"}
-                  className="transition-all duration-300"
-                />
-                
-                {/* Ring number */}
-                <text
-                  x={ring.cx}
-                  y={ring.cy}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fill={isActive ? "white" : "currentColor"}
-                  className={cn(
-                    "font-bold transition-all duration-300",
-                    size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'
-                  )}
-                >
-                  {ring.value}
-                </text>
-              </g>
-            );
-          })}
-          
-          {/* Gradients definitions */}
-          <defs>
-            <linearGradient id="activeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#F97316" />
-              <stop offset="100%" stopColor="#FB923C" />
-            </linearGradient>
-            <linearGradient id="inactiveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#d1d5db" />
-              <stop offset="100%" stopColor="#e5e7eb" />
-            </linearGradient>
-          </defs>
-        </svg>
+  // Calculate the stroke dasharray and dashoffset for animated rings
+  const calculateStrokeDashArray = (radius: number) => {
+    const circumference = 2 * Math.PI * radius;
+    return circumference;
+  };
 
-        {/* Circle Certified Badge - show only for high ratings */}
-        {isCertified && (
-          <div className="absolute -right-2 -top-2 bg-gradient-to-r from-brand-orange to-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
-            Circle Certified
-          </div>
-        )}
-      </div>
-      
-      {/* Rating value and text */}
-      <div className="mt-2 flex flex-col items-center">
-        {showValue && (
-          <span className={cn("font-bold", textClass)}>
-            {value.toFixed(1)}
-            <span className="text-brand-orange ml-1">•</span> 
-            <span className="text-muted-foreground font-normal ml-1">Groundz Score</span>
-          </span>
-        )}
+  return (
+    <TooltipProvider>
+      <div className={cn("flex flex-col items-center", className)}>
+        <div
+          className={cn(
+            "relative",
+            isInteractive && "cursor-pointer",
+            isCertified && "animate-pulse"
+          )}
+          onMouseLeave={() => isInteractive && setHoverRating(0)}
+        >
+          <svg
+            width={svgSize}
+            height={svgSize}
+            viewBox={`0 0 ${svgSize} ${svgSize}`}
+            className="transform transition-transform duration-300"
+          >
+            {/* Interlinking donut rings */}
+            {ringPositions.map((ring, i) => {
+              const isActive = effectiveRating >= ring.value;
+              const ringRadius = ringSize - strokeWidth / 2;
+              const circumference = calculateStrokeDashArray(ringRadius);
+              const activePercentage = isActive ? 100 : 0;
+              const dashOffset = circumference - (circumference * activePercentage) / 100;
+              
+              return (
+                <Tooltip key={`ring-${i}`}>
+                  <TooltipTrigger asChild>
+                    <g 
+                      className="transition-all duration-300 hover:scale-105 group"
+                      onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
+                      onClick={() => handleRingClick(ring.value)}
+                    >
+                      {/* Ring outline (always visible) */}
+                      <circle
+                        cx={ring.cx}
+                        cy={ring.cy}
+                        r={ringRadius}
+                        stroke={isActive ? "#F97316" : "gray"}
+                        strokeWidth={strokeWidth}
+                        fill="transparent"
+                        className="transition-all duration-300"
+                      />
+                      
+                      {/* Animated fill stroke */}
+                      <circle
+                        cx={ring.cx}
+                        cy={ring.cy}
+                        r={ringRadius}
+                        stroke="url(#activeGradient)"
+                        strokeWidth={strokeWidth}
+                        fill="transparent"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={isActive ? 0 : circumference}
+                        strokeLinecap="round"
+                        className="transition-all duration-500 ease-out"
+                        style={{ 
+                          transform: 'rotate(-90deg)', 
+                          transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                          opacity: isActive ? 1 : 0
+                        }}
+                      />
+                      
+                      {/* Hover glow effect */}
+                      {isInteractive && (
+                        <circle
+                          cx={ring.cx}
+                          cy={ring.cy}
+                          r={ringRadius + 2}
+                          stroke="#F97316"
+                          strokeWidth={2}
+                          fill="transparent"
+                          opacity="0"
+                          className="group-hover:opacity-30 transition-opacity duration-300"
+                        />
+                      )}
+                    </g>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="bg-popover/90 backdrop-blur-sm">
+                    {getRatingText(ring.value)}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+            
+            {/* Gradients definitions */}
+            <defs>
+              <linearGradient id="activeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#F97316" />
+                <stop offset="100%" stopColor="#FB923C" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          {/* Circle Certified Badge - show only for high ratings */}
+          {isCertified && (
+            <div className="absolute -right-2 -top-2 bg-gradient-to-r from-brand-orange to-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
+              Circle Certified
+            </div>
+          )}
+        </div>
         
-        {showLabel && isInteractive && (
-          <span className={cn("text-center mt-1", textClass)}>
-            {getRatingText(Math.round(effectiveRating))}
-          </span>
-        )}
+        {/* Rating value and text */}
+        <div className="mt-2 flex flex-col items-center">
+          {showValue && (
+            <span className={cn("font-bold", textClass)}>
+              {value.toFixed(1)}
+              <span className="text-brand-orange ml-1">•</span> 
+              <span className="text-muted-foreground font-normal ml-1">Groundz Score</span>
+            </span>
+          )}
+          
+          {showLabel && isInteractive && (
+            <span className={cn("text-center mt-1", textClass)}>
+              {getRatingText(Math.round(effectiveRating))}
+            </span>
+          )}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
 
