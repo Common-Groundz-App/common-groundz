@@ -161,9 +161,10 @@ const ConnectedRingsRating = ({
   return (
     <TooltipProvider>
       <div className={cn("flex flex-col items-center", className)}>
+        {/* Center the SVG container horizontally */}
         <div
           className={cn(
-            "relative",
+            "relative flex justify-center", // Added justify-center for centering
             isInteractive && "cursor-pointer",
             isCertified && "animate-pulse"
           )}
