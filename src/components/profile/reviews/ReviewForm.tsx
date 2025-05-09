@@ -52,7 +52,9 @@ const ReviewForm = ({
   const [experienceDate, setExperienceDate] = useState<Date | undefined>(
     review?.experience_date ? new Date(review.experience_date) : undefined
   );
-  const [visibility, setVisibility] = useState(review?.visibility || 'public');
+  const [visibility, setVisibility] = useState<"public" | "circle_only" | "private">(
+    (review?.visibility as "public" | "circle_only" | "private") || "public"
+  );
   const [foodTags, setFoodTags] = useState<string[]>(review?.metadata?.food_tags || []);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   
@@ -79,7 +81,7 @@ const ReviewForm = ({
       setDescription(review.description || '');
       setImageUrl(review.image_url || '');
       setSelectedImage(review.image_url || null);
-      setVisibility(review.visibility);
+      setVisibility((review.visibility as "public" | "circle_only" | "private") || "public");
       if (review.experience_date) {
         setExperienceDate(new Date(review.experience_date));
       }
@@ -205,6 +207,9 @@ const ReviewForm = ({
       // Prepare metadata based on category
       const metadata = category === 'food' ? { food_tags: foodTags } : undefined;
       
+      // Convert Date to ISO string for API submission
+      const formattedExperienceDate = experienceDate ? experienceDate.toISOString() : undefined;
+      
       if (isEditMode && review) {
         await updateReview(review.id, {
           title,
@@ -215,7 +220,7 @@ const ReviewForm = ({
           category,
           visibility,
           entity_id: entityId,
-          experience_date: experienceDate,
+          experience_date: formattedExperienceDate,
           metadata,
         });
         toast({
@@ -232,7 +237,7 @@ const ReviewForm = ({
           category,
           visibility,
           entity_id: entityId,
-          experience_date: experienceDate,
+          experience_date: formattedExperienceDate,
           metadata,
           user_id: user.id
         });
@@ -340,7 +345,7 @@ const ReviewForm = ({
                 experienceDate={experienceDate}
                 onExperienceDateChange={setExperienceDate}
                 visibility={visibility}
-                onVisibilityChange={setVisibility}
+                onVisibilityChange={(value: "public" | "circle_only" | "private") => setVisibility(value)}
                 foodTags={foodTags}
                 onAddFoodTag={(tag) => setFoodTags([...foodTags, tag])}
                 onRemoveFoodTag={(tag) => setFoodTags(foodTags.filter(t => t !== tag))}

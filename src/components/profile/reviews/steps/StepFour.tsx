@@ -12,8 +12,8 @@ interface StepFourProps {
   onDescriptionChange: (value: string) => void;
   experienceDate: Date | undefined;
   onExperienceDateChange: (date: Date) => void;
-  visibility: string;
-  onVisibilityChange: (value: string) => void;
+  visibility: "public" | "circle_only" | "private";
+  onVisibilityChange: (value: "public" | "circle_only" | "private") => void;
   foodTags: string[];
   onAddFoodTag: (tag: string) => void;
   onRemoveFoodTag: (tag: string) => void;

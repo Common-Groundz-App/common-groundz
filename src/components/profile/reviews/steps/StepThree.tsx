@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -19,7 +19,7 @@ interface StepThreeProps {
   onEntitySelect: (entity: Entity) => void;
   selectedEntity: Entity | null;
   selectedImage: string | null;
-  onImageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onImageChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onImageRemove: () => void;
   isUploading: boolean;
 }

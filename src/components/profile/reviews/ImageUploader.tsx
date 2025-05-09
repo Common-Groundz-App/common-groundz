@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 interface ImageUploaderProps {
   selectedImage: string | null;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onChange: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onRemove: () => void;
   isUploading: boolean;
 }
