@@ -9,6 +9,7 @@ interface RatingStarsEnhancedProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+// This component is kept for backwards compatibility but uses ConnectedRingsRating internally
 const RatingStarsEnhanced = ({ value, onChange, size = 'md' }: RatingStarsEnhancedProps) => {
   return (
     <div className="flex flex-col items-center py-6 px-4 rounded-xl bg-accent/10 w-full">
