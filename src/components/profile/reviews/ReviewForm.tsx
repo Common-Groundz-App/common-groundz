@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { createReview, updateReview, Review } from '@/services/reviewService';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import { Entity } from '@/services/recommendation/types';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 
 // Import step components
 import StepOne from './steps/StepOne';
@@ -39,6 +40,10 @@ const ReviewForm = ({
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Exit confirmation state
+  const [showExitConfirmation, setShowExitConfirmation] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
   // Form data
   const [rating, setRating] = useState(review?.rating || 0);
   const [category, setCategory] = useState(review?.category || 'food');
@@ -64,6 +69,25 @@ const ReviewForm = ({
       setSelectedEntity(review.entity);
     }
   }, [review, isEditMode]);
+  
+  // Track form changes
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    
+    // Check if form has non-default values
+    const hasChanges = 
+      (rating > 0) || 
+      (title !== '') || 
+      (venue !== '') || 
+      (description !== '') || 
+      (selectedImage !== null) || 
+      (foodTags.length > 0) ||
+      (entityId !== '');
+      
+    setHasUnsavedChanges(hasChanges);
+  }, [isOpen, rating, title, venue, description, selectedImage, foodTags, entityId]);
   
   // Reset form on close or when switching to a different review in edit mode
   useEffect(() => {
@@ -112,6 +136,25 @@ const ReviewForm = ({
     setSelectedEntity(null);
     setCurrentStep(1);
     setCompletedSteps([]);
+    setHasUnsavedChanges(false);
+  };
+  
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      setShowExitConfirmation(true);
+    } else {
+      onClose();
+    }
+  };
+  
+  const handleConfirmExit = () => {
+    setShowExitConfirmation(false);
+    resetForm();
+    onClose();
+  };
+  
+  const handleCancelExit = () => {
+    setShowExitConfirmation(false);
   };
   
   const handleImageUploadChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,6 +291,7 @@ const ReviewForm = ({
         resetForm();
       }
       await onSubmit();
+      setHasUnsavedChanges(false);
       onClose();
     } catch (error) {
       console.error('Error saving review:', error);
@@ -289,84 +333,103 @@ const ReviewForm = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl flex items-center gap-2">
-            <span className="bg-gradient-to-r from-brand-orange to-brand-orange/80 bg-clip-text text-transparent">
-              {getDialogTitle()}
-            </span>
-          </DialogTitle>
-        </DialogHeader>
-        
-        <div className="mt-4">
-          {/* Step indicator */}
-          <StepIndicator 
-            currentStep={currentStep} 
-            totalSteps={4}
-            completedSteps={completedSteps} 
-          />
+    <>
+      <Dialog 
+        open={isOpen} 
+        onOpenChange={(open) => {
+          if (!open && !isSubmitting) {
+            handleClose();
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <span className="bg-gradient-to-r from-brand-orange to-brand-orange/80 bg-clip-text text-transparent">
+                {getDialogTitle()}
+              </span>
+            </DialogTitle>
+          </DialogHeader>
           
-          {/* Step content */}
-          <div className="min-h-[400px]">
-            {currentStep === 1 && (
-              <StepOne rating={rating} onChange={setRating} />
-            )}
+          <div className="mt-4">
+            {/* Step indicator */}
+            <StepIndicator 
+              currentStep={currentStep} 
+              totalSteps={4}
+              completedSteps={completedSteps} 
+            />
             
-            {currentStep === 2 && (
-              <StepTwo category={category} onChange={setCategory} />
-            )}
+            {/* Step content */}
+            <div className="min-h-[400px]">
+              {currentStep === 1 && (
+                <StepOne rating={rating} onChange={setRating} />
+              )}
+              
+              {currentStep === 2 && (
+                <StepTwo category={category} onChange={setCategory} />
+              )}
+              
+              {currentStep === 3 && (
+                <StepThree 
+                  category={category}
+                  title={title}
+                  onTitleChange={setTitle}
+                  venue={venue}
+                  onVenueChange={setVenue}
+                  entityId={entityId}
+                  onEntitySelect={handleEntitySelect}
+                  selectedEntity={selectedEntity}
+                  selectedImage={selectedImage}
+                  onImageChange={handleImageUploadChange}
+                  onImageRemove={() => {
+                    setImageUrl('');
+                    setSelectedImage(null);
+                  }}
+                  isUploading={isUploading}
+                />
+              )}
+              
+              {currentStep === 4 && (
+                <StepFour 
+                  category={category}
+                  description={description}
+                  onDescriptionChange={setDescription}
+                  experienceDate={experienceDate}
+                  onExperienceDateChange={setExperienceDate}
+                  visibility={visibility}
+                  onVisibilityChange={(value: "public" | "circle_only" | "private") => setVisibility(value)}
+                  foodTags={foodTags}
+                  onAddFoodTag={(tag) => setFoodTags([...foodTags, tag])}
+                  onRemoveFoodTag={(tag) => setFoodTags(foodTags.filter(t => t !== tag))}
+                />
+              )}
+            </div>
             
-            {currentStep === 3 && (
-              <StepThree 
-                category={category}
-                title={title}
-                onTitleChange={setTitle}
-                venue={venue}
-                onVenueChange={setVenue}
-                entityId={entityId}
-                onEntitySelect={handleEntitySelect}
-                selectedEntity={selectedEntity}
-                selectedImage={selectedImage}
-                onImageChange={handleImageUploadChange}
-                onImageRemove={() => {
-                  setImageUrl('');
-                  setSelectedImage(null);
-                }}
-                isUploading={isUploading}
-              />
-            )}
-            
-            {currentStep === 4 && (
-              <StepFour 
-                category={category}
-                description={description}
-                onDescriptionChange={setDescription}
-                experienceDate={experienceDate}
-                onExperienceDateChange={setExperienceDate}
-                visibility={visibility}
-                onVisibilityChange={(value: "public" | "circle_only" | "private") => setVisibility(value)}
-                foodTags={foodTags}
-                onAddFoodTag={(tag) => setFoodTags([...foodTags, tag])}
-                onRemoveFoodTag={(tag) => setFoodTags(foodTags.filter(t => t !== tag))}
-              />
-            )}
+            {/* Navigation buttons */}
+            <StepNavigation 
+              currentStep={currentStep}
+              totalSteps={4}
+              isFirstStep={currentStep === 1}
+              isLastStep={currentStep === 4}
+              onPrevious={handlePrevious}
+              onNext={handleNext}
+              isNextDisabled={isNextDisabled()}
+              isSubmitting={isSubmitting}
+            />
           </div>
-          
-          {/* Navigation buttons */}
-          <StepNavigation 
-            currentStep={currentStep}
-            totalSteps={4}
-            isFirstStep={currentStep === 1}
-            isLastStep={currentStep === 4}
-            onPrevious={handlePrevious}
-            onNext={handleNext}
-            isNextDisabled={isNextDisabled()}
-            isSubmitting={isSubmitting}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Exit Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={showExitConfirmation}
+        onClose={handleCancelExit}
+        onConfirm={handleConfirmExit}
+        title="Discard this review?"
+        description="Your changes will not be saved."
+        isLoading={false}
+      />
+    </>
   );
 };
 
