@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import FoodTagSelector from '@/components/profile/reviews/FoodTagSelector';
 import DateSelector from '@/components/profile/reviews/DateSelector';
+import { Eye } from 'lucide-react';
 
 interface StepFourProps {
   category: string;
@@ -31,6 +32,20 @@ const StepFour = ({
   onAddFoodTag,
   onRemoveFoodTag
 }: StepFourProps) => {
+  // Get visibility info based on selected option
+  const getVisibilityInfo = () => {
+    switch (visibility) {
+      case "public":
+        return "Your review will be visible to all users of the platform";
+      case "circle_only":
+        return "Only people who follow you or you follow can see this review";
+      case "private":
+        return "Only you can see this private review";
+      default:
+        return "";
+    }
+  };
+  
   return (
     <div className="w-full space-y-8 py-2">
       <h2 className="text-xl font-medium text-center">
@@ -81,49 +96,37 @@ const StepFour = ({
       )}
       
       {/* Visibility */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Label className="flex items-center gap-2 font-medium">
-          <span className="text-lg">👁️</span>
+          <Eye className="text-muted-foreground" />
           <span>Who can see this review?</span>
         </Label>
+        
         <RadioGroup
           value={visibility}
           onValueChange={onVisibilityChange}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+          className="flex flex-row space-x-4 sm:space-x-8"
         >
-          {/* Everyone Option */}
-          <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="public" id="public" className="text-brand-orange" />
-              <Label htmlFor="public" className="cursor-pointer font-medium">Everyone</Label>
-            </div>
-            <p className="text-xs text-muted-foreground pl-6">
-              Your review will be visible to all users of the platform
-            </p>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="public" id="public" className="text-brand-orange" />
+            <Label htmlFor="public" className="cursor-pointer font-medium">Everyone</Label>
           </div>
           
-          {/* My Circle Option */}
-          <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" />
-              <Label htmlFor="circle" className="cursor-pointer font-medium">My Circle</Label>
-            </div>
-            <p className="text-xs text-muted-foreground pl-6">
-              Only people who follow you or you follow can see this review
-            </p>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" />
+            <Label htmlFor="circle" className="cursor-pointer font-medium">My Circle</Label>
           </div>
           
-          {/* Just Me Option */}
-          <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="private" id="private" className="text-brand-orange" />
-              <Label htmlFor="private" className="cursor-pointer font-medium">Just Me</Label>
-            </div>
-            <p className="text-xs text-muted-foreground pl-6">
-              Only you can see this private review
-            </p>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="private" id="private" className="text-brand-orange" />
+            <Label htmlFor="private" className="cursor-pointer font-medium">Just Me</Label>
           </div>
         </RadioGroup>
+        
+        {/* Info panel that shows only the selected option's explanation */}
+        <div className="mt-2 p-3 bg-muted/50 rounded-md text-sm text-muted-foreground">
+          {getVisibilityInfo()}
+        </div>
       </div>
     </div>
   );
