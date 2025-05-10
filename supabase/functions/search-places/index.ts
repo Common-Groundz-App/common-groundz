@@ -43,25 +43,33 @@ serve(async (req) => {
     }
 
     // Format the response to match our entity structure
-    // Modified: Changed how we structure the data to avoid incorrect field mapping
-    const results = data.results.map((place: any) => ({
-      name: place.name,
-      venue: place.name, // Now only storing the place name as venue, not the full address
-      // No description field to avoid auto-filling the "Your thoughts" field
-      image_url: place.photos && place.photos.length > 0 
-        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_PLACES_API_KEY}` 
-        : null,
-      api_source: "google_places",
-      api_ref: place.place_id,
-      metadata: {
-        location: place.geometry?.location,
-        types: place.types,
-        rating: place.rating,
-        user_ratings_total: place.user_ratings_total,
-        business_status: place.business_status,
-        formatted_address: place.formatted_address || null, // Store full address in metadata
-      }
-    }));
+    // Making sure we ONLY use the place name for the venue field
+    const results = data.results.map((place: any) => {
+      // Log the data structure for debugging
+      console.log(`Processing place: ${place.name}, Address: ${place.formatted_address}`);
+      
+      return {
+        name: place.name,
+        // IMPORTANT: Only use the name for venue, never the address
+        venue: place.name, 
+        // No description field
+        description: null,
+        image_url: place.photos && place.photos.length > 0 
+          ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_PLACES_API_KEY}` 
+          : null,
+        api_source: "google_places",
+        api_ref: place.place_id,
+        metadata: {
+          // Store the full address ONLY in metadata
+          formatted_address: place.formatted_address || null,
+          location: place.geometry?.location,
+          types: place.types,
+          rating: place.rating,
+          user_ratings_total: place.user_ratings_total,
+          business_status: place.business_status
+        }
+      };
+    });
 
     return new Response(
       JSON.stringify({ results }),

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
@@ -181,15 +180,24 @@ const ReviewForm = ({
   };
   
   const handleEntitySelect = (entity: Entity) => {
+    console.log("Entity selected in ReviewForm:", entity);
     setSelectedEntity(entity);
     setEntityId(entity.id);
     
     // For food category, only update the venue field (restaurant name)
-    // Title (what did you eat) and description (your thoughts) should remain empty
     if (category === 'food') {
-      // Only update venue with the restaurant name
-      setVenue(entity.venue || entity.name || '');
-      // Do not set title or description
+      console.log("Food category in ReviewForm: Setting venue");
+      
+      // For Google Places, always use the name as restaurant name, never address
+      if (entity.api_source === 'google_places') {
+        console.log("Using Google Places source: setting venue to name only:", entity.name);
+        setVenue(entity.name);
+      } else {
+        // For other sources, use venue or fallback to name
+        setVenue(entity.venue || entity.name || '');
+      }
+      
+      // Do not set title or description for food category
     } else {
       // For other categories, auto-fill title from entity
       if (entity.name) setTitle(entity.name);

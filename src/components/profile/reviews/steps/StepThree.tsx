@@ -86,17 +86,29 @@ const StepThree = ({
   
   // Handler for selecting an entity from search
   const handleEntitySelection = (entity: Entity) => {
+    console.log("Selected entity:", entity);
+    
     // Pass the entity to parent component
     onEntitySelect(entity);
     
-    // For food category, only update the venue field with the place name
+    // For food category, explicitly handle restaurant name vs address
     if (category === 'food') {
-      // Only update venue (restaurant name), leave title (what did you eat) blank
-      onVenueChange(entity.venue || entity.name || '');
+      console.log("Food category: Setting venue to entity name", entity.name);
+      
+      // IMPORTANT: When it's food category and Google Places result, 
+      // always use the name for the venue (restaurant name)
+      if (entity.api_source === 'google_places') {
+        onVenueChange(entity.name);
+      } else {
+        // For non-Google Places sources, fall back to venue or name
+        onVenueChange(entity.venue || entity.name || '');
+      }
+      
       // Do not update title for food category
     } else {
       // For other categories, update title with entity name
       onTitleChange(entity.name);
+      
       // Update venue if available
       if (entity.venue) {
         onVenueChange(entity.venue);
