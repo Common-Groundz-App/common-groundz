@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
@@ -230,6 +229,24 @@ const ReviewForm = ({
     }
   };
   
+  // Handle step navigation by clicking on step indicators
+  const handleStepClick = (step: number) => {
+    // Only allow navigation to completed steps
+    if (completedSteps.includes(step)) {
+      setCurrentStep(step);
+    } else if (step === currentStep) {
+      // Do nothing if clicking on current step
+      return;
+    } else {
+      // Show toast explaining why navigation is restricted
+      toast({
+        title: "Cannot skip steps",
+        description: "Please complete the current step before proceeding.",
+        variant: "destructive"
+      });
+    }
+  };
+  
   const handleNext = () => {
     // Validate current step
     if (currentStep === 1 && rating === 0) {
@@ -399,11 +416,12 @@ const ReviewForm = ({
           </DialogHeader>
           
           <div className="mt-4">
-            {/* Step indicator */}
+            {/* Step indicator - now with click handler */}
             <StepIndicator 
               currentStep={currentStep} 
               totalSteps={4}
               completedSteps={completedSteps} 
+              onStepClick={handleStepClick}
             />
             
             {/* Step content */}
