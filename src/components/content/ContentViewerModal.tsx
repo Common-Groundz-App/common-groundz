@@ -6,16 +6,18 @@ import RecommendationContentViewer from './RecommendationContentViewer';
 import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const resetBodyPointerEvents = () => {
-  if (document.body.style.pointerEvents === 'none') {
-    document.body.style.pointerEvents = '';
-  }
-};
-
+// Move this function inside the component
 const ContentViewerModal = () => {
   const { isOpen, contentType, contentId, commentId, closeContent } = useContentViewer();
   const [mounted, setMounted] = React.useState(false);
   const navigate = useNavigate();
+
+  // Define resetBodyPointerEvents inside the component
+  const resetBodyPointerEvents = () => {
+    if (document.body.style.pointerEvents === 'none') {
+      document.body.style.pointerEvents = '';
+    }
+  };
 
   React.useEffect(() => {
     if (isOpen) {
