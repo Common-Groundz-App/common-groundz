@@ -2,7 +2,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { ImageWithFallback } from "./ImageWithFallback";
-import { MapPin, Star, ExternalLink } from "lucide-react";
+import { MapPin } from "lucide-react";
 import RatingStars from "@/components/recommendations/RatingStars";
 
 interface EntityPreviewCardProps {
@@ -37,14 +37,11 @@ export const EntityPreviewCard = ({
 
   // Get address from metadata if available (for Google Places)
   const address = entity.metadata?.formatted_address || entity.venue;
-  const rating = entity.metadata?.rating;
-  const reviewCount = entity.metadata?.user_ratings_total;
   const isGooglePlace = entity.api_source === "google_places";
   
   // Extract useful metadata
   const priceLevel = entity.metadata?.price_level;
   const types = entity.metadata?.types || [];
-  const businessStatus = entity.metadata?.business_status;
   
   // Format price level to $ symbols
   const getPriceLevel = () => {
@@ -66,14 +63,6 @@ export const EntityPreviewCard = ({
       .join(', ');
   };
   
-  // Get the status text
-  const getStatusText = () => {
-    if (!businessStatus) return null;
-    return businessStatus === "OPERATIONAL" ? "Open" : 
-           businessStatus === "CLOSED_TEMPORARILY" ? "Temporarily closed" :
-           businessStatus === "CLOSED_PERMANENTLY" ? "Permanently closed" : null;
-  };
-  
   // Get the appropriate display label based on entity type
   const getDisplayLabel = () => {
     if (type === "food") {
@@ -81,8 +70,6 @@ export const EntityPreviewCard = ({
     }
     return `Selected ${type}`;
   };
-
-  console.log("EntityPreviewCard rendering with image_url:", entity.image_url);
   
   return (
     <div className="w-full mb-4">
@@ -132,22 +119,7 @@ export const EntityPreviewCard = ({
             </div>
           )}
           
-          {/* Rating and reviews (if from Google Places) */}
-          {isGooglePlace && rating && (
-            <div className="flex items-center gap-1 mb-2">
-              <div className="flex items-center">
-                <Star className="h-3.5 w-3.5 text-amber-500 mr-1" fill="currentColor" strokeWidth={0} />
-                <span className="text-xs font-medium">{rating.toFixed(1)}</span>
-              </div>
-              {reviewCount && (
-                <span className="text-xs text-gray-500">
-                  ({reviewCount} reviews)
-                </span>
-              )}
-            </div>
-          )}
-          
-          {/* Additional metadata - price, cuisine, status */}
+          {/* Additional metadata - price, cuisine types */}
           <div className="flex flex-wrap gap-x-2 gap-y-1 mb-1">
             {/* Price level */}
             {getPriceLevel() && (
@@ -162,17 +134,6 @@ export const EntityPreviewCard = ({
                 {getCuisineTypes()}
               </span>
             )}
-            
-            {/* Business status */}
-            {getStatusText() && (
-              <span className={cn(
-                "text-xs font-medium px-2 py-0.5 rounded",
-                businessStatus === "OPERATIONAL" ? "bg-green-100 text-green-800" : 
-                "bg-red-100 text-red-800"
-              )}>
-                {getStatusText()}
-              </span>
-            )}
           </div>
           
           {/* Description if available */}
@@ -182,11 +143,10 @@ export const EntityPreviewCard = ({
             </div>
           )}
           
-          {/* Google attribution */}
+          {/* Subtle attribution for Google Places data (minimum required by Google) */}
           {isGooglePlace && (
-            <div className="flex items-center justify-end mt-2 text-xs text-gray-400">
-              <span>Powered by Google</span>
-              <ExternalLink className="h-3 w-3 ml-1" />
+            <div className="flex items-center justify-end mt-2">
+              <span className="text-[10px] text-gray-400">Location data from Google</span>
             </div>
           )}
         </div>
@@ -194,3 +154,4 @@ export const EntityPreviewCard = ({
     </div>
   );
 };
+
