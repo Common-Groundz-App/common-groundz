@@ -5,7 +5,6 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import FoodTagSelector from '@/components/profile/reviews/FoodTagSelector';
 import DateSelector from '@/components/profile/reviews/DateSelector';
-import { Globe, Users, Lock } from 'lucide-react';
 
 interface StepFourProps {
   category: string;
@@ -93,59 +92,32 @@ const StepFour = ({
           className="grid grid-cols-1 sm:grid-cols-3 gap-3"
         >
           {/* Everyone Option */}
-          <div className={`
-            flex flex-col space-y-1 p-3 rounded-lg 
-            transition-all duration-200
-            ${visibility === 'public' 
-              ? 'bg-brand-orange/10 border-2 border-brand-orange' 
-              : 'border border-muted hover:bg-brand-orange/5'}
-          `}>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
+            <div className="flex items-center space-x-2">
               <RadioGroupItem value="public" id="public" className="text-brand-orange" />
-              <div className="flex items-center gap-1.5">
-                <Globe size={16} className="text-muted-foreground" />
-                <Label htmlFor="public" className="cursor-pointer font-medium">Everyone</Label>
-              </div>
+              <Label htmlFor="public" className="cursor-pointer font-medium">Everyone</Label>
             </div>
             <p className="text-xs text-muted-foreground pl-6">
-              Your review will be visible to all users
+              Your review will be visible to all users of the platform
             </p>
           </div>
           
           {/* My Circle Option */}
-          <div className={`
-            flex flex-col space-y-1 p-3 rounded-lg 
-            transition-all duration-200
-            ${visibility === 'circle_only' 
-              ? 'bg-brand-orange/10 border-2 border-brand-orange' 
-              : 'border border-muted hover:bg-brand-orange/5'}
-          `}>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
+            <div className="flex items-center space-x-2">
               <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" />
-              <div className="flex items-center gap-1.5">
-                <Users size={16} className="text-muted-foreground" />
-                <Label htmlFor="circle" className="cursor-pointer font-medium">My Circle</Label>
-              </div>
+              <Label htmlFor="circle" className="cursor-pointer font-medium">My Circle</Label>
             </div>
             <p className="text-xs text-muted-foreground pl-6">
-              Only people in your circle can see this
+              Only people who follow you or you follow can see this review
             </p>
           </div>
           
           {/* Just Me Option */}
-          <div className={`
-            flex flex-col space-y-1 p-3 rounded-lg 
-            transition-all duration-200
-            ${visibility === 'private' 
-              ? 'bg-brand-orange/10 border-2 border-brand-orange' 
-              : 'border border-muted hover:bg-brand-orange/5'}
-          `}>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
+            <div className="flex items-center space-x-2">
               <RadioGroupItem value="private" id="private" className="text-brand-orange" />
-              <div className="flex items-center gap-1.5">
-                <Lock size={16} className="text-muted-foreground" />
-                <Label htmlFor="private" className="cursor-pointer font-medium">Just Me</Label>
-              </div>
+              <Label htmlFor="private" className="cursor-pointer font-medium">Just Me</Label>
             </div>
             <p className="text-xs text-muted-foreground pl-6">
               Only you can see this private review
