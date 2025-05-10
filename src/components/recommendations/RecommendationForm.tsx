@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -182,8 +183,11 @@ const RecommendationForm = ({
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
-              <span>{getCategoryEmoji(selectedCategory)}</span>
-              <span>{isEditMode ? 'Edit recommendation' : 'Share a recommendation'}</span>
+              {/* Separate emoji from text so emoji retains original color */}
+              <span className="text-inherit">{getCategoryEmoji(selectedCategory)}</span>
+              <span className="bg-gradient-to-r from-brand-orange to-brand-orange/80 bg-clip-text text-transparent">
+                {isEditMode ? 'Edit recommendation' : 'Share a recommendation'}
+              </span>
             </DialogTitle>
           </DialogHeader>
           

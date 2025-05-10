@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
@@ -351,17 +352,26 @@ const ReviewForm = ({
   
   // Get dialog title based on current step
   const getDialogTitle = () => {
-    const emoji = category === 'food' ? '🍽️' : 
-                 category === 'movie' ? '🎬' : 
-                 category === 'book' ? '📚' : 
-                 category === 'place' ? '📍' : '🛍️';
-                 
+    // Get category-specific emoji
+    const getEmoji = () => {
+      switch(category) {
+        case 'food': return '🍽️';
+        case 'movie': return '🎬';
+        case 'book': return '📚';
+        case 'place': return '📍';
+        case 'product': return '🛍️';
+        default: return '✨';
+      }
+    };
+    
+    // Get step-specific text without emoji
+    let titleText;
     switch (currentStep) {
-      case 1: return 'Rate your experience';
-      case 2: return 'Select a category';
-      case 3: return `Tell us about your ${category} ${emoji}`;
-      case 4: return 'Add final details';
-      default: return isEditMode ? 'Edit your review' : 'Create a review';
+      case 1: return { emoji: '', text: 'Rate your experience' };
+      case 2: return { emoji: '', text: 'Select a category' };
+      case 3: return { emoji: getEmoji(), text: `Tell us about your ${category}` };
+      case 4: return { emoji: '', text: 'Add final details' };
+      default: return { emoji: '', text: isEditMode ? 'Edit your review' : 'Create a review' };
     }
   };
 
@@ -378,8 +388,12 @@ const ReviewForm = ({
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-xl">
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
+              {/* Separate emoji from text so emoji retains original color */}
+              {getDialogTitle().emoji && (
+                <span className="text-inherit">{getDialogTitle().emoji}</span>
+              )}
               <span className="bg-gradient-to-r from-brand-orange to-brand-orange/80 bg-clip-text text-transparent">
-                {getDialogTitle()}
+                {getDialogTitle().text}
               </span>
             </DialogTitle>
           </DialogHeader>
