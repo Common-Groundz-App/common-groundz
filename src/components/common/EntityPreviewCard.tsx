@@ -30,11 +30,19 @@ export const EntityPreviewCard = ({
     entity.venue;
 
   console.log("EntityPreviewCard rendering with image_url:", entity.image_url);
+  
+  // Get the appropriate display label based on entity type
+  const getDisplayLabel = () => {
+    if (type === "food") {
+      return "Selected place";
+    }
+    return `Selected ${type}`;
+  };
 
   return (
     <div className="w-full mb-4">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-sm">{`Selected ${type}:`}</span>
+        <span className="font-medium text-sm">{getDisplayLabel()}</span>
         <button
           type="button"
           className="text-sm px-3 py-1 border rounded-md bg-white hover:bg-accent border-border shadow-sm transition"
