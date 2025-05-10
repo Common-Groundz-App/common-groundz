@@ -1,5 +1,5 @@
 
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,26 @@ const StepThree = ({
   isUploading
 }: StepThreeProps) => {
   const [showEntitySearch, setShowEntitySearch] = useState(!selectedEntity);
+  const [processedEntity, setProcessedEntity] = useState<Entity | null>(null);
+  
+  // Process selected entity to ensure it has valid fields for display
+  useEffect(() => {
+    if (selectedEntity) {
+      console.log("StepThree: Processing selected entity:", selectedEntity);
+      
+      // Create a processed copy of the entity with validated fields
+      const processed = { ...selectedEntity };
+      
+      // Check if the image_url is valid
+      if (processed.image_url) {
+        console.log("Entity has image_url:", processed.image_url);
+      } else {
+        console.log("Entity missing image_url");
+      }
+      
+      setProcessedEntity(processed);
+    }
+  }, [selectedEntity]);
   
   const getCategoryIcon = () => {
     switch(category) {
@@ -86,7 +106,8 @@ const StepThree = ({
   
   // Handler for selecting an entity from search
   const handleEntitySelection = (entity: Entity) => {
-    console.log("Selected entity:", entity);
+    console.log("Selected entity in StepThree:", entity);
+    console.log("Entity image URL:", entity.image_url);
     
     // Pass the entity to parent component
     onEntitySelect(entity);
@@ -125,9 +146,9 @@ const StepThree = ({
       </h2>
       
       {/* Entity search/preview */}
-      {selectedEntity && !showEntitySearch ? (
+      {selectedEntity && processedEntity && !showEntitySearch ? (
         <EntityPreviewCard
-          entity={selectedEntity}
+          entity={processedEntity}
           type={category}
           onChange={() => setShowEntitySearch(true)}
         />

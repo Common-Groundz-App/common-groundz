@@ -48,15 +48,24 @@ serve(async (req) => {
       // Log the data structure for debugging
       console.log(`Processing place: ${place.name}, Address: ${place.formatted_address}`);
       
+      // Properly construct the photo URL if available
+      let imageUrl = null;
+      if (place.photos && place.photos.length > 0) {
+        const photoRef = place.photos[0].photo_reference;
+        if (photoRef) {
+          // Generate a direct URL for the photo
+          imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photoRef}&key=${GOOGLE_PLACES_API_KEY}`;
+          console.log(`Generated image URL for ${place.name}:`, imageUrl);
+        }
+      }
+      
       return {
         name: place.name,
         // IMPORTANT: Only use the name for venue, never the address
         venue: place.name, 
         // No description field
         description: null,
-        image_url: place.photos && place.photos.length > 0 
-          ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_PLACES_API_KEY}` 
-          : null,
+        image_url: imageUrl,
         api_source: "google_places",
         api_ref: place.place_id,
         metadata: {

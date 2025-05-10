@@ -8,6 +8,12 @@ export const ensureHttps = (url: string): string => {
   // If it's a relative URL, return as is
   if (url.startsWith('/')) return url;
   
+  // Handle google API URLs with photo references that may not need modification
+  if (url.includes('maps.googleapis.com/maps/api/place/photo')) {
+    console.log("Google Places photo URL detected:", url);
+    return url;
+  }
+  
   // If it's already HTTPS, return as is
   if (url.startsWith('https://')) return url;
   
@@ -24,3 +30,24 @@ export const ensureHttps = (url: string): string => {
   return url;
 };
 
+/**
+ * Validate if a URL is properly formatted
+ */
+export const isValidUrl = (url: string): boolean => {
+  try {
+    if (!url) return false;
+    new URL(url);
+    return true;
+  } catch {
+    // Try adding https:// if missing protocol
+    try {
+      if (!url.includes('://')) {
+        new URL(`https://${url}`);
+        return true;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  }
+};

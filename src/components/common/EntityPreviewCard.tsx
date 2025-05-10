@@ -1,6 +1,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { ImageWithFallback } from "./ImageWithFallback";
 
 interface EntityPreviewCardProps {
   entity: {
@@ -28,6 +29,8 @@ export const EntityPreviewCard = ({
     entity.website ||
     entity.venue;
 
+  console.log("EntityPreviewCard rendering with image_url:", entity.image_url);
+
   return (
     <div className="w-full mb-4">
       <div className="flex items-center justify-between mb-2">
@@ -46,10 +49,12 @@ export const EntityPreviewCard = ({
       )}>
         {entity.image_url ? (
           <div className="flex-shrink-0">
-            <img
+            <ImageWithFallback
               src={entity.image_url}
               alt={entity.name || entity.title || "Preview"}
               className="w-20 h-20 object-cover rounded-lg border bg-gray-100"
+              fallbackSrc="https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1776&q=80"
+              onError={(e) => console.error("Image failed to load:", entity.image_url)}
             />
           </div>
         ) : (
