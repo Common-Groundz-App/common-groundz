@@ -71,6 +71,24 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     }
   };
 
+  // Get appropriate placeholder text based on entity type
+  const getPlaceholderText = () => {
+    switch (type) {
+      case 'place':
+        return 'Search for place or restaurant...';
+      case 'food':
+        return 'Search for restaurant...';
+      case 'movie':
+        return 'Search for movie...';
+      case 'book':
+        return 'Search for book...';
+      case 'product':
+        return 'Search for product...';
+      default:
+        return `Search for ${type}...`;
+    }
+  };
+
   const handleUrlSubmit = async () => {
     if (!urlInput.trim()) return;
     
@@ -95,7 +113,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
             <div className="relative flex-1">
               <Input
                 type="text"
-                placeholder={`Search for ${type}...`}
+                placeholder={getPlaceholderText()}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery)}

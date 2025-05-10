@@ -106,6 +106,14 @@ const StepThree = ({
     }
   };
   
+  // New function to get appropriate search label
+  const getSearchLabel = () => {
+    if(category === 'food') {
+      return "place"; // Show "Search for place" instead of "Search for food"
+    }
+    return category;
+  };
+  
   // Handler for selecting an entity from search
   const handleEntitySelection = (entity: Entity) => {
     console.log("Selected entity in StepThree:", entity);
@@ -168,7 +176,7 @@ const StepThree = ({
             <span className="p-1.5 rounded-full bg-brand-orange/10">
               {getCategoryIcon()}
             </span>
-            <span>Search for {category}</span>
+            <span>Search for {getSearchLabel()}</span>
           </Label>
           <EntitySearch 
             type={getEntitySearchType() as any}
