@@ -1,7 +1,9 @@
+
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { uploadRecommendationImage } from '@/services/recommendationService';
+import { ensureHttps } from '@/utils/urlUtils';
 
 export const useRecommendationUploads = () => {
   const { user } = useAuth();
@@ -41,13 +43,17 @@ export const useRecommendationUploads = () => {
 
       // Upload image
       const imageUrl = await uploadRecommendationImage(user.id, file);
+      console.log('Image uploaded successfully:', imageUrl);
+      
+      // Ensure the URL uses HTTPS
+      const secureUrl = imageUrl ? ensureHttps(imageUrl) : null;
       
       toast({
         title: 'Image uploaded',
         description: 'Image has been uploaded successfully'
       });
       
-      return imageUrl;
+      return secureUrl;
     } catch (err) {
       console.error('Error uploading image:', err);
       toast({

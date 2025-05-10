@@ -1,4 +1,3 @@
-
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +7,7 @@ import { Entity } from '@/services/recommendation/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import { Book, Clapperboard, MapPin, ShoppingBag } from 'lucide-react';
 import ImageUploader from '@/components/profile/reviews/ImageUploader';
+import { ensureHttps } from '@/utils/urlUtils';
 
 interface StepThreeProps {
   category: string;
@@ -49,9 +49,11 @@ const StepThree = ({
       // Create a processed copy of the entity with validated fields
       const processed = { ...selectedEntity };
       
-      // Check if the image_url is valid
+      // Ensure the image_url uses HTTPS if it exists
       if (processed.image_url) {
-        console.log("Entity has image_url:", processed.image_url);
+        console.log("Entity has image_url before processing:", processed.image_url);
+        processed.image_url = ensureHttps(processed.image_url);
+        console.log("Entity has image_url after processing:", processed.image_url);
       } else {
         console.log("Entity missing image_url");
       }
@@ -107,7 +109,15 @@ const StepThree = ({
   // Handler for selecting an entity from search
   const handleEntitySelection = (entity: Entity) => {
     console.log("Selected entity in StepThree:", entity);
-    console.log("Entity image URL:", entity.image_url);
+    
+    // Process the image URL if it exists
+    if (entity.image_url) {
+      console.log("Entity image URL before processing:", entity.image_url);
+      entity.image_url = ensureHttps(entity.image_url);
+      console.log("Entity image URL after processing:", entity.image_url);
+    } else {
+      console.log("Selected entity has no image URL");
+    }
     
     // Pass the entity to parent component
     onEntitySelect(entity);
@@ -225,6 +235,9 @@ const StepThree = ({
           onRemove={onImageRemove}
           isUploading={isUploading}
         />
+        <p className="text-xs text-muted-foreground mt-1">
+          {selectedImage ? "Click × to remove this photo" : "Upload a photo of your experience"}
+        </p>
       </div>
     </div>
   );

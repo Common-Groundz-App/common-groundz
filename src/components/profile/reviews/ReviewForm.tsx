@@ -6,6 +6,7 @@ import { createReview, updateReview, Review } from '@/services/reviewService';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import { Entity } from '@/services/recommendation/types';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { ensureHttps } from '@/utils/urlUtils';
 
 // Import step components
 import StepOne from './steps/StepOne';
@@ -51,7 +52,9 @@ const ReviewForm = ({
   const [entityId, setEntityId] = useState(review?.entity_id || '');
   const [description, setDescription] = useState(review?.description || '');
   const [imageUrl, setImageUrl] = useState(review?.image_url || '');
-  const [selectedImage, setSelectedImage] = useState<string | null>(review?.image_url || null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(
+    review?.image_url ? ensureHttps(review.image_url) : null
+  );
   const [isUploading, setIsUploading] = useState(false);
   const [experienceDate, setExperienceDate] = useState<Date | undefined>(
     review?.experience_date ? new Date(review.experience_date) : undefined
@@ -65,7 +68,15 @@ const ReviewForm = ({
   // If in edit mode, populate entity once review is available
   useEffect(() => {
     if (isEditMode && review?.entity) {
-      setSelectedEntity(review.entity);
+      console.log("Edit mode: Loading entity from review:", review.entity);
+      
+      // Process the entity to ensure image_url is properly formatted
+      const processedEntity = { ...review.entity };
+      if (processedEntity.image_url) {
+        processedEntity.image_url = ensureHttps(processedEntity.image_url);
+      }
+      
+      setSelectedEntity(processedEntity);
     }
   }, [review, isEditMode]);
   
@@ -164,9 +175,13 @@ const ReviewForm = ({
     
     try {
       const url = await handleImageUpload(file);
+      console.log("Image uploaded, received URL:", url);
+      
       if (url) {
-        setImageUrl(url);
-        setSelectedImage(url);
+        const secureUrl = ensureHttps(url);
+        console.log("Setting image URL to:", secureUrl);
+        setImageUrl(secureUrl);
+        setSelectedImage(secureUrl);
       }
     } catch (error) {
       console.error('Image upload failed:', error);
@@ -207,8 +222,10 @@ const ReviewForm = ({
     
     // Use entity image if no user image has been selected
     if (entity.image_url && !selectedImage) {
-      setImageUrl(entity.image_url);
-      setSelectedImage(entity.image_url);
+      const secureImageUrl = ensureHttps(entity.image_url);
+      console.log("Setting entity image URL:", secureImageUrl);
+      setImageUrl(secureImageUrl);
+      setSelectedImage(secureImageUrl);
     }
   };
   
@@ -398,6 +415,7 @@ const ReviewForm = ({
                   selectedImage={selectedImage}
                   onImageChange={handleImageUploadChange}
                   onImageRemove={() => {
+                    console.log("Removing selected image");
                     setImageUrl('');
                     setSelectedImage(null);
                   }}

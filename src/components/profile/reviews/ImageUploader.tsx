@@ -1,10 +1,10 @@
-
 import React, { ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Camera } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface ImageUploaderProps {
   selectedImage: string | null;
@@ -14,6 +14,8 @@ interface ImageUploaderProps {
 }
 
 const ImageUploader = ({ selectedImage, onChange, onRemove, isUploading }: ImageUploaderProps) => {
+  console.log("ImageUploader rendering with selectedImage:", selectedImage);
+  
   return (
     <div 
       className={cn(
@@ -28,10 +30,11 @@ const ImageUploader = ({ selectedImage, onChange, onRemove, isUploading }: Image
       {selectedImage ? (
         <div className="relative w-full">
           <div className="h-48 overflow-hidden rounded-md">
-            <img
+            <ImageWithFallback
               src={selectedImage}
               alt="Preview"
               className="h-full w-full object-cover rounded-md mx-auto shadow-md hover:scale-105 transition-transform duration-300"
+              onError={(e) => console.error("Image failed to load in ImageUploader:", selectedImage)}
             />
           </div>
           <Button
