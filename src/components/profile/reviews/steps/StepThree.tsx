@@ -1,3 +1,4 @@
+
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -192,7 +193,7 @@ const StepThree = ({
         {/* Main Title Field */}
         <div className="space-y-2">
           <Label htmlFor="title" className="flex items-center gap-2">
-            <span className="text-lg">{category === 'food' ? '🍴' : category === 'movie' ? '🎬' : category === 'book' ? '📚' : category === 'place' ? '📍' : '🛍️'}</span>
+            <span className="text-lg">{category === 'food' ? '🍴' : category === 'movie' ? '🎬' : category === 'book' ? '📚' : category === 'place' ? '🏛️' : '🛍️'}</span>
             <span>{getMainFieldLabel()}</span>
           </Label>
           <Input 
