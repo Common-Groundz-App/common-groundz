@@ -43,10 +43,11 @@ serve(async (req) => {
     }
 
     // Format the response to match our entity structure
+    // Modified: Changed how we structure the data to avoid incorrect field mapping
     const results = data.results.map((place: any) => ({
       name: place.name,
-      venue: place.formatted_address || null,
-      description: `Rating: ${place.rating || 'N/A'}, ${place.user_ratings_total || 0} reviews`,
+      venue: place.name, // Now only storing the place name as venue, not the full address
+      // No description field to avoid auto-filling the "Your thoughts" field
       image_url: place.photos && place.photos.length > 0 
         ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_PLACES_API_KEY}` 
         : null,
@@ -57,7 +58,8 @@ serve(async (req) => {
         types: place.types,
         rating: place.rating,
         user_ratings_total: place.user_ratings_total,
-        business_status: place.business_status
+        business_status: place.business_status,
+        formatted_address: place.formatted_address || null, // Store full address in metadata
       }
     }));
 

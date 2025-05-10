@@ -84,6 +84,28 @@ const StepThree = ({
     }
   };
   
+  // Handler for selecting an entity from search
+  const handleEntitySelection = (entity: Entity) => {
+    // Pass the entity to parent component
+    onEntitySelect(entity);
+    
+    // For food category, only update the venue field with the place name
+    if (category === 'food') {
+      // Only update venue (restaurant name), leave title (what did you eat) blank
+      onVenueChange(entity.venue || entity.name || '');
+      // Do not update title for food category
+    } else {
+      // For other categories, update title with entity name
+      onTitleChange(entity.name);
+      // Update venue if available
+      if (entity.venue) {
+        onVenueChange(entity.venue);
+      }
+    }
+    
+    setShowEntitySearch(false);
+  };
+  
   return (
     <div className="w-full space-y-8 py-2">
       <h2 className="text-xl font-medium text-center">
@@ -107,10 +129,7 @@ const StepThree = ({
           </Label>
           <EntitySearch 
             type={getEntitySearchType() as any}
-            onSelect={(entity) => {
-              onEntitySelect(entity);
-              setShowEntitySearch(false);
-            }}
+            onSelect={handleEntitySelection}
           />
           <p className="text-xs text-muted-foreground mt-2 italic">
             Can't find what you're looking for? Just fill in the details below

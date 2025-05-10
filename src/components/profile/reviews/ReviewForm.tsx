@@ -184,10 +184,18 @@ const ReviewForm = ({
     setSelectedEntity(entity);
     setEntityId(entity.id);
     
-    // Auto-fill form fields with entity data if available
-    if (entity.name) setTitle(entity.name);
-    if (entity.venue) setVenue(entity.venue);
-    if (entity.description) setDescription(entity.description);
+    // For food category, only update the venue field (restaurant name)
+    // Title (what did you eat) and description (your thoughts) should remain empty
+    if (category === 'food') {
+      // Only update venue with the restaurant name
+      setVenue(entity.venue || entity.name || '');
+      // Do not set title or description
+    } else {
+      // For other categories, auto-fill title from entity
+      if (entity.name) setTitle(entity.name);
+      if (entity.venue) setVenue(entity.venue);
+      // Do not auto-fill description for any category
+    }
     
     // Use entity image if no user image has been selected
     if (entity.image_url && !selectedImage) {
