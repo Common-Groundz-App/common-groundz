@@ -275,36 +275,12 @@ const Settings = () => {
                       Control how your personal data is used and accessed
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium">Your Data</h3>
+                  <CardContent>
+                    <div className="bg-accent/30 rounded-md p-4">
                       <p className="text-sm text-muted-foreground">
-                        You can request a copy of your data or delete your account at any time.
+                        Additional privacy controls will be available in future updates. 
+                        You can always contact our support team if you have any privacy concerns.
                       </p>
-                      <div className="flex space-x-2 mt-2">
-                        <Button variant="outline" size="sm">Request Data Export</Button>
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium">Cookie Preferences</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Manage how we use cookies to enhance your experience.
-                      </p>
-                      <div className="flex flex-col space-y-4 mt-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="essential-cookies" className="text-sm">Essential Cookies</Label>
-                          <Switch id="essential-cookies" checked disabled />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="analytics-cookies" className="text-sm">Analytics Cookies</Label>
-                          <Switch id="analytics-cookies" defaultChecked />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="marketing-cookies" className="text-sm">Marketing Cookies</Label>
-                          <Switch id="marketing-cookies" />
-                        </div>
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
