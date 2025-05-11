@@ -213,6 +213,17 @@ const ReviewForm = ({
       }
       
       // Do not set title or description for food category
+    } else if (category === 'place') {
+      // For place category, use name as title but formatted address as venue
+      setTitle(entity.name);
+      
+      if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
+        console.log("Using Google Places formatted_address for venue:", entity.metadata.formatted_address);
+        setVenue(entity.metadata.formatted_address);
+      } else {
+        // For non-Google place sources or if no formatted address
+        setVenue(entity.venue || '');
+      }
     } else {
       // For other categories, auto-fill title from entity
       if (entity.name) setTitle(entity.name);

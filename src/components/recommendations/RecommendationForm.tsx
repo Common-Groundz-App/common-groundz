@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -258,7 +257,17 @@ const RecommendationForm = ({
                   onSelect={(entity) => {
                     setValue('title', entity.name);
                     setValue('entity_id', entity.id);
-                    if (entity.venue) setValue('venue', entity.venue);
+                    
+                    // Updated logic for handling place categories
+                    if (selectedCategory === 'place' && entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
+                      setValue('venue', entity.metadata.formatted_address);
+                    } else if (selectedCategory === 'food' && entity.api_source === 'google_places') {
+                      // For food category from Google Places, use name as venue
+                      setValue('venue', entity.name);
+                    } else if (entity.venue) {
+                      setValue('venue', entity.venue);
+                    }
+                    
                     if (entity.description) setValue('description', entity.description);
                     if (entity.image_url) {
                       setValue('image_url', entity.image_url);

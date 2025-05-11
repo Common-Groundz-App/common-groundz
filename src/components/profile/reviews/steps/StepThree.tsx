@@ -195,6 +195,18 @@ const StepThree = ({
       }
       
       // Do not update title for food category
+    } else if (category === 'place') {
+      // For place category, set name as title
+      onTitleChange(entity.name);
+      
+      // For Google Places, use formatted address as venue
+      if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
+        console.log("Using Google Places formatted_address for venue:", entity.metadata.formatted_address);
+        onVenueChange(entity.metadata.formatted_address);
+      } else {
+        // For non-Google Places or if no formatted address, use venue field
+        onVenueChange(entity.venue || '');
+      }
     } else {
       // For other categories, update title with entity name
       onTitleChange(entity.name);
