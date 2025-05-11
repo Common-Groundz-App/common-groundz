@@ -19,7 +19,8 @@ export function LocationAccessPrompt({ onCancel, className }: LocationAccessProm
     error, 
     permissionStatus, 
     isGeolocationSupported,
-    enableLocation
+    enableLocation,
+    locationEnabled
   } = useLocation();
 
   // Get status message and icon
@@ -66,6 +67,7 @@ export function LocationAccessPrompt({ onCancel, className }: LocationAccessProm
   const { message, icon, color } = getStatusInfo();
   
   const handleLocationAccess = () => {
+    // Use the enableLocation from context to ensure consistency
     enableLocation();
   };
   
@@ -101,9 +103,13 @@ export function LocationAccessPrompt({ onCancel, className }: LocationAccessProm
           variant="default"
           size="sm"
           onClick={handleLocationAccess}
-          disabled={!isGeolocationSupported || isLoading || !!position || permissionStatus === 'denied'}
+          disabled={!isGeolocationSupported || isLoading || !!position || permissionStatus === 'denied' || locationEnabled}
         >
-          {position ? "Location Accessed" : isLoading ? "Getting Location..." : permissionStatus === 'denied' ? "Access Denied" : "Allow Location Access"}
+          {position ? "Location Accessed" : 
+           locationEnabled ? "Location Enabled" :
+           isLoading ? "Getting Location..." : 
+           permissionStatus === 'denied' ? "Access Denied" : 
+           "Allow Location Access"}
         </Button>
       </div>
     </Card>

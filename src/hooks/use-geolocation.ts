@@ -12,6 +12,63 @@ export type GeolocationState = {
   timestamp: number | null;
 };
 
+// Create a custom event type for location updates
+export type LocationEventType = 'status-change' | 'position-update' | 'permission-change';
+export type LocationEventDetail = {
+  enabled: boolean;
+  position?: GeolocationState['position'];
+  permissionStatus?: PermissionState | null;
+  timestamp?: number | null;
+  source?: string; // Which component triggered the change
+};
+
+// Create a singleton event bus for location events
+class LocationEventBus {
+  private static instance: LocationEventBus;
+  
+  private constructor() {}
+  
+  public static getInstance(): LocationEventBus {
+    if (!LocationEventBus.instance) {
+      LocationEventBus.instance = new LocationEventBus();
+    }
+    return LocationEventBus.instance;
+  }
+  
+  public emit(type: LocationEventType, detail: LocationEventDetail): void {
+    const event = new CustomEvent<LocationEventDetail>(`location:${type}`, { detail });
+    window.dispatchEvent(event);
+    
+    // Also dispatch a general location-change event for any listeners
+    const generalEvent = new CustomEvent<LocationEventDetail>('location:change', { detail });
+    window.dispatchEvent(generalEvent);
+    
+    // Store last state in localStorage for persistence
+    if (type === 'status-change') {
+      localStorage.setItem('locationEnabled', detail.enabled.toString());
+      localStorage.setItem('locationLastChanged', Date.now().toString());
+    }
+  }
+  
+  public subscribe(type: LocationEventType | 'change', callback: (detail: LocationEventDetail) => void): () => void {
+    const eventName = type === 'change' ? 'location:change' : `location:${type}`;
+    
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<LocationEventDetail>;
+      callback(customEvent.detail);
+    };
+    
+    window.addEventListener(eventName, handler);
+    
+    // Return unsubscribe function
+    return () => {
+      window.removeEventListener(eventName, handler);
+    };
+  }
+}
+
+export const locationEventBus = LocationEventBus.getInstance();
+
 export function useGeolocation() {
   const [state, setState] = useState<GeolocationState>({
     isLoading: false,
@@ -53,8 +110,22 @@ export function useGeolocation() {
         const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
         setState(prev => ({ ...prev, permissionStatus: permission.state }));
         
+        // Emit permission change event
+        locationEventBus.emit('permission-change', {
+          enabled: localStorage.getItem('locationEnabled') === 'true',
+          permissionStatus: permission.state,
+          source: 'permission-check'
+        });
+        
         permission.addEventListener('change', () => {
           setState(prev => ({ ...prev, permissionStatus: permission.state }));
+          
+          // Emit permission change event when browser permission changes
+          locationEventBus.emit('permission-change', {
+            enabled: localStorage.getItem('locationEnabled') === 'true',
+            permissionStatus: permission.state,
+            source: 'permission-listener'
+          });
         });
       }
     } catch (error) {
@@ -90,12 +161,22 @@ export function useGeolocation() {
         localStorage.setItem('lastKnownPosition', JSON.stringify(positionData));
         localStorage.setItem('lastPositionTimestamp', position.timestamp.toString());
         
-        setState({
+        const newState = {
           isLoading: false,
           position: positionData,
           error: null,
           permissionStatus: state.permissionStatus,
           timestamp: position.timestamp
+        };
+        
+        setState(newState);
+        
+        // Emit position update event
+        locationEventBus.emit('position-update', {
+          enabled: true,
+          position: positionData,
+          timestamp: position.timestamp,
+          source: 'get-position'
         });
       },
       (error) => {
@@ -104,6 +185,15 @@ export function useGeolocation() {
           error,
           isLoading: false
         }));
+        
+        // If error is permission denied, update the permission status
+        if (error.code === 1) { // PERMISSION_DENIED
+          locationEventBus.emit('permission-change', {
+            enabled: false,
+            permissionStatus: 'denied',
+            source: 'position-error'
+          });
+        }
       },
       { 
         enableHighAccuracy: true, 

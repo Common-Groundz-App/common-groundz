@@ -1,7 +1,6 @@
-
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLocation } from '@/contexts/LocationContext';
+import { useLocation, setLocationStatus } from '@/contexts/LocationContext';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
@@ -17,6 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { locationEventBus } from '@/hooks/use-geolocation';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -26,9 +27,23 @@ const Settings = () => {
     disableLocation, 
     position, 
     permissionStatus,
-    timestamp
+    timestamp,
+    isLoading: locationLoading
   } = useLocation();
   const isMobile = useIsMobile();
+  const { toast } = useToast();
+  
+  // Subscribe to location events to keep UI in sync
+  useEffect(() => {
+    const unsubscribe = locationEventBus.subscribe('change', (detail) => {
+      // We don't need to do anything here because the useLocation hook
+      // will automatically update when the location state changes
+    });
+    
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   if (!user) {
     return <div>Loading...</div>;
@@ -170,7 +185,7 @@ const Settings = () => {
                         id="location-toggle"
                         checked={locationEnabled}
                         onCheckedChange={handleLocationToggle}
-                        disabled={permissionStatus === 'denied'}
+                        disabled={permissionStatus === 'denied' || locationLoading}
                       />
                     </div>
                     
@@ -187,6 +202,10 @@ const Settings = () => {
                            permissionStatus === 'denied' ? 'Blocked' :
                            permissionStatus === 'prompt' ? 'Not yet requested' : 'Unknown'}
                         </span>
+                        
+                        {locationLoading && (
+                          <span className="ml-2 text-xs animate-pulse">Updating...</span>
+                        )}
                       </div>
                       
                       <div>
