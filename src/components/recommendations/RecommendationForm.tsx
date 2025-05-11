@@ -13,7 +13,7 @@ import EntitySearch from './EntitySearch';
 import { RecommendationCategory, RecommendationVisibility, Recommendation } from '@/services/recommendationService';
 import ConnectedRingsRating from './ConnectedRingsRating';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
-import { useGeolocation } from '@/lib/hooks/useGeolocation';
+import { useGeolocation } from '@/hooks/use-geolocation';
 
 interface RecommendationFormProps {
   isOpen: boolean;
