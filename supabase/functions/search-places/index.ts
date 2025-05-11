@@ -82,9 +82,9 @@ serve(async (req) => {
         }
       }
 
-      // Only calculate distance if locationEnabled is true and coordinates are available
+      // Only calculate distance if locationEnabled is explicitly true and coordinates are available
       let distance = null;
-      if (locationEnabled && latitude && longitude && place.geometry?.location) {
+      if (locationEnabled === true && latitude && longitude && place.geometry?.location) {
         distance = calculateDistance(
           latitude,
           longitude,
@@ -110,7 +110,7 @@ serve(async (req) => {
           rating: place.rating,
           user_ratings_total: place.user_ratings_total,
           business_status: place.business_status,
-          // Include distance only if locationEnabled is true
+          // Include distance only if locationEnabled is true and distance was calculated
           ...(distance !== null && { distance })
         }
       };

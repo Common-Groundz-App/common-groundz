@@ -52,6 +52,11 @@ export function useEntitySearch(type: EntityType) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  // Check if location is enabled in localStorage
+  const isLocationEnabled = (): boolean => {
+    return localStorage.getItem('locationEnabled') === 'true';
+  };
+
   const handleSearch = useCallback(async (query: string, useLocation: boolean = false, position?: { latitude: number, longitude: number }) => {
     if (!query || query.length < 2) return;
     
@@ -73,7 +78,7 @@ export function useEntitySearch(type: EntityType) {
       let processedLocalData = localData as Entity[] || [];
       
       // Calculate distance for local entities if location is available and enabled
-      if (useLocation && position && processedLocalData.length > 0) {
+      if (useLocation && isLocationEnabled() && position && processedLocalData.length > 0) {
         processedLocalData = processedLocalData.map(entity => {
           // Check if the entity has location data in its metadata
           const hasLocationData = entity.metadata && 
@@ -114,13 +119,13 @@ export function useEntitySearch(type: EntityType) {
       let payload: any = { query };
       
       // Add location data if available and requested
-      if (position) {
+      if (useLocation && isLocationEnabled() && position) {
         payload.latitude = position.latitude;
         payload.longitude = position.longitude;
       }
       
       // Always send the locationEnabled flag to the edge function
-      payload.locationEnabled = useLocation;
+      payload.locationEnabled = useLocation && isLocationEnabled();
       
       switch (type) {
         case 'place':

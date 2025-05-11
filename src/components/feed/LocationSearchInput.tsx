@@ -253,6 +253,7 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
 
   // Check if we should show distance for a result
   const shouldShowDistance = (result: LocationResult) => {
+    // Only show distance if location is enabled AND distance is available in the result
     return isLocationEnabled() && result.metadata.distance !== undefined;
   };
 

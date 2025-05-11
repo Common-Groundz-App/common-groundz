@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { Search, Book, Film, MapPin, ShoppingBag, Coffee, Globe, Navigation } from 'lucide-react';
@@ -186,6 +185,12 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     }
   };
 
+  // Check if we should show distance for a result
+  const shouldShowDistance = (item: any) => {
+    // IMPORTANT: Only show distance if location is explicitly enabled AND distance exists
+    return locationEnabled && item.metadata?.distance !== undefined;
+  };
+
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
       <Tabs value={activeTab} onValueChange={(value: 'search' | 'url') => setActiveTab(value)}>
@@ -286,7 +291,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                                 <div className="text-xs text-gray-500">{entity.venue}</div>
                               )}
                               {/* Show distance if available in metadata */}
-                              {entity.metadata?.distance !== undefined && (
+                              {shouldShowDistance(entity) && (
                                 <div className="text-xs text-brand-orange font-medium mt-1">
                                   {formatDistance(entity.metadata.distance)}
                                 </div>
@@ -328,7 +333,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                                 <div className="text-xs text-gray-600 truncate">{result.description}</div>
                               )}
                               {/* Show distance if available */}
-                              {result.metadata?.distance !== undefined && locationEnabled && (
+                              {shouldShowDistance(result) && locationEnabled && (
                                 <div className="text-xs text-brand-orange font-medium mt-1">
                                   {formatDistance(result.metadata.distance)}
                                 </div>

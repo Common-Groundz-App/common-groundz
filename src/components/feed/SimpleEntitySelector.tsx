@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -116,6 +115,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
 
   // Check if we should show distance for a result
   const shouldShowDistance = (item: any) => {
+    // Only show distance if location is enabled AND distance exists in metadata
     return locationEnabled && item.metadata?.distance !== undefined;
   };
 
