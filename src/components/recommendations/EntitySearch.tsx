@@ -44,6 +44,38 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     permissionStatus
   } = useLocation();
 
+  // Add missing function: toggleLocationSearch
+  const toggleLocationSearch = () => {
+    if (locationEnabled) {
+      disableLocation();
+    } else {
+      enableLocation();
+      if (position === null) {
+        getPosition();
+      }
+    }
+  };
+
+  // Add missing function: handleUrlSubmit
+  const handleUrlSubmit = async () => {
+    if (!urlInput.trim()) return;
+    
+    try {
+      const entity = await createEntityFromUrl(urlInput);
+      if (entity) {
+        onSelect(entity);
+        clearUrlInput();
+      }
+    } catch (error) {
+      console.error('Error creating entity from URL:', error);
+    }
+  };
+
+  // Add missing function: clearUrlInput
+  const clearUrlInput = () => {
+    setUrlInput('');
+  };
+
   // Handle click outside to close results dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
