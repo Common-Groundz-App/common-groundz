@@ -87,6 +87,11 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
     };
   }, [query]);
 
+  // Check if location is enabled in localStorage
+  const isLocationEnabled = () => {
+    return localStorage.getItem('locationEnabled') === 'true';
+  };
+
   const searchPlaces = async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
     
@@ -94,14 +99,18 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
     setShowResults(true);
     
     try {
-      // Include position if available
+      // Include position if available AND location is enabled
       const payload: {
         query: string;
         latitude?: number;
         longitude?: number;
-      } = { query: searchQuery };
+        locationEnabled?: boolean;
+      } = { 
+        query: searchQuery,
+        locationEnabled: isLocationEnabled()
+      };
       
-      if (position) {
+      if (position && isLocationEnabled()) {
         payload.latitude = position.latitude;
         payload.longitude = position.longitude;
       }
@@ -143,7 +152,8 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
       const { data, error } = await supabase.functions.invoke('search-places', {
         body: { 
           latitude: position.latitude,
-          longitude: position.longitude
+          longitude: position.longitude,
+          locationEnabled: isLocationEnabled()
         }
       });
       
@@ -241,6 +251,11 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
     return null;
   };
 
+  // Check if we should show distance for a result
+  const shouldShowDistance = (result: LocationResult) => {
+    return isLocationEnabled() && result.metadata.distance !== undefined;
+  };
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <div className="flex items-center gap-2">
@@ -311,9 +326,9 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
                 {result.metadata.formatted_address && (
                   <div className="text-xs text-muted-foreground">{result.metadata.formatted_address}</div>
                 )}
-                {result.metadata.distance !== undefined && (
+                {shouldShowDistance(result) && (
                   <div className="text-xs text-brand-orange font-medium mt-1">
-                    {formatDistance(result.metadata.distance)}
+                    {formatDistance(result.metadata.distance!)}
                   </div>
                 )}
               </div>

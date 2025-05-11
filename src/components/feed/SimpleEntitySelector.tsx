@@ -114,6 +114,11 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     }
   };
 
+  // Check if we should show distance for a result
+  const shouldShowDistance = (item: any) => {
+    return locationEnabled && item.metadata?.distance !== undefined;
+  };
+
   return (
     <div className="space-y-3">
       <h4 className="text-sm font-medium">Tag a place, product, or media</h4>
@@ -198,7 +203,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                         {/* Entity Details */}
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium truncate">{entity.name}</div>
-                          {entity.metadata?.distance !== undefined && (
+                          {shouldShowDistance(entity) && (
                             <div className="text-xs text-brand-orange">
                               {formatDistance(entity.metadata.distance)}
                             </div>
@@ -231,7 +236,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                         {/* Result Details */}
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium truncate">{result.name}</div>
-                          {result.metadata?.distance !== undefined && locationEnabled && (
+                          {shouldShowDistance(result) && (
                             <div className="text-xs text-brand-orange">
                               {formatDistance(result.metadata.distance)}
                             </div>

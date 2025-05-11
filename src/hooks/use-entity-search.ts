@@ -114,10 +114,13 @@ export function useEntitySearch(type: EntityType) {
       let payload: any = { query };
       
       // Add location data if available and requested
-      if (useLocation && position) {
+      if (position) {
         payload.latitude = position.latitude;
         payload.longitude = position.longitude;
       }
+      
+      // Always send the locationEnabled flag to the edge function
+      payload.locationEnabled = useLocation;
       
       switch (type) {
         case 'place':

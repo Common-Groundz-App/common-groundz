@@ -18,7 +18,7 @@ serve(async (req) => {
       throw new Error("GOOGLE_PLACES_API_KEY is not set");
     }
 
-    const { query, latitude, longitude, radius = 5000 } = await req.json();
+    const { query, latitude, longitude, radius = 5000, locationEnabled = false } = await req.json();
     if (!query && !(latitude && longitude)) {
       return new Response(
         JSON.stringify({ error: "Query or location parameters are required" }),
@@ -81,6 +81,17 @@ serve(async (req) => {
           console.log(`Generated image URL for ${place.name}:`, imageUrl);
         }
       }
+
+      // Only calculate distance if locationEnabled is true and coordinates are available
+      let distance = null;
+      if (locationEnabled && latitude && longitude && place.geometry?.location) {
+        distance = calculateDistance(
+          latitude,
+          longitude,
+          place.geometry.location.lat,
+          place.geometry.location.lng
+        );
+      }
       
       return {
         name: place.name,
@@ -99,14 +110,8 @@ serve(async (req) => {
           rating: place.rating,
           user_ratings_total: place.user_ratings_total,
           business_status: place.business_status,
-          // Add distance from the searched coordinates if available
-          distance: (latitude && longitude && place.geometry?.location) ? 
-            calculateDistance(
-              latitude, 
-              longitude, 
-              place.geometry.location.lat, 
-              place.geometry.location.lng
-            ) : null
+          // Include distance only if locationEnabled is true
+          ...(distance !== null && { distance })
         }
       };
     });
