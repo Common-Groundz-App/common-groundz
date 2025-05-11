@@ -1,4 +1,3 @@
-
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +22,7 @@ interface StepThreeProps {
   onEntitySelect: (entity: Entity) => void;
   selectedEntity: Entity | null;
   selectedImage: string | null;
-  onImageChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onImageChange: (ChangeEvent<HTMLInputElement>) => Promise<void>;
   onImageRemove: () => void;
   isUploading: boolean;
 }
@@ -232,24 +231,24 @@ const StepThree = ({
             </Label>
             
             {/* Show location button for relevant categories */}
-            {isLocationRelevantCategory && !showLocationPrompt && !locationEnabled && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-1 text-xs"
-                onClick={() => {
-                  if (permissionStatus === 'denied') {
-                    setShowLocationPrompt(true);
-                  } else {
-                    enableLocation();
-                  }
-                }}
-                disabled={buttonState.disabled}
-              >
-                <Navigation className={`h-3.5 w-3.5 ${geoLoading ? 'animate-pulse' : ''}`} />
-                <span>{buttonState.text}</span>
-              </Button>
-            )}
+            {/*{isLocationRelevantCategory && !showLocationPrompt && !locationEnabled && (*/}
+            {/*  <Button*/}
+            {/*    variant="ghost"*/}
+            {/*    size="sm"*/}
+            {/*    className="flex items-center gap-1 text-xs"*/}
+            {/*    onClick={() => {*/}
+            {/*      if (permissionStatus === 'denied') {*/}
+            {/*        setShowLocationPrompt(true);*/}
+            {/*      } else {*/}
+            {/*        enableLocation();*/}
+            {/*      }*/}
+            {/*    }}*/}
+            {/*    disabled={buttonState.disabled}*/}
+            {/*  >*/}
+            {/*    <Navigation className={`h-3.5 w-3.5 ${geoLoading ? 'animate-pulse' : ''}`} />*/}
+            {/*    <span>{buttonState.text}</span>*/}
+            {/*  </Button>*/}
+            {/*)}*/}
           </div>
           
           <EntitySearch 
