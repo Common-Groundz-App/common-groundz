@@ -1,32 +1,24 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MapPin, Navigation, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { MapPin, Navigation, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useGeolocation } from '@/hooks/use-geolocation';
 import { cn } from '@/lib/utils';
 
 interface LocationAccessPromptProps {
   onCancel: () => void;
-  onLocationObtained?: () => void;
   className?: string;
-  compact?: boolean;
 }
 
-export function LocationAccessPrompt({ 
-  onCancel, 
-  onLocationObtained, 
-  className = "", 
-  compact = false 
-}: LocationAccessPromptProps) {
+export function LocationAccessPrompt({ onCancel, className }: LocationAccessPromptProps) {
   const { 
     getPosition, 
     position, 
     isLoading, 
     error, 
     permissionStatus, 
-    isGeolocationSupported,
-    checkPermission
+    isGeolocationSupported 
   } = useGeolocation();
 
   // Get status message and icon
@@ -35,28 +27,15 @@ export function LocationAccessPrompt({
       return {
         message: "Location services are not supported in your browser.",
         icon: <AlertCircle className="h-5 w-5 text-yellow-500" />,
-        color: "text-yellow-500",
-        buttonText: "Skip",
-        buttonAction: onCancel,
-        buttonDisabled: false,
-        buttonColor: "outline"
+        color: "text-yellow-500"
       };
     }
     
     if (error) {
-      const isDenied = error.code === 1; // PERMISSION_DENIED
       return {
-        message: isDenied 
-          ? "Location access was denied. Please enable location in your browser settings."
-          : error.message || "Error accessing location. Please check your browser settings.",
+        message: error.message || "Error accessing location. Please check your browser settings.",
         icon: <AlertCircle className="h-5 w-5 text-red-500" />,
-        color: "text-red-500",
-        buttonText: isDenied ? "Open Settings" : "Try Again",
-        buttonAction: isDenied 
-          ? () => window.open("https://support.google.com/chrome/answer/142065", "_blank")
-          : () => getPosition(),
-        buttonDisabled: false,
-        buttonColor: "default"
+        color: "text-red-500"
       };
     }
     
@@ -64,14 +43,7 @@ export function LocationAccessPrompt({
       return {
         message: "Location successfully accessed! You can now get nearby recommendations.",
         icon: <CheckCircle2 className="h-5 w-5 text-green-500" />,
-        color: "text-green-500",
-        buttonText: "Continue",
-        buttonAction: () => {
-          if (onLocationObtained) onLocationObtained();
-          else onCancel();
-        },
-        buttonDisabled: false,
-        buttonColor: "default"
+        color: "text-green-500"
       };
     }
     
@@ -79,44 +51,18 @@ export function LocationAccessPrompt({
       return {
         message: "Accessing your location...",
         icon: <Navigation className="h-5 w-5 text-brand-orange animate-pulse" />,
-        color: "text-brand-orange",
-        buttonText: "Getting Location...",
-        buttonAction: () => {},
-        buttonDisabled: true,
-        buttonColor: "default"
+        color: "text-brand-orange"
       };
     }
     
     return {
       message: "Allow access to your location for better recommendations.",
       icon: <MapPin className="h-5 w-5 text-brand-orange" />,
-      color: "text-muted-foreground",
-      buttonText: "Allow Location Access",
-      buttonAction: getPosition,
-      buttonDisabled: false,
-      buttonColor: "default"
+      color: "text-muted-foreground"
     };
   };
   
-  const { message, icon, color, buttonText, buttonAction, buttonDisabled, buttonColor } = getStatusInfo();
-  
-  if (compact) {
-    return (
-      <div className={cn("flex items-center gap-2 p-2", className)}>
-        {icon}
-        <p className={cn("text-sm flex-1", color)}>{message}</p>
-        <Button
-          variant={buttonColor as any}
-          size="sm"
-          onClick={buttonAction}
-          disabled={buttonDisabled}
-          className="whitespace-nowrap"
-        >
-          {buttonText}
-        </Button>
-      </div>
-    );
-  }
+  const { message, icon, color } = getStatusInfo();
   
   return (
     <Card className={cn("p-4", className)}>
@@ -138,23 +84,21 @@ export function LocationAccessPrompt({
       <p className={cn("text-sm mb-4", color)}>{message}</p>
       
       <div className="flex gap-2 justify-end">
-        {(!position && !error) && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-          >
-            Skip
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onCancel}
+        >
+          Skip
+        </Button>
         
         <Button
-          variant={buttonColor as any}
+          variant="default"
           size="sm"
-          onClick={buttonAction}
-          disabled={buttonDisabled}
+          onClick={getPosition}
+          disabled={!isGeolocationSupported || isLoading || !!position}
         >
-          {buttonText}
+          {position ? "Location Accessed" : isLoading ? "Getting Location..." : "Allow Location Access"}
         </Button>
       </div>
     </Card>

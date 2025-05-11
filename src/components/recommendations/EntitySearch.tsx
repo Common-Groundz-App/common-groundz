@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { Search, Book, Film, MapPin, ShoppingBag, Coffee, Globe, Navigation } from 'lucide-react';
@@ -12,16 +13,14 @@ import { Badge } from '@/components/ui/badge';
 interface EntitySearchProps {
   type: EntityType;
   onSelect: (entity: Entity) => void;
-  useLocation?: boolean;
-  position?: { latitude: number, longitude: number };
-  onToggleLocation?: (useLocation: boolean) => void;
 }
 
-export function EntitySearch({ type, onSelect, useLocation, position, onToggleLocation }: EntitySearchProps) {
+export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   const [activeTab, setActiveTab] = useState<'search' | 'url'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [useLocation, setUseLocation] = useState(false);
   
   const {
     localResults,
@@ -33,7 +32,7 @@ export function EntitySearch({ type, onSelect, useLocation, position, onToggleLo
   } = useEntitySearch(type);
   
   const {
-    position: geolocationPosition,
+    position,
     isLoading: geoLoading,
     getPosition,
     isGeolocationSupported,
@@ -124,9 +123,9 @@ export function EntitySearch({ type, onSelect, useLocation, position, onToggleLo
     if (!isGeolocationSupported) return;
     
     if (useLocation) {
-      onToggleLocation && onToggleLocation(false);
+      setUseLocation(false);
     } else {
-      onToggleLocation && onToggleLocation(true);
+      setUseLocation(true);
       if (!position) {
         getPosition();
       }

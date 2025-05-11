@@ -4,9 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import EntitySearch from '@/components/recommendations/EntitySearch';
-import { Entity } from '@/hooks/use-entity-search';
+import { Entity } from '@/services/recommendation/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
-import { Book, Clapperboard, MapPin, ShoppingBag, Navigation, Locate, AlertCircle } from 'lucide-react';
+import { Book, Clapperboard, MapPin, ShoppingBag, Navigation } from 'lucide-react';
 import ImageUploader from '@/components/profile/reviews/ImageUploader';
 import { ensureHttps } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';
@@ -49,10 +49,7 @@ const StepThree = ({
   const { 
     position, 
     isLoading: geoLoading, 
-    permissionStatus,
-    error: geoError,
-    getPosition,
-    resetError
+    permissionStatus 
   } = useGeolocation();
   
   // Process selected entity to ensure it has valid fields for display
@@ -75,28 +72,6 @@ const StepThree = ({
       setProcessedEntity(processed);
     }
   }, [selectedEntity]);
-  
-  // Determine if the category is location-relevant (food or place)
-  const isLocationRelevantCategory = category === 'place' || category === 'food';
-  
-  // Generate the appropriate location button text based on current state
-  const getLocationButtonText = () => {
-    if (geoLoading) return "Getting Location...";
-    if (position) return "Update My Location";
-    if (geoError && geoError.code === 1) return "Enable Location Access"; // Permission denied
-    return "Use My Location";
-  };
-
-  // Handle location button click with appropriate action based on state
-  const handleLocationButtonClick = () => {
-    if (geoError) {
-      // If there was an error, reset it and try again
-      resetError();
-    }
-    
-    // Show the location prompt
-    setShowLocationPrompt(true);
-  };
   
   const getCategoryIcon = () => {
     switch(category) {
@@ -193,45 +168,30 @@ const StepThree = ({
     setShowEntitySearch(false);
   };
   
+  // Show location prompt for place or food categories if permission not already granted
+  const isLocationRelevantCategory = category === 'place' || category === 'food';
+  
   return (
     <div className="w-full space-y-8 py-2">
       <h2 className="text-xl font-medium text-center">
         Tell us about your {category}
       </h2>
       
-      {/* Entity search/preview with improved location integration */}
+      {/* Location prompt - show only for place/food categories */}
+      {isLocationRelevantCategory && showLocationPrompt && (
+        <LocationAccessPrompt 
+          onCancel={() => setShowLocationPrompt(false)}
+          className="mb-8"
+        />
+      )}
+      
+      {/* Entity search/preview */}
       {selectedEntity && processedEntity && !showEntitySearch ? (
-        <div className="space-y-4">
-          <EntityPreviewCard
-            entity={processedEntity}
-            type={category}
-            onChange={() => setShowEntitySearch(true)}
-          />
-          
-          {/* Show location button after entity selection for relevant categories */}
-          {isLocationRelevantCategory && (
-            <div className="mt-2">
-              {showLocationPrompt ? (
-                <LocationAccessPrompt 
-                  onCancel={() => setShowLocationPrompt(false)}
-                  compact={true}
-                  onLocationObtained={() => setShowLocationPrompt(false)}
-                  className="bg-accent/10 border border-brand-orange/30 rounded-lg"
-                />
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-1 text-sm w-full justify-center border-brand-orange/30 hover:bg-brand-orange/10"
-                  onClick={handleLocationButtonClick}
-                >
-                  <Locate className="h-4 w-4" />
-                  <span>{getLocationButtonText()}</span>
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
+        <EntityPreviewCard
+          entity={processedEntity}
+          type={category}
+          onChange={() => setShowEntitySearch(true)}
+        />
       ) : (
         <div className="p-4 border border-dashed border-brand-orange/30 rounded-lg bg-gradient-to-b from-transparent to-accent/5 transition-all duration-300 hover:border-brand-orange/50">
           <div className="flex justify-between items-center mb-2">
@@ -242,55 +202,27 @@ const StepThree = ({
               <span>Search for {getSearchLabel()}</span>
             </Label>
             
-            {/* Always show location button for relevant categories, with different states */}
-            {isLocationRelevantCategory && (
+            {/* Show location button for relevant categories */}
+            {isLocationRelevantCategory && !showLocationPrompt && !permissionStatus && (
               <Button
-                variant={position ? "outline" : geoError ? "destructive" : "outline"}
+                variant="ghost"
                 size="sm"
-                className={cn(
-                  "flex items-center gap-1 text-xs",
-                  position && "border-green-500 text-green-600",
-                  geoError && geoError.code === 1 && "border-red-400 bg-red-50 text-red-600"
-                )}
-                onClick={handleLocationButtonClick}
+                className="flex items-center gap-1 text-xs"
+                onClick={() => setShowLocationPrompt(true)}
               >
-                {geoLoading ? (
-                  <Navigation className="h-3.5 w-3.5 animate-spin" />
-                ) : position ? (
-                  <Locate className="h-3.5 w-3.5 text-green-500" />
-                ) : geoError ? (
-                  <AlertCircle className="h-3.5 w-3.5" />
-                ) : (
-                  <Locate className="h-3.5 w-3.5" />
-                )}
-                <span>{getLocationButtonText()}</span>
+                <Navigation className="h-3.5 w-3.5" />
+                <span>Use my location</span>
               </Button>
             )}
           </div>
           
-          {/* Location prompt - always conditionally rendered based on showLocationPrompt flag */}
-          {isLocationRelevantCategory && showLocationPrompt && (
-            <LocationAccessPrompt 
-              onCancel={() => setShowLocationPrompt(false)}
-              onLocationObtained={() => setShowLocationPrompt(false)}
-              className="mb-4"
-            />
-          )}
-          
-          {/* Only show entity search when location prompt is not showing */}
-          {!showLocationPrompt && (
-            <>
-              <EntitySearch 
-                type={getEntitySearchType() as any}
-                onSelect={handleEntitySelection}
-                useLocation={isLocationRelevantCategory && !!position}
-                position={position || undefined}
-              />
-              <p className="text-xs text-muted-foreground mt-2 italic">
-                Can't find what you're looking for? Just fill in the details below
-              </p>
-            </>
-          )}
+          <EntitySearch 
+            type={getEntitySearchType() as any}
+            onSelect={handleEntitySelection}
+          />
+          <p className="text-xs text-muted-foreground mt-2 italic">
+            Can't find what you're looking for? Just fill in the details below
+          </p>
         </div>
       )}
       
