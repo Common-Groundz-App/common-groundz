@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { Search, Book, Film, MapPin, ShoppingBag, Coffee, Globe, Navigation, X, Loader2 } from 'lucide-react';
@@ -141,7 +140,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   const getPlaceholderText = () => {
     switch (type) {
       case 'place':
-        return 'Search for place or restaurant...';
+        return 'Search for place...';
       case 'food':
         return 'Search for restaurant...';
       case 'movie':
