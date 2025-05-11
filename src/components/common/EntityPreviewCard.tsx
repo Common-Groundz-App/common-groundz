@@ -3,7 +3,6 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { MapPin } from "lucide-react";
-import RatingStars from "@/components/recommendations/RatingStars";
 
 interface EntityPreviewCardProps {
   entity: {
