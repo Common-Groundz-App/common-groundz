@@ -1,9 +1,30 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Entity, EntityType } from '@/services/recommendation/types';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
+import { EntityType } from '@/services/recommendation/types';
+
+// Define Entity type based on the database schema
+export interface Entity {
+  id: string;
+  name: string;
+  type: EntityType;
+  venue: string | null;
+  description: string | null;
+  image_url: string | null;
+  api_source: string | null;
+  api_ref: string | null;
+  metadata: any | null;
+  created_by: string | null;
+  is_deleted: boolean;
+  is_verified: boolean | null;
+  verification_date: string | null;
+  website_url: string | null;
+  slug: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export function useEntitySearch(type: EntityType) {
   const [localResults, setLocalResults] = useState<Entity[]>([]);
@@ -21,7 +42,7 @@ export function useEntitySearch(type: EntityType) {
       const { data: localData, error: localError } = await supabase
         .from('entities')
         .select()
-        .eq('entity_type', type)
+        .eq('type', type)
         .ilike('name', `%${query}%`)
         .order('name')
         .limit(5);
@@ -89,16 +110,17 @@ export function useEntitySearch(type: EntityType) {
   const createEntityFromExternal = useCallback(async (externalData: any) => {
     try {
       // Create a new entity record from external data
-      const entityData: Partial<Entity> = {
+      const entityData = {
         id: uuidv4(),
         name: externalData.name,
+        type: type,
         venue: externalData.venue,
         description: externalData.description || null,
         image_url: externalData.image_url || null,
-        entity_type: type,
         api_source: externalData.api_source,
         api_ref: externalData.api_ref,
-        metadata: externalData.metadata
+        metadata: externalData.metadata,
+        is_deleted: false
       };
       
       // Insert the entity into our database
@@ -138,16 +160,17 @@ export function useEntitySearch(type: EntityType) {
       }
       
       // Create entity from the metadata
-      const entityData: Partial<Entity> = {
+      const entityData = {
         id: uuidv4(),
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
+        type: type,
         venue: data.metadata.site_name || new URL(url).hostname,
         description: data.metadata.description || data.metadata.og_description || null,
         image_url: data.metadata.og_image || data.metadata.image || null,
-        entity_type: type,
         api_source: 'url_metadata',
         api_ref: url,
-        metadata: data.metadata
+        metadata: data.metadata,
+        is_deleted: false
       };
       
       // Insert the entity into our database
