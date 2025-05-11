@@ -39,6 +39,7 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
   const { toast } = useToast();
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Get geolocation data
   const { 
@@ -86,6 +87,25 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
       }
     };
   }, [query]);
+  
+  // Add keyboard event listener for Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (query && showResults) {
+          e.preventDefault();
+          handleClear();
+        } else if (showResults) {
+          setShowResults(false);
+        }
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [query, showResults]);
 
   // Check if location is enabled in localStorage
   const isLocationEnabled = () => {
@@ -195,6 +215,10 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
     setResults([]);
     setShowResults(false);
     onClear();
+    // Focus back on the input after clearing
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   const handleUseMyLocation = () => {
@@ -267,14 +291,29 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search for a location..."
-            className="bg-transparent border-b border-l-0 border-r-0 border-t-0 rounded-none px-0 h-8 focus-visible:ring-0 focus-visible:ring-offset-0 pl-0"
+            className="bg-transparent border-b border-l-0 border-r-0 border-t-0 rounded-none px-0 h-8 focus-visible:ring-0 focus-visible:ring-offset-0 pl-0 pr-8"
             onFocus={() => query.length >= 2 && setShowResults(true)}
+            ref={inputRef}
+            aria-label="Location search"
+            aria-expanded={showResults}
+            aria-controls="location-search-results"
+            aria-autocomplete="list"
           />
-          {isLoading && (
-            <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </div>
-          )}
+          <div className="absolute right-0 top-1/2 transform -translate-y-1/2 flex items-center">
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mr-1" />
+            ) : query ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleClear}
+                className="h-6 w-6 p-0 mr-1"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+              </Button>
+            ) : null}
+          </div>
         </div>
         
         {/* Near me button */}
@@ -285,6 +324,7 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
           disabled={geoLoading}
           className="h-6 w-6 p-0"
           title="Use my location"
+          aria-label="Use my location"
         >
           {geoLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -292,24 +332,21 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
             <Navigation className="h-4 w-4" />
           )}
         </Button>
-        
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleClear}
-          className="h-6 w-6 p-0"
-        >
-          <X className="h-4 w-4" />
-        </Button>
       </div>
       
       {showResults && results.length > 0 && (
-        <div className="absolute z-[100] mt-1 w-full max-h-60 overflow-auto bg-background border rounded-md shadow-lg location-search-dropdown">
+        <div 
+          id="location-search-results"
+          className="absolute z-[100] mt-1 w-full max-h-60 overflow-auto bg-background border rounded-md shadow-lg location-search-dropdown"
+          role="listbox"
+        >
           {results.map((result, index) => (
             <div
               key={result.api_ref || index}
               className="px-3 py-2 hover:bg-accent cursor-pointer flex items-start gap-2"
               onClick={() => handleSelectLocation(result)}
+              role="option"
+              aria-selected="false"
             >
               {/* Image thumbnail */}
               <div className="flex-shrink-0">

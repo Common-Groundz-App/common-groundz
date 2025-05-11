@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Entity, EntityType } from '@/services/recommendation/types';
-import { Search, Book, Film, MapPin, ShoppingBag, Coffee, Globe, Navigation } from 'lucide-react';
+import { Search, Book, Film, MapPin, ShoppingBag, Coffee, Globe, Navigation, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +21,8 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   
   const {
     localResults,
@@ -42,6 +45,40 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     permissionStatus
   } = useLocation();
 
+  // Handle click outside to close results dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (resultsRef.current && !resultsRef.current.contains(event.target as Node) && 
+          inputRef.current && !inputRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
+  // Add keyboard event listener for Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (searchQuery && showResults) {
+          e.preventDefault();
+          clearSearch();
+        } else if (showResults) {
+          setShowResults(false);
+        }
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [searchQuery, showResults]);
+
   // Handler functions for selecting entities
   const handleSelectEntity = (entity: Entity) => {
     onSelect(entity);
@@ -55,6 +92,14 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
       onSelect(entity);
       setSearchQuery('');
       setShowResults(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setShowResults(false);
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
   };
 
@@ -119,6 +164,11 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
       setUrlInput('');
       setActiveTab('search');
     }
+  };
+  
+  // Clear URL input
+  const clearUrlInput = () => {
+    setUrlInput('');
   };
   
   // Toggle location-based search
@@ -210,9 +260,30 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery, locationEnabled, position)}
                   className="pr-8"
+                  ref={inputRef}
+                  aria-label={`Search for ${type}`}
+                  aria-expanded={showResults}
+                  aria-controls="entity-search-results"
+                  aria-autocomplete="list"
                 />
-                <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
-                  {getEntityIcon()}
+                <div className="absolute inset-y-0 right-2 flex items-center">
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : searchQuery.trim() ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={clearSearch}
+                      className="h-6 w-6 p-0"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                    </Button>
+                  ) : (
+                    <div className="pointer-events-none">
+                      {getEntityIcon()}
+                    </div>
+                  )}
                 </div>
               </div>
               <Button 
@@ -248,7 +319,12 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
             )}
 
             {showResults && (
-              <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden max-h-64 overflow-y-auto">
+              <div 
+                id="entity-search-results"
+                ref={resultsRef}
+                className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden max-h-64 overflow-y-auto"
+                role="listbox"
+              >
                 {isLoading || geoLoading ? (
                   <div className="p-2 space-y-2">
                     <Skeleton className="h-12 w-full" />
@@ -273,6 +349,8 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                             key={entity.id}
                             className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2"
                             onClick={() => handleSelectEntity(entity)}
+                            role="option"
+                            aria-selected="false"
                           >
                             {/* Entity Image */}
                             <div className="flex-shrink-0">
@@ -312,6 +390,8 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                             key={`${result.api_source}-${result.api_ref || idx}`}
                             className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2"
                             onClick={() => handleSelectExternal(result)}
+                            role="option"
+                            aria-selected="false"
                           >
                             {/* Result Image */}
                             <div className="flex-shrink-0">
@@ -360,9 +440,22 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                 onChange={(e) => setUrlInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
                 className="pr-8"
+                aria-label="URL input"
               />
-              <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
-                <Globe className="h-4 w-4" />
+              <div className="absolute inset-y-0 right-2 flex items-center">
+                {urlInput ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={clearUrlInput}
+                    className="h-6 w-6 p-0"
+                    aria-label="Clear URL"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                  </Button>
+                ) : (
+                  <Globe className="h-4 w-4 text-muted-foreground pointer-events-none" />
+                )}
               </div>
             </div>
             <Button 

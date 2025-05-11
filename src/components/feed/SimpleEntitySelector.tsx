@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { useEntitySearch } from '@/hooks/use-entity-search';
 import { SelectValue, SelectTrigger, SelectContent, Select, SelectItem } from '@/components/ui/select';
-import { Navigation } from 'lucide-react';
+import { Navigation, X, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/contexts/LocationContext';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
@@ -18,6 +18,9 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState('');
   const [entityType, setEntityType] = useState<EntityType>('place');
+  const [showResults, setShowResults] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   
   const { localResults, externalResults, isLoading, handleSearch, createEntityFromExternal } = useEntitySearch(entityType);
   const { 
@@ -30,13 +33,59 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     formatDistance
   } = useLocation();
 
+  // Handle click outside to close results dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (resultsRef.current && !resultsRef.current.contains(event.target as Node) && 
+          inputRef.current && !inputRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
+  // Keyboard event handler for Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (searchQuery && showResults) {
+          e.preventDefault();
+          clearSearch();
+        } else if (showResults) {
+          setShowResults(false);
+        }
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [searchQuery, showResults]);
+
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
     
     if (query.length >= 2) {
+      setShowResults(true);
       handleSearch(query, locationEnabled, position);
+    } else {
+      setShowResults(false);
+    }
+  };
+  
+  // Clear search input and hide results
+  const clearSearch = () => {
+    setSearchQuery('');
+    setShowResults(false);
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
   };
   
@@ -54,6 +103,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
       setSelectedEntities(newEntities);
       onEntitiesChange(newEntities);
       setSearchQuery('');
+      setShowResults(false);
     }
   };
 
@@ -146,8 +196,27 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
               placeholder={`Search for a ${entityType}...`}
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full"
+              className="w-full pr-8"
+              ref={inputRef}
+              aria-label={`Search for ${entityType}`}
+              aria-expanded={showResults}
+              aria-controls="simple-entity-search-results"
             />
+            <div className="absolute inset-y-0 right-2 flex items-center">
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : searchQuery.trim() ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={clearSearch}
+                  className="h-6 w-6 p-0"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
         
@@ -175,8 +244,13 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
         )}
         
         {/* Search Results */}
-        {searchQuery.length >= 2 && (
-          <div className="border rounded-md max-h-40 overflow-y-auto">
+        {searchQuery.length >= 2 && showResults && (
+          <div 
+            id="simple-entity-search-results"
+            ref={resultsRef}
+            className="border rounded-md max-h-40 overflow-y-auto"
+            role="listbox"
+          >
             {isLoading || geoLoading ? (
               <div className="p-2 text-sm text-center">Loading...</div>
             ) : (
@@ -189,6 +263,8 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                         key={entity.id}
                         className="flex items-center hover:bg-accent/30 cursor-pointer p-2"
                         onClick={() => handleEntitySelect(entity)}
+                        role="option"
+                        aria-selected="false"
                       >
                         {/* Entity Image */}
                         <div className="flex-shrink-0 mr-2">
@@ -222,6 +298,8 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                         key={`external-${index}-${result.name}`}
                         className="flex items-center hover:bg-accent/30 cursor-pointer p-2"
                         onClick={() => handleExternalResultSelect(result)}
+                        role="option"
+                        aria-selected="false"
                       >
                         {/* Result Image */}
                         <div className="flex-shrink-0 mr-2">
