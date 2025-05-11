@@ -6,8 +6,8 @@ import { Entity, EntityType } from '@/services/recommendation/types';
 import { useEntitySearch } from '@/hooks/use-entity-search';
 import { SelectValue, SelectTrigger, SelectContent, Select, SelectItem } from '@/components/ui/select';
 import { Navigation } from 'lucide-react';
-import { useGeolocation } from '@/hooks/use-geolocation';
 import { Badge } from '@/components/ui/badge';
+import { useLocation } from '@/contexts/LocationContext';
 
 interface SimpleEntitySelectorProps {
   onEntitiesChange: (entities: Entity[]) => void;
@@ -18,10 +18,16 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState('');
   const [entityType, setEntityType] = useState<EntityType>('place');
-  const [useLocation, setUseLocation] = useState(false);
   
   const { localResults, externalResults, isLoading, handleSearch, createEntityFromExternal } = useEntitySearch(entityType);
-  const { position, getPosition, isLoading: geoLoading } = useGeolocation();
+  const { 
+    position, 
+    locationEnabled, 
+    enableLocation, 
+    disableLocation,
+    isLoading: geoLoading,
+    permissionStatus
+  } = useLocation();
 
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,16 +35,16 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     setSearchQuery(query);
     
     if (query.length >= 2) {
-      handleSearch(query, useLocation, position);
+      handleSearch(query, locationEnabled, position);
     }
   };
   
   // Perform search when location status changes
   useEffect(() => {
-    if (searchQuery.length >= 2 && useLocation) {
-      handleSearch(searchQuery, true, position);
+    if (searchQuery.length >= 2) {
+      handleSearch(searchQuery, locationEnabled, position);
     }
-  }, [position, useLocation]);
+  }, [position, locationEnabled, searchQuery]);
   
   // Handle entity selection
   const handleEntitySelect = (entity: Entity) => {
@@ -61,14 +67,19 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
   
   // Toggle location-based search
   const toggleLocationSearch = () => {
-    if (useLocation) {
-      setUseLocation(false);
+    if (locationEnabled) {
+      disableLocation();
     } else {
-      setUseLocation(true);
-      if (!position) {
-        getPosition();
-      }
+      enableLocation();
     }
+  };
+  
+  // Get button text based on location state
+  const getLocationButtonText = () => {
+    if (geoLoading) return "Getting location...";
+    if (permissionStatus === 'denied') return "Location access denied";
+    if (locationEnabled && position) return "Near me";
+    return "Use my location";
   };
 
   return (
@@ -108,17 +119,17 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
           <div className="flex items-center justify-between">
             <Button
               type="button"
-              variant={useLocation ? "secondary" : "outline"}
+              variant={locationEnabled ? "secondary" : "outline"}
               size="sm"
               className="flex items-center gap-1 text-xs h-7"
               onClick={toggleLocationSearch}
-              disabled={geoLoading}
+              disabled={geoLoading || permissionStatus === 'denied'}
             >
               <Navigation className={`h-3.5 w-3.5 ${geoLoading ? 'animate-pulse' : ''}`} />
-              {position && useLocation ? "Near me" : geoLoading ? "Getting location..." : "Use my location"}
+              {getLocationButtonText()}
             </Button>
             
-            {useLocation && position && (
+            {locationEnabled && position && (
               <Badge variant="outline" className="text-xs bg-accent/30 border-none">
                 Using your location
               </Badge>
@@ -129,7 +140,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
         {/* Search Results */}
         {searchQuery.length >= 2 && (
           <div className="border rounded-md max-h-40 overflow-y-auto">
-            {isLoading || (useLocation && geoLoading) ? (
+            {isLoading || geoLoading ? (
               <div className="p-2 text-sm text-center">Loading...</div>
             ) : (
               <>
@@ -163,7 +174,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                       >
                         <div className="w-full flex flex-col items-start">
                           <span className="truncate">{result.name}</span>
-                          {result.metadata?.distance !== undefined && (
+                          {result.metadata?.distance !== undefined && locationEnabled && (
                             <span className="text-xs text-brand-orange">
                               {Math.round(result.metadata.distance * 10) / 10} km away
                             </span>

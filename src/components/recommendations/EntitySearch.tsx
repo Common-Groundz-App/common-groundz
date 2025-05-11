@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useEntitySearch } from '@/hooks/use-entity-search';
-import { useGeolocation } from '@/hooks/use-geolocation';
 import { Badge } from '@/components/ui/badge';
+import { useLocation } from '@/contexts/LocationContext';
 
 interface EntitySearchProps {
   type: EntityType;
@@ -20,7 +20,6 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [showResults, setShowResults] = useState(false);
-  const [useLocation, setUseLocation] = useState(false);
   
   const {
     localResults,
@@ -36,8 +35,12 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     isLoading: geoLoading,
     getPosition,
     isGeolocationSupported,
-    formatDistance
-  } = useGeolocation();
+    formatDistance,
+    locationEnabled,
+    enableLocation,
+    disableLocation,
+    permissionStatus
+  } = useLocation();
 
   // Handler functions for selecting entities
   const handleSelectEntity = (entity: Entity) => {
@@ -67,9 +70,9 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   // When location or search query changes, perform search
   useEffect(() => {
     if (searchQuery.trim().length >= 2) {
-      handleSearch(searchQuery, useLocation, position);
+      handleSearch(searchQuery, locationEnabled, position);
     }
-  }, [useLocation, position, searchQuery]);
+  }, [locationEnabled, position, searchQuery]);
 
   // Get the appropriate icon based on entity type
   const getEntityIcon = () => {
@@ -122,15 +125,35 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   const toggleLocationSearch = () => {
     if (!isGeolocationSupported) return;
     
-    if (useLocation) {
-      setUseLocation(false);
+    if (locationEnabled) {
+      disableLocation();
     } else {
-      setUseLocation(true);
-      if (!position) {
-        getPosition();
-      }
+      enableLocation();
     }
   };
+  
+  // Get button state based on permission status
+  const getLocationButtonState = () => {
+    if (!isGeolocationSupported) return { disabled: true, text: "Location not supported" };
+    
+    if (geoLoading) return { disabled: true, text: "Getting location..." };
+    
+    if (permissionStatus === 'denied') {
+      return { 
+        disabled: false, 
+        text: "Location access denied",
+        action: () => alert("Please enable location access in your browser settings")
+      };
+    }
+    
+    if (locationEnabled && position) {
+      return { disabled: false, text: "Near me", action: toggleLocationSearch };
+    }
+    
+    return { disabled: false, text: "Use my location", action: toggleLocationSearch };
+  };
+  
+  const buttonState = getLocationButtonState();
 
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -149,7 +172,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                   placeholder={getPlaceholderText()}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery, useLocation, position)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery, locationEnabled, position)}
                   className="pr-8"
                 />
                 <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
@@ -158,28 +181,29 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
               </div>
               <Button 
                 type="button" 
-                onClick={() => handleSearch(searchQuery, useLocation, position)} 
+                onClick={() => handleSearch(searchQuery, locationEnabled, position)} 
                 disabled={!searchQuery.trim()}
               >
                 Search
               </Button>
             </div>
             
-            {/* Location toggle button */}
+            {/* Location toggle button - only for place or food */}
             {(type === 'place' || type === 'food') && isGeolocationSupported && (
               <div className="flex items-center justify-between mt-2">
                 <Button
                   type="button"
-                  variant={useLocation ? "secondary" : "outline"}
+                  variant={locationEnabled ? "secondary" : "outline"}
                   size="sm"
                   className="flex items-center gap-1 text-xs h-8"
-                  onClick={toggleLocationSearch}
+                  onClick={buttonState.action || toggleLocationSearch}
+                  disabled={buttonState.disabled}
                 >
-                  <Navigation className="h-3.5 w-3.5" />
-                  {position && useLocation ? "Near me" : "Use my location"}
+                  <Navigation className={`h-3.5 w-3.5 ${geoLoading ? 'animate-pulse' : ''}`} />
+                  {buttonState.text}
                 </Button>
                 
-                {useLocation && position && (
+                {locationEnabled && position && (
                   <Badge variant="outline" className="text-xs bg-accent/30 border-none">
                     Using your location
                   </Badge>
@@ -242,7 +266,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                               <div className="text-xs text-gray-600 truncate">{result.description}</div>
                             )}
                             {/* Show distance if available */}
-                            {result.metadata?.distance !== undefined && (
+                            {result.metadata?.distance !== undefined && locationEnabled && (
                               <div className="text-xs text-brand-orange font-medium mt-1">
                                 {formatDistance(result.metadata.distance)}
                               </div>

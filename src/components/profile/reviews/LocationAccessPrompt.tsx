@@ -3,8 +3,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MapPin, Navigation, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { useGeolocation } from '@/hooks/use-geolocation';
 import { cn } from '@/lib/utils';
+import { useLocation } from '@/contexts/LocationContext';
 
 interface LocationAccessPromptProps {
   onCancel: () => void;
@@ -18,8 +18,9 @@ export function LocationAccessPrompt({ onCancel, className }: LocationAccessProm
     isLoading, 
     error, 
     permissionStatus, 
-    isGeolocationSupported 
-  } = useGeolocation();
+    isGeolocationSupported,
+    enableLocation
+  } = useLocation();
 
   // Get status message and icon
   const getStatusInfo = () => {
@@ -64,6 +65,10 @@ export function LocationAccessPrompt({ onCancel, className }: LocationAccessProm
   
   const { message, icon, color } = getStatusInfo();
   
+  const handleLocationAccess = () => {
+    enableLocation();
+  };
+  
   return (
     <Card className={cn("p-4", className)}>
       <div className="flex items-center gap-3 mb-3">
@@ -95,10 +100,10 @@ export function LocationAccessPrompt({ onCancel, className }: LocationAccessProm
         <Button
           variant="default"
           size="sm"
-          onClick={getPosition}
-          disabled={!isGeolocationSupported || isLoading || !!position}
+          onClick={handleLocationAccess}
+          disabled={!isGeolocationSupported || isLoading || !!position || permissionStatus === 'denied'}
         >
-          {position ? "Location Accessed" : isLoading ? "Getting Location..." : "Allow Location Access"}
+          {position ? "Location Accessed" : isLoading ? "Getting Location..." : permissionStatus === 'denied' ? "Access Denied" : "Allow Location Access"}
         </Button>
       </div>
     </Card>

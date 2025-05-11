@@ -10,7 +10,7 @@ import { Book, Clapperboard, MapPin, ShoppingBag, Navigation } from 'lucide-reac
 import ImageUploader from '@/components/profile/reviews/ImageUploader';
 import { ensureHttps } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';
-import { useGeolocation } from '@/hooks/use-geolocation';
+import { useLocation } from '@/contexts/LocationContext';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
 
 interface StepThreeProps {
@@ -47,10 +47,12 @@ const StepThree = ({
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   
   const { 
-    position, 
-    isLoading: geoLoading, 
-    permissionStatus 
-  } = useGeolocation();
+    position,
+    isLoading: geoLoading,
+    permissionStatus,
+    locationEnabled,
+    enableLocation
+  } = useLocation();
   
   // Process selected entity to ensure it has valid fields for display
   useEffect(() => {
@@ -72,6 +74,23 @@ const StepThree = ({
       setProcessedEntity(processed);
     }
   }, [selectedEntity]);
+
+  // Check if we should show the location prompt
+  useEffect(() => {
+    const isLocationRelevantCategory = category === 'place' || category === 'food';
+    const locationNotSetUp = !locationEnabled && permissionStatus !== 'granted' && permissionStatus !== 'denied';
+    
+    if (isLocationRelevantCategory && locationNotSetUp) {
+      // Only show the prompt if we haven't asked before or it's been a while
+      const lastPromptTime = localStorage.getItem('locationPromptLastShown');
+      const currentTime = Date.now();
+      
+      if (!lastPromptTime || (currentTime - parseInt(lastPromptTime)) > 86400000) { // 24 hours
+        setShowLocationPrompt(true);
+        localStorage.setItem('locationPromptLastShown', currentTime.toString());
+      }
+    }
+  }, [category, permissionStatus, locationEnabled]);
   
   const getCategoryIcon = () => {
     switch(category) {
@@ -168,6 +187,16 @@ const StepThree = ({
     setShowEntitySearch(false);
   };
   
+  // Get location button state
+  const getLocationButtonState = () => {
+    if (geoLoading) return { text: "Getting location...", disabled: true };
+    if (locationEnabled && position) return { text: "Location enabled", disabled: true };
+    if (permissionStatus === 'denied') return { text: "Access denied", disabled: true };
+    return { text: "Use my location", disabled: false };
+  };
+  
+  const buttonState = getLocationButtonState();
+  
   // Show location prompt for place or food categories if permission not already granted
   const isLocationRelevantCategory = category === 'place' || category === 'food';
   
@@ -203,15 +232,22 @@ const StepThree = ({
             </Label>
             
             {/* Show location button for relevant categories */}
-            {isLocationRelevantCategory && !showLocationPrompt && !permissionStatus && (
+            {isLocationRelevantCategory && !showLocationPrompt && !locationEnabled && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="flex items-center gap-1 text-xs"
-                onClick={() => setShowLocationPrompt(true)}
+                onClick={() => {
+                  if (permissionStatus === 'denied') {
+                    setShowLocationPrompt(true);
+                  } else {
+                    enableLocation();
+                  }
+                }}
+                disabled={buttonState.disabled}
               >
-                <Navigation className="h-3.5 w-3.5" />
-                <span>Use my location</span>
+                <Navigation className={`h-3.5 w-3.5 ${geoLoading ? 'animate-pulse' : ''}`} />
+                <span>{buttonState.text}</span>
               </Button>
             )}
           </div>

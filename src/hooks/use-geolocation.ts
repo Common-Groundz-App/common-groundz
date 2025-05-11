@@ -23,6 +23,25 @@ export function useGeolocation() {
 
   // Check if geolocation is supported by the browser
   const isGeolocationSupported = 'geolocation' in navigator;
+  
+  // Try to get cached position on mount
+  useEffect(() => {
+    const cachedPosition = localStorage.getItem('lastKnownPosition');
+    const cachedTimestamp = localStorage.getItem('lastPositionTimestamp');
+    
+    if (cachedPosition) {
+      try {
+        const position = JSON.parse(cachedPosition);
+        setState(prev => ({
+          ...prev,
+          position,
+          timestamp: cachedTimestamp ? parseInt(cachedTimestamp) : null
+        }));
+      } catch (e) {
+        console.error('Error parsing cached position:', e);
+      }
+    }
+  }, []);
 
   // Check permission status
   const checkPermission = useCallback(async () => {
@@ -62,12 +81,18 @@ export function useGeolocation() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        const positionData = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+        
+        // Cache the position
+        localStorage.setItem('lastKnownPosition', JSON.stringify(positionData));
+        localStorage.setItem('lastPositionTimestamp', position.timestamp.toString());
+        
         setState({
           isLoading: false,
-          position: {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          },
+          position: positionData,
           error: null,
           permissionStatus: state.permissionStatus,
           timestamp: position.timestamp
@@ -89,7 +114,7 @@ export function useGeolocation() {
   }, [isGeolocationSupported, state.permissionStatus]);
 
   // Calculate distance between two coordinates in kilometers
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const calculateDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Radius of the earth in km
     const dLat = deg2rad(lat2 - lat1);
     const dLon = deg2rad(lon2 - lon1); 
@@ -100,19 +125,32 @@ export function useGeolocation() {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
     const distance = R * c; // Distance in km
     return distance;
-  };
+  }, []);
   
   const deg2rad = (deg: number): number => {
     return deg * (Math.PI/180);
   };
 
   // Format distance for display
-  const formatDistance = (distance: number): string => {
+  const formatDistance = useCallback((distance: number): string => {
     if (distance < 1) {
       return `${Math.round(distance * 1000)} m`;
     }
     return `${Math.round(distance * 10) / 10} km`;
-  };
+  }, []);
+
+  // Get the last known position timestamp
+  const getLastPositionTimestamp = useCallback((): number | null => {
+    const timestamp = localStorage.getItem('lastPositionTimestamp');
+    return timestamp ? parseInt(timestamp) : null;
+  }, []);
+  
+  // Reset permission denied state - usually by directing user to browser settings
+  const resetPermissionDenied = useCallback(() => {
+    // This would typically open browser settings on most devices
+    // But since we can't do that directly, we'll show an alert
+    alert("Please update your browser settings to allow location access");
+  }, []);
 
   return {
     ...state,
@@ -120,6 +158,8 @@ export function useGeolocation() {
     isGeolocationSupported,
     checkPermission,
     calculateDistance,
-    formatDistance
+    formatDistance,
+    getLastPositionTimestamp,
+    resetPermissionDenied
   };
 }
