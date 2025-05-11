@@ -4,9 +4,9 @@ import { useLocation, setLocationStatus } from '@/contexts/LocationContext';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Bell, User, Shield, Palette, Globe, MapPin } from 'lucide-react';
+import { Bell, User, Shield, Palette, Globe, MapPin, Info, AlertTriangle } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -175,6 +175,9 @@ const Settings = () => {
                       <MapPin className="h-5 w-5" />
                       Location Services
                     </CardTitle>
+                    <CardDescription>
+                      Manage how your location data is used within the app
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
@@ -212,12 +215,6 @@ const Settings = () => {
                         <span className="font-medium">Last used: </span>
                         <span>{formattedTimestamp}</span>
                       </div>
-                      
-                      {position && (
-                        <div className="text-xs text-muted-foreground">
-                          Current coordinates: {position.latitude.toFixed(6)}, {position.longitude.toFixed(6)}
-                        </div>
-                      )}
                     </div>
                     
                     <Separator />
@@ -231,25 +228,41 @@ const Settings = () => {
                         <li>Distance information in search results</li>
                         <li>More accurate recommendations</li>
                       </ul>
-                      
-                      <p className="text-muted-foreground">
-                        Your location data is only used within the app and is not shared with third parties.
-                      </p>
+                    </div>
+                    
+                    <div className="bg-accent/30 rounded-md p-4 flex items-start space-x-3">
+                      <Info className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Data Usage Policy</p>
+                        <p className="text-xs text-muted-foreground">
+                          Your location data is only used within the app and is not shared with third parties. 
+                          We store your last known position to provide location-based features when you need them. 
+                          You can disable location services at any time.
+                        </p>
+                      </div>
                     </div>
                     
                     {permissionStatus === 'denied' && (
                       <div className="rounded-md bg-red-50 dark:bg-red-950 p-4 border border-red-200 dark:border-red-900">
-                        <p className="text-red-800 dark:text-red-200 text-sm mb-2">
-                          Location access is blocked in your browser settings
-                        </p>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-red-700 dark:text-red-300 border-red-300 dark:border-red-800"
-                          onClick={() => window.open('about:settings', '_blank')}
-                        >
-                          Open Browser Settings
-                        </Button>
+                        <div className="flex items-start space-x-3">
+                          <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                          <div className="space-y-2">
+                            <p className="text-red-800 dark:text-red-200 text-sm font-medium">
+                              Location access is blocked in your browser settings
+                            </p>
+                            <p className="text-xs text-red-700 dark:text-red-300 mb-2">
+                              You'll need to update your browser settings to enable location services.
+                            </p>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-red-700 dark:text-red-300 border-red-300 dark:border-red-800"
+                              onClick={() => window.open('about:settings', '_blank')}
+                            >
+                              Open Browser Settings
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -258,11 +271,41 @@ const Settings = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>Privacy Settings</CardTitle>
+                    <CardDescription>
+                      Control how your personal data is used and accessed
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      Manage additional privacy settings here. This feature will be available soon.
-                    </p>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Your Data</h3>
+                      <p className="text-sm text-muted-foreground">
+                        You can request a copy of your data or delete your account at any time.
+                      </p>
+                      <div className="flex space-x-2 mt-2">
+                        <Button variant="outline" size="sm">Request Data Export</Button>
+                      </div>
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Cookie Preferences</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Manage how we use cookies to enhance your experience.
+                      </p>
+                      <div className="flex flex-col space-y-4 mt-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="essential-cookies" className="text-sm">Essential Cookies</Label>
+                          <Switch id="essential-cookies" checked disabled />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="analytics-cookies" className="text-sm">Analytics Cookies</Label>
+                          <Switch id="analytics-cookies" defaultChecked />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="marketing-cookies" className="text-sm">Marketing Cookies</Label>
+                          <Switch id="marketing-cookies" />
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
