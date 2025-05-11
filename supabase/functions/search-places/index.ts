@@ -18,10 +18,10 @@ serve(async (req) => {
       throw new Error("GOOGLE_PLACES_API_KEY is not set");
     }
 
-    const { query } = await req.json();
-    if (!query) {
+    const { query, latitude, longitude, radius = 5000 } = await req.json();
+    if (!query && !(latitude && longitude)) {
       return new Response(
-        JSON.stringify({ error: "Query parameter is required" }),
+        JSON.stringify({ error: "Query or location parameters are required" }),
         { 
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -29,12 +29,36 @@ serve(async (req) => {
       );
     }
 
-    // Using Google Places API - Text Search
-    const url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
-    url.searchParams.append("query", query);
+    // Construct API URL based on whether we're doing a text search or nearby search
+    let url: URL;
+    
+    if (query && (!latitude || !longitude)) {
+      // Text search if no coordinates provided or query is provided
+      url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+      url.searchParams.append("query", query);
+      console.log(`Searching places for query: ${query}`);
+    } else if (latitude && longitude) {
+      if (query) {
+        // Text search with location bias
+        url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+        url.searchParams.append("query", query);
+        url.searchParams.append("location", `${latitude},${longitude}`);
+        url.searchParams.append("radius", radius.toString());
+        console.log(`Searching for ${query} near location: ${latitude},${longitude}`);
+      } else {
+        // Nearby search (no query, just location)
+        url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
+        url.searchParams.append("location", `${latitude},${longitude}`);
+        url.searchParams.append("radius", radius.toString());
+        url.searchParams.append("type", "restaurant");
+        console.log(`Searching nearby places at location: ${latitude},${longitude}`);
+      }
+    } else {
+      throw new Error("Invalid search parameters");
+    }
+
     url.searchParams.append("key", GOOGLE_PLACES_API_KEY);
     
-    console.log(`Searching places for query: ${query}`);
     const response = await fetch(url.toString());
     const data = await response.json();
     
@@ -43,7 +67,6 @@ serve(async (req) => {
     }
 
     // Format the response to match our entity structure
-    // Making sure we ONLY use the place name for the venue field
     const results = data.results.map((place: any) => {
       // Log the data structure for debugging
       console.log(`Processing place: ${place.name}, Address: ${place.formatted_address}`);
@@ -75,7 +98,15 @@ serve(async (req) => {
           types: place.types,
           rating: place.rating,
           user_ratings_total: place.user_ratings_total,
-          business_status: place.business_status
+          business_status: place.business_status,
+          // Add distance from the searched coordinates if available
+          distance: (latitude && longitude && place.geometry?.location) ? 
+            calculateDistance(
+              latitude, 
+              longitude, 
+              place.geometry.location.lat, 
+              place.geometry.location.lng
+            ) : null
         }
       };
     });
@@ -95,3 +126,21 @@ serve(async (req) => {
     );
   }
 });
+
+// Calculate distance between two points in kilometers
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const distance = R * c; // Distance in km
+  return Math.round(distance * 10) / 10; // Round to 1 decimal place
+}
+
+function deg2rad(deg: number): number {
+  return deg * (Math.PI/180);
+}

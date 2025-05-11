@@ -6,9 +6,12 @@ import { cn } from '@/lib/utils';
 import EntitySearch from '@/components/recommendations/EntitySearch';
 import { Entity } from '@/services/recommendation/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
-import { Book, Clapperboard, MapPin, ShoppingBag } from 'lucide-react';
+import { Book, Clapperboard, MapPin, ShoppingBag, Navigation } from 'lucide-react';
 import ImageUploader from '@/components/profile/reviews/ImageUploader';
 import { ensureHttps } from '@/utils/urlUtils';
+import { Button } from '@/components/ui/button';
+import { useGeolocation } from '@/hooks/use-geolocation';
+import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
 
 interface StepThreeProps {
   category: string;
@@ -41,6 +44,13 @@ const StepThree = ({
 }: StepThreeProps) => {
   const [showEntitySearch, setShowEntitySearch] = useState(!selectedEntity);
   const [processedEntity, setProcessedEntity] = useState<Entity | null>(null);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  
+  const { 
+    position, 
+    isLoading: geoLoading, 
+    permissionStatus 
+  } = useGeolocation();
   
   // Process selected entity to ensure it has valid fields for display
   useEffect(() => {
@@ -158,11 +168,22 @@ const StepThree = ({
     setShowEntitySearch(false);
   };
   
+  // Show location prompt for place or food categories if permission not already granted
+  const isLocationRelevantCategory = category === 'place' || category === 'food';
+  
   return (
     <div className="w-full space-y-8 py-2">
       <h2 className="text-xl font-medium text-center">
         Tell us about your {category}
       </h2>
+      
+      {/* Location prompt - show only for place/food categories */}
+      {isLocationRelevantCategory && showLocationPrompt && (
+        <LocationAccessPrompt 
+          onCancel={() => setShowLocationPrompt(false)}
+          className="mb-8"
+        />
+      )}
       
       {/* Entity search/preview */}
       {selectedEntity && processedEntity && !showEntitySearch ? (
@@ -173,12 +194,28 @@ const StepThree = ({
         />
       ) : (
         <div className="p-4 border border-dashed border-brand-orange/30 rounded-lg bg-gradient-to-b from-transparent to-accent/5 transition-all duration-300 hover:border-brand-orange/50">
-          <Label className="flex items-center gap-2 font-medium mb-2">
-            <span className="p-1.5 rounded-full bg-brand-orange/10">
-              {getCategoryIcon()}
-            </span>
-            <span>Search for {getSearchLabel()}</span>
-          </Label>
+          <div className="flex justify-between items-center mb-2">
+            <Label className="flex items-center gap-2 font-medium">
+              <span className="p-1.5 rounded-full bg-brand-orange/10">
+                {getCategoryIcon()}
+              </span>
+              <span>Search for {getSearchLabel()}</span>
+            </Label>
+            
+            {/* Show location button for relevant categories */}
+            {isLocationRelevantCategory && !showLocationPrompt && !permissionStatus && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-1 text-xs"
+                onClick={() => setShowLocationPrompt(true)}
+              >
+                <Navigation className="h-3.5 w-3.5" />
+                <span>Use my location</span>
+              </Button>
+            )}
+          </div>
+          
           <EntitySearch 
             type={getEntitySearchType() as any}
             onSelect={handleEntitySelection}

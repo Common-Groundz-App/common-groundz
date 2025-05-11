@@ -1,178 +1,184 @@
-import { useState } from 'react';
-import { Entity, EntityType } from '@/services/recommendation/types';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useEntityOperations } from '@/hooks/recommendations/use-entity-operations';
 
-interface ExternalSearchResult {
-  name: string;
-  venue: string | null;
-  description: string | null;
-  image_url: string | null;
-  api_source: string;
-  api_ref: string;
-  metadata: any;
-}
+import { useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Entity, EntityType } from '@/services/recommendation/types';
+import { useToast } from '@/hooks/use-toast';
+import { v4 as uuidv4 } from 'uuid';
 
 export function useEntitySearch(type: EntityType) {
-  const { toast } = useToast();
-  const { handleEntityCreation } = useEntityOperations();
-  const [query, setQuery] = useState('');
   const [localResults, setLocalResults] = useState<Entity[]>([]);
-  const [externalResults, setExternalResults] = useState<ExternalSearchResult[]>([]);
+  const [externalResults, setExternalResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
-  const searchLocalEntities = async (searchQuery: string) => {
-    if (!searchQuery.trim()) return [];
+  const { toast } = useToast();
+
+  const handleSearch = useCallback(async (query: string, useLocation: boolean = false, position?: { latitude: number, longitude: number }) => {
+    if (!query || query.length < 2) return;
     
-    try {
-      const { data, error } = await supabase
-        .from('entities')
-        .select('*')
-        .eq('type', type)
-        .eq('is_deleted', false)
-        .ilike('name', `%${searchQuery}%`)
-        .order('name')
-        .limit(5);
-      
-      if (error) throw error;
-      return data as Entity[];
-    } catch (error) {
-      console.error('Error searching local entities:', error);
-      return [];
-    }
-  };
-
-  const searchExternalAPI = async (searchQuery: string): Promise<ExternalSearchResult[]> => {
-    if (!searchQuery.trim()) return [];
-
-    try {
-      let functionName = "";
-
-      switch (type) {
-        case "place":
-          functionName = "search-places";
-          break;
-        case "movie":
-          functionName = "search-movies";
-          break;
-        case "book":
-          functionName = "search-books";
-          break;
-        case "food":
-          functionName = "search-food";
-          break;
-        case "product":
-          functionName = "search-products";
-          break;
-        default:
-          return [];
-      }
-
-      if (!functionName) return [];
-
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: { query: searchQuery }
-      });
-
-      if (error) throw error;
-      return data.results || [];
-    } catch (error) {
-      console.error(`Error searching external API for ${type}:`, error);
-      return [];
-    }
-  };
-
-  const handleSearch = async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
-      setLocalResults([]);
-      setExternalResults([]);
-      return;
-    }
-    
-    setQuery(searchQuery);
     setIsLoading(true);
     
     try {
-      const local = await searchLocalEntities(searchQuery);
-      setLocalResults(local);
+      // Search in our local database first
+      const { data: localData, error: localError } = await supabase
+        .from('entities')
+        .select()
+        .eq('entity_type', type)
+        .ilike('name', `%${query}%`)
+        .order('name')
+        .limit(5);
       
-      const external = await searchExternalAPI(searchQuery);
-      setExternalResults(external);
+      if (localError) throw localError;
+      
+      // Set local database results
+      setLocalResults(localData as Entity[] || []);
+      
+      // External API search
+      let externalData;
+      
+      // Call appropriate Supabase Edge Function based on entity type
+      let functionName;
+      let payload: any = { query };
+      
+      // Add location data if available and requested
+      if (useLocation && position) {
+        payload.latitude = position.latitude;
+        payload.longitude = position.longitude;
+      }
+      
+      switch (type) {
+        case 'place':
+        case 'food':
+          functionName = 'search-places';
+          break;
+        case 'movie':
+          functionName = 'search-movies';
+          break;
+        case 'book':
+          functionName = 'search-books';
+          break;
+        case 'product':
+          functionName = 'search-products';
+          break;
+        default:
+          functionName = 'search-places';
+      }
+      
+      const { data: funcData, error: funcError } = await supabase.functions.invoke(functionName, {
+        body: payload
+      });
+      
+      if (funcError) throw funcError;
+      
+      externalData = funcData?.results || [];
+      
+      // Set external API results
+      setExternalResults(externalData);
+      
     } catch (error) {
-      console.error('Error during search:', error);
+      console.error(`Error searching for ${type}:`, error);
       toast({
         title: 'Search failed',
-        description: 'Failed to search for entities. Please try again.',
+        description: `Could not search for ${type}s. Please try again.`,
         variant: 'destructive'
       });
+      setExternalResults([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [type, toast]);
 
-  const createEntityFromExternal = async (result: ExternalSearchResult): Promise<Entity | null> => {
+  const createEntityFromExternal = useCallback(async (externalData: any) => {
     try {
-      return await handleEntityCreation(
-        result.name,
-        type,
-        result.api_source,
-        result.api_ref,
-        result.venue,
-        result.description,
-        result.image_url,
-        result.metadata
-      );
+      // Create a new entity record from external data
+      const entityData: Partial<Entity> = {
+        id: uuidv4(),
+        name: externalData.name,
+        venue: externalData.venue,
+        description: externalData.description || null,
+        image_url: externalData.image_url || null,
+        entity_type: type,
+        api_source: externalData.api_source,
+        api_ref: externalData.api_ref,
+        metadata: externalData.metadata
+      };
+      
+      // Insert the entity into our database
+      const { data, error } = await supabase
+        .from('entities')
+        .insert(entityData)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      return data as Entity;
     } catch (error) {
-      console.error('Error creating entity from external result:', error);
+      console.error('Error creating entity:', error);
       toast({
-        title: 'Failed to save',
-        description: 'Could not create entity from external result.',
+        title: 'Error',
+        description: 'Could not save this entity. Please try again.',
         variant: 'destructive'
       });
       return null;
     }
-  };
+  }, [type, toast]);
 
-  const createEntityFromUrl = async (url: string): Promise<Entity | null> => {
+  const createEntityFromUrl = useCallback(async (url: string) => {
     try {
-      const entity = await handleEntityCreation(
-        '', // Name will be populated from metadata
-        type,
-        'website',
-        url,
-        null,
-        null,
-        null,
-        null,
-        url
-      );
-
-      if (entity) {
-        toast({
-          title: 'Success',
-          description: 'Website added successfully'
-        });
+      // Call the fetch-url-metadata function to scrape metadata
+      const { data, error } = await supabase.functions.invoke('fetch-url-metadata', {
+        body: { url }
+      });
+      
+      if (error) throw error;
+      
+      if (!data?.metadata) {
+        throw new Error('Could not fetch metadata from URL');
       }
-
-      return entity;
+      
+      // Create entity from the metadata
+      const entityData: Partial<Entity> = {
+        id: uuidv4(),
+        name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
+        venue: data.metadata.site_name || new URL(url).hostname,
+        description: data.metadata.description || data.metadata.og_description || null,
+        image_url: data.metadata.og_image || data.metadata.image || null,
+        entity_type: type,
+        api_source: 'url_metadata',
+        api_ref: url,
+        metadata: data.metadata
+      };
+      
+      // Insert the entity into our database
+      const { data: insertData, error: insertError } = await supabase
+        .from('entities')
+        .insert(entityData)
+        .select()
+        .single();
+      
+      if (insertError) {
+        throw insertError;
+      }
+      
+      return insertData as Entity;
     } catch (error) {
       console.error('Error creating entity from URL:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create entity from URL'
+        description: 'Could not create entity from this URL. Please check the URL and try again.',
+        variant: 'destructive'
       });
       return null;
     }
-  };
+  }, [type, toast]);
 
   return {
-    query,
     localResults,
     externalResults,
     isLoading,
     handleSearch,
-    createEntityFromUrl,
-    createEntityFromExternal
+    createEntityFromExternal,
+    createEntityFromUrl
   };
 }

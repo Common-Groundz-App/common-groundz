@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { X, MapPin, Loader2 } from 'lucide-react';
+import { X, MapPin, Loader2, Navigation } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useGeolocation } from '@/hooks/use-geolocation';
 
 interface LocationResult {
   name: string;
@@ -15,6 +16,8 @@ interface LocationResult {
       lat: number;
       lng: number;
     };
+    formatted_address?: string;
+    distance?: number;
   };
 }
 
@@ -33,6 +36,16 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
   const { toast } = useToast();
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Get geolocation data
+  const { 
+    position, 
+    error: geoError, 
+    isLoading: geoLoading, 
+    getPosition, 
+    isGeolocationSupported,
+    formatDistance
+  } = useGeolocation();
 
   // Handle click outside to close results dropdown
   useEffect(() => {
@@ -78,8 +91,20 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
     setShowResults(true);
     
     try {
+      // Include position if available
+      const payload: {
+        query: string;
+        latitude?: number;
+        longitude?: number;
+      } = { query: searchQuery };
+      
+      if (position) {
+        payload.latitude = position.latitude;
+        payload.longitude = position.longitude;
+      }
+      
       const { data, error } = await supabase.functions.invoke('search-places', {
-        body: { query: searchQuery }
+        body: payload
       });
       
       if (error) throw error;
@@ -102,10 +127,47 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
     }
   };
 
+  const searchNearby = async () => {
+    if (!position) {
+      getPosition();
+      return;
+    }
+    
+    setIsLoading(true);
+    setShowResults(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('search-places', {
+        body: { 
+          latitude: position.latitude,
+          longitude: position.longitude
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data && data.results) {
+        setResults(data.results);
+      } else {
+        setResults([]);
+      }
+    } catch (error) {
+      console.error('Error finding nearby places:', error);
+      toast({
+        title: 'Search failed',
+        description: 'Could not find nearby places. Please try again.',
+        variant: 'destructive'
+      });
+      setResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSelectLocation = (result: LocationResult) => {
     const locationData = {
       name: result.name,
-      address: result.venue || '',
+      address: result.metadata.formatted_address || '',
       placeId: result.api_ref,
       coordinates: result.metadata.location
     };
@@ -121,6 +183,43 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
     setShowResults(false);
     onClear();
   };
+
+  const handleUseMyLocation = () => {
+    if (!isGeolocationSupported) {
+      toast({
+        title: 'Not supported',
+        description: 'Geolocation is not supported in your browser.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (geoLoading) return;
+    
+    if (position) {
+      searchNearby();
+    } else {
+      getPosition();
+    }
+  };
+
+  // When position becomes available and the user requested it, search nearby
+  useEffect(() => {
+    if (geoLoading && position) {
+      searchNearby();
+    }
+  }, [position, geoLoading]);
+
+  // If there was an error getting location
+  useEffect(() => {
+    if (geoError) {
+      toast({
+        title: 'Location error',
+        description: geoError.message || 'Could not access your location. Please check your browser settings.',
+        variant: 'destructive'
+      });
+    }
+  }, [geoError, toast]);
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -141,6 +240,23 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
             </div>
           )}
         </div>
+        
+        {/* Near me button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleUseMyLocation}
+          disabled={geoLoading}
+          className="h-6 w-6 p-0"
+          title="Use my location"
+        >
+          {geoLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Navigation className="h-4 w-4" />
+          )}
+        </Button>
+        
         <Button
           variant="ghost"
           size="sm"
@@ -160,8 +276,13 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
               onClick={() => handleSelectLocation(result)}
             >
               <div className="font-medium">{result.name}</div>
-              {result.venue && (
-                <div className="text-xs text-muted-foreground">{result.venue}</div>
+              {result.metadata.formatted_address && (
+                <div className="text-xs text-muted-foreground">{result.metadata.formatted_address}</div>
+              )}
+              {result.metadata.distance !== null && (
+                <div className="text-xs text-brand-orange font-medium mt-1">
+                  {formatDistance(result.metadata.distance)}
+                </div>
               )}
             </div>
           ))}

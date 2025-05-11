@@ -1,10 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { useEntitySearch } from '@/hooks/use-entity-search';
 import { SelectValue, SelectTrigger, SelectContent, Select, SelectItem } from '@/components/ui/select';
+import { Navigation } from 'lucide-react';
+import { useGeolocation } from '@/hooks/use-geolocation';
+import { Badge } from '@/components/ui/badge';
 
 interface SimpleEntitySelectorProps {
   onEntitiesChange: (entities: Entity[]) => void;
@@ -15,17 +18,27 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState('');
   const [entityType, setEntityType] = useState<EntityType>('place');
+  const [useLocation, setUseLocation] = useState(false);
   
   const { localResults, externalResults, isLoading, handleSearch, createEntityFromExternal } = useEntitySearch(entityType);
+  const { position, getPosition, isLoading: geoLoading } = useGeolocation();
 
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
+    
     if (query.length >= 2) {
-      handleSearch(query);
+      handleSearch(query, useLocation, position);
     }
   };
+  
+  // Perform search when location status changes
+  useEffect(() => {
+    if (searchQuery.length >= 2 && useLocation) {
+      handleSearch(searchQuery, true, position);
+    }
+  }, [position, useLocation]);
   
   // Handle entity selection
   const handleEntitySelect = (entity: Entity) => {
@@ -43,6 +56,18 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     const entity = await createEntityFromExternal(result);
     if (entity) {
       handleEntitySelect(entity);
+    }
+  };
+  
+  // Toggle location-based search
+  const toggleLocationSearch = () => {
+    if (useLocation) {
+      setUseLocation(false);
+    } else {
+      setUseLocation(true);
+      if (!position) {
+        getPosition();
+      }
     }
   };
 
@@ -78,10 +103,33 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
           </div>
         </div>
         
+        {/* Location toggle for place/food entities */}
+        {(entityType === 'place' || entityType === 'food') && (
+          <div className="flex items-center justify-between">
+            <Button
+              type="button"
+              variant={useLocation ? "secondary" : "outline"}
+              size="sm"
+              className="flex items-center gap-1 text-xs h-7"
+              onClick={toggleLocationSearch}
+              disabled={geoLoading}
+            >
+              <Navigation className={`h-3.5 w-3.5 ${geoLoading ? 'animate-pulse' : ''}`} />
+              {position && useLocation ? "Near me" : geoLoading ? "Getting location..." : "Use my location"}
+            </Button>
+            
+            {useLocation && position && (
+              <Badge variant="outline" className="text-xs bg-accent/30 border-none">
+                Using your location
+              </Badge>
+            )}
+          </div>
+        )}
+        
         {/* Search Results */}
         {searchQuery.length >= 2 && (
           <div className="border rounded-md max-h-40 overflow-y-auto">
-            {isLoading ? (
+            {isLoading || (useLocation && geoLoading) ? (
               <div className="p-2 text-sm text-center">Loading...</div>
             ) : (
               <>
@@ -113,7 +161,14 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                         className="w-full justify-start text-left h-auto py-2 px-3"
                         onClick={() => handleExternalResultSelect(result)}
                       >
-                        <span className="truncate">{result.name}</span>
+                        <div className="w-full flex flex-col items-start">
+                          <span className="truncate">{result.name}</span>
+                          {result.metadata?.distance !== undefined && (
+                            <span className="text-xs text-brand-orange">
+                              {Math.round(result.metadata.distance * 10) / 10} km away
+                            </span>
+                          )}
+                        </div>
                       </Button>
                     ))}
                   </div>
