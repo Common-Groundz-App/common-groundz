@@ -12,11 +12,12 @@ import { Badge } from '@/components/ui/badge';
 interface EntitySearchProps {
   type: EntityType;
   onSelect: (entity: Entity) => void;
-  useLocation: boolean;
+  useLocation?: boolean;
   position?: { latitude: number, longitude: number };
+  onToggleLocation?: (useLocation: boolean) => void;
 }
 
-export function EntitySearch({ type, onSelect, useLocation, position }: EntitySearchProps) {
+export function EntitySearch({ type, onSelect, useLocation, position, onToggleLocation }: EntitySearchProps) {
   const [activeTab, setActiveTab] = useState<'search' | 'url'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [urlInput, setUrlInput] = useState('');
@@ -123,9 +124,9 @@ export function EntitySearch({ type, onSelect, useLocation, position }: EntitySe
     if (!isGeolocationSupported) return;
     
     if (useLocation) {
-      setUseLocation(false);
+      onToggleLocation && onToggleLocation(false);
     } else {
-      setUseLocation(true);
+      onToggleLocation && onToggleLocation(true);
       if (!position) {
         getPosition();
       }

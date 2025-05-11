@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import EntitySearch from '@/components/recommendations/EntitySearch';
 import { Entity } from '@/hooks/use-entity-search';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
-import { Book, Clapperboard, MapPin, ShoppingBag, Navigation, Locate } from 'lucide-react';
+import { Book, Clapperboard, MapPin, ShoppingBag, Navigation, Locate, AlertCircle } from 'lucide-react';
 import ImageUploader from '@/components/profile/reviews/ImageUploader';
 import { ensureHttps } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';

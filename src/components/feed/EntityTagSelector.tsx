@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useGeolocation } from '@/hooks/use-geolocation';
 
 interface EntityTagSelectorProps {
   onEntitiesChange: (entities: Entity[]) => void;
@@ -15,6 +16,9 @@ interface EntityTagSelectorProps {
 export function EntityTagSelector({ onEntitiesChange, initialEntities = [] }: EntityTagSelectorProps) {
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>(initialEntities);
   const [activeTab, setActiveTab] = useState<EntityType>('place');
+  const [useLocation, setUseLocation] = useState(false);
+  
+  const { position, getPosition } = useGeolocation();
   
   const handleEntitySelect = (entity: Entity) => {
     // Check if entity is already selected
@@ -32,6 +36,13 @@ export function EntityTagSelector({ onEntitiesChange, initialEntities = [] }: En
   };
   
   const entityTypes: EntityType[] = ['place', 'food', 'movie', 'book', 'product'];
+  
+  const handleToggleLocation = (value: boolean) => {
+    setUseLocation(value);
+    if (value && !position) {
+      getPosition();
+    }
+  };
   
   return (
     <div className="space-y-4">
@@ -52,6 +63,9 @@ export function EntityTagSelector({ onEntitiesChange, initialEntities = [] }: En
               <EntitySearch 
                 type={type} 
                 onSelect={handleEntitySelect}
+                useLocation={useLocation}
+                position={position}
+                onToggleLocation={handleToggleLocation}
               />
             </TabsContent>
           ))}

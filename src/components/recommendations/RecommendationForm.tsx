@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import EntitySearch from './EntitySearch';
 import { RecommendationCategory, RecommendationVisibility, Recommendation } from '@/services/recommendationService';
 import ConnectedRingsRating from './ConnectedRingsRating';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { useGeolocation } from '@/lib/hooks/useGeolocation';
 
 interface RecommendationFormProps {
   isOpen: boolean;
@@ -53,6 +53,8 @@ const RecommendationForm = ({
   const [selectedImage, setSelectedImage] = useState<string | null>(recommendation?.image_url || null);
   const [isUploading, setIsUploading] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
+  const [useLocation, setUseLocation] = useState(false);
+  const { position, getPosition } = useGeolocation();
   
   // Check for unsaved changes
   useEffect(() => {
@@ -170,6 +172,13 @@ const RecommendationForm = ({
     }
   };
 
+  const handleToggleLocation = (value: boolean) => {
+    setUseLocation(value);
+    if (value && !position) {
+      getPosition();
+    }
+  };
+
   return (
     <>
       <Dialog 
@@ -265,6 +274,9 @@ const RecommendationForm = ({
                       setSelectedImage(entity.image_url);
                     }
                   }}
+                  useLocation={useLocation}
+                  position={position}
+                  onToggleLocation={handleToggleLocation}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Can't find what you're looking for? You can just type the details below
