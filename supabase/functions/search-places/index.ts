@@ -6,6 +6,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// List of place types associated with food establishments
+const FOOD_PLACE_TYPES = [
+  'restaurant',
+  'cafe',
+  'bar',
+  'bakery',
+  'meal_delivery',
+  'meal_takeaway',
+  'night_club',
+  'food'
+];
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -18,7 +30,7 @@ serve(async (req) => {
       throw new Error("GOOGLE_PLACES_API_KEY is not set");
     }
 
-    const { query, latitude, longitude, radius = 5000, locationEnabled = false } = await req.json();
+    const { query, latitude, longitude, radius = 5000, locationEnabled = false, category } = await req.json();
     if (!query && !(latitude && longitude)) {
       return new Response(
         JSON.stringify({ error: "Query or location parameters are required" }),
@@ -36,7 +48,14 @@ serve(async (req) => {
       // Text search if no coordinates provided or query is provided
       url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
       url.searchParams.append("query", query);
-      console.log(`Searching places for query: ${query}`);
+      
+      // Add type filter for food category
+      if (category === 'food') {
+        // For text search, we can only add one type parameter
+        url.searchParams.append("type", "restaurant");
+      }
+      
+      console.log(`Searching places for query: ${query}${category === 'food' ? ' (filtered for food places)' : ''}`);
     } else if (latitude && longitude) {
       if (query) {
         // Text search with location bias
@@ -44,14 +63,29 @@ serve(async (req) => {
         url.searchParams.append("query", query);
         url.searchParams.append("location", `${latitude},${longitude}`);
         url.searchParams.append("radius", radius.toString());
-        console.log(`Searching for ${query} near location: ${latitude},${longitude}`);
+        
+        // Add type filter for food category
+        if (category === 'food') {
+          // For text search, we can only add one type parameter
+          url.searchParams.append("type", "restaurant");
+        }
+        
+        console.log(`Searching for ${query} near location: ${latitude},${longitude}${category === 'food' ? ' (filtered for food places)' : ''}`);
       } else {
         // Nearby search (no query, just location)
         url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
         url.searchParams.append("location", `${latitude},${longitude}`);
         url.searchParams.append("radius", radius.toString());
-        url.searchParams.append("type", "restaurant");
-        console.log(`Searching nearby places at location: ${latitude},${longitude}`);
+        
+        // For nearby search, use appropriate type based on category
+        if (category === 'food') {
+          url.searchParams.append("type", "restaurant");
+        } else {
+          // Default type for general nearby search
+          url.searchParams.append("type", "restaurant");
+        }
+        
+        console.log(`Searching nearby places at location: ${latitude},${longitude}${category === 'food' ? ' (filtered for food places)' : ''}`);
       }
     } else {
       throw new Error("Invalid search parameters");
@@ -67,7 +101,7 @@ serve(async (req) => {
     }
 
     // Format the response to match our entity structure
-    const results = data.results.map((place: any) => {
+    let results = data.results.map((place: any) => {
       // Log the data structure for debugging
       console.log(`Processing place: ${place.name}, Address: ${place.formatted_address}`);
       
@@ -115,6 +149,16 @@ serve(async (req) => {
         }
       };
     });
+
+    // For food category, post-filter results to ensure they are food-related establishments
+    if (category === 'food') {
+      results = results.filter((place: any) => {
+        // Check if place has types and if any of those types match our food-related types
+        return place.metadata?.types?.some((type: string) => 
+          FOOD_PLACE_TYPES.includes(type)
+        ) || true; // Fallback to keep everything if types information is missing
+      });
+    }
 
     return new Response(
       JSON.stringify({ results }),

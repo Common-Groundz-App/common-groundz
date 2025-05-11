@@ -127,6 +127,9 @@ export function useEntitySearch(type: EntityType) {
       // Always send the locationEnabled flag to the edge function
       payload.locationEnabled = useLocation && isLocationEnabled();
       
+      // Pass the category parameter for filtering (important for food category)
+      payload.category = type;
+      
       switch (type) {
         case 'place':
         case 'food':
@@ -145,6 +148,8 @@ export function useEntitySearch(type: EntityType) {
           functionName = 'search-places';
       }
       
+      console.log(`Searching for ${type} with query: "${query}"`, payload);
+      
       const { data: funcData, error: funcError } = await supabase.functions.invoke(functionName, {
         body: payload
       });
@@ -152,6 +157,7 @@ export function useEntitySearch(type: EntityType) {
       if (funcError) throw funcError;
       
       externalData = funcData?.results || [];
+      console.log(`Received ${externalData.length} results from ${functionName}:`, externalData);
       
       // Set external API results
       setExternalResults(externalData);

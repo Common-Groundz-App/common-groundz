@@ -142,7 +142,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
       case 'place':
         return 'Search for place...';
       case 'food':
-        return 'Search for restaurant...';
+        return 'Search for restaurant or cafe...';
       case 'movie':
         return 'Search for movie...';
       case 'book':
@@ -154,33 +154,14 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     }
   };
 
-  const handleUrlSubmit = async () => {
-    if (!urlInput.trim()) return;
-    
-    const entity = await createEntityFromUrl(urlInput);
-    if (entity) {
-      onSelect(entity);
-      setUrlInput('');
-      setActiveTab('search');
+  // New function to get appropriate search label
+  const getSearchLabel = () => {
+    if(type === 'food') {
+      return "restaurant"; // Show "Search for restaurant" instead of "Search for food"
     }
+    return type;
   };
-  
-  // Clear URL input
-  const clearUrlInput = () => {
-    setUrlInput('');
-  };
-  
-  // Toggle location-based search
-  const toggleLocationSearch = () => {
-    if (!isGeolocationSupported) return;
-    
-    if (locationEnabled) {
-      disableLocation();
-    } else {
-      enableLocation();
-    }
-  };
-  
+
   // Get button state based on permission status
   const getLocationButtonState = () => {
     if (!isGeolocationSupported) return { disabled: true, text: "Location not supported" };
@@ -260,7 +241,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery, locationEnabled, position)}
                   className="pr-8"
                   ref={inputRef}
-                  aria-label={`Search for ${type}`}
+                  aria-label={`Search for ${getSearchLabel()}`}
                   aria-expanded={showResults}
                   aria-controls="entity-search-results"
                   aria-autocomplete="list"
@@ -317,6 +298,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
               </div>
             )}
 
+            {/* Search results dropdown */}
             {showResults && (
               <div 
                 id="entity-search-results"
@@ -334,7 +316,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                   <>
                     {localResults.length === 0 && externalResults.length === 0 && (
                       <div className="p-4 text-center text-sm text-gray-500">
-                        No results found
+                        {type === 'food' ? 'No restaurants found' : 'No results found'}
                       </div>
                     )}
                     
