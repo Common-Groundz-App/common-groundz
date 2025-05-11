@@ -38,4 +38,9 @@ export const setLocationStatus = (enabled: boolean, source: string = 'external')
     enabled, 
     source 
   });
+  
+  // When disabling, also clear the skipped status to ensure prompt will show again
+  if (!enabled) {
+    localStorage.removeItem('locationPromptLastSkipped');
+  }
 };

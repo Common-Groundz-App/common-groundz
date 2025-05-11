@@ -77,19 +77,41 @@ const StepThree = ({
   // Check if we should show the location prompt
   useEffect(() => {
     const isLocationRelevantCategory = category === 'place' || category === 'food';
-    const locationNotSetUp = !locationEnabled && permissionStatus !== 'granted' && permissionStatus !== 'denied';
+    const locationNotSetUp = !locationEnabled && permissionStatus !== 'granted';
     
     if (isLocationRelevantCategory && locationNotSetUp) {
-      // Only show the prompt if we haven't asked before or it's been a while
+      // Different handling based on whether user has actively skipped before
       const lastPromptTime = localStorage.getItem('locationPromptLastShown');
+      const lastSkippedTime = localStorage.getItem('locationPromptLastSkipped');
       const currentTime = Date.now();
       
-      if (!lastPromptTime || (currentTime - parseInt(lastPromptTime)) > 86400000) { // 24 hours
+      // Define timeouts - 24 hours for normal display, 2 hours if explicitly skipped
+      const normalTimeout = 24 * 60 * 60 * 1000; // 24 hours
+      const skippedTimeout = 2 * 60 * 60 * 1000; // 2 hours
+      
+      // If the user explicitly skipped before, use shorter timeout
+      if (lastSkippedTime) {
+        if ((currentTime - parseInt(lastSkippedTime)) > skippedTimeout) {
+          setShowLocationPrompt(true);
+        }
+      } 
+      // Otherwise use normal timeout (or show immediately if never shown before)
+      else if (!lastPromptTime || (currentTime - parseInt(lastPromptTime)) > normalTimeout) {
         setShowLocationPrompt(true);
+      }
+      
+      // Always track that we've shown the prompt
+      if (showLocationPrompt) {
         localStorage.setItem('locationPromptLastShown', currentTime.toString());
       }
     }
   }, [category, permissionStatus, locationEnabled]);
+  
+  // Handle when user explicitly skips the location prompt
+  const handleSkipLocationPrompt = () => {
+    setShowLocationPrompt(false);
+    localStorage.setItem('locationPromptLastSkipped', Date.now().toString());
+  };
   
   const getCategoryIcon = () => {
     switch(category) {
@@ -208,7 +230,7 @@ const StepThree = ({
       {/* Location prompt - show only for place/food categories */}
       {isLocationRelevantCategory && showLocationPrompt && (
         <LocationAccessPrompt 
-          onCancel={() => setShowLocationPrompt(false)}
+          onCancel={handleSkipLocationPrompt}
           className="mb-8"
         />
       )}

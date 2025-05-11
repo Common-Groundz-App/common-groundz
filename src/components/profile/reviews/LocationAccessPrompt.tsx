@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MapPin, Navigation, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { MapPin, Navigation, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLocation } from '@/contexts/LocationContext';
 
@@ -72,7 +72,17 @@ export function LocationAccessPrompt({ onCancel, className }: LocationAccessProm
   };
   
   return (
-    <Card className={cn("p-4", className)}>
+    <Card className={cn("p-4 relative", className)}>
+      {/* Close button */}
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="absolute top-1 right-1 h-6 w-6" 
+        onClick={onCancel}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+      
       <div className="flex items-center gap-3 mb-3">
         {icon}
         <h3 className="text-lg font-semibold">Location Access</h3>
@@ -91,26 +101,36 @@ export function LocationAccessPrompt({ onCancel, className }: LocationAccessProm
       <p className={cn("text-sm mb-4", color)}>{message}</p>
       
       <div className="flex gap-2 justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onCancel}
-        >
-          Skip
-        </Button>
+        {!position && !locationEnabled && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+          >
+            Skip
+          </Button>
+        )}
         
-        <Button
-          variant="default"
-          size="sm"
-          onClick={handleLocationAccess}
-          disabled={!isGeolocationSupported || isLoading || !!position || permissionStatus === 'denied' || locationEnabled}
-        >
-          {position ? "Location Accessed" : 
-           locationEnabled ? "Location Enabled" :
-           isLoading ? "Getting Location..." : 
-           permissionStatus === 'denied' ? "Access Denied" : 
-           "Allow Location Access"}
-        </Button>
+        {position || locationEnabled ? (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onCancel}
+          >
+            Got it
+          </Button>
+        ) : (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleLocationAccess}
+            disabled={!isGeolocationSupported || isLoading || permissionStatus === 'denied'}
+          >
+            {isLoading ? "Getting Location..." : 
+             permissionStatus === 'denied' ? "Access Denied" : 
+             "Allow Location Access"}
+          </Button>
+        )}
       </div>
     </Card>
   );
