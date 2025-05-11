@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { Search, Book, Film, MapPin, ShoppingBag, Coffee, Globe, Navigation } from 'lucide-react';
@@ -13,14 +12,15 @@ import { Badge } from '@/components/ui/badge';
 interface EntitySearchProps {
   type: EntityType;
   onSelect: (entity: Entity) => void;
+  useLocation: boolean;
+  position?: { latitude: number, longitude: number };
 }
 
-export function EntitySearch({ type, onSelect }: EntitySearchProps) {
+export function EntitySearch({ type, onSelect, useLocation, position }: EntitySearchProps) {
   const [activeTab, setActiveTab] = useState<'search' | 'url'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [showResults, setShowResults] = useState(false);
-  const [useLocation, setUseLocation] = useState(false);
   
   const {
     localResults,
@@ -32,7 +32,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   } = useEntitySearch(type);
   
   const {
-    position,
+    position: geolocationPosition,
     isLoading: geoLoading,
     getPosition,
     isGeolocationSupported,

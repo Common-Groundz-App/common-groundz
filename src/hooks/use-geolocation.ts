@@ -37,15 +37,26 @@ export function useGeolocation() {
         permission.addEventListener('change', () => {
           setState(prev => ({ ...prev, permissionStatus: permission.state }));
         });
+        
+        return permission.state;
       }
     } catch (error) {
       console.error('Error checking geolocation permission:', error);
     }
+    return null;
   }, [isGeolocationSupported]);
 
   useEffect(() => {
     checkPermission();
   }, [checkPermission]);
+
+  // Reset error state so UI can return to initial state
+  const resetError = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      error: null
+    }));
+  }, []);
 
   // Request the user's location
   const getPosition = useCallback(() => {
@@ -58,7 +69,7 @@ export function useGeolocation() {
       return;
     }
 
-    setState(prev => ({ ...prev, isLoading: true }));
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -79,6 +90,11 @@ export function useGeolocation() {
           error,
           isLoading: false
         }));
+        
+        // Update permission status when error occurs
+        if (error.code === 1) { // PERMISSION_DENIED
+          checkPermission();
+        }
       },
       { 
         enableHighAccuracy: true, 
@@ -86,7 +102,7 @@ export function useGeolocation() {
         maximumAge: 300000 // 5 minutes cache
       }
     );
-  }, [isGeolocationSupported, state.permissionStatus]);
+  }, [isGeolocationSupported, state.permissionStatus, checkPermission]);
 
   // Calculate distance between two coordinates in kilometers
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -117,6 +133,7 @@ export function useGeolocation() {
   return {
     ...state,
     getPosition,
+    resetError,
     isGeolocationSupported,
     checkPermission,
     calculateDistance,
