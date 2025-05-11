@@ -26,6 +26,26 @@ export interface Entity {
   updated_at: string;
 }
 
+// Function to calculate distance between two points
+function calculateDistance(
+  lat1: number, 
+  lon1: number, 
+  lat2: number, 
+  lon2: number
+): number {
+  // Haversine formula to calculate distance between two points on Earth
+  const R = 6371; // Radius of the Earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const distance = R * c; // Distance in km
+  return distance;
+}
+
 export function useEntitySearch(type: EntityType) {
   const [localResults, setLocalResults] = useState<Entity[]>([]);
   const [externalResults, setExternalResults] = useState<any[]>([]);
@@ -49,8 +69,42 @@ export function useEntitySearch(type: EntityType) {
       
       if (localError) throw localError;
       
+      // Process local results - add distance if position is available
+      let processedLocalData = localData as Entity[] || [];
+      
+      // Calculate distance for local entities if location is available and enabled
+      if (useLocation && position && processedLocalData.length > 0) {
+        processedLocalData = processedLocalData.map(entity => {
+          // Check if the entity has location data in its metadata
+          const hasLocationData = entity.metadata && 
+            entity.metadata.location && 
+            typeof entity.metadata.location.lat === 'number' && 
+            typeof entity.metadata.location.lng === 'number';
+          
+          if (hasLocationData) {
+            // Calculate distance and add it to the entity metadata
+            const distance = calculateDistance(
+              position.latitude,
+              position.longitude,
+              entity.metadata.location.lat,
+              entity.metadata.location.lng
+            );
+            
+            return {
+              ...entity,
+              metadata: {
+                ...entity.metadata,
+                distance
+              }
+            };
+          }
+          
+          return entity;
+        });
+      }
+      
       // Set local database results
-      setLocalResults(localData as Entity[] || []);
+      setLocalResults(processedLocalData);
       
       // External API search
       let externalData;

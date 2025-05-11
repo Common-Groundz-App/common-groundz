@@ -8,6 +8,7 @@ import { SelectValue, SelectTrigger, SelectContent, Select, SelectItem } from '@
 import { Navigation } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/contexts/LocationContext';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface SimpleEntitySelectorProps {
   onEntitiesChange: (entities: Entity[]) => void;
@@ -26,7 +27,8 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     enableLocation, 
     disableLocation,
     isLoading: geoLoading,
-    permissionStatus
+    permissionStatus,
+    formatDistance
   } = useLocation();
 
   // Handle search input change
@@ -80,6 +82,36 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     if (permissionStatus === 'denied') return "Location access denied";
     if (locationEnabled && position) return "Near me";
     return "Use my location";
+  };
+
+  // Get image URL for entity or result based on type
+  const getImageUrl = (item: any) => {
+    if (item.image_url) return item.image_url;
+    
+    // For place/food results from Google, check for photos in metadata
+    if ((entityType === 'place' || entityType === 'food') && 
+        item.metadata?.photos && 
+        item.metadata.photos.length > 0) {
+      // In a real app, you'd proxy this through a Supabase function
+      // return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&photoreference=${
+      //   item.metadata.photos[0].photo_reference
+      // }&key=YOUR_API_KEY`;
+      
+      // For now, use a placeholder for places
+      return "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+    }
+    
+    // Type-specific placeholder images
+    switch (entityType) {
+      case 'movie':
+        return "https://images.unsplash.com/photo-1542204165-65bf26472b9b?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      case 'book':
+        return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      case 'product':
+        return "https://images.unsplash.com/photo-1546868871-7041f2a55e12?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      default:
+        return "https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+    }
   };
 
   return (
@@ -148,15 +180,31 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                 {localResults.length > 0 && (
                   <div className="divide-y">
                     {localResults.map((entity) => (
-                      <Button
+                      <div
                         key={entity.id}
-                        type="button"
-                        variant="ghost"
-                        className="w-full justify-start text-left h-auto py-2 px-3"
+                        className="flex items-center hover:bg-accent/30 cursor-pointer p-2"
                         onClick={() => handleEntitySelect(entity)}
                       >
-                        <span className="truncate">{entity.name}</span>
-                      </Button>
+                        {/* Entity Image */}
+                        <div className="flex-shrink-0 mr-2">
+                          <ImageWithFallback
+                            src={getImageUrl(entity)}
+                            alt={entity.name}
+                            className="w-8 h-8 object-cover rounded"
+                            fallbackSrc={getImageUrl({})}
+                          />
+                        </div>
+                        
+                        {/* Entity Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{entity.name}</div>
+                          {entity.metadata?.distance !== undefined && (
+                            <div className="text-xs text-brand-orange">
+                              {formatDistance(entity.metadata.distance)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -165,22 +213,31 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                 {externalResults.length > 0 && (
                   <div className="divide-y">
                     {externalResults.map((result, index) => (
-                      <Button
+                      <div
                         key={`external-${index}-${result.name}`}
-                        type="button"
-                        variant="ghost"
-                        className="w-full justify-start text-left h-auto py-2 px-3"
+                        className="flex items-center hover:bg-accent/30 cursor-pointer p-2"
                         onClick={() => handleExternalResultSelect(result)}
                       >
-                        <div className="w-full flex flex-col items-start">
-                          <span className="truncate">{result.name}</span>
+                        {/* Result Image */}
+                        <div className="flex-shrink-0 mr-2">
+                          <ImageWithFallback
+                            src={getImageUrl(result)}
+                            alt={result.name}
+                            className="w-8 h-8 object-cover rounded"
+                            fallbackSrc={getImageUrl({})}
+                          />
+                        </div>
+                        
+                        {/* Result Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{result.name}</div>
                           {result.metadata?.distance !== undefined && locationEnabled && (
-                            <span className="text-xs text-brand-orange">
-                              {Math.round(result.metadata.distance * 10) / 10} km away
-                            </span>
+                            <div className="text-xs text-brand-orange">
+                              {formatDistance(result.metadata.distance)}
+                            </div>
                           )}
                         </div>
-                      </Button>
+                      </div>
                     ))}
                   </div>
                 )}

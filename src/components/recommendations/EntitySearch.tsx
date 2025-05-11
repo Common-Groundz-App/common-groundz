@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useEntitySearch } from '@/hooks/use-entity-search';
 import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/contexts/LocationContext';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface EntitySearchProps {
   type: EntityType;
@@ -154,6 +155,36 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   };
   
   const buttonState = getLocationButtonState();
+  
+  // Get image URL for entity or result
+  const getImageUrl = (item: any) => {
+    if (item.image_url) return item.image_url;
+    
+    // For place/food results from Google, check for photos in metadata
+    if ((type === 'place' || type === 'food') && 
+        item.metadata?.photos && 
+        item.metadata.photos.length > 0) {
+      // In a real app, you'd proxy this through a Supabase function
+      // return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&photoreference=${
+      //   item.metadata.photos[0].photo_reference
+      // }&key=YOUR_API_KEY`;
+      
+      // For now, use a placeholder for places
+      return "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+    }
+    
+    // Type-specific placeholder images
+    switch (type) {
+      case 'movie':
+        return "https://images.unsplash.com/photo-1542204165-65bf26472b9b?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      case 'book':
+        return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      case 'product':
+        return "https://images.unsplash.com/photo-1546868871-7041f2a55e12?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      default:
+        return "https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+    }
+  };
 
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -235,13 +266,32 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                         {localResults.map((entity) => (
                           <div
                             key={entity.id}
-                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2"
                             onClick={() => handleSelectEntity(entity)}
                           >
-                            <div className="font-medium">{entity.name}</div>
-                            {entity.venue && (
-                              <div className="text-xs text-gray-500">{entity.venue}</div>
-                            )}
+                            {/* Entity Image */}
+                            <div className="flex-shrink-0">
+                              <ImageWithFallback
+                                src={getImageUrl(entity)}
+                                alt={entity.name}
+                                className="w-10 h-10 object-cover rounded-md"
+                                fallbackSrc={getImageUrl({})}
+                              />
+                            </div>
+                            
+                            {/* Entity Details */}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium">{entity.name}</div>
+                              {entity.venue && (
+                                <div className="text-xs text-gray-500">{entity.venue}</div>
+                              )}
+                              {/* Show distance if available in metadata */}
+                              {entity.metadata?.distance !== undefined && (
+                                <div className="text-xs text-brand-orange font-medium mt-1">
+                                  {formatDistance(entity.metadata.distance)}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </>
@@ -255,22 +305,35 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                         {externalResults.map((result, idx) => (
                           <div
                             key={`${result.api_source}-${result.api_ref || idx}`}
-                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2"
                             onClick={() => handleSelectExternal(result)}
                           >
-                            <div className="font-medium">{result.name}</div>
-                            {result.venue && (
-                              <div className="text-xs text-gray-500">{result.venue}</div>
-                            )}
-                            {result.description && (
-                              <div className="text-xs text-gray-600 truncate">{result.description}</div>
-                            )}
-                            {/* Show distance if available */}
-                            {result.metadata?.distance !== undefined && locationEnabled && (
-                              <div className="text-xs text-brand-orange font-medium mt-1">
-                                {formatDistance(result.metadata.distance)}
-                              </div>
-                            )}
+                            {/* Result Image */}
+                            <div className="flex-shrink-0">
+                              <ImageWithFallback
+                                src={getImageUrl(result)}
+                                alt={result.name}
+                                className="w-10 h-10 object-cover rounded-md"
+                                fallbackSrc={getImageUrl({})}
+                              />
+                            </div>
+                            
+                            {/* Result Details */}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium">{result.name}</div>
+                              {result.venue && (
+                                <div className="text-xs text-gray-500">{result.venue}</div>
+                              )}
+                              {result.description && (
+                                <div className="text-xs text-gray-600 truncate">{result.description}</div>
+                              )}
+                              {/* Show distance if available */}
+                              {result.metadata?.distance !== undefined && locationEnabled && (
+                                <div className="text-xs text-brand-orange font-medium mt-1">
+                                  {formatDistance(result.metadata.distance)}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </>

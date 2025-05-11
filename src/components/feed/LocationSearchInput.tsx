@@ -6,6 +6,7 @@ import { X, MapPin, Loader2, Navigation } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useGeolocation } from '@/hooks/use-geolocation';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface LocationResult {
   name: string;
@@ -18,7 +19,9 @@ interface LocationResult {
     };
     formatted_address?: string;
     distance?: number;
+    photos?: { photo_reference: string }[];
   };
+  image_url?: string;
 }
 
 interface LocationSearchInputProps {
@@ -221,6 +224,23 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
     }
   }, [geoError, toast]);
 
+  // Get the image URL for a result
+  const getImageUrl = (result: LocationResult) => {
+    // First try to use direct image_url if available
+    if (result.image_url) return result.image_url;
+    
+    // For Google Places results, check if there are photo references
+    if (result.metadata?.photos && result.metadata.photos.length > 0) {
+      return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&photoreference=${
+        result.metadata.photos[0].photo_reference
+      }&key=YOUR_API_KEY`;
+      // Note: In production, you would use the actual API key here, or preferably call your
+      // Supabase function to proxy the image request instead of exposing the API key
+    }
+    
+    return null;
+  };
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <div className="flex items-center gap-2">
@@ -272,18 +292,31 @@ export function LocationSearchInput({ onLocationSelect, onClear, initialLocation
           {results.map((result, index) => (
             <div
               key={result.api_ref || index}
-              className="px-3 py-2 hover:bg-accent cursor-pointer"
+              className="px-3 py-2 hover:bg-accent cursor-pointer flex items-start gap-2"
               onClick={() => handleSelectLocation(result)}
             >
-              <div className="font-medium">{result.name}</div>
-              {result.metadata.formatted_address && (
-                <div className="text-xs text-muted-foreground">{result.metadata.formatted_address}</div>
-              )}
-              {result.metadata.distance !== null && (
-                <div className="text-xs text-brand-orange font-medium mt-1">
-                  {formatDistance(result.metadata.distance)}
-                </div>
-              )}
+              {/* Image thumbnail */}
+              <div className="flex-shrink-0">
+                <ImageWithFallback
+                  src={getImageUrl(result)}
+                  alt={result.name}
+                  className="w-12 h-12 object-cover rounded-md bg-gray-100"
+                  fallbackSrc="https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80"
+                />
+              </div>
+              
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">{result.name}</div>
+                {result.metadata.formatted_address && (
+                  <div className="text-xs text-muted-foreground">{result.metadata.formatted_address}</div>
+                )}
+                {result.metadata.distance !== undefined && (
+                  <div className="text-xs text-brand-orange font-medium mt-1">
+                    {formatDistance(result.metadata.distance)}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
