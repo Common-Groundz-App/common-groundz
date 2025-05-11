@@ -70,18 +70,24 @@ export function LocationAccessPrompt({ onCancel, className }: LocationAccessProm
     // Use the enableLocation from context to ensure consistency
     enableLocation();
   };
+
+  // Check if we should show the close button (X)
+  // Only show it after location has been granted or in error states
+  const showCloseButton = position || locationEnabled || error;
   
   return (
     <Card className={cn("p-4 relative", className)}>
-      {/* Close button */}
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="absolute top-1 right-1 h-6 w-6" 
-        onClick={onCancel}
-      >
-        <X className="h-4 w-4" />
-      </Button>
+      {/* Close button - Only show after location access granted or error state */}
+      {showCloseButton && (
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute top-1 right-1 h-6 w-6" 
+          onClick={onCancel}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
       
       <div className="flex items-center gap-3 mb-3">
         {icon}
