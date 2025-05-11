@@ -1,33 +1,28 @@
-import React, { useState, ChangeEvent, useEffect } from 'react';
+
+import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
-import EntitySearch from '@/components/recommendations/EntitySearch';
-import { Entity } from '@/services/recommendation/types';
-import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
-import { Book, Clapperboard, MapPin, ShoppingBag, Navigation } from 'lucide-react';
-import ImageUploader from '@/components/profile/reviews/ImageUploader';
-import { ensureHttps } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';
-import { useLocation } from '@/contexts/LocationContext';
-import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
+import { Camera } from 'lucide-react';
+import { Entity } from '@/services/recommendation/types';
+import EntitySearch from '@/components/recommendations/EntitySearch';
 
 interface StepThreeProps {
   category: string;
   title: string;
-  onTitleChange: (value: string) => void;
+  onTitleChange: (title: string) => void;
   venue: string;
-  onVenueChange: (value: string) => void;
+  onVenueChange: (venue: string) => void;
   entityId: string;
   onEntitySelect: (entity: Entity) => void;
   selectedEntity: Entity | null;
   selectedImage: string | null;
-  onImageChange: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onImageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onImageRemove: () => void;
   isUploading: boolean;
 }
 
-const StepThree = ({ 
+const StepThree = ({
   category,
   title,
   onTitleChange,
@@ -39,288 +34,103 @@ const StepThree = ({
   selectedImage,
   onImageChange,
   onImageRemove,
-  isUploading
+  isUploading,
 }: StepThreeProps) => {
-  const [showEntitySearch, setShowEntitySearch] = useState(!selectedEntity);
-  const [processedEntity, setProcessedEntity] = useState<Entity | null>(null);
-  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
-  
-  const { 
-    position,
-    isLoading: geoLoading,
-    permissionStatus,
-    locationEnabled,
-    enableLocation
-  } = useLocation();
-  
-  // Process selected entity to ensure it has valid fields for display
-  useEffect(() => {
-    if (selectedEntity) {
-      console.log("StepThree: Processing selected entity:", selectedEntity);
-      
-      // Create a processed copy of the entity with validated fields
-      const processed = { ...selectedEntity };
-      
-      // Ensure the image_url uses HTTPS if it exists
-      if (processed.image_url) {
-        console.log("Entity has image_url before processing:", processed.image_url);
-        processed.image_url = ensureHttps(processed.image_url);
-        console.log("Entity has image_url after processing:", processed.image_url);
-      } else {
-        console.log("Entity missing image_url");
-      }
-      
-      setProcessedEntity(processed);
+  // Map category to a proper EntityType for the EntitySearch component
+  const getEntityType = () => {
+    switch (category) {
+      case 'food': return 'food';
+      case 'movie': return 'movie';
+      case 'book': return 'book';
+      case 'place': return 'place';
+      case 'product': return 'product';
+      default: return 'place';
     }
-  }, [selectedEntity]);
+  };
 
-  // Check if we should show the location prompt
-  useEffect(() => {
-    const isLocationRelevantCategory = category === 'place' || category === 'food';
-    const locationNotSetUp = !locationEnabled && permissionStatus !== 'granted';
-    
-    if (isLocationRelevantCategory && locationNotSetUp) {
-      // Different handling based on whether user has actively skipped before
-      const lastPromptTime = localStorage.getItem('locationPromptLastShown');
-      const lastSkippedTime = localStorage.getItem('locationPromptLastSkipped');
-      const currentTime = Date.now();
-      
-      // Define timeouts - 24 hours for normal display, 2 hours if explicitly skipped
-      const normalTimeout = 24 * 60 * 60 * 1000; // 24 hours
-      const skippedTimeout = 2 * 60 * 60 * 1000; // 2 hours
-      
-      // If the user explicitly skipped before, use shorter timeout
-      if (lastSkippedTime) {
-        if ((currentTime - parseInt(lastSkippedTime)) > skippedTimeout) {
-          setShowLocationPrompt(true);
-        }
-      } 
-      // Otherwise use normal timeout (or show immediately if never shown before)
-      else if (!lastPromptTime || (currentTime - parseInt(lastPromptTime)) > normalTimeout) {
-        setShowLocationPrompt(true);
-      }
-      
-      // Always track that we've shown the prompt
-      if (showLocationPrompt) {
-        localStorage.setItem('locationPromptLastShown', currentTime.toString());
-      }
-    }
-  }, [category, permissionStatus, locationEnabled]);
-  
-  // Handle when user explicitly skips the location prompt
-  const handleSkipLocationPrompt = () => {
-    setShowLocationPrompt(false);
-    localStorage.setItem('locationPromptLastSkipped', Date.now().toString());
-  };
-  
-  const getCategoryIcon = () => {
-    switch(category) {
-      case 'food': return <MapPin className="h-5 w-5 text-brand-orange" />;
-      case 'movie': return <Clapperboard className="h-5 w-5 text-brand-orange" />;
-      case 'book': return <Book className="h-5 w-5 text-brand-orange" />;
-      case 'place': return <MapPin className="h-5 w-5 text-brand-orange" />;
-      case 'product': return <ShoppingBag className="h-5 w-5 text-brand-orange" />;
-      default: return <MapPin className="h-5 w-5 text-brand-orange" />;
-    }
-  };
-  
-  const getMainFieldLabel = () => {
-    switch(category) {
-      case 'food': return "What did you eat?";
-      case 'movie': return "Movie title";
-      case 'book': return "Book title";
-      case 'place': return "Place name";
-      case 'product': return "Product name";
-      default: return "Title";
-    }
-  };
-  
-  const getSecondaryFieldLabel = () => {
-    switch(category) {
-      case 'food': return "Restaurant name";
-      case 'movie': return "Director/Studio";
-      case 'book': return "Author/Publisher";
-      case 'place': return "Location";
-      case 'product': return "Brand";
-      default: return "Venue";
-    }
-  };
-  
-  const getEntitySearchType = () => {
-    switch(category) {
-      case 'food': return "place";
-      case 'movie': return "movie";
-      case 'book': return "book";
-      case 'place': return "place";
-      case 'product': return "product";
-      default: return "place";
-    }
-  };
-  
-  // New function to get appropriate search label
-  const getSearchLabel = () => {
-    if(category === 'food') {
-      return "place"; // Show "Search for place" instead of "Search for food"
-    }
-    return category;
-  };
-  
-  // Handler for selecting an entity from search
-  const handleEntitySelection = (entity: Entity) => {
-    console.log("Selected entity in StepThree:", entity);
-    
-    // Process the image URL if it exists
-    if (entity.image_url) {
-      console.log("Entity image URL before processing:", entity.image_url);
-      entity.image_url = ensureHttps(entity.image_url);
-      console.log("Entity image URL after processing:", entity.image_url);
-    } else {
-      console.log("Selected entity has no image URL");
-    }
-    
-    // Pass the entity to parent component
-    onEntitySelect(entity);
-    
-    // For food category, explicitly handle restaurant name vs address
-    if (category === 'food') {
-      console.log("Food category: Setting venue to entity name", entity.name);
-      
-      // IMPORTANT: When it's food category and Google Places result, 
-      // always use the name for the venue (restaurant name)
-      if (entity.api_source === 'google_places') {
-        onVenueChange(entity.name);
-      } else {
-        // For non-Google Places sources, fall back to venue or name
-        onVenueChange(entity.venue || entity.name || '');
-      }
-      
-      // Do not update title for food category
-    } else {
-      // For other categories, update title with entity name
-      onTitleChange(entity.name);
-      
-      // Update venue if available
-      if (entity.venue) {
-        onVenueChange(entity.venue);
-      }
-    }
-    
-    setShowEntitySearch(false);
-  };
-  
-  // Get location button state
-  const getLocationButtonState = () => {
-    if (geoLoading) return { text: "Getting location...", disabled: true };
-    if (locationEnabled && position) return { text: "Location enabled", disabled: true };
-    if (permissionStatus === 'denied') return { text: "Access denied", disabled: true };
-    return { text: "Use my location", disabled: false };
-  };
-  
-  const buttonState = getLocationButtonState();
-  
-  // Show location prompt for place or food categories if permission not already granted
-  const isLocationRelevantCategory = category === 'place' || category === 'food';
-  
   return (
-    <div className="w-full space-y-8 py-2">
-      <h2 className="text-xl font-medium text-center">
-        Tell us about your {category}
-      </h2>
-      
-      {/* Location prompt - show only for place/food categories */}
-      {isLocationRelevantCategory && showLocationPrompt && (
-        <LocationAccessPrompt 
-          onCancel={handleSkipLocationPrompt}
-          className="mb-8"
-        />
-      )}
-      
-      {/* Entity search/preview */}
-      {selectedEntity && processedEntity && !showEntitySearch ? (
-        <EntityPreviewCard
-          entity={processedEntity}
-          type={category}
-          onChange={() => setShowEntitySearch(true)}
-        />
-      ) : (
-        <div className="p-4 border border-dashed border-brand-orange/30 rounded-lg bg-gradient-to-b from-transparent to-accent/5 transition-all duration-300 hover:border-brand-orange/50">
-          <div className="flex justify-between items-center mb-2">
-            <Label className="flex items-center gap-2 font-medium">
-              <span className="p-1.5 rounded-full bg-brand-orange/10">
-                {getCategoryIcon()}
-              </span>
-              <span>Search for {getSearchLabel()}</span>
-            </Label>
-          </div>
-          
-          <EntitySearch 
-            type={getEntitySearchType() as any}
-            onSelect={handleEntitySelection}
-          />
-          <p className="text-xs text-muted-foreground mt-2 italic">
-            Can't find what you're looking for? Just fill in the details below
-          </p>
-        </div>
-      )}
-      
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Main Title Field */}
+    <div className="space-y-6 w-full">
+      <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="title" className="flex items-center gap-2">
-            <span className="text-lg">{category === 'food' ? '🍴' : category === 'movie' ? '🎬' : category === 'book' ? '📚' : category === 'place' ? '🏛️' : '🛍️'}</span>
-            <span>{getMainFieldLabel()}</span>
-          </Label>
+          <Label>Find the {category} you're reviewing</Label>
+          <EntitySearch 
+            type={getEntityType()} 
+            onSelect={onEntitySelect} 
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="title">Name</Label>
           <Input 
             id="title"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            placeholder={`Name of the ${category}`}
-            className={cn(
-              !title ? "border-red-500" : "border-brand-orange/30 focus-visible:ring-brand-orange/30",
-              "transition-all duration-200"
-            )}
+            placeholder={`${category === 'food' ? 'Dish name' : `${category} name`}`}
+            className="bg-background"
           />
-          {!title && (
-            <p className="text-red-500 text-xs">This field is required</p>
-          )}
         </div>
         
-        {/* Venue/Location Field */}
         <div className="space-y-2">
-          <Label htmlFor="venue" className="flex items-center gap-2">
-            <span className="text-lg">{category === 'food' ? '🏠' : category === 'movie' ? '🎬' : category === 'book' ? '✍️' : category === 'place' ? '📍' : '🏢'}</span>
-            <span>{getSecondaryFieldLabel()}</span>
+          <Label htmlFor="venue">
+            {category === 'food' ? 'Restaurant name' : 
+             category === 'movie' ? 'Director/Studio' :
+             category === 'book' ? 'Author' :
+             category === 'place' ? 'Location' : 'Brand'}
           </Label>
           <Input 
             id="venue"
             value={venue}
             onChange={(e) => onVenueChange(e.target.value)}
             placeholder={
-              category === 'food' ? "Restaurant name" : 
-              category === 'movie' ? "Who made this movie?" : 
-              category === 'book' ? "Who wrote this book?" : 
-              category === 'place' ? "Address or location" : "Who makes this product?"
+              category === 'food' ? 'Where did you have it?' : 
+              category === 'movie' ? 'Who made it?' :
+              category === 'book' ? 'Who wrote it?' :
+              category === 'place' ? 'Address or location' : 'Who makes it?'
             }
-            className="border-brand-orange/30 focus-visible:ring-brand-orange/30"
+            className="bg-background"
           />
         </div>
-      </div>
-      
-      {/* Photo upload */}
-      <div className="space-y-2">
-        <Label className="flex items-center gap-2 font-medium mb-1">
-          <span className="text-lg">📸</span>
-          <span>Add a photo</span>
-        </Label>
-        <ImageUploader
-          selectedImage={selectedImage}
-          onChange={onImageChange}
-          onRemove={onImageRemove}
-          isUploading={isUploading}
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          {selectedImage ? "Click × to remove this photo" : "Upload a photo of your experience"}
-        </p>
+        
+        <div className="space-y-2">
+          <Label>Add a photo (optional)</Label>
+          <div className="flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4">
+            {selectedImage ? (
+              <div className="relative w-full">
+                <img
+                  src={selectedImage}
+                  alt="Selected preview"
+                  className="h-40 object-cover rounded-md mx-auto"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={onImageRemove}
+                  className="absolute top-2 right-2"
+                >
+                  Remove
+                </Button>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="file"
+                  id="review-image"
+                  accept="image/*"
+                  onChange={onImageChange}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="review-image"
+                  className="cursor-pointer flex flex-col items-center text-muted-foreground"
+                >
+                  <Camera className="h-12 w-12 mb-2" />
+                  <span className="text-sm">{isUploading ? 'Uploading...' : 'Upload Image'}</span>
+                </label>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
