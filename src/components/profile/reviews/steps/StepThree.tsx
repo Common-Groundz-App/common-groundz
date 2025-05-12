@@ -6,13 +6,14 @@ import { cn } from '@/lib/utils';
 import EntitySearch from '@/components/recommendations/EntitySearch';
 import { Entity } from '@/services/recommendation/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
-import { Book, Clapperboard, MapPin, ShoppingBag, Navigation } from 'lucide-react';
+import { Book, Clapperboard, MapPin, ShoppingBag, Navigation, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLocation } from '@/contexts/LocationContext';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { MediaItem } from '@/types/media';
 import { v4 as uuidv4 } from 'uuid';
+import { TwitterStyleMediaPreview } from '@/components/feed/TwitterStyleMediaPreview';
 
 interface StepThreeProps {
   category: string;
@@ -246,6 +247,13 @@ const StepThree = ({
     onMediaAdd(media);
   };
   
+  // Handle media removal
+  const handleRemoveMedia = (mediaUrl: string) => {
+    onMediaRemove(mediaUrl);
+  };
+
+  const MAX_MEDIA_COUNT = 4;
+  
   return (
     <div className="w-full space-y-8 py-2">
       <h2 className="text-xl font-medium text-center">
@@ -331,6 +339,20 @@ const StepThree = ({
         </div>
       </div>
       
+      {/* Media Preview Section - NEW */}
+      {selectedMedia.length > 0 && (
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2 font-medium">
+            <span className="text-lg">🖼️</span>
+            <span>Your media ({selectedMedia.length}/{MAX_MEDIA_COUNT})</span>
+          </Label>
+          <TwitterStyleMediaPreview
+            media={selectedMedia}
+            onRemove={(media) => handleRemoveMedia(media.url)}
+          />
+        </div>
+      )}
+      
       {/* Media upload section - Updated to use MediaUploader */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2 font-medium mb-1">
@@ -342,11 +364,11 @@ const StepThree = ({
           onMediaUploaded={handleMediaUploaded}
           initialMedia={selectedMedia}
           className="w-full"
-          maxMediaCount={4}
+          maxMediaCount={MAX_MEDIA_COUNT}
         />
         <p className="text-xs text-muted-foreground mt-1">
           {selectedMedia.length > 0 
-            ? `${selectedMedia.length}/4 media items added - Add photos or videos to make your review stand out`
+            ? `${selectedMedia.length}/${MAX_MEDIA_COUNT} media items added - Add photos or videos to make your review stand out`
             : "Add photos or videos to make your review stand out"
           }
         </p>
