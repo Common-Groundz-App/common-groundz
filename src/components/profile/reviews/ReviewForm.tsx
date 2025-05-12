@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
@@ -158,6 +157,31 @@ const ReviewForm = ({
       setCurrentStep(1);
     }
   }, [isOpen, review, isEditMode]);
+  
+  // Smart hybrid approach for handling category changes
+  const handleCategoryChange = (newCategory: string) => {
+    // Only clear category-specific data when changing categories
+    if (newCategory !== category) {
+      // Clear category-specific fields
+      setFoodName('');
+      setContentName('');
+      setSelectedEntity(null);
+      setEntityId('');
+      setVenue('');
+      setFoodTags([]);
+      
+      // Keep general fields intact
+      // - Keep rating (step 1)
+      // - Keep reviewTitle (if user entered one in step 4)
+      // - Keep description (step 4)
+      // - Keep selectedMedia (photos/videos)
+      // - Keep experienceDate
+      // - Keep visibility settings
+      
+      // Set the new category
+      setCategory(newCategory);
+    }
+  };
   
   const resetForm = () => {
     setRating(0);
@@ -498,7 +522,7 @@ const ReviewForm = ({
               )}
               
               {currentStep === 2 && (
-                <StepTwo category={category} onChange={setCategory} />
+                <StepTwo category={category} onChange={handleCategoryChange} />
               )}
               
               {currentStep === 3 && (
