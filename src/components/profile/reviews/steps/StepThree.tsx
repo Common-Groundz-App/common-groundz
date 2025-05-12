@@ -1,4 +1,3 @@
-
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +12,7 @@ import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAcces
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { MediaItem } from '@/types/media';
 import { v4 as uuidv4 } from 'uuid';
-import { TwitterStyleMediaPreview } from '@/components/feed/TwitterStyleMediaPreview';
+import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 
 interface StepThreeProps {
   category: string;
@@ -339,21 +338,23 @@ const StepThree = ({
         </div>
       </div>
       
-      {/* Media Preview Section - NEW */}
+      {/* Media Preview Section - UPDATED with CompactMediaGrid */}
       {selectedMedia.length > 0 && (
         <div className="space-y-2">
           <Label className="flex items-center gap-2 font-medium">
             <span className="text-lg">🖼️</span>
             <span>Your media ({selectedMedia.length}/{MAX_MEDIA_COUNT})</span>
           </Label>
-          <TwitterStyleMediaPreview
+          <CompactMediaGrid
             media={selectedMedia}
             onRemove={(media) => handleRemoveMedia(media.url)}
+            maxVisible={MAX_MEDIA_COUNT}
+            className="group"
           />
         </div>
       )}
       
-      {/* Media upload section - Updated to use MediaUploader */}
+      {/* Media upload section */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2 font-medium mb-1">
           <span className="text-lg">📸</span>
