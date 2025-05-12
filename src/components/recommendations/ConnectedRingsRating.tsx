@@ -104,7 +104,6 @@ const ConnectedRingsRating = ({
   
   const { ringSize, strokeWidth, textClass, overlapOffset } = sizeConfig[size];
   const effectiveRating = hoverRating || value;
-  const isCertified = value >= 4.5;
   
   // Calculate the actual width needed to display all 5 rings properly with even padding
   const calculateSvgWidth = () => {
@@ -322,8 +321,7 @@ const ConnectedRingsRating = ({
           <div
             className={cn(
               "relative flex justify-center",
-              isInteractive && "cursor-pointer",
-              isCertified && "animate-pulse"
+              isInteractive && "cursor-pointer"
             )}
             onMouseLeave={() => isInteractive && setHoverRating(0)}
           >
@@ -393,6 +391,7 @@ const ConnectedRingsRating = ({
                     style={{
                       animation: 'celebrationPulse 1.5s ease-in-out infinite',
                       transformOrigin: 'center',
+                      opacity: 0.7, // Reduced from original value to be less distracting
                     }}
                   />
                   
@@ -496,9 +495,9 @@ const ConnectedRingsRating = ({
                 const dashOffset = circumference - (circumference * activePercentage) / 100;
                 const isAnimating = animateRing === ring.value;
                 
-                // Calculate opacity for unselected rings after selection
-                // Only dim rings when a selection has been made and not hovering
-                const unselectedRingOpacity = value > 0 && ring.value > value && !isHovered ? 0.5 : 1;
+                // Never dim rings when rating is 5 - they should remain crisp and clear
+                const unselectedRingOpacity = (value === 5) ? 1 : 
+                                              (value > 0 && ring.value > value && !isHovered) ? 0.5 : 1;
                 
                 // Add a subtle tint to unselected rings on hover when they're not selected yet
                 const showHoverTint = isInteractive && isHovered && !isActive;
@@ -650,13 +649,8 @@ const ConnectedRingsRating = ({
                 );
               })}
             </svg>
-
-            {/* Circle Certified Badge - show only for high ratings */}
-            {isCertified && (
-              <div className="absolute -right-2 -top-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
-                Circle Certified
-              </div>
-            )}
+            
+            {/* Circle Certified Badge - Removed as requested */}
             
             {/* Sparkle decoration when perfect rating selected */}
             {showCelebration && (
@@ -675,51 +669,34 @@ const ConnectedRingsRating = ({
         {/* Rating value and text */}
         <div className="mt-2 flex flex-col items-center">
           {showValue && (
-            <span className={cn("font-bold", textClass)}>
-              <span className="mr-1" style={{ color: sentimentColor }}>{value.toFixed(1)}</span>
-              <span className="text-brand-orange">•</span> 
-              <span className="text-muted-foreground font-normal ml-1">Groundz Score</span>
+            <span 
+              className={cn(
+                textClass, 
+                "font-semibold text-center",
+                textAnimating && "animate-pulse"
+              )}
+              style={{
+                color: sentimentColor,
+                animation: textAnimating ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none'
+              }}
+            >
+              {effectiveRating.toFixed(1)}
             </span>
           )}
           
           {showLabel && (
-            <div 
+            <span 
               className={cn(
-                "text-center mt-1 flex items-center gap-1", 
-                textClass
+                textClass, 
+                "text-muted-foreground text-center",
+                textAnimating && "animate-pulse"
               )}
-              style={{ 
-                color: sentimentColor,
-                transform: textAnimating ? 'scale(1.05)' : 'scale(1)',
-                transition: 'transform 0.3s ease-out, color 0.3s ease-out',
+              style={{
+                animation: textAnimating ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s' : 'none'
               }}
             >
-              <span 
-                className="text-lg"
-                style={{
-                  animation: textAnimating ? 'ratingTextChange 0.4s ease-out' : 'none',
-                }}
-              >
-                {getRatingEmoji(Math.round(effectiveRating))}
-              </span>
-              <span style={{
-                animation: textAnimating ? 'ratingTextChange 0.4s ease-out' : 'none',
-              }}>
-                {getRatingText(Math.round(effectiveRating)).split(' ').slice(0, -1).join(' ')}
-              </span>
-              
-              {/* Special celebration label for perfect rating */}
-              {showCelebration && (
-                <span 
-                  className="ml-1 bg-gradient-to-r from-brand-orange via-brand-blue to-brand-orange bg-clip-text text-transparent font-semibold"
-                  style={{
-                    animation: 'celebrationPulse 2s ease-in-out infinite',
-                  }}
-                >
-                  Perfect!
-                </span>
-              )}
-            </div>
+              {getRatingText(effectiveRating)}
+            </span>
           )}
         </div>
       </div>
