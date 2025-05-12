@@ -295,6 +295,7 @@ const ConnectedRingsRating = ({
                         style={{ 
                           transformOrigin: `${ring.cx}px ${ring.cy}px`,
                           willChange: isInteractive ? 'transform, opacity' : 'auto',
+                          animation: isInteractive && isHovered ? 'springyHover 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 'none',
                         }}
                         onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
                         onClick={() => handleRingClick(ring.value)}
@@ -352,48 +353,39 @@ const ConnectedRingsRating = ({
                           />
                         )}
 
-                        {/* Interactive hover scale effect */}
-                        {isInteractive && (
-                          <g style={{
-                            animation: isHovered ? "springyHover 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : "none",
-                            transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                            willChange: 'transform',
-                          }}>
-                            {/* Selection animation - ripple effect */}
-                            {isAnimating && isActive && (
-                              <>
-                                {/* Inner pulse */}
-                                <circle
-                                  cx={ring.cx}
-                                  cy={ring.cy}
-                                  r={ringRadius}
-                                  stroke={sentimentColor}
-                                  strokeWidth={strokeWidth / 2}
-                                  fill="transparent"
-                                  style={{
-                                    animation: 'ringSelectPulse 0.5s ease-out forwards',
-                                    transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                                    willChange: 'transform, opacity',
-                                  }}
-                                />
-                                
-                                {/* Outer wave */}
-                                <circle
-                                  cx={ring.cx}
-                                  cy={ring.cy}
-                                  r={ringRadius}
-                                  stroke={sentimentColor}
-                                  strokeWidth={strokeWidth / 3}
-                                  fill="transparent"
-                                  style={{
-                                    animation: 'ringSelectWave 0.8s ease-out forwards',
-                                    transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                                    willChange: 'transform, opacity',
-                                  }}
-                                />
-                              </>
-                            )}
-                          </g>
+                        {/* Selection animation - ripple effect */}
+                        {isAnimating && isActive && (
+                          <>
+                            {/* Inner pulse */}
+                            <circle
+                              cx={ring.cx}
+                              cy={ring.cy}
+                              r={ringRadius}
+                              stroke={sentimentColor}
+                              strokeWidth={strokeWidth / 2}
+                              fill="transparent"
+                              style={{
+                                animation: 'ringSelectPulse 0.5s ease-out forwards',
+                                transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                                willChange: 'transform, opacity',
+                              }}
+                            />
+                            
+                            {/* Outer wave */}
+                            <circle
+                              cx={ring.cx}
+                              cy={ring.cy}
+                              r={ringRadius}
+                              stroke={sentimentColor}
+                              strokeWidth={strokeWidth / 3}
+                              fill="transparent"
+                              style={{
+                                animation: 'ringSelectWave 0.8s ease-out forwards',
+                                transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                                willChange: 'transform, opacity',
+                              }}
+                            />
+                          </>
                         )}
                       </g>
                     </TooltipTrigger>
