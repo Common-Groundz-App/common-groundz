@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from "@/lib/utils";
 import { useThemedClass } from '@/utils/theme-utils';
 import { 
@@ -30,6 +30,22 @@ const ConnectedRingsRating = ({
 }: ConnectedRingsRatingProps) => {
   const [hoverRating, setHoverRating] = useState(0);
   const [animateRing, setAnimateRing] = useState<number | null>(null);
+  const [textAnimating, setTextAnimating] = useState(false);
+  
+  // Track previous value for text animations
+  const [prevValue, setPrevValue] = useState(value);
+  
+  // Trigger text animation when value changes
+  useEffect(() => {
+    if (value !== prevValue) {
+      setTextAnimating(true);
+      const timer = setTimeout(() => {
+        setTextAnimating(false);
+      }, 400);
+      setPrevValue(value);
+      return () => clearTimeout(timer);
+    }
+  }, [value, prevValue]);
   
   const sizeConfig = {
     sm: {
@@ -174,6 +190,42 @@ const ConnectedRingsRating = ({
   return (
     <TooltipProvider>
       <div className={cn("flex flex-col items-center w-full", className)}>
+        {/* Define keyframe animations for ring interactions */}
+        <style>
+          {`
+          @keyframes ringSelectPulse {
+            0% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 0; }
+          }
+          
+          @keyframes ringSelectWave {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            100% { transform: scale(2); opacity: 0; }
+          }
+          
+          @keyframes springyHover {
+            0% { transform: scale(1); }
+            60% { transform: scale(1.12); }
+            80% { transform: scale(0.95); }
+            100% { transform: scale(1.05); }
+          }
+          
+          @keyframes ratingTextChange {
+            0% { transform: translateY(0); opacity: 1; }
+            20% { transform: translateY(-10px); opacity: 0; }
+            40% { transform: translateY(10px); opacity: 0; }
+            60% { transform: translateY(0); opacity: 1; }
+          }
+          
+          @keyframes elasticFill {
+            0% { stroke-dashoffset: 0; }
+            50% { stroke-dashoffset: -10; }
+            100% { stroke-dashoffset: 0; }
+          }
+          `}
+        </style>
+
         {/* Center the SVG container horizontally with proper alignment */}
         <div className="w-full flex justify-center">
           <div
@@ -188,7 +240,7 @@ const ConnectedRingsRating = ({
               width={svgWidth}
               height={svgHeight}
               viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-              className="transform transition-transform duration-300"
+              className="transform"
               style={{ overflow: 'visible' }}
             >
               {/* Gradient definitions for sentiment colors */}
@@ -229,9 +281,14 @@ const ConnectedRingsRating = ({
                     <TooltipTrigger asChild>
                       <g 
                         className={cn(
-                          "transition-all duration-300 hover:scale-105 group",
-                          isAnimating && "animate-[bounce_0.5s_ease-in-out]"
+                          "transform-gpu", // Use GPU acceleration
+                          isInteractive && "hover:scale-105"
                         )}
+                        style={{ 
+                          transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                          willChange: isInteractive ? 'transform' : 'auto',
+                          transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                        }}
                         onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
                         onClick={() => handleRingClick(ring.value)}
                       >
@@ -243,7 +300,9 @@ const ConnectedRingsRating = ({
                           stroke={isActive ? sentimentColor : inactiveRingColor}
                           strokeWidth={strokeWidth}
                           fill="transparent"
-                          className="transition-all duration-300"
+                          style={{
+                            transition: "stroke 0.3s ease-out"
+                          }}
                         />
                         
                         {/* Animated fill stroke */}
@@ -257,13 +316,49 @@ const ConnectedRingsRating = ({
                           strokeDasharray={circumference}
                           strokeDashoffset={isActive ? 0 : circumference}
                           strokeLinecap="round"
-                          className="transition-all duration-500 ease-out"
                           style={{ 
                             transform: 'rotate(-90deg)', 
                             transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                            opacity: isActive ? 1 : 0
+                            opacity: isActive ? 1 : 0,
+                            transition: 'stroke-dashoffset 0.4s ease-out, opacity 0.3s ease-out',
+                            animation: isActive && isAnimating ? 'elasticFill 0.5s ease-out' : 'none',
                           }}
                         />
+                        
+                        {/* Selection animation - ripple effect */}
+                        {isAnimating && isActive && (
+                          <>
+                            {/* Inner pulse */}
+                            <circle
+                              cx={ring.cx}
+                              cy={ring.cy}
+                              r={ringRadius}
+                              stroke={sentimentColor}
+                              strokeWidth={strokeWidth / 2}
+                              fill="transparent"
+                              style={{
+                                animation: 'ringSelectPulse 0.5s ease-out forwards',
+                                transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                                willChange: 'transform, opacity',
+                              }}
+                            />
+                            
+                            {/* Outer wave */}
+                            <circle
+                              cx={ring.cx}
+                              cy={ring.cy}
+                              r={ringRadius}
+                              stroke={sentimentColor}
+                              strokeWidth={strokeWidth / 3}
+                              fill="transparent"
+                              style={{
+                                animation: 'ringSelectWave 0.8s ease-out forwards',
+                                transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                                willChange: 'transform, opacity',
+                              }}
+                            />
+                          </>
+                        )}
                         
                         {/* Hover glow effect */}
                         {isInteractive && (
@@ -274,8 +369,11 @@ const ConnectedRingsRating = ({
                             stroke={sentimentColor}
                             strokeWidth={2}
                             fill="transparent"
-                            opacity="0"
-                            className="group-hover:opacity-30 transition-opacity duration-300"
+                            style={{
+                              opacity: hoverRating === ring.value ? 0.3 : 0,
+                              transition: "opacity 0.2s ease-out",
+                              filter: "blur(2px)",
+                            }}
                           />
                         )}
                       </g>
@@ -310,13 +408,28 @@ const ConnectedRingsRating = ({
           {showLabel && (
             <div 
               className={cn(
-                "text-center mt-1 transition-all duration-300 flex items-center gap-1", 
+                "text-center mt-1 flex items-center gap-1", 
                 textClass
               )}
-              style={{ color: sentimentColor }}
+              style={{ 
+                color: sentimentColor,
+                transform: textAnimating ? 'scale(1.05)' : 'scale(1)',
+                transition: 'transform 0.3s ease-out, color 0.3s ease-out',
+              }}
             >
-              <span className="text-lg">{getRatingEmoji(Math.round(effectiveRating))}</span>
-              <span>{getRatingText(Math.round(effectiveRating)).split(' ').slice(0, -1).join(' ')}</span>
+              <span 
+                className="text-lg"
+                style={{
+                  animation: textAnimating ? 'ratingTextChange 0.4s ease-out' : 'none',
+                }}
+              >
+                {getRatingEmoji(Math.round(effectiveRating))}
+              </span>
+              <span style={{
+                animation: textAnimating ? 'ratingTextChange 0.4s ease-out' : 'none',
+              }}>
+                {getRatingText(Math.round(effectiveRating)).split(' ').slice(0, -1).join(' ')}
+              </span>
             </div>
           )}
         </div>
