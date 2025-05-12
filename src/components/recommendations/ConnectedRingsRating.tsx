@@ -233,6 +233,13 @@ const ConnectedRingsRating = ({
             0% { stroke-dashoffset: 283; }
             100% { stroke-dashoffset: 0; }
           }
+          
+          @keyframes popScale {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            85% { transform: scale(0.98); }
+            100% { transform: scale(1); }
+          }
           `}
         </style>
 
@@ -275,6 +282,10 @@ const ConnectedRingsRating = ({
                   <stop offset="0%" stopColor="#22c55e" />
                   <stop offset="100%" stopColor="#86efac" />
                 </linearGradient>
+                <radialGradient id="selectionGlowGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.7" />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+                </radialGradient>
               </defs>
               
               {/* Interlinking donut rings */}
@@ -287,6 +298,13 @@ const ConnectedRingsRating = ({
                 const dashOffset = circumference - (circumference * activePercentage) / 100;
                 const isAnimating = animateRing === ring.value;
                 
+                // Calculate opacity for unselected rings after selection
+                // Only dim rings when a selection has been made and not hovering
+                const unselectedRingOpacity = value > 0 && ring.value > value && !isHovered ? 0.5 : 1;
+                
+                // Add a subtle tint to unselected rings on hover when they're not selected yet
+                const showHoverTint = isInteractive && isHovered && !isActive;
+                
                 return (
                   <Tooltip key={`ring-${i}`}>
                     <TooltipTrigger asChild>
@@ -295,7 +313,10 @@ const ConnectedRingsRating = ({
                         style={{ 
                           transformOrigin: `${ring.cx}px ${ring.cy}px`,
                           willChange: isInteractive ? 'transform, opacity' : 'auto',
-                          animation: isInteractive && isHovered ? 'springyHover 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 'none',
+                          animation: isInteractive && isHovered ? 'springyHover 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 
+                                   (isAnimating && isActive) ? 'popScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+                          opacity: unselectedRingOpacity, // Apply the dimming effect
+                          transition: "opacity 0.3s ease-out", // Smooth transition for opacity changes
                         }}
                         onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
                         onClick={() => handleRingClick(ring.value)}
@@ -312,6 +333,20 @@ const ConnectedRingsRating = ({
                             transition: "stroke 0.2s ease-out",
                           }}
                         />
+                        
+                        {/* Hover tint overlay for unselected rings */}
+                        {showHoverTint && (
+                          <circle
+                            cx={ring.cx}
+                            cy={ring.cy}
+                            r={ringRadius - strokeWidth/4}
+                            fill="hsl(var(--brand-orange)/20)"
+                            style={{
+                              transition: "opacity 0.2s ease",
+                              opacity: 0.8,
+                            }}
+                          />
+                        )}
                         
                         {/* Animated fill stroke */}
                         <circle
@@ -356,6 +391,20 @@ const ConnectedRingsRating = ({
                         {/* Selection animation - ripple effect */}
                         {isAnimating && isActive && (
                           <>
+                            {/* Glow pulse behind selected ring */}
+                            <circle
+                              cx={ring.cx}
+                              cy={ring.cy}
+                              r={ringRadius * 1.5}
+                              fill="url(#selectionGlowGradient)"
+                              style={{
+                                animation: 'ringSelectPulse 0.5s ease-out forwards',
+                                transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                                willChange: 'transform, opacity',
+                                opacity: 0.6,
+                              }}
+                            />
+                            
                             {/* Inner pulse */}
                             <circle
                               cx={ring.cx}
