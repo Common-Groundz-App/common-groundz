@@ -1,6 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';  // Added import for MediaItem
+import { PostgrestResponse } from '@supabase/postgrest-js';
+import { Database } from '@/integrations/supabase/types';
 
 export interface Review {
   id: string;
@@ -108,12 +110,34 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       const isSaved = userSaves?.some(s => s.review_id === review.id) || false;
       const entity = review.entity_id ? entitiesMap.get(review.entity_id) : null;
 
+      // Process the media field coming from Supabase (convert from Json to MediaItem[])
+      let processedMedia: MediaItem[] | null = null;
+      if (review.media) {
+        try {
+          // If it's already an array of objects, process it
+          processedMedia = (review.media as any[]).map(item => ({
+            url: item.url,
+            type: item.type,
+            order: item.order,
+            id: item.id,
+            caption: item.caption,
+            thumbnail_url: item.thumbnail_url,
+            width: item.width,
+            height: item.height,
+            orientation: item.orientation
+          }));
+        } catch (e) {
+          console.error('Error processing media data:', e);
+        }
+      }
+
       return {
         ...review,
         likes: Number(likes),
         isLiked,
         isSaved,
-        entity
+        entity,
+        media: processedMedia
       } as Review;
     });
 
@@ -192,6 +216,9 @@ export const toggleReviewSave = async (reviewId: string, userId: string, isSaved
 export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'updated_at' | 'is_converted' | 'recommendation_id' | 'status'>) => {
   console.log("Creating review with metadata:", review.metadata);
   
+  // Convert MediaItem[] to a format that Supabase can handle
+  const mediaForStorage = review.media ? JSON.parse(JSON.stringify(review.media)) : null;
+  
   const { data, error } = await supabase
     .from('reviews')
     .insert({
@@ -200,7 +227,7 @@ export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'u
       description: review.description,
       rating: review.rating,
       image_url: review.image_url,
-      media: review.media,
+      media: mediaForStorage as any,
       category: review.category,
       visibility: review.visibility,
       user_id: review.user_id,
@@ -344,12 +371,34 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
       isSaved = !!saveData;
     }
 
+    // Process the media field coming from Supabase
+    let processedMedia: MediaItem[] | null = null;
+    if (data.media) {
+      try {
+        // If it's already an array of objects, process it
+        processedMedia = (data.media as any[]).map(item => ({
+          url: item.url,
+          type: item.type,
+          order: item.order,
+          id: item.id,
+          caption: item.caption,
+          thumbnail_url: item.thumbnail_url,
+          width: item.width, 
+          height: item.height,
+          orientation: item.orientation
+        }));
+      } catch (e) {
+        console.error('Error processing media data:', e);
+      }
+    }
+
     return {
       ...data,
       likes: likesCount || 0,
       isLiked,
       isSaved,
-      entity
+      entity,
+      media: processedMedia
     } as Review;
   } catch (error) {
     console.error('Error in fetchReviewById:', error);
@@ -361,6 +410,9 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
 export const updateReview = async (id: string, updates: Partial<Review>) => {
   console.log("Updating review with metadata:", updates.metadata);
   
+  // Convert MediaItem[] to a format that Supabase can handle
+  const mediaForStorage = updates.media ? JSON.parse(JSON.stringify(updates.media)) : undefined;
+  
   // Create a new object with only the supported fields
   const validUpdates = {
     title: updates.title,
@@ -368,7 +420,7 @@ export const updateReview = async (id: string, updates: Partial<Review>) => {
     description: updates.description,
     rating: updates.rating,
     image_url: updates.image_url,
-    media: updates.media,
+    media: mediaForStorage as any,
     category: updates.category,
     visibility: updates.visibility as 'public' | 'private' | 'circle_only',
     experience_date: updates.experience_date,
