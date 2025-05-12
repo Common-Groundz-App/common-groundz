@@ -64,23 +64,8 @@ export const useRecommendationUploads = () => {
       return null;
     }
   };
-  
-  // Method to determine if an image URL is from an entity
-  const isEntityImageUrl = (imageUrl: string | null): boolean => {
-    if (!imageUrl) return false;
-    
-    // Check common patterns for entity images
-    return (
-      imageUrl.includes('googleapis.com') || 
-      imageUrl.includes('unsplash.com') ||
-      imageUrl.includes('placeholder.com') ||
-      imageUrl.includes('external-image') ||
-      imageUrl.includes('api.example.com')
-    );
-  };
 
   return {
-    handleImageUpload,
-    isEntityImageUrl
+    handleImageUpload
   };
 };

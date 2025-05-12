@@ -1,9 +1,8 @@
-
 import React, { ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Camera, X } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
@@ -12,19 +11,10 @@ interface ImageUploaderProps {
   onChange: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onRemove: () => void;
   isUploading: boolean;
-  isEntityImage?: boolean;
 }
 
-const ImageUploader = ({ 
-  selectedImage, 
-  onChange, 
-  onRemove, 
-  isUploading,
-  isEntityImage = false
-}: ImageUploaderProps) => {
-  // Only show the image uploader if it's a user-uploaded image or no image at all
-  // (We don't want to show entity images in the uploader)
-  const shouldShowImage = selectedImage && !isEntityImage;
+const ImageUploader = ({ selectedImage, onChange, onRemove, isUploading }: ImageUploaderProps) => {
+  console.log("ImageUploader rendering with selectedImage:", selectedImage);
   
   return (
     <div 
@@ -32,14 +22,12 @@ const ImageUploader = ({
         "transition-all duration-300",
         "flex flex-col items-center justify-center rounded-lg p-4",
         "border-2 border-dashed",
-        shouldShowImage 
-          ? "border-brand-orange/50" 
-          : "border-brand-orange/30",
+        selectedImage ? "border-brand-orange/50" : "border-brand-orange/30",
         "hover:border-brand-orange/70",
         "bg-gradient-to-b from-transparent to-accent/5"
       )}
     >
-      {shouldShowImage ? (
+      {selectedImage ? (
         <div className="relative w-full">
           <div className="h-48 overflow-hidden rounded-md">
             <ImageWithFallback
@@ -49,7 +37,6 @@ const ImageUploader = ({
               onError={(e) => console.error("Image failed to load in ImageUploader:", selectedImage)}
             />
           </div>
-          
           <Button
             type="button"
             variant="ghost"
@@ -57,7 +44,7 @@ const ImageUploader = ({
             className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-gray-800/80 text-white hover:bg-gray-900 shadow-md"
             onClick={onRemove}
           >
-            <X className="h-4 w-4" />
+            ×
           </Button>
         </div>
       ) : (
