@@ -51,14 +51,29 @@ const ConnectedRingsRating = ({
 
   // Handle celebration animation
   useEffect(() => {
+    // Clear any existing celebration timeout
+    let celebrationTimer: NodeJS.Timeout | null = null;
+
     if (value === 5 && prevValue !== 5) {
+      // Start celebration when rating becomes 5
       setShowCelebration(true);
-      const timer = setTimeout(() => {
+      
+      // Auto-dismiss celebration after 3 seconds
+      celebrationTimer = setTimeout(() => {
         setShowCelebration(false);
-      }, 3000); // Celebration lasts for 3 seconds
-      return () => clearTimeout(timer);
+      }, 3000);
+    } else if (value !== 5 && showCelebration) {
+      // Immediately clear celebration if rating changes from 5 to something else
+      setShowCelebration(false);
     }
-  }, [value, prevValue]);
+    
+    // Cleanup function to clear timeout when component unmounts or dependencies change
+    return () => {
+      if (celebrationTimer) {
+        clearTimeout(celebrationTimer);
+      }
+    };
+  }, [value, prevValue, showCelebration]);
   
   const sizeConfig = {
     sm: {
@@ -294,6 +309,11 @@ const ConnectedRingsRating = ({
             0% { transform: scale(1); opacity: 0.8; stroke-width: 3px; }
             100% { transform: scale(1.5); opacity: 0; stroke-width: 0.5px; }
           }
+          
+          @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+          }
           `}
         </style>
 
@@ -455,7 +475,7 @@ const ConnectedRingsRating = ({
                     width={60}
                     height={60}
                     style={{
-                      animation: showCelebration ? 'emojiPop 0.5s ease-out forwards, emojiFloat 2s ease-in-out 1s forwards' : 'none',
+                      animation: 'emojiPop 0.5s ease-out forwards, emojiFloat 2s ease-in-out 1s forwards',
                       opacity: 0,
                     }}
                   >
