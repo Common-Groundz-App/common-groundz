@@ -230,14 +230,6 @@ const ReviewForm = ({
       if (entity.venue) setVenue(entity.venue);
       // Do not auto-fill description for any category
     }
-    
-    // Use entity image if no user image has been selected
-    if (entity.image_url && !selectedImage) {
-      const secureImageUrl = ensureHttps(entity.image_url);
-      console.log("Setting entity image URL:", secureImageUrl);
-      setImageUrl(secureImageUrl);
-      setSelectedImage(secureImageUrl);
-    }
   };
   
   // Handle step navigation by clicking on step indicators

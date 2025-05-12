@@ -1,3 +1,4 @@
+
 import React, { ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,8 +70,8 @@ const ImageUploader = ({ selectedImage, onChange, onRemove, isUploading }: Image
               <div className="p-3 rounded-full bg-brand-orange/10 transition-colors duration-200 group-hover:bg-brand-orange/20">
                 <Camera className="h-8 w-8 text-brand-orange/70" />
               </div>
-              <span className="text-sm font-medium">{isUploading ? "Uploading..." : "Add a photo"}</span>
-              <span className="text-xs max-w-[80%] text-center">Share your experience visually</span>
+              <span className="text-sm font-medium">{isUploading ? "Uploading..." : "Add your own photo"}</span>
+              <span className="text-xs max-w-[80%] text-center">Share your personal experience with a photo</span>
             </div>
           </Label>
         </>

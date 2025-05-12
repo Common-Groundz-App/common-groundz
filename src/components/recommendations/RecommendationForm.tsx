@@ -269,10 +269,6 @@ const RecommendationForm = ({
                     }
                     
                     if (entity.description) setValue('description', entity.description);
-                    if (entity.image_url) {
-                      setValue('image_url', entity.image_url);
-                      setSelectedImage(entity.image_url);
-                    }
                   }}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -372,11 +368,11 @@ const RecommendationForm = ({
               
               {/* Right Column */}
               <div className="space-y-5">
-                {/* Add Photo */}
+                {/* Add Photo - Updated with better messaging */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <Camera className="h-4 w-4 text-brand-orange" />
-                    <span>Add a photo</span>
+                    <span>Add your own photo</span>
                   </Label>
                   <div className="flex flex-col items-center justify-center border-2 border-dashed border-brand-orange/30 rounded-lg p-4 review-image-upload">
                     {selectedImage ? (
@@ -413,8 +409,8 @@ const RecommendationForm = ({
                           className="cursor-pointer flex flex-col items-center text-muted-foreground"
                         >
                           <Camera className="h-12 w-12 mb-2 text-brand-orange/50" />
-                          <span className="text-sm">{isUploading ? "Uploading..." : "Tap to add photo"}</span>
-                          <span className="text-xs mt-1">Share your recommendation visually</span>
+                          <span className="text-sm">{isUploading ? "Uploading..." : "Add your own photo"}</span>
+                          <span className="text-xs mt-1">Share your personal experience with a photo</span>
                         </Label>
                       </>
                     )}

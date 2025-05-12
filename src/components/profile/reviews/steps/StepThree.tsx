@@ -1,3 +1,4 @@
+
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +12,7 @@ import { ensureHttps } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';
 import { useLocation } from '@/contexts/LocationContext';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface StepThreeProps {
   category: string;
@@ -318,11 +320,11 @@ const StepThree = ({
         </div>
       </div>
       
-      {/* Photo upload */}
+      {/* Photo upload - Updated with better messaging */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2 font-medium mb-1">
           <span className="text-lg">📸</span>
-          <span>Add a photo</span>
+          <span>Add your own photo</span>
         </Label>
         <ImageUploader
           selectedImage={selectedImage}
@@ -331,7 +333,7 @@ const StepThree = ({
           isUploading={isUploading}
         />
         <p className="text-xs text-muted-foreground mt-1">
-          {selectedImage ? "Click × to remove this photo" : "Upload a photo of your experience"}
+          {selectedImage ? "Click × to remove this photo" : "Add a personal photo to make your review stand out"}
         </p>
       </div>
     </div>
