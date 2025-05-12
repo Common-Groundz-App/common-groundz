@@ -1,7 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';  // Added import for MediaItem
-import { PostgrestResponse } from '@supabase/postgrest-js';
 import { Database } from '@/integrations/supabase/types';
 
 export interface Review {
