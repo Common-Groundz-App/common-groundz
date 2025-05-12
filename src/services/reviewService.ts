@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { MediaItem } from '@/types/media';  // Added import for MediaItem
 
 export interface Review {
   id: string;

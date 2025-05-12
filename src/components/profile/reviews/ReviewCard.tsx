@@ -202,7 +202,7 @@ const ReviewCard = ({
                 objectFit="cover"
                 enableBackground={true}
                 className="w-full h-full"
-                thumbnailDisplay={mediaItems.length > 1 ? "count" : "none"}
+                thumbnailDisplay={mediaItems.length > 1 ? "hover" : "none"}
               />
             ) : (
               <div className="w-full h-full bg-gray-100 flex items-center justify-center">
