@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,9 +53,6 @@ const ReviewForm = ({
   const [venue, setVenue] = useState(review?.venue || '');
   const [entityId, setEntityId] = useState(review?.entity_id || '');
   const [description, setDescription] = useState(review?.description || '');
-  
-  // New state for food name (separate from title)
-  const [foodName, setFoodName] = useState('');
   
   // Updated media handling
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
@@ -113,7 +111,6 @@ const ReviewForm = ({
     const hasChanges = 
       (rating > 0) || 
       (title !== '') || 
-      (foodName !== '') || 
       (venue !== '') || 
       (description !== '') || 
       (selectedMedia.length > 0) || 
@@ -121,7 +118,7 @@ const ReviewForm = ({
       (entityId !== '');
       
     setHasUnsavedChanges(hasChanges);
-  }, [isOpen, rating, title, foodName, venue, description, selectedMedia, foodTags, entityId]);
+  }, [isOpen, rating, title, venue, description, selectedMedia, foodTags, entityId]);
   
   // Reset form on close or when switching to a different review in edit mode
   useEffect(() => {
@@ -157,7 +154,6 @@ const ReviewForm = ({
     setRating(0);
     setCategory('food');
     setTitle('');
-    setFoodName('');
     setVenue('');
     setEntityId('');
     setDescription('');
@@ -237,7 +233,7 @@ const ReviewForm = ({
     setSelectedEntity(entity);
     setEntityId(entity.id);
     
-    // For food category, only update the venue field (restaurant name) and foodName
+    // For food category, only update the venue field (restaurant name)
     if (category === 'food') {
       console.log("Food category in ReviewForm: Setting venue");
       
@@ -250,8 +246,7 @@ const ReviewForm = ({
         setVenue(entity.venue || entity.name || '');
       }
       
-      // Set foodName but do not set title for food category
-      setFoodName(entity.name || '');
+      // Do not set title or description for food category
     } else if (category === 'place') {
       // For place category, use name as title but formatted address as venue
       setTitle(entity.name);
@@ -484,8 +479,8 @@ const ReviewForm = ({
               {currentStep === 3 && (
                 <StepThree 
                   category={category}
-                  title={category === 'food' ? foodName : title}
-                  onTitleChange={category === 'food' ? setFoodName : setTitle}
+                  title={title}
+                  onTitleChange={setTitle}
                   venue={venue}
                   onVenueChange={setVenue}
                   entityId={entityId}
@@ -501,8 +496,6 @@ const ReviewForm = ({
               {currentStep === 4 && (
                 <StepFour 
                   category={category}
-                  title={title}
-                  onTitleChange={setTitle}
                   description={description}
                   onDescriptionChange={setDescription}
                   experienceDate={experienceDate}
