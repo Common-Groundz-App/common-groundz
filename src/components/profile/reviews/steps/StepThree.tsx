@@ -25,6 +25,10 @@ interface StepThreeProps {
   onImageChange: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onImageRemove: () => void;
   isUploading: boolean;
+  // Add new props to track image source
+  isEntityImage?: boolean;
+  // Method to specifically use entity image
+  onUseEntityImage?: (imageUrl: string) => void;
 }
 
 const StepThree = ({ 
@@ -39,7 +43,9 @@ const StepThree = ({
   selectedImage,
   onImageChange,
   onImageRemove,
-  isUploading
+  isUploading,
+  isEntityImage = false,
+  onUseEntityImage
 }: StepThreeProps) => {
   const [showEntitySearch, setShowEntitySearch] = useState(!selectedEntity);
   const [processedEntity, setProcessedEntity] = useState<Entity | null>(null);
@@ -66,13 +72,18 @@ const StepThree = ({
         console.log("Entity has image_url before processing:", processed.image_url);
         processed.image_url = ensureHttps(processed.image_url);
         console.log("Entity has image_url after processing:", processed.image_url);
+        
+        // Set entity image if available and handler provided
+        if (onUseEntityImage && !selectedImage) {
+          onUseEntityImage(processed.image_url);
+        }
       } else {
         console.log("Entity missing image_url");
       }
       
       setProcessedEntity(processed);
     }
-  }, [selectedEntity]);
+  }, [selectedEntity, onUseEntityImage, selectedImage]);
 
   // Check if we should show the location prompt
   useEffect(() => {
@@ -174,6 +185,11 @@ const StepThree = ({
       console.log("Entity image URL before processing:", entity.image_url);
       entity.image_url = ensureHttps(entity.image_url);
       console.log("Entity image URL after processing:", entity.image_url);
+      
+      // Use the entity image if available and handler provided
+      if (onUseEntityImage) {
+        onUseEntityImage(entity.image_url);
+      }
     } else {
       console.log("Selected entity has no image URL");
     }
@@ -318,7 +334,7 @@ const StepThree = ({
         </div>
       </div>
       
-      {/* Photo upload */}
+      {/* Photo upload - Updated to pass isEntityImage flag */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2 font-medium mb-1">
           <span className="text-lg">📸</span>
@@ -329,13 +345,31 @@ const StepThree = ({
           onChange={onImageChange}
           onRemove={onImageRemove}
           isUploading={isUploading}
+          isEntityImage={isEntityImage}
         />
         <p className="text-xs text-muted-foreground mt-1">
-          {selectedImage ? "Click × to remove this photo" : "Upload a photo of your experience"}
+          {selectedImage && isEntityImage 
+            ? "This is the default image from our database - consider adding your own photo" 
+            : selectedImage 
+              ? "Click × to remove this photo" 
+              : "Upload a photo of your experience"}
         </p>
       </div>
     </div>
   );
+};
+
+// Re-export any missing functions to prevent TypeScript errors
+const getCategoryIcon = () => {
+  return <MapPin className="h-5 w-5 text-brand-orange" />;
+};
+
+const getSearchLabel = () => {
+  return "place";
+};
+
+const getEntitySearchType = () => {
+  return "place";
 };
 
 export default StepThree;
