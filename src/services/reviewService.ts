@@ -9,6 +9,7 @@ export interface Review {
   description: string | null;
   rating: number;
   image_url: string | null;
+  media?: MediaItem[] | null;  // New property for media items
   category: string;
   visibility: 'public' | 'private' | 'circle_only';
   user_id: string;
@@ -198,6 +199,7 @@ export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'u
       description: review.description,
       rating: review.rating,
       image_url: review.image_url,
+      media: review.media,
       category: review.category,
       visibility: review.visibility,
       user_id: review.user_id,
@@ -365,6 +367,7 @@ export const updateReview = async (id: string, updates: Partial<Review>) => {
     description: updates.description,
     rating: updates.rating,
     image_url: updates.image_url,
+    media: updates.media,
     category: updates.category,
     visibility: updates.visibility as 'public' | 'private' | 'circle_only',
     experience_date: updates.experience_date,

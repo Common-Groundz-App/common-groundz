@@ -7,12 +7,12 @@ import EntitySearch from '@/components/recommendations/EntitySearch';
 import { Entity } from '@/services/recommendation/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import { Book, Clapperboard, MapPin, ShoppingBag, Navigation } from 'lucide-react';
-import ImageUploader from '@/components/profile/reviews/ImageUploader';
-import { ensureHttps } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';
 import { useLocation } from '@/contexts/LocationContext';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { MediaUploader } from '@/components/media/MediaUploader';
+import { MediaItem } from '@/types/media';
+import { v4 as uuidv4 } from 'uuid';
 
 interface StepThreeProps {
   category: string;
@@ -23,9 +23,9 @@ interface StepThreeProps {
   entityId: string;
   onEntitySelect: (entity: Entity) => void;
   selectedEntity: Entity | null;
-  selectedImage: string | null;
-  onImageChange: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
-  onImageRemove: () => void;
+  selectedMedia: MediaItem[];
+  onMediaAdd: (media: MediaItem) => void;
+  onMediaRemove: (mediaUrl: string) => void;
   isUploading: boolean;
 }
 
@@ -38,9 +38,9 @@ const StepThree = ({
   entityId,
   onEntitySelect,
   selectedEntity,
-  selectedImage,
-  onImageChange,
-  onImageRemove,
+  selectedMedia,
+  onMediaAdd,
+  onMediaRemove,
   isUploading
 }: StepThreeProps) => {
   const [showEntitySearch, setShowEntitySearch] = useState(!selectedEntity);
@@ -235,6 +235,17 @@ const StepThree = ({
   // Show location prompt for place or food categories if permission not already granted
   const isLocationRelevantCategory = category === 'place' || category === 'food';
   
+  // Helper function to ensure HTTPS urls
+  const ensureHttps = (url: string): string => {
+    if (!url) return url;
+    return url.replace(/^http:\/\//i, 'https://');
+  };
+  
+  // Handle media uploaded
+  const handleMediaUploaded = (media: MediaItem) => {
+    onMediaAdd(media);
+  };
+  
   return (
     <div className="w-full space-y-8 py-2">
       <h2 className="text-xl font-medium text-center">
@@ -320,20 +331,24 @@ const StepThree = ({
         </div>
       </div>
       
-      {/* Photo upload - Updated with better messaging */}
+      {/* Media upload section - Updated to use MediaUploader */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2 font-medium mb-1">
           <span className="text-lg">📸</span>
-          <span>Add your own photo</span>
+          <span>Add photos & videos</span>
         </Label>
-        <ImageUploader
-          selectedImage={selectedImage}
-          onChange={onImageChange}
-          onRemove={onImageRemove}
-          isUploading={isUploading}
+        <MediaUploader
+          sessionId={uuidv4()}
+          onMediaUploaded={handleMediaUploaded}
+          initialMedia={selectedMedia}
+          className="w-full"
+          maxMediaCount={4}
         />
         <p className="text-xs text-muted-foreground mt-1">
-          {selectedImage ? "Click × to remove this photo" : "Add a personal photo to make your review stand out"}
+          {selectedMedia.length > 0 
+            ? `${selectedMedia.length}/4 media items added - Add photos or videos to make your review stand out`
+            : "Add photos or videos to make your review stand out"
+          }
         </p>
       </div>
     </div>

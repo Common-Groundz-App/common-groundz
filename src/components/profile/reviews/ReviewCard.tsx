@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle } from 'lucide-react';
+import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +19,8 @@ import { deleteReview, updateReviewStatus } from '@/services/reviewService';
 import ReviewForm from './ReviewForm';
 import RatingStars from '@/components/recommendations/RatingStars';
 import { format } from 'date-fns';
+import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
+import { MediaItem } from '@/types/media';
 
 interface ReviewCardProps {
   review: Review;
@@ -42,6 +45,36 @@ const ReviewCard = ({
   
   const isOwner = user?.id === review.user_id;
   const isAdmin = user?.email?.includes('@lovable.dev') || false; // Simple admin check
+  
+  // Process media items for display
+  const mediaItems = React.useMemo(() => {
+    // If we have a media array already, use it
+    if (review.media && Array.isArray(review.media) && review.media.length > 0) {
+      return review.media as MediaItem[];
+    }
+    
+    // If we have a legacy image_url, convert it to a media item
+    if (review.image_url) {
+      return [{
+        url: review.image_url,
+        type: 'image',
+        order: 0,
+        id: review.id
+      }] as MediaItem[];
+    }
+    
+    // If we have an entity with an image, use it as fallback
+    if (review.entity?.image_url) {
+      return [{
+        url: review.entity.image_url,
+        type: 'image',
+        order: 0,
+        id: `entity-${review.entity.id}`
+      }] as MediaItem[];
+    }
+    
+    return [] as MediaItem[];
+  }, [review]);
   
   const getCategoryLabel = (category: string): string => {
     const labels: Record<string, string> = {
@@ -132,12 +165,6 @@ const ReviewCard = ({
     return null;
   };
 
-  const getImageUrl = () => {
-    if (review.image_url) return review.image_url;
-    if (review.entity && review.entity.image_url) return review.entity.image_url;
-    return "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07";
-  };
-
   return (
     <>
       <Card 
@@ -168,11 +195,20 @@ const ReviewCard = ({
           </div>
           
           <div className="h-48 relative overflow-hidden group">
-            <img 
-              src={getImageUrl()} 
-              alt={review.title} 
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-            />
+            {mediaItems.length > 0 ? (
+              <PostMediaDisplay
+                media={mediaItems}
+                aspectRatio="maintain"
+                objectFit="cover"
+                enableBackground={true}
+                className="w-full h-full"
+                thumbnailDisplay={mediaItems.length > 1 ? "count" : "none"}
+              />
+            ) : (
+              <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                <ImageIcon className="h-12 w-12 text-gray-300" />
+              </div>
+            )}
           </div>
         </div>
         
@@ -301,6 +337,13 @@ const ReviewCard = ({
                   <span>{review.comment_count}</span>
                 )}
               </Button>
+
+              {mediaItems.length > 0 && (
+                <span className="text-xs text-gray-500 flex items-center gap-1">
+                  <ImageIcon size={12} />
+                  {mediaItems.length}
+                </span>
+              )}
             </div>
             
             {!review.is_converted && isOwner && onConvert && (

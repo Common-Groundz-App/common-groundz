@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +8,7 @@ import { useRecommendationUploads } from '@/hooks/recommendations/use-recommenda
 import { Entity } from '@/services/recommendation/types';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { ensureHttps } from '@/utils/urlUtils';
+import { MediaItem } from '@/types/media';
 
 // Import step components
 import StepOne from './steps/StepOne';
@@ -51,11 +53,11 @@ const ReviewForm = ({
   const [venue, setVenue] = useState(review?.venue || '');
   const [entityId, setEntityId] = useState(review?.entity_id || '');
   const [description, setDescription] = useState(review?.description || '');
-  const [imageUrl, setImageUrl] = useState(review?.image_url || '');
-  const [selectedImage, setSelectedImage] = useState<string | null>(
-    review?.image_url ? ensureHttps(review.image_url) : null
-  );
+  
+  // Updated media handling
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  
   const [experienceDate, setExperienceDate] = useState<Date | undefined>(
     review?.experience_date ? new Date(review.experience_date) : undefined
   );
@@ -64,6 +66,25 @@ const ReviewForm = ({
   );
   const [foodTags, setFoodTags] = useState<string[]>(review?.metadata?.food_tags || []);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
+  
+  // Initialize media from legacy image_url or new media array
+  useEffect(() => {
+    if (isEditMode && review) {
+      // Initialize from existing media if available
+      if (review.media && Array.isArray(review.media) && review.media.length > 0) {
+        setSelectedMedia(review.media as MediaItem[]);
+      } 
+      // Fallback to legacy image_url
+      else if (review.image_url) {
+        setSelectedMedia([{
+          url: ensureHttps(review.image_url),
+          type: 'image',
+          order: 0,
+          id: review.id
+        }]);
+      }
+    }
+  }, [review, isEditMode]);
   
   // If in edit mode, populate entity once review is available
   useEffect(() => {
@@ -92,12 +113,12 @@ const ReviewForm = ({
       (title !== '') || 
       (venue !== '') || 
       (description !== '') || 
-      (selectedImage !== null) || 
+      (selectedMedia.length > 0) || 
       (foodTags.length > 0) ||
       (entityId !== '');
       
     setHasUnsavedChanges(hasChanges);
-  }, [isOpen, rating, title, venue, description, selectedImage, foodTags, entityId]);
+  }, [isOpen, rating, title, venue, description, selectedMedia, foodTags, entityId]);
   
   // Reset form on close or when switching to a different review in edit mode
   useEffect(() => {
@@ -113,8 +134,6 @@ const ReviewForm = ({
       setVenue(review.venue || '');
       setEntityId(review.entity_id || '');
       setDescription(review.description || '');
-      setImageUrl(review.image_url || '');
-      setSelectedImage(review.image_url || null);
       setVisibility((review.visibility as "public" | "circle_only" | "private") || "public");
       if (review.experience_date) {
         setExperienceDate(new Date(review.experience_date));
@@ -138,8 +157,7 @@ const ReviewForm = ({
     setVenue('');
     setEntityId('');
     setDescription('');
-    setImageUrl('');
-    setSelectedImage(null);
+    setSelectedMedia([]);
     setExperienceDate(undefined);
     setVisibility('public');
     setFoodTags([]);
@@ -167,6 +185,16 @@ const ReviewForm = ({
     setShowExitConfirmation(false);
   };
   
+  // Handle adding a new media item
+  const handleAddMedia = (media: MediaItem) => {
+    setSelectedMedia(prev => [...prev, media]);
+  };
+  
+  // Handle removing a media item
+  const handleRemoveMedia = (mediaUrl: string) => {
+    setSelectedMedia(prev => prev.filter(item => item.url !== mediaUrl));
+  };
+  
   const handleImageUploadChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -180,8 +208,14 @@ const ReviewForm = ({
       if (url) {
         const secureUrl = ensureHttps(url);
         console.log("Setting image URL to:", secureUrl);
-        setImageUrl(secureUrl);
-        setSelectedImage(secureUrl);
+        
+        // Add as a media item instead of setting single image URL
+        handleAddMedia({
+          url: secureUrl,
+          type: 'image',
+          order: selectedMedia.length,
+          id: `new-${Date.now()}`
+        });
       }
     } catch (error) {
       console.error('Image upload failed:', error);
@@ -307,13 +341,17 @@ const ReviewForm = ({
       // Convert Date to ISO string for API submission
       const formattedExperienceDate = experienceDate ? experienceDate.toISOString() : undefined;
       
+      // For backward compatibility, use the first image as the main image_url
+      const image_url = selectedMedia.length > 0 ? selectedMedia[0].url : undefined;
+      
       if (isEditMode && review) {
         await updateReview(review.id, {
           title,
           venue,
           description,
           rating,
-          image_url: imageUrl,
+          image_url,
+          media: selectedMedia,
           category,
           visibility,
           entity_id: entityId,
@@ -330,7 +368,8 @@ const ReviewForm = ({
           venue,
           description,
           rating,
-          image_url: imageUrl,
+          image_url,
+          media: selectedMedia,
           category,
           visibility,
           entity_id: entityId,
@@ -447,13 +486,9 @@ const ReviewForm = ({
                   entityId={entityId}
                   onEntitySelect={handleEntitySelect}
                   selectedEntity={selectedEntity}
-                  selectedImage={selectedImage}
-                  onImageChange={handleImageUploadChange}
-                  onImageRemove={() => {
-                    console.log("Removing selected image");
-                    setImageUrl('');
-                    setSelectedImage(null);
-                  }}
+                  selectedMedia={selectedMedia}
+                  onMediaAdd={handleAddMedia}
+                  onMediaRemove={handleRemoveMedia}
                   isUploading={isUploading}
                 />
               )}
