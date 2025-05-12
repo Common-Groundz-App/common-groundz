@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { cn } from "@/lib/utils";
 import { useThemedClass } from '@/utils/theme-utils';
@@ -173,68 +172,71 @@ const ConnectedRingsRating = ({
   // Use the appropriate inactive color based on whether a value has been selected
   const inactiveRingColor = value > 0 ? selectedInactiveColor : defaultInactiveColor;
 
+  // Create a style element for CSS animations - Fixed by using regular style tag
+  const animationStyles = `
+    @keyframes bouncyScale {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      75% { transform: scale(0.95); }
+      100% { transform: scale(1); }
+    }
+    
+    @keyframes springScale {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.15); }
+      60% { transform: scale(0.9); }
+      80% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    
+    @keyframes glowPulse {
+      0% { opacity: 0.2; filter: blur(1px); }
+      50% { opacity: 0.6; filter: blur(2px); }
+      100% { opacity: 0.2; filter: blur(1px); }
+    }
+    
+    @keyframes textPop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    
+    @keyframes celebrationRipple {
+      0% { 
+        transform: scale(0.8); 
+        opacity: 0.8;
+        stroke-width: ${strokeWidth}px;
+      }
+      70% { 
+        transform: scale(1.2);
+        opacity: 0;
+        stroke-width: 0;
+      }
+      100% { 
+        transform: scale(1.4);
+        opacity: 0;
+        stroke-width: 0;
+      }
+    }
+    
+    .ring-hover-anim {
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    
+    .ring-hover-anim:hover {
+      transform: scale(1.08);
+    }
+    
+    .label-text-bounce {
+      animation: textPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+  `;
+
   return (
     <TooltipProvider>
       <div className={cn("flex flex-col items-center w-full", className)}>
-        {/* CSS Keyframes for custom animations */}
-        <style jsx global>{`
-          @keyframes bouncyScale {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            75% { transform: scale(0.95); }
-            100% { transform: scale(1); }
-          }
-          
-          @keyframes springScale {
-            0% { transform: scale(1); }
-            40% { transform: scale(1.15); }
-            60% { transform: scale(0.9); }
-            80% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-          }
-          
-          @keyframes glowPulse {
-            0% { opacity: 0.2; filter: blur(1px); }
-            50% { opacity: 0.6; filter: blur(2px); }
-            100% { opacity: 0.2; filter: blur(1px); }
-          }
-          
-          @keyframes textPop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-          }
-          
-          @keyframes celebrationRipple {
-            0% { 
-              transform: scale(0.8); 
-              opacity: 0.8;
-              stroke-width: ${strokeWidth}px;
-            }
-            70% { 
-              transform: scale(1.2);
-              opacity: 0;
-              stroke-width: 0;
-            }
-            100% { 
-              transform: scale(1.4);
-              opacity: 0;
-              stroke-width: 0;
-            }
-          }
-          
-          .ring-hover-anim {
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-          }
-          
-          .ring-hover-anim:hover {
-            transform: scale(1.08);
-          }
-          
-          .label-text-bounce {
-            animation: textPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-          }
-        `}</style>
+        {/* CSS Keyframes for custom animations - Fixed by using regular style tag */}
+        <style>{animationStyles}</style>
         
         {/* Center the SVG container horizontally with proper alignment */}
         <div className="w-full flex justify-center">
