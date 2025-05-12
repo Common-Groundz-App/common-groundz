@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,7 +49,12 @@ const ReviewForm = ({
   // Form data
   const [rating, setRating] = useState(review?.rating || 0);
   const [category, setCategory] = useState(review?.category || 'food');
-  const [title, setTitle] = useState(review?.title || '');
+  
+  // Separate state variables for different fields
+  const [foodName, setFoodName] = useState(''); // For "What did you eat?" in food category
+  const [contentName, setContentName] = useState(''); // For movie/book/place/product name
+  const [reviewTitle, setReviewTitle] = useState(review?.title || ''); // For review title in Step 4
+  
   const [venue, setVenue] = useState(review?.venue || '');
   const [entityId, setEntityId] = useState(review?.entity_id || '');
   const [description, setDescription] = useState(review?.description || '');
@@ -109,7 +115,9 @@ const ReviewForm = ({
     // Check if form has non-default values
     const hasChanges = 
       (rating > 0) || 
-      (title !== '') || 
+      (reviewTitle !== '') || 
+      (foodName !== '') || 
+      (contentName !== '') || 
       (venue !== '') || 
       (description !== '') || 
       (selectedMedia.length > 0) || 
@@ -117,7 +125,7 @@ const ReviewForm = ({
       (entityId !== '');
       
     setHasUnsavedChanges(hasChanges);
-  }, [isOpen, rating, title, venue, description, selectedMedia, foodTags, entityId]);
+  }, [isOpen, rating, reviewTitle, foodName, contentName, venue, description, selectedMedia, foodTags, entityId]);
   
   // Reset form on close or when switching to a different review in edit mode
   useEffect(() => {
@@ -129,7 +137,9 @@ const ReviewForm = ({
       // Populate form with review data
       setRating(review.rating);
       setCategory(review.category);
-      setTitle(review.title);
+      setReviewTitle(review.title || '');
+      setFoodName('');
+      setContentName('');
       setVenue(review.venue || '');
       setEntityId(review.entity_id || '');
       setDescription(review.description || '');
@@ -152,7 +162,9 @@ const ReviewForm = ({
   const resetForm = () => {
     setRating(0);
     setCategory('food');
-    setTitle('');
+    setReviewTitle('');
+    setFoodName('');
+    setContentName('');
     setVenue('');
     setEntityId('');
     setDescription('');
@@ -232,9 +244,9 @@ const ReviewForm = ({
     setSelectedEntity(entity);
     setEntityId(entity.id);
     
-    // For food category, only update the venue field (restaurant name)
+    // For food category, handle differently
     if (category === 'food') {
-      console.log("Food category in ReviewForm: Setting venue");
+      console.log("Food category in ReviewForm");
       
       // For Google Places, always use the name as restaurant name, never address
       if (entity.api_source === 'google_places') {
@@ -245,10 +257,10 @@ const ReviewForm = ({
         setVenue(entity.venue || entity.name || '');
       }
       
-      // Do not set title for food category as it will be added separately in Step 4
+      // Do not set reviewTitle for food category as it will be added separately in Step 4
     } else if (category === 'place') {
-      // For place category, use name as title but formatted address as venue
-      setTitle(entity.name);
+      // For place category, use name as contentName but formatted address as venue
+      setContentName(entity.name);
       
       if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
         console.log("Using Google Places formatted_address for venue:", entity.metadata.formatted_address);
@@ -258,8 +270,8 @@ const ReviewForm = ({
         setVenue(entity.venue || '');
       }
     } else {
-      // For other categories, auto-fill title from entity
-      if (entity.name) setTitle(entity.name);
+      // For other categories, set contentName from entity
+      if (entity.name) setContentName(entity.name);
       if (entity.venue) setVenue(entity.venue);
     }
   };
@@ -293,13 +305,23 @@ const ReviewForm = ({
       return;
     }
     
-    if (currentStep === 3 && !title) {
-      toast({
-        title: 'Title required',
-        description: `Please provide a name for the ${category} you're reviewing.`,
-        variant: 'destructive'
-      });
-      return;
+    if (currentStep === 3) {
+      // Validate based on category
+      if (category === 'food' && !foodName) {
+        toast({
+          title: 'Food name required',
+          description: 'Please specify what you ate.',
+          variant: 'destructive'
+        });
+        return;
+      } else if (category !== 'food' && !contentName) {
+        toast({
+          title: `${category} name required`,
+          description: `Please provide a name for the ${category} you're reviewing.`,
+          variant: 'destructive'
+        });
+        return;
+      }
     }
     
     // Mark current step as completed
@@ -342,9 +364,12 @@ const ReviewForm = ({
       // For backward compatibility, use the first image as the main image_url
       const image_url = selectedMedia.length > 0 ? selectedMedia[0].url : undefined;
       
+      // Determine final title based on the content type and user input
+      const finalTitle = reviewTitle || (category === 'food' ? foodName : contentName);
+      
       if (isEditMode && review) {
         await updateReview(review.id, {
-          title,
+          title: finalTitle,
           venue,
           description,
           rating,
@@ -362,7 +387,7 @@ const ReviewForm = ({
         });
       } else {
         await createReview({
-          title,
+          title: finalTitle,
           venue,
           description,
           rating,
@@ -402,7 +427,9 @@ const ReviewForm = ({
     
     switch (currentStep) {
       case 1: return rating === 0;
-      case 3: return title === '';
+      case 3: 
+        if (category === 'food') return !foodName;
+        return !contentName;
       default: return false;
     }
   };
@@ -477,8 +504,8 @@ const ReviewForm = ({
               {currentStep === 3 && (
                 <StepThree 
                   category={category}
-                  title={title}
-                  onTitleChange={setTitle}
+                  title={category === 'food' ? foodName : contentName}
+                  onTitleChange={category === 'food' ? setFoodName : setContentName}
                   venue={venue}
                   onVenueChange={setVenue}
                   entityId={entityId}
@@ -494,8 +521,8 @@ const ReviewForm = ({
               {currentStep === 4 && (
                 <StepFour 
                   category={category}
-                  title={title}
-                  onTitleChange={setTitle}
+                  title={reviewTitle}
+                  onTitleChange={setReviewTitle}
                   description={description}
                   onDescriptionChange={setDescription}
                   experienceDate={experienceDate}
