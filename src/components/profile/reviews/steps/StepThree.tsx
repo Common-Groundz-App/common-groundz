@@ -11,6 +11,7 @@ import { ensureHttps } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';
 import { useLocation } from '@/contexts/LocationContext';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface StepThreeProps {
   category: string;
