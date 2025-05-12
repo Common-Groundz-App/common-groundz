@@ -3,11 +3,14 @@ import React from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Input } from '@/components/ui/input';
 import FoodTagSelector from '@/components/profile/reviews/FoodTagSelector';
 import DateSelector from '@/components/profile/reviews/DateSelector';
 
 interface StepFourProps {
   category: string;
+  title: string;
+  onTitleChange: (value: string) => void;
   description: string;
   onDescriptionChange: (value: string) => void;
   experienceDate: Date | undefined;
@@ -21,6 +24,8 @@ interface StepFourProps {
 
 const StepFour = ({
   category,
+  title,
+  onTitleChange,
   description,
   onDescriptionChange,
   experienceDate,
@@ -36,6 +41,21 @@ const StepFour = ({
       <h2 className="text-xl font-medium text-center">
         Additional details (optional)
       </h2>
+      
+      {/* Review Title */}
+      <div className="space-y-2">
+        <Label htmlFor="review-title" className="flex items-center gap-2 font-medium">
+          <span className="text-lg">📝</span>
+          <span>Review title</span>
+        </Label>
+        <Input 
+          id="review-title"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="Give your review a catchy title..."
+          className="border-brand-orange/30 focus-visible:ring-brand-orange/30 transition-all duration-200"
+        />
+      </div>
       
       {/* Description */}
       <div className="space-y-2">

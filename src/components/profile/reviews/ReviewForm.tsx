@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
@@ -246,7 +245,7 @@ const ReviewForm = ({
         setVenue(entity.venue || entity.name || '');
       }
       
-      // Do not set title or description for food category
+      // Do not set title for food category as it will be added separately in Step 4
     } else if (category === 'place') {
       // For place category, use name as title but formatted address as venue
       setTitle(entity.name);
@@ -262,7 +261,6 @@ const ReviewForm = ({
       // For other categories, auto-fill title from entity
       if (entity.name) setTitle(entity.name);
       if (entity.venue) setVenue(entity.venue);
-      // Do not auto-fill description for any category
     }
   };
   
@@ -496,6 +494,8 @@ const ReviewForm = ({
               {currentStep === 4 && (
                 <StepFour 
                   category={category}
+                  title={title}
+                  onTitleChange={setTitle}
                   description={description}
                   onDescriptionChange={setDescription}
                   experienceDate={experienceDate}
