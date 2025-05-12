@@ -65,7 +65,7 @@ export const useRecommendationUploads = () => {
     }
   };
   
-  // New method to determine if an image URL is from an entity
+  // Method to determine if an image URL is from an entity
   const isEntityImageUrl = (imageUrl: string | null): boolean => {
     if (!imageUrl) return false;
     

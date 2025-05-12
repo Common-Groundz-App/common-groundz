@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import StepTwo from './steps/StepTwo';
 import StepThree from './steps/StepThree';
 import StepFour from './steps/StepFour';
 import { Entity } from '@/services/recommendation/types';
-import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
+import { useRecommendationUploads } from '@/hooks/use-recommendation-uploads';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ReviewFormProps {
@@ -20,12 +21,13 @@ interface ReviewFormProps {
   onClose: () => void;
   onSubmit: (review: any) => Promise<void>;
   review?: any;
+  isEditMode?: boolean; // Added isEditMode prop
 }
 
-const ReviewForm = ({ isOpen, onClose, onSubmit, review = null }: ReviewFormProps) => {
+const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = false }: ReviewFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { handleImageUpload } = useRecommendationUploads();
+  const { handleImageUpload: uploadImage } = useRecommendationUploads(); // Renamed to avoid conflict
   
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,8 +80,8 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null }: ReviewFormProp
     }
   }, [isOpen, form]);
   
-  // Updated image upload handler
-  const handleImageUpload = async (e) => {
+  // Updated image upload handler - renamed to processImageUpload to avoid conflict
+  const processImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user) return;
     
     const file = e.target.files?.[0];
@@ -89,7 +91,7 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null }: ReviewFormProp
       setIsUploading(true);
       
       // Upload custom user image
-      const imageUrl = await handleImageUpload(file);
+      const imageUrl = await uploadImage(file);
       
       if (imageUrl) {
         // Since we're uploading a user image, this is not an entity image
@@ -109,7 +111,7 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null }: ReviewFormProp
   };
   
   // New handler to use entity image without uploading
-  const handleUseEntityImage = useCallback((imageUrl) => {
+  const handleUseEntityImage = useCallback((imageUrl: string) => {
     if (imageUrl) {
       setSelectedImage(imageUrl);
       setIsEntityImage(true);
@@ -151,7 +153,7 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null }: ReviewFormProp
   };
   
   // Modify the form submit handler to handle the image source correctly
-  const handleFormSubmit = async (values) => {
+  const handleFormSubmit = async (values: any) => {
     try {
       setIsSubmitting(true);
       
@@ -193,14 +195,14 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null }: ReviewFormProp
       case 1:
         return (
           <StepOne 
-            category={category} 
+            selectedCategory={category} 
             onCategoryChange={(value) => setValue('category', value)} 
           />
         );
       case 2:
         return (
           <StepTwo 
-            rating={rating} 
+            selectedRating={rating} 
             onRatingChange={(value) => setValue('rating', value)} 
           />
         );
@@ -216,7 +218,7 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null }: ReviewFormProp
             onEntitySelect={handleEntitySelect}
             selectedEntity={selectedEntity}
             selectedImage={selectedImage}
-            onImageChange={handleImageUpload}
+            onImageChange={processImageUpload}
             onImageRemove={() => {
               setSelectedImage(null);
               setIsEntityImage(false);
@@ -229,9 +231,9 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null }: ReviewFormProp
       case 4:
         return (
           <StepFour
-            content={content}
+            reviewContent={content}
             onContentChange={(value) => setValue('content', value)}
-            visibility={watch('visibility')}
+            selectedVisibility={watch('visibility')}
             onVisibilityChange={(value) => setValue('visibility', value)}
           />
         );
@@ -247,7 +249,7 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null }: ReviewFormProp
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl text-center">
-            {review ? 'Edit Review' : 'Create Review'}
+            {isEditMode ? 'Edit Review' : 'Create Review'}
           </DialogTitle>
         </DialogHeader>
         
