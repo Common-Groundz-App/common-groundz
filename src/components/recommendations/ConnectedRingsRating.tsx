@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { cn } from "@/lib/utils";
 import { useThemedClass } from '@/utils/theme-utils';
@@ -29,7 +30,6 @@ const ConnectedRingsRating = ({
 }: ConnectedRingsRatingProps) => {
   const [hoverRating, setHoverRating] = useState(0);
   const [animateRing, setAnimateRing] = useState<number | null>(null);
-  const [lastSelectedRing, setLastSelectedRing] = useState<number | null>(null);
   
   const sizeConfig = {
     sm: {
@@ -147,13 +147,12 @@ const ConnectedRingsRating = ({
   const handleRingClick = (ringValue: number) => {
     if (isInteractive && onChange) {
       setAnimateRing(ringValue);
-      setLastSelectedRing(ringValue);
       onChange(ringValue);
       
       // Reset animation state after animation completes
       setTimeout(() => {
         setAnimateRing(null);
-      }, 700); // Slightly longer to accommodate the extended animation
+      }, 500);
     }
   };
 
@@ -172,72 +171,9 @@ const ConnectedRingsRating = ({
   // Use the appropriate inactive color based on whether a value has been selected
   const inactiveRingColor = value > 0 ? selectedInactiveColor : defaultInactiveColor;
 
-  // Create a style element for CSS animations - Fixed by using regular style tag
-  const animationStyles = `
-    @keyframes bouncyScale {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      75% { transform: scale(0.95); }
-      100% { transform: scale(1); }
-    }
-    
-    @keyframes springScale {
-      0% { transform: scale(1); }
-      40% { transform: scale(1.15); }
-      60% { transform: scale(0.9); }
-      80% { transform: scale(1.05); }
-      100% { transform: scale(1); }
-    }
-    
-    @keyframes glowPulse {
-      0% { opacity: 0.2; filter: blur(1px); }
-      50% { opacity: 0.6; filter: blur(2px); }
-      100% { opacity: 0.2; filter: blur(1px); }
-    }
-    
-    @keyframes textPop {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
-    }
-    
-    @keyframes celebrationRipple {
-      0% { 
-        transform: scale(0.8); 
-        opacity: 0.8;
-        stroke-width: ${strokeWidth}px;
-      }
-      70% { 
-        transform: scale(1.2);
-        opacity: 0;
-        stroke-width: 0;
-      }
-      100% { 
-        transform: scale(1.4);
-        opacity: 0;
-        stroke-width: 0;
-      }
-    }
-    
-    .ring-hover-anim {
-      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-    
-    .ring-hover-anim:hover {
-      transform: scale(1.08);
-    }
-    
-    .label-text-bounce {
-      animation: textPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-  `;
-
   return (
     <TooltipProvider>
       <div className={cn("flex flex-col items-center w-full", className)}>
-        {/* CSS Keyframes for custom animations - Fixed by using regular style tag */}
-        <style>{animationStyles}</style>
-        
         {/* Center the SVG container horizontally with proper alignment */}
         <div className="w-full flex justify-center">
           <div
@@ -277,12 +213,6 @@ const ConnectedRingsRating = ({
                   <stop offset="0%" stopColor="#22c55e" />
                   <stop offset="100%" stopColor="#86efac" />
                 </linearGradient>
-                
-                {/* Add filter for glow effect */}
-                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
               </defs>
               
               {/* Interlinking donut rings */}
@@ -293,24 +223,19 @@ const ConnectedRingsRating = ({
                 const activePercentage = isActive ? 100 : 0;
                 const dashOffset = circumference - (circumference * activePercentage) / 100;
                 const isAnimating = animateRing === ring.value;
-                const wasJustSelected = lastSelectedRing === ring.value;
                 
                 return (
                   <Tooltip key={`ring-${i}`}>
                     <TooltipTrigger asChild>
                       <g 
                         className={cn(
-                          isAnimating && "animate-[springScale_0.7s_cubic-bezier(0.18,0.89,0.32,1.28)]",
-                          "group"
+                          "transition-all duration-300 hover:scale-105 group",
+                          isAnimating && "animate-[bounce_0.5s_ease-in-out]"
                         )}
                         onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
                         onClick={() => handleRingClick(ring.value)}
-                        style={{
-                          transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                          willChange: 'transform',
-                        }}
                       >
-                        {/* Base ring (always visible) */}
+                        {/* Ring outline (always visible) */}
                         <circle
                           cx={ring.cx}
                           cy={ring.cy}
@@ -318,10 +243,10 @@ const ConnectedRingsRating = ({
                           stroke={isActive ? sentimentColor : inactiveRingColor}
                           strokeWidth={strokeWidth}
                           fill="transparent"
-                          className="transition-colors duration-300"
+                          className="transition-all duration-300"
                         />
                         
-                        {/* Animated fill stroke with elastic motion */}
+                        {/* Animated fill stroke */}
                         <circle
                           cx={ring.cx}
                           cy={ring.cy}
@@ -332,7 +257,7 @@ const ConnectedRingsRating = ({
                           strokeDasharray={circumference}
                           strokeDashoffset={isActive ? 0 : circumference}
                           strokeLinecap="round"
-                          className="transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                          className="transition-all duration-500 ease-out"
                           style={{ 
                             transform: 'rotate(-90deg)', 
                             transformOrigin: `${ring.cx}px ${ring.cy}px`,
@@ -340,42 +265,8 @@ const ConnectedRingsRating = ({
                           }}
                         />
                         
-                        {/* Celebration ripple animation on selection */}
-                        {isAnimating && (
-                          <circle
-                            cx={ring.cx}
-                            cy={ring.cy}
-                            r={ringRadius}
-                            stroke={sentimentColor}
-                            strokeWidth={strokeWidth}
-                            fill="transparent"
-                            style={{ 
-                              transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                              animation: 'celebrationRipple 0.8s ease-out forwards'
-                            }}
-                          />
-                        )}
-                        
-                        {/* Subtle glow effect for selected rings */}
-                        {isActive && wasJustSelected && (
-                          <circle
-                            cx={ring.cx}
-                            cy={ring.cy}
-                            r={ringRadius + 3}
-                            stroke={sentimentColor}
-                            strokeWidth={2}
-                            fill="transparent"
-                            opacity="0.6"
-                            filter="url(#glow)"
-                            style={{
-                              animation: 'glowPulse 2s ease-in-out infinite',
-                              transformOrigin: `${ring.cx}px ${ring.cy}px`
-                            }}
-                          />
-                        )}
-                        
-                        {/* Hover glow effect - only for unselected rings */}
-                        {isInteractive && !isActive && (
+                        {/* Hover glow effect */}
+                        {isInteractive && (
                           <circle
                             cx={ring.cx}
                             cy={ring.cy}
@@ -385,21 +276,6 @@ const ConnectedRingsRating = ({
                             fill="transparent"
                             opacity="0"
                             className="group-hover:opacity-30 transition-opacity duration-300"
-                          />
-                        )}
-                        
-                        {/* Elastic scale transform on unselected rings only */}
-                        {isInteractive && !isActive && (
-                          <circle
-                            cx={ring.cx}
-                            cy={ring.cy}
-                            r={ringRadius}
-                            stroke="transparent"
-                            fill="transparent"
-                            style={{ 
-                              transformOrigin: `${ring.cx}px ${ring.cy}px` 
-                            }}
-                            className="ring-hover-anim"
                           />
                         )}
                       </g>
@@ -421,7 +297,7 @@ const ConnectedRingsRating = ({
           </div>
         </div>
         
-        {/* Rating value and text with animation */}
+        {/* Rating value and text */}
         <div className="mt-2 flex flex-col items-center">
           {showValue && (
             <span className={cn("font-bold", textClass)}>
@@ -433,11 +309,9 @@ const ConnectedRingsRating = ({
           
           {showLabel && (
             <div 
-              key={`rating-label-${Math.round(effectiveRating)}`}
               className={cn(
                 "text-center mt-1 transition-all duration-300 flex items-center gap-1", 
-                textClass,
-                lastSelectedRing && "label-text-bounce"
+                textClass
               )}
               style={{ color: sentimentColor }}
             >
