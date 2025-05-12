@@ -21,13 +21,13 @@ interface ReviewFormProps {
   onClose: () => void;
   onSubmit: (review: any) => Promise<void>;
   review?: any;
-  isEditMode?: boolean; // Added isEditMode prop
+  isEditMode?: boolean;
 }
 
 const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = false }: ReviewFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { handleImageUpload: uploadImage } = useRecommendationUploads(); // Renamed to avoid conflict
+  const { handleImageUpload: uploadImage, isEntityImageUrl } = useRecommendationUploads();
   
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,7 +80,7 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
     }
   }, [isOpen, form]);
   
-  // Updated image upload handler - renamed to processImageUpload to avoid conflict
+  // Process image upload function
   const processImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user) return;
     
@@ -195,15 +195,15 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
       case 1:
         return (
           <StepOne 
-            selectedCategory={category} 
-            onCategoryChange={(value) => setValue('category', value)} 
+            rating={rating}
+            onChange={(value) => setValue('rating', value)} 
           />
         );
       case 2:
         return (
           <StepTwo 
-            selectedRating={rating} 
-            onRatingChange={(value) => setValue('rating', value)} 
+            category={category}
+            onChange={(value) => setValue('category', value)} 
           />
         );
       case 3:
@@ -231,10 +231,16 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
       case 4:
         return (
           <StepFour
-            reviewContent={content}
-            onContentChange={(value) => setValue('content', value)}
-            selectedVisibility={watch('visibility')}
+            category={category}
+            description={content}
+            onDescriptionChange={(value) => setValue('content', value)}
+            experienceDate={undefined}
+            onExperienceDateChange={() => {}}
+            visibility={watch('visibility') as "public" | "circle_only" | "private"}
             onVisibilityChange={(value) => setValue('visibility', value)}
+            foodTags={[]}
+            onAddFoodTag={() => {}}
+            onRemoveFoodTag={() => {}}
           />
         );
       default:
