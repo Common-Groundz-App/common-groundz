@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -34,8 +33,8 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
   const [isUploading, setIsUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
-  // Added state to track where the image came from - entity or user
   const [isEntityImage, setIsEntityImage] = useState(false);
+  const [entityImage, setEntityImage] = useState<string | null>(null);
   
   const formSchema = z.object({
     category: z.string().min(1, { message: 'Please select a category' }),
@@ -75,6 +74,7 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
       setStep(1);
       form.reset();
       setSelectedImage(null);
+      setEntityImage(null);
       setSelectedEntity(null);
       setIsEntityImage(false);
     }
@@ -94,9 +94,12 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
       const imageUrl = await uploadImage(file);
       
       if (imageUrl) {
-        // Since we're uploading a user image, this is not an entity image
+        // User uploaded image takes precedence over entity image
         setSelectedImage(imageUrl);
         setIsEntityImage(false);
+        
+        // Clear entity image reference since user uploaded their own
+        setEntityImage(null);
       }
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -113,6 +116,10 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
   // New handler to use entity image without uploading
   const handleUseEntityImage = useCallback((imageUrl: string) => {
     if (imageUrl) {
+      // Store the entity image URL separately
+      setEntityImage(imageUrl);
+      
+      // Also set as selected image so it can be displayed in form
       setSelectedImage(imageUrl);
       setIsEntityImage(true);
     }
@@ -123,10 +130,10 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
     
     switch (step) {
       case 1:
-        isValid = await trigger(['category']);
+        isValid = await trigger(['rating']);
         break;
       case 2:
-        isValid = await trigger(['rating']);
+        isValid = await trigger(['category']);
         break;
       case 3:
         isValid = await trigger(['title']);
@@ -152,6 +159,13 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
     setValue('entity_id', entity.id);
   };
   
+  // Handle image removal - clear all image states
+  const handleImageRemove = () => {
+    setSelectedImage(null);
+    setEntityImage(null);
+    setIsEntityImage(false);
+  };
+  
   // Modify the form submit handler to handle the image source correctly
   const handleFormSubmit = async (values: any) => {
     try {
@@ -160,9 +174,10 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
       // Create a payload with the form values
       const payload = {
         ...values,
-        // If it's an entity image, pass it directly without triggering a new upload
-        image_url: selectedImage,
-        is_entity_image: isEntityImage, // Pass this flag to backend if needed
+        // If it's an entity image and we have one, use it
+        // Otherwise use the user uploaded image
+        image_url: entityImage && isEntityImage ? entityImage : selectedImage,
+        is_entity_image: isEntityImage,
       };
       
       // Call the parent's onSubmit handler
@@ -171,6 +186,7 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
       // Reset form
       form.reset();
       setSelectedImage(null);
+      setEntityImage(null);
       setSelectedEntity(null);
       setIsEntityImage(false);
       setStep(1);
@@ -219,10 +235,7 @@ const ReviewForm = ({ isOpen, onClose, onSubmit, review = null, isEditMode = fal
             selectedEntity={selectedEntity}
             selectedImage={selectedImage}
             onImageChange={processImageUpload}
-            onImageRemove={() => {
-              setSelectedImage(null);
-              setIsEntityImage(false);
-            }}
+            onImageRemove={handleImageRemove}
             isUploading={isUploading}
             isEntityImage={isEntityImage}
             onUseEntityImage={handleUseEntityImage}

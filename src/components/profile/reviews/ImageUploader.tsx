@@ -20,9 +20,11 @@ const ImageUploader = ({
   onChange, 
   onRemove, 
   isUploading,
-  isEntityImage = false  // Flag to check if image is from entity or user-uploaded
+  isEntityImage = false
 }: ImageUploaderProps) => {
-  console.log("ImageUploader rendering with selectedImage:", selectedImage);
+  // Only show the image uploader if it's a user-uploaded image or no image at all
+  // (We don't want to show entity images in the uploader)
+  const shouldShowImage = selectedImage && !isEntityImage;
   
   return (
     <div 
@@ -30,67 +32,33 @@ const ImageUploader = ({
         "transition-all duration-300",
         "flex flex-col items-center justify-center rounded-lg p-4",
         "border-2 border-dashed",
-        selectedImage 
-          ? isEntityImage 
-            ? "border-gray-300 bg-gray-50/50" 
-            : "border-brand-orange/50" 
+        shouldShowImage 
+          ? "border-brand-orange/50" 
           : "border-brand-orange/30",
         "hover:border-brand-orange/70",
         "bg-gradient-to-b from-transparent to-accent/5"
       )}
     >
-      {selectedImage ? (
+      {shouldShowImage ? (
         <div className="relative w-full">
-          <div className={cn(
-            "h-48 overflow-hidden rounded-md",
-            isEntityImage && "opacity-70 hover:opacity-100 transition-opacity"
-          )}>
+          <div className="h-48 overflow-hidden rounded-md">
             <ImageWithFallback
               src={selectedImage}
               alt="Preview"
-              className={cn(
-                "h-full w-full object-cover rounded-md mx-auto shadow-md hover:scale-105 transition-transform duration-300",
-                isEntityImage && "filter brightness-95"
-              )}
+              className="h-full w-full object-cover rounded-md mx-auto shadow-md hover:scale-105 transition-transform duration-300"
               onError={(e) => console.error("Image failed to load in ImageUploader:", selectedImage)}
             />
           </div>
           
-          {/* Only show remove button for user images */}
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className={cn(
-              "absolute -top-2 -right-2 h-8 w-8 rounded-full bg-gray-800/80 text-white hover:bg-gray-900 shadow-md"
-            )}
+            className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-gray-800/80 text-white hover:bg-gray-900 shadow-md"
             onClick={onRemove}
           >
             <X className="h-4 w-4" />
           </Button>
-          
-          {/* Show "Add your own photo" button on top of entity images */}
-          {isEntityImage && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <Label
-                htmlFor="image"
-                className={cn(
-                  "cursor-pointer px-3 py-2 rounded-md",
-                  "bg-black/60 hover:bg-black/70 text-white",
-                  "text-sm font-medium transition-colors duration-200"
-                )}
-              >
-                <Input
-                  type="file"
-                  id="image"
-                  accept="image/*"
-                  onChange={onChange}
-                  className="hidden"
-                />
-                Add your own photo
-              </Label>
-            </div>
-          )}
         </div>
       ) : (
         <>

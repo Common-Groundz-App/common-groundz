@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import EntitySearch from '@/components/recommendations/EntitySearch';
 import { Entity } from '@/services/recommendation/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
-import { Book, Clapperboard, MapPin, ShoppingBag, Navigation } from 'lucide-react';
+import { Book, Clapperboard, MapPin, ShoppingBag, Navigation, ImagePlus } from 'lucide-react';
 import ImageUploader from '@/components/profile/reviews/ImageUploader';
 import { ensureHttps } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';
@@ -25,9 +25,7 @@ interface StepThreeProps {
   onImageChange: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onImageRemove: () => void;
   isUploading: boolean;
-  // Add new props to track image source
   isEntityImage?: boolean;
-  // Method to specifically use entity image
   onUseEntityImage?: (imageUrl: string) => void;
 }
 
@@ -50,6 +48,7 @@ const StepThree = ({
   const [showEntitySearch, setShowEntitySearch] = useState(!selectedEntity);
   const [processedEntity, setProcessedEntity] = useState<Entity | null>(null);
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [showEntityImageOptions, setShowEntityImageOptions] = useState(false);
   
   const { 
     position,
@@ -73,17 +72,16 @@ const StepThree = ({
         processed.image_url = ensureHttps(processed.image_url);
         console.log("Entity has image_url after processing:", processed.image_url);
         
-        // Set entity image if available and handler provided
-        if (onUseEntityImage && !selectedImage) {
-          onUseEntityImage(processed.image_url);
-        }
+        // Show entity image options if entity has an image
+        setShowEntityImageOptions(true);
       } else {
         console.log("Entity missing image_url");
+        setShowEntityImageOptions(false);
       }
       
       setProcessedEntity(processed);
     }
-  }, [selectedEntity, onUseEntityImage, selectedImage]);
+  }, [selectedEntity]);
 
   // Check if we should show the location prompt
   useEffect(() => {
@@ -186,17 +184,17 @@ const StepThree = ({
       entity.image_url = ensureHttps(entity.image_url);
       console.log("Entity image URL after processing:", entity.image_url);
       
-      // Use the entity image if available and handler provided
-      if (onUseEntityImage) {
-        onUseEntityImage(entity.image_url);
-      }
+      // Don't automatically use entity image - just show the option
+      setShowEntityImageOptions(true);
     } else {
       console.log("Selected entity has no image URL");
+      setShowEntityImageOptions(false);
     }
     
     // Pass the entity to parent component
     onEntitySelect(entity);
     
+    // For food category, explicitly handle restaurant name vs address
     // For food category, explicitly handle restaurant name vs address
     if (category === 'food') {
       console.log("Food category: Setting venue to entity name", entity.name);
@@ -236,6 +234,13 @@ const StepThree = ({
     setShowEntitySearch(false);
   };
   
+  // Handle using the entity image
+  const handleUseEntityImage = () => {
+    if (processedEntity?.image_url && onUseEntityImage) {
+      onUseEntityImage(processedEntity.image_url);
+    }
+  };
+  
   // Get location button state
   const getLocationButtonState = () => {
     if (geoLoading) return { text: "Getting location...", disabled: true };
@@ -265,11 +270,45 @@ const StepThree = ({
       
       {/* Entity search/preview */}
       {selectedEntity && processedEntity && !showEntitySearch ? (
-        <EntityPreviewCard
-          entity={processedEntity}
-          type={category}
-          onChange={() => setShowEntitySearch(true)}
-        />
+        <div className="space-y-4">
+          <EntityPreviewCard
+            entity={processedEntity}
+            type={category}
+            onChange={() => setShowEntitySearch(true)}
+          />
+          
+          {/* Entity Image Usage Option - Only show if entity has an image */}
+          {showEntityImageOptions && processedEntity.image_url && (
+            <div className="border border-dashed border-brand-orange/30 rounded-lg p-3 bg-accent/10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ImagePlus className="h-5 w-5 text-brand-orange" />
+                  <span className="font-medium text-sm">Available image for this {getSearchLabel()}</span>
+                </div>
+                <Button 
+                  onClick={handleUseEntityImage}
+                  variant="outline" 
+                  size="sm"
+                  className="text-xs border-brand-orange/50 text-brand-orange hover:bg-brand-orange/10"
+                >
+                  Use this image
+                </Button>
+              </div>
+              {processedEntity.image_url && (
+                <div className="mt-2 h-16 w-16 rounded overflow-hidden">
+                  <ImageWithFallback 
+                    src={processedEntity.image_url}
+                    alt={processedEntity.name || "Entity image"}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                You can use this image or add your own photo below
+              </p>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="p-4 border border-dashed border-brand-orange/30 rounded-lg bg-gradient-to-b from-transparent to-accent/5 transition-all duration-300 hover:border-brand-orange/50">
           <div className="flex justify-between items-center mb-2">
@@ -334,11 +373,11 @@ const StepThree = ({
         </div>
       </div>
       
-      {/* Photo upload - Updated to pass isEntityImage flag */}
+      {/* Photo upload - Updated to clearly encourage users to add their own photos */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2 font-medium mb-1">
           <span className="text-lg">📸</span>
-          <span>Add a photo</span>
+          <span>Add your own photo</span>
         </Label>
         <ImageUploader
           selectedImage={selectedImage}
@@ -348,28 +387,13 @@ const StepThree = ({
           isEntityImage={isEntityImage}
         />
         <p className="text-xs text-muted-foreground mt-1">
-          {selectedImage && isEntityImage 
-            ? "This is the default image from our database - consider adding your own photo" 
-            : selectedImage 
-              ? "Click × to remove this photo" 
-              : "Upload a photo of your experience"}
+          {selectedImage && !isEntityImage 
+            ? "Great! Your photo has been added." 
+            : "Adding your own photo makes your review more authentic and helpful to others."}
         </p>
       </div>
     </div>
   );
-};
-
-// Re-export any missing functions to prevent TypeScript errors
-const getCategoryIcon = () => {
-  return <MapPin className="h-5 w-5 text-brand-orange" />;
-};
-
-const getSearchLabel = () => {
-  return "place";
-};
-
-const getEntitySearchType = () => {
-  return "place";
 };
 
 export default StepThree;
