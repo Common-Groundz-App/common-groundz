@@ -19,6 +19,8 @@ import {
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { toast } from '@/hooks/use-toast';
 import { deleteRecommendation } from '@/services/recommendation/crudOperations';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { MediaItem } from '@/types/media';
 
 interface RecommendationCardProps {
   recommendation: any;
@@ -44,6 +46,55 @@ const RecommendationCard = ({
   const [isDeleting, setIsDeleting] = useState(false);
   
   const isOwner = user?.id === recommendation.user_id;
+
+  // Process media items for proper fallback handling
+  const mediaItems = React.useMemo(() => {
+    // If media array is already provided
+    if (recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0) {
+      return recommendation.media as MediaItem[];
+    }
+    
+    // If we have a legacy image_url, convert it to a media item
+    if (recommendation.image_url) {
+      return [{
+        url: recommendation.image_url,
+        type: 'image',
+        order: 0,
+        id: recommendation.id
+      }] as MediaItem[];
+    }
+    
+    // If we have an entity with an image, use it as fallback
+    if (recommendation.entity?.image_url) {
+      return [{
+        url: recommendation.entity.image_url,
+        type: 'image',
+        order: 0,
+        id: `entity-${recommendation.entity.id}`
+      }] as MediaItem[];
+    }
+    
+    return [] as MediaItem[];
+  }, [recommendation]);
+
+  // Get a category-specific fallback image URL
+  const getCategoryFallbackImage = (category: string): string => {
+    const fallbacks: Record<string, string> = {
+      'Food': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1',
+      'Drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
+      'Movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
+      'Book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
+      'Place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
+      'Product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
+      'Activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
+      'Music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
+      'Art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
+      'TV': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
+      'Travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
+    };
+    
+    return fallbacks[category] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
+  };
 
   const handleLike = async () => {
     if (!user) return;
@@ -204,24 +255,28 @@ const RecommendationCard = ({
           </div>
         </div>
         
-        {/* Media - Using enhanced PostMediaDisplay */}
-        {recommendation.image_url && (
-          <div className="mt-3">
+        {/* Media - Using enhanced PostMediaDisplay with improved fallback */}
+        <div className="mt-3">
+          {mediaItems.length > 0 ? (
             <PostMediaDisplay 
-              media={[{ 
-                url: recommendation.image_url, 
-                type: 'image', 
-                order: 0, 
-                id: recommendation.id
-              }]} 
+              media={mediaItems} 
               className="mt-2 mb-3"
               aspectRatio="maintain"
               objectFit="contain"
               enableBackground={true}
               thumbnailDisplay="none"
             />
-          </div>
-        )}
+          ) : recommendation.category ? (
+            <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
+              <ImageWithFallback
+                src={getCategoryFallbackImage(recommendation.category)}
+                alt={`${recommendation.title} - ${recommendation.category}`}
+                className="w-full h-full object-cover"
+                fallbackSrc={getCategoryFallbackImage(recommendation.category)}
+              />
+            </div>
+          ) : null}
+        </div>
         
         {/* Description */}
         {recommendation.description && (

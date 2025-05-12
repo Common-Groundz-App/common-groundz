@@ -21,6 +21,7 @@ import RatingStars from '@/components/recommendations/RatingStars';
 import { format } from 'date-fns';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface ReviewCardProps {
   review: Review;
@@ -46,7 +47,7 @@ const ReviewCard = ({
   const isOwner = user?.id === review.user_id;
   const isAdmin = user?.email?.includes('@lovable.dev') || false; // Simple admin check
   
-  // Process media items for display
+  // Process media items for display with improved fallback handling
   const mediaItems = React.useMemo(() => {
     // If we have a media array already, use it
     if (review.media && Array.isArray(review.media) && review.media.length > 0) {
@@ -75,6 +76,22 @@ const ReviewCard = ({
     
     return [] as MediaItem[];
   }, [review]);
+  
+  // Get a category-specific fallback image URL for when no image is available
+  const getCategoryFallbackImage = (category: string): string => {
+    const fallbacks: Record<string, string> = {
+      'food': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1',
+      'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
+      'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
+      'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
+      'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
+      'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
+      'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
+      'music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4'
+    };
+    
+    return fallbacks[category.toLowerCase()] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
+  };
   
   const getCategoryLabel = (category: string): string => {
     const labels: Record<string, string> = {
@@ -205,8 +222,13 @@ const ReviewCard = ({
                 thumbnailDisplay={mediaItems.length > 1 ? "hover" : "none"}
               />
             ) : (
-              <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                <ImageIcon className="h-12 w-12 text-gray-300" />
+              <div className="w-full h-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                <ImageWithFallback
+                  src={getCategoryFallbackImage(review.category)}
+                  alt={`${review.title} - ${review.category}`}
+                  className="w-full h-full object-cover"
+                  fallbackSrc={getCategoryFallbackImage(review.category)}
+                />
               </div>
             )}
           </div>
