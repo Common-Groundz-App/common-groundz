@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Star, Sparkles } from "lucide-react";
 
 interface ConnectedRingsRatingProps {
   value: number;
@@ -31,6 +32,7 @@ const ConnectedRingsRating = ({
   const [hoverRating, setHoverRating] = useState(0);
   const [animateRing, setAnimateRing] = useState<number | null>(null);
   const [textAnimating, setTextAnimating] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   
   // Track previous value for text animations
   const [prevValue, setPrevValue] = useState(value);
@@ -43,6 +45,17 @@ const ConnectedRingsRating = ({
         setTextAnimating(false);
       }, 400);
       setPrevValue(value);
+      return () => clearTimeout(timer);
+    }
+  }, [value, prevValue]);
+
+  // Handle celebration animation
+  useEffect(() => {
+    if (value === 5 && prevValue !== 5) {
+      setShowCelebration(true);
+      const timer = setTimeout(() => {
+        setShowCelebration(false);
+      }, 3000); // Celebration lasts for 3 seconds
       return () => clearTimeout(timer);
     }
   }, [value, prevValue]);
@@ -240,6 +253,47 @@ const ConnectedRingsRating = ({
             85% { transform: scale(0.98); }
             100% { transform: scale(1); }
           }
+          
+          /* Celebration animations */
+          @keyframes celebrationPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+          }
+          
+          @keyframes confettiBurst {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+          }
+          
+          @keyframes starFloat {
+            0%, 100% { transform: translateY(0); opacity: 0.8; }
+            50% { transform: translateY(-15px); opacity: 1; }
+          }
+          
+          @keyframes colorFlash {
+            0% { opacity: 0; }
+            25% { opacity: 0.6; }
+            50% { opacity: 0.3; }
+            100% { opacity: 0; }
+          }
+          
+          @keyframes emojiPop {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            60% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            80% { transform: translate(-50%, -50%) scale(0.9); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+          }
+          
+          @keyframes emojiFloat {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            70% { transform: translate(-50%, -80px) scale(1.1); opacity: 1; }
+            100% { transform: translate(-50%, -120px) scale(0.8); opacity: 0; }
+          }
+          
+          @keyframes celebrationRingRipple {
+            0% { transform: scale(1); opacity: 0.8; stroke-width: 3px; }
+            100% { transform: scale(1.5); opacity: 0; stroke-width: 0.5px; }
+          }
           `}
         </style>
 
@@ -286,7 +340,131 @@ const ConnectedRingsRating = ({
                   <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.7" />
                   <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
                 </radialGradient>
+                
+                {/* Celebration gradients */}
+                <radialGradient id="celebrationGlowGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                  <stop offset="0%" stopColor="#F97316" stopOpacity="0.8" />
+                  <stop offset="70%" stopColor="#F97316" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#F97316" stopOpacity="0" />
+                </radialGradient>
+                <linearGradient id="confettiGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#F97316" />
+                  <stop offset="100%" stopColor="#9b87f5" />
+                </linearGradient>
+                <linearGradient id="confettiGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#D946EF" />
+                  <stop offset="100%" stopColor="#22c55e" />
+                </linearGradient>
+                <linearGradient id="confettiGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#0EA5E9" />
+                  <stop offset="100%" stopColor="#FEC006" />
+                </linearGradient>
               </defs>
+              
+              {/* Background celebration effect - shown only when perfect rating is selected */}
+              {showCelebration && (
+                <>
+                  {/* Background glow effect */}
+                  <circle
+                    cx={svgWidth/2}
+                    cy={svgHeight/2}
+                    r={ringSize * 3.5}
+                    fill="url(#celebrationGlowGradient)"
+                    style={{
+                      animation: 'celebrationPulse 1.5s ease-in-out infinite',
+                      transformOrigin: 'center',
+                    }}
+                  />
+                  
+                  {/* Confetti bursts */}
+                  {Array.from({length: 15}).map((_, i) => {
+                    const angle = i * (360 / 15);
+                    const distance = ringSize * 2.5;
+                    const x = svgWidth/2 + distance * Math.cos(angle * Math.PI / 180);
+                    const y = svgHeight/2 + distance * Math.sin(angle * Math.PI / 180);
+                    const size = Math.random() * 6 + 2;
+                    const delay = Math.random() * 0.8;
+                    const duration = Math.random() * 0.5 + 1.2;
+                    const gradientIndex = Math.floor(Math.random() * 3) + 1;
+                    
+                    return (
+                      <circle
+                        key={`confetti-${i}`}
+                        cx={x}
+                        cy={y}
+                        r={size}
+                        fill={`url(#confettiGradient${gradientIndex})`}
+                        style={{
+                          animation: `confettiBurst ${duration}s ease-out ${delay}s infinite`,
+                          transformOrigin: 'center',
+                          opacity: 0,
+                        }}
+                      />
+                    );
+                  })}
+                  
+                  {/* Animated stars */}
+                  {Array.from({length: 5}).map((_, i) => {
+                    const angle = i * (360 / 5) + 45;
+                    const distance = ringSize * 3;
+                    const x = svgWidth/2 + distance * Math.cos(angle * Math.PI / 180);
+                    const y = svgHeight/2 + distance * Math.sin(angle * Math.PI / 180);
+                    const delay = i * 0.2;
+                    const scale = 0.7 + Math.random() * 0.3;
+                    
+                    return (
+                      <g 
+                        key={`star-${i}`}
+                        transform={`translate(${x} ${y}) scale(${scale})`}
+                        style={{
+                          animation: `starFloat 2s ease-in-out ${delay}s infinite`,
+                          transformOrigin: 'center',
+                        }}
+                      >
+                        <Star className="text-yellow-300" size={14} fill="#FEC006" stroke="#FEC006" />
+                      </g>
+                    );
+                  })}
+                  
+                  {/* Colorful rings that ripple outward */}
+                  {Array.from({length: 3}).map((_, i) => {
+                    const delay = i * 0.5;
+                    const color = i === 0 ? "#F97316" : i === 1 ? "#0EA5E9" : "#D946EF";
+                    
+                    return (
+                      <circle
+                        key={`ripple-${i}`}
+                        cx={svgWidth/2}
+                        cy={svgHeight/2}
+                        r={ringSize * 2}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={3}
+                        style={{
+                          animation: `celebrationRingRipple 2s ease-out ${delay}s infinite`,
+                          transformOrigin: 'center',
+                        }}
+                      />
+                    );
+                  })}
+                  
+                  {/* Emoji celebration in the center */}
+                  <foreignObject
+                    x={svgWidth/2 - 30}
+                    y={svgHeight/2 - 30}
+                    width={60}
+                    height={60}
+                    style={{
+                      animation: showCelebration ? 'emojiPop 0.5s ease-out forwards, emojiFloat 2s ease-in-out 1s forwards' : 'none',
+                      opacity: 0,
+                    }}
+                  >
+                    <div className="flex items-center justify-center w-full h-full text-2xl">
+                      🎉
+                    </div>
+                  </foreignObject>
+                </>
+              )}
               
               {/* Interlinking donut rings */}
               {ringPositions.map((ring, i) => {
@@ -305,6 +483,11 @@ const ConnectedRingsRating = ({
                 // Add a subtle tint to unselected rings on hover when they're not selected yet
                 const showHoverTint = isInteractive && isHovered && !isActive;
                 
+                // Add synchronized animation for all rings when perfect rating is selected
+                const isPerfectRating = showCelebration && value === 5;
+                const celebrationAnimation = isPerfectRating ? 'celebrationPulse 1.8s ease-in-out infinite' : 'none';
+                const celebrationDelay = `${i * 0.1}s`;
+                
                 return (
                   <Tooltip key={`ring-${i}`}>
                     <TooltipTrigger asChild>
@@ -313,10 +496,12 @@ const ConnectedRingsRating = ({
                         style={{ 
                           transformOrigin: `${ring.cx}px ${ring.cy}px`,
                           willChange: isInteractive ? 'transform, opacity' : 'auto',
-                          animation: isInteractive && isHovered ? 'springyHover 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 
+                          animation: isPerfectRating ? celebrationAnimation : 
+                                   (isInteractive && isHovered) ? 'springyHover 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 
                                    (isAnimating && isActive) ? 'popScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
                           opacity: unselectedRingOpacity, // Apply the dimming effect
                           transition: "opacity 0.3s ease-out", // Smooth transition for opacity changes
+                          animationDelay: celebrationDelay,
                         }}
                         onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
                         onClick={() => handleRingClick(ring.value)}
@@ -452,6 +637,18 @@ const ConnectedRingsRating = ({
                 Circle Certified
               </div>
             )}
+            
+            {/* Sparkle decoration when perfect rating selected */}
+            {showCelebration && (
+              <div 
+                className="absolute -right-6 -top-6 text-yellow-400"
+                style={{
+                  animation: 'starFloat 2s ease-in-out infinite',
+                }}
+              >
+                <Sparkles size={24} className="fill-yellow-300" />
+              </div>
+            )}
           </div>
         </div>
         
@@ -490,6 +687,18 @@ const ConnectedRingsRating = ({
               }}>
                 {getRatingText(Math.round(effectiveRating)).split(' ').slice(0, -1).join(' ')}
               </span>
+              
+              {/* Special celebration label for perfect rating */}
+              {showCelebration && (
+                <span 
+                  className="ml-1 bg-gradient-to-r from-brand-orange via-brand-blue to-brand-orange bg-clip-text text-transparent font-semibold"
+                  style={{
+                    animation: 'celebrationPulse 2s ease-in-out infinite',
+                  }}
+                >
+                  Perfect!
+                </span>
+              )}
             </div>
           )}
         </div>
