@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
@@ -496,6 +495,8 @@ const ReviewForm = ({
               {currentStep === 4 && (
                 <StepFour 
                   category={category}
+                  title={title}
+                  onTitleChange={setTitle}
                   description={description}
                   onDescriptionChange={setDescription}
                   experienceDate={experienceDate}
