@@ -229,11 +229,15 @@ const ConnectedRingsRating = ({
                     <TooltipTrigger asChild>
                       <g 
                         className={cn(
-                          "transition-all duration-300 hover:scale-105 group",
-                          isAnimating && "animate-[bounce_0.5s_ease-in-out]"
+                          isAnimating && "animate-[bounce_0.5s_ease-in-out]",
+                          "group"
                         )}
                         onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
                         onClick={() => handleRingClick(ring.value)}
+                        style={{
+                          transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                          willChange: 'transform',
+                        }}
                       >
                         {/* Ring outline (always visible) */}
                         <circle
@@ -243,7 +247,7 @@ const ConnectedRingsRating = ({
                           stroke={isActive ? sentimentColor : inactiveRingColor}
                           strokeWidth={strokeWidth}
                           fill="transparent"
-                          className="transition-all duration-300"
+                          className="transition-colors duration-300"
                         />
                         
                         {/* Animated fill stroke */}
@@ -265,8 +269,8 @@ const ConnectedRingsRating = ({
                           }}
                         />
                         
-                        {/* Hover glow effect */}
-                        {isInteractive && (
+                        {/* Hover glow effect - only for unselected rings */}
+                        {isInteractive && !isActive && (
                           <circle
                             cx={ring.cx}
                             cy={ring.cy}
@@ -276,6 +280,21 @@ const ConnectedRingsRating = ({
                             fill="transparent"
                             opacity="0"
                             className="group-hover:opacity-30 transition-opacity duration-300"
+                          />
+                        )}
+                        
+                        {/* Scale transform on unselected rings only */}
+                        {isInteractive && !isActive && (
+                          <circle
+                            cx={ring.cx}
+                            cy={ring.cy}
+                            r={ringRadius}
+                            stroke="transparent"
+                            fill="transparent"
+                            style={{ 
+                              transformOrigin: `${ring.cx}px ${ring.cy}px` 
+                            }}
+                            className="group-hover:scale-105 transition-transform duration-200 ease-out"
                           />
                         )}
                       </g>
