@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useRecommendations } from '@/hooks/use-recommendations';
+import { useReviews } from '@/hooks/use-reviews';
 import { useRecommendationFilters } from '@/hooks/recommendations/use-recommendation-filters';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import RecommendationForm from '@/components/recommendations/RecommendationForm';
@@ -21,15 +21,15 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   
-  // Fetch recommendations
+  // Fetch recommendations (actually reviews that we treat as recommendations)
   const {
-    recommendations,
+    reviews,
     isLoading,
     error,
     handleLike,
     handleSave,
-    refreshRecommendations
-  } = useRecommendations({ 
+    refreshReviews
+  } = useReviews({ 
     profileUserId
   });
   
@@ -45,7 +45,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     filteredRecommendations,
     categories,
     clearFilters
-  } = useRecommendationFilters(recommendations || []);
+  } = useRecommendationFilters(reviews || []);
   
   useEffect(() => {
     const handleOpenForm = () => {
@@ -67,7 +67,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
         description: "Your recommendation has been added successfully"
       });
       setIsFormOpen(false);
-      refreshRecommendations();
+      refreshReviews();
     } catch (error) {
       console.error('Error adding recommendation:', error);
       toast({
@@ -79,7 +79,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
   };
 
   const handleRecommendationDeleted = () => {
-    refreshRecommendations();
+    refreshReviews();
   };
 
   return (
