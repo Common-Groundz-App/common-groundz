@@ -1,5 +1,4 @@
 
-import { Review } from '@/services/reviewService';
 import { 
   Recommendation,
   RecommendationCategory, 
@@ -41,7 +40,7 @@ export interface PostFeedItem {
   tagged_entities?: Entity[];
   media?: MediaItem[];
   status?: 'draft' | 'published' | 'failed';
-  tags?: string[];
+  tags?: string[]; // Adding the tags property which was missing
 }
 
 export type CombinedFeedItem = FeedItem | PostFeedItem;
@@ -60,11 +59,3 @@ export interface FeedQueryParams {
   page: number;
   itemsPerPage: number;
 }
-
-export interface ReviewOptimisticUpdateProps {
-  id: string;
-  isLiked?: boolean;
-  likes?: number;
-  isSaved?: boolean;
-}
-

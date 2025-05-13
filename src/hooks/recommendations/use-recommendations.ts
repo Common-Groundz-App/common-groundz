@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRecommendationFilters } from './use-recommendation-filters';
 import { Recommendation } from '@/services/recommendation/types';
-import { useContentMutationManager } from '@/hooks/use-content-mutation-manager';
 
 interface UseRecommendationsProps {
   profileUserId?: string;
@@ -33,7 +32,6 @@ export const useRecommendations = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const contentMutation = useContentMutationManager();
   
   // Fetch recommendations data
   const { 
@@ -69,28 +67,28 @@ export const useRecommendations = ({
     }
 
     try {
-      // Get the current recommendation being modified
-      const recommendation = recommendations?.find(rec => rec.id === id);
-      if (!recommendation) return;
+      // Optimistic update
+      const prevData = [...(recommendations || [])];
       
-      // Optimistic update using the mutation manager
-      contentMutation.optimisticUpdate<Recommendation>(
-        'recommendation',
-        id,
-        (item) => ({
-          ...item,
-          isLiked: !item.isLiked,
-          likes: item.isLiked 
-            ? Math.max(0, (item.likes || 0) - 1) 
-            : (item.likes || 0) + 1
+      // Update local state
+      queryClient.setQueryData(['recommendations', profileUserId, user.id], 
+        (old: any) => old?.map((item: any) => {
+          if (item.id === id) {
+            const isLiked = !item.isLiked;
+            return {
+              ...item,
+              isLiked,
+              likes: isLiked 
+                ? (item.likes || 0) + 1 
+                : Math.max(0, (item.likes || 0) - 1)
+            };
+          }
+          return item;
         })
       );
 
       // Server update - Pass the current like status as the third argument
-      await toggleLike(id, user.id, !!(recommendation.isLiked));
-      
-      // Notify mutation manager of completed action
-      contentMutation.mutationCompleted('recommendation', 'like', undefined, user.id);
+      await toggleLike(id, user.id, !!(recommendations?.find(rec => rec.id === id)?.isLiked));
     } catch (err) {
       console.error('Error toggling like:', err);
       // Revert on failure
@@ -114,25 +112,21 @@ export const useRecommendations = ({
     }
 
     try {
-      // Get the current recommendation being modified
-      const recommendation = recommendations?.find(rec => rec.id === id);
-      if (!recommendation) return;
-      
-      // Optimistic update using the mutation manager
-      contentMutation.optimisticUpdate<Recommendation>(
-        'recommendation',
-        id,
-        (item) => ({
-          ...item,
-          isSaved: !item.isSaved
+      // Optimistic update
+      queryClient.setQueryData(['recommendations', profileUserId, user.id], 
+        (old: any) => old?.map((item: any) => {
+          if (item.id === id) {
+            return {
+              ...item,
+              isSaved: !item.isSaved,
+            };
+          }
+          return item;
         })
       );
 
       // Server update - Pass the current save status as the third argument
-      await toggleSave(id, user.id, !!(recommendation.isSaved));
-      
-      // Notify mutation manager of completed action
-      contentMutation.mutationCompleted('recommendation', 'save', undefined, user.id);
+      await toggleSave(id, user.id, !!(recommendations?.find(rec => rec.id === id)?.isSaved));
     } catch (err) {
       console.error('Error toggling save:', err);
       // Revert on failure

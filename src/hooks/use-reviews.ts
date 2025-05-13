@@ -6,12 +6,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { 
   toggleReviewLike, 
   toggleReviewSave,
-  convertReviewToRecommendation,
-  Review 
+  convertReviewToRecommendation 
 } from '@/services/reviewService';
 import { useReviewsFetch } from './reviews/use-reviews-fetch';
-import { useContentMutationManager } from './use-content-mutation-manager';
-import { ReviewOptimisticUpdateProps } from './feed/types';
 
 interface UseReviewsProps {
   profileUserId: string;
@@ -21,7 +18,6 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const contentMutation = useContentMutationManager();
   
   const {
     data: reviews,
@@ -46,22 +42,23 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
       const item = reviews?.find(r => r.id === id);
       if (!item) return;
 
-      // Optimistic update using the mutation manager with proper typing
-      contentMutation.optimisticUpdate<ReviewOptimisticUpdateProps>(
-        'review',
-        id,
-        (item) => ({
-          ...item,
-          isLiked: !item.isLiked,
-          likes: (item.likes || 0) + (!item.isLiked ? 1 : -1)
+      // Optimistic update
+      queryClient.setQueryData(['reviews', profileUserId, user.id], 
+        (old: any) => old?.map((item: any) => {
+          if (item.id === id) {
+            const isLiked = !item.isLiked;
+            return {
+              ...item,
+              isLiked,
+              likes: (item.likes || 0) + (isLiked ? 1 : -1)
+            };
+          }
+          return item;
         })
       );
 
       // Server update
       await toggleReviewLike(id, user.id, !!item.isLiked);
-      
-      // Notify mutation manager of completed action
-      contentMutation.mutationCompleted('review', 'like', undefined, user.id);
     } catch (err) {
       console.error('Error toggling like:', err);
       // Revert on failure
@@ -72,7 +69,7 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
         variant: 'destructive'
       });
     }
-  }, [reviews, user, toast, profileUserId, refetch, contentMutation]);
+  }, [reviews, user, toast, profileUserId, refetch, queryClient]);
 
   // Handle save action
   const handleSave = useCallback(async (id: string) => {
@@ -89,21 +86,21 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
       const item = reviews?.find(r => r.id === id);
       if (!item) return;
 
-      // Optimistic update using the mutation manager with proper typing
-      contentMutation.optimisticUpdate<ReviewOptimisticUpdateProps>(
-        'review',
-        id,
-        (item) => ({
-          ...item,
-          isSaved: !item.isSaved
+      // Optimistic update
+      queryClient.setQueryData(['reviews', profileUserId, user.id], 
+        (old: any) => old?.map((item: any) => {
+          if (item.id === id) {
+            return {
+              ...item,
+              isSaved: !item.isSaved
+            };
+          }
+          return item;
         })
       );
 
       // Server update
       await toggleReviewSave(id, user.id, !!item.isSaved);
-      
-      // Notify mutation manager of completed action
-      contentMutation.mutationCompleted('review', 'save', undefined, user.id);
     } catch (err) {
       console.error('Error toggling save:', err);
       // Revert on failure
@@ -114,7 +111,7 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
         variant: 'destructive'
       });
     }
-  }, [reviews, user, toast, profileUserId, refetch, contentMutation]);
+  }, [reviews, user, toast, profileUserId, refetch, queryClient]);
 
   // Convert to recommendation
   const convertToRecommendation = useCallback(async (id: string) => {
@@ -135,18 +132,8 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
         description: 'Review successfully converted to recommendation'
       });
       
-      // Use the mutation manager for high-impact changes
-      contentMutation.mutationCompleted(
-        'review', 
-        'delete', 
-        {
-          showToast: false
-        },
-        user.id
-      );
-      
-      // Also invalidate recommendations since a new one was created
-      contentMutation.mutationCompleted('recommendation', 'create', undefined, user.id);
+      // Refresh the list
+      refetch();
     } catch (err) {
       console.error('Error converting review:', err);
       toast({
@@ -155,7 +142,7 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
         variant: 'destructive'
       });
     }
-  }, [user, toast, contentMutation]);
+  }, [user, toast, refetch]);
 
   return {
     reviews,
