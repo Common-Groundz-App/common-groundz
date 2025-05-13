@@ -62,16 +62,14 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     console.log('Entity IDs from reviews:', entityIds);
 
     // Parallel fetching for better performance
-    const [entitiesResult, likesResult, savesResult] = await Promise.all([
+    const [entitiesResult, likesResult, userLikesResult, userSavesResult] = await Promise.all([
       // Fetch entities in batch if we have entity IDs
       entityIds.length > 0 ? 
         supabase.from('entities').select('*').in('id', entityIds) : 
         Promise.resolve({ data: [], error: null }),
       
       // Fetch likes count using batch operation
-      currentUserId ? 
-        supabase.rpc('get_review_likes_batch', { p_review_ids: reviewIds }) : 
-        Promise.resolve({ data: [], error: null }),
+      supabase.rpc('get_review_likes_batch', { p_review_ids: reviewIds }),
       
       // Fetch user likes in batch 
       currentUserId ? 
@@ -85,10 +83,25 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     ]);
     
     const { data: entitiesData, error: entitiesError } = entitiesResult;
+    const { data: likesData, error: likesError } = likesResult;
+    const { data: userLikesData, error: userLikesError } = userLikesResult; 
+    const { data: userSavesData, error: userSavesError } = userSavesResult;
     
     // Handle entity fetch errors
     if (entitiesError) {
       console.error('Error fetching entities batch:', entitiesError);
+    }
+    
+    if (likesError) {
+      console.error('Error fetching likes batch:', likesError);
+    }
+    
+    if (userLikesError) {
+      console.error('Error fetching user likes batch:', userLikesError);
+    }
+    
+    if (userSavesError) {
+      console.error('Error fetching user saves batch:', userSavesError);
     }
     
     // Create maps for quick lookup
@@ -107,22 +120,22 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     }
     
     // Map likes counts
-    if (likesResult.data) {
-      likesResult.data.forEach((item: any) => {
+    if (likesData && Array.isArray(likesData)) {
+      likesData.forEach((item: any) => {
         likesCountMap.set(item.review_id, item.like_count);
       });
     }
     
     // Map user likes
-    if (savesResult.data && Array.isArray(savesResult.data)) {
-      savesResult.data.forEach((item: any) => {
+    if (userLikesData && Array.isArray(userLikesData)) {
+      userLikesData.forEach((item: any) => {
         userLikedMap.set(item.review_id, true);
       });
     }
     
     // Map user saves
-    if (savesResult.data && Array.isArray(savesResult.data)) {
-      savesResult.data.forEach((item: any) => {
+    if (userSavesData && Array.isArray(userSavesData)) {
+      userSavesData.forEach((item: any) => {
         userSavedMap.set(item.review_id, true);
       });
     }

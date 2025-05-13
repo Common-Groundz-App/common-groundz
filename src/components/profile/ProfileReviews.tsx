@@ -57,7 +57,10 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
           <ReviewForm 
             isOpen={isFormOpen} 
             onClose={() => setIsFormOpen(false)} 
-            onSubmit={refreshReviews}
+            onSubmit={() => {
+              refreshReviews();
+              return Promise.resolve();
+            }}
           />
         )}
       </div>
@@ -87,7 +90,10 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
             onLike={handleLike}
             onSave={handleSave}
             onConvert={isOwnProfile ? convertToRecommendation : undefined}
-            refreshReviews={refreshReviews}
+            refreshReviews={() => {
+              refreshReviews();
+              return Promise.resolve();
+            }}
           />
         ))}
       </div>
@@ -96,7 +102,10 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
         <ReviewForm 
           isOpen={isFormOpen} 
           onClose={() => setIsFormOpen(false)} 
-          onSubmit={refreshReviews}
+          onSubmit={() => {
+            refreshReviews();
+            return Promise.resolve();
+          }}
         />
       )}
     </div>

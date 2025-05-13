@@ -793,6 +793,13 @@ export type Database = {
           like_count: number
         }[]
       }
+      get_review_likes_batch: {
+        Args: { p_review_ids: string[] }
+        Returns: {
+          review_id: string
+          like_count: number
+        }[]
+      }
       get_user_post_likes: {
         Args: { p_post_ids: string[]; p_user_id: string }
         Returns: {
@@ -809,6 +816,18 @@ export type Database = {
         Args: { p_recommendation_ids: string[]; p_user_id: string }
         Returns: {
           recommendation_id: string
+        }[]
+      }
+      get_user_review_likes: {
+        Args: { p_review_ids: string[]; p_user_id: string }
+        Returns: {
+          review_id: string
+        }[]
+      }
+      get_user_review_saves: {
+        Args: { p_review_ids: string[]; p_user_id: string }
+        Returns: {
+          review_id: string
         }[]
       }
       increment_comment_count: {
@@ -845,6 +864,14 @@ export type Database = {
       }
       toggle_recommendation_like: {
         Args: { p_recommendation_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      toggle_review_like: {
+        Args: { p_review_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      toggle_review_save: {
+        Args: { p_review_id: string; p_user_id: string }
         Returns: boolean
       }
       update_comment: {
