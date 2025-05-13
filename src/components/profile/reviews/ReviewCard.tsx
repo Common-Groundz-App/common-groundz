@@ -51,33 +51,13 @@ const ReviewCard = ({
   // Get entity image URL if available, ensuring it uses HTTPS
   const entityImageUrl = review.entity?.image_url ? ensureHttps(review.entity.image_url) : null;
   
-  console.log(`ReviewCard - Review ${review.id} entity data:`, {
-    hasEntity: !!review.entity,
-    entityId: review.entity?.id,
-    entityName: review.entity?.name,
-    entityImageUrl: entityImageUrl,
-    rawEntityId: review.entity_id
-  });
-  
   // Process media items for display with improved fallback handling
   const mediaItems = React.useMemo(() => {
-    console.log(`Processing media for review ${review.id}:`, {
-      hasMedia: Boolean(review.media && Array.isArray(review.media) && review.media.length > 0),
-      hasImageUrl: Boolean(review.image_url),
-      hasEntityImage: Boolean(entityImageUrl),
-      entityId: review.entity?.id,
-      rawEntityId: review.entity_id,
-    });
-    
-    // If we have a media array already, use it
     if (review.media && Array.isArray(review.media) && review.media.length > 0) {
-      console.log(`Using ${review.media.length} media items from review.media`);
       return review.media as MediaItem[];
     }
     
-    // If we have a legacy image_url, convert it to a media item
     if (review.image_url) {
-      console.log(`Using legacy image_url: ${review.image_url}`);
       return [{
         url: review.image_url,
         type: 'image' as const,
@@ -86,19 +66,16 @@ const ReviewCard = ({
       }] as MediaItem[];
     }
     
-    // If we have an entity with an image, use it as fallback
     if (entityImageUrl) {
-      console.log(`Using entity image as fallback: ${entityImageUrl}`);
       return [{
         url: entityImageUrl,
         type: 'image' as const,
         order: 0,
         id: `entity-${review.entity?.id}`,
-        source: 'entity' // Now this property is defined in the MediaItem interface
+        source: 'entity'
       }] as MediaItem[];
     }
     
-    console.log(`No media found for review ${review.id}, using empty array`);
     return [] as MediaItem[];
   }, [review, entityImageUrl]);
   
@@ -118,9 +95,7 @@ const ReviewCard = ({
     return fallbacks[category.toLowerCase()] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
   };
   
-  // Get a fallback image with the proper priority:
-  // 1. Entity image if available
-  // 2. Category image if no entity image
+  // Get a fallback image with the proper priority
   const getFallbackImage = (): string => {
     if (entityImageUrl) {
       return entityImageUrl;
@@ -222,7 +197,7 @@ const ReviewCard = ({
       <Card 
         key={review.id} 
         className={cn(
-          "overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border border-gray-200",
+          "overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border border-gray-200 flex flex-col h-full",
           review.is_converted && "opacity-75",
           review.status === 'flagged' && "border-yellow-300",
           review.status === 'deleted' && "opacity-50 border-red-300"
@@ -241,12 +216,12 @@ const ReviewCard = ({
             {review.is_converted && (
               <Badge variant="secondary" className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
                 <UploadCloud size={12} />
-                <span>Converted to Recommendation</span>
+                <span>Converted</span>
               </Badge>
             )}
           </div>
           
-          <div className="h-48 relative overflow-hidden group">
+          <div className="h-48 relative overflow-hidden">
             {mediaItems.length > 0 ? (
               <PostMediaDisplay
                 media={mediaItems}
@@ -269,7 +244,7 @@ const ReviewCard = ({
           </div>
         </div>
         
-        <CardContent className="p-4">
+        <CardContent className="p-4 flex flex-col flex-grow">
           <div className="flex justify-between items-start mb-2">
             <h3 className="text-lg font-bold line-clamp-1">{review.title}</h3>
             <div className="flex items-center">
@@ -343,9 +318,9 @@ const ReviewCard = ({
             </div>
           </div>
           
-          <p className="text-gray-600 mb-3 text-sm">{review.venue || 'Unknown venue'}</p>
+          <p className="text-gray-600 mb-2 text-sm line-clamp-1">{review.venue || 'Unknown venue'}</p>
           
-          <div className="flex flex-wrap gap-2 items-center mb-3">
+          <div className="flex flex-wrap gap-2 items-center mb-2">
             <RatingStars rating={review.rating} />
             
             {review.experience_date && (
@@ -357,11 +332,11 @@ const ReviewCard = ({
           </div>
           
           {review.description && (
-            <p className="mt-3 text-sm line-clamp-2">{review.description}</p>
+            <p className="mt-2 text-sm line-clamp-2 text-gray-700">{review.description}</p>
           )}
           
-          <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
-            <div className="flex items-center gap-2">
+          <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center">
+            <div className="flex items-center gap-1">
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -396,23 +371,12 @@ const ReviewCard = ({
               </Button>
 
               {mediaItems.length > 0 && (
-                <span className="text-xs text-gray-500 flex items-center gap-1">
+                <span className="text-xs text-gray-500 flex items-center gap-1 ml-1">
                   <ImageIcon size={12} />
                   {mediaItems.length}
                 </span>
               )}
             </div>
-            
-            {!review.is_converted && isOwner && onConvert && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleConvertClick}
-                className="text-xs flex items-center gap-1"
-              >
-                <UploadCloud size={14} /> Convert to Recommendation
-              </Button>
-            )}
           </div>
         </CardContent>
       </Card>
