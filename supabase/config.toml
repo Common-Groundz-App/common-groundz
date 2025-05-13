@@ -6,3 +6,7 @@ verify_jwt = false
 
 [functions.search-movies]
 verify_jwt = false
+
+# Add CORS headers to allow storage access
+[storage]
+file_size_limit = "5MB"

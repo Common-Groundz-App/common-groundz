@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface ProfileAvatarProps {
   username: string;
@@ -24,6 +25,8 @@ const ProfileAvatar = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
+  
+  console.log("ProfileAvatar rendering with profileImage:", profileImage);
 
   // Get initials from username
   const getInitials = () => {
@@ -69,6 +72,8 @@ const ProfileAvatar = ({
       // Add a timestamp to force refresh
       const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
       
+      console.log("New profile image URL:", urlWithTimestamp);
+      
       // Store the image URL in temporary state
       if (onImageSelected) {
         onImageSelected(publicUrl);
@@ -100,11 +105,12 @@ const ProfileAvatar = ({
             {getInitials()}
           </div>
         ) : (
-          <img 
+          <ImageWithFallback 
             src={profileImage} 
-            alt="Profile" 
+            alt={`${username}'s profile`}
             className="w-full h-full object-cover"
-            key={profileImage} // Add key to force re-render when image changes
+            onError={(e) => console.error("Profile image failed to load:", profileImage)}
+            fallbackSrc=""
           />
         )}
       </div>

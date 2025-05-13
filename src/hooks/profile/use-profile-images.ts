@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { updateUserProfile } from '@/services/profileService';
@@ -68,21 +69,24 @@ export const useProfileImages = (defaultCoverImage: string) => {
       ];
       
       localStorage.setItem(cacheKey, JSON.stringify(newCache));
-      console.log('Updated image cache for user:', userId);
+      console.log('Updated image cache for user:', userId, 'with cover:', coverUrl, 'and profile:', profileUrl);
     } catch (e) {
       console.error('Error caching images:', e);
     }
   }, []);
 
   const handleProfileImageChange = (url: string) => {
+    console.log('Setting profile image to:', url);
     setProfileImage(url);
   };
 
   const handleCoverImageChange = (url: string) => {
+    console.log('Setting cover image to:', url);
     setCoverImage(url);
   };
 
   const handleCoverImageUpdated = (url: string | null) => {
+    console.log('Setting tempCoverImage to:', url);
     setTempCoverImage(url);
   };
   
@@ -94,6 +98,7 @@ export const useProfileImages = (defaultCoverImage: string) => {
     type: 'cover' | 'avatar'
   ) => {
     if (!imageUrl) {
+      console.log(`No ${type} image URL provided, using fallback:`, fallback);
       return type === 'cover' ? fallback : '';
     }
     
@@ -102,15 +107,19 @@ export const useProfileImages = (defaultCoverImage: string) => {
       const cachedString = localStorage.getItem(PROFILE_IMAGES_CACHE_KEY);
       if (cachedString) {
         const cache = JSON.parse(cachedString) as CachedImages[];
+        console.log('Found cache entries:', cache.length);
+        
         const userCache = cache.find(item => item.profileId === userId);
         
         if (userCache) {
+          console.log('Found cache for user:', userId);
+          
           const cachedUrl = type === 'cover' 
             ? userCache.coverImage 
             : userCache.profileImage;
           
           // If the base URLs match, use the cached one that already has a timestamp
-          if (cachedUrl && cachedUrl.split('?')[0] === imageUrl.split('?')[0]) {
+          if (cachedUrl && stripQueryParams(cachedUrl) === stripQueryParams(imageUrl)) {
             console.log(`Using cached ${type} URL:`, cachedUrl);
             return cachedUrl;
           }
@@ -126,9 +135,19 @@ export const useProfileImages = (defaultCoverImage: string) => {
     return timestampedUrl;
   }, []);
   
+  // Helper to strip query parameters from URLs for comparison
+  const stripQueryParams = (url: string) => {
+    try {
+      return url.split('?')[0];
+    } catch (e) {
+      return url;
+    }
+  };
+  
   const setInitialImages = useCallback((profileData: any) => {
     if (!profileData) return;
     
+    console.log('Setting initial images from profile data:', profileData);
     setProfileId(profileData.id);
     
     let newCoverImage = defaultCoverImage;
@@ -152,6 +171,9 @@ export const useProfileImages = (defaultCoverImage: string) => {
       );
     }
     
+    console.log('Setting cover image to:', newCoverImage);
+    console.log('Setting profile image to:', newProfileImage);
+    
     setCoverImage(newCoverImage);
     setProfileImage(newProfileImage);
     
@@ -165,7 +187,7 @@ export const useProfileImages = (defaultCoverImage: string) => {
         await updateUserProfile(userId, { cover_url: tempCoverImage });
         
         // Update the cache with the new URL (without timestamp)
-        const baseUrl = tempCoverImage.split('?')[0];
+        const baseUrl = stripQueryParams(tempCoverImage);
         const timestampedUrl = `${baseUrl}?t=${Date.now()}`;
         
         setCoverImage(timestampedUrl);

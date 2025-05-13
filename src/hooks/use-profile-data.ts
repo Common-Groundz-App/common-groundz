@@ -63,11 +63,14 @@ export const useProfileData = (userId?: string) => {
       setIsOwnProfile(!userId || userId === user.id);
       
       if (profile) {
+        console.log("Profile data loaded:", profile);
         setProfileData(profile);
         
         const displayName = getDisplayName(user, profile);
         setUsername(displayName);
         setProfileMetadata(user.user_metadata, profile);
+        
+        // This will now use cached images if available
         setInitialImages(profile);
       }
     } catch (err) {

@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Camera, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface ProfileCoverImageProps {
   coverImage: string;
@@ -26,6 +27,10 @@ const ProfileCoverImage = memo(({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [showRemoveButton, setShowRemoveButton] = useState(false);
+  
+  console.log("ProfileCoverImage rendering with coverImage:", coverImage);
+  
+  const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80';
 
   const handleCoverImageClick = () => {
     if (isEditable && onCoverImageChange && fileInputRef.current) {
@@ -64,6 +69,8 @@ const ProfileCoverImage = memo(({
       
       // Add a timestamp to force refresh
       const urlWithTimestamp = publicUrl + '?t=' + Date.now();
+      
+      console.log("New cover image URL:", urlWithTimestamp);
       
       // Update the visual display
       onCoverImageChange(urlWithTimestamp);
@@ -111,18 +118,26 @@ const ProfileCoverImage = memo(({
 
   return (
     <div 
-      className="w-full h-48 md:h-64 bg-cover bg-center relative group z-0"
-      style={{ 
-        backgroundImage: `url(${coverImage || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80'})`,
-        cursor: isEditable ? 'pointer' : 'default'
-      }}
-      onClick={handleCoverImageClick}
+      className="w-full h-48 md:h-64 relative group z-0"
       onMouseEnter={() => setShowRemoveButton(true)}
       onMouseLeave={() => setShowRemoveButton(false)}
     >
+      <div className="absolute inset-0 overflow-hidden">
+        <ImageWithFallback
+          src={coverImage}
+          fallbackSrc={defaultCoverImage}
+          alt="Cover Image"
+          className="w-full h-full object-cover"
+          onError={(e) => console.error("Cover image failed to load:", coverImage)}
+        />
+      </div>
+      
       {isEditable && onCoverImageChange && (
         <>
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center cursor-pointer"
+            onClick={handleCoverImageClick}
+          >
             {!uploading && !isLoading && (
               <div className="bg-black bg-opacity-70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300">
                 <Camera size={24} />
@@ -144,7 +159,7 @@ const ProfileCoverImage = memo(({
             disabled={uploading || isLoading}
           />
           
-          {coverImage && coverImage !== 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80' && showRemoveButton && !uploading && !isLoading && (
+          {coverImage && coverImage !== defaultCoverImage && showRemoveButton && !uploading && !isLoading && (
             <button 
               className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-2 rounded-full"
               onClick={(e) => {

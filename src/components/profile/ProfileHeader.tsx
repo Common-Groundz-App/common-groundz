@@ -28,6 +28,8 @@ const ProfileHeader = memo(({
   onCoverImageChange,
   onCoverImageUpdated
 }: ProfileHeaderProps) => {
+  console.log("ProfileHeader rendering with coverImage:", coverImage);
+  
   return (
     <div className="relative">
       <ProfileCoverImage 
