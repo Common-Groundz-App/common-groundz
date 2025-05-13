@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';  // Added import for MediaItem
 import { Database } from '@/integrations/supabase/types';
@@ -32,7 +31,7 @@ export interface Review {
   };
 }
 
-// Fetch user reviews
+// Fetch user reviews - optimized with batch operations
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
     // Fetch reviews
@@ -56,86 +55,76 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     // Get entity IDs from all reviews for batch fetching
     const entityIds = reviewsData
       .filter(review => review.entity_id !== null)
-      .map(review => review.entity_id);
+      .map(review => review.entity_id as string);
 
-    console.log('Entity IDs from reviews:', entityIds);
-
-    // If we have entity IDs, fetch the entity data in a batch
+    // Fetch entities in batch if we have entity IDs
     const entitiesMap = new Map();
     
-    if (entityIds && entityIds.length > 0) {
+    if (entityIds.length > 0) {
       const { data: entitiesData, error: entitiesError } = await supabase
         .from('entities')
         .select('*')
         .in('id', entityIds);
       
-      if (entitiesError) {
-        console.error('Error fetching entities batch:', entitiesError);
-      } else if (entitiesData) {
-        console.log(`Found ${entitiesData.length} entities for reviews`);
-        
-        // Map entities by ID for quick lookup
+      if (!entitiesError && entitiesData) {
         entitiesData.forEach(entity => {
-          console.log(`Mapping entity ${entity.id}: ${entity.name}`);
           entitiesMap.set(entity.id, entity);
         });
       }
     }
 
-    // Get likes for each review
-    let userLikes: any[] = [];
-    let userSaves: any[] = [];
+    // Use RPC functions for batch operations to get likes counts
+    const { data: likesCountData } = await supabase
+      .rpc('get_review_likes_batch', { p_review_ids: reviewIds });
+    
+    // Create a Map for quick lookup
+    const likesCountMap = new Map();
+    if (likesCountData) {
+      likesCountData.forEach((item: { review_id: string; like_count: number }) => {
+        likesCountMap.set(item.review_id, item.like_count);
+      });
+    }
+
+    // If we have a logged-in user, get their likes and saves in batch
+    let userLikes: Array<{review_id: string}> = [];
+    let userSaves: Array<{review_id: string}> = [];
     
     if (currentUserId) {
+      // Get user likes in batch
       const { data: likesData } = await supabase
-        .from('review_likes')
-        .select('review_id')
-        .in('review_id', reviewIds)
-        .eq('user_id', currentUserId);
-        
+        .rpc('get_user_review_likes', { 
+          p_review_ids: reviewIds,
+          p_user_id: currentUserId
+        });
+      
       userLikes = likesData || [];
-        
+      
+      // Get user saves in batch
       const { data: savesData } = await supabase
-        .from('review_saves')
-        .select('review_id')
-        .in('review_id', reviewIds)
-        .eq('user_id', currentUserId);
-        
+        .rpc('get_user_review_saves', { 
+          p_review_ids: reviewIds,
+          p_user_id: currentUserId
+        });
+      
       userSaves = savesData || [];
     }
 
-    // Get like counts - using count instead of group
-    const likeCountMap = new Map();
-    for (const reviewId of reviewIds) {
-      const { count } = await supabase
-        .from('review_likes')
-        .select('*', { count: 'exact', head: true })
-        .eq('review_id', reviewId);
-      
-      likeCountMap.set(reviewId, count || 0);
-    }
-
-    // Map all data to reviews
+    // Map all data to reviews with optimized processing
     const reviews = reviewsData.map(review => {
-      const likes = likeCountMap.get(review.id) || 0;
+      // Get likes count from our map
+      const likes = likesCountMap.get(review.id) || 0;
+      
+      // Check if user liked or saved this review
       const isLiked = userLikes?.some(l => l.review_id === review.id) || false;
       const isSaved = userSaves?.some(s => s.review_id === review.id) || false;
       
       // Get the entity for this review from our map
       const entity = review.entity_id ? entitiesMap.get(review.entity_id) : null;
-      
-      console.log(`Review ${review.id} entity lookup:`, {
-        entity_id: review.entity_id,
-        entity_found: !!entity,
-        entity_name: entity?.name,
-        entity_image: entity?.image_url
-      });
 
-      // Process the media field coming from Supabase (convert from Json to MediaItem[])
+      // Process the media field coming from Supabase
       let processedMedia: MediaItem[] | null = null;
       if (review.media) {
         try {
-          // If it's already an array of objects, process it
           processedMedia = (review.media as any[]).map(item => ({
             url: item.url,
             type: item.type,
@@ -171,66 +160,36 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
 
 // Toggle like on review
 export const toggleReviewLike = async (reviewId: string, userId: string, isLiked: boolean) => {
-  if (isLiked) {
-    // Remove like
-    const { error } = await supabase
-      .from('review_likes')
-      .delete()
-      .eq('review_id', reviewId)
-      .eq('user_id', userId);
+  // Use the Supabase RPC function that handles toggle in a single operation
+  const { data, error } = await supabase
+    .rpc('toggle_review_like', {
+      p_review_id: reviewId,
+      p_user_id: userId
+    });
 
-    if (error) {
-      console.error('Error removing like:', error);
-      throw error;
-    }
-  } else {
-    // Add like
-    const { error } = await supabase
-      .from('review_likes')
-      .insert({
-        review_id: reviewId,
-        user_id: userId
-      });
-
-    if (error) {
-      console.error('Error adding like:', error);
-      throw error;
-    }
+  if (error) {
+    console.error('Error toggling review like:', error);
+    throw error;
   }
 
-  return !isLiked;
+  return data; // Will return true if liked, false if unliked
 };
 
 // Toggle save on review
 export const toggleReviewSave = async (reviewId: string, userId: string, isSaved: boolean) => {
-  if (isSaved) {
-    // Remove save
-    const { error } = await supabase
-      .from('review_saves')
-      .delete()
-      .eq('review_id', reviewId)
-      .eq('user_id', userId);
+  // Use the Supabase RPC function that handles toggle in a single operation
+  const { data, error } = await supabase
+    .rpc('toggle_review_save', {
+      p_review_id: reviewId,
+      p_user_id: userId
+    });
 
-    if (error) {
-      console.error('Error removing save:', error);
-      throw error;
-    }
-  } else {
-    // Add save
-    const { error } = await supabase
-      .from('review_saves')
-      .insert({
-        review_id: reviewId,
-        user_id: userId
-      });
-
-    if (error) {
-      console.error('Error adding save:', error);
-      throw error;
-    }
+  if (error) {
+    console.error('Error toggling review save:', error);
+    throw error;
   }
 
-  return !isSaved;
+  return data; // Will return true if saved, false if unsaved
 };
 
 // Create review

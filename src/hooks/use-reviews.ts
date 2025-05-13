@@ -1,14 +1,14 @@
 
-import { useState, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from './use-toast';
-import { Review } from '@/services/reviewService';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
-  fetchUserReviews, 
   toggleReviewLike, 
   toggleReviewSave,
   convertReviewToRecommendation 
 } from '@/services/reviewService';
+import { useReviewsFetch } from './reviews/use-reviews-fetch';
 
 interface UseReviewsProps {
   profileUserId: string;
@@ -17,39 +17,18 @@ interface UseReviewsProps {
 export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchReviews = async () => {
-    if (!profileUserId) return;
-    
-    try {
-      setIsLoading(true);
-      const data = await fetchUserReviews(user?.id || null, profileUserId);
-      setReviews(data);
-      setError(null);
-    } catch (err) {
-      console.error('Error in useReviews:', err);
-      setError(err instanceof Error ? err : new Error('Failed to fetch reviews'));
-      toast({
-        title: 'Error',
-        description: 'Failed to load reviews. Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (profileUserId) {
-      fetchReviews();
-    }
-  }, [profileUserId, user?.id]);
+  const queryClient = useQueryClient();
+  
+  const {
+    data: reviews,
+    isLoading,
+    isError,
+    error,
+    refetch
+  } = useReviewsFetch({ profileUserId });
 
   // Handle like action
-  const handleLike = async (id: string) => {
+  const handleLike = useCallback(async (id: string) => {
     if (!user) {
       toast({
         title: 'Authentication required',
@@ -60,12 +39,12 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
     }
 
     try {
-      const item = reviews.find(r => r.id === id);
+      const item = reviews?.find(r => r.id === id);
       if (!item) return;
 
       // Optimistic update
-      setReviews(prev => 
-        prev.map(item => {
+      queryClient.setQueryData(['reviews', profileUserId, user.id], 
+        (old: any) => old?.map((item: any) => {
           if (item.id === id) {
             const isLiked = !item.isLiked;
             return {
@@ -83,17 +62,17 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
     } catch (err) {
       console.error('Error toggling like:', err);
       // Revert on failure
-      fetchReviews();
+      refetch();
       toast({
         title: 'Error',
         description: 'Failed to update like status. Please try again.',
         variant: 'destructive'
       });
     }
-  };
+  }, [reviews, user, toast, profileUserId, refetch, queryClient]);
 
   // Handle save action
-  const handleSave = async (id: string) => {
+  const handleSave = useCallback(async (id: string) => {
     if (!user) {
       toast({
         title: 'Authentication required',
@@ -104,12 +83,12 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
     }
 
     try {
-      const item = reviews.find(r => r.id === id);
+      const item = reviews?.find(r => r.id === id);
       if (!item) return;
 
       // Optimistic update
-      setReviews(prev => 
-        prev.map(item => {
+      queryClient.setQueryData(['reviews', profileUserId, user.id], 
+        (old: any) => old?.map((item: any) => {
           if (item.id === id) {
             return {
               ...item,
@@ -125,17 +104,17 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
     } catch (err) {
       console.error('Error toggling save:', err);
       // Revert on failure
-      fetchReviews();
+      refetch();
       toast({
         title: 'Error',
         description: 'Failed to update save status. Please try again.',
         variant: 'destructive'
       });
     }
-  };
+  }, [reviews, user, toast, profileUserId, refetch, queryClient]);
 
   // Convert to recommendation
-  const convertToRecommendation = async (id: string) => {
+  const convertToRecommendation = useCallback(async (id: string) => {
     if (!user) {
       toast({
         title: 'Authentication required',
@@ -154,7 +133,7 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
       });
       
       // Refresh the list
-      fetchReviews();
+      refetch();
     } catch (err) {
       console.error('Error converting review:', err);
       toast({
@@ -163,15 +142,15 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
         variant: 'destructive'
       });
     }
-  };
+  }, [user, toast, refetch]);
 
   return {
     reviews,
     isLoading,
-    error,
+    error: isError ? error : null,
     handleLike,
     handleSave,
-    refreshReviews: fetchReviews,
+    refreshReviews: refetch,
     convertToRecommendation
   };
 };
