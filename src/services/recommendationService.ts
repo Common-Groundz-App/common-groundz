@@ -37,8 +37,8 @@ export { fetchRecommendationById } from './recommendation/fetchRecommendationByI
 // Export fetchUserRecommendations function from fetchRecommendations.ts
 export { fetchUserRecommendations } from './recommendation/fetchRecommendations';
 
-// Fix the toggleLike function to properly handle the response and errors
-export const toggleLike = async (recommendationId: string, userId: string, isLiked: boolean) => {
+// Fix the toggleLike function to handle the isLiked parameter
+export const toggleLike = async (recommendationId: string, userId: string, isLiked: boolean = false) => {
   try {
     // Direct approach to add or remove the like based on current state
     if (isLiked) {

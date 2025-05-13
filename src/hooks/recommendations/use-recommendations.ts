@@ -38,7 +38,11 @@ export const useRecommendations = ({
     isLoading,
     error,
     refreshRecommendations
-  } = useRecommendationsFetch({ profileUserId });
+  } = useRecommendationsFetch({ 
+    profileUserId,
+    category,
+    limit 
+  });
   
   // Apply filters and sorting
   const {
@@ -82,8 +86,8 @@ export const useRecommendations = ({
         })
       );
 
-      // Server update
-      await toggleLike(id, user.id);
+      // Server update - Pass the current like status as the third argument
+      await toggleLike(id, user.id, !!(recommendations?.find(rec => rec.id === id)?.isLiked));
     } catch (err) {
       console.error('Error toggling like:', err);
       // Revert on failure
@@ -120,8 +124,8 @@ export const useRecommendations = ({
         })
       );
 
-      // Server update
-      await toggleSave(id, user.id);
+      // Server update - Pass the current save status as the third argument
+      await toggleSave(id, user.id, !!(recommendations?.find(rec => rec.id === id)?.isSaved));
     } catch (err) {
       console.error('Error toggling save:', err);
       // Revert on failure
