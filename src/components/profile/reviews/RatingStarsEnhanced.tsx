@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { cn } from "@/lib/utils";
-import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
+import ConnectedRingsRating from '@/components/ui/connected-rings';
 
 interface RatingStarsEnhancedProps {
   value: number;
