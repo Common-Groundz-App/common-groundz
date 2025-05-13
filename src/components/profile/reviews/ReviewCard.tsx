@@ -1,31 +1,22 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, ChevronDown } from 'lucide-react';
+import { MoreVertical, Pencil, Flag, Trash2, AlertTriangle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { deleteReview, updateReviewStatus } from '@/services/reviewService';
 import ReviewForm from './ReviewForm';
-import { format } from 'date-fns';
-import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ensureHttps } from '@/utils/urlUtils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
-import { useCardStyles, useThemedClass } from '@/utils/theme-utils';
+import { useCardStyles } from '@/utils/theme-utils';
+import ReviewCardHeader from './ReviewCardHeader';
+import ReviewCardBody from './ReviewCardBody';
+import ReviewCardFooter from './ReviewCardFooter';
 
 interface ReviewCardProps {
   review: Review;
@@ -52,7 +43,6 @@ const ReviewCard = ({
   
   const isOwner = user?.id === review.user_id;
   const isAdmin = user?.email?.includes('@lovable.dev') || false; // Simple admin check
-  const CONTENT_LIMIT = 150;
   
   // Get entity image URL if available, ensuring it uses HTTPS
   const entityImageUrl = review.entity?.image_url ? ensureHttps(review.entity.image_url) : null;
@@ -182,14 +172,6 @@ const ReviewCard = ({
     }
   };
 
-  const handleConvertClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (onConvert) {
-      onConvert(review.id);
-    }
-  };
-
   const handleStatusChange = async (status: 'published' | 'flagged' | 'deleted') => {
     try {
       await updateReviewStatus(review.id, status);
@@ -233,291 +215,89 @@ const ReviewCard = ({
       <Card 
         key={review.id} 
         className={cn(
-          "overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1",
+          "overflow-hidden mx-auto max-w-[680px] p-4 bg-white dark:bg-gray-900/50 rounded-2xl",
+          "shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01]",
+          "flex flex-col gap-4",
           cardStyles.cardBorder,
           review.is_converted && "opacity-75",
           review.status === 'flagged' && "border-yellow-300",
           review.status === 'deleted' && "opacity-50 border-red-300"
         )}
       >
-        {/* Media Section at the top */}
-        <div className="relative">
-          {/* Category Badge with Emoji */}
-          <div className="absolute top-3 left-3 z-10 flex gap-2">
-            <Badge className={cn("font-medium", getCategoryColor(review.category))}>
-              <span className="mr-1">{getCategoryEmoji(review.category)}</span>
-              {getCategoryLabel(review.category)}
-            </Badge>
-          </div>
-          
-          {/* Status Badges */}
-          <div className="absolute top-3 right-3 z-10 flex gap-2">
-            {getStatusBadge()}
-            
-            {review.is_converted && (
-              <Badge variant="secondary" className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
-                <UploadCloud size={12} />
-                <span>Converted to Recommendation</span>
-              </Badge>
-            )}
-          </div>
-          
-          {/* Media Display */}
-          <div className="h-48 sm:h-56 relative overflow-hidden group">
-            {mediaItems.length > 0 ? (
-              <PostMediaDisplay
-                media={mediaItems}
-                aspectRatio="16:9"
-                objectFit="cover"
-                enableBackground={true}
-                className="w-full h-full"
-                thumbnailDisplay="hover"
-              />
-            ) : (
-              <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
-                <ImageWithFallback
-                  src={getFallbackImage()}
-                  alt={`${review.title} - ${review.category}`}
-                  className="w-full h-full object-cover"
-                  fallbackSrc={getCategoryFallbackImage(review.category)}
-                />
-              </div>
-            )}
-            
-            {/* Media Counter Badge */}
-            {mediaItems.length > 1 && (
-              <div className="absolute bottom-3 right-3 bg-black/60 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center">
-                <ImageIcon size={14} className="mr-1" />
-                +{mediaItems.length - 1} more
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <CardContent className="p-4">
-          {/* Header with avatar and user info */}
-          <div className="flex items-center gap-2 mb-3">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={review.avatar_url || undefined} alt={review.username || 'User'} />
-              <AvatarFallback>{(review.username || 'U')[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <div className="font-medium text-sm">{review.username || 'User'}</div>
-              <div className="text-xs text-muted-foreground">
-                {format(new Date(review.created_at), 'MMM d, yyyy')}
-              </div>
-            </div>
-            
-            {/* Rating Display */}
-            <div className="flex items-center">
-              <ConnectedRingsRating 
-                value={review.rating} 
-                size="sm" 
-                showLabel={true}
-                className="mr-2"
-              />
-            </div>
-          </div>
-          
-          {/* Review Title and Content */}
-          <div>
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="text-lg font-bold line-clamp-1">{review.title}</h3>
-              <div className="flex items-center">
+        {/* Card options dropdown */}
+        {(isOwner || isAdmin) && (
+          <div className="absolute top-3 right-3 z-10">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                  <MoreVertical className="h-4 w-4" />
+                  <span className="sr-only">More options</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {isOwner && (
+                  <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                )}
+                
+                {isAdmin && review.status !== 'flagged' && (
+                  <DropdownMenuItem 
+                    onClick={() => handleStatusChange('flagged')}
+                    className="flex items-center gap-2"
+                  >
+                    <Flag className="h-4 w-4" /> Flag for Review
+                  </DropdownMenuItem>
+                )}
+                
+                {isAdmin && review.status === 'flagged' && (
+                  <DropdownMenuItem 
+                    onClick={() => handleStatusChange('published')}
+                    className="flex items-center gap-2"
+                  >
+                    <Flag className="h-4 w-4" /> Remove Flag
+                  </DropdownMenuItem>
+                )}
+                
                 {(isOwner || isAdmin) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                        <MoreVertical className="h-4 w-4" />
-                        <span className="sr-only">More options</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {isOwner && (
-                        <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
-                          <Pencil className="h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                      )}
-                      
-                      {!review.is_converted && isOwner && onConvert && (
-                        <DropdownMenuItem onClick={handleConvertClick} className="flex items-center gap-2">
-                          <UploadCloud className="h-4 w-4" /> Convert to Recommendation
-                        </DropdownMenuItem>
-                      )}
-                      
-                      {isAdmin && review.status !== 'flagged' && (
-                        <DropdownMenuItem 
-                          onClick={() => handleStatusChange('flagged')}
-                          className="flex items-center gap-2"
-                        >
-                          <Flag className="h-4 w-4" /> Flag for Review
-                        </DropdownMenuItem>
-                      )}
-                      
-                      {isAdmin && review.status === 'flagged' && (
-                        <DropdownMenuItem 
-                          onClick={() => handleStatusChange('published')}
-                          className="flex items-center gap-2"
-                        >
-                          <Flag className="h-4 w-4" /> Remove Flag
-                        </DropdownMenuItem>
-                      )}
-                      
-                      {(isOwner || isAdmin) && (
-                        <DropdownMenuItem 
-                          onClick={handleDeleteClick} 
-                          className="text-destructive focus:text-destructive flex items-center gap-2"
-                        >
-                          <Trash2 className="h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className={cn(
-                    "h-8 w-8 transition-colors", 
-                    review.isSaved 
-                      ? "text-brand-orange" 
-                      : "text-gray-500 hover:text-brand-orange"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onSave(review.id);
-                  }}
-                >
-                  <Bookmark size={18} className={review.isSaved ? "fill-brand-orange" : ""} />
-                </Button>
-              </div>
-            </div>
-            
-            {/* Venue and Experience Date */}
-            <div className="flex flex-wrap gap-2 items-center mb-3 text-sm text-muted-foreground">
-              {review.venue && (
-                <span className="flex items-center gap-1">
-                  <span>📍</span>
-                  {review.venue}
-                </span>
-              )}
-              
-              {review.experience_date && (
-                <span className="flex items-center">
-                  <Calendar className="h-3 w-3 mr-1" />
-                  {format(new Date(review.experience_date), 'MMM d, yyyy')}
-                </span>
-              )}
-            </div>
-            
-            {/* Review description with expandable text */}
-            {review.description && (
-              <div className="mt-3">
-                <div className={cn(
-                  "text-sm relative",
-                  isExpanded ? "" : "max-h-[80px] overflow-hidden"
-                )}>
-                  <p>{review.description}</p>
-                  
-                  {(!isExpanded && review.description && review.description.length > CONTENT_LIMIT) && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background to-transparent h-8" />
-                  )}
-                </div>
-                
-                {review.description && review.description.length > CONTENT_LIMIT && (
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="p-0 h-auto font-normal text-muted-foreground"
-                    onClick={() => setIsExpanded(!isExpanded)}
+                  <DropdownMenuItem 
+                    onClick={handleDeleteClick} 
+                    className="text-destructive focus:text-destructive flex items-center gap-2"
                   >
-                    {isExpanded ? "Show less" : "Show more"}
-                    <ChevronDown className={cn("h-4 w-4 ml-1 transition-transform", isExpanded && "rotate-180")} />
-                  </Button>
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </DropdownMenuItem>
                 )}
-              </div>
-            )}
-            
-            {/* Tags */}
-            {review.tags && review.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {review.tags.map((tag, index) => (
-                  <Badge 
-                    key={index}
-                    variant="outline" 
-                    className="text-xs bg-gray-50 dark:bg-gray-800 hover:bg-gray-100"
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
-            
-            {/* Interaction Bar */}
-            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className={cn(
-                    "transition-colors flex items-center gap-1 px-2",
-                    review.isLiked 
-                      ? "text-red-500" 
-                      : "text-gray-500 hover:text-red-500"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onLike(review.id);
-                  }}
-                >
-                  <Heart 
-                    size={16} 
-                    className={review.isLiked ? "fill-red-500" : ""} 
-                  />
-                  <span>{review.likes || 0}</span>
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="transition-colors flex items-center gap-1 px-2 text-gray-500 hover:text-gray-700"
-                >
-                  <MessageCircle size={16} />
-                  {review.comment_count > 0 && (
-                    <span>{review.comment_count}</span>
-                  )}
-                </Button>
-
-                {mediaItems.length > 0 && (
-                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                    <ImageIcon size={12} />
-                    {mediaItems.length}
-                  </span>
-                )}
-              </div>
-              
-              {!review.is_converted && isOwner && onConvert && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleConvertClick}
-                      className="text-xs flex items-center gap-1"
-                    >
-                      <UploadCloud size={14} /> Convert
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Convert this review to a recommendation</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </CardContent>
+        )}
+        
+        {/* Card Header */}
+        <ReviewCardHeader 
+          review={review}
+          getStatusBadge={getStatusBadge}
+          getCategoryColor={getCategoryColor}
+          getCategoryEmoji={getCategoryEmoji}
+          getCategoryLabel={getCategoryLabel}
+        />
+        
+        {/* Card Body */}
+        <ReviewCardBody 
+          review={review}
+          mediaItems={mediaItems}
+          getFallbackImage={getFallbackImage}
+          getCategoryFallbackImage={getCategoryFallbackImage}
+          isExpanded={isExpanded}
+          setIsExpanded={setIsExpanded}
+        />
+        
+        {/* Card Footer */}
+        <ReviewCardFooter 
+          review={review}
+          onLike={onLike}
+          onSave={onSave}
+          onConvert={onConvert}
+        />
       </Card>
 
       {/* Delete Confirmation Dialog */}
