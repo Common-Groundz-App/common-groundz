@@ -321,7 +321,7 @@ const ReviewCard = ({
           
           <div className="flex flex-wrap items-center gap-3 mb-1.5">
             <div className="flex items-center gap-2">
-              <RatingStars rating={review.rating} size="sm" className="scale-90" />
+              <RatingStars rating={review.rating} size="xs" className="scale-95" />
               <span className="text-xs text-gray-600 font-medium">
                 {review.rating.toFixed(1)}
               </span>

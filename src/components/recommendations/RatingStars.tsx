@@ -5,7 +5,7 @@ import ConnectedRingsRating from './ConnectedRingsRating';
 
 interface RatingStarsProps {
   rating: number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   showValue?: boolean;
   className?: string;
 }

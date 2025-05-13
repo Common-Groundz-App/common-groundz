@@ -13,7 +13,7 @@ import { Star, Sparkles } from "lucide-react";
 interface ConnectedRingsRatingProps {
   value: number;
   onChange?: (value: number) => void;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   showValue?: boolean;
   className?: string;
   isInteractive?: boolean;
@@ -76,6 +76,14 @@ const ConnectedRingsRating = ({
   }, [value, prevValue, showCelebration]);
   
   const sizeConfig = {
+    xs: {
+      svgSize: 120,
+      ringSize: 12,
+      strokeWidth: 2.5,
+      textClass: 'text-[10px]',
+      textOffset: 20,
+      overlapOffset: 8
+    },
     sm: {
       svgSize: 150,
       ringSize: 20,
