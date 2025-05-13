@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -15,47 +16,55 @@ export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFet
   const { user } = useAuth();
   const { toast } = useToast();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   
-  // Fetch recommendations
-  const fetchRecommendations = async () => {
-    if (!profileUserId) return;
-    
-    try {
-      setIsLoading(true);
-      // Use fetchUserRecommendations instead of fetchRecommendationWithLikesAndSaves
-      // because it returns a direct array of recommendations
-      const data = await fetchUserRecommendations(
-        user?.id || null, 
-        profileUserId
-      );
+  // Fetch recommendations using React Query
+  const { 
+    data,
+    isLoading,
+    error: queryError,
+    refetch
+  } = useQuery({
+    queryKey: ['recommendations', profileUserId, user?.id],
+    queryFn: () => fetchUserRecommendations(user?.id || null, profileUserId),
+    enabled: !!profileUserId,
+  });
+  
+  // Update state when data is fetched
+  useEffect(() => {
+    if (data) {
       setRecommendations(data);
       setError(null);
-    } catch (err) {
-      console.error('Error in useRecommendationsFetch:', err);
-      setError(err instanceof Error ? err : new Error('Failed to fetch recommendations'));
+    }
+  }, [data]);
+  
+  // Handle errors
+  useEffect(() => {
+    if (queryError) {
+      console.error('Error in useRecommendationsFetch:', queryError);
+      setError(queryError instanceof Error ? queryError : new Error('Failed to fetch recommendations'));
       toast({
         title: 'Error',
         description: 'Failed to load recommendations. Please try again.',
         variant: 'destructive'
       });
-    } finally {
-      setIsLoading(false);
+    }
+  }, [queryError, toast]);
+
+  // Refresh recommendations function
+  const refreshRecommendations = async () => {
+    try {
+      await refetch();
+    } catch (err) {
+      console.error('Error refreshing recommendations:', err);
     }
   };
-
-  useEffect(() => {
-    if (profileUserId) {
-      fetchRecommendations();
-    }
-  }, [profileUserId, user?.id]);
 
   return {
     recommendations,
     setRecommendations,
     isLoading,
     error,
-    refreshRecommendations: fetchRecommendations
+    refreshRecommendations
   };
 };

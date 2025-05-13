@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
@@ -17,7 +17,7 @@ interface ProfileContentProps {
   defaultActiveTab?: string;
 }
 
-const ProfileContent = ({ defaultActiveTab = 'posts' }: ProfileContentProps) => {
+const ProfileContent = React.memo(({ defaultActiveTab = 'posts' }: ProfileContentProps) => {
   const { userId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -42,6 +42,17 @@ const ProfileContent = ({ defaultActiveTab = 'posts' }: ProfileContentProps) => 
     setSearchParams({ tab: value });
   };
 
+  // Memoize the profile user ID to prevent unnecessary rerenders
+  const profileUserId = useMemo(() => userId || user?.id, [userId, user?.id]);
+  
+  // Memoize tab items to prevent unnecessary rerenders
+  const tabItems = useMemo(() => [
+    { value: 'posts', label: 'Posts' },
+    { value: 'recommendations', label: 'Recs' },
+    { value: 'reviews', label: 'Reviews' },
+    { value: 'circles', label: 'Circles' }
+  ], []);
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-6 px-4">
@@ -62,16 +73,6 @@ const ProfileContent = ({ defaultActiveTab = 'posts' }: ProfileContentProps) => 
       </div>
     );
   }
-
-  // If on the main profile page with no userId param, use the current user's ID
-  const profileUserId = userId || user?.id;
-
-  const tabItems = [
-    { value: 'posts', label: 'Posts' },
-    { value: 'recommendations', label: 'Recs' },
-    { value: 'reviews', label: 'Reviews' },
-    { value: 'circles', label: 'Circles' }
-  ];
 
   return (
     <div className="pb-12">
@@ -130,6 +131,8 @@ const ProfileContent = ({ defaultActiveTab = 'posts' }: ProfileContentProps) => 
       </div>
     </div>
   );
-};
+});
+
+ProfileContent.displayName = 'ProfileContent';
 
 export default ProfileContent;

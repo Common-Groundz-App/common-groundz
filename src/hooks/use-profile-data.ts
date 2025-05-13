@@ -1,4 +1,6 @@
+
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserProfile, getDisplayName, fetchFollowerCount, fetchFollowingCount } from '@/services/profileService'; 
 import { useProfileFollows } from './profile/use-profile-follows';
@@ -9,7 +11,6 @@ const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5
 
 export const useProfileData = (userId?: string) => {
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
   const [isOwnProfile, setIsOwnProfile] = useState<boolean>(false);
@@ -42,26 +43,26 @@ export const useProfileData = (userId?: string) => {
     setProfileMetadata
   } = useProfileMetadata();
 
-  const loadProfileData = async () => {
+  // Use React Query to fetch profile data
+  const viewingUserId = userId || user?.id;
+  
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ['profile', viewingUserId],
+    queryFn: () => fetchUserProfile(viewingUserId as string),
+    enabled: !!viewingUserId && !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
+  useEffect(() => {
     if (!user) return;
     
     try {
-      setIsLoading(true);
-      const viewingUserId = userId || user.id;
+      const currentViewingUserId = userId || user.id;
       setIsOwnProfile(!userId || userId === user.id);
       
-      const profile = await fetchUserProfile(viewingUserId);
-      
-      // Fetch follower and following counts
-      const followerCountData = await fetchFollowerCount(viewingUserId);
-      const followingCountData = await fetchFollowingCount(viewingUserId);
-      
-      setFollowerCount(followerCountData);
-      setFollowingCount(followingCountData);
-      
-      setProfileData(profile);
-      
       if (profile) {
+        setProfileData(profile);
+        
         const displayName = getDisplayName(user, profile);
         setUsername(displayName);
         setProfileMetadata(user.user_metadata, profile);
@@ -70,14 +71,34 @@ export const useProfileData = (userId?: string) => {
     } catch (err) {
       console.error('Error:', err);
       setError(err instanceof Error ? err : new Error('Failed to load profile data'));
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [user, userId, profile, setUsername, setProfileMetadata, setInitialImages]);
 
+  // Use React Query to fetch follower and following counts
+  const { data: followerCountData } = useQuery({
+    queryKey: ['followerCount', viewingUserId],
+    queryFn: () => fetchFollowerCount(viewingUserId as string),
+    enabled: !!viewingUserId,
+  });
+  
+  const { data: followingCountData } = useQuery({
+    queryKey: ['followingCount', viewingUserId],
+    queryFn: () => fetchFollowingCount(viewingUserId as string),
+    enabled: !!viewingUserId,
+  });
+  
+  // Update follower and following counts when data changes
   useEffect(() => {
-    loadProfileData();
-  }, [user, userId]);
+    if (followerCountData !== undefined) {
+      setFollowerCount(followerCountData);
+    }
+  }, [followerCountData, setFollowerCount]);
+  
+  useEffect(() => {
+    if (followingCountData !== undefined) {
+      setFollowingCount(followingCountData);
+    }
+  }, [followingCountData, setFollowingCount]);
 
   return {
     isLoading,

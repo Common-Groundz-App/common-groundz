@@ -15,7 +15,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-const Feed = () => {
+const Feed = React.memo(() => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState("for-you");
@@ -27,14 +27,6 @@ const Feed = () => {
   const [isActive, setIsActive] = useState(false);
   const [startY, setStartY] = useState(0);
   const [newContentAvailable, setNewContentAvailable] = useState(false);
-  const [newPostCount, setNewPostCount] = useState(0);
-  const [showNewPosts, setShowNewPosts] = useState(false);
-  const [hasScrolledDown, setHasScrolledDown] = useState(false);
-  const lastScrollTop = useRef(0);
-  const pullThreshold = 80; // Pixels needed to pull down to trigger refresh
-  const startThreshold = 10; // Minimum drag distance before showing pull UI
-  const lastUpdateTime = useRef(0);
-  const frameId = useRef(0);
   
   const getInitialActiveTab = () => {
     if (location.pathname === '/home' || location.pathname === '/feed') {
@@ -245,6 +237,21 @@ const Feed = () => {
     };
   }, [refreshing, isActive, startY, pullIntent, pullProgress]);
   
+  // Handle tab change with memoization
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+  }, []);
+  
+  // Reset the refreshing state after a delay
+  useEffect(() => {
+    if (refreshing) {
+      const timer = setTimeout(() => {
+        setRefreshing(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [refreshing]);
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Mobile Header - Fixed Position */}
@@ -530,6 +537,8 @@ const Feed = () => {
       <Toaster />
     </div>
   );
-};
+});
+
+Feed.displayName = 'Feed';
 
 export default Feed;

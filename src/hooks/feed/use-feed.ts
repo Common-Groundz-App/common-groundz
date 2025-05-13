@@ -1,5 +1,5 @@
-
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { FeedVisibility, FeedState } from './types';
@@ -21,79 +21,78 @@ export const useFeed = (feedType: FeedVisibility) => {
     isLoadingMore: false
   });
 
-  const fetchFeed = useCallback(async (page: number = 0, reset: boolean = false) => {
-    if (!user) {
-      console.log("No user found in useFeed");
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: new Error('User not authenticated'),
-        items: [],
-        hasMore: false,
-        isLoadingMore: false
-      }));
-      return;
-    }
-
-    try {
-      console.log(`Fetching ${feedType} feed for page ${page}`);
-      setState(prev => ({
-        ...prev,
-        isLoading: !prev.items.length || reset,
-        isLoadingMore: !!prev.items.length && !reset
-      }));
-      
+  // Use React Query to fetch the feed data
+  const { 
+    data: feedData,
+    error: feedError,
+    isLoading: isFeedLoading,
+    refetch
+  } = useQuery({
+    queryKey: ['feed', feedType, user?.id, state.page],
+    queryFn: async () => {
       const fetchFunction = feedType === 'for_you' ? fetchForYouFeed : fetchFollowingFeed;
-      const { items, hasMore } = await fetchFunction({ 
-        userId: user.id, 
-        page,
+      return await fetchFunction({ 
+        userId: user?.id || '', 
+        page: state.page,
         itemsPerPage: ITEMS_PER_PAGE
       });
-      
-      console.log(`Received ${items.length} items for ${feedType} feed`);
-      
+    },
+    enabled: !!user,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+
+  // Update state when data changes
+  useEffect(() => {
+    if (feedData) {
       setState(prev => ({
         ...prev,
-        items: reset ? items : [...prev.items, ...items],
-        hasMore,
-        page,
+        items: prev.page === 0 ? feedData.items : [...prev.items, ...feedData.items],
+        hasMore: feedData.hasMore,
         isLoading: false,
         isLoadingMore: false,
         error: null
       }));
-    } catch (error) {
-      console.error(`Error fetching ${feedType} feed:`, error);
+    }
+  }, [feedData]);
+
+  // Handle errors
+  useEffect(() => {
+    if (feedError) {
       setState(prev => ({
         ...prev,
         isLoading: false,
         isLoadingMore: false,
-        error: error instanceof Error ? error : new Error('Failed to fetch feed')
+        error: feedError instanceof Error ? feedError : new Error('Failed to fetch feed')
       }));
       
       toast({
         title: 'Feed Error',
-        description: error instanceof Error ? error.message : 'Failed to load feed items',
+        description: feedError instanceof Error ? feedError.message : 'Failed to load feed items',
         variant: 'destructive'
       });
     }
-  }, [user, feedType, toast]);
+  }, [feedError, toast]);
 
-  useEffect(() => {
-    if (user) {
-      console.log(`Setting up initial feed load for ${feedType}`);
-      fetchFeed(0, true);
-    }
-  }, [fetchFeed, user]);
-
+  // Load more data
   const loadMore = useCallback(() => {
     if (state.isLoadingMore || !state.hasMore) return;
-    fetchFeed(state.page + 1);
-  }, [state.isLoadingMore, state.hasMore, state.page, fetchFeed]);
+    
+    setState(prev => ({ 
+      ...prev, 
+      page: prev.page + 1,
+      isLoadingMore: true 
+    }));
+  }, [state.isLoadingMore, state.hasMore]);
 
-  const refreshFeed = useCallback(() => {
-    setState(prev => ({ ...prev, isLoading: true }));
-    fetchFeed(0, true);
-  }, [fetchFeed]);
+  // Refresh feed
+  const refreshFeed = useCallback(async () => {
+    setState(prev => ({ 
+      ...prev, 
+      page: 0,
+      isLoading: true 
+    }));
+    await refetch();
+  }, [refetch]);
 
   const { handleLike: interactionLike, handleSave: interactionSave } = useInteractions();
 
@@ -233,6 +232,7 @@ export const useFeed = (feedType: FeedVisibility) => {
 
   return {
     ...state,
+    isLoading: state.isLoading || isFeedLoading,
     loadMore,
     refreshFeed,
     handleLike,

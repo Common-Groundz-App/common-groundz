@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { UserProfile } from './types';
 import { fetchFollowers, fetchFollowing } from './api/circleService';
 import { useFollowActions } from './hooks/useFollowActions';
@@ -7,37 +8,43 @@ import { useFollowActions } from './hooks/useFollowActions';
 export const useCircleData = (profileUserId: string, currentUserId?: string) => {
   const [followers, setFollowers] = useState<UserProfile[]>([]);
   const [following, setFollowing] = useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const { actionLoading, handleFollowToggle: toggleFollow } = useFollowActions(currentUserId);
 
-  // Fetch followers and following data
+  // Fetch followers using React Query
+  const { 
+    data: followerProfiles,
+    isLoading: isLoadingFollowers,
+    error: followerError
+  } = useQuery({
+    queryKey: ['followers', profileUserId, currentUserId],
+    queryFn: () => fetchFollowers(profileUserId, currentUserId),
+    enabled: !!profileUserId,
+  });
+  
+  // Fetch following using React Query
+  const { 
+    data: followingProfiles,
+    isLoading: isLoadingFollowing,
+    error: followingError
+  } = useQuery({
+    queryKey: ['following', profileUserId, currentUserId],
+    queryFn: () => fetchFollowing(profileUserId, currentUserId),
+    enabled: !!profileUserId,
+  });
+  
+  // Update state when data is fetched
   useEffect(() => {
-    const fetchCircles = async () => {
-      if (!profileUserId) return;
-      
-      setIsLoading(true);
-      
-      try {
-        // Fetch followers and following in parallel
-        const [followerProfiles, followingProfiles] = await Promise.all([
-          fetchFollowers(profileUserId, currentUserId),
-          fetchFollowing(profileUserId, currentUserId)
-        ]);
-        
-        console.log(`[useCircleData] Fetched ${followerProfiles.length} followers and ${followingProfiles.length} following for ${profileUserId}`);
-        
-        setFollowers(followerProfiles);
-        setFollowing(followingProfiles);
-      } catch (error) {
-        console.error('Error fetching circles:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchCircles();
-  }, [profileUserId, currentUserId]);
+    if (followerProfiles) {
+      setFollowers(followerProfiles);
+    }
+  }, [followerProfiles]);
+  
+  useEffect(() => {
+    if (followingProfiles) {
+      setFollowing(followingProfiles);
+    }
+  }, [followingProfiles]);
 
   // Updater functions for UI state
   const updateFollowers = (targetUserId: string, isFollowing: boolean) => {
@@ -100,8 +107,9 @@ export const useCircleData = (profileUserId: string, currentUserId?: string) => 
   return {
     followers,
     following,
-    isLoading,
+    isLoading: isLoadingFollowers || isLoadingFollowing,
     actionLoading,
-    handleFollowToggle
+    handleFollowToggle,
+    error: followerError || followingError
   };
 };

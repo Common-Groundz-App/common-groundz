@@ -4,6 +4,7 @@ import { useRecommendationFilters } from './use-recommendation-filters';
 import { useRecommendationActions } from './use-recommendation-actions';
 import { useRecommendationUploads } from './use-recommendation-uploads';
 import { useEntityOperations } from './use-entity-operations';
+import { useCallback } from 'react';
 
 interface UseRecommendationsProps {
   profileUserId: string;
@@ -28,11 +29,16 @@ export const useRecommendations = ({ profileUserId }: UseRecommendationsProps) =
     clearFilters
   } = useRecommendationFilters(recommendations);
   
+  // Wrap refreshRecommendations in useCallback to prevent unnecessary rerenders
+  const refreshRecommendationsCallback = useCallback(async () => {
+    await refreshRecommendations();
+  }, [refreshRecommendations]);
+  
   const {
     handleLike,
     handleSave,
     addRecommendation
-  } = useRecommendationActions(recommendations, setRecommendations, refreshRecommendations);
+  } = useRecommendationActions(recommendations, setRecommendations, refreshRecommendationsCallback);
   
   const { handleImageUpload } = useRecommendationUploads();
 
@@ -63,7 +69,7 @@ export const useRecommendations = ({ profileUserId }: UseRecommendationsProps) =
     handleSave,
     handleImageUpload,
     addRecommendation,
-    refreshRecommendations,
+    refreshRecommendations: refreshRecommendationsCallback,
     
     // Entity operations
     handleEntityCreation,
