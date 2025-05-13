@@ -6,7 +6,7 @@ import { fetchUserProfile } from '../profileService';
 export const fetchUserRecommendations = async (
   userId: string | null = null, 
   profileUserId?: string,
-  category?: EntityType,
+  category?: string,
   sortBy: 'latest' | 'top' = 'latest',
   limit = 50
 ): Promise<Recommendation[]> => {
@@ -80,4 +80,3 @@ export const fetchUserRecommendations = async (
     throw error;
   }
 };
-

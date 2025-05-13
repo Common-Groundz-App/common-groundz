@@ -10,9 +10,15 @@ import {
 
 interface UseRecommendationsFetchProps {
   profileUserId?: string;
+  category?: string;
+  limit?: number;
 }
 
-export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFetchProps) => {
+export const useRecommendationsFetch = ({ 
+  profileUserId,
+  category,
+  limit
+}: UseRecommendationsFetchProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -26,8 +32,8 @@ export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFet
     isError,
     refetch
   } = useQuery({
-    queryKey: ['recommendations', profileUserId, user?.id],
-    queryFn: () => fetchUserRecommendations(user?.id || null, profileUserId || ''),
+    queryKey: ['recommendations', profileUserId, user?.id, category, limit],
+    queryFn: () => fetchUserRecommendations(user?.id || null, profileUserId || '', category, undefined, limit),
     enabled: !!profileUserId,
   });
   
