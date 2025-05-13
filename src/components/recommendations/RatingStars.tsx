@@ -13,7 +13,7 @@ interface RatingStarsProps {
 const RatingStars = ({ 
   rating, 
   size = 'sm',
-  showValue = true,
+  showValue = false,
   className
 }: RatingStarsProps) => {
   return (

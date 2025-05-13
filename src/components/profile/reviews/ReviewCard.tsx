@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -318,10 +317,15 @@ const ReviewCard = ({
             </div>
           </div>
           
-          <p className="text-gray-600 mb-2 text-sm line-clamp-1">{review.venue || 'Unknown venue'}</p>
+          <p className="text-gray-600 mb-1 text-sm line-clamp-1">{review.venue || 'Unknown venue'}</p>
           
-          <div className="flex flex-wrap gap-2 items-center mb-2">
-            <RatingStars rating={review.rating} />
+          <div className="flex flex-wrap items-center gap-3 mb-1.5">
+            <div className="flex items-center gap-2">
+              <RatingStars rating={review.rating} size="sm" className="scale-90" />
+              <span className="text-xs text-gray-600 font-medium">
+                {review.rating.toFixed(1)}
+              </span>
+            </div>
             
             {review.experience_date && (
               <div className="text-xs text-gray-500 flex items-center">
@@ -332,10 +336,10 @@ const ReviewCard = ({
           </div>
           
           {review.description && (
-            <p className="mt-2 text-sm line-clamp-2 text-gray-700">{review.description}</p>
+            <p className="mt-1 text-sm line-clamp-2 text-gray-700">{review.description}</p>
           )}
           
-          <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center">
+          <div className="mt-auto pt-2 border-t border-gray-100 flex justify-between items-center">
             <div className="flex items-center gap-1">
               <Button 
                 variant="ghost" 
