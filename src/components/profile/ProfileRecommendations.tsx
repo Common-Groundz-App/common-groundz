@@ -10,6 +10,8 @@ import RecommendationFilters from '@/components/recommendations/RecommendationFi
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import RecommendationSkeleton from '@/components/recommendations/RecommendationSkeleton';
 import EmptyRecommendations from '@/components/recommendations/EmptyRecommendations';
+import { Review } from '@/services/reviewService';
+import { Recommendation } from '@/services/recommendation/types';
 
 type ProfileRecommendationsProps = {
   profileUserId: string;
@@ -36,6 +38,13 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
   // Handle image uploads for recommendation form
   const { handleImageUpload } = useRecommendationUploads();
   
+  // Convert reviews to recommendations format for filtering
+  const reviewsAsRecommendations = reviews ? reviews.map(review => ({
+    ...review,
+    is_certified: false,
+    view_count: 0,
+  } as Recommendation)) : [];
+  
   // Apply filtering and sorting
   const {
     activeFilter,
@@ -45,7 +54,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     filteredRecommendations,
     categories,
     clearFilters
-  } = useRecommendationFilters(reviews || []);
+  } = useRecommendationFilters(reviewsAsRecommendations);
   
   useEffect(() => {
     const handleOpenForm = () => {

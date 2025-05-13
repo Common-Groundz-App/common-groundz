@@ -1,34 +1,59 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Recommendation, EntityType } from '@/services/recommendationService';
 
-export const useRecommendationFilters = (recommendations: Recommendation[]) => {
+import { useState, useMemo } from 'react';
+import { Recommendation } from '@/services/recommendation/types';
+
+type FilterableItem = {
+  id: string;
+  title: string;
+  category: string;
+  rating: number;
+  created_at: string;
+};
+
+export const useRecommendationFilters = <T extends FilterableItem>(items: T[]) => {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'latest' | 'highestRated' | 'mostLiked'>('latest');
+  const [sortBy, setSortBy] = useState<'newest' | 'highest' | 'lowest'>('newest');
 
-  // Extract unique categories from recommendations
+  // Extract unique categories from the items
   const categories = useMemo(() => {
-    return [...new Set(recommendations.map(item => item.category))];
-  }, [recommendations]);
+    const uniqueCategories = new Set<string>();
+    items.forEach(item => {
+      if (item.category) {
+        uniqueCategories.add(item.category);
+      }
+    });
+    return Array.from(uniqueCategories);
+  }, [items]);
 
-  // Filter and sort recommendations
+  // Apply filtering and sorting
   const filteredRecommendations = useMemo(() => {
-    return recommendations
-      .filter(item => !activeFilter || item.category === activeFilter)
-      .sort((a, b) => {
-        if (sortBy === 'latest') {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        } else if (sortBy === 'highestRated') {
-          return b.rating - a.rating;
-        } else if (sortBy === 'mostLiked') {
-          return (b.likes || 0) - (a.likes || 0);
-        }
-        return 0;
-      });
-  }, [recommendations, activeFilter, sortBy]);
+    // Start with all items
+    let filtered = [...items];
+
+    // Apply category filter if active
+    if (activeFilter) {
+      filtered = filtered.filter(item => item.category === activeFilter);
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'newest':
+        filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        break;
+      case 'highest':
+        filtered.sort((a, b) => b.rating - a.rating);
+        break;
+      case 'lowest':
+        filtered.sort((a, b) => a.rating - b.rating);
+        break;
+    }
+
+    return filtered;
+  }, [items, activeFilter, sortBy]);
 
   const clearFilters = () => {
     setActiveFilter(null);
-    setSortBy('latest');
+    setSortBy('newest');
   };
 
   return {
@@ -38,6 +63,6 @@ export const useRecommendationFilters = (recommendations: Recommendation[]) => {
     setSortBy,
     filteredRecommendations,
     categories,
-    clearFilters
+    clearFilters,
   };
 };
