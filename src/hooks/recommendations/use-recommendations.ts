@@ -1,128 +1,78 @@
 
-import { useState } from 'react';
-import { useToast } from '@/components/ui/use-toast';
-import { Review } from '@/services/reviewService';
-import { useAuth } from '@/contexts/AuthContext';
-import { 
-  toggleReviewLike,
-  toggleReviewSave,
-  convertReviewToRecommendation
-} from '@/services/reviewService';
-import { useReviewsFetch } from './use-reviews-fetch';
+import { useRecommendationsFetch } from './use-recommendations-fetch';
+import { useRecommendationFilters } from './use-recommendation-filters';
+import { useRecommendationActions } from './use-recommendation-actions';
+import { useRecommendationUploads } from './use-recommendation-uploads';
+import { useEntityOperations } from './use-entity-operations';
+import { useCallback } from 'react';
 
 interface UseRecommendationsProps {
   profileUserId: string;
 }
 
 export const useRecommendations = ({ profileUserId }: UseRecommendationsProps) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const { 
+    recommendations, 
+    setRecommendations, 
+    isLoading, 
+    error, 
+    refreshRecommendations 
+  } = useRecommendationsFetch({ profileUserId });
   
-  // Use the React Query hook for data fetching
   const {
-    data: reviews,
-    isLoading,
-    error,
-    refetch: refreshReviews
-  } = useReviewsFetch({ profileUserId });
+    activeFilter,
+    setActiveFilter,
+    sortBy,
+    setSortBy,
+    filteredRecommendations,
+    categories,
+    clearFilters
+  } = useRecommendationFilters(recommendations);
   
-  // Handle like action
-  const handleLike = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to like reviews',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    try {
-      const item = reviews?.find(r => r.id === id);
-      if (!item) return;
-
-      // Optimistic update
-      // Note: We don't need to manually update state as react-query will handle refetching
-
-      // Server update
-      await toggleReviewLike(id, user.id, !!item.isLiked);
-      refreshReviews();
-    } catch (err) {
-      console.error('Error toggling like:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to update like status. Please try again.',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  // Handle save action
-  const handleSave = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to save reviews',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    try {
-      const item = reviews?.find(r => r.id === id);
-      if (!item) return;
-
-      // Server update
-      await toggleReviewSave(id, user.id, !!item.isSaved);
-      refreshReviews();
-    } catch (err) {
-      console.error('Error toggling save:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to update save status. Please try again.',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  // Convert to recommendation
-  const convertToRecommendation = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to convert reviews',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    try {
-      await convertReviewToRecommendation(id, user.id);
-      
-      toast({
-        title: 'Success',
-        description: 'Review successfully converted to recommendation'
-      });
-      
-      // Refresh the list
-      refreshReviews();
-    } catch (err) {
-      console.error('Error converting review:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to convert review. Please try again.',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  return {
-    reviews: reviews || [],
-    isLoading,
-    error,
+  // Wrap refreshRecommendations in useCallback to prevent unnecessary rerenders
+  const refreshRecommendationsCallback = useCallback(async () => {
+    await refreshRecommendations();
+  }, [refreshRecommendations]);
+  
+  const {
     handleLike,
     handleSave,
-    refreshReviews,
-    convertToRecommendation
+    addRecommendation
+  } = useRecommendationActions(recommendations, setRecommendations, refreshRecommendationsCallback);
+  
+  const { handleImageUpload } = useRecommendationUploads();
+
+  const {
+    entities,
+    isLoading: isLoadingEntities,
+    handleEntityCreation,
+    searchEntities
+  } = useEntityOperations();
+
+  return {
+    // Data state
+    recommendations: filteredRecommendations,
+    isLoading: isLoading || isLoadingEntities,
+    error,
+    categories,
+    entities,
+    
+    // Filter state
+    activeFilter,
+    setActiveFilter,
+    sortBy,
+    setSortBy,
+    clearFilters,
+    
+    // Actions
+    handleLike,
+    handleSave,
+    handleImageUpload,
+    addRecommendation,
+    refreshRecommendations: refreshRecommendationsCallback,
+    
+    // Entity operations
+    handleEntityCreation,
+    searchEntities
   };
 };

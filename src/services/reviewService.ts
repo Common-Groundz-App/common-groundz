@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';  // Added import for MediaItem
 import { Database } from '@/integrations/supabase/types';
@@ -31,10 +32,9 @@ export interface Review {
   };
 }
 
-// Fetch user reviews with optimized batch operations
+// Fetch user reviews
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
-    console.time('fetchUserReviews');
     // Fetch reviews
     const { data: reviewsData, error: reviewsError } = await supabase
       .from('reviews')
@@ -56,98 +56,80 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     // Get entity IDs from all reviews for batch fetching
     const entityIds = reviewsData
       .filter(review => review.entity_id !== null)
-      .map(review => review.entity_id)
-      .filter(Boolean) as string[];
+      .map(review => review.entity_id);
 
     console.log('Entity IDs from reviews:', entityIds);
 
-    // Parallel fetching for better performance
-    const [entitiesResult, likesResult, userLikesResult, userSavesResult] = await Promise.all([
-      // Fetch entities in batch if we have entity IDs
-      entityIds.length > 0 ? 
-        supabase.from('entities').select('*').in('id', entityIds) : 
-        Promise.resolve({ data: [], error: null }),
-      
-      // Fetch likes count using batch operation
-      supabase.rpc('get_review_likes_batch', { p_review_ids: reviewIds }),
-      
-      // Fetch user likes in batch 
-      currentUserId ? 
-        supabase.rpc('get_user_review_likes', { p_review_ids: reviewIds, p_user_id: currentUserId }) : 
-        Promise.resolve({ data: [], error: null }),
-        
-      // Fetch user saves in batch
-      currentUserId ? 
-        supabase.rpc('get_user_review_saves', { p_review_ids: reviewIds, p_user_id: currentUserId }) : 
-        Promise.resolve({ data: [], error: null })
-    ]);
-    
-    const { data: entitiesData, error: entitiesError } = entitiesResult;
-    const { data: likesData, error: likesError } = likesResult;
-    const { data: userLikesData, error: userLikesError } = userLikesResult; 
-    const { data: userSavesData, error: userSavesError } = userSavesResult;
-    
-    // Handle entity fetch errors
-    if (entitiesError) {
-      console.error('Error fetching entities batch:', entitiesError);
-    }
-    
-    if (likesError) {
-      console.error('Error fetching likes batch:', likesError);
-    }
-    
-    if (userLikesError) {
-      console.error('Error fetching user likes batch:', userLikesError);
-    }
-    
-    if (userSavesError) {
-      console.error('Error fetching user saves batch:', userSavesError);
-    }
-    
-    // Create maps for quick lookup
+    // If we have entity IDs, fetch the entity data in a batch
     const entitiesMap = new Map();
-    const likesCountMap = new Map();
-    const userLikedMap = new Map();
-    const userSavedMap = new Map();
     
-    // Map entities by ID
-    if (entitiesData && entitiesData.length > 0) {
-      console.log(`Found ${entitiesData.length} entities for reviews`);
-      entitiesData.forEach(entity => {
-        console.log(`Mapping entity ${entity.id}: ${entity.name}`);
-        entitiesMap.set(entity.id, entity);
-      });
+    if (entityIds && entityIds.length > 0) {
+      const { data: entitiesData, error: entitiesError } = await supabase
+        .from('entities')
+        .select('*')
+        .in('id', entityIds);
+      
+      if (entitiesError) {
+        console.error('Error fetching entities batch:', entitiesError);
+      } else if (entitiesData) {
+        console.log(`Found ${entitiesData.length} entities for reviews`);
+        
+        // Map entities by ID for quick lookup
+        entitiesData.forEach(entity => {
+          console.log(`Mapping entity ${entity.id}: ${entity.name}`);
+          entitiesMap.set(entity.id, entity);
+        });
+      }
     }
+
+    // Get likes for each review
+    let userLikes: any[] = [];
+    let userSaves: any[] = [];
     
-    // Map likes counts
-    if (likesData && Array.isArray(likesData)) {
-      likesData.forEach((item: any) => {
-        likesCountMap.set(item.review_id, item.like_count);
-      });
+    if (currentUserId) {
+      const { data: likesData } = await supabase
+        .from('review_likes')
+        .select('review_id')
+        .in('review_id', reviewIds)
+        .eq('user_id', currentUserId);
+        
+      userLikes = likesData || [];
+        
+      const { data: savesData } = await supabase
+        .from('review_saves')
+        .select('review_id')
+        .in('review_id', reviewIds)
+        .eq('user_id', currentUserId);
+        
+      userSaves = savesData || [];
     }
-    
-    // Map user likes
-    if (userLikesData && Array.isArray(userLikesData)) {
-      userLikesData.forEach((item: any) => {
-        userLikedMap.set(item.review_id, true);
-      });
-    }
-    
-    // Map user saves
-    if (userSavesData && Array.isArray(userSavesData)) {
-      userSavesData.forEach((item: any) => {
-        userSavedMap.set(item.review_id, true);
-      });
+
+    // Get like counts - using count instead of group
+    const likeCountMap = new Map();
+    for (const reviewId of reviewIds) {
+      const { count } = await supabase
+        .from('review_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('review_id', reviewId);
+      
+      likeCountMap.set(reviewId, count || 0);
     }
 
     // Map all data to reviews
     const reviews = reviewsData.map(review => {
-      const likes = likesCountMap.get(review.id) || 0;
-      const isLiked = userLikedMap.has(review.id) || false;
-      const isSaved = userSavedMap.has(review.id) || false;
+      const likes = likeCountMap.get(review.id) || 0;
+      const isLiked = userLikes?.some(l => l.review_id === review.id) || false;
+      const isSaved = userSaves?.some(s => s.review_id === review.id) || false;
       
       // Get the entity for this review from our map
       const entity = review.entity_id ? entitiesMap.get(review.entity_id) : null;
+      
+      console.log(`Review ${review.id} entity lookup:`, {
+        entity_id: review.entity_id,
+        entity_found: !!entity,
+        entity_name: entity?.name,
+        entity_image: entity?.image_url
+      });
 
       // Process the media field coming from Supabase (convert from Json to MediaItem[])
       let processedMedia: MediaItem[] | null = null;
@@ -180,7 +162,6 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       } as Review;
     });
 
-    console.timeEnd('fetchUserReviews');
     return reviews;
   } catch (error) {
     console.error('Error in fetchUserReviews:', error);

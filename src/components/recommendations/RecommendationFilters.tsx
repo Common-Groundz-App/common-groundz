@@ -15,10 +15,10 @@ import {
 interface RecommendationFiltersProps {
   isOwnProfile: boolean;
   activeFilter: string | null;
-  sortBy: 'newest' | 'highest' | 'lowest';
+  sortBy: 'latest' | 'highestRated' | 'mostLiked';
   categories: string[];
   onFilterChange: (category: string) => void;
-  onSortChange: (sort: 'newest' | 'highest' | 'lowest') => void;
+  onSortChange: (sort: 'latest' | 'highestRated' | 'mostLiked') => void;
   onClearFilters: () => void;
   onAddNew: () => void;
 }
@@ -108,22 +108,22 @@ const RecommendationFilters = ({
                 Sort By
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => onSortChange('newest')}
-                className={cn("cursor-pointer", sortBy === 'newest' ? "bg-gray-100" : "")}
+                onClick={() => onSortChange('latest')}
+                className={cn("cursor-pointer", sortBy === 'latest' ? "bg-gray-100" : "")}
               >
                 Latest
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => onSortChange('highest')}
-                className={cn("cursor-pointer", sortBy === 'highest' ? "bg-gray-100" : "")}
+                onClick={() => onSortChange('highestRated')}
+                className={cn("cursor-pointer", sortBy === 'highestRated' ? "bg-gray-100" : "")}
               >
                 Highest Rated
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => onSortChange('lowest')}
-                className={cn("cursor-pointer", sortBy === 'lowest' ? "bg-gray-100" : "")}
+                onClick={() => onSortChange('mostLiked')}
+                className={cn("cursor-pointer", sortBy === 'mostLiked' ? "bg-gray-100" : "")}
               >
-                Lowest Rated
+                Most Liked
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
