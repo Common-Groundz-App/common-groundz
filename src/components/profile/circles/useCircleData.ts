@@ -3,41 +3,41 @@ import { useState, useEffect } from 'react';
 import { UserProfile } from './types';
 import { fetchFollowers, fetchFollowing } from './api/circleService';
 import { useFollowActions } from './hooks/useFollowActions';
+import { useQuery } from '@tanstack/react-query';
 
 export const useCircleData = (profileUserId: string, currentUserId?: string) => {
   const [followers, setFollowers] = useState<UserProfile[]>([]);
   const [following, setFollowing] = useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const { actionLoading, handleFollowToggle: toggleFollow } = useFollowActions(currentUserId);
 
-  // Fetch followers and following data
-  useEffect(() => {
-    const fetchCircles = async () => {
-      if (!profileUserId) return;
-      
-      setIsLoading(true);
-      
-      try {
-        // Fetch followers and following in parallel
-        const [followerProfiles, followingProfiles] = await Promise.all([
-          fetchFollowers(profileUserId, currentUserId),
-          fetchFollowing(profileUserId, currentUserId)
-        ]);
-        
-        console.log(`[useCircleData] Fetched ${followerProfiles.length} followers and ${followingProfiles.length} following for ${profileUserId}`);
-        
-        setFollowers(followerProfiles);
-        setFollowing(followingProfiles);
-      } catch (error) {
-        console.error('Error fetching circles:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchCircles();
-  }, [profileUserId, currentUserId]);
+  // Use React Query to fetch and cache followers
+  const { isLoading: isLoadingFollowers } = useQuery({
+    queryKey: ['followers', profileUserId, currentUserId],
+    queryFn: () => fetchFollowers(profileUserId, currentUserId),
+    enabled: !!profileUserId,
+    staleTime: 2 * 60 * 1000,
+    onSuccess: (data) => {
+      setFollowers(data);
+    },
+    onError: (error) => {
+      console.error('Error fetching followers:', error);
+    }
+  });
+
+  // Use React Query to fetch and cache following
+  const { isLoading: isLoadingFollowing } = useQuery({
+    queryKey: ['following', profileUserId, currentUserId],
+    queryFn: () => fetchFollowing(profileUserId, currentUserId),
+    enabled: !!profileUserId,
+    staleTime: 2 * 60 * 1000,
+    onSuccess: (data) => {
+      setFollowing(data);
+    },
+    onError: (error) => {
+      console.error('Error fetching following:', error);
+    }
+  });
 
   // Updater functions for UI state
   const updateFollowers = (targetUserId: string, isFollowing: boolean) => {
@@ -100,7 +100,7 @@ export const useCircleData = (profileUserId: string, currentUserId?: string) => 
   return {
     followers,
     following,
-    isLoading,
+    isLoading: isLoadingFollowers || isLoadingFollowing,
     actionLoading,
     handleFollowToggle
   };

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -5,6 +6,7 @@ import { motion } from "framer-motion";
 import * as RadixTabs from "@radix-ui/react-tabs";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
+
 interface TubelightTabsProps {
   defaultValue: string;
   className?: string;
@@ -16,6 +18,7 @@ interface TubelightTabsProps {
   onValueChange?: (value: string) => void;
   children?: React.ReactNode;
 }
+
 export function TubelightTabs({
   defaultValue,
   className,
@@ -24,17 +27,24 @@ export function TubelightTabs({
   children
 }: TubelightTabsProps) {
   const [activeTab, setActiveTab] = useState(defaultValue);
+
+  // Only update the activeTab state when defaultValue changes
+  // This prevents unnecessary re-renders
   useEffect(() => {
-    if (defaultValue) {
+    if (defaultValue !== activeTab) {
       setActiveTab(defaultValue);
     }
   }, [defaultValue]);
+
   const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    if (onValueChange) {
-      onValueChange(value);
+    if (value !== activeTab) {
+      setActiveTab(value);
+      if (onValueChange) {
+        onValueChange(value);
+      }
     }
   };
+
   return <RadixTabs.Root value={activeTab} onValueChange={handleTabChange} className="px-0 py-[96px]">
       <div className="flex justify-center mb-6">
         <RadixTabs.List className={cn("flex items-center gap-2 py-1 px-1 rounded-full shadow-lg", "bg-background/30 border border-white/10 backdrop-blur-md")}>
@@ -64,4 +74,5 @@ export function TubelightTabs({
       {children}
     </RadixTabs.Root>;
 }
+
 export const TabsContent = RadixTabs.Content;

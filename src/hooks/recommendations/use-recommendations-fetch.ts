@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Recommendation,
   fetchUserRecommendations
@@ -15,47 +16,34 @@ export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFet
   const { user } = useAuth();
   const { toast } = useToast();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   
-  // Fetch recommendations
-  const fetchRecommendations = async () => {
-    if (!profileUserId) return;
-    
-    try {
-      setIsLoading(true);
-      // Use fetchUserRecommendations instead of fetchRecommendationWithLikesAndSaves
-      // because it returns a direct array of recommendations
-      const data = await fetchUserRecommendations(
-        user?.id || null, 
-        profileUserId
-      );
-      setRecommendations(data);
-      setError(null);
-    } catch (err) {
+  // Use React Query for caching recommendations
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['recommendations', profileUserId, user?.id],
+    queryFn: async () => {
+      if (!profileUserId) return [];
+      return await fetchUserRecommendations(user?.id || null, profileUserId);
+    },
+    enabled: !!profileUserId,
+    staleTime: 2 * 60 * 1000, // Keep recommendations fresh for 2 minutes
+    onSuccess: (data) => {
+      setRecommendations(data || []);
+    },
+    onError: (err) => {
       console.error('Error in useRecommendationsFetch:', err);
-      setError(err instanceof Error ? err : new Error('Failed to fetch recommendations'));
       toast({
         title: 'Error',
         description: 'Failed to load recommendations. Please try again.',
         variant: 'destructive'
       });
-    } finally {
-      setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (profileUserId) {
-      fetchRecommendations();
-    }
-  }, [profileUserId, user?.id]);
+  });
 
   return {
     recommendations,
     setRecommendations,
     isLoading,
     error,
-    refreshRecommendations: fetchRecommendations
+    refreshRecommendations: refetch
   };
 };
