@@ -26,10 +26,11 @@ export const fetchUserRecommendations = async (
       query = query.eq('user_id', profileUserId);
     }
 
-    // Filter by category if provided with type safety
+    // Filter by category if provided
     if (category) {
-      // We'll use the string value directly as Supabase can handle this with enum types
-      query = query.eq('category', category);
+      // Type assertion to handle both string and enum types
+      // This tells TypeScript that we know what we're doing with the category value
+      query = query.eq('category', category as RecommendationCategory);
     }
 
     // Execute the query
