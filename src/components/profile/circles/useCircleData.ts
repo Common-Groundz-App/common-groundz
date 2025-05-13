@@ -17,15 +17,8 @@ export const useCircleData = (profileUserId: string, currentUserId?: string) => 
     queryFn: () => fetchFollowers(profileUserId, currentUserId),
     enabled: !!profileUserId,
     staleTime: 2 * 60 * 1000,
-    meta: {
-      onSuccess: (data: UserProfile[]) => {
-        setFollowers(data);
-      }
-    },
-    onSettled: (data: UserProfile[] | undefined) => {
-      if (data) {
-        setFollowers(data);
-      }
+    onSuccess: (data: UserProfile[]) => {
+      setFollowers(data);
     },
     onError: (error) => {
       console.error('Error fetching followers:', error);
@@ -38,15 +31,8 @@ export const useCircleData = (profileUserId: string, currentUserId?: string) => 
     queryFn: () => fetchFollowing(profileUserId, currentUserId),
     enabled: !!profileUserId,
     staleTime: 2 * 60 * 1000,
-    meta: {
-      onSuccess: (data: UserProfile[]) => {
-        setFollowing(data);
-      }
-    },
-    onSettled: (data: UserProfile[] | undefined) => {
-      if (data) {
-        setFollowing(data);
-      }
+    onSuccess: (data: UserProfile[]) => {
+      setFollowing(data);
     },
     onError: (error) => {
       console.error('Error fetching following:', error);

@@ -34,7 +34,6 @@ export const useRecommendations = ({ profileUserId }: UseRecommendationsProps) =
     addRecommendation
   } = useRecommendationActions(recommendations, setRecommendations, async () => {
     await refreshRecommendations();
-    return;
   });
   
   const { handleImageUpload } = useRecommendationUploads();
