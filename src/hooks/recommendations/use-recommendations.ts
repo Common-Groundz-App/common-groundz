@@ -32,7 +32,10 @@ export const useRecommendations = ({ profileUserId }: UseRecommendationsProps) =
     handleLike,
     handleSave,
     addRecommendation
-  } = useRecommendationActions(recommendations, setRecommendations, refreshRecommendations);
+  } = useRecommendationActions(recommendations, setRecommendations, async () => {
+    await refreshRecommendations();
+    return;
+  });
   
   const { handleImageUpload } = useRecommendationUploads();
 
