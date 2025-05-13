@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge"; // Add Badge import
+import { Badge } from "@/components/ui/badge";
 import { MoreVertical, Pencil, Flag, Trash2, AlertTriangle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
@@ -216,9 +216,9 @@ const ReviewCard = ({
       <Card 
         key={review.id} 
         className={cn(
-          "overflow-hidden mx-auto max-w-[680px] p-4 bg-white dark:bg-gray-900/50 rounded-2xl",
-          "shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01]",
-          "flex flex-col gap-4",
+          "overflow-hidden bg-white dark:bg-gray-900/50 rounded-xl",
+          "shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.01]",
+          "flex flex-col h-full",
           cardStyles.cardBorder,
           review.is_converted && "opacity-75",
           review.status === 'flagged' && "border-yellow-300",
@@ -273,32 +273,36 @@ const ReviewCard = ({
           </div>
         )}
         
-        {/* Card Header */}
-        <ReviewCardHeader 
-          review={review}
-          getStatusBadge={getStatusBadge}
-          getCategoryColor={getCategoryColor}
-          getCategoryEmoji={getCategoryEmoji}
-          getCategoryLabel={getCategoryLabel}
-        />
-        
-        {/* Card Body */}
-        <ReviewCardBody 
-          review={review}
-          mediaItems={mediaItems}
-          getFallbackImage={getFallbackImage}
-          getCategoryFallbackImage={getCategoryFallbackImage}
-          isExpanded={isExpanded}
-          setIsExpanded={setIsExpanded}
-        />
-        
-        {/* Card Footer */}
-        <ReviewCardFooter 
-          review={review}
-          onLike={onLike}
-          onSave={onSave}
-          onConvert={onConvert}
-        />
+        <div className="p-4 flex flex-col h-full">
+          {/* Card Header */}
+          <ReviewCardHeader 
+            review={review}
+            getStatusBadge={getStatusBadge}
+            getCategoryColor={getCategoryColor}
+            getCategoryEmoji={getCategoryEmoji}
+            getCategoryLabel={getCategoryLabel}
+          />
+          
+          {/* Card Body */}
+          <div className="flex-grow">
+            <ReviewCardBody 
+              review={review}
+              mediaItems={mediaItems}
+              getFallbackImage={getFallbackImage}
+              getCategoryFallbackImage={getCategoryFallbackImage}
+              isExpanded={isExpanded}
+              setIsExpanded={setIsExpanded}
+            />
+          </div>
+          
+          {/* Card Footer */}
+          <ReviewCardFooter 
+            review={review}
+            onLike={onLike}
+            onSave={onSave}
+            onConvert={onConvert}
+          />
+        </div>
       </Card>
 
       {/* Delete Confirmation Dialog */}

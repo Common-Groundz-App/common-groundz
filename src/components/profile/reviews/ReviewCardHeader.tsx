@@ -22,15 +22,15 @@ const ReviewCardHeader: React.FC<ReviewCardHeaderProps> = ({
   getCategoryLabel
 }) => {
   return (
-    <div className="space-y-3">
+    <div className="mb-3">
       {/* User info and timestamp */}
-      <div className="flex items-center gap-2">
-        <Avatar className="h-8 w-8">
+      <div className="flex items-center gap-2 mb-2">
+        <Avatar className="h-7 w-7">
           <AvatarImage src={review.avatar_url || undefined} alt={review.username || 'User'} />
           <AvatarFallback>{(review.username || 'U')[0].toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <div className="font-medium text-sm">{review.username || 'User'}</div>
+          <div className="font-medium text-xs">{review.username || 'User'}</div>
           <div className="text-xs text-muted-foreground">
             {format(new Date(review.created_at), 'MMM d, yyyy')}
           </div>
@@ -45,8 +45,8 @@ const ReviewCardHeader: React.FC<ReviewCardHeaderProps> = ({
         </Badge>
         {getStatusBadge()}
         {review.is_converted && (
-          <Badge variant="secondary" className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
-            <UploadCloud size={12} />
+          <Badge variant="secondary" className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1 text-xs">
+            <UploadCloud size={10} />
             <span>Converted</span>
           </Badge>
         )}

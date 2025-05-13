@@ -40,13 +40,13 @@ const ReviewCardFooter: React.FC<ReviewCardFooterProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800">
+    <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100 dark:border-gray-800">
       <div className="flex items-center gap-2">
         <Button 
           variant="ghost" 
           size="sm" 
           className={cn(
-            "transition-colors flex items-center gap-1 px-2",
+            "transition-colors flex items-center gap-1 px-2 py-0 h-8",
             review.isLiked 
               ? "text-red-500" 
               : "text-gray-500 hover:text-red-500"
@@ -57,17 +57,17 @@ const ReviewCardFooter: React.FC<ReviewCardFooterProps> = ({
             size={16} 
             className={review.isLiked ? "fill-red-500" : ""} 
           />
-          <span>{review.likes || 0}</span>
+          <span className="text-xs">{review.likes || 0}</span>
         </Button>
         
         <Button
           variant="ghost"
           size="sm"
-          className="transition-colors flex items-center gap-1 px-2 text-gray-500 hover:text-gray-700"
+          className="transition-colors flex items-center gap-1 px-2 py-0 h-8 text-gray-500 hover:text-gray-700"
         >
           <MessageCircle size={16} />
           {review.comment_count > 0 && (
-            <span>{review.comment_count}</span>
+            <span className="text-xs">{review.comment_count}</span>
           )}
         </Button>
       </div>
@@ -84,7 +84,7 @@ const ReviewCardFooter: React.FC<ReviewCardFooterProps> = ({
           )}
           onClick={handleSaveClick}
         >
-          <Bookmark size={18} className={review.isSaved ? "fill-brand-orange" : ""} />
+          <Bookmark size={16} className={review.isSaved ? "fill-brand-orange" : ""} />
         </Button>
 
         {!review.is_converted && onConvert && (
@@ -94,9 +94,9 @@ const ReviewCardFooter: React.FC<ReviewCardFooterProps> = ({
                 variant="outline" 
                 size="sm"
                 onClick={handleConvertClick}
-                className="text-xs flex items-center gap-1"
+                className="text-xs flex items-center gap-1 h-7 px-2"
               >
-                <UploadCloud size={14} /> Convert
+                <UploadCloud size={12} /> Convert
               </Button>
             </TooltipTrigger>
             <TooltipContent>

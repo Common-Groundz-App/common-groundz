@@ -20,7 +20,7 @@ interface ReviewCardBodyProps {
   setIsExpanded: (value: boolean) => void;
 }
 
-const CONTENT_LIMIT = 150;
+const CONTENT_LIMIT = 120;
 
 const ReviewCardBody: React.FC<ReviewCardBodyProps> = ({
   review,
@@ -31,20 +31,20 @@ const ReviewCardBody: React.FC<ReviewCardBodyProps> = ({
   setIsExpanded
 }) => {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Media Gallery */}
-      <div className="h-56 relative overflow-hidden rounded-xl">
+      <div className="h-48 relative overflow-hidden rounded-lg">
         {mediaItems.length > 0 ? (
           <PostMediaDisplay
             media={mediaItems}
             aspectRatio="16:9"
             objectFit="cover"
             enableBackground={true}
-            className="w-full h-full rounded-xl"
+            className="w-full h-full rounded-lg"
             thumbnailDisplay="hover"
           />
         ) : (
-          <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden rounded-xl">
+          <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden rounded-lg">
             <ImageWithFallback
               src={getFallbackImage()}
               alt={`${review.title} - ${review.category}`}
@@ -64,8 +64,8 @@ const ReviewCardBody: React.FC<ReviewCardBodyProps> = ({
       </div>
 
       {/* Title and Rating */}
-      <div className="flex items-start justify-between gap-4">
-        <h3 className="text-lg font-bold line-clamp-2 flex-1">{review.title}</h3>
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-base font-semibold line-clamp-2">{review.title}</h3>
         <div className="flex-shrink-0">
           <ConnectedRingsRating 
             value={review.rating} 
@@ -76,9 +76,9 @@ const ReviewCardBody: React.FC<ReviewCardBodyProps> = ({
       </div>
 
       {/* Venue and Experience Date */}
-      <div className="flex flex-wrap gap-3 items-center text-sm text-muted-foreground">
+      <div className="flex flex-wrap gap-2 items-center text-xs text-muted-foreground">
         {review.venue && (
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 truncate max-w-[150px]">
             <span>📍</span>
             {review.venue}
           </span>
@@ -96,8 +96,8 @@ const ReviewCardBody: React.FC<ReviewCardBodyProps> = ({
       {review.description && (
         <div>
           <div className={cn(
-            "text-sm relative",
-            isExpanded ? "" : "max-h-[80px] overflow-hidden"
+            "text-xs text-muted-foreground relative",
+            isExpanded ? "" : "max-h-[60px] overflow-hidden"
           )}>
             <p>{review.description}</p>
             
@@ -108,13 +108,13 @@ const ReviewCardBody: React.FC<ReviewCardBodyProps> = ({
           
           {review.description && review.description.length > CONTENT_LIMIT && (
             <Button
-              variant="link"
+              variant="ghost"
               size="sm"
-              className="p-0 h-auto font-normal text-muted-foreground"
+              className="p-0 h-auto text-xs font-normal text-muted-foreground mt-1"
               onClick={() => setIsExpanded(!isExpanded)}
             >
               {isExpanded ? "Show less" : "Show more"}
-              <ChevronDown className={cn("h-4 w-4 ml-1 transition-transform", isExpanded && "rotate-180")} />
+              <ChevronDown className={cn("h-3 w-3 ml-1 transition-transform", isExpanded && "rotate-180")} />
             </Button>
           )}
         </div>
@@ -122,8 +122,8 @@ const ReviewCardBody: React.FC<ReviewCardBodyProps> = ({
 
       {/* Tags */}
       {review.tags && review.tags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {review.tags.map((tag, index) => (
+        <div className="flex flex-wrap gap-1">
+          {review.tags.slice(0, 3).map((tag, index) => (
             <Badge 
               key={index}
               variant="outline" 
@@ -132,6 +132,9 @@ const ReviewCardBody: React.FC<ReviewCardBodyProps> = ({
               {tag}
             </Badge>
           ))}
+          {review.tags.length > 3 && (
+            <span className="text-xs text-muted-foreground">+{review.tags.length - 3} more</span>
+          )}
         </div>
       )}
     </div>
