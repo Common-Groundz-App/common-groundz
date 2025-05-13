@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import ProfileHeader from './ProfileHeader';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
@@ -13,11 +13,18 @@ import { useCardStyles } from '@/utils/theme-utils';
 import ProfileCard from './ProfileCard';
 import { useAuth } from '@/contexts/AuthContext';
 
-const ProfileContent = () => {
+interface ProfileContentProps {
+  defaultActiveTab?: string;
+}
+
+const ProfileContent = ({ defaultActiveTab = 'posts' }: ProfileContentProps) => {
   const { userId } = useParams();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('posts');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || defaultActiveTab;
   const cardStyles = useCardStyles();
+  
   const { 
     isLoading, 
     error,
@@ -30,9 +37,10 @@ const ProfileContent = () => {
     isOwnProfile
   } = useProfileData(userId);
 
-  useEffect(() => {
-    setActiveTab('posts');
-  }, [userId]);
+  // Handle tab change by updating URL parameter instead of state
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value });
+  };
 
   if (isLoading) {
     return (
@@ -84,7 +92,7 @@ const ProfileContent = () => {
             <ScrollArea className="w-full">
               <TubelightTabs 
                 defaultValue={activeTab} 
-                onValueChange={setActiveTab}
+                onValueChange={handleTabChange}
                 items={tabItems}
                 className="mb-6"
               >
