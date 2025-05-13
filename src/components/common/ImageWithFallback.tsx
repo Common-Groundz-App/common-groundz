@@ -25,9 +25,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       setHasError(false);
       setRetryCount(0);
       const secureUrl = ensureHttps(src);
-      console.log("ImageWithFallback: Processing URL:", secureUrl);
+      console.log("ImageWithFallback: Processing URL:", secureUrl, "Original:", src);
       setImgSrc(secureUrl);
     } else {
+      console.log("ImageWithFallback: No source URL provided, using fallback:", fallbackSrc);
       setImgSrc(fallbackSrc);
     }
   }, [src, fallbackSrc]);
@@ -44,7 +45,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         setImgSrc(`${imgSrc}${imgSrc?.includes('?') ? '&' : '?'}_retry=${Date.now()}`);
       }, 1000);
     } else if (!hasError) {
-      console.log("Using fallback image after retries");
+      console.log("Using fallback image after retries:", fallbackSrc);
       setImgSrc(fallbackSrc);
       setHasError(true);
       

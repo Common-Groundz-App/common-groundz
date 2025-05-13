@@ -21,6 +21,7 @@ import { toast } from '@/hooks/use-toast';
 import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
+import { ensureHttps } from '@/utils/urlUtils';
 
 interface RecommendationCardProps {
   recommendation: any;
@@ -47,15 +48,29 @@ const RecommendationCard = ({
   
   const isOwner = user?.id === recommendation.user_id;
 
+  // Get entity image URL if available, ensuring it uses HTTPS
+  const entityImageUrl = recommendation.entity?.image_url 
+    ? ensureHttps(recommendation.entity.image_url) 
+    : null;
+
   // Process media items for proper fallback handling
   const mediaItems = React.useMemo(() => {
+    console.log(`Processing media for recommendation ${recommendation.id}:`, {
+      hasMedia: Boolean(recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0),
+      hasImageUrl: Boolean(recommendation.image_url),
+      hasEntityImage: Boolean(entityImageUrl),
+      entityId: recommendation.entity?.id,
+    });
+    
     // If media array is already provided
     if (recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0) {
+      console.log(`Using ${recommendation.media.length} media items from recommendation.media`);
       return recommendation.media as MediaItem[];
     }
     
     // If we have a legacy image_url, convert it to a media item
     if (recommendation.image_url) {
+      console.log(`Using legacy image_url: ${recommendation.image_url}`);
       return [{
         url: recommendation.image_url,
         type: 'image',
@@ -65,17 +80,20 @@ const RecommendationCard = ({
     }
     
     // If we have an entity with an image, use it as fallback
-    if (recommendation.entity?.image_url) {
+    if (entityImageUrl) {
+      console.log(`Using entity image as fallback: ${entityImageUrl}`);
       return [{
-        url: recommendation.entity.image_url,
+        url: entityImageUrl,
         type: 'image',
         order: 0,
-        id: `entity-${recommendation.entity.id}`
+        id: `entity-${recommendation.entity.id}`,
+        source: 'entity'
       }] as MediaItem[];
     }
     
+    console.log(`No media found for recommendation ${recommendation.id}, using empty array`);
     return [] as MediaItem[];
-  }, [recommendation]);
+  }, [recommendation, entityImageUrl]);
 
   // Get a category-specific fallback image URL
   const getCategoryFallbackImage = (category: string): string => {
@@ -94,6 +112,16 @@ const RecommendationCard = ({
     };
     
     return fallbacks[category] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
+  };
+  
+  // Get a fallback image with proper priority:
+  // 1. Entity image if available
+  // 2. Category image if no entity image
+  const getFallbackImage = (): string => {
+    if (entityImageUrl) {
+      return entityImageUrl;
+    }
+    return recommendation.category ? getCategoryFallbackImage(recommendation.category) : 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
   };
 
   const handleLike = async () => {
@@ -266,16 +294,16 @@ const RecommendationCard = ({
               enableBackground={true}
               thumbnailDisplay="none"
             />
-          ) : recommendation.category ? (
+          ) : (
             <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
               <ImageWithFallback
-                src={getCategoryFallbackImage(recommendation.category)}
-                alt={`${recommendation.title} - ${recommendation.category}`}
+                src={getFallbackImage()}
+                alt={`${recommendation.title} - ${recommendation.category || 'Recommendation'}`}
                 className="w-full h-full object-cover"
-                fallbackSrc={getCategoryFallbackImage(recommendation.category)}
+                fallbackSrc={recommendation.category ? getCategoryFallbackImage(recommendation.category) : undefined}
               />
             </div>
-          ) : null}
+          )}
         </div>
         
         {/* Description */}

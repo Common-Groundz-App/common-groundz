@@ -3,10 +3,16 @@
  * Ensures a URL uses HTTPS instead of HTTP
  */
 export const ensureHttps = (url: string): string => {
-  if (!url) return url;
+  if (!url) {
+    console.log("ensureHttps: Empty URL provided");
+    return url;
+  }
   
   // If it's a relative URL, return as is
-  if (url.startsWith('/')) return url;
+  if (url.startsWith('/')) {
+    console.log("ensureHttps: Relative URL detected", url);
+    return url;
+  }
   
   // Handle google API URLs with photo references that may not need modification
   if (url.includes('maps.googleapis.com/maps/api/place/photo')) {
@@ -15,16 +21,22 @@ export const ensureHttps = (url: string): string => {
   }
   
   // If it's already HTTPS, return as is
-  if (url.startsWith('https://')) return url;
+  if (url.startsWith('https://')) {
+    return url;
+  }
   
   // If it's an HTTP URL, convert to HTTPS
   if (url.startsWith('http://')) {
-    return `https://${url.slice(7)}`;
+    const httpsUrl = `https://${url.slice(7)}`;
+    console.log("ensureHttps: Converting HTTP to HTTPS", { from: url, to: httpsUrl });
+    return httpsUrl;
   }
   
   // If there's no protocol, assume HTTPS
   if (!url.includes('://')) {
-    return `https://${url}`;
+    const httpsUrl = `https://${url}`;
+    console.log("ensureHttps: Adding HTTPS protocol", { from: url, to: httpsUrl });
+    return httpsUrl;
   }
   
   return url;

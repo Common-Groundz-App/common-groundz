@@ -56,14 +56,25 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     const entitiesMap = new Map();
     for (const review of reviewsData) {
       if (review.entity_id) {
-        const { data: entityData } = await supabase
+        console.log(`Fetching entity data for review ${review.id}, entity_id: ${review.entity_id}`);
+        const { data: entityData, error: entityError } = await supabase
           .from('entities')
           .select('*')
           .eq('id', review.entity_id)
           .single();
         
+        if (entityError) {
+          console.error(`Error fetching entity data for review ${review.id}:`, entityError);
+        }
+        
         if (entityData) {
+          console.log(`Found entity data for review ${review.id}:`, {
+            name: entityData.name,
+            image_url: entityData.image_url
+          });
           entitiesMap.set(review.entity_id, entityData);
+        } else {
+          console.log(`No entity data found for review ${review.id}, entity_id: ${review.entity_id}`);
         }
       }
     }
@@ -127,6 +138,17 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
         } catch (e) {
           console.error('Error processing media data:', e);
         }
+      }
+
+      // Log entity information for debugging
+      if (entity) {
+        console.log(`Review ${review.id} has entity:`, {
+          entity_id: review.entity_id,
+          entity_name: entity.name,
+          entity_image: entity.image_url
+        });
+      } else if (review.entity_id) {
+        console.log(`Review ${review.id} has entity_id ${review.entity_id} but no entity data was found`);
       }
 
       return {
@@ -326,13 +348,26 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
     // Get entity data if there's an entity_id
     let entity = null;
     if (data.entity_id) {
-      const { data: entityData } = await supabase
+      console.log(`Fetching entity data for review ${id}, entity_id: ${data.entity_id}`);
+      const { data: entityData, error: entityError } = await supabase
         .from('entities')
         .select('*')
         .eq('id', data.entity_id)
         .single();
       
-      entity = entityData;
+      if (entityError) {
+        console.error(`Error fetching entity for review ${id}:`, entityError);
+      }
+      
+      if (entityData) {
+        console.log(`Found entity for review ${id}:`, {
+          name: entityData.name, 
+          image_url: entityData.image_url
+        });
+        entity = entityData;
+      } else {
+        console.log(`No entity found for review ${id} with entity_id ${data.entity_id}`);
+      }
     }
 
     // Get likes count

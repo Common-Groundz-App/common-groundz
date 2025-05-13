@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +21,7 @@ import { format } from 'date-fns';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { ensureHttps } from '@/utils/urlUtils';
 
 interface ReviewCardProps {
   review: Review;
@@ -47,15 +47,27 @@ const ReviewCard = ({
   const isOwner = user?.id === review.user_id;
   const isAdmin = user?.email?.includes('@lovable.dev') || false; // Simple admin check
   
+  // Get entity image URL if available, ensuring it uses HTTPS
+  const entityImageUrl = review.entity?.image_url ? ensureHttps(review.entity.image_url) : null;
+  
   // Process media items for display with improved fallback handling
   const mediaItems = React.useMemo(() => {
+    console.log(`Processing media for review ${review.id}:`, {
+      hasMedia: Boolean(review.media && Array.isArray(review.media) && review.media.length > 0),
+      hasImageUrl: Boolean(review.image_url),
+      hasEntityImage: Boolean(entityImageUrl),
+      entityId: review.entity?.id,
+    });
+    
     // If we have a media array already, use it
     if (review.media && Array.isArray(review.media) && review.media.length > 0) {
+      console.log(`Using ${review.media.length} media items from review.media`);
       return review.media as MediaItem[];
     }
     
     // If we have a legacy image_url, convert it to a media item
     if (review.image_url) {
+      console.log(`Using legacy image_url: ${review.image_url}`);
       return [{
         url: review.image_url,
         type: 'image',
@@ -65,17 +77,20 @@ const ReviewCard = ({
     }
     
     // If we have an entity with an image, use it as fallback
-    if (review.entity?.image_url) {
+    if (entityImageUrl) {
+      console.log(`Using entity image as fallback: ${entityImageUrl}`);
       return [{
-        url: review.entity.image_url,
+        url: entityImageUrl,
         type: 'image',
         order: 0,
-        id: `entity-${review.entity.id}`
+        id: `entity-${review.entity?.id}`,
+        source: 'entity'
       }] as MediaItem[];
     }
     
+    console.log(`No media found for review ${review.id}, using empty array`);
     return [] as MediaItem[];
-  }, [review]);
+  }, [review, entityImageUrl]);
   
   // Get a category-specific fallback image URL for when no image is available
   const getCategoryFallbackImage = (category: string): string => {
@@ -91,6 +106,16 @@ const ReviewCard = ({
     };
     
     return fallbacks[category.toLowerCase()] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
+  };
+  
+  // Get a fallback image with the proper priority:
+  // 1. Entity image if available
+  // 2. Category image if no entity image
+  const getFallbackImage = (): string => {
+    if (entityImageUrl) {
+      return entityImageUrl;
+    }
+    return getCategoryFallbackImage(review.category);
   };
   
   const getCategoryLabel = (category: string): string => {
@@ -224,7 +249,7 @@ const ReviewCard = ({
             ) : (
               <div className="w-full h-full bg-gray-100 flex items-center justify-center overflow-hidden">
                 <ImageWithFallback
-                  src={getCategoryFallbackImage(review.category)}
+                  src={getFallbackImage()}
                   alt={`${review.title} - ${review.category}`}
                   className="w-full h-full object-cover"
                   fallbackSrc={getCategoryFallbackImage(review.category)}
