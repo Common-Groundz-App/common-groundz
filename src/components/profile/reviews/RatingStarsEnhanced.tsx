@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { cn } from "@/lib/utils";
-import ConnectedRingsRating from '@/components/ui/connected-rings';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 interface RatingStarsEnhancedProps {
   value: number;

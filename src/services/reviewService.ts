@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';  // Added import for MediaItem
 import { Database } from '@/integrations/supabase/types';
@@ -29,6 +30,10 @@ export interface Review {
     food_tags?: string[];
     [key: string]: any;
   };
+  // Add missing properties needed by ReviewCard
+  username?: string | null;
+  avatar_url?: string | null;
+  tags?: string[];
 }
 
 // Fetch user reviews - optimized with batch operations
