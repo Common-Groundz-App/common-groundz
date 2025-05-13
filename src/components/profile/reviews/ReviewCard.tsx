@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge"; // Add Badge import
 import { MoreVertical, Pencil, Flag, Trash2, AlertTriangle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
