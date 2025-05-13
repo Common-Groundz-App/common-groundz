@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Import sub-hooks
 import { useRecommendationFilters } from './use-recommendation-filters';
-import { useRecommendationFetch } from './use-recommendations-fetch';
+import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useRecommendationActions } from './use-recommendation-actions';
 import { useRecommendationUploads } from './use-recommendation-uploads';
 import { useEntityOperations } from './use-entity-operations';
@@ -32,12 +32,10 @@ export const useRecommendations = ({
   // Initialize sub-hooks
   const { activeFilter, setActiveFilter, sortBy, setSortBy, clearFilters } = useRecommendationFilters();
   
-  const { recommendations, fetchRecommendations, refreshRecommendations } = 
-    useRecommendationFetch({
+  const { recommendations, setRecommendations, isLoading: isFetching, refreshRecommendations } = 
+    useRecommendationsFetch({
       profileUserId,
-      entityId,
       category: activeFilter || category,
-      sortBy,
       limit
     });
   
@@ -85,24 +83,16 @@ export const useRecommendations = ({
   // Initial fetch
   useEffect(() => {
     const loadRecommendations = async () => {
-      setIsLoading(true);
-      try {
-        await fetchRecommendations();
-      } catch (err: any) {
-        console.error("Error loading recommendations:", err);
-        setError(err);
-      } finally {
-        setIsLoading(false);
-      }
+      setIsLoading(false); // We're using the isLoading from useRecommendationsFetch instead
     };
 
     loadRecommendations();
-  }, [fetchRecommendations, activeFilter, sortBy]);
+  }, [activeFilter, sortBy]);
 
   // Return consolidated hook data and functions
   return {
     recommendations,
-    isLoading,
+    isLoading: isFetching, // Use the loading state from the fetch hook
     error,
     activeFilter,
     setActiveFilter,
