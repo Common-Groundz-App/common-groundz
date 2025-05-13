@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -27,6 +28,20 @@ const Feed = React.memo(() => {
   const [isActive, setIsActive] = useState(false);
   const [startY, setStartY] = useState(0);
   const [newContentAvailable, setNewContentAvailable] = useState(false);
+  
+  // Add missing state variables
+  const [hasScrolledDown, setHasScrolledDown] = useState(false);
+  const [showNewPosts, setShowNewPosts] = useState(false);
+  const [newPostCount, setNewPostCount] = useState(0);
+
+  // Add missing refs
+  const lastScrollTop = useRef(0);
+  const frameId = useRef(0);
+  const lastUpdateTime = useRef(0);
+  
+  // Add missing constants
+  const pullThreshold = 80;
+  const startThreshold = 10;
   
   const getInitialActiveTab = () => {
     if (location.pathname === '/home' || location.pathname === '/feed') {
