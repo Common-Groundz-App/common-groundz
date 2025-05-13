@@ -5,6 +5,7 @@ import ProfilePostItem from './ProfilePostItem';
 import ProfilePostsEmpty from './ProfilePostsEmpty';
 import ProfilePostsLoading from './ProfilePostsLoading';
 import { fetchUserPosts, Post } from './services/profilePostsService';
+import { useContentMutationManager } from '@/hooks/use-content-mutation-manager';
 
 interface ProfilePostsProps {
   profileUserId: string;
@@ -15,6 +16,7 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const contentMutation = useContentMutationManager();
 
   const loadPosts = async () => {
     try {
@@ -55,8 +57,14 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
     // Immediately update the local state by filtering out the deleted post
     setPosts(currentPosts => currentPosts.filter(post => post.id !== deletedPostId));
     
-    // Also refresh from the server to ensure data consistency
-    loadPosts();
+    // Notify the mutation manager so it can handle invalidation
+    contentMutation.mutationCompleted('post', 'delete', {
+      showToast: true,
+      toastMessage: {
+        title: 'Post deleted',
+        description: 'Your post has been removed successfully'
+      }
+    }, profileUserId);
   };
 
   if (loading) {
@@ -70,7 +78,11 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   return (
     <div className="space-y-6">
       {posts.map(post => (
-        <ProfilePostItem key={post.id} post={post} onDeleted={() => handlePostDeleted(post.id)} />
+        <ProfilePostItem 
+          key={post.id} 
+          post={post} 
+          onDeleted={() => handlePostDeleted(post.id)} 
+        />
       ))}
     </div>
   );
