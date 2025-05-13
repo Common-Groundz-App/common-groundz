@@ -54,6 +54,13 @@ const RecommendationCard = ({
     ? ensureHttps(recommendation.entity.image_url) 
     : null;
 
+  console.log(`RecommendationCard - Recommendation ${recommendation.id} entity data:`, {
+    hasEntity: !!recommendation.entity,
+    entityId: recommendation.entity?.id,
+    entityName: recommendation.entity?.name,
+    entityImageUrl: entityImageUrl
+  });
+
   // Process media items for proper fallback handling
   const mediaItems = React.useMemo(() => {
     console.log(`Processing media for recommendation ${recommendation.id}:`, {
@@ -87,7 +94,7 @@ const RecommendationCard = ({
         url: entityImageUrl,
         type: 'image' as const,
         order: 0,
-        id: `entity-${recommendation.entity.id}`,
+        id: `entity-${recommendation.entity?.id}`,
         source: 'entity' // This is now defined in the MediaItem interface
       }] as MediaItem[];
     }

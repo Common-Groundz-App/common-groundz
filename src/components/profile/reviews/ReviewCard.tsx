@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,13 @@ const ReviewCard = ({
   
   // Get entity image URL if available, ensuring it uses HTTPS
   const entityImageUrl = review.entity?.image_url ? ensureHttps(review.entity.image_url) : null;
+  
+  console.log(`ReviewCard - Review ${review.id} entity data:`, {
+    hasEntity: !!review.entity,
+    entityId: review.entity?.id,
+    entityName: review.entity?.name,
+    entityImageUrl: entityImageUrl
+  });
   
   // Process media items for display with improved fallback handling
   const mediaItems = React.useMemo(() => {
