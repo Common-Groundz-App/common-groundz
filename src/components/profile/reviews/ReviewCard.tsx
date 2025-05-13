@@ -55,7 +55,8 @@ const ReviewCard = ({
     hasEntity: !!review.entity,
     entityId: review.entity?.id,
     entityName: review.entity?.name,
-    entityImageUrl: entityImageUrl
+    entityImageUrl: entityImageUrl,
+    rawEntityId: review.entity_id
   });
   
   // Process media items for display with improved fallback handling
@@ -65,6 +66,7 @@ const ReviewCard = ({
       hasImageUrl: Boolean(review.image_url),
       hasEntityImage: Boolean(entityImageUrl),
       entityId: review.entity?.id,
+      rawEntityId: review.entity_id,
     });
     
     // If we have a media array already, use it

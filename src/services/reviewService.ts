@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';  // Added import for MediaItem
 import { Database } from '@/integrations/supabase/types';
@@ -52,30 +53,32 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     // Get array of review IDs
     const reviewIds = reviewsData.map(rev => rev.id);
 
-    // Get entities data
+    // Get entity IDs from all reviews for batch fetching
+    const entityIds = reviewsData
+      .filter(review => review.entity_id !== null)
+      .map(review => review.entity_id);
+
+    console.log('Entity IDs from reviews:', entityIds);
+
+    // If we have entity IDs, fetch the entity data in a batch
     const entitiesMap = new Map();
-    for (const review of reviewsData) {
-      if (review.entity_id) {
-        console.log(`Fetching entity data for review ${review.id}, entity_id: ${review.entity_id}`);
-        const { data: entityData, error: entityError } = await supabase
-          .from('entities')
-          .select('*')
-          .eq('id', review.entity_id)
-          .single();
+    
+    if (entityIds && entityIds.length > 0) {
+      const { data: entitiesData, error: entitiesError } = await supabase
+        .from('entities')
+        .select('*')
+        .in('id', entityIds);
+      
+      if (entitiesError) {
+        console.error('Error fetching entities batch:', entitiesError);
+      } else if (entitiesData) {
+        console.log(`Found ${entitiesData.length} entities for reviews`);
         
-        if (entityError) {
-          console.error(`Error fetching entity data for review ${review.id}:`, entityError);
-        }
-        
-        if (entityData) {
-          console.log(`Found entity data for review ${review.id}:`, {
-            name: entityData.name,
-            image_url: entityData.image_url
-          });
-          entitiesMap.set(review.entity_id, entityData);
-        } else {
-          console.log(`No entity data found for review ${review.id}, entity_id: ${review.entity_id}`);
-        }
+        // Map entities by ID for quick lookup
+        entitiesData.forEach(entity => {
+          console.log(`Mapping entity ${entity.id}: ${entity.name}`);
+          entitiesMap.set(entity.id, entity);
+        });
       }
     }
 
@@ -117,7 +120,16 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       const likes = likeCountMap.get(review.id) || 0;
       const isLiked = userLikes?.some(l => l.review_id === review.id) || false;
       const isSaved = userSaves?.some(s => s.review_id === review.id) || false;
+      
+      // Get the entity for this review from our map
       const entity = review.entity_id ? entitiesMap.get(review.entity_id) : null;
+      
+      console.log(`Review ${review.id} entity lookup:`, {
+        entity_id: review.entity_id,
+        entity_found: !!entity,
+        entity_name: entity?.name,
+        entity_image: entity?.image_url
+      });
 
       // Process the media field coming from Supabase (convert from Json to MediaItem[])
       let processedMedia: MediaItem[] | null = null;
@@ -138,17 +150,6 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
         } catch (e) {
           console.error('Error processing media data:', e);
         }
-      }
-
-      // Log entity information for debugging
-      if (entity) {
-        console.log(`Review ${review.id} has entity:`, {
-          entity_id: review.entity_id,
-          entity_name: entity.name,
-          entity_image: entity.image_url
-        });
-      } else if (review.entity_id) {
-        console.log(`Review ${review.id} has entity_id ${review.entity_id} but no entity data was found`);
       }
 
       return {
@@ -234,7 +235,8 @@ export const toggleReviewSave = async (reviewId: string, userId: string, isSaved
 
 // Create review
 export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'updated_at' | 'is_converted' | 'recommendation_id' | 'status'>) => {
-  console.log("Creating review with metadata:", review.metadata);
+  console.log("Creating review with entity_id:", review.entity_id);
+  console.log("Review metadata:", review.metadata);
   
   // Convert MediaItem[] to a format that Supabase can handle
   const mediaForStorage = review.media ? JSON.parse(JSON.stringify(review.media)) : null;
@@ -253,6 +255,7 @@ export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'u
       user_id: review.user_id,
       experience_date: review.experience_date,
       metadata: review.metadata,
+      entity_id: review.entity_id, // Ensure entity_id is saved properly
       is_converted: false,
       recommendation_id: null,
       status: 'published'
@@ -441,6 +444,7 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
 
 // Update review
 export const updateReview = async (id: string, updates: Partial<Review>) => {
+  console.log("Updating review entity_id:", updates.entity_id);
   console.log("Updating review with metadata:", updates.metadata);
   
   // Convert MediaItem[] to a format that Supabase can handle
@@ -457,6 +461,7 @@ export const updateReview = async (id: string, updates: Partial<Review>) => {
     category: updates.category,
     visibility: updates.visibility as 'public' | 'private' | 'circle_only',
     experience_date: updates.experience_date,
+    entity_id: updates.entity_id, // Make sure entity_id is included in updates
     metadata: updates.metadata
     // No need to include updated_at as our DB trigger handles that now
   };
