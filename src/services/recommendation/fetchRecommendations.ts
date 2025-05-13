@@ -1,12 +1,12 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Recommendation, EntityType } from './types';
+import { Recommendation, EntityType, RecommendationCategory } from './types';
 import { fetchUserProfile } from '../profileService';
 
 export const fetchUserRecommendations = async (
   userId: string | null = null, 
   profileUserId?: string,
-  category?: string,
+  category?: RecommendationCategory | string,
   sortBy: 'latest' | 'top' = 'latest',
   limit = 50
 ): Promise<Recommendation[]> => {

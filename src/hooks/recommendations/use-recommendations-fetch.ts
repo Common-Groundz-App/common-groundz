@@ -5,12 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Recommendation,
-  fetchUserRecommendations
+  fetchUserRecommendations,
+  RecommendationCategory
 } from '@/services/recommendationService';
 
 interface UseRecommendationsFetchProps {
   profileUserId?: string;
-  category?: string;
+  category?: string | RecommendationCategory;
   limit?: number;
 }
 

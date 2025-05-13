@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Recommendation, EntityType } from './recommendation/types';
+import { Recommendation, EntityType, RecommendationCategory } from './recommendation/types';
 
 // Export types that are used across multiple files
 export type { 
