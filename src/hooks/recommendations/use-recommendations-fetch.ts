@@ -26,20 +26,26 @@ export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFet
     },
     enabled: !!profileUserId,
     staleTime: 2 * 60 * 1000, // Keep recommendations fresh for 2 minutes
-    onSuccess: (data) => {
-      if (data) {
-        setRecommendations(data || []);
-      }
-    },
-    onError: (err) => {
-      console.error('Error in useRecommendationsFetch:', err);
+  });
+
+  // Update recommendations when data changes
+  useEffect(() => {
+    if (data) {
+      setRecommendations(data || []);
+    }
+  }, [data]);
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      console.error('Error in useRecommendationsFetch:', error);
       toast({
         title: 'Error',
         description: 'Failed to load recommendations. Please try again.',
         variant: 'destructive'
       });
     }
-  });
+  }, [error, toast]);
 
   return {
     recommendations,

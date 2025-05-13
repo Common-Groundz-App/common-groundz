@@ -17,13 +17,23 @@ export const useCircleData = (profileUserId: string, currentUserId?: string) => 
     queryFn: () => fetchFollowers(profileUserId, currentUserId),
     enabled: !!profileUserId,
     staleTime: 2 * 60 * 1000,
-    onSuccess: (data: UserProfile[]) => {
-      setFollowers(data);
-    },
-    onError: (error) => {
-      console.error('Error fetching followers:', error);
-    }
   });
+
+  // Set followers when data changes
+  useEffect(() => {
+    const fetchAndSetFollowers = async () => {
+      if (profileUserId) {
+        try {
+          const data = await fetchFollowers(profileUserId, currentUserId);
+          setFollowers(data);
+        } catch (error) {
+          console.error('Error fetching followers:', error);
+        }
+      }
+    };
+    
+    fetchAndSetFollowers();
+  }, [profileUserId, currentUserId]);
 
   // Use React Query to fetch and cache following
   const { isLoading: isLoadingFollowing } = useQuery({
@@ -31,13 +41,23 @@ export const useCircleData = (profileUserId: string, currentUserId?: string) => 
     queryFn: () => fetchFollowing(profileUserId, currentUserId),
     enabled: !!profileUserId,
     staleTime: 2 * 60 * 1000,
-    onSuccess: (data: UserProfile[]) => {
-      setFollowing(data);
-    },
-    onError: (error) => {
-      console.error('Error fetching following:', error);
-    }
   });
+
+  // Set following when data changes
+  useEffect(() => {
+    const fetchAndSetFollowing = async () => {
+      if (profileUserId) {
+        try {
+          const data = await fetchFollowing(profileUserId, currentUserId);
+          setFollowing(data);
+        } catch (error) {
+          console.error('Error fetching following:', error);
+        }
+      }
+    };
+    
+    fetchAndSetFollowing();
+  }, [profileUserId, currentUserId]);
 
   // Updater functions for UI state
   const updateFollowers = (targetUserId: string, isFollowing: boolean) => {
