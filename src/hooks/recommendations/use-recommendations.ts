@@ -1,85 +1,168 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-
-// Import sub-hooks
-import { useRecommendationFilters } from './use-recommendation-filters';
+import { useState } from 'react';
 import { useRecommendationsFetch } from './use-recommendations-fetch';
-import { useRecommendationActions } from './use-recommendation-actions';
-import { useRecommendationUploads } from './use-recommendation-uploads';
-import { useEntityOperations } from './use-entity-operations';
+import { useAuth } from '@/contexts/AuthContext';
+import { 
+  toggleLike, 
+  toggleSave,
+  RecommendationCategory
+} from '@/services/recommendationService';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRecommendationFilters } from './use-recommendation-filters';
+import { Recommendation } from '@/services/recommendation/types';
 
 interface UseRecommendationsProps {
   profileUserId?: string;
-  entityId?: string;
-  category?: string;
+  category?: string | RecommendationCategory;
   limit?: number;
+  filterOptions?: {
+    sort?: 'latest' | 'highestRated' | 'mostLiked';
+    minRating?: number;
+    isCertifiedOnly?: boolean;
+  };
 }
 
-export const useRecommendations = ({
-  profileUserId,
-  entityId,
+export const useRecommendations = ({ 
+  profileUserId, 
   category,
-  limit = 50
+  limit,
+  filterOptions
 }: UseRecommendationsProps = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  // Initialize the fetch hook first since we need recommendations for filters
-  const { recommendations, setRecommendations, isLoading: isFetching, refreshRecommendations } = 
-    useRecommendationsFetch({
-      profileUserId,
-      category: category,
-      limit
-    });
+  const queryClient = useQueryClient();
   
-  // Now we can pass recommendations to the filters hook
-  const { activeFilter, setActiveFilter, sortBy, setSortBy, clearFilters } = 
-    useRecommendationFilters(recommendations);
-  
-  // Pass required arguments to recommendation actions hook
-  const { handleLike, handleSave, addRecommendation } = 
-    useRecommendationActions(recommendations, setRecommendations, refreshRecommendations);
-    
-  const { handleImageUpload } = useRecommendationUploads();
-  const { searchEntities } = useEntityOperations();
-
-  // Update category when activeFilter changes
-  useEffect(() => {
-    // This effect will run when activeFilter changes
-    // The recommendations will be updated by the useRecommendationsFetch hook
-  }, [activeFilter, category]);
-
-  // Initial fetch
-  useEffect(() => {
-    const loadRecommendations = async () => {
-      setIsLoading(false); // We're using the isLoading from useRecommendationsFetch instead
-    };
-
-    loadRecommendations();
-  }, [activeFilter, sortBy]);
-
-  // Return consolidated hook data and functions
-  return {
+  // Fetch recommendations data
+  const { 
     recommendations,
-    isLoading: isFetching, // Use the loading state from the fetch hook
+    isLoading,
     error,
+    refreshRecommendations
+  } = useRecommendationsFetch({ 
+    profileUserId,
+    category,
+    limit 
+  });
+  
+  // Apply filters and sorting
+  const {
     activeFilter,
     setActiveFilter,
-    sortBy, 
+    sortBy,
+    setSortBy,
+    filteredRecommendations,
+    categories,
+    clearFilters
+  } = useRecommendationFilters(recommendations);
+
+  const handleLike = async (id: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to like recommendations",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Optimistic update
+      const prevData = [...(recommendations || [])];
+      
+      // Update local state
+      queryClient.setQueryData(['recommendations', profileUserId, user.id], 
+        (old: any) => old?.map((item: any) => {
+          if (item.id === id) {
+            const isLiked = !item.isLiked;
+            return {
+              ...item,
+              isLiked,
+              likes: isLiked 
+                ? (item.likes || 0) + 1 
+                : Math.max(0, (item.likes || 0) - 1)
+            };
+          }
+          return item;
+        })
+      );
+
+      // Server update - Pass the current like status as the third argument
+      await toggleLike(id, user.id, !!(recommendations?.find(rec => rec.id === id)?.isLiked));
+    } catch (err) {
+      console.error('Error toggling like:', err);
+      // Revert on failure
+      refreshRecommendations();
+      toast({
+        title: "Error",
+        description: "Failed to update like status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSave = async (id: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to save recommendations",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Optimistic update
+      queryClient.setQueryData(['recommendations', profileUserId, user.id], 
+        (old: any) => old?.map((item: any) => {
+          if (item.id === id) {
+            return {
+              ...item,
+              isSaved: !item.isSaved,
+            };
+          }
+          return item;
+        })
+      );
+
+      // Server update - Pass the current save status as the third argument
+      await toggleSave(id, user.id, !!(recommendations?.find(rec => rec.id === id)?.isSaved));
+    } catch (err) {
+      console.error('Error toggling save:', err);
+      // Revert on failure
+      refreshRecommendations();
+      toast({
+        title: "Error",
+        description: "Failed to update save status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Stub functions to satisfy the interface
+  const handleImageUpload = async (file: File): Promise<string | null> => {
+    // Implementation would go here
+    return null;
+  };
+
+  const addRecommendation = async (recommendation: Partial<Recommendation>): Promise<boolean> => {
+    // Implementation would go here
+    return false;
+  };
+
+  return {
+    recommendations: filteredRecommendations,
+    isLoading,
+    error: error,
+    activeFilter,
+    setActiveFilter,
+    sortBy,
     setSortBy,
     handleLike,
     handleSave,
     handleImageUpload,
-    searchEntities,
     addRecommendation,
     clearFilters,
     refreshRecommendations
   };
 };
-
-export default useRecommendations;

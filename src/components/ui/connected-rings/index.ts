@@ -1,3 +1,4 @@
 
-// Export the ConnectedRingsRating component
-export { default as ConnectedRingsRating } from '@/components/recommendations/ConnectedRingsRating';
+import ConnectedRingsRating from '../../recommendations/ConnectedRingsRating';
+
+export { ConnectedRingsRating };

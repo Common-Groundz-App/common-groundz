@@ -33,7 +33,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
 
   if (isLoading) {
     return (
-      <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="w-full max-w-4xl mx-auto grid gap-6">
         {[1, 2, 3].map(i => (
           <div 
             key={i} 
@@ -71,7 +71,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full max-w-4xl mx-auto">
       {isOwnProfile && (
         <div className="flex justify-end mb-6">
           <Button 
@@ -85,7 +85,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid gap-6">
         {reviews.map(review => (
           <ReviewCard 
             key={review.id}

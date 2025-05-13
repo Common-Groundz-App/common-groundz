@@ -36,9 +36,8 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     profileUserId
   });
   
-  // Extract unique categories and explicitly cast to string[]
   const categories = recommendations.length > 0 
-    ? [...new Set(recommendations.map(item => item.category))] as string[]
+    ? [...new Set(recommendations.map(item => item.category))] 
     : [];
   
   useEffect(() => {
