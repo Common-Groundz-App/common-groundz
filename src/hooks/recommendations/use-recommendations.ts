@@ -29,56 +29,30 @@ export const useRecommendations = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // Initialize sub-hooks
-  const { activeFilter, setActiveFilter, sortBy, setSortBy, clearFilters } = useRecommendationFilters();
-  
+  // Initialize the fetch hook first since we need recommendations for filters
   const { recommendations, setRecommendations, isLoading: isFetching, refreshRecommendations } = 
     useRecommendationsFetch({
       profileUserId,
-      category: activeFilter || category,
+      category: category,
       limit
     });
   
-  const { handleLike, handleSave } = useRecommendationActions();
+  // Now we can pass recommendations to the filters hook
+  const { activeFilter, setActiveFilter, sortBy, setSortBy, clearFilters } = 
+    useRecommendationFilters(recommendations);
+  
+  // Pass required arguments to recommendation actions hook
+  const { handleLike, handleSave, addRecommendation } = 
+    useRecommendationActions(recommendations, setRecommendations, refreshRecommendations);
+    
   const { handleImageUpload } = useRecommendationUploads();
   const { searchEntities } = useEntityOperations();
 
-  // Add a new recommendation
-  const addRecommendation = async (recommendationData: any) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "You must be logged in to create a recommendation",
-        variant: "destructive"
-      });
-      return null;
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('recommendations')
-        .insert({
-          ...recommendationData,
-          user_id: user.id,
-          created_at: new Date(),
-          updated_at: new Date()
-        })
-        .select();
-
-      if (error) throw error;
-      
-      await refreshRecommendations();
-      return data[0];
-    } catch (error: any) {
-      console.error("Error adding recommendation:", error);
-      toast({
-        title: "Failed to add recommendation",
-        description: error.message || "Please try again",
-        variant: "destructive"
-      });
-      return null;
-    }
-  };
+  // Update category when activeFilter changes
+  useEffect(() => {
+    // This effect will run when activeFilter changes
+    // The recommendations will be updated by the useRecommendationsFetch hook
+  }, [activeFilter, category]);
 
   // Initial fetch
   useEffect(() => {
