@@ -3,11 +3,13 @@ import { useState } from 'react';
 import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
-  toggleRecommendationLike,
-  toggleRecommendationSave
-} from '@/services/recommendation/interactionOperations';
+  toggleLike, 
+  toggleSave
+} from '@/services/recommendationService';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRecommendationFilters } from './use-recommendation-filters';
+import { Recommendation } from '@/services/recommendation/types';
 
 interface UseRecommendationsProps {
   profileUserId?: string;
@@ -30,20 +32,24 @@ export const useRecommendations = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  // Fetch recommendations data
   const { 
-    data: recommendations,
+    recommendations,
     isLoading,
-    isError,
     error,
-    refetch
-  } = useRecommendationsFetch({ 
-    profileUserId, 
-    category,
-    limit,
-    sort: filterOptions?.sort,
-    minRating: filterOptions?.minRating,
-    isCertifiedOnly: filterOptions?.isCertifiedOnly
-  });
+    refreshRecommendations
+  } = useRecommendationsFetch({ profileUserId });
+  
+  // Apply filters and sorting
+  const {
+    activeFilter,
+    setActiveFilter,
+    sortBy,
+    setSortBy,
+    filteredRecommendations,
+    categories,
+    clearFilters
+  } = useRecommendationFilters(recommendations);
 
   const handleLike = async (id: string) => {
     if (!user) {
@@ -77,11 +83,11 @@ export const useRecommendations = ({
       );
 
       // Server update
-      await toggleRecommendationLike(id, user.id);
+      await toggleLike(id, user.id);
     } catch (err) {
       console.error('Error toggling like:', err);
       // Revert on failure
-      refetch();
+      refreshRecommendations();
       toast({
         title: "Error",
         description: "Failed to update like status",
@@ -115,11 +121,11 @@ export const useRecommendations = ({
       );
 
       // Server update
-      await toggleRecommendationSave(id, user.id);
+      await toggleSave(id, user.id);
     } catch (err) {
       console.error('Error toggling save:', err);
       // Revert on failure
-      refetch();
+      refreshRecommendations();
       toast({
         title: "Error",
         description: "Failed to update save status",
@@ -128,12 +134,30 @@ export const useRecommendations = ({
     }
   };
 
+  // Stub functions to satisfy the interface
+  const handleImageUpload = async (file: File): Promise<string | null> => {
+    // Implementation would go here
+    return null;
+  };
+
+  const addRecommendation = async (recommendation: Partial<Recommendation>): Promise<boolean> => {
+    // Implementation would go here
+    return false;
+  };
+
   return {
-    recommendations,
+    recommendations: filteredRecommendations,
     isLoading,
-    error: isError ? error : null,
+    error: error,
+    activeFilter,
+    setActiveFilter,
+    sortBy,
+    setSortBy,
     handleLike,
     handleSave,
-    refreshRecommendations: refetch
+    handleImageUpload,
+    addRecommendation,
+    clearFilters,
+    refreshRecommendations
   };
 };

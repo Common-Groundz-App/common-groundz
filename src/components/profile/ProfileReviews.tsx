@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import EmptyReviews from './reviews/EmptyReviews';
@@ -24,6 +24,12 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     refreshReviews,
     convertToRecommendation,
   } = useReviews({ profileUserId });
+
+  // Create a wrapped version of refreshReviews that returns void
+  const handleRefreshReviews = useCallback(async () => {
+    await refreshReviews();
+    // Return void to satisfy the type requirements
+  }, [refreshReviews]);
 
   if (isLoading) {
     return (
@@ -57,7 +63,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
           <ReviewForm 
             isOpen={isFormOpen} 
             onClose={() => setIsFormOpen(false)} 
-            onSubmit={refreshReviews}
+            onSubmit={handleRefreshReviews}
           />
         )}
       </div>
@@ -87,7 +93,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
             onLike={handleLike}
             onSave={handleSave}
             onConvert={isOwnProfile ? convertToRecommendation : undefined}
-            refreshReviews={refreshReviews}
+            refreshReviews={handleRefreshReviews}
           />
         ))}
       </div>
@@ -96,7 +102,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
         <ReviewForm 
           isOpen={isFormOpen} 
           onClose={() => setIsFormOpen(false)} 
-          onSubmit={refreshReviews}
+          onSubmit={handleRefreshReviews}
         />
       )}
     </div>

@@ -1,6 +1,15 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+// Export the functions to satisfy import requirements
+export const toggleRecommendationLike = async (recommendationId: string, userId: string) => {
+  return toggleLike(recommendationId, userId, false);
+};
+
+export const toggleRecommendationSave = async (recommendationId: string, userId: string) => {
+  return toggleSave(recommendationId, userId, false);
+};
+
 // This function is kept here for consistency with the service structure,
 // but the main implementation is now in recommendationService.ts
 export const toggleLike = async (recommendationId: string, userId: string, isLiked: boolean) => {

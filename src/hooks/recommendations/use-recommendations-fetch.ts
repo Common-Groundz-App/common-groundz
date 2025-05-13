@@ -9,7 +9,7 @@ import {
 } from '@/services/recommendationService';
 
 interface UseRecommendationsFetchProps {
-  profileUserId: string;
+  profileUserId?: string;
 }
 
 export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFetchProps) => {
@@ -23,10 +23,11 @@ export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFet
     data,
     isLoading,
     error: queryError,
+    isError,
     refetch
   } = useQuery({
     queryKey: ['recommendations', profileUserId, user?.id],
-    queryFn: () => fetchUserRecommendations(user?.id || null, profileUserId),
+    queryFn: () => fetchUserRecommendations(user?.id || null, profileUserId || ''),
     enabled: !!profileUserId,
   });
   
@@ -65,6 +66,9 @@ export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFet
     setRecommendations,
     isLoading,
     error,
-    refreshRecommendations
+    isError,
+    refetch,
+    refreshRecommendations,
+    data
   };
 };
