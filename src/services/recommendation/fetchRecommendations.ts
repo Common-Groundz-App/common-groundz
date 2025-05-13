@@ -28,6 +28,7 @@ export const fetchUserRecommendations = async (
 
     // Filter by category if provided with type safety
     if (category) {
+      // We'll use the string value directly as Supabase can handle this with enum types
       query = query.eq('category', category);
     }
 

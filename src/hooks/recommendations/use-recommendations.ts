@@ -4,7 +4,8 @@ import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   toggleLike, 
-  toggleSave
+  toggleSave,
+  RecommendationCategory
 } from '@/services/recommendationService';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -13,7 +14,7 @@ import { Recommendation } from '@/services/recommendation/types';
 
 interface UseRecommendationsProps {
   profileUserId?: string;
-  category?: string;
+  category?: string | RecommendationCategory;
   limit?: number;
   filterOptions?: {
     sort?: 'latest' | 'highestRated' | 'mostLiked';
