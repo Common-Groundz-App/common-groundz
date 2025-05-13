@@ -1,2 +1,4 @@
 
-export { useRecommendations } from './recommendations/use-recommendations';
+import { useRecommendations } from './recommendations/use-recommendations';
+
+export { useRecommendations };
