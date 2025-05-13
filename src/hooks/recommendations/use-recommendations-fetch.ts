@@ -26,8 +26,10 @@ export const useRecommendationsFetch = ({ profileUserId }: UseRecommendationsFet
     },
     enabled: !!profileUserId,
     staleTime: 2 * 60 * 1000, // Keep recommendations fresh for 2 minutes
-    onSuccess: (data) => {
-      setRecommendations(data || []);
+    onSettled: (data) => {
+      if (data) {
+        setRecommendations(data || []);
+      }
     },
     onError: (err) => {
       console.error('Error in useRecommendationsFetch:', err);
