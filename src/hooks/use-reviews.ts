@@ -6,10 +6,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { 
   toggleReviewLike, 
   toggleReviewSave,
-  convertReviewToRecommendation 
+  convertReviewToRecommendation,
+  Review 
 } from '@/services/reviewService';
 import { useReviewsFetch } from './reviews/use-reviews-fetch';
 import { useContentMutationManager } from './use-content-mutation-manager';
+import { ReviewOptimisticUpdateProps } from './feed/types';
 
 interface UseReviewsProps {
   profileUserId: string;
@@ -44,8 +46,8 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
       const item = reviews?.find(r => r.id === id);
       if (!item) return;
 
-      // Optimistic update using the mutation manager
-      contentMutation.optimisticUpdate(
+      // Optimistic update using the mutation manager with proper typing
+      contentMutation.optimisticUpdate<ReviewOptimisticUpdateProps>(
         'review',
         id,
         (item) => ({
@@ -87,8 +89,8 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
       const item = reviews?.find(r => r.id === id);
       if (!item) return;
 
-      // Optimistic update using the mutation manager
-      contentMutation.optimisticUpdate(
+      // Optimistic update using the mutation manager with proper typing
+      contentMutation.optimisticUpdate<ReviewOptimisticUpdateProps>(
         'review',
         id,
         (item) => ({

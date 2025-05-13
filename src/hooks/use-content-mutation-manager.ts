@@ -126,6 +126,7 @@ export const useContentMutationManager = () => {
 
   /**
    * Handle optimistic updates for low-impact mutations like likes and saves
+   * Updated to use generic type parameter for better type safety
    */
   const optimisticUpdate = <T extends { id: string }>(
     contentType: ContentType,
