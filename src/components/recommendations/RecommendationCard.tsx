@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -73,7 +74,7 @@ const RecommendationCard = ({
       console.log(`Using legacy image_url: ${recommendation.image_url}`);
       return [{
         url: recommendation.image_url,
-        type: 'image',
+        type: 'image' as const,
         order: 0,
         id: recommendation.id
       }] as MediaItem[];
@@ -84,10 +85,10 @@ const RecommendationCard = ({
       console.log(`Using entity image as fallback: ${entityImageUrl}`);
       return [{
         url: entityImageUrl,
-        type: 'image',
+        type: 'image' as const,
         order: 0,
         id: `entity-${recommendation.entity.id}`,
-        source: 'entity'
+        source: 'entity' // This is now defined in the MediaItem interface
       }] as MediaItem[];
     }
     

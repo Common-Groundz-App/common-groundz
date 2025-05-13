@@ -12,6 +12,7 @@ export interface MediaItem {
   width?: number;
   height?: number;
   orientation?: 'portrait' | 'landscape' | 'square';
+  source?: string; // Added this optional property to track the source of media items
 }
 
 export type MediaUploadStatus = 'idle' | 'uploading' | 'success' | 'error';

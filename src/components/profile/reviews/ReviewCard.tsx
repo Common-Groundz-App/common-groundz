@@ -70,7 +70,7 @@ const ReviewCard = ({
       console.log(`Using legacy image_url: ${review.image_url}`);
       return [{
         url: review.image_url,
-        type: 'image',
+        type: 'image' as const,
         order: 0,
         id: review.id
       }] as MediaItem[];
@@ -81,10 +81,10 @@ const ReviewCard = ({
       console.log(`Using entity image as fallback: ${entityImageUrl}`);
       return [{
         url: entityImageUrl,
-        type: 'image',
+        type: 'image' as const,
         order: 0,
         id: `entity-${review.entity?.id}`,
-        source: 'entity'
+        source: 'entity' // Now this property is defined in the MediaItem interface
       }] as MediaItem[];
     }
     
