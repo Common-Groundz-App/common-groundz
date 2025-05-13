@@ -51,6 +51,8 @@ export const useProfileData = (userId?: string) => {
     queryFn: () => fetchUserProfile(viewingUserId as string),
     enabled: !!viewingUserId && !!user,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false, // Important: prevent refetch on window focus
   });
 
   useEffect(() => {
@@ -79,12 +81,18 @@ export const useProfileData = (userId?: string) => {
     queryKey: ['followerCount', viewingUserId],
     queryFn: () => fetchFollowerCount(viewingUserId as string),
     enabled: !!viewingUserId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false, // Important: prevent refetch on window focus
   });
   
   const { data: followingCountData } = useQuery({
     queryKey: ['followingCount', viewingUserId],
     queryFn: () => fetchFollowingCount(viewingUserId as string),
     enabled: !!viewingUserId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false, // Important: prevent refetch on window focus
   });
   
   // Update follower and following counts when data changes

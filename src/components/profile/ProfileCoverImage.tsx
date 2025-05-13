@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, memo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Camera, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +13,8 @@ interface ProfileCoverImageProps {
   isEditable?: boolean;
 }
 
-const ProfileCoverImage = ({ 
+// Using memo to prevent unnecessary re-renders
+const ProfileCoverImage = memo(({ 
   coverImage, 
   isLoading,
   onCoverImageChange,
@@ -62,7 +63,7 @@ const ProfileCoverImage = ({
         .getPublicUrl(filePath);
       
       // Add a timestamp to force refresh
-      const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
+      const urlWithTimestamp = publicUrl + '?t=' + Date.now();
       
       // Update the visual display
       onCoverImageChange(urlWithTimestamp);
@@ -158,6 +159,8 @@ const ProfileCoverImage = ({
       )}
     </div>
   );
-};
+});
+
+ProfileCoverImage.displayName = 'ProfileCoverImage';
 
 export default ProfileCoverImage;

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import ProfileCoverImage from './ProfileCoverImage';
 
 interface ProfileHeaderProps {
@@ -21,7 +21,8 @@ interface ProfileHeaderProps {
   profileUserId?: string;
 }
 
-const ProfileHeader = ({
+// Memoize the component to prevent unnecessary re-renders
+const ProfileHeader = memo(({
   coverImage,
   isLoading,
   onCoverImageChange,
@@ -37,6 +38,8 @@ const ProfileHeader = ({
       />
     </div>
   );
-};
+});
+
+ProfileHeader.displayName = 'ProfileHeader';
 
 export default ProfileHeader;
