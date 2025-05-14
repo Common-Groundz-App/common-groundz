@@ -22,6 +22,8 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ensureHttps } from '@/utils/urlUtils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface ReviewCardProps {
   review: Review;
@@ -191,6 +193,27 @@ const ReviewCard = ({
     return null;
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) {
+      return 'Today';
+    } else if (diffInDays === 1) {
+      return 'Yesterday';
+    } else if (diffInDays < 7) {
+      return `${diffInDays} days ago`;
+    } else {
+      return format(date, 'MMM d, yyyy');
+    }
+  };
+  
+  const getInitials = (name: string | null) => {
+    if (!name) return 'U';
+    return name.charAt(0).toUpperCase();
+  };
+
   return (
     <>
       <Card 
@@ -202,51 +225,27 @@ const ReviewCard = ({
           review.status === 'deleted' && "opacity-50 border-red-300"
         )}
       >
-        <div className="relative">
-          <div className="absolute top-3 left-3 z-10">
-            <Badge variant="secondary" className="bg-black/70 hover:bg-black/80 text-white">
-              {getCategoryLabel(review.category)}
-            </Badge>
-          </div>
-          
-          <div className="absolute top-3 right-3 z-10 flex gap-2">
-            {getStatusBadge()}
-            
-            {review.is_converted && (
-              <Badge variant="secondary" className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
-                <UploadCloud size={12} />
-                <span>Converted</span>
-              </Badge>
-            )}
-          </div>
-          
-          <div className="h-48 relative overflow-hidden">
-            {mediaItems.length > 0 ? (
-              <PostMediaDisplay
-                media={mediaItems}
-                aspectRatio="maintain"
-                objectFit="cover"
-                enableBackground={true}
-                className="w-full h-full"
-                thumbnailDisplay={mediaItems.length > 1 ? "hover" : "none"}
-              />
-            ) : (
-              <div className="w-full h-full bg-gray-100 flex items-center justify-center overflow-hidden">
-                <ImageWithFallback
-                  src={getFallbackImage()}
-                  alt={`${review.title} - ${review.category}`}
-                  className="w-full h-full object-cover"
-                  fallbackSrc={getCategoryFallbackImage(review.category)}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-        
         <CardContent className="p-4 flex flex-col flex-grow">
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="text-lg font-bold line-clamp-1">{review.title}</h3>
-            <div className="flex items-center">
+          {/* New header section based on recommendation card */}
+          <div className="flex items-center space-x-4 mb-4">
+            <Avatar className="h-10 w-10 border">
+              <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
+              <AvatarFallback>{getInitials(review.user?.username)}</AvatarFallback>
+            </Avatar>
+            
+            <div className="flex-grow">
+              <UsernameLink 
+                username={review.user?.username} 
+                userId={review.user_id}
+                className="font-medium"
+                isCurrentUser={isOwner}
+              />
+              <div className="text-sm text-muted-foreground">{formatDate(review.created_at)}</div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Badge>{getCategoryLabel(review.category)}</Badge>
+              
               {(isOwner || isAdmin) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -297,48 +296,45 @@ const ReviewCard = ({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={cn(
-                  "h-8 w-8 transition-colors", 
-                  review.isSaved 
-                    ? "text-brand-orange" 
-                    : "text-gray-500 hover:text-brand-orange"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onSave(review.id);
-                }}
-              >
-                <Bookmark size={18} className={review.isSaved ? "fill-brand-orange" : ""} />
-              </Button>
             </div>
           </div>
           
-          <p className="text-gray-600 mb-1 text-sm line-clamp-1">{review.venue || 'Unknown venue'}</p>
-          
-          <div className="flex flex-wrap items-center gap-3 mb-1.5">
-            <div className="flex items-center gap-2">
-              <RatingStars rating={review.rating} size="xs" className="scale-95" />
-              <span className="text-xs text-gray-600 font-medium">
-                {review.rating.toFixed(1)}
-              </span>
-            </div>
-            
-            {review.experience_date && (
-              <div className="text-xs text-gray-500 flex items-center">
-                <Calendar className="h-3 w-3 mr-1" />
-                <span>Experienced: {format(new Date(review.experience_date), 'MMM d, yyyy')}</span>
-              </div>
-            )}
+          {/* Rating displayed as part of header */}
+          <div className="flex items-center mb-3">
+            <RatingStars rating={review.rating} size="xs" className="scale-95" />
+            <span className="ml-2 text-sm font-medium">{review.rating.toFixed(1)}</span>
           </div>
+
+          {/* Review content section */}
+          <h3 className="text-lg font-bold line-clamp-1 mb-1">{review.title}</h3>
+          <p className="text-gray-600 mb-2 text-sm line-clamp-1">{review.venue || 'Unknown venue'}</p>
           
           {review.description && (
-            <p className="mt-1 text-sm line-clamp-2 text-gray-700">{review.description}</p>
+            <p className="mt-1 text-sm line-clamp-2 text-gray-700 mb-3">{review.description}</p>
           )}
           
+          {review.experience_date && (
+            <div className="text-xs text-gray-500 flex items-center mb-3">
+              <Calendar className="h-3 w-3 mr-1" />
+              <span>Experienced: {format(new Date(review.experience_date), 'MMM d, yyyy')}</span>
+            </div>
+          )}
+          
+          {/* Media display */}
+          {mediaItems.length > 0 && (
+            <div className="mb-3 rounded-md overflow-hidden">
+              <PostMediaDisplay
+                media={mediaItems}
+                aspectRatio="maintain"
+                objectFit="cover"
+                enableBackground={true}
+                className="w-full h-36"
+                thumbnailDisplay={mediaItems.length > 1 ? "hover" : "none"}
+              />
+            </div>
+          )}
+          
+          {/* Card footer */}
           <div className="mt-auto pt-2 border-t border-gray-100 flex justify-between items-center">
             <div className="flex items-center gap-1">
               <Button 
@@ -381,6 +377,24 @@ const ReviewCard = ({
                 </span>
               )}
             </div>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={cn(
+                "transition-colors", 
+                review.isSaved 
+                  ? "text-brand-orange" 
+                  : "text-gray-500 hover:text-brand-orange"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onSave(review.id);
+              }}
+            >
+              <Bookmark size={18} className={review.isSaved ? "fill-brand-orange" : ""} />
+            </Button>
           </div>
         </CardContent>
       </Card>
