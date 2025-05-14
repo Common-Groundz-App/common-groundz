@@ -482,6 +482,8 @@ const RatingDisplay = ({ rating }: { rating: number }) => {
       showValue={false}
       isInteractive={false}
       showLabel={false}
+      variant="inline"
+      className="ml-0"
     />
   );
 };

@@ -22,6 +22,7 @@ const RatingStarsEnhanced = ({ value, onChange, size = 'md' }: RatingStarsEnhanc
           showValue={true}
           isInteractive={true}
           showLabel={true}
+          variant="standard"
           className="transition-all duration-300 hover:scale-105"
         />
       </div>
