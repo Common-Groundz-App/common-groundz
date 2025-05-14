@@ -1,6 +1,12 @@
 
-// Import from shadcn components
-import { useToast, toast } from "@/components/ui/toast";
+import * as React from "react"
+import {
+  toast,
+  useToast as useToastInternal,
+} from "@/components/ui/toast"
 
-// Just re-export them
-export { useToast, toast };
+export {
+  toast,
+}
+
+export const useToast = useToastInternal

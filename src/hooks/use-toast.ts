@@ -1,9 +1,7 @@
 
-// We're importing from the shadcn component
+// Import from the correct location
 import { useToast as useToastOriginal, toast } from "@/components/ui/use-toast";
 
-// Re-export the toast function
+// Re-export the toast function and hook
 export { toast };
-
-// Re-export the hook
 export const useToast = useToastOriginal;
