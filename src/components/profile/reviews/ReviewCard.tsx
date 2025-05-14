@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -261,11 +260,11 @@ const ReviewCard = ({
               </UsernameLink>
               <div>
                 <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
-                <div className="flex items-center gap-1 text-muted-foreground text-xs">
-                  <span>{formatDate(review.created_at)}</span>
-                  <span>·</span>
-                  <RatingDisplay rating={review.rating} />
+                <div className="text-muted-foreground text-xs">
+                  {formatDate(review.created_at)}
                 </div>
+                {/* Rating display now positioned below date */}
+                <RatingDisplay rating={review.rating} />
               </div>
             </div>
             
@@ -472,17 +471,16 @@ const ReviewCard = ({
   );
 };
 
-// Replace the star-based RatingDisplay with ConnectedRingsRating
+// Updated RatingDisplay component - now as a standalone component with proper sizing
 const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
-    <div className="flex items-center">
+    <div className="flex items-center mt-1">
       <ConnectedRingsRating
         value={rating}
         size="xs"
         showValue={false}
         isInteractive={false}
         showLabel={false}
-        className="scale-[0.5] origin-left transform -ml-1.5 -my-1"
       />
     </div>
   );
