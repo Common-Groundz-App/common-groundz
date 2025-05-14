@@ -3,12 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Recommendation, EntityType, RecommendationCategory } from './types';
 import { fetchUserProfile } from '../profileService';
 
-// Define type for the joined profile data
-interface ProfileData {
-  username: string | null;
-  avatar_url: string | null;
-}
-
 export const fetchUserRecommendations = async (
   userId: string | null = null, 
   profileUserId?: string,
@@ -17,13 +11,13 @@ export const fetchUserRecommendations = async (
   limit = 50
 ): Promise<Recommendation[]> => {
   try {
-    // Base query with proper join syntax to get profile data
+    // Base query using standard SQL join
     let query = supabase
       .from('recommendations')
       .select(`
-        *,
+        recommendations.*, 
         entities (*),
-        profiles (username, avatar_url)
+        profiles:profiles (username, avatar_url)
       `)
       .order(sortBy === 'latest' ? 'created_at' : 'view_count', { ascending: false })
       .limit(limit);
@@ -36,7 +30,6 @@ export const fetchUserRecommendations = async (
     // Filter by category if provided
     if (category) {
       // Type assertion to handle both string and enum types
-      // This tells TypeScript that we know what we're doing with the category value
       query = query.eq('category', category as RecommendationCategory);
     }
 
@@ -74,14 +67,25 @@ export const fetchUserRecommendations = async (
       const likeCount = likeCounts?.find(l => l.recommendation_id === rec.id)?.like_count || 0;
       const isLiked = userLikes?.some(like => like.recommendation_id === rec.id) || false;
       
-      // Extract profile data with proper typing
-      const profileData = (rec.profiles && Array.isArray(rec.profiles) && rec.profiles[0]) || 
-                          (rec.profiles && !Array.isArray(rec.profiles) ? rec.profiles : {});
+      // Process profile data considering possible response formats
+      let username = null;
+      let avatar_url = null;
+      
+      if (rec.profiles) {
+        // Handle both array and object formats that Supabase might return
+        if (Array.isArray(rec.profiles) && rec.profiles.length > 0) {
+          username = rec.profiles[0].username;
+          avatar_url = rec.profiles[0].avatar_url;
+        } else if (!Array.isArray(rec.profiles)) {
+          username = rec.profiles.username;
+          avatar_url = rec.profiles.avatar_url;
+        }
+      }
       
       return {
         ...rec,
-        username: profileData.username || null,
-        avatar_url: profileData.avatar_url || null,
+        username,
+        avatar_url,
         likes: Number(likeCount),
         isLiked,
         entity: rec.entities,
