@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import EmptyReviews from './reviews/EmptyReviews';
@@ -30,6 +30,13 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     await refreshReviews();
     // Return void to satisfy the type requirements
   }, [refreshReviews]);
+  
+  // Force refresh when form is closed
+  useEffect(() => {
+    if (!isFormOpen) {
+      refreshReviews();
+    }
+  }, [isFormOpen, refreshReviews]);
 
   if (isLoading) {
     return (

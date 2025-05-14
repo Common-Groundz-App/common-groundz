@@ -1,4 +1,3 @@
-
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -184,14 +183,14 @@ const StepThree = ({
     // Pass the entity to parent component
     onEntitySelect(entity);
     
-    // MODIFIED: Only update fields if they haven't been filled in yet
-    // This is critical to avoid overwriting user input
+    // IMPORTANT CHANGE: Don't automatically change the title field 
+    // when an entity is selected - let the user decide what the review title should be
     
-    // For food category, explicitly handle restaurant name vs address
+    // For food category, handle venue differently
     if (category === 'food') {
       console.log("Food category: Setting venue to entity name", entity.name);
       
-      // IMPORTANT: When it's food category and Google Places result, 
+      // For food category and Google Places result, 
       // always use the name for the venue (restaurant name)
       if (entity.api_source === 'google_places') {
         onVenueChange(entity.name);
@@ -199,18 +198,8 @@ const StepThree = ({
         // For non-Google Places sources, fall back to venue or name
         onVenueChange(entity.venue || entity.name || '');
       }
-      
-      // Only update title if it's empty
-      if (!title) {
-        onTitleChange(entity.name);
-      }
     } else if (category === 'place') {
-      // For place category, only set name as title if it's empty
-      if (!title) {
-        onTitleChange(entity.name);
-      }
-      
-      // For Google Places, use formatted address as venue
+      // For place category, set venue to formatted address when available
       if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
         console.log("Using Google Places formatted_address for venue:", entity.metadata.formatted_address);
         onVenueChange(entity.metadata.formatted_address);
@@ -219,13 +208,8 @@ const StepThree = ({
         onVenueChange(entity.venue || '');
       }
     } else {
-      // For other categories, update title only if it's empty
-      if (!title && entity.name) {
-        onTitleChange(entity.name);
-      }
-      
-      // Update venue if available and current venue is empty
-      if (entity.venue && !venue) {
+      // For other categories, update venue if available
+      if (entity.venue) {
         onVenueChange(entity.venue);
       }
     }
