@@ -39,9 +39,15 @@ const ConnectedRingsRating = ({
   // Track previous value for text animations
   const [prevValue, setPrevValue] = useState(value);
   
+  // Add debug logging for clicks
+  useEffect(() => {
+    console.log("ConnectedRingsRating mounted with value:", value, "isInteractive:", isInteractive);
+  }, []);
+  
   // Trigger text animation when value changes
   useEffect(() => {
     if (value !== prevValue) {
+      console.log("Value changed from", prevValue, "to", value);
       setTextAnimating(true);
       const timer = setTimeout(() => {
         setTextAnimating(false);
@@ -215,12 +221,18 @@ const ConnectedRingsRating = ({
     return "🤩";
   };
   
-  // FIX: Modified ring click handler to fix response to user clicks
-  const handleRingClick = (ringValue: number) => {
+  // FIXED: Enhanced ring click handler for better event capture
+  const handleRingClick = (ringValue: number, e: React.MouseEvent) => {
     console.log("Ring clicked:", ringValue);
     if (isInteractive && onChange) {
+      // Stop event propagation
+      e.stopPropagation();
+      e.preventDefault();
+      
+      // Animate the ring
       setAnimateRing(ringValue);
-      // FIX: Ensure onChange is called with the clicked value
+      
+      // Call onChange with the clicked value
       onChange(ringValue);
       
       // Reset animation state after animation completes
@@ -256,6 +268,9 @@ const ConnectedRingsRating = ({
   // For inline variant, hide certain animations and effects
   const showAnimations = variant !== 'inline' && variant !== 'badge';
 
+  // Add high z-index for interactive elements to ensure they're clickable
+  const interactiveZIndex = isInteractive ? 50 : 'auto';
+
   // Only render the tooltip for standard variant, not for inline or badge
   const RingComponent = ({ children }: { children: React.ReactNode }) => {
     if (variant === 'inline' || variant === 'badge' || !isInteractive) {
@@ -274,9 +289,31 @@ const ConnectedRingsRating = ({
     );
   };
 
+  // Create a direct click handler for the root component that's more aggressive about capturing clicks
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Only use this if isInteractive is true and there's an onChange handler
+    if (!isInteractive || !onChange) return;
+    
+    // Get click coordinates
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    
+    // Calculate relative position (0 to 1)
+    const relativeX = Math.max(0, Math.min(1, x / rect.width));
+    
+    // Convert to 1-5 rating, rounded to nearest integer
+    const clickedRating = Math.max(1, Math.min(5, Math.ceil(relativeX * 5)));
+    
+    console.log("Container click detected, calculated rating:", clickedRating);
+    onChange(clickedRating);
+  };
+
   return (
     <TooltipProvider>
-      <div className={containerClass}>
+      <div 
+        className={containerClass}
+        style={{ position: 'relative' }} // Ensure positioning context
+      >
         {/* Define keyframe animations for ring interactions */}
         <style>
           {`
@@ -409,16 +446,25 @@ const ConnectedRingsRating = ({
         </style>
 
         {/* Center the SVG container horizontally with proper alignment */}
-        <div className={cn(
-          "flex justify-center",
-          (variant === 'inline' || variant === 'badge') ? "inline-block" : "w-full"
-        )}>
+        <div 
+          className={cn(
+            "flex justify-center",
+            (variant === 'inline' || variant === 'badge') ? "inline-block" : "w-full"
+          )}
+          style={{ position: 'relative', zIndex: interactiveZIndex }} // Ensure proper z-index
+          onClick={isInteractive ? handleContainerClick : undefined} // Add backup click handler
+        >
           <div
             className={cn(
               "relative flex justify-center",
               isInteractive && "cursor-pointer",
               (variant === 'inline' || variant === 'badge') && "inline-flex items-center"
             )}
+            style={{ 
+              position: 'relative', 
+              zIndex: interactiveZIndex, 
+              pointerEvents: 'auto' // Ensure this element can receive click events
+            }}
             onMouseLeave={() => isInteractive && setHoverRating(0)}
           >
             <svg
@@ -432,7 +478,16 @@ const ConnectedRingsRating = ({
                        variant === 'inline' ? '100%' : undefined,
                 height: variant === 'badge' ? '16px' : 
                        variant === 'inline' ? 'auto' : undefined,
-                pointerEvents: 'auto', // FIX: Ensure SVG can receive pointer events
+                pointerEvents: 'auto', // Ensure SVG can receive pointer events
+                position: 'relative', // Add this to create stacking context
+                zIndex: interactiveZIndex, // Set high z-index
+                cursor: isInteractive ? 'pointer' : 'default' // Add pointer cursor
+              }}
+              onClick={(e) => {
+                if (!isInteractive) return;
+                // This is a fallback click handler for the SVG element
+                console.log("SVG element clicked");
+                e.stopPropagation();
               }}
             >
               {/* Gradient definitions for sentiment colors */}
@@ -623,16 +678,38 @@ const ConnectedRingsRating = ({
                         opacity: unselectedRingOpacity, // Apply the dimming effect
                         transition: "opacity 0.3s ease-out", // Smooth transition for opacity changes
                         animationDelay: celebrationDelay,
-                        pointerEvents: 'auto', // FIX: Ensure group elements can receive pointer events
+                        position: 'relative', // Add positioning
+                        zIndex: 10, // Set high z-index
+                        pointerEvents: 'auto', // Ensure group elements can receive pointer events
+                        cursor: isInteractive ? 'pointer' : 'default' // Show pointer cursor for interactive elements
                       }}
                       onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
                       onClick={(e) => {
-                        // FIX: Added event parameter and prevent default to ensure click works
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleRingClick(ring.value);
+                        // FIXED: Added event parameter and improved click handling
+                        console.log("Ring g element clicked:", ring.value);
+                        handleRingClick(ring.value, e);
                       }}
                     >
+                      {/* Transparent hit area for better click detection */}
+                      {isInteractive && (
+                        <circle
+                          cx={ring.cx}
+                          cy={ring.cy}
+                          r={ringRadius * 1.5} // Larger hit area
+                          fill="transparent"
+                          style={{
+                            cursor: 'pointer',
+                            pointerEvents: 'auto'
+                          }}
+                          onClick={(e) => {
+                            // Additional hit area for easier clicking
+                            console.log("Hit area clicked for ring:", ring.value);
+                            e.stopPropagation();
+                            if (onChange) onChange(ring.value);
+                          }}
+                        />
+                      )}
+
                       {/* Ring outline (always visible) */}
                       <circle
                         cx={ring.cx}
@@ -643,7 +720,16 @@ const ConnectedRingsRating = ({
                         fill="transparent"
                         style={{
                           transition: "stroke 0.2s ease-out",
-                          pointerEvents: 'auto', // FIX: Ensure circle elements can receive pointer events
+                          pointerEvents: 'auto', // Ensure circle elements can receive pointer events
+                          cursor: isInteractive ? 'pointer' : 'default'
+                        }}
+                        onClick={(e) => {
+                          // Direct handler on ring element
+                          console.log("Ring circle element clicked:", ring.value);
+                          if (isInteractive && onChange) {
+                            e.stopPropagation();
+                            onChange(ring.value);
+                          }
                         }}
                       />
                       
@@ -657,7 +743,6 @@ const ConnectedRingsRating = ({
                           style={{
                             transition: "opacity 0.2s ease",
                             opacity: 0.8,
-                            pointerEvents: 'none', // This element should not block interactions
                           }}
                         />
                       )}
@@ -680,7 +765,6 @@ const ConnectedRingsRating = ({
                           transition: 'stroke-dashoffset 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease-out',
                           animation: isActive && isAnimating && showAnimations ? 'elasticFill 0.5s ease-out' : 'none',
                           willChange: 'opacity, stroke-dashoffset',
-                          pointerEvents: 'none', // This element should not block interactions
                         }}
                       />
                       
@@ -699,7 +783,6 @@ const ConnectedRingsRating = ({
                             filter: "blur(3px)",
                             animation: isHovered ? "ringHoverGlow 0.3s forwards" : "none",
                             willChange: 'opacity',
-                            pointerEvents: 'none', // This element should not block interactions
                           }}
                         />
                       )}
@@ -806,6 +889,22 @@ const ConnectedRingsRating = ({
               </span>
             )}
           </div>
+        )}
+        
+        {/* Transparent overlay to catch clicks when isInteractive is true */}
+        {isInteractive && (
+          <div 
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 5,
+              cursor: 'pointer',
+              pointerEvents: 'none' // Don't block the real clicks
+            }}
+          />
         )}
       </div>
     </TooltipProvider>
