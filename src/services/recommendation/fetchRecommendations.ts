@@ -11,13 +11,12 @@ export const fetchUserRecommendations = async (
   limit = 50
 ): Promise<Recommendation[]> => {
   try {
-    // Base query using standard SQL join
+    // Base query using a different approach for joining
     let query = supabase
       .from('recommendations')
       .select(`
-        recommendations.*, 
-        entities (*),
-        profiles:profiles (username, avatar_url)
+        *,
+        entities (*)
       `)
       .order(sortBy === 'latest' ? 'created_at' : 'view_count', { ascending: false })
       .limit(limit);
@@ -46,6 +45,29 @@ export const fetchUserRecommendations = async (
 
     // Extract recommendation IDs
     const recommendationIds = data.map(rec => rec.id);
+    
+    // Get user profiles for these recommendations
+    const userIds = data.map(rec => rec.user_id);
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', userIds);
+      
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      // Continue without profiles rather than failing completely
+    }
+    
+    // Create a map of user_id -> profile data for faster lookups
+    const profilesMap = new Map();
+    if (profilesData) {
+      profilesData.forEach(profile => {
+        profilesMap.set(profile.id, {
+          username: profile.username,
+          avatar_url: profile.avatar_url
+        });
+      });
+    }
 
     // Get likes count
     const { data: likeCounts } = await supabase.rpc('get_recommendation_likes_by_ids', {
@@ -67,33 +89,21 @@ export const fetchUserRecommendations = async (
       const likeCount = likeCounts?.find(l => l.recommendation_id === rec.id)?.like_count || 0;
       const isLiked = userLikes?.some(like => like.recommendation_id === rec.id) || false;
       
-      // Process profile data considering possible response formats
-      let username = null;
-      let avatar_url = null;
-      
-      if (rec.profiles) {
-        // Handle both array and object formats that Supabase might return
-        if (Array.isArray(rec.profiles) && rec.profiles.length > 0) {
-          username = rec.profiles[0].username;
-          avatar_url = rec.profiles[0].avatar_url;
-        } else if (!Array.isArray(rec.profiles)) {
-          username = rec.profiles.username;
-          avatar_url = rec.profiles.avatar_url;
-        }
-      }
+      // Get profile data from our map
+      const profile = profilesMap.get(rec.user_id) || {};
       
       return {
         ...rec,
-        username,
-        avatar_url,
+        username: profile.username || null,
+        avatar_url: profile.avatar_url || null,
         likes: Number(likeCount),
         isLiked,
         entity: rec.entities,
-        entities: undefined,
-        profiles: undefined
+        entities: undefined,  // Remove this from the final object to avoid confusion
       } as Recommendation;
     });
 
+    console.log('Recommendations to return:', recommendations.length);
     return recommendations;
   } catch (error) {
     console.error('Error in fetchUserRecommendations:', error);
