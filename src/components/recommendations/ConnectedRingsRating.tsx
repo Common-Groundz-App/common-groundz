@@ -215,10 +215,12 @@ const ConnectedRingsRating = ({
     return "🤩";
   };
   
-  // Handle ring click with animation
+  // FIX: Modified ring click handler to fix response to user clicks
   const handleRingClick = (ringValue: number) => {
+    console.log("Ring clicked:", ringValue);
     if (isInteractive && onChange) {
       setAnimateRing(ringValue);
+      // FIX: Ensure onChange is called with the clicked value
       onChange(ringValue);
       
       // Reset animation state after animation completes
@@ -429,7 +431,8 @@ const ConnectedRingsRating = ({
                 width: variant === 'badge' ? '84px' :
                        variant === 'inline' ? '100%' : undefined,
                 height: variant === 'badge' ? '16px' : 
-                       variant === 'inline' ? 'auto' : undefined
+                       variant === 'inline' ? 'auto' : undefined,
+                pointerEvents: 'auto', // FIX: Ensure SVG can receive pointer events
               }}
             >
               {/* Gradient definitions for sentiment colors */}
@@ -620,9 +623,15 @@ const ConnectedRingsRating = ({
                         opacity: unselectedRingOpacity, // Apply the dimming effect
                         transition: "opacity 0.3s ease-out", // Smooth transition for opacity changes
                         animationDelay: celebrationDelay,
+                        pointerEvents: 'auto', // FIX: Ensure group elements can receive pointer events
                       }}
                       onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
-                      onClick={() => handleRingClick(ring.value)}
+                      onClick={(e) => {
+                        // FIX: Added event parameter and prevent default to ensure click works
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleRingClick(ring.value);
+                      }}
                     >
                       {/* Ring outline (always visible) */}
                       <circle
@@ -634,6 +643,7 @@ const ConnectedRingsRating = ({
                         fill="transparent"
                         style={{
                           transition: "stroke 0.2s ease-out",
+                          pointerEvents: 'auto', // FIX: Ensure circle elements can receive pointer events
                         }}
                       />
                       
@@ -647,6 +657,7 @@ const ConnectedRingsRating = ({
                           style={{
                             transition: "opacity 0.2s ease",
                             opacity: 0.8,
+                            pointerEvents: 'none', // This element should not block interactions
                           }}
                         />
                       )}
@@ -669,6 +680,7 @@ const ConnectedRingsRating = ({
                           transition: 'stroke-dashoffset 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease-out',
                           animation: isActive && isAnimating && showAnimations ? 'elasticFill 0.5s ease-out' : 'none',
                           willChange: 'opacity, stroke-dashoffset',
+                          pointerEvents: 'none', // This element should not block interactions
                         }}
                       />
                       
@@ -687,6 +699,7 @@ const ConnectedRingsRating = ({
                             filter: "blur(3px)",
                             animation: isHovered ? "ringHoverGlow 0.3s forwards" : "none",
                             willChange: 'opacity',
+                            pointerEvents: 'none', // This element should not block interactions
                           }}
                         />
                       )}

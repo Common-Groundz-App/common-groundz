@@ -15,7 +15,7 @@ const StepOne = ({ rating, onChange }: StepOneProps) => {
         How would you rate your experience?
       </h2>
       
-      <div className="flex justify-center items-center w-full">
+      <div className="flex justify-center items-center w-full relative z-10">
         <ConnectedRingsRating
           value={rating}
           onChange={onChange}
@@ -23,7 +23,7 @@ const StepOne = ({ rating, onChange }: StepOneProps) => {
           showValue={true}
           isInteractive={true}
           showLabel={true}
-          className="transition-all duration-300 hover:scale-105"
+          className="transition-all duration-300 hover:scale-105 pointer-events-auto"
         />
       </div>
       
