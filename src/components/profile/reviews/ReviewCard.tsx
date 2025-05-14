@@ -24,6 +24,7 @@ import { ensureHttps } from '@/utils/urlUtils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import UsernameLink from '@/components/common/UsernameLink';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { Separator } from "@/components/ui/separator";
 
 interface ReviewCardProps {
   review: Review;
@@ -246,9 +247,9 @@ const ReviewCard = ({
         className="overflow-hidden hover:shadow-md transition-shadow duration-200"
       >
         <CardContent className="p-6">
-          {/* Card Header with User Info - Matching RecommendationCard structure */}
+          {/* Card Header with User Info - Improved layout to match RecommendationCard */}
           <div className="flex justify-between items-start">
-            <div className="flex items-center gap-3">
+            <div className="flex items-start gap-3">
               <UsernameLink 
                 userId={review.user_id}
                 className="hover:opacity-80 transition-opacity"
@@ -260,11 +261,11 @@ const ReviewCard = ({
               </UsernameLink>
               <div>
                 <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
-                <div className="text-muted-foreground text-xs">
-                  {formatDate(review.created_at)}
+                <div className="flex items-center text-muted-foreground text-xs gap-2 mt-0.5">
+                  <span>{formatDate(review.created_at)}</span>
+                  <Separator orientation="vertical" className="h-3" />
+                  <RatingDisplay rating={review.rating} />
                 </div>
-                {/* Rating display now positioned below date */}
-                <RatingDisplay rating={review.rating} />
               </div>
             </div>
             
@@ -343,7 +344,7 @@ const ReviewCard = ({
             </div>
           </div>
           
-          {/* Media - Using enhanced PostMediaDisplay with improved fallback */}
+          {/* Media */}
           <div className="mt-3">
             {mediaItems.length > 0 ? (
               <PostMediaDisplay 
@@ -389,7 +390,7 @@ const ReviewCard = ({
             </div>
           )}
           
-          {/* Social Actions - Match layout with RecommendationCard */}
+          {/* Social Actions */}
           <div className="flex items-center justify-between mt-4 pt-4 border-t">
             <div className="flex items-center gap-3 sm:gap-6">
               <Button 
@@ -471,18 +472,16 @@ const ReviewCard = ({
   );
 };
 
-// Updated RatingDisplay component - now as a standalone component with proper sizing
+// Updated RatingDisplay component - now positioned inline with date
 const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
-    <div className="flex items-center mt-1">
-      <ConnectedRingsRating
-        value={rating}
-        size="xs"
-        showValue={false}
-        isInteractive={false}
-        showLabel={false}
-      />
-    </div>
+    <ConnectedRingsRating
+      value={rating}
+      size="xs"
+      showValue={false}
+      isInteractive={false}
+      showLabel={false}
+    />
   );
 };
 
