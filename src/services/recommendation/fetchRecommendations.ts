@@ -17,14 +17,15 @@ export const fetchUserRecommendations = async (
   limit = 50
 ): Promise<Recommendation[]> => {
   try {
-    // Base query with join to profiles table to get user data
+    // Base query with explicit join to profiles table to get user data
     let query = supabase
       .from('recommendations')
       .select(`
-        *,
-        entities(*),
-        profiles:user_id(username, avatar_url)
-      `)
+        recommendations.*,
+        entities (*),
+        profiles:profiles!inner (username, avatar_url)
+      `, { count: 'exact' })
+      .eq('recommendations.user_id', 'profiles.id')
       .order(sortBy === 'latest' ? 'created_at' : 'view_count', { ascending: false })
       .limit(limit);
 
@@ -73,6 +74,7 @@ export const fetchUserRecommendations = async (
     const recommendations = data.map(rec => {
       const likeCount = likeCounts?.find(l => l.recommendation_id === rec.id)?.like_count || 0;
       const isLiked = userLikes?.some(like => like.recommendation_id === rec.id) || false;
+      
       // Properly type the profile data
       const profileData = (rec.profiles || {}) as ProfileData;
       
