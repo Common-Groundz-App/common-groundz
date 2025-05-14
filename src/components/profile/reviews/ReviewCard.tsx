@@ -473,7 +473,7 @@ const ReviewCard = ({
   );
 };
 
-// Updated RatingDisplay component - now on its own row below the date
+// Updated RatingDisplay component with improved visibility
 const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
     <ConnectedRingsRating

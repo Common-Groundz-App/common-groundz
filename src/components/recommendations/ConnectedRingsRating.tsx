@@ -81,11 +81,11 @@ const ConnectedRingsRating = ({
   const sizeConfig = {
     xs: {
       svgSize: variant === 'inline' ? 30 : 120,
-      ringSize: variant === 'inline' ? 4 : 12,
-      strokeWidth: variant === 'inline' ? 1.5 : 2.5,
+      ringSize: variant === 'inline' ? 6 : 12,  // Increased from 4 to 6 for better visibility
+      strokeWidth: variant === 'inline' ? 2 : 2.5,  // Increased from 1.5 to 2 for better visibility
       textClass: 'text-[10px]',
       textOffset: variant === 'inline' ? 10 : 20,
-      overlapOffset: variant === 'inline' ? 2 : 8
+      overlapOffset: variant === 'inline' ? 3 : 8  // Adjusted from 2 to 3 for better spacing
     },
     sm: {
       svgSize: variant === 'inline' ? 40 : 150,
@@ -369,6 +369,7 @@ const ConnectedRingsRating = ({
             height: auto;
             display: inline-flex;
             align-items: center;
+            margin-top: 2px; /* Small top margin for better alignment */
           }
           
           .connected-rings-inline svg {
