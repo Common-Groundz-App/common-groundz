@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as ToastPrimitives from "@radix-ui/react-toast"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -114,8 +115,8 @@ type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
 
 type ToastActionElement = React.ReactElement<typeof ToastAction>
 
-// Add useToast and toast functionality
-type ToastActionType = {
+// Define ToastActionType interface
+interface ToastActionType {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
@@ -125,6 +126,7 @@ type ToastActionType = {
 const TOAST_LIMIT = 5
 const TOAST_REMOVE_DELAY = 1000000
 
+// Update ToasterToast type to ensure title is compatible with React.ReactNode
 type ToasterToast = ToastProps & {
   id: string
   title?: React.ReactNode
@@ -292,6 +294,12 @@ const useToast = (initialState: State = { toasts: [] }) => {
     toast,
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
+}
+
+// Define and export the toast function
+const toast = (props: ToastActionType) => {
+  const { toast: toastFunction } = useToast()
+  return toastFunction(props)
 }
 
 export {
