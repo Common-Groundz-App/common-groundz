@@ -18,7 +18,7 @@ interface ConnectedRingsRatingProps {
   className?: string;
   isInteractive?: boolean;
   showLabel?: boolean;
-  variant?: 'standard' | 'inline';
+  variant?: 'standard' | 'inline' | 'badge';
 }
 
 const ConnectedRingsRating = ({ 
@@ -80,36 +80,37 @@ const ConnectedRingsRating = ({
   // Configuration for different sizes
   const sizeConfig = {
     xs: {
-      svgSize: variant === 'inline' ? 30 : 120,
-      ringSize: variant === 'inline' ? 6 : 12,  // Increased from 4 to 6 for better visibility
-      strokeWidth: variant === 'inline' ? 2 : 2.5,  // Increased from 1.5 to 2 for better visibility
+      // For inline variant
+      svgSize: variant === 'inline' ? 30 : variant === 'badge' ? 20 : 120,
+      ringSize: variant === 'inline' ? 6 : variant === 'badge' ? 4 : 12,
+      strokeWidth: variant === 'inline' ? 2 : variant === 'badge' ? 1.75 : 2.5,
       textClass: 'text-[10px]',
-      textOffset: variant === 'inline' ? 10 : 20,
-      overlapOffset: variant === 'inline' ? 3 : 8  // Adjusted from 2 to 3 for better spacing
+      textOffset: variant === 'inline' ? 10 : variant === 'badge' ? 8 : 20,
+      overlapOffset: variant === 'inline' ? 3 : variant === 'badge' ? 2.5 : 8
     },
     sm: {
-      svgSize: variant === 'inline' ? 40 : 150,
-      ringSize: variant === 'inline' ? 6 : 20,
-      strokeWidth: variant === 'inline' ? 2 : 4,
+      svgSize: variant === 'inline' ? 40 : variant === 'badge' ? 25 : 150,
+      ringSize: variant === 'inline' ? 6 : variant === 'badge' ? 4.5 : 20,
+      strokeWidth: variant === 'inline' ? 2 : variant === 'badge' ? 1.75 : 4,
       textClass: 'text-xs',
-      textOffset: variant === 'inline' ? 15 : 30,
-      overlapOffset: variant === 'inline' ? 3 : 15
+      textOffset: variant === 'inline' ? 15 : variant === 'badge' ? 10 : 30,
+      overlapOffset: variant === 'inline' ? 3 : variant === 'badge' ? 2.5 : 15
     },
     md: {
-      svgSize: variant === 'inline' ? 50 : 200,
-      ringSize: variant === 'inline' ? 8 : 28,
-      strokeWidth: variant === 'inline' ? 2.5 : 4.5,
+      svgSize: variant === 'inline' ? 50 : variant === 'badge' ? 30 : 200,
+      ringSize: variant === 'inline' ? 8 : variant === 'badge' ? 5 : 28,
+      strokeWidth: variant === 'inline' ? 2.5 : variant === 'badge' ? 1.75 : 4.5,
       textClass: 'text-sm',
-      textOffset: variant === 'inline' ? 20 : 40,
-      overlapOffset: variant === 'inline' ? 4 : 20
+      textOffset: variant === 'inline' ? 20 : variant === 'badge' ? 12 : 40,
+      overlapOffset: variant === 'inline' ? 4 : variant === 'badge' ? 3 : 20
     },
     lg: {
-      svgSize: variant === 'inline' ? 60 : 250,
-      ringSize: variant === 'inline' ? 10 : 36,
-      strokeWidth: variant === 'inline' ? 3 : 5,
+      svgSize: variant === 'inline' ? 60 : variant === 'badge' ? 36 : 250,
+      ringSize: variant === 'inline' ? 10 : variant === 'badge' ? 6 : 36,
+      strokeWidth: variant === 'inline' ? 3 : variant === 'badge' ? 2 : 5,
       textClass: 'text-base',
-      textOffset: variant === 'inline' ? 25 : 50,
-      overlapOffset: variant === 'inline' ? 5 : 25
+      textOffset: variant === 'inline' ? 25 : variant === 'badge' ? 15 : 50,
+      overlapOffset: variant === 'inline' ? 5 : variant === 'badge' ? 3.5 : 25
     }
   };
   
@@ -118,6 +119,11 @@ const ConnectedRingsRating = ({
   
   // Calculate the actual width needed to display all 5 rings properly with even padding
   const calculateSvgWidth = () => {
+    // For badge variant, create an even more compact width
+    if (variant === 'badge') {
+      return ((ringSize * 2) * 5) - (overlapOffset * 4) + (ringSize / 2);
+    }
+    
     // For inline variant, create a more compact width-to-height ratio
     if (variant === 'inline') {
       return ((ringSize * 2) * 5) - (overlapOffset * 4) + ringSize;
@@ -136,10 +142,12 @@ const ConnectedRingsRating = ({
   // Calculate the viewBox size dynamically
   const svgWidth = calculateSvgWidth();
   
-  // For inline variant, use a much shorter height
-  const svgHeight = variant === 'inline' 
-    ? ringSize * 2 + strokeWidth * 2  // Make height just enough for the rings plus stroke
-    : sizeConfig[size].svgSize;        // Use standard height for regular variant
+  // For badge and inline variants, use a much shorter height
+  const svgHeight = variant === 'badge' 
+    ? ringSize * 2 + strokeWidth        // Minimum height for badge variant
+    : variant === 'inline' 
+      ? ringSize * 2 + strokeWidth * 2  // Make height just enough for the rings plus stroke
+      : sizeConfig[size].svgSize;        // Use standard height for regular variant
   
   // Calculate positions for the 5 interlinking rings with centered distribution
   const calculateRingPositions = () => {
@@ -235,19 +243,20 @@ const ConnectedRingsRating = ({
   // Use the appropriate inactive color based on whether a value has been selected
   const inactiveRingColor = value > 0 ? selectedInactiveColor : defaultInactiveColor;
 
-  // For inline variant, we'll use a simpler container class with different styles
+  // For inline/badge variants, we'll use a simpler container class with different styles
   const containerClass = cn(
     "flex items-center", 
+    variant === 'badge' ? "connected-rings-badge" :
     variant === 'inline' ? "connected-rings-inline" : "flex-col w-full",
     className
   );
 
   // For inline variant, hide certain animations and effects
-  const showAnimations = variant !== 'inline';
+  const showAnimations = variant !== 'inline' && variant !== 'badge';
 
-  // Only render the tooltip for standard variant, not for inline
+  // Only render the tooltip for standard variant, not for inline or badge
   const RingComponent = ({ children }: { children: React.ReactNode }) => {
-    if (variant === 'inline' || !isInteractive) {
+    if (variant === 'inline' || variant === 'badge' || !isInteractive) {
       return <>{children}</>;
     }
     
@@ -378,19 +387,35 @@ const ConnectedRingsRating = ({
             aspect-ratio: 5 / 1;
             overflow: visible;
           }
+          
+          /* Badge variant for Trustpilot-like compact display */
+          .connected-rings-badge {
+            width: auto;
+            height: 16px; /* Fixed height for consistent alignment */
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+          }
+          
+          .connected-rings-badge svg {
+            width: 84px; /* Fixed width for Trustpilot-like badges */
+            height: 16px; /* Fixed height */
+            aspect-ratio: 5.25 / 1; /* Precise aspect ratio */
+            overflow: visible;
+          }
           `}
         </style>
 
         {/* Center the SVG container horizontally with proper alignment */}
         <div className={cn(
           "flex justify-center",
-          variant === 'inline' ? "inline-block" : "w-full"
+          (variant === 'inline' || variant === 'badge') ? "inline-block" : "w-full"
         )}>
           <div
             className={cn(
               "relative flex justify-center",
               isInteractive && "cursor-pointer",
-              variant === 'inline' && "inline-flex items-center"
+              (variant === 'inline' || variant === 'badge') && "inline-flex items-center"
             )}
             onMouseLeave={() => isInteractive && setHoverRating(0)}
           >
@@ -401,8 +426,10 @@ const ConnectedRingsRating = ({
               className="transform"
               style={{ 
                 overflow: 'visible',
-                width: variant === 'inline' ? '100%' : undefined,
-                height: variant === 'inline' ? 'auto' : undefined
+                width: variant === 'badge' ? '84px' :
+                       variant === 'inline' ? '100%' : undefined,
+                height: variant === 'badge' ? '16px' : 
+                       variant === 'inline' ? 'auto' : undefined
               }}
             >
               {/* Gradient definitions for sentiment colors */}
