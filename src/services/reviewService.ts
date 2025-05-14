@@ -1,6 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';  // Added import for MediaItem
 import { Database } from '@/integrations/supabase/types';
+import { UserProfile } from '@/components/profile/circles/types';
 
 export interface Review {
   id: string;
@@ -25,6 +27,7 @@ export interface Review {
   isLiked?: boolean;
   isSaved?: boolean;
   entity?: any | null;
+  user?: UserProfile | null; // Add user property to fix the TypeScript error
   metadata?: {
     food_tags?: string[];
     [key: string]: any;
@@ -72,6 +75,24 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
         });
       }
     }
+
+    // Fetch user profile data for the review creator
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .eq('id', profileUserId)
+      .single();
+
+    if (userError) {
+      console.error('Error fetching user profile:', userError);
+    }
+
+    // Create the user profile object from the fetched data
+    const userProfile = userData ? {
+      id: userData.id,
+      username: userData.username,
+      avatar_url: userData.avatar_url
+    } : null;
 
     // Use RPC functions for batch operations to get likes counts
     const { data: likesCountData } = await supabase
@@ -147,6 +168,7 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
         isLiked,
         isSaved,
         entity,
+        user: userProfile,
         media: processedMedia
       } as Review;
     });
@@ -307,6 +329,24 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
 
     if (!data) return null;
 
+    // Get user profile data for the review creator
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .eq('id', data.user_id)
+      .single();
+    
+    if (userError) {
+      console.error('Error fetching user profile:', userError);
+    }
+    
+    // Create the user profile object
+    const userProfile = userData ? {
+      id: userData.id,
+      username: userData.username,
+      avatar_url: userData.avatar_url
+    } : null;
+
     // Get entity data if there's an entity_id
     let entity = null;
     if (data.entity_id) {
@@ -393,6 +433,7 @@ export const fetchReviewById = async (id: string, userId: string | null = null):
       isLiked,
       isSaved,
       entity,
+      user: userProfile,
       media: processedMedia
     } as Review;
   } catch (error) {
