@@ -126,12 +126,15 @@ interface ToastActionType {
 const TOAST_LIMIT = 5
 const TOAST_REMOVE_DELAY = 1000000
 
-// Update ToasterToast type to ensure title is compatible with React.ReactNode
-type ToasterToast = ToastProps & {
+// Modified: Update ToasterToast type to fix type compatibility issues
+type ToasterToast = {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  variant?: "default" | "destructive"
 }
 
 const actionTypes = {
