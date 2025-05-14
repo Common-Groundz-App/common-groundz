@@ -49,7 +49,7 @@ const ReviewForm = ({
   const [rating, setRating] = useState(review?.rating || 0);
   const [category, setCategory] = useState(review?.category || 'food');
   
-  // Separate state variables for different fields
+  // IMPORTANT: Separate state variables for different fields
   const [foodName, setFoodName] = useState(''); // For "What did you eat?" in food category
   const [contentName, setContentName] = useState(''); // For movie/book/place/product name
   const [reviewTitle, setReviewTitle] = useState(review?.title || ''); // For review title in Step 4
@@ -136,9 +136,11 @@ const ReviewForm = ({
       // Populate form with review data
       setRating(review.rating);
       setCategory(review.category);
+      
+      // MODIFICATION: Correctly initialize the review title from existing review
       setReviewTitle(review.title || '');
       
-      // NEW: Correctly populate food name or content name based on category
+      // NEW: Initialize content name and food name based on category and data
       if (review.category === 'food') {
         setFoodName(review.title || '');
         setContentName('');
@@ -276,6 +278,9 @@ const ReviewForm = ({
     setSelectedEntity(entity);
     setEntityId(entity.id);
     
+    // MODIFIED: Only update venue information, don't change the content name
+    // unless a title hasn't been specified yet
+    
     // For food category, handle differently
     if (category === 'food') {
       console.log("Food category in ReviewForm");
@@ -289,10 +294,15 @@ const ReviewForm = ({
         setVenue(entity.venue || entity.name || '');
       }
       
-      // Do not set reviewTitle for food category as it will be added separately in Step 4
+      // Only set foodName if it's empty (user hasn't entered anything yet)
+      if (!foodName) {
+        setFoodName(entity.name);
+      }
     } else if (category === 'place') {
-      // For place category, use name as contentName but formatted address as venue
-      setContentName(entity.name);
+      // For place category, only set contentName if it's empty and set venue separately
+      if (!contentName) {
+        setContentName(entity.name);
+      }
       
       if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
         console.log("Using Google Places formatted_address for venue:", entity.metadata.formatted_address);
@@ -302,9 +312,13 @@ const ReviewForm = ({
         setVenue(entity.venue || '');
       }
     } else {
-      // For other categories, set contentName from entity
-      if (entity.name) setContentName(entity.name);
-      if (entity.venue) setVenue(entity.venue);
+      // For other categories, set contentName from entity if empty
+      if (!contentName && entity.name) {
+        setContentName(entity.name);
+      }
+      if (entity.venue) {
+        setVenue(entity.venue);
+      }
     }
   };
   
@@ -396,8 +410,12 @@ const ReviewForm = ({
       // For backward compatibility, use the first image as the main image_url
       const image_url = selectedMedia.length > 0 ? selectedMedia[0].url : undefined;
       
-      // Determine final title based on the content type and user input
-      const finalTitle = reviewTitle || (category === 'food' ? foodName : contentName);
+      // MODIFIED: Use reviewTitle if provided, otherwise use what was entered in Step 3
+      // This is the key change - separate review title from entity name
+      let finalTitle = reviewTitle;
+      if (!finalTitle || finalTitle.trim() === '') {
+        finalTitle = category === 'food' ? foodName : contentName;
+      }
       
       if (isEditMode && review) {
         await updateReview(review.id, {

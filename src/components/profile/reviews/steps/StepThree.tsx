@@ -1,3 +1,4 @@
+
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -183,6 +184,9 @@ const StepThree = ({
     // Pass the entity to parent component
     onEntitySelect(entity);
     
+    // MODIFIED: Only update fields if they haven't been filled in yet
+    // This is critical to avoid overwriting user input
+    
     // For food category, explicitly handle restaurant name vs address
     if (category === 'food') {
       console.log("Food category: Setting venue to entity name", entity.name);
@@ -196,10 +200,15 @@ const StepThree = ({
         onVenueChange(entity.venue || entity.name || '');
       }
       
-      // Do not update title for food category
+      // Only update title if it's empty
+      if (!title) {
+        onTitleChange(entity.name);
+      }
     } else if (category === 'place') {
-      // For place category, set name as title
-      onTitleChange(entity.name);
+      // For place category, only set name as title if it's empty
+      if (!title) {
+        onTitleChange(entity.name);
+      }
       
       // For Google Places, use formatted address as venue
       if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
@@ -210,11 +219,13 @@ const StepThree = ({
         onVenueChange(entity.venue || '');
       }
     } else {
-      // For other categories, update title with entity name
-      onTitleChange(entity.name);
+      // For other categories, update title only if it's empty
+      if (!title && entity.name) {
+        onTitleChange(entity.name);
+      }
       
-      // Update venue if available
-      if (entity.venue) {
+      // Update venue if available and current venue is empty
+      if (entity.venue && !venue) {
         onVenueChange(entity.venue);
       }
     }
