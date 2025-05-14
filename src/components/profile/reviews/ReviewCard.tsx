@@ -246,29 +246,35 @@ const ReviewCard = ({
         className="overflow-hidden hover:shadow-md transition-shadow duration-200"
       >
         <CardContent className="p-6">
-          {/* Card Header with User Info - Matching RecommendationCard structure */}
+          {/* Card Header with User Info - Better aligned with RecommendationCard */}
           <div className="flex justify-between items-start">
-            <div className="flex items-center gap-3">
+            <div className="flex items-start gap-3">
+              {/* Avatar */}
               <UsernameLink 
                 userId={review.user_id}
                 className="hover:opacity-80 transition-opacity"
               >
-                <Avatar className="h-10 w-10 border">
+                <Avatar className="h-8 w-8 border">
                   <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
                   <AvatarFallback>{getInitials(review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
-              <div>
-                <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
-                <div className="text-muted-foreground text-xs">
-                  {formatDate(review.created_at)}
+              
+              {/* User info and rating in a vertical stack */}
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1">
+                  <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline text-sm" />
+                  <span className="text-muted-foreground text-xs">• {formatDate(review.created_at)}</span>
                 </div>
-                {/* Rating display now positioned below date */}
-                <RatingDisplay rating={review.rating} />
+                
+                {/* Rating display positioned right below username line */}
+                <div className="mt-0.5">
+                  <RatingDisplay rating={review.rating} />
+                </div>
               </div>
             </div>
             
-            {/* Options Menu for own content */}
+            {/* Options Menu */}
             {(isOwner || isAdmin) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -326,7 +332,7 @@ const ReviewCard = ({
           </div>
           
           {/* Title and Category */}
-          <div className="mt-4">
+          <div className="mt-3">
             <h3 className="font-semibold text-lg">{review.title}</h3>
             <div className="flex flex-wrap gap-2 mt-1">
               {review.category && (
@@ -471,18 +477,16 @@ const ReviewCard = ({
   );
 };
 
-// Updated RatingDisplay component - now as a standalone component with proper sizing
+// Updated RatingDisplay component with more compact layout
 const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
-    <div className="flex items-center mt-1">
-      <ConnectedRingsRating
-        value={rating}
-        size="xs"
-        showValue={false}
-        isInteractive={false}
-        showLabel={false}
-      />
-    </div>
+    <ConnectedRingsRating
+      value={rating}
+      size="xs"
+      showValue={false}
+      isInteractive={false}
+      showLabel={false}
+    />
   );
 };
 
