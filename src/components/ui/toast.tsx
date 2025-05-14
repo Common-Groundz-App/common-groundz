@@ -115,12 +115,12 @@ type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
 type ToastActionElement = React.ReactElement<typeof ToastAction>
 
 // Add useToast and toast functionality
-type ToastActionType = (props: {
+type ToastActionType = {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
   variant?: "default" | "destructive"
-})
+}
 
 const TOAST_LIMIT = 5
 const TOAST_REMOVE_DELAY = 1000000
@@ -231,7 +231,7 @@ const reducer = (state: State, action: Action): State => {
   }
 }
 
-const useToastInternal = (initialState: State = { toasts: [] }) => {
+const useToast = (initialState: State = { toasts: [] }) => {
   const [state, dispatch] = React.useReducer(reducer, initialState)
 
   React.useEffect(() => {
@@ -256,7 +256,7 @@ const useToastInternal = (initialState: State = { toasts: [] }) => {
   }, [state.toasts])
 
   const toast = React.useCallback(
-    ({ ...props }: ToastActionType) => {
+    (props: ToastActionType) => {
       const id = genId()
 
       const update = (props: ToastActionType) =>
@@ -304,6 +304,6 @@ export {
   ToastDescription,
   ToastClose,
   ToastAction,
-  useToastInternal as useToast,
+  useToast,
   toast,
 }

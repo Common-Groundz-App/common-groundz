@@ -1,12 +1,11 @@
 
 import * as React from "react"
 import {
+  useToast,
   toast,
-  useToast as useToastInternal,
 } from "@/components/ui/toast"
 
 export {
+  useToast,
   toast,
 }
-
-export const useToast = useToastInternal
