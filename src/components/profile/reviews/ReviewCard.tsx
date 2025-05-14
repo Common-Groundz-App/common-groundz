@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -481,7 +482,7 @@ const RatingDisplay = ({ rating }: { rating: number }) => {
         showValue={false}
         isInteractive={false}
         showLabel={false}
-        className="scale-[0.6] origin-left transform -ml-1 -my-2"
+        className="scale-[0.5] origin-left transform -ml-1.5 -my-1"
       />
     </div>
   );
