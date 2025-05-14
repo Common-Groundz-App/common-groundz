@@ -45,4 +45,8 @@ export interface Recommendation {
   isLiked?: boolean;
   isSaved?: boolean;
   entity?: Entity | null;
+  
+  // User profile information
+  username?: string | null;
+  avatar_url?: string | null;
 }

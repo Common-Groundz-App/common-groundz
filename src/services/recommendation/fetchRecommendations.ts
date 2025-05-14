@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Recommendation, EntityType, RecommendationCategory } from './types';
 import { fetchUserProfile } from '../profileService';
 
+// Define type for the joined profile data
+interface ProfileData {
+  username: string | null;
+  avatar_url: string | null;
+}
+
 export const fetchUserRecommendations = async (
   userId: string | null = null, 
   profileUserId?: string,
@@ -67,7 +73,8 @@ export const fetchUserRecommendations = async (
     const recommendations = data.map(rec => {
       const likeCount = likeCounts?.find(l => l.recommendation_id === rec.id)?.like_count || 0;
       const isLiked = userLikes?.some(like => like.recommendation_id === rec.id) || false;
-      const profileData = rec.profiles || {};
+      // Properly type the profile data
+      const profileData = (rec.profiles || {}) as ProfileData;
       
       return {
         ...rec,
