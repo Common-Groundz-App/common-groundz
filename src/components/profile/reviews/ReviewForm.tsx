@@ -137,8 +137,16 @@ const ReviewForm = ({
       setRating(review.rating);
       setCategory(review.category);
       setReviewTitle(review.title || '');
-      setFoodName('');
-      setContentName('');
+      
+      // NEW: Correctly populate food name or content name based on category
+      if (review.category === 'food') {
+        setFoodName(review.title || '');
+        setContentName('');
+      } else {
+        setContentName(review.title || '');
+        setFoodName('');
+      }
+      
       setVenue(review.venue || '');
       setEntityId(review.entity_id || '');
       setDescription(review.description || '');
