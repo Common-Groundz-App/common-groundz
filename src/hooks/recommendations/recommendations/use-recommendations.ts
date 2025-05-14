@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { RecommendationCategory } from '@/services/recommendation/types';
 
 export const useRecommendations = () => {
   const { user } = useAuth();
@@ -13,7 +14,7 @@ export const useRecommendations = () => {
 
   const fetchRecommendations = async (
     filters?: {
-      category?: string;
+      category?: RecommendationCategory;
       userId?: string;
       limit?: number;
       offset?: number;

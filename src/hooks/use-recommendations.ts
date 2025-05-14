@@ -1,2 +1,2 @@
 
-export { useRecommendations } from './recommendations/use-recommendations';
+export { useRecommendations } from './recommendations/recommendations/use-recommendations';
