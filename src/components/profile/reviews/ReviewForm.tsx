@@ -51,7 +51,6 @@ const ReviewForm = ({
   
   // CRITICAL CHANGE: Completely separate these variables
   // foodName/contentName - The entity being reviewed (place, movie, food item)
-  // reviewTitle - The user's title for their review (e.g., "Lovely view")
   const [foodName, setFoodName] = useState('');
   const [contentName, setContentName] = useState('');
   const [reviewTitle, setReviewTitle] = useState(review?.title || '');
@@ -284,17 +283,18 @@ const ReviewForm = ({
     }
   };
   
+  // FIXED: Modified to not automatically set food name when selecting a restaurant
   const handleEntitySelect = (entity: Entity) => {
     console.log("Entity selected in ReviewForm:", entity);
     setSelectedEntity(entity);
     setEntityId(entity.id);
     
-    // CRITICAL CHANGE: Set entity information but DO NOT affect the review title
-    // Set entity name based on category
+    // CRITICAL CHANGE: Don't automatically change food name when selecting a restaurant
     if (category === 'food') {
-      setFoodName(entity.name);
+      // For food category, we only set venue information
+      // DO NOT set the foodName - let the user enter what they ate manually
       
-      // For Google Places, always use the name as restaurant name, never address
+      // For Google Places, always use the name as restaurant name
       if (entity.api_source === 'google_places') {
         setVenue(entity.name);
       } else {
@@ -302,7 +302,8 @@ const ReviewForm = ({
         setVenue(entity.venue || entity.name || '');
       }
     } else {
-      // For other categories including place, set the name but don't change review title
+      // For other categories like movie, book, etc. we do want to set the content name
+      // since the entity itself is what's being reviewed
       setContentName(entity.name);
       
       // For place category, handle venue differently

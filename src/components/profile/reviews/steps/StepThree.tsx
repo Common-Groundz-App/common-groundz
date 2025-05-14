@@ -1,3 +1,4 @@
+
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -137,6 +138,14 @@ const StepThree = ({
     }
   };
   
+  // IMPROVED: Get clarifying label text for food category
+  const getMainFieldHelpText = () => {
+    if (category === 'food') {
+      return "Enter the dish or food item you ate, not the restaurant name";
+    }
+    return "";
+  };
+  
   const getSecondaryFieldLabel = () => {
     switch(category) {
       case 'food': return "Restaurant name";
@@ -162,7 +171,7 @@ const StepThree = ({
   // New function to get appropriate search label
   const getSearchLabel = () => {
     if(category === 'food') {
-      return "place"; // Show "Search for place" instead of "Search for food"
+      return "restaurant"; // Clearer label for food category
     }
     return category;
   };
@@ -284,8 +293,12 @@ const StepThree = ({
             type={getEntitySearchType() as any}
             onSelect={handleEntitySelection}
           />
+          
+          {/* IMPROVED: Better help text for food category */}
           <p className="text-xs text-muted-foreground mt-2 italic">
-            Can't find what you're looking for? Just fill in the details below
+            {category === 'food' 
+              ? "Search for the restaurant name. You'll enter what you ate separately below."
+              : "Can't find what you're looking for? Just fill in the details below"}
           </p>
         </div>
       )}
@@ -301,12 +314,18 @@ const StepThree = ({
             id="title"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            placeholder={`Name of the ${category}`}
+            placeholder={category === 'food' ? "Enter the dish name (e.g. Pasta Carbonara)" : `Name of the ${category}`}
             className={cn(
               !title ? "border-red-500" : "border-brand-orange/30 focus-visible:ring-brand-orange/30",
               "transition-all duration-200"
             )}
           />
+          
+          {/* ADDED: Help text for food category */}
+          {getMainFieldHelpText() && (
+            <p className="text-xs text-muted-foreground italic">{getMainFieldHelpText()}</p>
+          )}
+          
           {!title && (
             <p className="text-red-500 text-xs">This field is required</p>
           )}
@@ -330,6 +349,13 @@ const StepThree = ({
             }
             className="border-brand-orange/30 focus-visible:ring-brand-orange/30"
           />
+          
+          {/* Added helper text for restaurant field */}
+          {category === 'food' && (
+            <p className="text-xs text-muted-foreground italic">
+              {venue ? "This will be auto-filled when you select a restaurant" : "Auto-filled when you select a restaurant above"}
+            </p>
+          )}
         </div>
       </div>
       
