@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Star, Share2 } from 'lucide-react';
+import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +23,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ensureHttps } from '@/utils/urlUtils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import UsernameLink from '@/components/common/UsernameLink';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 interface ReviewCardProps {
   review: Review;
@@ -471,19 +471,18 @@ const ReviewCard = ({
   );
 };
 
-// Helper component for displaying star ratings - copied from RecommendationCard
+// Replace the star-based RatingDisplay with ConnectedRingsRating
 const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
     <div className="flex items-center">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star 
-          key={i}
-          className={cn(
-            "h-3 w-3",
-            i < rating ? "text-yellow-500 fill-yellow-500" : "text-gray-300"
-          )}
-        />
-      ))}
+      <ConnectedRingsRating
+        value={rating}
+        size="xs"
+        showValue={false}
+        isInteractive={false}
+        showLabel={false}
+        className="scale-[0.6] origin-left transform -ml-1 -my-2"
+      />
     </div>
   );
 };
