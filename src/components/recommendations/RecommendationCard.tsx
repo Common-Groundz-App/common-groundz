@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, Bookmark, MoreVertical, Star, Share2 } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, MoreVertical, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
@@ -23,6 +22,7 @@ import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
 import { ensureHttps } from '@/utils/urlUtils';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 interface RecommendationCardProps {
   recommendation: any;
@@ -243,7 +243,7 @@ const RecommendationCard = ({
               <div className="flex items-center gap-1 text-muted-foreground text-xs">
                 <span>{format(new Date(recommendation.created_at), 'MMM d, yyyy')}</span>
                 <span>·</span>
-                <RatingDisplay rating={recommendation.rating} />
+                <ConnectedRingsRating value={recommendation.rating} size="xs" variant="inline" isInteractive={false} showValue={false} />
               </div>
             </div>
           </div>
@@ -402,23 +402,6 @@ const RecommendationCard = ({
         isLoading={isDeleting}
       />
     </Card>
-  );
-};
-
-// Helper component for displaying star ratings
-const RatingDisplay = ({ rating }: { rating: number }) => {
-  return (
-    <div className="flex items-center">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star 
-          key={i}
-          className={cn(
-            "h-3 w-3",
-            i < rating ? "text-yellow-500 fill-yellow-500" : "text-gray-300"
-          )}
-        />
-      ))}
-    </div>
   );
 };
 

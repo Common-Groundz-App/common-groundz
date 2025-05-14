@@ -3,7 +3,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, Star, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Bookmark, Heart, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { FeedItem } from '@/hooks/feed/types';
@@ -21,6 +21,7 @@ import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDial
 import { useToast } from '@/hooks/use-toast';
 import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { useNavigate } from 'react-router-dom';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -226,17 +227,14 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         )}
         
         <div className="flex items-center mb-4">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Star
-              key={star}
-              size={18}
-              className={cn(
-                "mr-1",
-                star <= recommendation.rating ? "fill-brand-orange text-brand-orange" : "text-gray-300"
-              )}
-            />
-          ))}
-          <span className="ml-1 text-sm font-medium">{recommendation.rating.toFixed(1)}</span>
+          <ConnectedRingsRating 
+            value={recommendation.rating} 
+            size="xs" 
+            variant="badge" 
+            isInteractive={false}
+            showValue={true}
+            className="mt-0"
+          />
         </div>
         
         {recommendation.description && (
