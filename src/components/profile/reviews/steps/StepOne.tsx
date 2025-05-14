@@ -15,7 +15,10 @@ const StepOne = ({ rating, onChange }: StepOneProps) => {
         How would you rate your experience?
       </h2>
       
-      <div className="flex justify-center items-center w-full relative z-10">
+      <div 
+        className="flex justify-center items-center w-full relative z-50"
+        data-component="rating-container"
+      >
         <ConnectedRingsRating
           value={rating}
           onChange={onChange}

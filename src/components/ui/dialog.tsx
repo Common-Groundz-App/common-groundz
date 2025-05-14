@@ -41,28 +41,35 @@ const DialogContent = React.forwardRef<
         className
       )}
       onPointerDownOutside={(e) => {
-        // Prevent pointer down outside from closing the dialog if it's coming from inside
-        // an emoji picker, location picker, or other interactive UI element
+        // Let the rating component event handlers work - don't block them
         const target = e.target as HTMLElement;
-        if (target.closest('.emoji-mart') || 
+        if (target.closest('[data-rating-component]') || 
+            target.closest('[data-component="rating-container"]') ||
+            // The existing exclusions
+            target.closest('.emoji-mart') || 
             target.closest('.emoji-mart-emoji') || 
             target.closest('[data-emoji-set]') ||
             target.closest('.emoji-picker-wrapper') ||
             target.closest('.emoji-picker-dropdown') ||
             target.closest('.location-search-dropdown')) {
+          console.log("[Dialog] Preventing pointer outside for rating component");
           e.preventDefault();
           e.stopPropagation();
         }
       }}
       onClick={(e) => {
-        // Prevent event propagation from emoji picker and location picker clicks
+        // Don't interfere with rating component clicks
         const target = e.target as HTMLElement;
-        if (target.closest('.emoji-mart') || 
+        if (target.closest('[data-rating-component]') || 
+            target.closest('[data-component="rating-container"]') ||
+            // The existing exclusions
+            target.closest('.emoji-mart') || 
             target.closest('.emoji-mart-emoji') ||
             target.closest('[data-emoji-set]') ||
             target.closest('.emoji-picker-wrapper') ||
             target.closest('.emoji-picker-dropdown') ||
             target.closest('.location-search-dropdown')) {
+          console.log("[Dialog] Stopping propagation for rating component click");
           e.stopPropagation();
         }
       }}
