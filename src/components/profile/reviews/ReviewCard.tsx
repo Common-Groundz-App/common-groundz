@@ -261,9 +261,10 @@ const ReviewCard = ({
               </UsernameLink>
               <div>
                 <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
-                <div className="flex items-center text-muted-foreground text-xs gap-2 mt-0.5">
+                <div className="text-muted-foreground text-xs mt-0.5">
                   <span>{formatDate(review.created_at)}</span>
-                  <Separator orientation="vertical" className="h-3" />
+                </div>
+                <div className="mt-1">
                   <RatingDisplay rating={review.rating} />
                 </div>
               </div>
@@ -472,7 +473,7 @@ const ReviewCard = ({
   );
 };
 
-// Updated RatingDisplay component - now positioned inline with date
+// Updated RatingDisplay component - now on its own row below the date
 const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
     <ConnectedRingsRating
