@@ -35,12 +35,22 @@ export const fetchUserRecommendations = async (
       `, { count: 'exact' })
       .eq('user_id', profileUserId);
     
-    // Add category filter if specified - use string as is for database
+    // Add category filter if specified - validate category value first
     if (category) {
       console.log(`Filtering by category: ${category}`);
-      // Handle both enum and string categories - convert to lowercase for consistency
-      const categoryValue = typeof category === 'string' ? category.toLowerCase() : String(category).toLowerCase();
-      query = query.eq('category', categoryValue);
+      
+      // Validate that category is one of the allowed values
+      const validCategories = ['book', 'movie', 'place', 'product', 'food'];
+      const categoryValue = typeof category === 'string' 
+        ? category.toLowerCase() 
+        : String(category).toLowerCase();
+      
+      // Only apply category filter if it's a valid category
+      if (validCategories.includes(categoryValue)) {
+        query = query.eq('category', categoryValue);
+      } else {
+        console.warn(`Invalid category: ${category}, ignoring category filter`);
+      }
     }
 
     // Add sorting
