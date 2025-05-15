@@ -17,13 +17,6 @@ export const fetchUserRecommendations = async (
   hasMore: boolean
 }> => {
   try {
-    console.log(`Fetching recommendations for profile: ${profileUserId}, category: ${category}, limit: ${limit}`);
-    
-    if (!profileUserId) {
-      console.error('Profile user ID is required');
-      return { recommendations: [], count: 0, hasMore: false };
-    }
-    
     // Build the base query
     let query = supabase
       .from('recommendations')
@@ -35,23 +28,20 @@ export const fetchUserRecommendations = async (
       `, { count: 'exact' })
       .eq('user_id', profileUserId);
     
-    // Add category filter if specified - validate category value first
+    // Add category filter if specified - use string as is for database
     if (category) {
-      console.log(`Filtering by category: ${category}`);
-      
-      // Validate that category is one of the allowed values
-      const validCategories = ['book', 'movie', 'place', 'product', 'food'];
-      const categoryValue = typeof category === 'string' 
-        ? category.toLowerCase() 
-        : String(category).toLowerCase();
-      
-      // Only apply category filter if it's a valid category
-      if (validCategories.includes(categoryValue)) {
-        // Use type assertion since we've validated the value
-        query = query.eq('category', categoryValue as any);
+      // Handle both enum and string categories
+      let categoryValue: string;
+      if (typeof category === 'string') {
+        categoryValue = category.toLowerCase();
       } else {
-        console.warn(`Invalid category: ${category}, ignoring category filter`);
+        // This is a fallback for any value that might be passed
+        categoryValue = String(category).toLowerCase();
       }
+      
+      // Use 'eq' with the string value without casting to a specific type
+      // This avoids the type error with NonNullable<"movie" | "book" | "food" | "product" | "place">
+      query = query.eq('category', categoryValue as any);
     }
 
     // Add sorting
@@ -82,52 +72,35 @@ export const fetchUserRecommendations = async (
       return { recommendations: [], count: 0, hasMore: false };
     }
 
-    console.log(`Recommendations fetched: ${recommendations?.length || 0}`);
-    
     // Process recommendations to add like and save counts
     const processedRecommendations = recommendations?.map(rec => {
-      try {
-        // For each recommendation, extract the like count
-        const likes = rec.recommendation_likes?.[0]?.count || 0;
-        
-        // Extract profile information safely
-        const profileData = rec.profiles || {};
-        
-        // Use safe property access
-        const username = profileData && typeof profileData === 'object' && 'username' in profileData
-          ? profileData.username || null
-          : null;
-        const avatar_url = profileData && typeof profileData === 'object' && 'avatar_url' in profileData
-          ? profileData.avatar_url || null
-          : null;
-        
-        // Add isLiked as false by default (will be updated in FE if needed)
-        const processed = {
-          ...rec,
-          likes,
-          isLiked: false,
-          isSaved: false,
-          username,
-          avatar_url,
-        };
-        
-        // Clean up nested data that's already been extracted
-        delete processed.recommendation_likes;
-        delete processed.profiles;
-        
-        return processed as unknown as Recommendation;
-      } catch (err) {
-        console.error(`Error processing recommendation ${rec.id}:`, err);
-        // Return a safe fallback with required fields
-        return {
-          ...rec,
-          likes: 0,
-          isLiked: false,
-          isSaved: false,
-          username: null,
-          avatar_url: null
-        } as unknown as Recommendation;
-      }
+      // For each recommendation, extract the like count
+      const likes = rec.recommendation_likes?.[0]?.count || 0;
+      
+      // Extract profile information safely with proper type checking
+      const profileData = rec.profiles || {};
+      // Use type assertion to tell TypeScript that profileData has these properties
+      const username = typeof profileData === 'object' && profileData !== null && 'username' in profileData 
+        ? (profileData as { username?: string }).username || null 
+        : null;
+      const avatar_url = typeof profileData === 'object' && profileData !== null && 'avatar_url' in profileData 
+        ? (profileData as { avatar_url?: string }).avatar_url || null 
+        : null;
+      
+      // Add isLiked as false by default (will be updated in FE if needed)
+      const processed = {
+        ...rec,
+        likes,
+        isLiked: false,
+        username,
+        avatar_url,
+      };
+      
+      // Clean up nested data that's already been extracted
+      delete processed.recommendation_likes;
+      delete processed.profiles;
+      
+      return processed as unknown as Recommendation;
     }) || [];
 
     return {

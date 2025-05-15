@@ -19,13 +19,9 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   
-  // Add some debugging
-  console.log(`ProfileRecommendations for user: ${profileUserId}, isOwnProfile: ${isOwnProfile}`);
-  
   const {
     recommendations,
     isLoading,
-    error,
     activeFilter,
     setActiveFilter,
     sortBy,
@@ -37,25 +33,10 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     clearFilters,
     refreshRecommendations
   } = useRecommendations({ 
-    profileUserId: profileUserId || ''
+    profileUserId
   });
   
-  useEffect(() => {
-    if (error) {
-      console.error("Recommendation error:", error);
-      toast({
-        title: "Error loading recommendations",
-        description: "There was a problem loading recommendations. Please try again.",
-        variant: "destructive"
-      });
-    }
-  }, [error, toast]);
-  
-  useEffect(() => {
-    console.log(`Recommendations loaded: ${recommendations?.length || 0}`);
-  }, [recommendations]);
-  
-  const categories = recommendations && recommendations.length > 0 
+  const categories = recommendations.length > 0 
     ? [...new Set(recommendations.map(item => item.category))] 
     : [];
   
@@ -97,12 +78,6 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     refreshRecommendations();
   };
 
-  // Trigger a refresh when the component mounts or when profileUserId changes
-  useEffect(() => {
-    console.log("Profile ID changed or component mounted, refreshing recommendations");
-    refreshRecommendations();
-  }, [profileUserId, refreshRecommendations]);
-
   return (
     <div className="space-y-6 mx-0 my-0">
       <RecommendationFilters 
@@ -118,7 +93,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
       
       {isLoading ? (
         <RecommendationSkeleton />
-      ) : recommendations && recommendations.length === 0 ? (
+      ) : recommendations.length === 0 ? (
         <EmptyRecommendations 
           isOwnProfile={isOwnProfile}
           hasActiveFilter={!!activeFilter}
@@ -127,7 +102,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recommendations && recommendations.map(item => (
+          {recommendations.map(item => (
             <RecommendationCard 
               key={item.id}
               recommendation={item}

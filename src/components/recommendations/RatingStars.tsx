@@ -5,7 +5,7 @@ import ConnectedRingsRating from './ConnectedRingsRating';
 
 interface RatingStarsProps {
   rating: number;
-  size?: 'xs' | 'sm' | 'md' | 'lg'; // Update to include 'xs'
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   showValue?: boolean;
   className?: string;
 }
@@ -18,7 +18,7 @@ const RatingStars = ({
 }: RatingStarsProps) => {
   return (
     <ConnectedRingsRating
-      rating={rating}
+      value={rating}
       size={size}
       showValue={showValue}
       className={className}

@@ -16,7 +16,7 @@ const RatingStarsEnhanced = ({ value, onChange, size = 'md' }: RatingStarsEnhanc
       <p className="text-center mb-4 text-lg font-medium">How would you rate it?</p>
       <div className="flex justify-center items-center w-full">
         <ConnectedRingsRating
-          rating={value}
+          value={value}
           onChange={onChange}
           size={size}
           showValue={true}

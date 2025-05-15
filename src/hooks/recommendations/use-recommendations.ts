@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -33,8 +33,6 @@ export const useRecommendations = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  console.log(`useRecommendations for profileUserId: ${profileUserId}`);
-  
   // Fetch recommendations data
   const { 
     recommendations,
@@ -47,9 +45,6 @@ export const useRecommendations = ({
     limit 
   });
   
-  // Make sure we have an array to work with even if we get null/undefined
-  const safeRecommendations = recommendations || [];
-  
   // Apply filters and sorting
   const {
     activeFilter,
@@ -59,12 +54,7 @@ export const useRecommendations = ({
     filteredRecommendations,
     categories,
     clearFilters
-  } = useRecommendationFilters(safeRecommendations);
-
-  // Log the recommendations we're working with
-  useEffect(() => {
-    console.log(`Recommendations in useRecommendations: ${safeRecommendations.length}`);
-  }, [safeRecommendations]);
+  } = useRecommendationFilters(recommendations);
 
   const handleLike = async (id: string) => {
     if (!user) {
@@ -77,45 +67,28 @@ export const useRecommendations = ({
     }
 
     try {
-      // Find the recommendation to toggle
-      const recommendation = safeRecommendations.find(rec => rec.id === id);
-      if (!recommendation) {
-        console.error('Recommendation not found:', id);
-        return;
-      }
-
       // Optimistic update
-      const prevData = [...safeRecommendations];
+      const prevData = [...(recommendations || [])];
       
       // Update local state
       queryClient.setQueryData(['recommendations', profileUserId, user.id], 
-        (old: any) => {
-          if (!old || !Array.isArray(old?.recommendations)) {
-            console.warn('Invalid query data structure', old);
-            return old;
+        (old: any) => old?.map((item: any) => {
+          if (item.id === id) {
+            const isLiked = !item.isLiked;
+            return {
+              ...item,
+              isLiked,
+              likes: isLiked 
+                ? (item.likes || 0) + 1 
+                : Math.max(0, (item.likes || 0) - 1)
+            };
           }
-          
-          return {
-            ...old,
-            recommendations: old.recommendations.map((item: any) => {
-              if (item.id === id) {
-                const isLiked = !item.isLiked;
-                return {
-                  ...item,
-                  isLiked,
-                  likes: isLiked 
-                    ? (item.likes || 0) + 1 
-                    : Math.max(0, (item.likes || 0) - 1)
-                };
-              }
-              return item;
-            })
-          };
-        }
+          return item;
+        })
       );
 
       // Server update - Pass the current like status as the third argument
-      await toggleLike(id, user.id, !!(recommendation?.isLiked));
+      await toggleLike(id, user.id, !!(recommendations?.find(rec => rec.id === id)?.isLiked));
     } catch (err) {
       console.error('Error toggling like:', err);
       // Revert on failure
@@ -139,38 +112,21 @@ export const useRecommendations = ({
     }
 
     try {
-      // Find the recommendation to toggle
-      const recommendation = safeRecommendations.find(rec => rec.id === id);
-      if (!recommendation) {
-        console.error('Recommendation not found:', id);
-        return;
-      }
-
       // Optimistic update
       queryClient.setQueryData(['recommendations', profileUserId, user.id], 
-        (old: any) => {
-          if (!old || !Array.isArray(old?.recommendations)) {
-            console.warn('Invalid query data structure', old);
-            return old;
+        (old: any) => old?.map((item: any) => {
+          if (item.id === id) {
+            return {
+              ...item,
+              isSaved: !item.isSaved,
+            };
           }
-          
-          return {
-            ...old,
-            recommendations: old.recommendations.map((item: any) => {
-              if (item.id === id) {
-                return {
-                  ...item,
-                  isSaved: !item.isSaved,
-                };
-              }
-              return item;
-            })
-          };
-        }
+          return item;
+        })
       );
 
       // Server update - Pass the current save status as the third argument
-      await toggleSave(id, user.id, !!(recommendation?.isSaved));
+      await toggleSave(id, user.id, !!(recommendations?.find(rec => rec.id === id)?.isSaved));
     } catch (err) {
       console.error('Error toggling save:', err);
       // Revert on failure
