@@ -1,3 +1,4 @@
+
 export interface Entity {
   id: string;
   name: string;
@@ -49,6 +50,7 @@ export interface Recommendation {
   id: string;
   user_id: string;
   title: string;
+  subtitle?: string; // Added subtitle field for review headlines/titles
   description?: string;
   image_url?: string;
   category: RecommendationCategory;

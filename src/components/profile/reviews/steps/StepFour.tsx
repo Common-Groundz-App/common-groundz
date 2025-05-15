@@ -42,17 +42,17 @@ const StepFour = ({
         Additional details (optional)
       </h2>
       
-      {/* Review Title */}
+      {/* Review Headline - Updated label for clarity */}
       <div className="space-y-2">
         <Label htmlFor="review-title" className="flex items-center gap-2 font-medium">
           <span className="text-lg">📝</span>
-          <span>Review title</span>
+          <span>Review headline (optional)</span>
         </Label>
         <Input 
           id="review-title"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
-          placeholder="Give your review a catchy title..."
+          placeholder="Add a custom headline for your review..."
           className="border-brand-orange/30 focus-visible:ring-brand-orange/30 transition-all duration-200"
         />
       </div>

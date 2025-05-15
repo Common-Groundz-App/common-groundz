@@ -52,7 +52,7 @@ const ReviewForm = ({
   // Separate state variables for different fields
   const [foodName, setFoodName] = useState(''); // For "What did you eat?" in food category
   const [contentName, setContentName] = useState(''); // For movie/book/place/product name
-  const [reviewTitle, setReviewTitle] = useState(''); // For review title in Step 4
+  const [reviewTitle, setReviewTitle] = useState(''); // For review title/subtitle in Step 4
   
   const [venue, setVenue] = useState(review?.venue || '');
   const [entityId, setEntityId] = useState(review?.entity_id || '');
@@ -133,47 +133,28 @@ const ReviewForm = ({
         resetForm();
       }
     } else if (isEditMode && review) {
-      // Improved logic for handling the review title, food name, and content name
-      // when editing an existing review
+      // Update with new data structure - cleanly separate title and subtitle
       setRating(review.rating);
       setCategory(review.category);
       
-      // For food category:
-      //   - Set foodName to the review title (what was eaten)
-      //   - Extract any user-entered review title from description if available
+      // For food category, use the main title field for the food name
       if (review.category === 'food') {
-        // Always put the main title in foodName for food category
         setFoodName(review.title || '');
-        
-        // Try to detect if there was an actual review title
-        // Check if description starts with a heading-like pattern (e.g. "Lovely ambience!")
-        const description = review.description || '';
-        const potentialTitle = description.split('\n')[0];
-        
-        if (potentialTitle && potentialTitle.length < 50 && 
-            (potentialTitle.endsWith('!') || potentialTitle.endsWith('.') || 
-             !potentialTitle.includes(' '))) {
-          setReviewTitle(potentialTitle);
-        } else {
-          setReviewTitle('');
-        }
-        
-        // Clear the other category field
-        setContentName('');
-      } 
-      // For non-food categories:
-      //   - Set contentName to the review title (movie/book/place name)
-      //   - Set reviewTitle to the user's title if different from contentName
-      else {
+        setContentName(''); // Clear the other category field
+      } else {
+        // For other categories, use the main title for the content name
         setContentName(review.title || '');
-        setReviewTitle(''); // Default to empty for non-food
-        setFoodName(''); // Clear food category field
+        setFoodName(''); // Clear the food category field
       }
+      
+      // Always use subtitle field for the review title/headline
+      setReviewTitle(review.subtitle || '');
       
       setVenue(review.venue || '');
       setEntityId(review.entity_id || '');
       setDescription(review.description || '');
       setVisibility((review.visibility as "public" | "circle_only" | "private") || "public");
+      
       if (review.experience_date) {
         setExperienceDate(new Date(review.experience_date));
       }
@@ -189,7 +170,7 @@ const ReviewForm = ({
     }
   }, [isOpen, review, isEditMode]);
   
-  // Smart hybrid approach for handling category changes
+  // Handle category changes
   const handleCategoryChange = (newCategory: string) => {
     // Only clear category-specific data when changing categories
     if (newCategory !== category) {
@@ -203,8 +184,8 @@ const ReviewForm = ({
       
       // Keep general fields intact
       // - Keep rating (step 1)
-      // - Keep reviewTitle (if user entered one in step 4)
-      // - Keep description (step 4)
+      // - Keep reviewTitle (for subtitle)
+      // - Keep description
       // - Keep selectedMedia (photos/videos)
       // - Keep experienceDate
       // - Keep visibility settings
@@ -311,8 +292,6 @@ const ReviewForm = ({
         // For other sources, use venue or fallback to name
         setVenue(entity.venue || entity.name || '');
       }
-      
-      // Do not set reviewTitle for food category as it will be added separately in Step 4
     } else if (category === 'place') {
       // For place category, use name as contentName but formatted address as venue
       setContentName(entity.name);
@@ -426,7 +405,8 @@ const ReviewForm = ({
       
       if (isEditMode && review) {
         await updateReview(review.id, {
-          title: finalTitle, // Always use the category-appropriate name as title
+          title: finalTitle, // Use the content name as the title
+          subtitle: reviewTitle, // Store the review headline in the subtitle field
           venue,
           description,
           rating,
@@ -444,7 +424,8 @@ const ReviewForm = ({
         });
       } else {
         await createReview({
-          title: finalTitle, // Always use the category-appropriate name as title
+          title: finalTitle, // Use the content name as the title
+          subtitle: reviewTitle, // Store the review headline in the subtitle field
           venue,
           description,
           rating,

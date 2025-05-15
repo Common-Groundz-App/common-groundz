@@ -641,6 +641,7 @@ export type Database = {
           rating: number
           recommendation_id: string | null
           status: string
+          subtitle: string | null
           title: string
           updated_at: string
           user_id: string
@@ -661,6 +662,7 @@ export type Database = {
           rating: number
           recommendation_id?: string | null
           status?: string
+          subtitle?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -681,6 +683,7 @@ export type Database = {
           rating?: number
           recommendation_id?: string | null
           status?: string
+          subtitle?: string | null
           title?: string
           updated_at?: string
           user_id?: string

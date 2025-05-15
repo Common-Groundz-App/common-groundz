@@ -329,7 +329,16 @@ const ReviewCard = ({
           
           {/* Title and Category */}
           <div className="mt-4">
-            <h3 className="font-semibold text-lg">{review.title}</h3>
+            {/* Display Review Headline/Title (subtitle) if available */}
+            {review.subtitle && (
+              <h3 className="font-semibold text-lg">{review.subtitle}</h3>
+            )}
+            
+            {/* Always display the content name (title) */}
+            <h3 className={`${review.subtitle ? "text-base mt-1" : "font-semibold text-lg"}`}>
+              {review.title}
+            </h3>
+            
             <div className="flex flex-wrap gap-2 mt-1">
               {review.category && (
                 <Badge className={cn("font-normal", getCategoryColor(review.category))} variant="outline">
