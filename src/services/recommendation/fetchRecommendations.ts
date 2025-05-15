@@ -17,18 +17,17 @@ export const fetchUserRecommendations = async (
   hasMore: boolean
 }> => {
   try {
-    // Build the base query with LEFT JOIN instead of inner join to include recommendations without entities
+    console.log('fetchUserRecommendations called with:', {
+      userId, profileUserId, category, sortBy, page, limit
+    });
+    
+    // Build query without nested select - this avoids the relationship error
     let query = supabase
       .from('recommendations')
-      .select(`
-        *,
-        recommendation_likes(count),
-        entity:entity_id(*),
-        profiles!recommendations_user_id_fkey(username, avatar_url)
-      `, { count: 'exact' })
+      .select('*, recommendation_likes(count)', { count: 'exact' })
       .eq('user_id', profileUserId);
     
-    // Add category filter if specified - use string as is for database
+    // Add category filter if specified
     if (category) {
       // Handle both enum and string categories
       let categoryValue: string;
@@ -39,7 +38,7 @@ export const fetchUserRecommendations = async (
         categoryValue = String(category).toLowerCase();
       }
       
-      // Use 'eq' with the string value without casting to a specific type
+      // Use 'eq' with the string value
       query = query.eq('category', categoryValue as any);
     }
 
@@ -63,49 +62,106 @@ export const fetchUserRecommendations = async (
     const to = from + limit - 1;
     query = query.range(from, to);
 
-    // Execute the query
+    // Execute the query for recommendations
+    console.log('Executing recommendations query');
     const { data: recommendations, error, count } = await query;
 
     if (error) {
-      console.error('Error fetching user recommendations:', error);
+      console.error('Error fetching recommendations:', error);
       return { recommendations: [], count: 0, hasMore: false };
     }
+    
+    console.log(`Found ${recommendations?.length || 0} recommendations`);
 
-    // Process recommendations to add like and save counts
-    const processedRecommendations = recommendations?.map(rec => {
-      // For each recommendation, extract the like count
-      const likes = rec.recommendation_likes?.[0]?.count || 0;
+    // If we have recommendations, fetch related entity data and profile data separately
+    if (recommendations && recommendations.length > 0) {
+      // Get list of entity IDs we need to fetch (filtering out nulls)
+      const entityIds = recommendations
+        .map(rec => rec.entity_id)
+        .filter(id => id !== null) as string[];
+
+      // Get list of user IDs to fetch profiles
+      const userIds = [...new Set(recommendations.map(rec => rec.user_id))];
       
-      // Extract profile information safely with proper type checking
-      const profileData = rec.profiles || {};
-      // Use type assertion to tell TypeScript that profileData has these properties
-      const username = typeof profileData === 'object' && profileData !== null && 'username' in profileData 
-        ? (profileData as { username?: string }).username || null 
-        : null;
-      const avatar_url = typeof profileData === 'object' && profileData !== null && 'avatar_url' in profileData 
-        ? (profileData as { avatar_url?: string }).avatar_url || null 
-        : null;
+      // Fetch entities if we have any entity IDs
+      let entities: Record<string, any> = {};
+      if (entityIds.length > 0) {
+        const { data: entitiesData, error: entitiesError } = await supabase
+          .from('entities')
+          .select('*')
+          .in('id', entityIds);
+          
+        if (entitiesError) {
+          console.error('Error fetching entities:', entitiesError);
+        } else if (entitiesData) {
+          // Create a lookup map of entities by ID
+          entities = entitiesData.reduce((acc, entity) => {
+            acc[entity.id] = entity;
+            return acc;
+          }, {} as Record<string, any>);
+          
+          console.log(`Fetched ${entitiesData.length} entities`);
+        }
+      }
       
-      // Add isLiked as false by default (will be updated in FE if needed)
-      const processed = {
-        ...rec,
-        likes,
-        isLiked: false,
-        username,
-        avatar_url,
+      // Fetch user profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds);
+      
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      }
+      
+      // Create a lookup map of profiles by user ID
+      const profiles = profilesData?.reduce((acc, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {} as Record<string, any>) || {};
+      
+      console.log(`Fetched ${profilesData?.length || 0} profiles`);
+
+      // Process recommendations to integrate entity and profile data
+      const processedRecommendations = recommendations.map(rec => {
+        // Extract like count
+        const likes = rec.recommendation_likes?.[0]?.count || 0;
+        
+        // Get profile data for this recommendation's user_id
+        const profile = profiles[rec.user_id] || {};
+        const username = profile?.username || null;
+        const avatar_url = profile?.avatar_url || null;
+        
+        // Get entity data if available
+        const entity = rec.entity_id ? entities[rec.entity_id] || null : null;
+        
+        // Add isLiked as false by default (will be updated on client)
+        const processed = {
+          ...rec,
+          entity,
+          likes,
+          isLiked: false,
+          username,
+          avatar_url,
+        };
+        
+        // Clean up nested data that's already been extracted
+        delete processed.recommendation_likes;
+        
+        return processed as unknown as Recommendation;
+      });
+
+      return {
+        recommendations: processedRecommendations,
+        count: count || 0,
+        hasMore: (count || 0) > from + processedRecommendations.length
       };
-      
-      // Clean up nested data that's already been extracted
-      delete processed.recommendation_likes;
-      delete processed.profiles;
-      
-      return processed as unknown as Recommendation;
-    }) || [];
+    }
 
     return {
-      recommendations: processedRecommendations,
+      recommendations: [],
       count: count || 0,
-      hasMore: (count || 0) > from + processedRecommendations.length
+      hasMore: false
     };
   } catch (error) {
     console.error('Error in fetchUserRecommendations:', error);
