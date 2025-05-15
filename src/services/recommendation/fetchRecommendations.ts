@@ -47,7 +47,8 @@ export const fetchUserRecommendations = async (
       
       // Only apply category filter if it's a valid category
       if (validCategories.includes(categoryValue)) {
-        query = query.eq('category', categoryValue);
+        // Use type assertion since we've validated the value
+        query = query.eq('category', categoryValue as any);
       } else {
         console.warn(`Invalid category: ${category}, ignoring category filter`);
       }
