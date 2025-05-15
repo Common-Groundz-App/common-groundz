@@ -25,6 +25,9 @@ export const useRecommendationsFetch = ({
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [error, setError] = useState<Error | null>(null);
   
+  // Define sortBy with the proper type
+  const sortBy: 'latest' | 'oldest' | 'highest_rated' = 'latest';
+  
   // Fetch recommendations using React Query
   const { 
     data,
@@ -34,14 +37,21 @@ export const useRecommendationsFetch = ({
     refetch
   } = useQuery({
     queryKey: ['recommendations', profileUserId, user?.id, category, limit],
-    queryFn: () => fetchUserRecommendations(user?.id || null, profileUserId || '', category, undefined, limit),
+    queryFn: () => fetchUserRecommendations(
+      user?.id || null, 
+      profileUserId || '', 
+      category, 
+      sortBy,
+      undefined, 
+      limit
+    ),
     enabled: !!profileUserId,
   });
   
   // Update state when data is fetched
   useEffect(() => {
     if (data) {
-      setRecommendations(data);
+      setRecommendations(data.recommendations);
       setError(null);
     }
   }, [data]);

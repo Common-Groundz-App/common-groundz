@@ -1,29 +1,21 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
-import { EntityType, Entity } from '@/services/recommendation/types';
-import { EntityTypeString, mapStringToEntityType } from './feed/api/types';
+import { useToast } from './use-toast';
+import type { Entity as EntityType } from '@/services/recommendation/types';
+import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
 
-// Define Entity type based on the database schema
-export interface Entity {
+// Define a simplified entity structure for the component's internal use
+interface Entity {
   id: string;
   name: string;
-  type: EntityType;
-  venue: string | null;
-  description: string | null;
-  image_url: string | null;
-  api_source: string | null;
-  api_ref: string | null;
-  metadata: any | null;
-  created_by: string | null;
-  is_deleted: boolean;
-  is_verified: boolean | null;
-  verification_date: string | null;
-  website_url: string | null;
-  slug: string | null;
-  created_at: string;
-  updated_at: string;
+  description?: string;
+  image_url?: string;
+  type: EntityTypeString;
+  venue?: string;
+  api_source?: string;
+  api_ref?: string;
+  metadata?: any;
 }
 
 // Function to calculate distance between two points

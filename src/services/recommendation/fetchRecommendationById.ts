@@ -58,15 +58,23 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
       }
     }
     
+    // Extract profile information safely
+    const username = data.profiles?.username || null;
+    const avatar_url = data.profiles?.avatar_url || null;
+    
     // Return the processed recommendation with added data
-    return {
+    const processedData = {
       ...data,
       likes,
       isLiked,
       isSaved,
-      username: data.profiles?.username,
-      avatar_url: data.profiles?.avatar_url
-    } as unknown as Recommendation;
+      username,
+      avatar_url
+    };
+    
+    delete processedData.profiles;  // Clean up the nested profiles data
+    
+    return processedData as unknown as Recommendation;
     
   } catch (error) {
     console.error('Error in fetchRecommendationById:', error);

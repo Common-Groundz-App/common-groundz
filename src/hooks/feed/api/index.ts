@@ -3,4 +3,5 @@
 export { fetchForYouFeed, fetchFollowingFeed } from './feed';
 export { isItemPost } from './utils';
 export { fetchPosts, processPosts } from './posts';
-export { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from './types';
+export type { EntityTypeString } from './types';
+export { mapStringToEntityType, mapEntityTypeToString } from './types';

@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
@@ -46,11 +47,13 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
   // Convert EntityType enum to string for database compatibility
   const typeAsString = typeof entity.type === 'string' ? entity.type : mapEntityTypeToString(entity.type as EntityType);
   
+  // For database insertion, we need to ensure the type is a string literal type
   const entityForDb = {
     ...entity,
-    type: typeAsString, // Use string type for database
-    is_deleted: false
+    type: typeAsString // Use string type for database
   };
+  
+  delete (entityForDb as any).created_by; // Remove created_by if it exists
   
   const { data, error } = await supabase
     .from('entities')
@@ -88,7 +91,7 @@ export const findOrCreateEntity = async (
   }
   
   // Convert type to string if it's an enum
-  const typeAsString = typeof type === 'string' ? type : mapEntityTypeToString(type as EntityType);
+  const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
 
   // Create a new entity if not found or if we don't have API reference info
   return createEntity({
@@ -100,7 +103,6 @@ export const findOrCreateEntity = async (
     api_source: apiSource,
     api_ref: apiRef,
     metadata,
-    created_by: userId,
     is_verified: false,
     verification_date: null,
     website_url: websiteUrl,
@@ -111,7 +113,7 @@ export const findOrCreateEntity = async (
 // Get entities by type (for searching/filtering)
 export const getEntitiesByType = async (type: EntityType | EntityTypeString, searchTerm: string = ''): Promise<Entity[]> => {
   // Convert type to string if it's an enum
-  const typeAsString = typeof type === 'string' ? type : mapEntityTypeToString(type as EntityType);
+  const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
   
   let query = supabase
     .from('entities')

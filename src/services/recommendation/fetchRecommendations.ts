@@ -5,7 +5,8 @@ import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types'
 
 // Function to fetch user recommendations
 export const fetchUserRecommendations = async (
-  userId: string,
+  userId: string | null,
+  profileUserId: string,
   category?: RecommendationCategory | string,
   sortBy: 'latest' | 'oldest' | 'highest_rated' = 'latest',
   page: number = 1,
@@ -25,11 +26,16 @@ export const fetchUserRecommendations = async (
         entity(*),
         profiles!recommendations_user_id_fkey(username, avatar_url)
       `, { count: 'exact' })
-      .eq('user_id', userId);
+      .eq('user_id', profileUserId);
     
     // Add category filter if specified - use string as is for database
     if (category) {
-      query = query.eq('category', typeof category === 'string' ? category : category.toString().toLowerCase());
+      // Handle both enum and string categories
+      const categoryValue = typeof category === 'string' 
+        ? category.toLowerCase()
+        : category.toLowerCase();
+        
+      query = query.eq('category', categoryValue);
     }
 
     // Add sorting
@@ -65,15 +71,20 @@ export const fetchUserRecommendations = async (
       // For each recommendation, extract the like count
       const likes = rec.recommendation_likes?.[0]?.count || 0;
       
+      // Extract profile information safely
+      const username = rec.profiles?.username || null;
+      const avatar_url = rec.profiles?.avatar_url || null;
+      
       // Add isLiked as false by default (will be updated in FE if needed)
       const processed = {
         ...rec,
         likes,
         isLiked: false,
-        username: rec.profiles?.username,
-        avatar_url: rec.profiles?.avatar_url,
+        username,
+        avatar_url,
       };
       
+      // Clean up nested data that's already been extracted
       delete processed.recommendation_likes;
       delete processed.profiles;
       
