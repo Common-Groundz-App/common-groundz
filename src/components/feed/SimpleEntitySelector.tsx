@@ -1,22 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Entity, EntityType } from '@/services/recommendation/types';
+import { Entity } from '@/services/recommendation/types';
 import { useEntitySearch } from '@/hooks/use-entity-search';
 import { SelectValue, SelectTrigger, SelectContent, Select, SelectItem } from '@/components/ui/select';
 import { Navigation, X, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/contexts/LocationContext';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { EntityTypeString } from '@/hooks/use-recommendations';
+import { EntityTypeString } from '@/hooks/feed/api/types';
+import { EntityAdapter } from '@/components/profile/circles/types';
 
 interface SimpleEntitySelectorProps {
-  onEntitiesChange: (entities: Entity[]) => void;
-  initialEntities?: Entity[];
+  onEntitiesChange: (entities: EntityAdapter[]) => void;
+  initialEntities?: EntityAdapter[];
 }
 
 export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }: SimpleEntitySelectorProps) {
-  const [selectedEntities, setSelectedEntities] = useState<Entity[]>(initialEntities);
+  const [selectedEntities, setSelectedEntities] = useState<EntityAdapter[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState('');
   const [entityType, setEntityType] = useState<EntityTypeString>('place');
   const [showResults, setShowResults] = useState(false);
@@ -98,7 +99,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
   }, [position, locationEnabled, searchQuery]);
   
   // Handle entity selection
-  const handleEntitySelect = (entity: Entity) => {
+  const handleEntitySelect = (entity: EntityAdapter) => {
     if (!selectedEntities.some(e => e.id === entity.id)) {
       const newEntities = [...selectedEntities, entity];
       setSelectedEntities(newEntities);
@@ -113,7 +114,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     // Create an entity from the external result
     const entity = await createEntityFromExternal(result);
     if (entity) {
-      handleEntitySelect(entity);
+      handleEntitySelect(entity as EntityAdapter);
     }
   };
   

@@ -10,10 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/contexts/LocationContext';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityTypeString } from '@/hooks/feed/api/types';
+import { EntityAdapter } from '@/components/profile/circles/types';
 
 interface EntitySearchProps {
   type: EntityTypeString;
-  onSelect: (entity: Entity) => void;
+  onSelect: (entity: EntityAdapter) => void;
 }
 
 export function EntitySearch({ type, onSelect }: EntitySearchProps) {
@@ -112,7 +113,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   }, [searchQuery, showResults]);
 
   // Handler functions for selecting entities
-  const handleSelectEntity = (entity: Entity) => {
+  const handleSelectEntity = (entity: EntityAdapter) => {
     onSelect(entity);
     setSearchQuery('');
     setShowResults(false);
@@ -121,7 +122,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   const handleSelectExternal = async (result: any) => {
     const entity = await createEntityFromExternal(result);
     if (entity) {
-      onSelect(entity);
+      onSelect(entity as EntityAdapter);
       setSearchQuery('');
       setShowResults(false);
     }

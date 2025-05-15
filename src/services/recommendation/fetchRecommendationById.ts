@@ -59,8 +59,9 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
     }
     
     // Extract profile information safely
-    const username = data.profiles?.username || null;
-    const avatar_url = data.profiles?.avatar_url || null;
+    const profileData = data.profiles || {};
+    const username = profileData?.username || null;
+    const avatar_url = profileData?.avatar_url || null;
     
     // Return the processed recommendation with added data
     const processedData = {
@@ -74,6 +75,7 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
     
     delete processedData.profiles;  // Clean up the nested profiles data
     
+    // Type cast to ensure compatibility
     return processedData as unknown as Recommendation;
     
   } catch (error) {

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from './use-toast';
-import type { Entity as EntityType } from '@/services/recommendation/types';
+import type { Entity } from '@/services/recommendation/types';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
 
 // Define a simplified entity structure for the component's internal use
@@ -176,7 +177,7 @@ export function useEntitySearch(type: EntityTypeString) {
       const entityData = {
         id: uuidv4(),
         name: externalData.name,
-        type: type, // Use the string type as is for database compatibility
+        type, // Use the string type as is for database compatibility
         venue: externalData.venue,
         description: externalData.description || null,
         image_url: externalData.image_url || null,
@@ -189,7 +190,16 @@ export function useEntitySearch(type: EntityTypeString) {
       // Insert the entity into our database
       const { data, error } = await supabase
         .from('entities')
-        .insert(entityData)
+        .insert({
+          name: entityData.name,
+          type: entityData.type,
+          venue: entityData.venue,
+          description: entityData.description,
+          image_url: entityData.image_url,
+          api_source: entityData.api_source,
+          api_ref: entityData.api_ref,
+          metadata: entityData.metadata
+        })
         .select()
         .single();
       
@@ -224,16 +234,14 @@ export function useEntitySearch(type: EntityTypeString) {
       
       // Create entity from the metadata - use string type
       const entityData = {
-        id: uuidv4(),
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
-        type: type, // Use string type for database compatibility
+        type, // Use string type for database compatibility
         venue: data.metadata.site_name || new URL(url).hostname,
         description: data.metadata.description || data.metadata.og_description || null,
         image_url: data.metadata.og_image || data.metadata.image || null,
         api_source: 'url_metadata',
         api_ref: url,
-        metadata: data.metadata,
-        is_deleted: false
+        metadata: data.metadata
       };
       
       // Insert the entity into our database

@@ -2,13 +2,13 @@
 // Re-export the types from the parent directory
 export * from '../types';
 
+// Import the EntityType enum directly
+import { EntityType } from '@/services/recommendation/types';
+
 // Add string literal compatibility types for existing components
 export type EntityTypeString = 'movie' | 'book' | 'food' | 'product' | 'place';
 
-// Import EntityType directly to avoid dynamic imports that cause errors
-import { EntityType } from '@/services/recommendation/types';
-
-// Mapping function to convert between string literals and enum values
+// Mapping functions to convert between string literals and enum values
 export function mapStringToEntityType(stringType: EntityTypeString): EntityType {
   switch (stringType) {
     case 'movie': return EntityType.Movie;

@@ -45,15 +45,29 @@ export const findEntityByApiRef = async (apiSource: string, apiRef: string): Pro
 // Create a new entity
 export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>): Promise<Entity | null> => {
   // Convert EntityType enum to string for database compatibility
-  const typeAsString = typeof entity.type === 'string' ? entity.type : mapEntityTypeToString(entity.type as EntityType);
+  let typeAsString: string;
   
-  // For database insertion, we need to ensure the type is a string literal type
+  if (typeof entity.type === 'string') {
+    typeAsString = entity.type;
+  } else {
+    typeAsString = mapEntityTypeToString(entity.type as EntityType);
+  }
+  
+  // For database insertion, prepare the entity data
   const entityForDb = {
-    ...entity,
-    type: typeAsString // Use string type for database
+    name: entity.name,
+    type: typeAsString, 
+    venue: entity.venue,
+    description: entity.description,
+    image_url: entity.image_url,
+    api_source: entity.api_source,
+    api_ref: entity.api_ref,
+    metadata: entity.metadata,
+    website_url: entity.website_url,
+    is_verified: false,
+    verification_date: null,
+    slug: entity.name ? entity.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : null
   };
-  
-  delete (entityForDb as any).created_by; // Remove created_by if it exists
   
   const { data, error } = await supabase
     .from('entities')
@@ -96,29 +110,26 @@ export const findOrCreateEntity = async (
   // Create a new entity if not found or if we don't have API reference info
   return createEntity({
     name,
-    type: typeAsString as any, // Type assertion needed for database compatibility
+    type: typeAsString,
     venue,
     description,
     image_url: imageUrl,
     api_source: apiSource,
     api_ref: apiRef,
     metadata,
-    is_verified: false,
-    verification_date: null,
-    website_url: websiteUrl,
-    slug: name ? name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : null
+    website_url: websiteUrl
   });
 };
 
 // Get entities by type (for searching/filtering)
 export const getEntitiesByType = async (type: EntityType | EntityTypeString, searchTerm: string = ''): Promise<Entity[]> => {
   // Convert type to string if it's an enum
-  const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
+  const typeAsString = typeof type === 'string' ? type as string : mapEntityTypeToString(type as EntityType);
   
   let query = supabase
     .from('entities')
     .select('*')
-    .eq('type', typeAsString) // Use string type for database
+    .eq('type', typeAsString)
     .eq('is_deleted', false);
     
   if (searchTerm) {
