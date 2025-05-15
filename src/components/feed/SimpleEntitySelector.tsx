@@ -8,6 +8,7 @@ import { Navigation, X, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/contexts/LocationContext';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityTypeString } from '@/hooks/use-recommendations';
 
 interface SimpleEntitySelectorProps {
   onEntitiesChange: (entities: Entity[]) => void;
@@ -17,7 +18,7 @@ interface SimpleEntitySelectorProps {
 export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }: SimpleEntitySelectorProps) {
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState('');
-  const [entityType, setEntityType] = useState<EntityType>('place');
+  const [entityType, setEntityType] = useState<EntityTypeString>('place');
   const [showResults, setShowResults] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -177,7 +178,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
         <div className="flex gap-2">
           <Select 
             value={entityType}
-            onValueChange={(value) => setEntityType(value as EntityType)}
+            onValueChange={(value) => setEntityType(value as EntityTypeString)}
           >
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Type" />

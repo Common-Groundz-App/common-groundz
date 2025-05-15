@@ -1,11 +1,19 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { Recommendation } from './types';
+import { mapStringToEntityType } from '@/hooks/feed/api/types';
 
 export const createRecommendation = async (recommendation: Omit<Recommendation, 'id' | 'created_at' | 'updated_at'>) => {
+  // Convert recommendation data for database compatibility
+  const dbRecommendation: any = {
+    ...recommendation,
+    // Convert category to string if needed - this will help with type compatibility
+    category: recommendation.category.toString().toLowerCase()
+  };
+
   const { data, error } = await supabase
     .from('recommendations')
-    .insert(recommendation)
+    .insert(dbRecommendation)
     .select()
     .single();
 
@@ -18,9 +26,19 @@ export const createRecommendation = async (recommendation: Omit<Recommendation, 
 };
 
 export const updateRecommendation = async (id: string, updates: Partial<Recommendation>) => {
+  // Convert recommendation data for database compatibility
+  const dbUpdates: any = {
+    ...updates
+  };
+
+  // If category is being updated, ensure it's in the right format
+  if (updates.category) {
+    dbUpdates.category = updates.category.toString().toLowerCase();
+  }
+
   const { data, error } = await supabase
     .from('recommendations')
-    .update(updates)
+    .update(dbUpdates)
     .eq('id', id)
     .select()
     .single();

@@ -1,11 +1,12 @@
 
 import React, { useState } from 'react';
 import { EntitySearch } from '@/components/recommendations/EntitySearch';
-import { Entity, EntityType } from '@/services/recommendation/types';
+import { Entity } from '@/services/recommendation/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EntityTypeString } from '@/hooks/use-recommendations';
 
 interface EntityTagSelectorProps {
   onEntitiesChange: (entities: Entity[]) => void;
@@ -14,7 +15,7 @@ interface EntityTagSelectorProps {
 
 export function EntityTagSelector({ onEntitiesChange, initialEntities = [] }: EntityTagSelectorProps) {
   const [selectedEntities, setSelectedEntities] = useState<Entity[]>(initialEntities);
-  const [activeTab, setActiveTab] = useState<EntityType>('place');
+  const [activeTab, setActiveTab] = useState<EntityTypeString>('place');
   
   const handleEntitySelect = (entity: Entity) => {
     // Check if entity is already selected
@@ -31,14 +32,14 @@ export function EntityTagSelector({ onEntitiesChange, initialEntities = [] }: En
     onEntitiesChange(newEntities);
   };
   
-  const entityTypes: EntityType[] = ['place', 'food', 'movie', 'book', 'product'];
+  const entityTypes: EntityTypeString[] = ['place', 'food', 'movie', 'book', 'product'];
   
   return (
     <div className="space-y-4">
       <div>
         <p className="text-sm font-medium mb-2">Tag entities in your post</p>
         
-        <Tabs defaultValue="place" className="w-full" onValueChange={(value) => setActiveTab(value as EntityType)}>
+        <Tabs defaultValue="place" className="w-full" onValueChange={(value) => setActiveTab(value as EntityTypeString)}>
           <TabsList className="grid grid-cols-5">
             {entityTypes.map(type => (
               <TabsTrigger key={type} value={type} className="capitalize">

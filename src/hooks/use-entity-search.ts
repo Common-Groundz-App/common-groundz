@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { EntityType } from '@/services/recommendation/types';
+import { EntityTypeString, mapStringToEntityType } from './feed/api/types';
 
 // Define Entity type based on the database schema
 export interface Entity {
@@ -46,11 +47,14 @@ function calculateDistance(
   return distance;
 }
 
-export function useEntitySearch(type: EntityType) {
+export function useEntitySearch(type: EntityTypeString) {
   const [localResults, setLocalResults] = useState<Entity[]>([]);
   const [externalResults, setExternalResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  
+  // Convert string type to enum type for database operations
+  const entityTypeEnum = mapStringToEntityType(type);
 
   // Check if location is enabled in localStorage
   const isLocationEnabled = (): boolean => {
@@ -63,7 +67,7 @@ export function useEntitySearch(type: EntityType) {
     setIsLoading(true);
     
     try {
-      // Search in our local database first
+      // Search in our local database first - use the string type directly for the query
       const { data: localData, error: localError } = await supabase
         .from('entities')
         .select()
@@ -177,11 +181,11 @@ export function useEntitySearch(type: EntityType) {
 
   const createEntityFromExternal = useCallback(async (externalData: any) => {
     try {
-      // Create a new entity record from external data
+      // Create a new entity record from external data - convert to enum type for database
       const entityData = {
         id: uuidv4(),
         name: externalData.name,
-        type: type,
+        type: type as any, // Use the string type as is for database compatibility
         venue: externalData.venue,
         description: externalData.description || null,
         image_url: externalData.image_url || null,
@@ -227,11 +231,11 @@ export function useEntitySearch(type: EntityType) {
         throw new Error('Could not fetch metadata from URL');
       }
       
-      // Create entity from the metadata
+      // Create entity from the metadata - use string type for database
       const entityData = {
         id: uuidv4(),
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
-        type: type,
+        type: type as any, // Use string type for database compatibility
         venue: data.metadata.site_name || new URL(url).hostname,
         description: data.metadata.description || data.metadata.og_description || null,
         image_url: data.metadata.og_image || data.metadata.image || null,

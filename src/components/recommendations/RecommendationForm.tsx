@@ -10,9 +10,13 @@ import { Star, Loader2, Camera, MapPin, Tag as TagIcon, Clapperboard, Book, Shop
 import { cn } from "@/lib/utils";
 import { useForm, Controller } from "react-hook-form";
 import EntitySearch from './EntitySearch';
-import { RecommendationCategory, RecommendationVisibility, Recommendation } from '@/services/recommendationService';
+import { RecommendationVisibility, Recommendation } from '@/services/recommendationService';
 import ConnectedRingsRating from './ConnectedRingsRating';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { EntityTypeString } from '@/hooks/use-recommendations';
+
+// String literal type for category fields in forms
+type CategoryString = 'food' | 'movie' | 'book' | 'place' | 'product';
 
 interface RecommendationFormProps {
   isOpen: boolean;
@@ -38,7 +42,7 @@ const RecommendationForm = ({
       description: recommendation?.description || '',
       rating: recommendation?.rating || 0,
       image_url: recommendation?.image_url || '',
-      category: recommendation?.category || 'food' as RecommendationCategory,
+      category: (recommendation?.category || 'food').toLowerCase() as CategoryString, // Convert enum to string
       visibility: recommendation?.visibility || 'public' as RecommendationVisibility,
       entity_id: recommendation?.entity_id || '',
     }
@@ -93,7 +97,7 @@ const RecommendationForm = ({
       setValue('description', recommendation.description || '');
       setValue('rating', recommendation.rating);
       setValue('image_url', recommendation.image_url || '');
-      setValue('category', recommendation.category);
+      setValue('category', (recommendation.category || 'food').toLowerCase() as CategoryString);
       setValue('visibility', recommendation.visibility);
       setValue('entity_id', recommendation.entity_id || '');
       setSelectedImage(recommendation.image_url || null);
@@ -253,7 +257,7 @@ const RecommendationForm = ({
                   <span>Search for {selectedCategory}</span>
                 </Label>
                 <EntitySearch 
-                  type={selectedCategory as any}
+                  type={selectedCategory as EntityTypeString}
                   onSelect={(entity) => {
                     setValue('title', entity.name);
                     setValue('entity_id', entity.id);
