@@ -22,7 +22,7 @@ import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
 import { ensureHttps } from '@/utils/urlUtils';
-import { ConnectedRingsRating } from '@/components/ui/ConnectedRingsRating';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 interface RecommendationCardProps {
   recommendation: any;
