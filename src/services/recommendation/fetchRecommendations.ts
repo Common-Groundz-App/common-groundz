@@ -17,13 +17,13 @@ export const fetchUserRecommendations = async (
   hasMore: boolean
 }> => {
   try {
-    // Build the base query
+    // Build the base query with LEFT JOIN instead of inner join to include recommendations without entities
     let query = supabase
       .from('recommendations')
       .select(`
         *,
         recommendation_likes(count),
-        entity(*),
+        entity:entity_id(*),
         profiles!recommendations_user_id_fkey(username, avatar_url)
       `, { count: 'exact' })
       .eq('user_id', profileUserId);
@@ -40,7 +40,6 @@ export const fetchUserRecommendations = async (
       }
       
       // Use 'eq' with the string value without casting to a specific type
-      // This avoids the type error with NonNullable<"movie" | "book" | "food" | "product" | "place">
       query = query.eq('category', categoryValue as any);
     }
 

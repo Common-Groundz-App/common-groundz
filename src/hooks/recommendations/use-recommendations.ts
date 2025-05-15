@@ -33,6 +33,8 @@ export const useRecommendations = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  console.log('useRecommendations called with profileUserId:', profileUserId);
+  
   // Fetch recommendations data
   const { 
     recommendations,

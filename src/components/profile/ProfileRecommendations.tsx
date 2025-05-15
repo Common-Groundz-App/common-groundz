@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useRecommendations } from '@/hooks/recommendations/use-recommendations';
+import { useRecommendations } from '@/hooks/use-recommendations';
 import RecommendationForm from '@/components/recommendations/RecommendationForm';
 import RecommendationFilters from '@/components/recommendations/RecommendationFilters';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
@@ -18,6 +18,8 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
   const { user } = useAuth();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  
+  console.log('ProfileRecommendations rendering with profileUserId:', profileUserId);
   
   const {
     recommendations,
@@ -35,6 +37,14 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
   } = useRecommendations({ 
     profileUserId
   });
+  
+  // Debug log recommendations when they change
+  useEffect(() => {
+    console.log('Recommendations in ProfileRecommendations:', recommendations?.length || 0);
+    if (recommendations?.length) {
+      console.log('First recommendation:', recommendations[0]);
+    }
+  }, [recommendations]);
   
   const categories = recommendations.length > 0 
     ? [...new Set(recommendations.map(item => item.category))] 

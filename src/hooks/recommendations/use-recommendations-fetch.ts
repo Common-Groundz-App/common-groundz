@@ -28,6 +28,9 @@ export const useRecommendationsFetch = ({
   // Define sortBy with the proper type
   const sortBy: 'latest' | 'oldest' | 'highest_rated' = 'latest';
   
+  // Improved debugging with the profile user ID
+  console.log('useRecommendationsFetch called with profileUserId:', profileUserId);
+  
   // Fetch recommendations using React Query
   const { 
     data,
@@ -37,20 +40,24 @@ export const useRecommendationsFetch = ({
     refetch
   } = useQuery({
     queryKey: ['recommendations', profileUserId, user?.id, category, limit],
-    queryFn: () => fetchUserRecommendations(
-      user?.id || null, 
-      profileUserId || '', 
-      category, 
-      sortBy,
-      undefined, 
-      limit
-    ),
+    queryFn: () => {
+      console.log('Fetching recommendations for profileUserId:', profileUserId);
+      return fetchUserRecommendations(
+        user?.id || null, 
+        profileUserId || '', 
+        category, 
+        sortBy,
+        undefined, 
+        limit
+      );
+    },
     enabled: !!profileUserId,
   });
   
   // Update state when data is fetched
   useEffect(() => {
     if (data) {
+      console.log('Recommendations fetched:', data.recommendations.length);
       setRecommendations(data.recommendations);
       setError(null);
     }
@@ -72,6 +79,7 @@ export const useRecommendationsFetch = ({
   // Refresh recommendations function
   const refreshRecommendations = async () => {
     try {
+      console.log('Refreshing recommendations for profileUserId:', profileUserId);
       await refetch();
     } catch (err) {
       console.error('Error refreshing recommendations:', err);
