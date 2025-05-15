@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { createReview, updateReview, Review } from '@/services/reviewService';
+import { createReview, updateReview, Review, Entity } from '@/services/reviewService';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
-import { Entity } from '@/services/recommendation/types';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
 
@@ -101,7 +99,7 @@ const ReviewForm = ({
         processedEntity.image_url = ensureHttps(processedEntity.image_url);
       }
       
-      setSelectedEntity(processedEntity);
+      setSelectedEntity(processedEntity as Entity);
     }
   }, [review, isEditMode]);
   
@@ -413,7 +411,7 @@ const ReviewForm = ({
           image_url,
           media: selectedMedia,
           category,
-          visibility,
+          visibility: visibility as "public" | "private" | "friends_only", // Match what the API expects
           entity_id: entityId,
           experience_date: formattedExperienceDate,
           metadata,
@@ -432,7 +430,7 @@ const ReviewForm = ({
           image_url,
           media: selectedMedia,
           category,
-          visibility,
+          visibility: visibility as "public" | "private" | "friends_only", // Match what the API expects
           entity_id: entityId,
           experience_date: formattedExperienceDate,
           metadata,

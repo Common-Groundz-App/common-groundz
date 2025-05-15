@@ -1,7 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
-import { RecommendationVisibility } from "@/services/recommendation/types";
+import { RecommendationVisibility, EntityType } from "@/services/recommendation/types";
+import { MediaItem } from "@/types/media";
 
 export interface Review {
   id: string;
@@ -14,9 +14,9 @@ export interface Review {
   venue?: string;
   entity_id?: string;
   entity?: Entity;
-  visibility: RecommendationVisibility;
+  visibility: "public" | "private" | "friends_only"; // Match exactly what Supabase expects
   image_url?: string;
-  media?: any; // Media items array
+  media?: MediaItem[]; // Properly typed media array
   created_at: string;
   updated_at: string;
   is_converted: boolean;
@@ -48,7 +48,7 @@ export interface Entity {
   api_source?: string;
   metadata?: Record<string, any>;
   venue?: string;
-  type: string;
+  type: string; // Keep as string for compatibility
 }
 
 export interface ReviewCreateInput {
@@ -60,9 +60,9 @@ export interface ReviewCreateInput {
   category: string;
   venue?: string;
   entity_id?: string;
-  visibility: RecommendationVisibility;
+  visibility: "public" | "private" | "friends_only"; // Match exactly what Supabase expects
   image_url?: string;
-  media?: any;
+  media?: MediaItem[];
   experience_date?: string;
   metadata?: {
     food_tags?: string[];
@@ -262,6 +262,7 @@ export const createReview = async (review: Omit<Review, 'id' | 'created_at' | 'u
     .from('reviews')
     .insert({
       title: review.title,
+      subtitle: review.subtitle,
       venue: review.venue,
       description: review.description,
       rating: review.rating,
@@ -489,6 +490,7 @@ export const updateReview = async (id: string, updates: Partial<Review>) => {
   // Create a new object with only the supported fields
   const validUpdates = {
     title: updates.title,
+    subtitle: updates.subtitle,
     venue: updates.venue,
     description: updates.description,
     rating: updates.rating,
