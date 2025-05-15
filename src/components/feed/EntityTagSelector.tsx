@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { EntityTypeString } from '@/hooks/use-recommendations';
+import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
 
 interface EntityTagSelectorProps {
   onEntitiesChange: (entities: Entity[]) => void;

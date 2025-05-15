@@ -1,102 +1,92 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Recommendation, EntityType, RecommendationCategory } from './types';
-import { fetchUserProfile } from '../profileService';
+import { Recommendation, RecommendationCategory } from '../recommendation/types';
+import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
 
+// Function to fetch user recommendations
 export const fetchUserRecommendations = async (
-  userId: string | null = null, 
-  profileUserId?: string,
+  userId: string,
   category?: RecommendationCategory | string,
-  sortBy: 'latest' | 'top' = 'latest',
-  limit = 50
-): Promise<Recommendation[]> => {
+  sortBy: 'latest' | 'oldest' | 'highest_rated' = 'latest',
+  page: number = 1,
+  limit: number = 10
+): Promise<{
+  recommendations: Recommendation[],
+  count: number,
+  hasMore: boolean
+}> => {
   try {
-    // Base query
+    // Build the base query
     let query = supabase
       .from('recommendations')
       .select(`
         *,
-        entities(*)
-      `)
-      .order(sortBy === 'latest' ? 'created_at' : 'view_count', { ascending: false })
-      .limit(limit);
-
-    // Filter by specific user profile if provided
-    if (profileUserId) {
-      query = query.eq('user_id', profileUserId);
-    }
-
-    // Filter by category if provided
+        recommendation_likes(count),
+        entity(*),
+        profiles!recommendations_user_id_fkey(username, avatar_url)
+      `, { count: 'exact' })
+      .eq('user_id', userId);
+    
+    // Add category filter if specified - use string as is for database
     if (category) {
-      // Type assertion to handle both string and enum types
-      // This tells TypeScript that we know what we're doing with the category value
-      query = query.eq('category', category as RecommendationCategory);
+      query = query.eq('category', typeof category === 'string' ? category : category.toString().toLowerCase());
     }
+
+    // Add sorting
+    switch (sortBy) {
+      case 'latest':
+        query = query.order('created_at', { ascending: false });
+        break;
+      case 'oldest':
+        query = query.order('created_at', { ascending: true });
+        break;
+      case 'highest_rated':
+        query = query.order('rating', { ascending: false });
+        break;
+      default:
+        query = query.order('created_at', { ascending: false });
+    }
+
+    // Pagination
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+    query = query.range(from, to);
 
     // Execute the query
-    const { data, error } = await query;
+    const { data: recommendations, error, count } = await query;
 
     if (error) {
-      console.error('Error fetching recommendations:', error);
-      throw error;
+      console.error('Error fetching user recommendations:', error);
+      return { recommendations: [], count: 0, hasMore: false };
     }
 
-    // No recommendations found
-    if (!data || data.length === 0) return [];
-
-    // Extract recommendation IDs and user IDs
-    const recommendationIds = data.map(rec => rec.id);
-    const userIds = [...new Set(data.map(rec => rec.user_id))];
-
-    // Get likes count
-    const { data: likeCounts } = await supabase.rpc('get_recommendation_likes_by_ids', {
-      p_recommendation_ids: recommendationIds
-    });
-
-    // Get user likes
-    let userLikes: any[] = [];
-    if (userId) {
-      const { data: likesData } = await supabase.rpc('get_user_recommendation_likes', {
-        p_recommendation_ids: recommendationIds,
-        p_user_id: userId
-      });
-      userLikes = likesData || [];
-    }
-    
-    // Get user profiles
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
-    
-    // Create a map of user IDs to profiles for quick lookup
-    const profileMap = new Map();
-    if (profiles) {
-      profiles.forEach(profile => {
-        profileMap.set(profile.id, profile);
-      });
-    }
-
-    // Combine all the data
-    const recommendations = data.map(rec => {
-      const likeCount = likeCounts?.find(l => l.recommendation_id === rec.id)?.like_count || 0;
-      const isLiked = userLikes?.some(like => like.recommendation_id === rec.id) || false;
-      const profile = profileMap.get(rec.user_id) || {};
+    // Process recommendations to add like and save counts
+    const processedRecommendations = recommendations?.map(rec => {
+      // For each recommendation, extract the like count
+      const likes = rec.recommendation_likes?.[0]?.count || 0;
       
-      return {
+      // Add isLiked as false by default (will be updated in FE if needed)
+      const processed = {
         ...rec,
-        likes: Number(likeCount),
-        isLiked,
-        entity: rec.entities,
-        entities: undefined,
-        username: profile.username || null,
-        avatar_url: profile.avatar_url || null
-      } as Recommendation;
-    });
+        likes,
+        isLiked: false,
+        username: rec.profiles?.username,
+        avatar_url: rec.profiles?.avatar_url,
+      };
+      
+      delete processed.recommendation_likes;
+      delete processed.profiles;
+      
+      return processed as unknown as Recommendation;
+    }) || [];
 
-    return recommendations;
+    return {
+      recommendations: processedRecommendations,
+      count: count || 0,
+      hasMore: (count || 0) > from + processedRecommendations.length
+    };
   } catch (error) {
     console.error('Error in fetchUserRecommendations:', error);
-    throw error;
+    return { recommendations: [], count: 0, hasMore: false };
   }
 };

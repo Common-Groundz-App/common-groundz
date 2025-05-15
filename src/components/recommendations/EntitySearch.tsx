@@ -9,9 +9,10 @@ import { useEntitySearch } from '@/hooks/use-entity-search';
 import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/contexts/LocationContext';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityTypeString } from '@/hooks/feed/api/types';
 
 interface EntitySearchProps {
-  type: EntityType;
+  type: EntityTypeString;
   onSelect: (entity: Entity) => void;
 }
 

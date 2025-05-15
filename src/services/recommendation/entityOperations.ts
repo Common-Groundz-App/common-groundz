@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
+import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
 
 // Fetch an entity by its ID
 export const fetchEntityById = async (entityId: string): Promise<Entity | null> => {
@@ -43,9 +43,18 @@ export const findEntityByApiRef = async (apiSource: string, apiRef: string): Pro
 
 // Create a new entity
 export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>): Promise<Entity | null> => {
+  // Convert EntityType enum to string for database compatibility
+  const typeAsString = typeof entity.type === 'string' ? entity.type : mapEntityTypeToString(entity.type as EntityType);
+  
+  const entityForDb = {
+    ...entity,
+    type: typeAsString, // Use string type for database
+    is_deleted: false
+  };
+  
   const { data, error } = await supabase
     .from('entities')
-    .insert({ ...entity, is_deleted: false })
+    .insert(entityForDb)
     .select()
     .single();
 
@@ -60,7 +69,7 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
 // Find or create an entity based on external API data
 export const findOrCreateEntity = async (
   name: string,
-  type: EntityType,
+  type: EntityType | EntityTypeString,
   apiSource: string | null,
   apiRef: string | null,
   venue: string | null = null,
@@ -77,11 +86,14 @@ export const findOrCreateEntity = async (
       return existingEntity;
     }
   }
+  
+  // Convert type to string if it's an enum
+  const typeAsString = typeof type === 'string' ? type : mapEntityTypeToString(type as EntityType);
 
   // Create a new entity if not found or if we don't have API reference info
   return createEntity({
     name,
-    type,
+    type: typeAsString as any, // Type assertion needed for database compatibility
     venue,
     description,
     image_url: imageUrl,
@@ -97,11 +109,14 @@ export const findOrCreateEntity = async (
 };
 
 // Get entities by type (for searching/filtering)
-export const getEntitiesByType = async (type: EntityType, searchTerm: string = ''): Promise<Entity[]> => {
+export const getEntitiesByType = async (type: EntityType | EntityTypeString, searchTerm: string = ''): Promise<Entity[]> => {
+  // Convert type to string if it's an enum
+  const typeAsString = typeof type === 'string' ? type : mapEntityTypeToString(type as EntityType);
+  
   let query = supabase
     .from('entities')
     .select('*')
-    .eq('type', type)
+    .eq('type', typeAsString) // Use string type for database
     .eq('is_deleted', false);
     
   if (searchTerm) {

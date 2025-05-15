@@ -13,7 +13,7 @@ import EntitySearch from './EntitySearch';
 import { RecommendationVisibility, Recommendation } from '@/services/recommendationService';
 import ConnectedRingsRating from './ConnectedRingsRating';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
-import { EntityTypeString } from '@/hooks/use-recommendations';
+import { EntityTypeString } from '@/hooks/feed/api/types';
 
 // String literal type for category fields in forms
 type CategoryString = 'food' | 'movie' | 'book' | 'place' | 'product';

@@ -5,25 +5,28 @@ export * from '../types';
 // Add string literal compatibility types for existing components
 export type EntityTypeString = 'movie' | 'book' | 'food' | 'product' | 'place';
 
+// Import EntityType directly to avoid dynamic imports that cause errors
+import { EntityType } from '@/services/recommendation/types';
+
 // Mapping function to convert between string literals and enum values
-export function mapStringToEntityType(stringType: EntityTypeString): import('@/services/recommendation/types').EntityType {
+export function mapStringToEntityType(stringType: EntityTypeString): EntityType {
   switch (stringType) {
-    case 'movie': return import('@/services/recommendation/types').EntityType.Movie;
-    case 'book': return import('@/services/recommendation/types').EntityType.Book;
-    case 'food': return import('@/services/recommendation/types').EntityType.Food;
-    case 'product': return import('@/services/recommendation/types').EntityType.Product;
-    case 'place': return import('@/services/recommendation/types').EntityType.Place;
-    default: return import('@/services/recommendation/types').EntityType.Place;
+    case 'movie': return EntityType.Movie;
+    case 'book': return EntityType.Book;
+    case 'food': return EntityType.Food;
+    case 'product': return EntityType.Product;
+    case 'place': return EntityType.Place;
+    default: return EntityType.Place;
   }
 }
 
-export function mapEntityTypeToString(enumType: import('@/services/recommendation/types').EntityType): EntityTypeString {
+export function mapEntityTypeToString(enumType: EntityType): EntityTypeString {
   switch (enumType) {
-    case import('@/services/recommendation/types').EntityType.Movie: return 'movie';
-    case import('@/services/recommendation/types').EntityType.Book: return 'book';
-    case import('@/services/recommendation/types').EntityType.Food: return 'food';
-    case import('@/services/recommendation/types').EntityType.Product: return 'product';
-    case import('@/services/recommendation/types').EntityType.Place: return 'place';
+    case EntityType.Movie: return 'movie';
+    case EntityType.Book: return 'book';
+    case EntityType.Food: return 'food';
+    case EntityType.Product: return 'product';
+    case EntityType.Place: return 'place';
     default: return 'place';
   }
 }
