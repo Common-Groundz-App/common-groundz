@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,13 +19,15 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { useNavigate } from 'react-router-dom';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getRecommendationFallbackImage } from '@/utils/fallbackImageUtils';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { LightboxPreview } from '@/components/media/LightboxPreview';
+import { MediaItem } from '@/types/media';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -56,11 +59,28 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Add state for lightbox control
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   
   const isOwner = user?.id === recommendation.user_id;
 
   // Determine the best image to display
   const imageUrl = getRecommendationFallbackImage(recommendation);
+  
+  // Create a media item for the lightbox
+  const mediaItem: MediaItem = {
+    id: recommendation.id,
+    type: 'image',
+    url: imageUrl,
+    alt: recommendation.title,
+    caption: recommendation.title,
+    width: 1200,  // Default width
+    height: 675,  // Default height for 16:9 aspect ratio
+    orientation: 'landscape'
+  };
+  
+  // Create media array for lightbox (single item)
+  const media: MediaItem[] = [mediaItem];
   
   // Log entity data for debugging
   useEffect(() => {
@@ -185,6 +205,13 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     e.preventDefault();
     if (onLike) onLike(recommendation.id);
   };
+  
+  // Add handler to open lightbox when image is clicked
+  const handleImageClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsLightboxOpen(true);
+  };
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
   
@@ -261,8 +288,11 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           <p className="text-muted-foreground mb-4">{recommendation.description}</p>
         )}
         
-        {/* Image display with fallback strategy - always show an image */}
-        <div className="mt-2 rounded-md overflow-hidden">
+        {/* Updated image display with onClick handler to open lightbox */}
+        <div 
+          className="mt-2 rounded-md overflow-hidden cursor-pointer" 
+          onClick={handleImageClick}
+        >
           <AspectRatio ratio={16/9} className="bg-muted/20">
             <ImageWithFallback 
               src={imageUrl} 
@@ -323,6 +353,15 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           Save
         </Button>
       </CardFooter>
+      
+      {/* Add Lightbox component */}
+      {isLightboxOpen && (
+        <LightboxPreview 
+          media={media}
+          initialIndex={0}
+          onClose={() => setIsLightboxOpen(false)}
+        />
+      )}
       
       <CommentDialog 
         isOpen={isCommentDialogOpen} 
