@@ -12,7 +12,7 @@ export const fetchRecommendations = async (
   try {
     let query = supabase
       .from('recommendations')
-      .select('*')
+      .select('*, entity_id')
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .range(page * itemsPerPage, (page + 1) * itemsPerPage - 1);
@@ -120,6 +120,26 @@ export const getUserRecommendationSaves = async (recommendationIds: string[], us
   }
 };
 
+// Fetch entities for recommendations
+const fetchEntitiesForRecommendations = async (entityIds: string[]): Promise<Map<string, any>> => {
+  if (!entityIds.length) return new Map<string, any>();
+  
+  try {
+    const { data, error } = await supabase
+      .from('entities')
+      .select('*')
+      .in('id', entityIds)
+      .eq('is_deleted', false);
+    
+    if (error) throw error;
+    
+    return createMap(data || [], 'id');
+  } catch (error) {
+    console.error('Error fetching entities:', error);
+    return new Map<string, any>();
+  }
+};
+
 // Process recommendations data with additional metadata
 export const processRecommendations = async (
   recommendationsData: any[], 
@@ -131,12 +151,21 @@ export const processRecommendations = async (
     // Get recommendation IDs for fetching related data
     const recommendationIds = recommendationsData.map(rec => rec.id);
     
+    // Extract entity IDs for fetching entity data
+    const entityIds = recommendationsData
+      .map(rec => rec.entity_id)
+      .filter(id => id !== null && id !== undefined) as string[];
+    
     // Fetch user profiles
     const userIds = recommendationsData.map(rec => rec.user_id);
     const { data: profilesData } = await fetchProfiles(userIds);
     
     // Create lookup map for profiles
     const profilesMap = createMap(profilesData, 'id');
+    
+    // Fetch entities data for recommendations
+    const entitiesMap = await fetchEntitiesForRecommendations(entityIds);
+    console.log('Fetched entities for recommendations:', entitiesMap.size);
     
     // Get recommendation likes count
     const likeCounts = await getRecommendationLikeCounts(recommendationIds);
@@ -151,6 +180,9 @@ export const processRecommendations = async (
       const profile = profilesMap.get(rec.user_id);
       const username = profile?.username || null;
       const avatar_url = profile?.avatar_url || null;
+      
+      // Get entity data
+      const entity = rec.entity_id ? entitiesMap.get(rec.entity_id) || null : null;
       
       // Get recommendation metadata
       const likes = likeCounts.get(rec.id) || 0;
@@ -168,7 +200,8 @@ export const processRecommendations = async (
         likes,
         is_liked: isLiked,
         is_saved: isSaved,
-        comment_count
+        comment_count,
+        entity // Important: Add the entity object to the recommendation
       };
     });
     
@@ -178,3 +211,4 @@ export const processRecommendations = async (
     throw error;
   }
 };
+

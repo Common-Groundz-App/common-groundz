@@ -17,7 +17,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 2;
+  const maxRetries = 1; // Reduced to 1 retry to avoid excessive retries and console errors
 
   useEffect(() => {
     // Reset error state when src changes
@@ -36,7 +36,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     console.error("Image load error:", imgSrc);
     
-    if (!hasError && retryCount < maxRetries) {
+    if (!hasError && retryCount < maxRetries && imgSrc && !imgSrc.startsWith('data:')) {
       // Try again with a small delay (network issues)
       setRetryCount(prev => prev + 1);
       setTimeout(() => {
@@ -44,7 +44,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         // Force a refresh by appending a cache buster
         setImgSrc(`${imgSrc}${imgSrc?.includes('?') ? '&' : '?'}_retry=${Date.now()}`);
       }, 1000);
-    } else if (!hasError) {
+    } else {
       console.log("Using fallback image after retries:", fallbackSrc);
       setImgSrc(fallbackSrc);
       setHasError(true);
@@ -64,3 +64,4 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     />
   );
 };
+

@@ -10,13 +10,16 @@ export const ensureHttps = (url: string): string => {
   
   // If it's a relative URL, return as is
   if (url.startsWith('/')) {
-    console.log("ensureHttps: Relative URL detected", url);
+    return url;
+  }
+  
+  // If it's a data URL, return as is
+  if (url.startsWith('data:')) {
     return url;
   }
   
   // Handle google API URLs with photo references that may not need modification
   if (url.includes('maps.googleapis.com/maps/api/place/photo')) {
-    console.log("Google Places photo URL detected:", url);
     return url;
   }
   
@@ -48,6 +51,10 @@ export const ensureHttps = (url: string): string => {
 export const isValidUrl = (url: string): boolean => {
   try {
     if (!url) return false;
+    
+    // Data URLs are always valid
+    if (url.startsWith('data:')) return true;
+    
     new URL(url);
     return true;
   } catch {
@@ -63,3 +70,4 @@ export const isValidUrl = (url: string): boolean => {
     return false;
   }
 };
+

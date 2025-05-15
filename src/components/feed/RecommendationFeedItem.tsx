@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -59,6 +58,18 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   
   const isOwner = user?.id === recommendation.user_id;
+
+  // Determine the best image to display
+  const imageUrl = getRecommendationFallbackImage(recommendation);
+  
+  // Log entity data for debugging
+  useEffect(() => {
+    if (recommendation.entity) {
+      console.log("Recommendation has entity data:", recommendation.entity);
+    } else {
+      console.log("Recommendation has no entity data:", recommendation.id);
+    }
+  }, [recommendation]);
 
   useEffect(() => {
     const getInitialCommentCount = async () => {
@@ -177,8 +188,10 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
   
-  // Get fallback image for the recommendation
-  const imageUrl = getRecommendationFallbackImage(recommendation);
+  // Log the image URL being used
+  useEffect(() => {
+    console.log("RecommendationFeedItem: Using image URL:", imageUrl, "for recommendation:", recommendation.id);
+  }, [imageUrl, recommendation.id]);
 
   return (
     <Card className="overflow-hidden">
@@ -248,19 +261,17 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           <p className="text-muted-foreground mb-4">{recommendation.description}</p>
         )}
         
-        {/* Image display with fallback strategy */}
-        {imageUrl && (
-          <div className="mt-2 rounded-md overflow-hidden">
-            <AspectRatio ratio={16/9} className="bg-muted/20">
-              <ImageWithFallback 
-                src={imageUrl} 
-                alt={recommendation.title}
-                className="w-full h-full object-cover transition-all hover:scale-105 duration-300" 
-                fallbackSrc={getRecommendationFallbackImage({ category: recommendation.category })}
-              />
-            </AspectRatio>
-          </div>
-        )}
+        {/* Image display with fallback strategy - always show an image */}
+        <div className="mt-2 rounded-md overflow-hidden">
+          <AspectRatio ratio={16/9} className="bg-muted/20">
+            <ImageWithFallback 
+              src={imageUrl} 
+              alt={recommendation.title}
+              className="w-full h-full object-cover transition-all hover:scale-105 duration-300" 
+              fallbackSrc={getRecommendationFallbackImage({ category: recommendation.category })}
+            />
+          </AspectRatio>
+        </div>
       </CardContent>
       
       <CardFooter className="flex justify-between pt-2 pb-4">
