@@ -52,7 +52,7 @@ const ReviewForm = ({
   // Separate state variables for different fields
   const [foodName, setFoodName] = useState(''); // For "What did you eat?" in food category
   const [contentName, setContentName] = useState(''); // For movie/book/place/product name
-  const [reviewTitle, setReviewTitle] = useState(review?.title || ''); // For review title in Step 4
+  const [reviewTitle, setReviewTitle] = useState(''); // For review title in Step 4
   
   const [venue, setVenue] = useState(review?.venue || '');
   const [entityId, setEntityId] = useState(review?.entity_id || '');
@@ -133,19 +133,41 @@ const ReviewForm = ({
         resetForm();
       }
     } else if (isEditMode && review) {
-      // Populate form with review data
+      // Improved logic for handling the review title, food name, and content name
+      // when editing an existing review
       setRating(review.rating);
       setCategory(review.category);
-      setReviewTitle(review.title || '');
       
-      // Fix: Also populate the foodName or contentName based on the category and title
-      // This ensures the category-specific title field is filled when editing
+      // For food category:
+      //   - Set foodName to the review title (what was eaten)
+      //   - Extract any user-entered review title from description if available
       if (review.category === 'food') {
+        // Always put the main title in foodName for food category
         setFoodName(review.title || '');
-        setContentName(''); // Clear the other field
-      } else {
+        
+        // Try to detect if there was an actual review title
+        // Check if description starts with a heading-like pattern (e.g. "Lovely ambience!")
+        const description = review.description || '';
+        const potentialTitle = description.split('\n')[0];
+        
+        if (potentialTitle && potentialTitle.length < 50 && 
+            (potentialTitle.endsWith('!') || potentialTitle.endsWith('.') || 
+             !potentialTitle.includes(' '))) {
+          setReviewTitle(potentialTitle);
+        } else {
+          setReviewTitle('');
+        }
+        
+        // Clear the other category field
+        setContentName('');
+      } 
+      // For non-food categories:
+      //   - Set contentName to the review title (movie/book/place name)
+      //   - Set reviewTitle to the user's title if different from contentName
+      else {
         setContentName(review.title || '');
-        setFoodName(''); // Clear the other field
+        setReviewTitle(''); // Default to empty for non-food
+        setFoodName(''); // Clear food category field
       }
       
       setVenue(review.venue || '');
@@ -397,12 +419,14 @@ const ReviewForm = ({
       // For backward compatibility, use the first image as the main image_url
       const image_url = selectedMedia.length > 0 ? selectedMedia[0].url : undefined;
       
-      // Determine final title based on the content type and user input
-      const finalTitle = reviewTitle || (category === 'food' ? foodName : contentName);
+      // Determine final title based on the content type
+      // For food category: always use foodName as the main title
+      // For other categories: use contentName as the main title
+      const finalTitle = category === 'food' ? foodName : contentName;
       
       if (isEditMode && review) {
         await updateReview(review.id, {
-          title: finalTitle,
+          title: finalTitle, // Always use the category-appropriate name as title
           venue,
           description,
           rating,
@@ -420,7 +444,7 @@ const ReviewForm = ({
         });
       } else {
         await createReview({
-          title: finalTitle,
+          title: finalTitle, // Always use the category-appropriate name as title
           venue,
           description,
           rating,
