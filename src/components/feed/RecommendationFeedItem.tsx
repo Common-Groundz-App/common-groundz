@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -76,7 +75,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     caption: recommendation.title,
     width: 1200,  // Default width
     height: 675,  // Default height for 16:9 aspect ratio
-    orientation: 'landscape'
+    orientation: 'landscape',
+    order: 0      // Add the required 'order' property
   };
   
   // Create media array for lightbox (single item)
