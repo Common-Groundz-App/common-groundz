@@ -137,8 +137,17 @@ const ReviewForm = ({
       setRating(review.rating);
       setCategory(review.category);
       setReviewTitle(review.title || '');
-      setFoodName('');
-      setContentName('');
+      
+      // Fix: Also populate the foodName or contentName based on the category and title
+      // This ensures the category-specific title field is filled when editing
+      if (review.category === 'food') {
+        setFoodName(review.title || '');
+        setContentName(''); // Clear the other field
+      } else {
+        setContentName(review.title || '');
+        setFoodName(''); // Clear the other field
+      }
+      
       setVenue(review.venue || '');
       setEntityId(review.entity_id || '');
       setDescription(review.description || '');
