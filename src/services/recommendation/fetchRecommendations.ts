@@ -17,6 +17,8 @@ export const fetchUserRecommendations = async (
   hasMore: boolean
 }> => {
   try {
+    console.log(`Fetching recommendations for profile: ${profileUserId}, category: ${category}, limit: ${limit}`);
+    
     // Build the base query
     let query = supabase
       .from('recommendations')
@@ -30,6 +32,7 @@ export const fetchUserRecommendations = async (
     
     // Add category filter if specified - use string as is for database
     if (category) {
+      console.log(`Filtering by category: ${category}`);
       // Handle both enum and string categories
       let categoryValue: string;
       if (typeof category === 'string') {
@@ -40,7 +43,6 @@ export const fetchUserRecommendations = async (
       }
       
       // Use 'eq' with the string value without casting to a specific type
-      // This avoids the type error with NonNullable<"movie" | "book" | "food" | "product" | "place">
       query = query.eq('category', categoryValue as any);
     }
 
@@ -72,6 +74,8 @@ export const fetchUserRecommendations = async (
       return { recommendations: [], count: 0, hasMore: false };
     }
 
+    console.log(`Recommendations fetched: ${recommendations?.length || 0}`);
+    
     // Process recommendations to add like and save counts
     const processedRecommendations = recommendations?.map(rec => {
       // For each recommendation, extract the like count
@@ -79,6 +83,7 @@ export const fetchUserRecommendations = async (
       
       // Extract profile information safely with proper type checking
       const profileData = rec.profiles || {};
+      
       // Use type assertion to tell TypeScript that profileData has these properties
       const username = typeof profileData === 'object' && profileData !== null && 'username' in profileData 
         ? (profileData as { username?: string }).username || null 
@@ -92,6 +97,7 @@ export const fetchUserRecommendations = async (
         ...rec,
         likes,
         isLiked: false,
+        isSaved: false,
         username,
         avatar_url,
       };

@@ -46,11 +46,14 @@ export const useRecommendationsFetch = ({
       limit
     ),
     enabled: !!profileUserId,
+    retry: 2, // Retry failed requests up to 2 times
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
   });
   
   // Update state when data is fetched
   useEffect(() => {
-    if (data) {
+    if (data?.recommendations && Array.isArray(data.recommendations)) {
+      console.log(`Setting ${data.recommendations.length} recommendations`);
       setRecommendations(data.recommendations);
       setError(null);
     }

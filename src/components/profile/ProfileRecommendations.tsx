@@ -19,6 +19,9 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
   
+  // Add some debugging
+  console.log(`ProfileRecommendations for user: ${profileUserId}, isOwnProfile: ${isOwnProfile}`);
+  
   const {
     recommendations,
     isLoading,
@@ -36,7 +39,11 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     profileUserId
   });
   
-  const categories = recommendations.length > 0 
+  useEffect(() => {
+    console.log(`Recommendations loaded: ${recommendations?.length || 0}`);
+  }, [recommendations]);
+  
+  const categories = recommendations && recommendations.length > 0 
     ? [...new Set(recommendations.map(item => item.category))] 
     : [];
   
@@ -93,7 +100,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
       
       {isLoading ? (
         <RecommendationSkeleton />
-      ) : recommendations.length === 0 ? (
+      ) : recommendations && recommendations.length === 0 ? (
         <EmptyRecommendations 
           isOwnProfile={isOwnProfile}
           hasActiveFilter={!!activeFilter}
@@ -102,7 +109,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recommendations.map(item => (
+          {recommendations && recommendations.map(item => (
             <RecommendationCard 
               key={item.id}
               recommendation={item}
