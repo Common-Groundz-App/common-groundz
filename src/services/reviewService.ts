@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { RecommendationVisibility, EntityType } from "@/services/recommendation/types";
@@ -14,7 +15,7 @@ export interface Review {
   venue?: string;
   entity_id?: string;
   entity?: Entity;
-  visibility: "public" | "private" | "friends_only"; // Match exactly what Supabase expects
+  visibility: "public" | "private" | "circle_only"; // Match exactly what Supabase expects
   image_url?: string;
   media?: MediaItem[]; // Properly typed media array
   created_at: string;
@@ -60,7 +61,7 @@ export interface ReviewCreateInput {
   category: string;
   venue?: string;
   entity_id?: string;
-  visibility: "public" | "private" | "friends_only"; // Match exactly what Supabase expects
+  visibility: "public" | "private" | "circle_only"; // Match exactly what Supabase expects
   image_url?: string;
   media?: MediaItem[];
   experience_date?: string;

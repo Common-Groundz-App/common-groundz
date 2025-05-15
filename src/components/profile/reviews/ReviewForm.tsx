@@ -6,6 +6,7 @@ import { createReview, updateReview, Review, Entity } from '@/services/reviewSer
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 
 // Import step components
 import StepOne from './steps/StepOne';
@@ -273,7 +274,7 @@ const ReviewForm = ({
     }
   };
   
-  const handleEntitySelect = (entity: Entity) => {
+  const handleEntitySelect = (entity: any) => {
     console.log("Entity selected in ReviewForm:", entity);
     setSelectedEntity(entity);
     setEntityId(entity.id);
@@ -411,7 +412,7 @@ const ReviewForm = ({
           image_url,
           media: selectedMedia,
           category,
-          visibility: visibility as "public" | "private" | "friends_only", // Match what the API expects
+          visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
           entity_id: entityId,
           experience_date: formattedExperienceDate,
           metadata,
@@ -430,7 +431,7 @@ const ReviewForm = ({
           image_url,
           media: selectedMedia,
           category,
-          visibility: visibility as "public" | "private" | "friends_only", // Match what the API expects
+          visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
           entity_id: entityId,
           experience_date: formattedExperienceDate,
           metadata,
