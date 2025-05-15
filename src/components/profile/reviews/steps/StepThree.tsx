@@ -1,4 +1,3 @@
-
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -138,14 +137,6 @@ const StepThree = ({
     }
   };
   
-  // IMPROVED: Get clarifying label text for food category
-  const getMainFieldHelpText = () => {
-    if (category === 'food') {
-      return "Enter the dish or food item you ate, not the restaurant name";
-    }
-    return "";
-  };
-  
   const getSecondaryFieldLabel = () => {
     switch(category) {
       case 'food': return "Restaurant name";
@@ -171,7 +162,7 @@ const StepThree = ({
   // New function to get appropriate search label
   const getSearchLabel = () => {
     if(category === 'food') {
-      return "restaurant"; // Clearer label for food category
+      return "place"; // Show "Search for place" instead of "Search for food"
     }
     return category;
   };
@@ -192,14 +183,11 @@ const StepThree = ({
     // Pass the entity to parent component
     onEntitySelect(entity);
     
-    // IMPORTANT CHANGE: Don't automatically change the title field 
-    // when an entity is selected - let the user decide what the review title should be
-    
-    // For food category, handle venue differently
+    // For food category, explicitly handle restaurant name vs address
     if (category === 'food') {
       console.log("Food category: Setting venue to entity name", entity.name);
       
-      // For food category and Google Places result, 
+      // IMPORTANT: When it's food category and Google Places result, 
       // always use the name for the venue (restaurant name)
       if (entity.api_source === 'google_places') {
         onVenueChange(entity.name);
@@ -207,8 +195,13 @@ const StepThree = ({
         // For non-Google Places sources, fall back to venue or name
         onVenueChange(entity.venue || entity.name || '');
       }
+      
+      // Do not update title for food category
     } else if (category === 'place') {
-      // For place category, set venue to formatted address when available
+      // For place category, set name as title
+      onTitleChange(entity.name);
+      
+      // For Google Places, use formatted address as venue
       if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
         console.log("Using Google Places formatted_address for venue:", entity.metadata.formatted_address);
         onVenueChange(entity.metadata.formatted_address);
@@ -217,7 +210,10 @@ const StepThree = ({
         onVenueChange(entity.venue || '');
       }
     } else {
-      // For other categories, update venue if available
+      // For other categories, update title with entity name
+      onTitleChange(entity.name);
+      
+      // Update venue if available
       if (entity.venue) {
         onVenueChange(entity.venue);
       }
@@ -293,12 +289,8 @@ const StepThree = ({
             type={getEntitySearchType() as any}
             onSelect={handleEntitySelection}
           />
-          
-          {/* IMPROVED: Better help text for food category */}
           <p className="text-xs text-muted-foreground mt-2 italic">
-            {category === 'food' 
-              ? "Search for the restaurant name. You'll enter what you ate separately below."
-              : "Can't find what you're looking for? Just fill in the details below"}
+            Can't find what you're looking for? Just fill in the details below
           </p>
         </div>
       )}
@@ -314,18 +306,12 @@ const StepThree = ({
             id="title"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            placeholder={category === 'food' ? "Enter the dish name (e.g. Pasta Carbonara)" : `Name of the ${category}`}
+            placeholder={`Name of the ${category}`}
             className={cn(
               !title ? "border-red-500" : "border-brand-orange/30 focus-visible:ring-brand-orange/30",
               "transition-all duration-200"
             )}
           />
-          
-          {/* ADDED: Help text for food category */}
-          {getMainFieldHelpText() && (
-            <p className="text-xs text-muted-foreground italic">{getMainFieldHelpText()}</p>
-          )}
-          
           {!title && (
             <p className="text-red-500 text-xs">This field is required</p>
           )}
@@ -349,13 +335,6 @@ const StepThree = ({
             }
             className="border-brand-orange/30 focus-visible:ring-brand-orange/30"
           />
-          
-          {/* Added helper text for restaurant field */}
-          {category === 'food' && (
-            <p className="text-xs text-muted-foreground italic">
-              {venue ? "This will be auto-filled when you select a restaurant" : "Auto-filled when you select a restaurant above"}
-            </p>
-          )}
         </div>
       </div>
       

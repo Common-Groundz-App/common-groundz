@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { cn } from "@/lib/utils";
 import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
 
@@ -14,10 +14,7 @@ const RatingStarsEnhanced = ({ value, onChange, size = 'md' }: RatingStarsEnhanc
   return (
     <div className="flex flex-col items-center py-6 px-4 rounded-xl bg-accent/10 w-full">
       <p className="text-center mb-4 text-lg font-medium">How would you rate it?</p>
-      <div 
-        className="flex justify-center items-center w-full relative z-50"
-        data-component="rating-container"
-      >
+      <div className="flex justify-center items-center w-full">
         <ConnectedRingsRating
           value={value}
           onChange={onChange}
@@ -25,7 +22,6 @@ const RatingStarsEnhanced = ({ value, onChange, size = 'md' }: RatingStarsEnhanc
           showValue={true}
           isInteractive={true}
           showLabel={true}
-          variant="standard"
           className="transition-all duration-300 hover:scale-105"
         />
       </div>

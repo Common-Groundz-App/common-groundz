@@ -41,7 +41,6 @@ export const useRecommendationsFetch = ({
   // Update state when data is fetched
   useEffect(() => {
     if (data) {
-      console.log('Recommendations data received:', data);
       setRecommendations(data);
       setError(null);
     }

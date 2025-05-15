@@ -247,7 +247,7 @@ const ReviewCard = ({
         className="overflow-hidden hover:shadow-md transition-shadow duration-200"
       >
         <CardContent className="p-6">
-          {/* Card Header with User Info - Now using badge variant for ratings */}
+          {/* Card Header with User Info - Improved layout to match RecommendationCard */}
           <div className="flex justify-between items-start">
             <div className="flex items-start gap-3">
               <UsernameLink 
@@ -260,12 +260,12 @@ const ReviewCard = ({
                 </Avatar>
               </UsernameLink>
               <div>
-                <div className="flex items-center gap-2">
-                  <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
-                  <RatingDisplay rating={review.rating} />
-                </div>
+                <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
                 <div className="text-muted-foreground text-xs mt-0.5">
                   <span>{formatDate(review.created_at)}</span>
+                </div>
+                <div className="mt-1">
+                  <RatingDisplay rating={review.rating} />
                 </div>
               </div>
             </div>
@@ -473,7 +473,7 @@ const ReviewCard = ({
   );
 };
 
-// Updated RatingDisplay component to use the new badge variant
+// Updated RatingDisplay component - now on its own row below the date
 const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
     <ConnectedRingsRating
@@ -482,8 +482,6 @@ const RatingDisplay = ({ rating }: { rating: number }) => {
       showValue={false}
       isInteractive={false}
       showLabel={false}
-      variant="badge"
-      className="ml-0"
     />
   );
 };

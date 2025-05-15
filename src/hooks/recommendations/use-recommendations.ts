@@ -1,10 +1,15 @@
 
+import { useState } from 'react';
 import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRecommendationFilters } from './use-recommendation-filters';
-import { toggleLike, toggleSave, RecommendationCategory } from '@/services/recommendationService';
+import { 
+  toggleLike, 
+  toggleSave,
+  RecommendationCategory
+} from '@/services/recommendationService';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRecommendationFilters } from './use-recommendation-filters';
 import { Recommendation } from '@/services/recommendation/types';
 
 interface UseRecommendationsProps {
@@ -134,7 +139,7 @@ export const useRecommendations = ({
     }
   };
 
-  // Functions to satisfy the interface
+  // Stub functions to satisfy the interface
   const handleImageUpload = async (file: File): Promise<string | null> => {
     // Implementation would go here
     return null;

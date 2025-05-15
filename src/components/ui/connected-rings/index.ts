@@ -1,4 +1,4 @@
 
-import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
+import ConnectedRingsRating from '../../recommendations/ConnectedRingsRating';
 
 export { ConnectedRingsRating };
