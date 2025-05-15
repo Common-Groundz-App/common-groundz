@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { cn } from "@/lib/utils";
 import { useThemedClass } from '@/utils/theme-utils';
@@ -608,7 +607,9 @@ const ConnectedRingsRating = ({
                       cx={ring.cx}
                       cy={ring.cy}
                       r={ringRadius}
-                      stroke={`url(#${getSentimentGradientId(isHovered ? ring.value : effectiveRating)})`}
+                      stroke={minimal && variant === 'badge' 
+                        ? getSentimentColor(isHovered ? ring.value : effectiveRating) 
+                        : `url(#${getSentimentGradientId(isHovered ? ring.value : effectiveRating)})`}
                       strokeWidth={strokeWidth}
                       fill="transparent"
                       strokeDasharray={circumference}
