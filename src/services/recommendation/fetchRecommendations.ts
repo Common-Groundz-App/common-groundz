@@ -19,6 +19,11 @@ export const fetchUserRecommendations = async (
   try {
     console.log(`Fetching recommendations for profile: ${profileUserId}, category: ${category}, limit: ${limit}`);
     
+    if (!profileUserId) {
+      console.error('Profile user ID is required');
+      return { recommendations: [], count: 0, hasMore: false };
+    }
+    
     // Build the base query
     let query = supabase
       .from('recommendations')
@@ -33,17 +38,9 @@ export const fetchUserRecommendations = async (
     // Add category filter if specified - use string as is for database
     if (category) {
       console.log(`Filtering by category: ${category}`);
-      // Handle both enum and string categories
-      let categoryValue: string;
-      if (typeof category === 'string') {
-        categoryValue = category.toLowerCase();
-      } else {
-        // This is a fallback for any value that might be passed
-        categoryValue = String(category).toLowerCase();
-      }
-      
-      // Use 'eq' with the string value without casting to a specific type
-      query = query.eq('category', categoryValue as any);
+      // Handle both enum and string categories - convert to lowercase for consistency
+      const categoryValue = typeof category === 'string' ? category.toLowerCase() : String(category).toLowerCase();
+      query = query.eq('category', categoryValue);
     }
 
     // Add sorting
@@ -78,35 +75,48 @@ export const fetchUserRecommendations = async (
     
     // Process recommendations to add like and save counts
     const processedRecommendations = recommendations?.map(rec => {
-      // For each recommendation, extract the like count
-      const likes = rec.recommendation_likes?.[0]?.count || 0;
-      
-      // Extract profile information safely with proper type checking
-      const profileData = rec.profiles || {};
-      
-      // Use type assertion to tell TypeScript that profileData has these properties
-      const username = typeof profileData === 'object' && profileData !== null && 'username' in profileData 
-        ? (profileData as { username?: string }).username || null 
-        : null;
-      const avatar_url = typeof profileData === 'object' && profileData !== null && 'avatar_url' in profileData 
-        ? (profileData as { avatar_url?: string }).avatar_url || null 
-        : null;
-      
-      // Add isLiked as false by default (will be updated in FE if needed)
-      const processed = {
-        ...rec,
-        likes,
-        isLiked: false,
-        isSaved: false,
-        username,
-        avatar_url,
-      };
-      
-      // Clean up nested data that's already been extracted
-      delete processed.recommendation_likes;
-      delete processed.profiles;
-      
-      return processed as unknown as Recommendation;
+      try {
+        // For each recommendation, extract the like count
+        const likes = rec.recommendation_likes?.[0]?.count || 0;
+        
+        // Extract profile information safely
+        const profileData = rec.profiles || {};
+        
+        // Use safe property access
+        const username = profileData && typeof profileData === 'object' && 'username' in profileData
+          ? profileData.username || null
+          : null;
+        const avatar_url = profileData && typeof profileData === 'object' && 'avatar_url' in profileData
+          ? profileData.avatar_url || null
+          : null;
+        
+        // Add isLiked as false by default (will be updated in FE if needed)
+        const processed = {
+          ...rec,
+          likes,
+          isLiked: false,
+          isSaved: false,
+          username,
+          avatar_url,
+        };
+        
+        // Clean up nested data that's already been extracted
+        delete processed.recommendation_likes;
+        delete processed.profiles;
+        
+        return processed as unknown as Recommendation;
+      } catch (err) {
+        console.error(`Error processing recommendation ${rec.id}:`, err);
+        // Return a safe fallback with required fields
+        return {
+          ...rec,
+          likes: 0,
+          isLiked: false,
+          isSaved: false,
+          username: null,
+          avatar_url: null
+        } as unknown as Recommendation;
+      }
     }) || [];
 
     return {

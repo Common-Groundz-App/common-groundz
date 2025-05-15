@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -47,6 +47,9 @@ export const useRecommendations = ({
     limit 
   });
   
+  // Make sure we have an array to work with even if we get null/undefined
+  const safeRecommendations = recommendations || [];
+  
   // Apply filters and sorting
   const {
     activeFilter,
@@ -56,7 +59,12 @@ export const useRecommendations = ({
     filteredRecommendations,
     categories,
     clearFilters
-  } = useRecommendationFilters(recommendations || []);
+  } = useRecommendationFilters(safeRecommendations);
+
+  // Log the recommendations we're working with
+  useEffect(() => {
+    console.log(`Recommendations in useRecommendations: ${safeRecommendations.length}`);
+  }, [safeRecommendations]);
 
   const handleLike = async (id: string) => {
     if (!user) {
@@ -70,14 +78,14 @@ export const useRecommendations = ({
 
     try {
       // Find the recommendation to toggle
-      const recommendation = recommendations?.find(rec => rec.id === id);
+      const recommendation = safeRecommendations.find(rec => rec.id === id);
       if (!recommendation) {
         console.error('Recommendation not found:', id);
         return;
       }
 
       // Optimistic update
-      const prevData = [...(recommendations || [])];
+      const prevData = [...safeRecommendations];
       
       // Update local state
       queryClient.setQueryData(['recommendations', profileUserId, user.id], 
@@ -132,7 +140,7 @@ export const useRecommendations = ({
 
     try {
       // Find the recommendation to toggle
-      const recommendation = recommendations?.find(rec => rec.id === id);
+      const recommendation = safeRecommendations.find(rec => rec.id === id);
       if (!recommendation) {
         console.error('Recommendation not found:', id);
         return;

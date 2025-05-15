@@ -25,6 +25,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
   const {
     recommendations,
     isLoading,
+    error,
     activeFilter,
     setActiveFilter,
     sortBy,
@@ -36,8 +37,19 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     clearFilters,
     refreshRecommendations
   } = useRecommendations({ 
-    profileUserId
+    profileUserId: profileUserId || ''
   });
+  
+  useEffect(() => {
+    if (error) {
+      console.error("Recommendation error:", error);
+      toast({
+        title: "Error loading recommendations",
+        description: "There was a problem loading recommendations. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [error, toast]);
   
   useEffect(() => {
     console.log(`Recommendations loaded: ${recommendations?.length || 0}`);
@@ -84,6 +96,12 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
   const handleRecommendationDeleted = () => {
     refreshRecommendations();
   };
+
+  // Trigger a refresh when the component mounts or when profileUserId changes
+  useEffect(() => {
+    console.log("Profile ID changed or component mounted, refreshing recommendations");
+    refreshRecommendations();
+  }, [profileUserId, refreshRecommendations]);
 
   return (
     <div className="space-y-6 mx-0 my-0">

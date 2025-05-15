@@ -28,6 +28,9 @@ export const useRecommendationsFetch = ({
   // Define sortBy with the proper type
   const sortBy: 'latest' | 'oldest' | 'highest_rated' = 'latest';
   
+  // Make sure profileUserId is a string
+  const safeProfileUserId = profileUserId || '';
+  
   // Fetch recommendations using React Query
   const { 
     data,
@@ -36,16 +39,16 @@ export const useRecommendationsFetch = ({
     isError,
     refetch
   } = useQuery({
-    queryKey: ['recommendations', profileUserId, user?.id, category, limit],
+    queryKey: ['recommendations', safeProfileUserId, user?.id, category, limit],
     queryFn: () => fetchUserRecommendations(
       user?.id || null, 
-      profileUserId || '', 
+      safeProfileUserId, 
       category, 
       sortBy,
       undefined, 
       limit
     ),
-    enabled: !!profileUserId,
+    enabled: !!safeProfileUserId,
     retry: 2, // Retry failed requests up to 2 times
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
   });
@@ -56,6 +59,9 @@ export const useRecommendationsFetch = ({
       console.log(`Setting ${data.recommendations.length} recommendations`);
       setRecommendations(data.recommendations);
       setError(null);
+    } else if (data && 'recommendations' in data && !data.recommendations) {
+      console.warn('Received empty recommendations array');
+      setRecommendations([]);
     }
   }, [data]);
   
@@ -65,8 +71,8 @@ export const useRecommendationsFetch = ({
       console.error('Error in useRecommendationsFetch:', queryError);
       setError(queryError instanceof Error ? queryError : new Error('Failed to fetch recommendations'));
       toast({
-        title: 'Error',
-        description: 'Failed to load recommendations. Please try again.',
+        title: 'Error loading recommendations',
+        description: 'Please refresh the page or try again later.',
         variant: 'destructive'
       });
     }
