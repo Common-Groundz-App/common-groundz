@@ -1,48 +1,73 @@
-
-import { Database } from '@/integrations/supabase/types';
-
-export type RecommendationCategory = Database['public']['Enums']['recommendation_category'];
-export type RecommendationVisibility = Database['public']['Enums']['recommendation_visibility'];
-export type EntityType = 'book' | 'movie' | 'place' | 'product' | 'food';
-
 export interface Entity {
   id: string;
   name: string;
+  description?: string;
+  image_url?: string;
+  api_ref?: string;
+  api_source?: string;
+  metadata?: Record<string, any>;
+  venue?: string;
+  website_url?: string;
   type: EntityType;
-  venue: string | null;
-  description: string | null;
-  image_url: string | null;
-  api_source: string | null;
-  api_ref: string | null;
-  metadata: any | null;
-  created_by: string | null;
-  is_deleted: boolean;
-  is_verified: boolean | null;
-  verification_date: string | null;
-  website_url: string | null;
-  slug: string | null;
-  created_at: string;
-  updated_at: string;
+}
+
+export enum EntityType {
+  Movie = 'movie',
+  Book = 'book',
+  Food = 'food',
+  Product = 'product',
+  Place = 'place',
+  Activity = 'activity',
+  Music = 'music',
+  Art = 'art',
+  TV = 'tv',
+  Drink = 'drink',
+  Travel = 'travel'
+}
+
+export enum RecommendationCategory {
+  Food = 'Food',
+  Drink = 'Drink',
+  Movie = 'Movie',
+  Book = 'Book',
+  Place = 'Place',
+  Product = 'Product',
+  Activity = 'Activity',
+  Music = 'Music',
+  Art = 'Art',
+  TV = 'TV',
+  Travel = 'Travel'
+}
+
+export enum RecommendationVisibility {
+  Public = 'public',
+  Private = 'private',
+  FriendsOnly = 'friends_only'
 }
 
 export interface Recommendation {
   id: string;
+  user_id: string;
   title: string;
-  venue: string | null;
-  description: string | null;
-  rating: number;
-  image_url: string | null;
+  description?: string;
+  image_url?: string;
   category: RecommendationCategory;
+  rating: number;
+  venue?: string;
+  entity_id?: string;
+  entity?: Entity;
   visibility: RecommendationVisibility;
   is_certified: boolean;
   view_count: number;
-  user_id: string;
-  entity_id: string | null;
   created_at: string;
   updated_at: string;
-  likes?: number;
   comment_count?: number;
+  
+  // Additional fields that can be populated
+  likes?: number;
   isLiked?: boolean;
   isSaved?: boolean;
-  entity?: Entity | null;
+  media?: any[];
+  username?: string | null;
+  avatar_url?: string | null;
 }
