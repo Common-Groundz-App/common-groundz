@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,6 +23,9 @@ import { useToast } from '@/hooks/use-toast';
 import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { useNavigate } from 'react-router-dom';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { getRecommendationFallbackImage } from '@/utils/fallbackImageUtils';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -172,6 +176,9 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   };
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
+  
+  // Get fallback image for the recommendation
+  const imageUrl = getRecommendationFallbackImage(recommendation);
 
   return (
     <Card className="overflow-hidden">
@@ -238,16 +245,20 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         </div>
         
         {recommendation.description && (
-          <p className="text-muted-foreground">{recommendation.description}</p>
+          <p className="text-muted-foreground mb-4">{recommendation.description}</p>
         )}
         
-        {recommendation.image_url && (
-          <div className="mt-4 rounded-md overflow-hidden">
-            <img 
-              src={recommendation.image_url} 
-              alt={recommendation.title}
-              className="w-full h-48 object-cover" 
-            />
+        {/* Image display with fallback strategy */}
+        {imageUrl && (
+          <div className="mt-2 rounded-md overflow-hidden">
+            <AspectRatio ratio={16/9} className="bg-muted/20">
+              <ImageWithFallback 
+                src={imageUrl} 
+                alt={recommendation.title}
+                className="w-full h-full object-cover transition-all hover:scale-105 duration-300" 
+                fallbackSrc={getRecommendationFallbackImage({ category: recommendation.category })}
+              />
+            </AspectRatio>
           </div>
         )}
       </CardContent>
