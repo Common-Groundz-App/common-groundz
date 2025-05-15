@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
 import { ensureHttps } from '@/utils/urlUtils';
+import { ConnectedRingsRating } from '@/components/ui/ConnectedRingsRating';
 
 interface RecommendationCardProps {
   recommendation: any;
@@ -408,17 +408,15 @@ const RecommendationCard = ({
 // Helper component for displaying star ratings
 const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
-    <div className="flex items-center">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star 
-          key={i}
-          className={cn(
-            "h-3 w-3",
-            i < rating ? "text-yellow-500 fill-yellow-500" : "text-gray-300"
-          )}
-        />
-      ))}
-    </div>
+    <ConnectedRingsRating
+      value={rating}
+      size="badge"
+      variant="badge"
+      showValue={false}
+      isInteractive={false}
+      showLabel={false}
+      minimal={true}
+    />
   );
 };
 

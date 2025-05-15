@@ -478,10 +478,12 @@ const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
     <ConnectedRingsRating
       value={rating}
-      size="xs"
+      size="badge"
+      variant="badge"
       showValue={false}
       isInteractive={false}
       showLabel={false}
+      minimal={true}
     />
   );
 };

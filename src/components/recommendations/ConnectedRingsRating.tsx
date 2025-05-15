@@ -13,21 +13,25 @@ import { Star, Sparkles } from "lucide-react";
 interface ConnectedRingsRatingProps {
   value: number;
   onChange?: (value: number) => void;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'badge';
+  variant?: 'default' | 'badge';
   showValue?: boolean;
   className?: string;
   isInteractive?: boolean;
   showLabel?: boolean;
+  minimal?: boolean;
 }
 
 const ConnectedRingsRating = ({ 
   value, 
   onChange,
   size = 'md',
+  variant = 'default',
   showValue = true,
   className,
   isInteractive = false,
-  showLabel = false
+  showLabel = false,
+  minimal = false
 }: ConnectedRingsRatingProps) => {
   const [hoverRating, setHoverRating] = useState(0);
   const [animateRing, setAnimateRing] = useState<number | null>(null);
@@ -39,7 +43,7 @@ const ConnectedRingsRating = ({
   
   // Trigger text animation when value changes
   useEffect(() => {
-    if (value !== prevValue) {
+    if (!minimal && value !== prevValue) {
       setTextAnimating(true);
       const timer = setTimeout(() => {
         setTextAnimating(false);
@@ -47,10 +51,13 @@ const ConnectedRingsRating = ({
       setPrevValue(value);
       return () => clearTimeout(timer);
     }
-  }, [value, prevValue]);
+  }, [value, prevValue, minimal]);
 
   // Handle celebration animation
   useEffect(() => {
+    // Skip celebrations in minimal mode
+    if (minimal) return;
+    
     // Clear any existing celebration timeout
     let celebrationTimer: NodeJS.Timeout | null = null;
 
@@ -73,11 +80,12 @@ const ConnectedRingsRating = ({
         clearTimeout(celebrationTimer);
       }
     };
-  }, [value, prevValue, showCelebration]);
+  }, [value, prevValue, showCelebration, minimal]);
   
   const sizeConfig = {
     xs: {
-      svgSize: 120,
+      svgWidth: 120,
+      svgHeight: 120,
       ringSize: 12,
       strokeWidth: 2.5,
       textClass: 'text-[10px]',
@@ -85,7 +93,8 @@ const ConnectedRingsRating = ({
       overlapOffset: 8
     },
     sm: {
-      svgSize: 150,
+      svgWidth: 150,
+      svgHeight: 150,
       ringSize: 20,
       strokeWidth: 4,
       textClass: 'text-xs',
@@ -93,7 +102,8 @@ const ConnectedRingsRating = ({
       overlapOffset: 15
     },
     md: {
-      svgSize: 200,
+      svgWidth: 200,
+      svgHeight: 200,
       ringSize: 28,
       strokeWidth: 4.5,
       textClass: 'text-sm',
@@ -101,55 +111,77 @@ const ConnectedRingsRating = ({
       overlapOffset: 20
     },
     lg: {
-      svgSize: 250,
+      svgWidth: 250,
+      svgHeight: 250,
       ringSize: 36,
       strokeWidth: 5,
       textClass: 'text-base',
       textOffset: 50,
       overlapOffset: 25
+    },
+    badge: {
+      svgWidth: 108,
+      svgHeight: 20,
+      ringSize: 9,
+      strokeWidth: 2,
+      textClass: 'text-[10px]',
+      textOffset: 12,
+      overlapOffset: 6
     }
   };
   
-  const { ringSize, strokeWidth, textClass, overlapOffset } = sizeConfig[size];
+  // Use the badge size config for badge variant regardless of specified size
+  const config = variant === 'badge' ? sizeConfig.badge : sizeConfig[size];
+  
+  const { ringSize, strokeWidth, textClass, overlapOffset } = config;
+  const svgWidth = config.svgWidth;
+  const svgHeight = config.svgHeight;
+  
   const effectiveRating = hoverRating || value;
   
-  // Calculate the actual width needed to display all 5 rings properly with even padding
-  const calculateSvgWidth = () => {
-    // Calculate the total width needed for 5 rings with overlap
-    const totalRingsWidth = ((ringSize * 2) * 5) - (overlapOffset * 4);
-    
-    // Add equal padding on both sides
-    const sidePadding = ringSize;
-    
-    return totalRingsWidth + (sidePadding * 2);
-  };
-  
-  // Calculate the viewBox size dynamically
-  const svgWidth = calculateSvgWidth();
-  const svgHeight = sizeConfig[size].svgSize;
-  
-  // Calculate positions for the 5 interlinking rings with centered distribution
+  // Calculate ring positions based on the variant
   const calculateRingPositions = () => {
     const rings = [];
-    const verticalCenter = svgHeight / 2;
     
-    // Calculate the total width of all 5 rings with overlap
-    const totalRingsWidth = ((ringSize * 2) * 5) - (overlapOffset * 4);
-    
-    // Calculate the starting position to center the rings within the SVG
-    const startX = (svgWidth - totalRingsWidth) / 2 + ringSize;
-    
-    let horizontalPosition = startX;
-    
-    // Create 5 rings in a row with overlap, centered in the SVG
-    for (let i = 0; i < 5; i++) {
-      rings.push({
-        cx: horizontalPosition,
-        cy: verticalCenter,
-        value: i + 1 // Rating value 1-5
-      });
-      // Move horizontally with overlap
-      horizontalPosition += (ringSize * 2) - overlapOffset;
+    if (variant === 'badge') {
+      // For badge variant: horizontal layout with tighter spacing
+      const verticalCenter = svgHeight / 2;
+      
+      // For badge, we want the rings to start from the left with some padding
+      let horizontalPosition = ringSize;
+      
+      // Create 5 rings in a row with overlap, starting from the left
+      for (let i = 0; i < 5; i++) {
+        rings.push({
+          cx: horizontalPosition,
+          cy: verticalCenter,
+          value: i + 1 // Rating value 1-5
+        });
+        // Move horizontally with overlap
+        horizontalPosition += (ringSize * 2) - overlapOffset;
+      }
+    } else {
+      // Default: centered layout
+      const verticalCenter = svgHeight / 2;
+      
+      // Calculate the total width of all 5 rings with overlap
+      const totalRingsWidth = ((ringSize * 2) * 5) - (overlapOffset * 4);
+      
+      // Calculate the starting position to center the rings within the SVG
+      const startX = (svgWidth - totalRingsWidth) / 2 + ringSize;
+      
+      let horizontalPosition = startX;
+      
+      // Create 5 rings in a row with overlap, centered in the SVG
+      for (let i = 0; i < 5; i++) {
+        rings.push({
+          cx: horizontalPosition,
+          cy: verticalCenter,
+          value: i + 1 // Rating value 1-5
+        });
+        // Move horizontally with overlap
+        horizontalPosition += (ringSize * 2) - overlapOffset;
+      }
     }
     
     return rings;
@@ -197,13 +229,15 @@ const ConnectedRingsRating = ({
   // Handle ring click with animation
   const handleRingClick = (ringValue: number) => {
     if (isInteractive && onChange) {
-      setAnimateRing(ringValue);
+      if (!minimal) {
+        setAnimateRing(ringValue);
+        
+        // Reset animation state after animation completes
+        setTimeout(() => {
+          setAnimateRing(null);
+        }, 500);
+      }
       onChange(ringValue);
-      
-      // Reset animation state after animation completes
-      setTimeout(() => {
-        setAnimateRing(null);
-      }, 500);
     }
   };
 
@@ -222,116 +256,125 @@ const ConnectedRingsRating = ({
   // Use the appropriate inactive color based on whether a value has been selected
   const inactiveRingColor = value > 0 ? selectedInactiveColor : defaultInactiveColor;
 
-  return (
-    <TooltipProvider>
-      <div className={cn("flex flex-col items-center w-full", className)}>
+  // Conditionally render different layouts based on variant and minimal props
+  const renderRating = () => {
+    // Base component with animations and tooltips conditionally applied
+    return (
+      // Only wrap with TooltipProvider if not minimal
+      <>
         {/* Define keyframe animations for ring interactions */}
-        <style>
-          {`
-          @keyframes ringSelectPulse {
-            0% { transform: scale(1); opacity: 0.5; }
-            50% { transform: scale(1.2); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 0; }
-          }
-          
-          @keyframes ringSelectWave {
-            0% { transform: scale(0.8); opacity: 0.8; }
-            100% { transform: scale(2); opacity: 0; }
-          }
-          
-          @keyframes springyHover {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.25); }
-            75% { transform: scale(0.95); }
-            100% { transform: scale(1.15); }
-          }
-          
-          @keyframes ringHoverGlow {
-            0% { opacity: 0; filter: blur(1px); }
-            100% { opacity: 0.4; filter: blur(3px); }
-          }
-          
-          @keyframes ratingTextChange {
-            0% { transform: translateY(0); opacity: 1; }
-            20% { transform: translateY(-10px); opacity: 0; }
-            40% { transform: translateY(10px); opacity: 0; }
-            60% { transform: translateY(0); opacity: 1; }
-          }
-          
-          @keyframes elasticFill {
-            0% { stroke-dashoffset: 0; }
-            50% { stroke-dashoffset: -10; }
-            100% { stroke-dashoffset: 0; }
-          }
-          
-          @keyframes fillProgress {
-            0% { stroke-dashoffset: 283; }
-            100% { stroke-dashoffset: 0; }
-          }
-          
-          @keyframes popScale {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.08); }
-            85% { transform: scale(0.98); }
-            100% { transform: scale(1); }
-          }
-          
-          /* Celebration animations */
-          @keyframes celebrationPulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.8; }
-          }
-          
-          @keyframes confettiBurst {
-            0% { transform: scale(0); opacity: 1; }
-            100% { transform: scale(2); opacity: 0; }
-          }
-          
-          @keyframes starFloat {
-            0%, 100% { transform: translateY(0); opacity: 0.8; }
-            50% { transform: translateY(-15px); opacity: 1; }
-          }
-          
-          @keyframes colorFlash {
-            0% { opacity: 0; }
-            25% { opacity: 0.6; }
-            50% { opacity: 0.3; }
-            100% { opacity: 0; }
-          }
-          
-          @keyframes emojiPop {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            60% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-            80% { transform: translate(-50%, -50%) scale(0.9); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-          }
-          
-          @keyframes emojiFloat {
-            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-            70% { transform: translate(-50%, -80px) scale(1.1); opacity: 1; }
-            100% { transform: translate(-50%, -120px) scale(0.8); opacity: 0; }
-          }
-          
-          @keyframes celebrationRingRipple {
-            0% { transform: scale(1); opacity: 0.8; stroke-width: 3px; }
-            100% { transform: scale(1.5); opacity: 0; stroke-width: 0.5px; }
-          }
-          
-          @keyframes fadeOut {
-            0% { opacity: 1; }
-            100% { opacity: 0; }
-          }
-          `}
-        </style>
+        {!minimal && (
+          <style>
+            {`
+            @keyframes ringSelectPulse {
+              0% { transform: scale(1); opacity: 0.5; }
+              50% { transform: scale(1.2); opacity: 0.8; }
+              100% { transform: scale(1); opacity: 0; }
+            }
+            
+            @keyframes ringSelectWave {
+              0% { transform: scale(0.8); opacity: 0.8; }
+              100% { transform: scale(2); opacity: 0; }
+            }
+            
+            @keyframes springyHover {
+              0% { transform: scale(1); }
+              50% { transform: scale(1.25); }
+              75% { transform: scale(0.95); }
+              100% { transform: scale(1.15); }
+            }
+            
+            @keyframes ringHoverGlow {
+              0% { opacity: 0; filter: blur(1px); }
+              100% { opacity: 0.4; filter: blur(3px); }
+            }
+            
+            @keyframes ratingTextChange {
+              0% { transform: translateY(0); opacity: 1; }
+              20% { transform: translateY(-10px); opacity: 0; }
+              40% { transform: translateY(10px); opacity: 0; }
+              60% { transform: translateY(0); opacity: 1; }
+            }
+            
+            @keyframes elasticFill {
+              0% { stroke-dashoffset: 0; }
+              50% { stroke-dashoffset: -10; }
+              100% { stroke-dashoffset: 0; }
+            }
+            
+            @keyframes fillProgress {
+              0% { stroke-dashoffset: 283; }
+              100% { stroke-dashoffset: 0; }
+            }
+            
+            @keyframes popScale {
+              0% { transform: scale(1); }
+              50% { transform: scale(1.08); }
+              85% { transform: scale(0.98); }
+              100% { transform: scale(1); }
+            }
+            
+            /* Celebration animations */
+            @keyframes celebrationPulse {
+              0%, 100% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.1); opacity: 0.8; }
+            }
+            
+            @keyframes confettiBurst {
+              0% { transform: scale(0); opacity: 1; }
+              100% { transform: scale(2); opacity: 0; }
+            }
+            
+            @keyframes starFloat {
+              0%, 100% { transform: translateY(0); opacity: 0.8; }
+              50% { transform: translateY(-15px); opacity: 1; }
+            }
+            
+            @keyframes colorFlash {
+              0% { opacity: 0; }
+              25% { opacity: 0.6; }
+              50% { opacity: 0.3; }
+              100% { opacity: 0; }
+            }
+            
+            @keyframes emojiPop {
+              0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+              60% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+              80% { transform: translate(-50%, -50%) scale(0.9); opacity: 1; }
+              100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            }
+            
+            @keyframes emojiFloat {
+              0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+              70% { transform: translate(-50%, -80px) scale(1.1); opacity: 1; }
+              100% { transform: translate(-50%, -120px) scale(0.8); opacity: 0; }
+            }
+            
+            @keyframes celebrationRingRipple {
+              0% { transform: scale(1); opacity: 0.8; stroke-width: 3px; }
+              100% { transform: scale(1.5); opacity: 0; stroke-width: 0.5px; }
+            }
+            
+            @keyframes fadeOut {
+              0% { opacity: 1; }
+              100% { opacity: 0; }
+            }
+            `}
+          </style>
+        )}
 
         {/* Center the SVG container horizontally with proper alignment */}
-        <div className="w-full flex justify-center">
+        <div className={cn(
+          "w-full flex",
+          variant === 'badge' ? "items-center" : "justify-center"
+        )}>
           <div
             className={cn(
-              "relative flex justify-center",
-              isInteractive && "cursor-pointer"
+              "relative flex",
+              variant === 'badge' ? "items-center" : "justify-center",
+              isInteractive && !minimal && "cursor-pointer"
             )}
-            onMouseLeave={() => isInteractive && setHoverRating(0)}
+            onMouseLeave={() => isInteractive && !minimal && setHoverRating(0)}
           >
             <svg
               width={svgWidth}
@@ -388,7 +431,7 @@ const ConnectedRingsRating = ({
               </defs>
               
               {/* Background celebration effect - shown only when perfect rating is selected */}
-              {showCelebration && (
+              {!minimal && showCelebration && (
                 <>
                   {/* Background glow effect */}
                   <circle
@@ -508,147 +551,156 @@ const ConnectedRingsRating = ({
                                               (value > 0 && ring.value > value && !isHovered) ? 0.5 : 1;
                 
                 // Add a subtle tint to unselected rings on hover when they're not selected yet
-                const showHoverTint = isInteractive && isHovered && !isActive;
+                const showHoverTint = !minimal && isInteractive && isHovered && !isActive;
                 
                 // Add synchronized animation for all rings when perfect rating is selected
-                const isPerfectRating = showCelebration && value === 5;
+                const isPerfectRating = !minimal && showCelebration && value === 5;
                 const celebrationAnimation = isPerfectRating ? 'celebrationPulse 1.8s ease-in-out infinite' : 'none';
                 const celebrationDelay = `${i * 0.1}s`;
                 
-                return (
-                  <Tooltip key={`ring-${i}`}>
-                    <TooltipTrigger asChild>
-                      <g 
-                        className="transform-gpu"
-                        style={{ 
-                          transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                          willChange: isInteractive ? 'transform, opacity' : 'auto',
-                          animation: isPerfectRating ? celebrationAnimation : 
-                                   (isInteractive && isHovered) ? 'springyHover 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 
-                                   (isAnimating && isActive) ? 'popScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
-                          opacity: unselectedRingOpacity, // Apply the dimming effect
-                          transition: "opacity 0.3s ease-out", // Smooth transition for opacity changes
-                          animationDelay: celebrationDelay,
+                // Generate the ring component, different for minimal vs. interactive
+                const ringComponent = (
+                  <g 
+                    key={`ring-${i}`}
+                    className="transform-gpu"
+                    style={{ 
+                      transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                      willChange: !minimal && isInteractive ? 'transform, opacity' : 'auto',
+                      animation: isPerfectRating ? celebrationAnimation : 
+                              (!minimal && isInteractive && isHovered) ? 'springyHover 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 
+                              (!minimal && isAnimating && isActive) ? 'popScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+                      opacity: unselectedRingOpacity, // Apply the dimming effect
+                      transition: "opacity 0.3s ease-out", // Smooth transition for opacity changes
+                      animationDelay: celebrationDelay,
+                    }}
+                    onMouseEnter={() => isInteractive && !minimal && setHoverRating(ring.value)}
+                    onClick={() => handleRingClick(ring.value)}
+                  >
+                    {/* Ring outline (always visible) */}
+                    <circle
+                      cx={ring.cx}
+                      cy={ring.cy}
+                      r={ringRadius}
+                      stroke={isActive || isHovered ? sentimentColor : inactiveRingColor}
+                      strokeWidth={strokeWidth}
+                      fill="transparent"
+                      style={{
+                        transition: "stroke 0.2s ease-out",
+                      }}
+                    />
+                    
+                    {/* Hover tint overlay for unselected rings */}
+                    {showHoverTint && (
+                      <circle
+                        cx={ring.cx}
+                        cy={ring.cy}
+                        r={ringRadius - strokeWidth/4}
+                        fill="hsl(var(--brand-orange)/20)"
+                        style={{
+                          transition: "opacity 0.2s ease",
+                          opacity: 0.8,
                         }}
-                        onMouseEnter={() => isInteractive && setHoverRating(ring.value)}
-                        onClick={() => handleRingClick(ring.value)}
-                      >
-                        {/* Ring outline (always visible) */}
+                      />
+                    )}
+                    
+                    {/* Animated fill stroke */}
+                    <circle
+                      cx={ring.cx}
+                      cy={ring.cy}
+                      r={ringRadius}
+                      stroke={`url(#${getSentimentGradientId(isHovered ? ring.value : effectiveRating)})`}
+                      strokeWidth={strokeWidth}
+                      fill="transparent"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={isActive || isHovered ? 0 : circumference}
+                      strokeLinecap="round"
+                      style={{ 
+                        transform: 'rotate(-90deg)', 
+                        transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                        opacity: isActive || isHovered ? 1 : 0,
+                        transition: 'stroke-dashoffset 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease-out',
+                        animation: !minimal && isActive && isAnimating ? 'elasticFill 0.5s ease-out' : 'none',
+                        willChange: 'opacity, stroke-dashoffset',
+                      }}
+                    />
+                    
+                    {/* Hover glow effect - appears during hover */}
+                    {!minimal && isInteractive && (
+                      <circle
+                        cx={ring.cx}
+                        cy={ring.cy}
+                        r={ringRadius + strokeWidth/2}
+                        stroke={getSentimentColor(ring.value)}
+                        strokeWidth={strokeWidth * 1.5}
+                        fill="transparent"
+                        style={{
+                          opacity: isHovered ? 0.3 : 0,
+                          transition: isHovered ? "none" : "opacity 0.3s ease-out", 
+                          filter: "blur(3px)",
+                          animation: isHovered ? "ringHoverGlow 0.3s forwards" : "none",
+                          willChange: 'opacity',
+                        }}
+                      />
+                    )}
+
+                    {/* Selection animation - ripple effect */}
+                    {!minimal && isAnimating && isActive && (
+                      <>
+                        {/* Glow pulse behind selected ring */}
+                        <circle
+                          cx={ring.cx}
+                          cy={ring.cy}
+                          r={ringRadius * 1.5}
+                          fill="url(#selectionGlowGradient)"
+                          style={{
+                            animation: 'ringSelectPulse 0.5s ease-out forwards',
+                            transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                            willChange: 'transform, opacity',
+                            opacity: 0.6,
+                          }}
+                        />
+                        
+                        {/* Inner pulse */}
                         <circle
                           cx={ring.cx}
                           cy={ring.cy}
                           r={ringRadius}
-                          stroke={isActive || isHovered ? sentimentColor : inactiveRingColor}
-                          strokeWidth={strokeWidth}
+                          stroke={sentimentColor}
+                          strokeWidth={strokeWidth / 2}
                           fill="transparent"
                           style={{
-                            transition: "stroke 0.2s ease-out",
+                            animation: 'ringSelectPulse 0.5s ease-out forwards',
+                            transformOrigin: `${ring.cx}px ${ring.cy}px`,
+                            willChange: 'transform, opacity',
                           }}
                         />
                         
-                        {/* Hover tint overlay for unselected rings */}
-                        {showHoverTint && (
-                          <circle
-                            cx={ring.cx}
-                            cy={ring.cy}
-                            r={ringRadius - strokeWidth/4}
-                            fill="hsl(var(--brand-orange)/20)"
-                            style={{
-                              transition: "opacity 0.2s ease",
-                              opacity: 0.8,
-                            }}
-                          />
-                        )}
-                        
-                        {/* Animated fill stroke */}
+                        {/* Outer wave */}
                         <circle
                           cx={ring.cx}
                           cy={ring.cy}
                           r={ringRadius}
-                          stroke={`url(#${getSentimentGradientId(isHovered ? ring.value : effectiveRating)})`}
-                          strokeWidth={strokeWidth}
+                          stroke={sentimentColor}
+                          strokeWidth={strokeWidth / 3}
                           fill="transparent"
-                          strokeDasharray={circumference}
-                          strokeDashoffset={isActive || isHovered ? 0 : circumference}
-                          strokeLinecap="round"
-                          style={{ 
-                            transform: 'rotate(-90deg)', 
+                          style={{
+                            animation: 'ringSelectWave 0.8s ease-out forwards',
                             transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                            opacity: isActive || isHovered ? 1 : 0,
-                            transition: 'stroke-dashoffset 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease-out',
-                            animation: isActive && isAnimating ? 'elasticFill 0.5s ease-out' : 'none',
-                            willChange: 'opacity, stroke-dashoffset',
+                            willChange: 'transform, opacity',
                           }}
                         />
-                        
-                        {/* Hover glow effect - appears during hover */}
-                        {isInteractive && (
-                          <circle
-                            cx={ring.cx}
-                            cy={ring.cy}
-                            r={ringRadius + strokeWidth/2}
-                            stroke={getSentimentColor(ring.value)}
-                            strokeWidth={strokeWidth * 1.5}
-                            fill="transparent"
-                            style={{
-                              opacity: isHovered ? 0.3 : 0,
-                              transition: isHovered ? "none" : "opacity 0.3s ease-out", 
-                              filter: "blur(3px)",
-                              animation: isHovered ? "ringHoverGlow 0.3s forwards" : "none",
-                              willChange: 'opacity',
-                            }}
-                          />
-                        )}
-
-                        {/* Selection animation - ripple effect */}
-                        {isAnimating && isActive && (
-                          <>
-                            {/* Glow pulse behind selected ring */}
-                            <circle
-                              cx={ring.cx}
-                              cy={ring.cy}
-                              r={ringRadius * 1.5}
-                              fill="url(#selectionGlowGradient)"
-                              style={{
-                                animation: 'ringSelectPulse 0.5s ease-out forwards',
-                                transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                                willChange: 'transform, opacity',
-                                opacity: 0.6,
-                              }}
-                            />
-                            
-                            {/* Inner pulse */}
-                            <circle
-                              cx={ring.cx}
-                              cy={ring.cy}
-                              r={ringRadius}
-                              stroke={sentimentColor}
-                              strokeWidth={strokeWidth / 2}
-                              fill="transparent"
-                              style={{
-                                animation: 'ringSelectPulse 0.5s ease-out forwards',
-                                transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                                willChange: 'transform, opacity',
-                              }}
-                            />
-                            
-                            {/* Outer wave */}
-                            <circle
-                              cx={ring.cx}
-                              cy={ring.cy}
-                              r={ringRadius}
-                              stroke={sentimentColor}
-                              strokeWidth={strokeWidth / 3}
-                              fill="transparent"
-                              style={{
-                                animation: 'ringSelectWave 0.8s ease-out forwards',
-                                transformOrigin: `${ring.cx}px ${ring.cy}px`,
-                                willChange: 'transform, opacity',
-                              }}
-                            />
-                          </>
-                        )}
-                      </g>
+                      </>
+                    )}
+                  </g>
+                );
+                
+                // Wrap the ring with Tooltip only if not in minimal mode
+                return minimal ? (
+                  ringComponent
+                ) : (
+                  <Tooltip key={`tooltip-${i}`}>
+                    <TooltipTrigger asChild>
+                      {ringComponent}
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-popover/90 backdrop-blur-sm">
                       {getRatingText(ring.value)}
@@ -656,57 +708,73 @@ const ConnectedRingsRating = ({
                   </Tooltip>
                 );
               })}
+              
+              {/* Sparkle decoration when perfect rating selected */}
+              {!minimal && showCelebration && (
+                <div 
+                  className="absolute -right-6 -top-6 text-yellow-400"
+                  style={{
+                    animation: 'starFloat 2s ease-in-out infinite',
+                  }}
+                >
+                  <Sparkles size={24} className="fill-yellow-300" />
+                </div>
+              )}
             </svg>
-            
-            {/* Circle Certified Badge - Removed as requested */}
-            
-            {/* Sparkle decoration when perfect rating selected */}
-            {showCelebration && (
-              <div 
-                className="absolute -right-6 -top-6 text-yellow-400"
-                style={{
-                  animation: 'starFloat 2s ease-in-out infinite',
-                }}
-              >
-                <Sparkles size={24} className="fill-yellow-300" />
-              </div>
-            )}
           </div>
         </div>
         
-        {/* Rating value and text */}
-        <div className="mt-2 flex flex-col items-center">
-          {showValue && (
-            <span 
-              className={cn(
-                textClass, 
-                "font-semibold text-center",
-                textAnimating && "animate-pulse"
-              )}
-              style={{
-                color: sentimentColor,
-                animation: textAnimating ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none'
-              }}
-            >
-              {effectiveRating.toFixed(1)}
-            </span>
-          )}
-          
-          {showLabel && (
-            <span 
-              className={cn(
-                textClass, 
-                "text-muted-foreground text-center",
-                textAnimating && "animate-pulse"
-              )}
-              style={{
-                animation: textAnimating ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s' : 'none'
-              }}
-            >
-              {getRatingText(effectiveRating)}
-            </span>
-          )}
-        </div>
+        {/* Rating value and text - only show if not in badge variant or if explicitly enabled */}
+        {(variant !== 'badge' || (variant === 'badge' && showValue)) && (
+          <div className={cn(
+            "flex",
+            variant === 'badge' ? "ml-2 items-center" : "mt-2 flex-col items-center"
+          )}>
+            {showValue && (
+              <span 
+                className={cn(
+                  textClass, 
+                  "font-semibold",
+                  textAnimating && !minimal && "animate-pulse"
+                )}
+                style={{
+                  color: sentimentColor,
+                  animation: textAnimating && !minimal ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none'
+                }}
+              >
+                {effectiveRating.toFixed(1)}
+              </span>
+            )}
+            
+            {showLabel && variant !== 'badge' && (
+              <span 
+                className={cn(
+                  textClass, 
+                  "text-muted-foreground text-center",
+                  textAnimating && !minimal && "animate-pulse"
+                )}
+                style={{
+                  animation: textAnimating && !minimal ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s' : 'none'
+                }}
+              >
+                {getRatingText(effectiveRating)}
+              </span>
+            )}
+          </div>
+        )}
+      </>
+    );
+  };
+
+  // Wrap with TooltipProvider only if not in minimal mode
+  return minimal ? (
+    <div className={cn("flex flex-col items-center w-full", className)}>
+      {renderRating()}
+    </div>
+  ) : (
+    <TooltipProvider>
+      <div className={cn("flex flex-col items-center w-full", className)}>
+        {renderRating()}
       </div>
     </TooltipProvider>
   );
