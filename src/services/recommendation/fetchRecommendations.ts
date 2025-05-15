@@ -35,8 +35,8 @@ export const fetchUserRecommendations = async (
       if (typeof category === 'string') {
         categoryValue = category.toLowerCase();
       } else {
-        // Convert enum to string if needed
-        categoryValue = category.toString().toLowerCase();
+        // This is a fallback for any value that might be passed
+        categoryValue = String(category).toLowerCase();
       }
         
       query = query.eq('category', categoryValue);
@@ -77,8 +77,8 @@ export const fetchUserRecommendations = async (
       
       // Extract profile information safely
       const profileData = rec.profiles || {};
-      const username = profileData?.username || null;
-      const avatar_url = profileData?.avatar_url || null;
+      const username = profileData.username || null;
+      const avatar_url = profileData.avatar_url || null;
       
       // Add isLiked as false by default (will be updated in FE if needed)
       const processed = {

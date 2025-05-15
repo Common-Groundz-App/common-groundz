@@ -60,8 +60,8 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
     
     // Extract profile information safely
     const profileData = data.profiles || {};
-    const username = profileData?.username || null;
-    const avatar_url = profileData?.avatar_url || null;
+    const username = profileData.username || null;
+    const avatar_url = profileData.avatar_url || null;
     
     // Return the processed recommendation with added data
     const processedData = {
