@@ -8,16 +8,27 @@ export interface Review {
   id: string;
   user_id: string;
   title: string;
-  subtitle?: string; // Added subtitle field
+  subtitle?: string;
   description?: string;
   rating: number;
   category: string;
   venue?: string;
   entity_id?: string;
-  entity?: Entity;
-  visibility: "public" | "private" | "circle_only"; // Match exactly what Supabase expects
+  entity?: {
+    id: string;
+    name: string;
+    description?: string;
+    image_url?: string;
+    api_ref?: string;
+    api_source?: string;
+    metadata?: Record<string, any>;
+    venue?: string;
+    type: string; // Keep as string for compatibility with Supabase
+    website_url?: string;
+  };
+  visibility: "public" | "private" | "circle_only";
   image_url?: string;
-  media?: MediaItem[]; // Properly typed media array
+  media?: MediaItem[];
   created_at: string;
   updated_at: string;
   is_converted: boolean;
@@ -40,6 +51,7 @@ export interface Review {
   comment_count?: number;
 }
 
+// Define Entity interface to match the structure from Supabase
 export interface Entity {
   id: string;
   name: string;
@@ -49,19 +61,20 @@ export interface Entity {
   api_source?: string;
   metadata?: Record<string, any>;
   venue?: string;
-  type: string; // Keep as string for compatibility
+  type: string; // Keep as string for direct compatibility with Supabase
+  website_url?: string;
 }
 
 export interface ReviewCreateInput {
   user_id: string;
   title: string;
-  subtitle?: string; // Added subtitle field
+  subtitle?: string;
   description?: string;
   rating: number;
   category: string;
   venue?: string;
   entity_id?: string;
-  visibility: "public" | "private" | "circle_only"; // Match exactly what Supabase expects
+  visibility: "public" | "private" | "circle_only";
   image_url?: string;
   media?: MediaItem[];
   experience_date?: string;

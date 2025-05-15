@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { createReview, updateReview, Review, Entity } from '@/services/reviewService';
+import { createReview, updateReview, Review } from '@/services/reviewService';
+import { EntityType, Entity as RecommendationEntity } from '@/services/recommendation/types'; 
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
@@ -68,7 +69,9 @@ const ReviewForm = ({
     (review?.visibility as "public" | "circle_only" | "private") || "public"
   );
   const [foodTags, setFoodTags] = useState<string[]>(review?.metadata?.food_tags || []);
-  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
+  
+  // Update the type of selectedEntity to be compatible with both Entity types
+  const [selectedEntity, setSelectedEntity] = useState<RecommendationEntity | null>(null);
   
   // Initialize media from legacy image_url or new media array
   useEffect(() => {
@@ -100,9 +103,34 @@ const ReviewForm = ({
         processedEntity.image_url = ensureHttps(processedEntity.image_url);
       }
       
-      setSelectedEntity(processedEntity as Entity);
+      // Convert the string type to EntityType enum if possible
+      if (typeof processedEntity.type === 'string') {
+        // Map from string to EntityType enum
+        const mappedType = mapStringToEntityType(processedEntity.type);
+        processedEntity.type = mappedType;
+      }
+      
+      setSelectedEntity(processedEntity as RecommendationEntity);
     }
   }, [review, isEditMode]);
+  
+  // Helper function to map string type to EntityType enum
+  const mapStringToEntityType = (type: string): EntityType => {
+    switch (type.toLowerCase()) {
+      case 'movie': return EntityType.Movie;
+      case 'book': return EntityType.Book;
+      case 'food': return EntityType.Food;
+      case 'product': return EntityType.Product;
+      case 'place': return EntityType.Place;
+      case 'activity': return EntityType.Activity;
+      case 'music': return EntityType.Music;
+      case 'art': return EntityType.Art;
+      case 'tv': return EntityType.TV;
+      case 'drink': return EntityType.Drink;
+      case 'travel': return EntityType.Travel;
+      default: return EntityType.Place; // Default fallback
+    }
+  };
   
   // Track form changes
   useEffect(() => {
@@ -274,9 +302,19 @@ const ReviewForm = ({
     }
   };
   
+  // Handle entity selection, ensuring type compatibility
   const handleEntitySelect = (entity: any) => {
     console.log("Entity selected in ReviewForm:", entity);
-    setSelectedEntity(entity);
+    
+    // Process the entity to ensure type compatibility
+    const processedEntity = { ...entity };
+    
+    // Convert string type to EntityType if needed
+    if (typeof processedEntity.type === 'string') {
+      processedEntity.type = mapStringToEntityType(processedEntity.type);
+    }
+    
+    setSelectedEntity(processedEntity as RecommendationEntity);
     setEntityId(entity.id);
     
     // For food category, handle differently
