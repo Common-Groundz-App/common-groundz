@@ -1,33 +1,69 @@
 
-import { supabase } from '@/integrations/supabase/client';
-import { MediaItem } from '@/types/media';  // Added import for MediaItem
-import { Database } from '@/integrations/supabase/types';
-import { UserProfile } from '@/components/profile/circles/types';
+import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
+import { RecommendationVisibility } from "@/services/recommendation/types";
 
 export interface Review {
   id: string;
-  title: string;
-  entity_id: string | null;
-  venue: string | null;
-  description: string | null;
-  rating: number;
-  image_url: string | null;
-  media?: MediaItem[] | null;  // New property for media items
-  category: string;
-  visibility: 'public' | 'private' | 'circle_only';
   user_id: string;
+  title: string;
+  subtitle?: string; // Added subtitle field
+  description?: string;
+  rating: number;
+  category: string;
+  venue?: string;
+  entity_id?: string;
+  entity?: Entity;
+  visibility: RecommendationVisibility;
+  image_url?: string;
+  media?: any; // Media items array
   created_at: string;
   updated_at: string;
   is_converted: boolean;
-  recommendation_id: string | null;
-  experience_date: string | null;
-  status: 'published' | 'flagged' | 'deleted';
+  recommendation_id?: string;
+  status: string;
+  experience_date?: string | null;
+  metadata?: {
+    food_tags?: string[];
+    [key: string]: any;
+  };
+  
+  // These fields get populated by the fetching functions
   likes?: number;
-  comment_count?: number;
   isLiked?: boolean;
   isSaved?: boolean;
-  entity?: any | null;
-  user?: UserProfile | null; // Add user property to fix the TypeScript error
+  user?: {
+    username: string | null;
+    avatar_url: string | null;
+  };
+  comment_count?: number;
+}
+
+export interface Entity {
+  id: string;
+  name: string;
+  description?: string;
+  image_url?: string;
+  api_ref?: string;
+  api_source?: string;
+  metadata?: Record<string, any>;
+  venue?: string;
+  type: string;
+}
+
+export interface ReviewCreateInput {
+  user_id: string;
+  title: string;
+  subtitle?: string; // Added subtitle field
+  description?: string;
+  rating: number;
+  category: string;
+  venue?: string;
+  entity_id?: string;
+  visibility: RecommendationVisibility;
+  image_url?: string;
+  media?: any;
+  experience_date?: string;
   metadata?: {
     food_tags?: string[];
     [key: string]: any;
