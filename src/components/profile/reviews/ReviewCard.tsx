@@ -477,7 +477,7 @@ const ReviewCard = ({
 const RatingDisplay = ({ rating }: { rating: number }) => {
   return (
     <ConnectedRingsRating
-      value={rating}
+      rating={rating}
       size="xs"
       showValue={false}
       isInteractive={false}

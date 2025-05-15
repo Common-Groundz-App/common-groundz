@@ -17,7 +17,7 @@ const StepOne = ({ rating, onChange }: StepOneProps) => {
       
       <div className="flex justify-center items-center w-full">
         <ConnectedRingsRating
-          value={rating}
+          rating={rating}
           onChange={onChange}
           size="lg"
           showValue={true}
