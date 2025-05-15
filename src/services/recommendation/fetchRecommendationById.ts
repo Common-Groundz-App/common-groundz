@@ -58,10 +58,15 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
       }
     }
     
-    // Extract profile information safely
+    // Extract profile information safely with proper type checking
     const profileData = data.profiles || {};
-    const username = profileData.username || null;
-    const avatar_url = profileData.avatar_url || null;
+    // Use type assertion to tell TypeScript that profileData has these properties
+    const username = typeof profileData === 'object' && profileData !== null && 'username' in profileData 
+      ? (profileData as { username?: string }).username || null 
+      : null;
+    const avatar_url = typeof profileData === 'object' && profileData !== null && 'avatar_url' in profileData 
+      ? (profileData as { avatar_url?: string }).avatar_url || null 
+      : null;
     
     // Return the processed recommendation with added data
     const processedData = {

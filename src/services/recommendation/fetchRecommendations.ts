@@ -38,8 +38,10 @@ export const fetchUserRecommendations = async (
         // This is a fallback for any value that might be passed
         categoryValue = String(category).toLowerCase();
       }
-        
-      query = query.eq('category', categoryValue);
+      
+      // Use 'eq' with the string value without casting to a specific type
+      // This avoids the type error with NonNullable<"movie" | "book" | "food" | "product" | "place">
+      query = query.eq('category', categoryValue as any);
     }
 
     // Add sorting
@@ -75,10 +77,15 @@ export const fetchUserRecommendations = async (
       // For each recommendation, extract the like count
       const likes = rec.recommendation_likes?.[0]?.count || 0;
       
-      // Extract profile information safely
+      // Extract profile information safely with proper type checking
       const profileData = rec.profiles || {};
-      const username = profileData.username || null;
-      const avatar_url = profileData.avatar_url || null;
+      // Use type assertion to tell TypeScript that profileData has these properties
+      const username = typeof profileData === 'object' && profileData !== null && 'username' in profileData 
+        ? (profileData as { username?: string }).username || null 
+        : null;
+      const avatar_url = typeof profileData === 'object' && profileData !== null && 'avatar_url' in profileData 
+        ? (profileData as { avatar_url?: string }).avatar_url || null 
+        : null;
       
       // Add isLiked as false by default (will be updated in FE if needed)
       const processed = {
