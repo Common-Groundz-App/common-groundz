@@ -165,6 +165,9 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     
     if (recommendation.entity && recommendation.entity.slug) {
       navigate(`/entity/${recommendation.entity.slug}`);
+    } else if (recommendation.entity && recommendation.entity.id) {
+      // Fallback to using entity id if slug is not available
+      navigate(`/entity/${recommendation.entity.id}`);
     } else {
       toast({
         title: "Error",

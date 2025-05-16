@@ -1,4 +1,3 @@
-
 export interface Entity {
   id: string;
   name: string;
@@ -10,6 +9,9 @@ export interface Entity {
   venue?: string;
   website_url?: string;
   type: EntityType;
+  slug?: string;
+  category_id?: string;
+  popularity_score?: number;
 }
 
 export enum EntityType {

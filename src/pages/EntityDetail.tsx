@@ -13,7 +13,7 @@ import { useEntityDetail } from '@/hooks/use-entity-detail';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
 import NotFound from './NotFound';
-import { ReviewCard } from '@/components/profile/reviews/ReviewCard';
+import ReviewCard from '@/components/profile/reviews/ReviewCard';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { useToast } from '@/hooks/use-toast';
 

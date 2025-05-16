@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 
@@ -43,7 +42,7 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
   }
 
   // If we have a logged-in user, fetch likes and saves
-  if (userId && recommendations.length > 0) {
+  if (userId && recommendations && recommendations.length > 0) {
     const recommendationIds = recommendations.map(rec => rec.id);
     
     // Get user likes for these recommendations
@@ -76,8 +75,8 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
     // Enhance recommendations with likes and saves info
     return recommendations.map(rec => ({
       ...rec,
-      username: rec.profiles?.username,
-      avatar_url: rec.profiles?.avatar_url,
+      username: rec.profiles?.username || null,
+      avatar_url: rec.profiles?.avatar_url || null,
       isLiked: likedIds.has(rec.id),
       isSaved: savedIds.has(rec.id),
       likes: likeCountMap.get(rec.id) || 0
@@ -87,8 +86,8 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
   // Format the results
   return recommendations.map(rec => ({
     ...rec,
-    username: rec.profiles?.username,
-    avatar_url: rec.profiles?.avatar_url,
+    username: rec.profiles?.username || null,
+    avatar_url: rec.profiles?.avatar_url || null,
     likes: 0
   }));
 };
@@ -115,7 +114,7 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
   }
 
   // If we have a logged-in user, fetch likes and saves
-  if (userId && reviews.length > 0) {
+  if (userId && reviews && reviews.length > 0) {
     const reviewIds = reviews.map(rev => rev.id);
     
     // Get user likes for these reviews
@@ -146,8 +145,8 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
     // Enhance reviews with likes and saves info
     return reviews.map(rev => ({
       ...rev,
-      username: rev.profiles?.username,
-      avatar_url: rev.profiles?.avatar_url,
+      username: rev.profiles?.username || null,
+      avatar_url: rev.profiles?.avatar_url || null,
       isLiked: likedIds.has(rev.id),
       isSaved: savedIds.has(rev.id),
       likes: likeCountMap.get(rev.id) || 0
@@ -157,8 +156,8 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
   // Format the results
   return reviews.map(rev => ({
     ...rev,
-    username: rev.profiles?.username,
-    avatar_url: rev.profiles?.avatar_url,
+    username: rev.profiles?.username || null,
+    avatar_url: rev.profiles?.avatar_url || null,
     likes: 0
   }));
 };
