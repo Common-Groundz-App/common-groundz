@@ -215,11 +215,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated, entityId,
               profileData={profileData}
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)} 
-              // Pass entity data as part of metadata instead of defaultEntityId prop
-              metadata={entityId ? { 
-                entityId: entityId,
-                entityName: entityName
-              } : undefined}
             />
           )}
           
@@ -231,11 +226,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated, entityId,
                 handleContentCreated();
                 return Promise.resolve();
               }}
-              // Pass entity data as part of entityData prop
-              entityData={entityId ? {
-                id: entityId,
-                name: entityName || ''
-              } : undefined}
             />
           )}
           
@@ -245,11 +235,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated, entityId,
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="journal"
-              // Pass entity data as part of metadata instead of defaultEntityId prop
-              metadata={entityId ? { 
-                entityId: entityId,
-                entityName: entityName
-              } : undefined}
             />
           )}
           
@@ -259,11 +244,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated, entityId,
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="watching"
-              // Pass entity data as part of metadata instead of defaultEntityId prop
-              metadata={entityId ? { 
-                entityId: entityId,
-                entityName: entityName
-              } : undefined}
             />
           )}
         </DialogContent>
@@ -276,9 +256,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated, entityId,
           onClose={() => setIsRecommendationFormOpen(false)}
           onSubmit={handleRecommendationSubmit}
           onImageUpload={handleImageUpload}
-          // Pass entity data using existing props pattern
-          initialEntityId={entityId}
-          initialEntityName={entityName}
         />
       )}
     </>
