@@ -85,7 +85,7 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
   }
 
   // Format the results
-  return recommendations.map(rec => ({
+  return (recommendations || []).map(rec => ({
     ...rec,
     username: rec.profiles?.username || null,
     avatar_url: rec.profiles?.avatar_url || null,
@@ -155,7 +155,7 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
   }
 
   // Format the results
-  return reviews.map(rev => ({
+  return (reviews || []).map(rev => ({
     ...rev,
     username: rev.profiles?.username || null,
     avatar_url: rev.profiles?.avatar_url || null,
