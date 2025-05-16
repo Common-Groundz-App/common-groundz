@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Star, Heart } from 'lucide-react';
+import { Star, Heart, Compass } from 'lucide-react';
 
 const Header = () => {
   return (
@@ -18,6 +18,12 @@ const Header = () => {
           </Link>
         </div>
         <div className="flex items-center space-x-3">
+          <Button size="sm" variant="ghost" className="hidden md:inline-flex">
+            <Link to="/entity/the-office" className="flex items-center gap-1">
+              <Compass className="h-4 w-4" />
+              <span>Explore</span>
+            </Link>
+          </Button>
           <Button size="sm" className="hidden md:inline-flex bg-secondary hover:bg-secondary/90 text-secondary-foreground">
             <Link to="/auth">Sign In</Link>
           </Button>

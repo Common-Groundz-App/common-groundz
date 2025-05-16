@@ -16,6 +16,9 @@ import NotFound from './NotFound';
 import ReviewCard from '@/components/profile/reviews/ReviewCard';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { useToast } from '@/hooks/use-toast';
+import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
+import NavBarComponent from '@/components/NavBarComponent';
+import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -58,36 +61,6 @@ const EntityDetail = () => {
     return fallbacks[type] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
   };
 
-  const handleAddRecommendation = () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to add a recommendation",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Navigate to the recommendation form with the entity pre-selected
-    // This is a placeholder and would need to be implemented in the recommendation form
-    navigate('/profile', { state: { action: 'add-recommendation', entityId: entity?.id } });
-  };
-
-  const handleAddReview = () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to add a review",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Navigate to the review form with the entity pre-selected
-    // This is a placeholder and would need to be implemented in the review form
-    navigate('/profile', { state: { action: 'add-review', entityId: entity?.id } });
-  };
-
   const handleRecommendationAction = (action: string, id: string) => {
     console.log(`Recommendation ${action} action for ${id}`);
     // In a real implementation, you'd call the appropriate service function here
@@ -103,198 +76,234 @@ const EntityDetail = () => {
   };
 
   return (
-    <div className="container max-w-4xl mx-auto py-6 px-4">
-      {/* Entity Header */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-6 w-1/2" />
-              <Skeleton className="h-40 w-full" />
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col md:flex-row gap-6">
-                {/* Entity Image */}
-                <div className="w-full md:w-1/3">
-                  <AspectRatio ratio={4/3} className="overflow-hidden rounded-md bg-muted/20">
-                    <ImageWithFallback
-                      src={entity?.image_url || ''}
-                      alt={entity?.name || 'Entity image'}
-                      className="w-full h-full object-cover"
-                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
-                    />
-                  </AspectRatio>
-                </div>
-                
-                {/* Entity Details */}
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <h1 className="text-2xl font-bold">{entity?.name}</h1>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
-                        {entity?.type}
-                      </Badge>
-                      {entity?.category_id && (
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                          {/* Category name would be fetched here */}
-                          Category
-                        </Badge>
-                      )}
-                    </div>
+    <>
+      <NavBarComponent />
+      <div className="container max-w-4xl mx-auto py-6 px-4 pb-20 md:pb-6">
+        {/* Entity Header */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-6 w-1/2" />
+                <Skeleton className="h-40 w-full" />
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col md:flex-row gap-6">
+                  {/* Entity Image */}
+                  <div className="w-full md:w-1/3">
+                    <AspectRatio ratio={4/3} className="overflow-hidden rounded-md bg-muted/20">
+                      <ImageWithFallback
+                        src={entity?.image_url || ''}
+                        alt={entity?.name || 'Entity image'}
+                        className="w-full h-full object-cover"
+                        fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
+                      />
+                    </AspectRatio>
                   </div>
                   
-                  {entity?.venue && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">{entity.venue}</span>
+                  {/* Entity Details */}
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <h1 className="text-2xl font-bold">{entity?.name}</h1>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
+                          {entity?.type}
+                        </Badge>
+                        {entity?.category_id && (
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            {/* Category name would be fetched here */}
+                            Category
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  
-                  {/* Rating and Stats */}
-                  <div className="flex flex-wrap gap-4">
-                    {stats.averageRating !== null && (
+                    
+                    {entity?.venue && (
                       <div className="flex items-center gap-2">
-                        <ConnectedRingsRating
-                          value={stats.averageRating}
-                          variant="badge"
-                          minimal={true}
-                          showValue={true}
-                          size="sm"
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          from {stats.recommendationCount + stats.reviewCount} ratings
-                        </span>
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">{entity.venue}</span>
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        {stats.recommendationCount} recommendations
-                      </span>
+                    {/* Rating and Stats */}
+                    <div className="flex flex-wrap gap-4">
+                      {stats.averageRating !== null && (
+                        <div className="flex items-center gap-2">
+                          <ConnectedRingsRating
+                            value={stats.averageRating}
+                            variant="badge"
+                            minimal={true}
+                            showValue={true}
+                            size="sm"
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            from {stats.recommendationCount + stats.reviewCount} ratings
+                          </span>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          {stats.recommendationCount} recommendations
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          {stats.reviewCount} reviews
+                        </span>
+                      </div>
                     </div>
                     
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        {stats.reviewCount} reviews
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Description */}
-                  {entity?.description && (
-                    <p className="text-muted-foreground">{entity.description}</p>
-                  )}
-                  
-                  {/* Action Buttons */}
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <Button 
-                      onClick={handleAddRecommendation}
-                      className="flex items-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Recommendation
-                    </Button>
+                    {/* Description */}
+                    {entity?.description && (
+                      <p className="text-muted-foreground">{entity.description}</p>
+                    )}
                     
-                    <Button 
-                      onClick={handleAddReview}
-                      variant="outline" 
-                      className="flex items-center gap-2"
-                    >
-                      <Star className="h-4 w-4" />
-                      Add Review
-                    </Button>
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {user ? (
+                        <div className="flex-wrap gap-2">
+                          <SmartComposerButton 
+                            entityId={entity?.id} 
+                            entityName={entity?.name}
+                            onContentCreated={refreshData}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <Button 
+                            onClick={() => {
+                              toast({
+                                title: "Authentication required",
+                                description: "Please sign in to add content",
+                                variant: "destructive",
+                              });
+                              navigate('/auth');
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Content
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Content Tabs */}
+        <Tabs 
+          defaultValue="recommendations" 
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="mt-6"
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="recommendations">
+              Recommendations ({stats.recommendationCount})
+            </TabsTrigger>
+            <TabsTrigger value="reviews">
+              Reviews ({stats.reviewCount})
+            </TabsTrigger>
+          </TabsList>
+          
+          {/* Recommendations Tab */}
+          <TabsContent value="recommendations">
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full" />
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Content Tabs */}
-      <Tabs 
-        defaultValue="recommendations" 
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="mt-6"
-      >
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="recommendations">
-            Recommendations ({stats.recommendationCount})
-          </TabsTrigger>
-          <TabsTrigger value="reviews">
-            Reviews ({stats.reviewCount})
-          </TabsTrigger>
-        </TabsList>
-        
-        {/* Recommendations Tab */}
-        <TabsContent value="recommendations">
-          {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-48 w-full" />
-              <Skeleton className="h-48 w-full" />
-            </div>
-          ) : recommendations.length === 0 ? (
-            <div className="py-12 text-center">
-              <h3 className="font-medium text-lg">No recommendations yet</h3>
-              <p className="text-muted-foreground mt-2">
-                Be the first to recommend {entity?.name}!
-              </p>
-              <Button onClick={handleAddRecommendation} className="mt-4">
-                Add Recommendation
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4 mt-4">
-              {recommendations.map((recommendation) => (
-                <RecommendationCard
-                  key={recommendation.id}
-                  recommendation={recommendation}
-                  onLike={() => handleRecommendationAction('like', recommendation.id)}
-                  onSave={() => handleRecommendationAction('save', recommendation.id)}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-        
-        {/* Reviews Tab */}
-        <TabsContent value="reviews">
-          {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-48 w-full" />
-              <Skeleton className="h-48 w-full" />
-            </div>
-          ) : reviews.length === 0 ? (
-            <div className="py-12 text-center">
-              <h3 className="font-medium text-lg">No reviews yet</h3>
-              <p className="text-muted-foreground mt-2">
-                Be the first to review {entity?.name}!
-              </p>
-              <Button onClick={handleAddReview} className="mt-4">
-                Add Review
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4 mt-4">
-              {reviews.map((review) => (
-                <ReviewCard
-                  key={review.id}
-                  review={review}
-                  onLike={() => handleReviewAction('like', review.id)}
-                  onSave={() => handleReviewAction('save', review.id)}
-                  refreshReviews={refreshData}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+            ) : recommendations.length === 0 ? (
+              <div className="py-12 text-center">
+                <h3 className="font-medium text-lg">No recommendations yet</h3>
+                <p className="text-muted-foreground mt-2">
+                  Be the first to recommend {entity?.name}!
+                </p>
+                {user ? (
+                  <SmartComposerButton 
+                    entityId={entity?.id} 
+                    entityName={entity?.name}
+                    onContentCreated={refreshData}
+                  />
+                ) : (
+                  <Button 
+                    onClick={() => navigate('/auth')} 
+                    className="mt-4"
+                  >
+                    Sign in to add recommendation
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4 mt-4">
+                {recommendations.map((recommendation) => (
+                  <RecommendationCard
+                    key={recommendation.id}
+                    recommendation={recommendation}
+                    onLike={() => handleRecommendationAction('like', recommendation.id)}
+                    onSave={() => handleRecommendationAction('save', recommendation.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+          
+          {/* Reviews Tab */}
+          <TabsContent value="reviews">
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full" />
+              </div>
+            ) : reviews.length === 0 ? (
+              <div className="py-12 text-center">
+                <h3 className="font-medium text-lg">No reviews yet</h3>
+                <p className="text-muted-foreground mt-2">
+                  Be the first to review {entity?.name}!
+                </p>
+                {user ? (
+                  <SmartComposerButton 
+                    entityId={entity?.id} 
+                    entityName={entity?.name}
+                    onContentCreated={refreshData}
+                  />
+                ) : (
+                  <Button 
+                    onClick={() => navigate('/auth')} 
+                    className="mt-4"
+                  >
+                    Sign in to add review
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4 mt-4">
+                {reviews.map((review) => (
+                  <ReviewCard
+                    key={review.id}
+                    review={review}
+                    onLike={() => handleReviewAction('like', review.id)}
+                    onSave={() => handleReviewAction('save', review.id)}
+                    refreshReviews={refreshData}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+      <BottomNavigation />
+    </>
   );
 };
 
