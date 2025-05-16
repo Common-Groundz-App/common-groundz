@@ -9,10 +9,49 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          slug: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          slug?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          slug?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entities: {
         Row: {
           api_ref: string | null
           api_source: string | null
+          category_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -23,6 +62,7 @@ export type Database = {
           metadata: Json | null
           name: string
           open_graph_data: Json | null
+          popularity_score: number | null
           slug: string | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at: string
@@ -33,6 +73,7 @@ export type Database = {
         Insert: {
           api_ref?: string | null
           api_source?: string | null
+          category_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -43,6 +84,7 @@ export type Database = {
           metadata?: Json | null
           name: string
           open_graph_data?: Json | null
+          popularity_score?: number | null
           slug?: string | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
@@ -53,6 +95,7 @@ export type Database = {
         Update: {
           api_ref?: string | null
           api_source?: string | null
+          category_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -63,6 +106,7 @@ export type Database = {
           metadata?: Json | null
           name?: string
           open_graph_data?: Json | null
+          popularity_score?: number | null
           slug?: string | null
           type?: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
@@ -71,6 +115,13 @@ export type Database = {
           website_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "entities_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "entities_created_by_fkey"
             columns: ["created_by"]

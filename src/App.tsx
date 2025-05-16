@@ -11,6 +11,7 @@ import Explore from './pages/Explore';
 import NotFound from './pages/NotFound';
 import PostView from './pages/PostView';
 import RecommendationView from './pages/RecommendationView';
+import EntityDetail from './pages/EntityDetail';
 import './App.css';
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from './components/ui/tooltip';
@@ -89,6 +90,13 @@ function App() {
                   <ProtectedRoute>
                     <RecommendationView />
                   </ProtectedRoute>
+                } 
+              />
+              {/* New route for entity details */}
+              <Route 
+                path="/entity/:slug" 
+                element={
+                  <EntityDetail />
                 } 
               />
               {/* Redirect old edit routes to profile */}

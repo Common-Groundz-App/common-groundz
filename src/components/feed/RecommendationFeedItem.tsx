@@ -158,6 +158,22 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     setIsDeleteDialogOpen(true);
   };
 
+  // Handle navigation to entity detail page
+  const handleEntityClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (recommendation.entity && recommendation.entity.slug) {
+      navigate(`/entity/${recommendation.entity.slug}`);
+    } else {
+      toast({
+        title: "Error",
+        description: "Entity information is not available",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!user) return;
     
@@ -286,6 +302,19 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         
         {recommendation.description && (
           <p className="text-muted-foreground mb-4">{recommendation.description}</p>
+        )}
+        
+        {/* Add entity badge if an entity is linked */}
+        {recommendation.entity && (
+          <div className="mb-4">
+            <Badge 
+              variant="outline" 
+              className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-300 cursor-pointer hover:bg-violet-200"
+              onClick={handleEntityClick}
+            >
+              {recommendation.entity.name}
+            </Badge>
+          </div>
         )}
         
         {/* Updated image display with onClick handler to open lightbox */}
