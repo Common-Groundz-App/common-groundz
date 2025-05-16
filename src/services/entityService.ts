@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 
@@ -53,7 +52,7 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
       .eq('user_id', userId)
       .in('recommendation_id', recommendationIds);
     
-    const likedIds = new Set((likesData || []).map(like => like.recommendation_id));
+    const likedIds = new Set(((likesData || []) as any[]).map(like => like.recommendation_id));
     
     // Get user saves for these recommendations
     const { data: savesData } = await supabase
@@ -62,7 +61,7 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
       .eq('user_id', userId)
       .in('recommendation_id', recommendationIds);
     
-    const savedIds = new Set((savesData || []).map(save => save.recommendation_id));
+    const savedIds = new Set(((savesData || []) as any[]).map(save => save.recommendation_id));
     
     // Get like counts
     const { data: likeCounts } = await supabase.rpc('get_recommendation_likes_by_ids', {
@@ -70,14 +69,14 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
     });
     
     const likeCountMap = new Map(
-      (likeCounts || []).map(item => [item.recommendation_id, item.like_count])
+      ((likeCounts || []) as any[]).map(item => [item.recommendation_id, item.like_count])
     );
 
     // Enhance recommendations with likes and saves info
-    return recommendations.map(rec => ({
+    return (recommendations as any[]).map(rec => ({
       ...rec,
-      username: rec.profiles?.username || null,
-      avatar_url: rec.profiles?.avatar_url || null,
+      username: rec.profiles && typeof rec.profiles === 'object' ? rec.profiles.username : null,
+      avatar_url: rec.profiles && typeof rec.profiles === 'object' ? rec.profiles.avatar_url : null,
       isLiked: likedIds.has(rec.id),
       isSaved: savedIds.has(rec.id),
       likes: likeCountMap.get(rec.id) || 0
@@ -85,10 +84,10 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
   }
 
   // Format the results
-  return (recommendations || []).map(rec => ({
+  return ((recommendations || []) as any[]).map(rec => ({
     ...rec,
-    username: rec.profiles?.username || null,
-    avatar_url: rec.profiles?.avatar_url || null,
+    username: rec.profiles && typeof rec.profiles === 'object' ? rec.profiles.username : null,
+    avatar_url: rec.profiles && typeof rec.profiles === 'object' ? rec.profiles.avatar_url : null,
     likes: 0
   }));
 };
@@ -124,7 +123,7 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
       p_user_id: userId
     });
     
-    const likedIds = new Set((likesData || []).map(like => like.review_id));
+    const likedIds = new Set(((likesData || []) as any[]).map(like => like.review_id));
     
     // Get user saves for these reviews
     const { data: savesData } = await supabase.rpc('get_user_review_saves', {
@@ -132,7 +131,7 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
       p_user_id: userId
     });
     
-    const savedIds = new Set((savesData || []).map(save => save.review_id));
+    const savedIds = new Set(((savesData || []) as any[]).map(save => save.review_id));
     
     // Get like counts
     const { data: likeCounts } = await supabase.rpc('get_review_likes_batch', {
@@ -140,14 +139,14 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
     });
     
     const likeCountMap = new Map(
-      (likeCounts || []).map(item => [item.review_id, item.like_count])
+      ((likeCounts || []) as any[]).map(item => [item.review_id, item.like_count])
     );
 
     // Enhance reviews with likes and saves info
-    return reviews.map(rev => ({
+    return (reviews as any[]).map(rev => ({
       ...rev,
-      username: rev.profiles?.username || null,
-      avatar_url: rev.profiles?.avatar_url || null,
+      username: rev.profiles && typeof rev.profiles === 'object' ? rev.profiles.username : null,
+      avatar_url: rev.profiles && typeof rev.profiles === 'object' ? rev.profiles.avatar_url : null,
       isLiked: likedIds.has(rev.id),
       isSaved: savedIds.has(rev.id),
       likes: likeCountMap.get(rev.id) || 0
@@ -155,10 +154,10 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
   }
 
   // Format the results
-  return (reviews || []).map(rev => ({
+  return ((reviews || []) as any[]).map(rev => ({
     ...rev,
-    username: rev.profiles?.username || null,
-    avatar_url: rev.profiles?.avatar_url || null,
+    username: rev.profiles && typeof rev.profiles === 'object' ? rev.profiles.username : null,
+    avatar_url: rev.profiles && typeof rev.profiles === 'object' ? rev.profiles.avatar_url : null,
     likes: 0
   }));
 };
