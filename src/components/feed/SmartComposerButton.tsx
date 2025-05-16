@@ -17,13 +17,11 @@ import { fetchUserProfile } from '@/services/profileService';
 interface SmartComposerButtonProps {
   onContentCreated?: () => void;
   onPostCreated?: () => void; // Add compatibility with old prop name
-  entityId?: string; // Add entity ID for pre-selecting
-  entityName?: string; // Add entity name for display
 }
 
 type ContentType = 'post' | 'review' | 'journal' | 'recommendation' | 'watching';
 
-export function SmartComposerButton({ onContentCreated, onPostCreated, entityId, entityName }: SmartComposerButtonProps) {
+export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartComposerButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
@@ -117,7 +115,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated, entityId,
         is_certified: false,
         view_count: 0,
         user_id: user.id,
-        entity_id: values.entity_id || entityId || null
+        entity_id: values.entity_id || null
       });
       
       toast({
@@ -160,11 +158,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated, entityId,
           <div className="bg-popover rounded-md shadow-md">
             <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">
               What would you like to create?
-              {entityName && (
-                <div className="text-xs mt-1 font-normal text-muted-foreground">
-                  Related to: {entityName}
-                </div>
-              )}
             </div>
             <div className="py-1">
               {/* Rearranged order of content type options */}
