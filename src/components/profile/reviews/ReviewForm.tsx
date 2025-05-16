@@ -178,13 +178,8 @@ const ReviewForm = ({
       if (!completedSteps.includes(2)) {
         setCompletedSteps(prev => [...prev, 2]);
       }
-      
-      // Move to step 3 if just opened with entity
-      if (currentStep === 1) {
-        setCurrentStep(3);
-      }
     }
-  }, [entity, isOpen, isEditMode, completedSteps, currentStep]);
+  }, [entity, isOpen, isEditMode, completedSteps]);
   
   // Track form changes
   useEffect(() => {
