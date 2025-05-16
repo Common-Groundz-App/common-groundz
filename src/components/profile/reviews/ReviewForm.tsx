@@ -74,7 +74,16 @@ const ReviewForm = ({
   const [contentName, setContentName] = useState(entity?.name || ''); // For movie/book/place/product name
   const [reviewTitle, setReviewTitle] = useState(review?.subtitle || ''); // For review title/subtitle in Step 4
   
-  const [venue, setVenue] = useState(review?.venue || entity?.venue || '');
+  // Initialize venue properly based on entity type and metadata
+  const [venue, setVenue] = useState(() => {
+    // For place category with Google Places metadata, use formatted_address
+    if (entity?.type?.toLowerCase() === 'place' && entity?.metadata?.formatted_address) {
+      return entity.metadata.formatted_address;
+    }
+    // Otherwise use standard venue or empty string
+    return review?.venue || entity?.venue || '';
+  });
+  
   const [entityId, setEntityId] = useState(review?.entity_id || entity?.id || '');
   const [description, setDescription] = useState(review?.description || entity?.description || '');
   
@@ -677,7 +686,7 @@ const ReviewForm = ({
                   onMediaAdd={handleAddMedia}
                   onMediaRemove={handleRemoveMedia}
                   isUploading={isUploading}
-                  disableEntityChange={isFromEntityPage} // Disable entity change when from entity page
+                  disableEntityChange={isFromEntityPage} // Pass the flag to disable entity change when from entity page
                 />
               )}
               

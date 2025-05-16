@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -343,14 +344,15 @@ const EntityDetail = () => {
           onClose={() => setIsRecommendationFormOpen(false)}
           onSubmit={handleRecommendationSubmit}
           onImageUpload={handleImageUpload}
-          // Pre-select the current entity
+          // Pre-select the current entity with complete data
           entity={{
             id: entity.id,
             name: entity.name,
             type: entity.type,
             venue: entity.venue || '',
             image_url: entity.image_url || '',
-            description: entity.description || ''
+            description: entity.description || '',
+            metadata: entity.metadata
           }}
         />
       )}
@@ -361,14 +363,15 @@ const EntityDetail = () => {
           isOpen={isReviewFormOpen}
           onClose={() => setIsReviewFormOpen(false)}
           onSubmit={handleReviewSubmit}
-          // Pre-select the current entity
+          // Pre-select the current entity with complete data including metadata
           entity={{
             id: entity.id,
             name: entity.name,
             type: entity.type,
             venue: entity.venue || '',
             image_url: entity.image_url || '',
-            description: entity.description || ''
+            description: entity.description || '',
+            metadata: entity.metadata // Pass the complete metadata object
           }}
         />
       )}

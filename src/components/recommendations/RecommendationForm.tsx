@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,14 @@ interface EntityData {
   venue?: string;
   image_url?: string;
   description?: string;
+  metadata?: {
+    formatted_address?: string;
+    rating?: number;
+    user_ratings_total?: number;
+    price_level?: number;
+    types?: string[];
+    business_status?: string;
+  };
 }
 
 interface RecommendationFormProps {
@@ -117,7 +126,18 @@ const RecommendationForm = ({
       setSelectedImage(recommendation.image_url || null);
     } else if (entity && !isEditMode && isOpen) {
       setValue('title', entity.name);
-      setValue('venue', entity.venue || '');
+      
+      // For place type with Google Places metadata, use formatted_address as venue
+      if (entity.type.toLowerCase() === 'place' && entity.metadata?.formatted_address) {
+        setValue('venue', entity.metadata.formatted_address);
+      } else if (entity.type.toLowerCase() === 'food') {
+        // For food type, use entity name as venue (restaurant name)
+        setValue('venue', entity.name);
+      } else {
+        // For other types, use venue field if available
+        setValue('venue', entity.venue || '');
+      }
+      
       setValue('description', entity.description || '');
       setValue('image_url', entity.image_url || '');
       setValue('category', (entity.type as CategoryString) || 'food');

@@ -28,7 +28,7 @@ interface StepThreeProps {
   onMediaAdd: (media: MediaItem) => void;
   onMediaRemove: (mediaUrl: string) => void;
   isUploading: boolean;
-  disableEntityChange?: boolean; // New prop to disable entity change
+  disableEntityChange?: boolean; // Prop to disable entity change
 }
 
 const StepThree = ({ 
@@ -275,8 +275,8 @@ const StepThree = ({
         <EntityPreviewCard
           entity={processedEntity}
           type={category}
-          onChange={() => setShowEntitySearch(true)}
-          disableChange={disableEntityChange} // Pass the new prop
+          onChange={() => !disableEntityChange && setShowEntitySearch(true)}
+          disableChange={disableEntityChange} // Pass the disableChange prop to EntityPreviewCard
         />
       ) : (
         <div className="p-4 border border-dashed border-brand-orange/30 rounded-lg bg-gradient-to-b from-transparent to-accent/5 transition-all duration-300 hover:border-brand-orange/50">
@@ -342,7 +342,7 @@ const StepThree = ({
         </div>
       </div>
       
-      {/* Media Preview Section - UPDATED with CompactMediaGrid */}
+      {/* Media Preview Section */}
       {selectedMedia.length > 0 && (
         <div className="space-y-2">
           <Label className="flex items-center gap-2 font-medium">
