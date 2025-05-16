@@ -17,11 +17,13 @@ import { fetchUserProfile } from '@/services/profileService';
 interface SmartComposerButtonProps {
   onContentCreated?: () => void;
   onPostCreated?: () => void; // Add compatibility with old prop name
+  entityId?: string; // Add entity ID for pre-selecting
+  entityName?: string; // Add entity name for display
 }
 
 type ContentType = 'post' | 'review' | 'journal' | 'recommendation' | 'watching';
 
-export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartComposerButtonProps) {
+export function SmartComposerButton({ onContentCreated, onPostCreated, entityId, entityName }: SmartComposerButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
@@ -115,7 +117,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
         is_certified: false,
         view_count: 0,
         user_id: user.id,
-        entity_id: values.entity_id || null
+        entity_id: values.entity_id || entityId || null
       });
       
       toast({
@@ -158,6 +160,11 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
           <div className="bg-popover rounded-md shadow-md">
             <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">
               What would you like to create?
+              {entityName && (
+                <div className="text-xs mt-1 font-normal text-muted-foreground">
+                  Related to: {entityName}
+                </div>
+              )}
             </div>
             <div className="py-1">
               {/* Rearranged order of content type options */}
@@ -208,6 +215,11 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               profileData={profileData}
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)} 
+              // Pass entity data as part of metadata instead of defaultEntityId prop
+              metadata={entityId ? { 
+                entityId: entityId,
+                entityName: entityName
+              } : undefined}
             />
           )}
           
@@ -219,6 +231,11 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
                 handleContentCreated();
                 return Promise.resolve();
               }}
+              // Pass entity data as part of entityData prop
+              entityData={entityId ? {
+                id: entityId,
+                name: entityName || ''
+              } : undefined}
             />
           )}
           
@@ -228,6 +245,11 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="journal"
+              // Pass entity data as part of metadata instead of defaultEntityId prop
+              metadata={entityId ? { 
+                entityId: entityId,
+                entityName: entityName
+              } : undefined}
             />
           )}
           
@@ -237,6 +259,11 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="watching"
+              // Pass entity data as part of metadata instead of defaultEntityId prop
+              metadata={entityId ? { 
+                entityId: entityId,
+                entityName: entityName
+              } : undefined}
             />
           )}
         </DialogContent>
@@ -249,6 +276,9 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
           onClose={() => setIsRecommendationFormOpen(false)}
           onSubmit={handleRecommendationSubmit}
           onImageUpload={handleImageUpload}
+          // Pass entity data using existing props pattern
+          initialEntityId={entityId}
+          initialEntityName={entityName}
         />
       )}
     </>
