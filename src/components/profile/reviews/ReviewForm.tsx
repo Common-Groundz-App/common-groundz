@@ -25,6 +25,14 @@ interface EntityData {
   venue?: string;
   image_url?: string;
   description?: string;
+  metadata?: {
+    formatted_address?: string;
+    rating?: number;
+    user_ratings_total?: number;
+    price_level?: number;
+    types?: string[];
+    business_status?: string;
+  };
 }
 
 interface ReviewFormProps {
