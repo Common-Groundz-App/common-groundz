@@ -74,6 +74,9 @@ const ReviewForm = ({
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   
+  // Flag to determine if the form was opened from an entity page
+  const isFromEntityPage = !!entity && !isEditMode;
+  
   const [experienceDate, setExperienceDate] = useState<Date | undefined>(
     review?.experience_date ? new Date(review.experience_date) : undefined
   );
@@ -85,7 +88,7 @@ const ReviewForm = ({
   // Update the type of selectedEntity to be compatible with both Entity types
   const [selectedEntity, setSelectedEntity] = useState<RecommendationEntity | null>(null);
   
-  // Initialize media from legacy image_url or new media array
+  // Initialize media from legacy image_url or new media array - but only in edit mode or when we have review data
   useEffect(() => {
     if (isEditMode && review) {
       // Initialize from existing media if available
@@ -101,16 +104,10 @@ const ReviewForm = ({
           id: review.id
         }]);
       }
-    } else if (entity?.image_url) {
-      // Initialize from entity image if available
-      setSelectedMedia([{
-        url: ensureHttps(entity.image_url),
-        type: 'image',
-        order: 0,
-        id: `entity-${entity.id}`
-      }]);
     }
-  }, [review, isEditMode, entity]);
+    // Do not automatically set entity image in selectedMedia when opening from entity page
+    // This prevents duplicate images and unnecessary storage use
+  }, [review, isEditMode]);
   
   // If in edit mode, populate entity once review is available, or use provided entity
   useEffect(() => {
@@ -164,13 +161,28 @@ const ReviewForm = ({
       // Set initial values from entity
       setCategory(entity.type.toLowerCase());
       
+      // IMPORTANT: Handle the foodName vs contentName differently based on category
       if (entity.type.toLowerCase() === 'food') {
-        setFoodName(entity.name);
+        // For food entity, leave the foodName empty since it's what the user ate
+        // and set the venue to the restaurant name
+        setFoodName(''); // Don't set food name - user needs to specify what they ate
+        setVenue(entity.name || ''); // Use entity name as the restaurant name
+      } else if (entity.type.toLowerCase() === 'place') {
+        // For place entity, set the contentName to the place name
+        setContentName(entity.name || '');
+        
+        // For venue/location field, prefer formatted_address from metadata if entity originated from Google Places
+        if (entity.metadata?.formatted_address) {
+          setVenue(entity.metadata.formatted_address || '');
+        } else {
+          setVenue(entity.venue || '');
+        }
       } else {
-        setContentName(entity.name);
+        // For other categories, use name as contentName
+        setContentName(entity.name || '');
+        setVenue(entity.venue || '');
       }
       
-      setVenue(entity.venue || '');
       setEntityId(entity.id);
       if (entity.description) setDescription(entity.description);
 
@@ -386,7 +398,7 @@ const ReviewForm = ({
         console.log("Using Google Places formatted_address for venue:", entity.metadata.formatted_address);
         setVenue(entity.metadata.formatted_address);
       } else {
-        // For non-Google place sources or if no formatted address
+        // For non-Google Place sources or if no formatted address
         setVenue(entity.venue || '');
       }
     } else {
@@ -481,8 +493,26 @@ const ReviewForm = ({
       // Convert Date to ISO string for API submission
       const formattedExperienceDate = experienceDate ? experienceDate.toISOString() : undefined;
       
-      // For backward compatibility, use the first image as the main image_url
-      const image_url = selectedMedia.length > 0 ? selectedMedia[0].url : undefined;
+      // For backward compatibility, use the first image as the main image_url,
+      // but if no user-uploaded images and we're from entity page, use entity image as fallback
+      let image_url: string | undefined = undefined;
+      
+      if (selectedMedia.length > 0) {
+        // Use the first uploaded image as the main image
+        image_url = selectedMedia[0].url;
+      } else if (isFromEntityPage && entity?.image_url) {
+        // If no user-uploaded images and we're from entity page, use entity image as fallback
+        image_url = entity.image_url;
+        
+        // Also add it to the media array so it shows in the review
+        const entityMedia: MediaItem = {
+          url: ensureHttps(entity.image_url),
+          type: 'image',
+          order: 0,
+          id: `entity-${entity.id}`
+        };
+        setSelectedMedia([entityMedia]);
+      }
       
       // Determine final title based on the content type
       // For food category: always use foodName as the main title
@@ -639,6 +669,7 @@ const ReviewForm = ({
                   onMediaAdd={handleAddMedia}
                   onMediaRemove={handleRemoveMedia}
                   isUploading={isUploading}
+                  disableEntityChange={isFromEntityPage} // Disable entity change when from entity page
                 />
               )}
               

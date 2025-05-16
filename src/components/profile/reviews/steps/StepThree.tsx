@@ -1,3 +1,4 @@
+
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +28,7 @@ interface StepThreeProps {
   onMediaAdd: (media: MediaItem) => void;
   onMediaRemove: (mediaUrl: string) => void;
   isUploading: boolean;
+  disableEntityChange?: boolean; // New prop to disable entity change
 }
 
 const StepThree = ({ 
@@ -41,7 +43,8 @@ const StepThree = ({
   selectedMedia,
   onMediaAdd,
   onMediaRemove,
-  isUploading
+  isUploading,
+  disableEntityChange = false // Default to false for backward compatibility
 }: StepThreeProps) => {
   const [showEntitySearch, setShowEntitySearch] = useState(!selectedEntity);
   const [processedEntity, setProcessedEntity] = useState<Entity | null>(null);
@@ -273,6 +276,7 @@ const StepThree = ({
           entity={processedEntity}
           type={category}
           onChange={() => setShowEntitySearch(true)}
+          disableChange={disableEntityChange} // Pass the new prop
         />
       ) : (
         <div className="p-4 border border-dashed border-brand-orange/30 rounded-lg bg-gradient-to-b from-transparent to-accent/5 transition-all duration-300 hover:border-brand-orange/50">

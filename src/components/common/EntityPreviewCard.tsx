@@ -25,12 +25,14 @@ interface EntityPreviewCardProps {
   };
   type: string;
   onChange: () => void;
+  disableChange?: boolean; // New prop to disable the change button
 }
 
 export const EntityPreviewCard = ({
   entity,
   type,
   onChange,
+  disableChange = false, // Default to false to maintain backward compatibility
 }: EntityPreviewCardProps) => {
   if (!entity) return null;
 
@@ -74,13 +76,18 @@ export const EntityPreviewCard = ({
     <div className="w-full mb-4">
       <div className="flex items-center justify-between mb-2">
         <span className="font-medium text-sm">{getDisplayLabel()}</span>
-        <button
-          type="button"
-          className="text-sm px-3 py-1 border rounded-md bg-white hover:bg-accent border-border shadow-sm transition"
-          onClick={onChange}
-        >
-          Change
-        </button>
+        {!disableChange && (
+          <button
+            type="button"
+            className="text-sm px-3 py-1 border rounded-md bg-white hover:bg-accent border-border shadow-sm transition"
+            onClick={onChange}
+          >
+            Change
+          </button>
+        )}
+        {disableChange && (
+          <span className="text-xs text-muted-foreground">From entity page</span>
+        )}
       </div>
       <div className={cn(
         "flex flex-col sm:flex-row w-full rounded-xl bg-white p-4 shadow-md border gap-4",
@@ -153,4 +160,3 @@ export const EntityPreviewCard = ({
     </div>
   );
 };
-
