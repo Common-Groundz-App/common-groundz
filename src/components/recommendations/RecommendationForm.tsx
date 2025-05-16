@@ -18,6 +18,16 @@ import { EntityTypeString } from '@/hooks/feed/api/types';
 // String literal type for category fields in forms
 type CategoryString = 'food' | 'movie' | 'book' | 'place' | 'product';
 
+// Define the entity type for the form
+interface EntityData {
+  id: string;
+  name: string;
+  type: string;
+  venue?: string;
+  image_url?: string;
+  description?: string;
+}
+
 interface RecommendationFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -25,6 +35,7 @@ interface RecommendationFormProps {
   onImageUpload: (file: File) => Promise<string | null>;
   recommendation?: Recommendation; // For edit mode
   isEditMode?: boolean;
+  entity?: EntityData; // Add this new prop to pre-populate entity data
 }
 
 const RecommendationForm = ({
@@ -33,18 +44,19 @@ const RecommendationForm = ({
   onSubmit,
   onImageUpload,
   recommendation,
-  isEditMode = false
+  isEditMode = false,
+  entity // New prop
 }: RecommendationFormProps) => {
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors, isSubmitting, isDirty } } = useForm({
     defaultValues: {
-      title: recommendation?.title || '',
-      venue: recommendation?.venue || '',
-      description: recommendation?.description || '',
+      title: recommendation?.title || entity?.name || '',
+      venue: recommendation?.venue || entity?.venue || '',
+      description: recommendation?.description || entity?.description || '',
       rating: recommendation?.rating || 0,
-      image_url: recommendation?.image_url || '',
-      category: (recommendation?.category || 'food').toLowerCase() as CategoryString, // Convert enum to string
+      image_url: recommendation?.image_url || entity?.image_url || '',
+      category: (recommendation?.category || (entity?.type as CategoryString) || 'food').toLowerCase() as CategoryString, 
       visibility: recommendation?.visibility || 'public' as RecommendationVisibility,
-      entity_id: recommendation?.entity_id || '',
+      entity_id: recommendation?.entity_id || entity?.id || '',
     }
   });
   
@@ -53,18 +65,19 @@ const RecommendationForm = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   const selectedCategory = watch('category');
-  const [selectedImage, setSelectedImage] = useState<string | null>(recommendation?.image_url || null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(recommendation?.image_url || entity?.image_url || null);
   const [isUploading, setIsUploading] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
+  const [selectedEntity, setSelectedEntity] = useState<any>(entity || null);
   
   // Check for unsaved changes
   useEffect(() => {
     if (isOpen) {
-      setHasUnsavedChanges(isDirty || selectedImage !== (recommendation?.image_url || null));
+      setHasUnsavedChanges(isDirty || selectedImage !== (recommendation?.image_url || entity?.image_url || null));
     } else {
       setHasUnsavedChanges(false);
     }
-  }, [isOpen, isDirty, selectedImage, recommendation]);
+  }, [isOpen, isDirty, selectedImage, recommendation, entity]);
   
   // Listen for custom event to open the form
   useEffect(() => {
@@ -85,11 +98,12 @@ const RecommendationForm = ({
       if (!isEditMode) {
         reset();
         setSelectedImage(null);
+        setSelectedEntity(entity || null);
       }
     }
-  }, [isOpen, reset, isEditMode]);
+  }, [isOpen, reset, isEditMode, entity]);
   
-  // Set form values when in edit mode and recommendation changes
+  // Set form values when in edit mode or entity changes
   useEffect(() => {
     if (isEditMode && recommendation) {
       setValue('title', recommendation.title);
@@ -101,8 +115,17 @@ const RecommendationForm = ({
       setValue('visibility', recommendation.visibility);
       setValue('entity_id', recommendation.entity_id || '');
       setSelectedImage(recommendation.image_url || null);
+    } else if (entity && !isEditMode && isOpen) {
+      setValue('title', entity.name);
+      setValue('venue', entity.venue || '');
+      setValue('description', entity.description || '');
+      setValue('image_url', entity.image_url || '');
+      setValue('category', (entity.type as CategoryString) || 'food');
+      setValue('entity_id', entity.id);
+      setSelectedImage(entity.image_url || null);
+      setSelectedEntity(entity);
     }
-  }, [recommendation, isEditMode, setValue]);
+  }, [recommendation, entity, isEditMode, setValue, isOpen]);
   
   const handleClose = () => {
     if (hasUnsavedChanges) {
@@ -249,8 +272,8 @@ const RecommendationForm = ({
               />
             </div>
             
-            {/* Entity search */}
-            {!isEditMode && (
+            {/* Entity search - Hide if entity is already selected */}
+            {!isEditMode && !selectedEntity && (
               <div className="space-y-2 p-4 border border-dashed border-muted-foreground/30 rounded-lg">
                 <Label className="flex items-center gap-2">
                   {getCategoryIcon(selectedCategory)}
@@ -273,6 +296,7 @@ const RecommendationForm = ({
                     }
                     
                     if (entity.description) setValue('description', entity.description);
+                    setSelectedEntity(entity);
                   }}
                 />
                 <p className="text-xs text-muted-foreground mt-1">

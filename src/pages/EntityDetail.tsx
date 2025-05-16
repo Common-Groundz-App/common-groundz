@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,6 +15,9 @@ import NotFound from './NotFound';
 import ReviewCard from '@/components/profile/reviews/ReviewCard';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { useToast } from '@/hooks/use-toast';
+import RecommendationForm from '@/components/recommendations/RecommendationForm';
+import ReviewForm from '@/components/profile/reviews/ReviewForm';
+import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -23,6 +25,11 @@ const EntityDetail = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('recommendations');
+  const { handleImageUpload } = useRecommendationUploads();
+  
+  // New state variables to control the visibility of forms
+  const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
+  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   
   const {
     entity,
@@ -68,9 +75,8 @@ const EntityDetail = () => {
       return;
     }
     
-    // Navigate to the recommendation form with the entity pre-selected
-    // This is a placeholder and would need to be implemented in the recommendation form
-    navigate('/profile', { state: { action: 'add-recommendation', entityId: entity?.id } });
+    // Show recommendation form instead of navigating away
+    setIsRecommendationFormOpen(true);
   };
 
   const handleAddReview = () => {
@@ -83,9 +89,8 @@ const EntityDetail = () => {
       return;
     }
     
-    // Navigate to the review form with the entity pre-selected
-    // This is a placeholder and would need to be implemented in the review form
-    navigate('/profile', { state: { action: 'add-review', entityId: entity?.id } });
+    // Show review form instead of navigating away
+    setIsReviewFormOpen(true);
   };
 
   const handleRecommendationAction = (action: string, id: string) => {
@@ -100,6 +105,42 @@ const EntityDetail = () => {
     // In a real implementation, you'd call the appropriate service function here
     // Then refresh the data
     refreshData();
+  };
+  
+  // Handle recommendation form submission
+  const handleRecommendationSubmit = async (values: any) => {
+    try {
+      // Submit was successful
+      toast({
+        title: "Recommendation added",
+        description: "Your recommendation has been added successfully"
+      });
+      
+      // Close the form and refresh the data
+      setIsRecommendationFormOpen(false);
+      refreshData();
+    } catch (error) {
+      console.error('Error adding recommendation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add recommendation",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Handle review form submission
+  const handleReviewSubmit = async () => {
+    try {
+      // Close the form and refresh the data
+      setIsReviewFormOpen(false);
+      refreshData();
+      
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Error adding review:', error);
+      return Promise.reject(error);
+    }
   };
 
   return (
@@ -294,6 +335,43 @@ const EntityDetail = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Add Recommendation Form */}
+      {user && entity && (
+        <RecommendationForm
+          isOpen={isRecommendationFormOpen}
+          onClose={() => setIsRecommendationFormOpen(false)}
+          onSubmit={handleRecommendationSubmit}
+          onImageUpload={handleImageUpload}
+          // Pre-select the current entity
+          entity={{
+            id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            venue: entity.venue || '',
+            image_url: entity.image_url || '',
+            description: entity.description || ''
+          }}
+        />
+      )}
+      
+      {/* Add Review Form */}
+      {user && entity && (
+        <ReviewForm
+          isOpen={isReviewFormOpen}
+          onClose={() => setIsReviewFormOpen(false)}
+          onSubmit={handleReviewSubmit}
+          // Pre-select the current entity
+          entity={{
+            id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            venue: entity.venue || '',
+            image_url: entity.image_url || '',
+            description: entity.description || ''
+          }}
+        />
+      )}
     </div>
   );
 };

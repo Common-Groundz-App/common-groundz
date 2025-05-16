@@ -17,12 +17,23 @@ import StepFour from './steps/StepFour';
 import StepIndicator from './StepIndicator';
 import StepNavigation from './StepNavigation';
 
+// Define the entity interface for pre-populating entity data
+interface EntityData {
+  id: string;
+  name: string;
+  type: string;
+  venue?: string;
+  image_url?: string;
+  description?: string;
+}
+
 interface ReviewFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: () => Promise<void>;
   review?: Review;
   isEditMode?: boolean;
+  entity?: EntityData; // New prop to pre-populate entity data
 }
 
 const ReviewForm = ({
@@ -30,7 +41,8 @@ const ReviewForm = ({
   onClose,
   onSubmit,
   review,
-  isEditMode = false
+  isEditMode = false,
+  entity // New prop
 }: ReviewFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -47,16 +59,16 @@ const ReviewForm = ({
   
   // Form data
   const [rating, setRating] = useState(review?.rating || 0);
-  const [category, setCategory] = useState(review?.category || 'food');
+  const [category, setCategory] = useState(review?.category || entity?.type?.toLowerCase() || 'food');
   
   // Separate state variables for different fields
   const [foodName, setFoodName] = useState(''); // For "What did you eat?" in food category
-  const [contentName, setContentName] = useState(''); // For movie/book/place/product name
-  const [reviewTitle, setReviewTitle] = useState(''); // For review title/subtitle in Step 4
+  const [contentName, setContentName] = useState(entity?.name || ''); // For movie/book/place/product name
+  const [reviewTitle, setReviewTitle] = useState(review?.subtitle || ''); // For review title/subtitle in Step 4
   
-  const [venue, setVenue] = useState(review?.venue || '');
-  const [entityId, setEntityId] = useState(review?.entity_id || '');
-  const [description, setDescription] = useState(review?.description || '');
+  const [venue, setVenue] = useState(review?.venue || entity?.venue || '');
+  const [entityId, setEntityId] = useState(review?.entity_id || entity?.id || '');
+  const [description, setDescription] = useState(review?.description || entity?.description || '');
   
   // Updated media handling
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
@@ -89,14 +101,20 @@ const ReviewForm = ({
           id: review.id
         }]);
       }
+    } else if (entity?.image_url) {
+      // Initialize from entity image if available
+      setSelectedMedia([{
+        url: ensureHttps(entity.image_url),
+        type: 'image',
+        order: 0,
+        id: `entity-${entity.id}`
+      }]);
     }
-  }, [review, isEditMode]);
+  }, [review, isEditMode, entity]);
   
-  // If in edit mode, populate entity once review is available
+  // If in edit mode, populate entity once review is available, or use provided entity
   useEffect(() => {
     if (isEditMode && review?.entity) {
-      console.log("Edit mode: Loading entity from review:", review.entity);
-      
       // Process the entity to ensure image_url is properly formatted
       const processedEntity = { ...review.entity };
       if (processedEntity.image_url) {
@@ -111,9 +129,17 @@ const ReviewForm = ({
       }
       
       setSelectedEntity(processedEntity as RecommendationEntity);
+    } else if (entity && !selectedEntity) {
+      // Convert provided entity to expected format
+      const entityToUse: any = {
+        ...entity,
+        type: mapStringToEntityType(entity.type)
+      };
+      
+      setSelectedEntity(entityToUse);
     }
-  }, [review, isEditMode]);
-  
+  }, [review, isEditMode, entity, selectedEntity]);
+
   // Helper function to map string type to EntityType enum
   const mapStringToEntityType = (type: string): EntityType => {
     switch (type.toLowerCase()) {
@@ -131,6 +157,34 @@ const ReviewForm = ({
       default: return EntityType.Place; // Default fallback
     }
   };
+  
+  // Ensure proper initialization when entity is provided
+  useEffect(() => {
+    if (entity && isOpen && !isEditMode) {
+      // Set initial values from entity
+      setCategory(entity.type.toLowerCase());
+      
+      if (entity.type.toLowerCase() === 'food') {
+        setFoodName(entity.name);
+      } else {
+        setContentName(entity.name);
+      }
+      
+      setVenue(entity.venue || '');
+      setEntityId(entity.id);
+      if (entity.description) setDescription(entity.description);
+
+      // Auto-complete step 2 and 3 since we have an entity
+      if (!completedSteps.includes(2)) {
+        setCompletedSteps(prev => [...prev, 2]);
+      }
+      
+      // Move to step 3 if just opened with entity
+      if (currentStep === 1) {
+        setCurrentStep(3);
+      }
+    }
+  }, [entity, isOpen, isEditMode, completedSteps, currentStep]);
   
   // Track form changes
   useEffect(() => {

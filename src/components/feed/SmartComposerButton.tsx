@@ -27,6 +27,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
+  const [entityData, setEntityData] = useState<any>(null); // Store entity data for forms
   const { user } = useAuth();
   const { handleImageUpload } = useRecommendationUploads();
   const { toast } = useToast();
@@ -54,10 +55,17 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
     const handleOpenDialog = (event: Event) => {
       // Check if the event has a detail property with a contentType
       const customEvent = event as CustomEvent;
-      if (customEvent.detail && customEvent.detail.contentType) {
-        setSelectedContentType(customEvent.detail.contentType as ContentType);
-        setIsPopoverOpen(false);
-        setIsDialogOpen(true);
+      if (customEvent.detail) {
+        if (customEvent.detail.contentType) {
+          setSelectedContentType(customEvent.detail.contentType as ContentType);
+          setIsPopoverOpen(false);
+          setIsDialogOpen(true);
+        }
+        
+        // Extract entity data if available
+        if (customEvent.detail.entity) {
+          setEntityData(customEvent.detail.entity);
+        }
       } else {
         setSelectedContentType('post');
         setIsPopoverOpen(false);
@@ -65,19 +73,29 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
       }
     };
     
-    window.addEventListener('open-create-post-dialog', handleOpenDialog);
-    window.addEventListener('open-recommendation-form', () => {
+    const handleOpenRecommendationForm = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      // Extract entity data if available
+      if (customEvent.detail && customEvent.detail.entity) {
+        setEntityData(customEvent.detail.entity);
+      }
       setIsRecommendationFormOpen(true);
-    });
+    };
+    
+    window.addEventListener('open-create-post-dialog', handleOpenDialog);
+    window.addEventListener('open-recommendation-form', handleOpenRecommendationForm);
     
     return () => {
       window.removeEventListener('open-create-post-dialog', handleOpenDialog);
-      window.removeEventListener('open-recommendation-form', () => {});
+      window.removeEventListener('open-recommendation-form', handleOpenRecommendationForm);
     };
   }, []);
 
   const handleContentCreated = () => {
     setIsDialogOpen(false);
+    
+    // Clear entity data
+    setEntityData(null);
     
     // Dispatch events to refresh both feeds and profile posts
     window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
@@ -124,6 +142,9 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
       });
       
       setIsRecommendationFormOpen(false);
+      
+      // Clear entity data
+      setEntityData(null);
       
       // Dispatch events to refresh feeds
       window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
@@ -219,6 +240,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
                 handleContentCreated();
                 return Promise.resolve();
               }}
+              entity={entityData}
             />
           )}
           
@@ -242,13 +264,17 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
         </DialogContent>
       </Dialog>
 
-      {/* Directly render the RecommendationForm component instead of relying on events */}
+      {/* Directly render the RecommendationForm component */}
       {user && (
         <RecommendationForm
           isOpen={isRecommendationFormOpen}
-          onClose={() => setIsRecommendationFormOpen(false)}
+          onClose={() => {
+            setIsRecommendationFormOpen(false);
+            setEntityData(null);
+          }}
           onSubmit={handleRecommendationSubmit}
           onImageUpload={handleImageUpload}
+          entity={entityData}
         />
       )}
     </>
