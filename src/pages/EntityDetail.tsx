@@ -287,8 +287,7 @@ const EntityDetail = () => {
                   review={review}
                   onLike={() => handleReviewAction('like', review.id)}
                   onSave={() => handleReviewAction('save', review.id)}
-                  onDelete={() => handleReviewAction('delete', review.id)}
-                  onConvert={() => handleReviewAction('convert', review.id)}
+                  refreshReviews={refreshData}
                 />
               ))}
             </div>
