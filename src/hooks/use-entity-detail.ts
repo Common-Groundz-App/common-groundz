@@ -51,6 +51,10 @@ export const useEntityDetail = (slug: string) => {
         
         const entityReviews = await fetchEntityReviews(entityData.id, user?.id || null);
         console.log('Entity reviews fetched:', entityReviews);
+        // Log a sample review to verify the structure
+        if (entityReviews && entityReviews.length > 0) {
+          console.log('Sample review structure:', JSON.stringify(entityReviews[0], null, 2));
+        }
         setReviews(entityReviews);
         
         const entityStats = await getEntityStats(entityData.id);
@@ -87,6 +91,11 @@ export const useEntityDetail = (slug: string) => {
 
       console.log('Refresh received recommendations:', refreshedRecommendations.length);
       console.log('Refresh received reviews:', refreshedReviews.length);
+      
+      // Log a sample review after refresh to verify the structure
+      if (refreshedReviews && refreshedReviews.length > 0) {
+        console.log('Sample refreshed review structure:', JSON.stringify(refreshedReviews[0], null, 2));
+      }
 
       setRecommendations(refreshedRecommendations);
       setReviews(refreshedReviews);

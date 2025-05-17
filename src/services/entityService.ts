@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 
@@ -184,8 +185,15 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
       const profile = profilesMap.get(rev.user_id);
       return {
         ...rev,
+        // Add both direct properties for backward compatibility
         username: profile ? profile.username : null,
         avatar_url: profile ? profile.avatar_url : null,
+        // AND add a nested user object to match what ReviewCard expects
+        user: {
+          id: rev.user_id,
+          username: profile ? profile.username : null,
+          avatar_url: profile ? profile.avatar_url : null
+        }
       };
     });
 
