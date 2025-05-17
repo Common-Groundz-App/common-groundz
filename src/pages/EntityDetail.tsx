@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +41,20 @@ const EntityDetail = () => {
     error,
     refreshData
   } = useEntityDetail(slug || '');
+  
+  // Debug logging for recommendations and reviews
+  useEffect(() => {
+    if (!isLoading) {
+      console.log('EntityDetail component received recommendations:', recommendations?.length);
+      console.log('EntityDetail component received reviews:', reviews?.length);
+      if (recommendations?.length > 0) {
+        console.log('Sample recommendation:', recommendations[0]);
+      }
+      if (reviews?.length > 0) {
+        console.log('Sample review:', reviews[0]);
+      }
+    }
+  }, [isLoading, recommendations, reviews]);
 
   // Handle entity not found or deleted
   if (!isLoading && (error || !entity)) {
@@ -52,7 +66,7 @@ const EntityDetail = () => {
     const fallbacks: Record<string, string> = {
       'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
       'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
-      'food': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1',
+      'food': 'https://images.unsplash.com/photo-1555939594-58d7698950b',
       'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
       'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
       'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
@@ -120,6 +134,8 @@ const EntityDetail = () => {
       // Close the form and refresh the data
       setIsRecommendationFormOpen(false);
       refreshData();
+      
+      return Promise.resolve();
     } catch (error) {
       console.error('Error adding recommendation:', error);
       toast({
@@ -127,6 +143,8 @@ const EntityDetail = () => {
         description: "Failed to add recommendation",
         variant: "destructive"
       });
+      
+      return Promise.reject(error);
     }
   };
   
@@ -280,7 +298,7 @@ const EntityDetail = () => {
               <Skeleton className="h-48 w-full" />
               <Skeleton className="h-48 w-full" />
             </div>
-          ) : recommendations.length === 0 ? (
+          ) : !recommendations || recommendations.length === 0 ? (
             <div className="py-12 text-center">
               <h3 className="font-medium text-lg">No recommendations yet</h3>
               <p className="text-muted-foreground mt-2">
@@ -292,6 +310,9 @@ const EntityDetail = () => {
             </div>
           ) : (
             <div className="space-y-4 mt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {recommendations.length} recommendation{recommendations.length !== 1 ? 's' : ''}
+              </p>
               {recommendations.map((recommendation) => (
                 <RecommendationCard
                   key={recommendation.id}
@@ -311,7 +332,7 @@ const EntityDetail = () => {
               <Skeleton className="h-48 w-full" />
               <Skeleton className="h-48 w-full" />
             </div>
-          ) : reviews.length === 0 ? (
+          ) : !reviews || reviews.length === 0 ? (
             <div className="py-12 text-center">
               <h3 className="font-medium text-lg">No reviews yet</h3>
               <p className="text-muted-foreground mt-2">
@@ -323,6 +344,9 @@ const EntityDetail = () => {
             </div>
           ) : (
             <div className="space-y-4 mt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {reviews.length} review{reviews.length !== 1 ? 's' : ''}
+              </p>
               {reviews.map((review) => (
                 <ReviewCard
                   key={review.id}

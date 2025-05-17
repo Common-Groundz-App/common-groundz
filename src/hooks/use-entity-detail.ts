@@ -28,6 +28,7 @@ export const useEntityDetail = (slug: string) => {
 
   useEffect(() => {
     const fetchEntityData = async () => {
+      console.log('Fetching entity data for slug:', slug);
       setIsLoading(true);
       setError(null);
 
@@ -40,14 +41,21 @@ export const useEntityDetail = (slug: string) => {
           return;
         }
 
+        console.log('Found entity data:', entityData);
         setEntity(entityData);
 
         // Fetch related content
-        const [entityRecommendations, entityReviews, entityStats] = await Promise.all([
+        const results = await Promise.all([
           fetchEntityRecommendations(entityData.id, user?.id || null),
           fetchEntityReviews(entityData.id, user?.id || null),
           getEntityStats(entityData.id)
         ]);
+        
+        const [entityRecommendations, entityReviews, entityStats] = results;
+
+        console.log('Entity detail hook received recommendations:', entityRecommendations.length);
+        console.log('Entity detail hook received reviews:', entityReviews.length);
+        console.log('Entity detail hook received stats:', entityStats);
 
         setRecommendations(entityRecommendations);
         setReviews(entityReviews);
@@ -69,6 +77,7 @@ export const useEntityDetail = (slug: string) => {
   const refreshData = async () => {
     if (!entity) return;
     
+    console.log('Refreshing entity data for:', entity.name);
     setIsLoading(true);
     
     try {
@@ -77,6 +86,9 @@ export const useEntityDetail = (slug: string) => {
         fetchEntityReviews(entity.id, user?.id || null),
         getEntityStats(entity.id)
       ]);
+
+      console.log('Refresh received recommendations:', refreshedRecommendations.length);
+      console.log('Refresh received reviews:', refreshedReviews.length);
 
       setRecommendations(refreshedRecommendations);
       setReviews(refreshedReviews);
