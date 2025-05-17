@@ -28,12 +28,12 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
   console.log('Fetching entity recommendations for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Modified query to use explicit join with profiles table instead of relying on foreign key relationships
-    const { data: recommendations, error } = await supabase
+    // Use a proper join query with the profiles table
+    const { data: recommendationsData, error } = await supabase
       .from('recommendations')
       .select(`
-        *,
-        profiles:user_id (username, avatar_url)
+        recommendations.*,
+        profiles:profiles!recommendations.user_id (username, avatar_url)
       `)
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
@@ -43,7 +43,14 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
       return [];
     }
 
-    console.log('Raw recommendations data:', recommendations);
+    console.log('Raw recommendations data:', recommendationsData);
+    
+    // Format recommendations with user data
+    let recommendations = recommendationsData.map(rec => ({
+      ...rec,
+      username: rec.profiles ? rec.profiles.username : null,
+      avatar_url: rec.profiles ? rec.profiles.avatar_url : null,
+    }));
     
     // If we have a logged-in user, fetch likes and saves
     if (userId && recommendations && recommendations.length > 0) {
@@ -77,29 +84,25 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
       );
       
       // Process the recommendations with user interaction data
-      const processedRecommendations = (recommendations as any[]).map(rec => ({
+      recommendations = recommendations.map(rec => ({
         ...rec,
-        username: rec.profiles ? rec.profiles.username : null,
-        avatar_url: rec.profiles ? rec.profiles.avatar_url : null,
         isLiked: likedIds.has(rec.id),
         isSaved: savedIds.has(rec.id),
         likes: likeCountMap.get(rec.id) || 0
       }));
       
-      console.log('Processed recommendations with user data:', processedRecommendations);
-      return processedRecommendations;
+      console.log('Processed recommendations with user data:', recommendations);
+      return recommendations;
     }
     
     // Format the results (no user data)
-    const processedRecommendations = ((recommendations || []) as any[]).map(rec => ({
+    recommendations = recommendations.map(rec => ({
       ...rec,
-      username: rec.profiles ? rec.profiles.username : null,
-      avatar_url: rec.profiles ? rec.profiles.avatar_url : null,
       likes: 0
     }));
     
-    console.log('Processed recommendations without user data:', processedRecommendations);
-    return processedRecommendations;
+    console.log('Processed recommendations without user data:', recommendations);
+    return recommendations;
   } catch (err) {
     console.error('Exception in fetchEntityRecommendations:', err);
     return [];
@@ -113,12 +116,12 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
   console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Modified query to use explicit join with profiles table instead of relying on foreign key relationships
-    const { data: reviews, error } = await supabase
+    // Use a proper join query with the profiles table
+    const { data: reviewsData, error } = await supabase
       .from('reviews')
       .select(`
-        *,
-        profiles:user_id (username, avatar_url)
+        reviews.*,
+        profiles:profiles!reviews.user_id (username, avatar_url)
       `)
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
@@ -128,7 +131,14 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
       return [];
     }
     
-    console.log('Raw reviews data:', reviews);
+    console.log('Raw reviews data:', reviewsData);
+
+    // Format reviews with user data
+    let reviews = reviewsData.map(rev => ({
+      ...rev,
+      username: rev.profiles ? rev.profiles.username : null,
+      avatar_url: rev.profiles ? rev.profiles.avatar_url : null,
+    }));
 
     // If we have a logged-in user, fetch likes and saves
     if (userId && reviews && reviews.length > 0) {
@@ -162,29 +172,25 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
       );
       
       // Process the reviews with user interaction data
-      const processedReviews = (reviews as any[]).map(rev => ({
+      reviews = reviews.map(rev => ({
         ...rev,
-        username: rev.profiles ? rev.profiles.username : null,
-        avatar_url: rev.profiles ? rev.profiles.avatar_url : null,
         isLiked: likedIds.has(rev.id),
         isSaved: savedIds.has(rev.id),
         likes: likeCountMap.get(rev.id) || 0
       }));
       
-      console.log('Processed reviews with user data:', processedReviews);
-      return processedReviews;
+      console.log('Processed reviews with user data:', reviews);
+      return reviews;
     }
 
     // Format the results (no user data)
-    const processedReviews = ((reviews || []) as any[]).map(rev => ({
+    reviews = reviews.map(rev => ({
       ...rev,
-      username: rev.profiles ? rev.profiles.username : null,
-      avatar_url: rev.profiles ? rev.profiles.avatar_url : null,
       likes: 0
     }));
     
-    console.log('Processed reviews without user data:', processedReviews);
-    return processedReviews;
+    console.log('Processed reviews without user data:', reviews);
+    return reviews;
   } catch (err) {
     console.error('Exception in fetchEntityReviews:', err);
     return [];
