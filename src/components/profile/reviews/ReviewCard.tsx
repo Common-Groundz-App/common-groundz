@@ -16,7 +16,7 @@ import {
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { deleteReview, updateReviewStatus } from '@/services/reviewService';
 import ReviewForm from './ReviewForm';
-import { format } from 'date-fns';
+import { formatRelativeDate } from '@/utils/dateUtils';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
@@ -203,22 +203,6 @@ const ReviewCard = ({
     return null;
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffInDays === 0) {
-      return 'Today';
-    } else if (diffInDays === 1) {
-      return 'Yesterday';
-    } else if (diffInDays < 7) {
-      return `${diffInDays} days ago`;
-    } else {
-      return format(date, 'MMM d, yyyy');
-    }
-  };
-  
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
@@ -247,7 +231,7 @@ const ReviewCard = ({
         className="overflow-hidden hover:shadow-md transition-shadow duration-200"
       >
         <CardContent className="p-6">
-          {/* Card Header with User Info - Improved layout to match RecommendationCard */}
+          {/* Card Header with User Info */}
           <div className="flex justify-between items-start">
             <div className="flex items-start gap-3">
               <UsernameLink 
@@ -262,7 +246,7 @@ const ReviewCard = ({
               <div>
                 <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
                 <div className="text-muted-foreground text-xs mt-0.5">
-                  <span>{formatDate(review.created_at)}</span>
+                  <span>{formatRelativeDate(review.created_at)}</span>
                 </div>
                 <div className="mt-1">
                   <RatingDisplay rating={review.rating} />

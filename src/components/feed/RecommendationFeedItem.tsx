@@ -27,6 +27,7 @@ import { getRecommendationFallbackImage } from '@/utils/fallbackImageUtils';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
+import { formatRelativeDate } from '@/utils/dateUtils';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -123,22 +124,6 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffInDays === 0) {
-      return 'Today';
-    } else if (diffInDays === 1) {
-      return 'Yesterday';
-    } else if (diffInDays < 7) {
-      return `${diffInDays} days ago`;
-    } else {
-      return format(date, 'MMM d, yyyy');
-    }
   };
 
   const handleCommentClick = () => {
@@ -254,7 +239,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
               className="font-medium"
               isCurrentUser={isOwner}
             />
-            <div className="text-sm text-muted-foreground">{formatDate(recommendation.created_at)}</div>
+            <div className="text-sm text-muted-foreground">{formatRelativeDate(recommendation.created_at)}</div>
           </div>
           
           <div className="flex items-center gap-2">

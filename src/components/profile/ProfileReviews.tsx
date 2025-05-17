@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
@@ -6,6 +5,7 @@ import EmptyReviews from './reviews/EmptyReviews';
 import { useReviews } from '@/hooks/use-reviews';
 import ReviewCard from './reviews/ReviewCard';
 import ReviewForm from './reviews/ReviewForm';
+import { formatRelativeDate } from '@/utils/dateUtils';
 
 interface ProfileReviewsProps {
   profileUserId: string;

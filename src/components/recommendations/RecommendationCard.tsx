@@ -23,6 +23,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
 import { ensureHttps } from '@/utils/urlUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { formatRelativeDate } from '@/utils/dateUtils';
 
 interface RecommendationCardProps {
   recommendation: any;
@@ -241,7 +242,7 @@ const RecommendationCard = ({
             <div>
               <UsernameLink userId={recommendation.user_id} username={recommendation.username} className="font-medium hover:underline" />
               <div className="flex items-center gap-1 text-muted-foreground text-xs">
-                <span>{format(new Date(recommendation.created_at), 'MMM d, yyyy')}</span>
+                <span>{formatRelativeDate(recommendation.created_at)}</span>
                 <span>·</span>
                 <RatingDisplay rating={recommendation.rating} />
               </div>
