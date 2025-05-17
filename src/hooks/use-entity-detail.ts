@@ -45,21 +45,21 @@ export const useEntityDetail = (slug: string) => {
         setEntity(entityData);
 
         // Fetch related content
-        const results = await Promise.all([
-          fetchEntityRecommendations(entityData.id, user?.id || null),
-          fetchEntityReviews(entityData.id, user?.id || null),
-          getEntityStats(entityData.id)
-        ]);
+        const entityRecommendations = await fetchEntityRecommendations(entityData.id, user?.id || null);
+        console.log('Entity recommendations fetched:', entityRecommendations);
+        setRecommendations(entityRecommendations);
         
-        const [entityRecommendations, entityReviews, entityStats] = results;
+        const entityReviews = await fetchEntityReviews(entityData.id, user?.id || null);
+        console.log('Entity reviews fetched:', entityReviews);
+        setReviews(entityReviews);
+        
+        const entityStats = await getEntityStats(entityData.id);
+        console.log('Entity stats fetched:', entityStats);
+        setStats(entityStats);
 
         console.log('Entity detail hook received recommendations:', entityRecommendations.length);
         console.log('Entity detail hook received reviews:', entityReviews.length);
-        console.log('Entity detail hook received stats:', entityStats);
-
-        setRecommendations(entityRecommendations);
-        setReviews(entityReviews);
-        setStats(entityStats);
+        
       } catch (err) {
         console.error('Error fetching entity data:', err);
         setError('Failed to load entity data');
@@ -81,11 +81,9 @@ export const useEntityDetail = (slug: string) => {
     setIsLoading(true);
     
     try {
-      const [refreshedRecommendations, refreshedReviews, refreshedStats] = await Promise.all([
-        fetchEntityRecommendations(entity.id, user?.id || null),
-        fetchEntityReviews(entity.id, user?.id || null),
-        getEntityStats(entity.id)
-      ]);
+      const refreshedRecommendations = await fetchEntityRecommendations(entity.id, user?.id || null);
+      const refreshedReviews = await fetchEntityReviews(entity.id, user?.id || null);
+      const refreshedStats = await getEntityStats(entity.id);
 
       console.log('Refresh received recommendations:', refreshedRecommendations.length);
       console.log('Refresh received reviews:', refreshedReviews.length);
