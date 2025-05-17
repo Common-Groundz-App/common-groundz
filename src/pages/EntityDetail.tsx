@@ -481,14 +481,12 @@ const EntityDetail = () => {
                       </div>
                     )}
                     
-                    {entity.created_at && (
-                      <div className="text-sm">
-                        <div className="font-medium">Added</div>
-                        <div className="text-muted-foreground">
-                          {formatRelativeDate(entity.created_at)}
-                        </div>
+                    <div className="text-sm">
+                      <div className="font-medium">Added</div>
+                      <div className="text-muted-foreground">
+                        Recently added
                       </div>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
               )}
