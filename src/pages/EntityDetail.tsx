@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -481,11 +480,11 @@ const EntityDetail = () => {
                       </div>
                     )}
                     
-                    {entity.created_at && (
+                    {entity.updated_at && (
                       <div className="text-sm">
                         <div className="font-medium">Added</div>
                         <div className="text-muted-foreground">
-                          {formatRelativeDate(entity.created_at)}
+                          {formatRelativeDate(entity.updated_at)}
                         </div>
                       </div>
                     )}

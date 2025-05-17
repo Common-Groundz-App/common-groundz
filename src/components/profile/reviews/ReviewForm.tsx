@@ -61,6 +61,9 @@ const ReviewForm = ({
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Form validation error state
+  const [showRatingError, setShowRatingError] = useState(false);
+  
   // Exit confirmation state
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -203,7 +206,8 @@ const ReviewForm = ({
       setEntityId(entity.id);
       if (entity.description) setDescription(entity.description);
 
-      // Auto-complete step 2 and 3 since we have an entity
+      // Only auto-complete step 2 since we have an entity
+      // Step 1 (rating) is still required
       if (!completedSteps.includes(2)) {
         setCompletedSteps(prev => [...prev, 2]);
       }
@@ -427,12 +431,17 @@ const ReviewForm = ({
   
   // Handle step navigation by clicking on step indicators
   const handleStepClick = (step: number) => {
-    // Only allow navigation to completed steps
-    if (completedSteps.includes(step)) {
-      setCurrentStep(step);
-    } else if (step === currentStep) {
-      // Do nothing if clicking on current step
+    // First check if user has selected a rating when trying to navigate away from step 1
+    if (currentStep === 1 && step !== 1 && rating === 0) {
+      setShowRatingError(true);
+      // Add a small shake animation to indicate error
+      setTimeout(() => setShowRatingError(false), 1500);
       return;
+    }
+    
+    // Only allow navigation to completed steps or current step
+    if (completedSteps.includes(step) || step === currentStep) {
+      setCurrentStep(step);
     } else {
       // Show toast explaining why navigation is restricted
       toast({
@@ -446,6 +455,9 @@ const ReviewForm = ({
   const handleNext = () => {
     // Validate current step
     if (currentStep === 1 && rating === 0) {
+      setShowRatingError(true);
+      // Add a small shake animation to indicate error
+      setTimeout(() => setShowRatingError(false), 1500);
       toast({
         title: 'Rating required',
         description: 'Please select a rating before proceeding.',
@@ -665,7 +677,11 @@ const ReviewForm = ({
             {/* Step content */}
             <div className="min-h-[400px]">
               {currentStep === 1 && (
-                <StepOne rating={rating} onChange={setRating} />
+                <StepOne 
+                  rating={rating} 
+                  onChange={setRating} 
+                  showError={showRatingError}
+                />
               )}
               
               {currentStep === 2 && (
