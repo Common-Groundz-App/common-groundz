@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 
@@ -27,12 +28,12 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
   console.log('Fetching entity recommendations for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Modified query to directly use select with profiles instead of using a foreign key relationship
+    // Modified query to use explicit join with profiles table instead of relying on foreign key relationships
     const { data: recommendations, error } = await supabase
       .from('recommendations')
       .select(`
         *,
-        profiles(username, avatar_url)
+        profiles:user_id (username, avatar_url)
       `)
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
@@ -112,12 +113,12 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
   console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Modified query to directly use select with profiles instead of using a foreign key relationship
+    // Modified query to use explicit join with profiles table instead of relying on foreign key relationships
     const { data: reviews, error } = await supabase
       .from('reviews')
       .select(`
         *,
-        profiles(username, avatar_url)
+        profiles:user_id (username, avatar_url)
       `)
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
