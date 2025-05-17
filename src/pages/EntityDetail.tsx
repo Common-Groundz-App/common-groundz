@@ -430,6 +430,7 @@ const EntityDetail = () => {
             
             {/* Right Sidebar */}
             <div className="w-full md:w-72 lg:w-80 space-y-5 order-first md:order-last">
+              {/* Share Your Experience Card */}
               {!isLoading && (
                 <Card>
                   <CardHeader className="pb-3">
@@ -480,11 +481,11 @@ const EntityDetail = () => {
                       </div>
                     )}
                     
-                    {entity.updated_at && (
+                    {entity.created_at && (
                       <div className="text-sm">
                         <div className="font-medium">Added</div>
                         <div className="text-muted-foreground">
-                          {formatRelativeDate(entity.updated_at)}
+                          {formatRelativeDate(entity.created_at)}
                         </div>
                       </div>
                     )}
