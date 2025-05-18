@@ -18,11 +18,11 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     
-    const url = new URL(req.url);
-    const query = url.searchParams.get("query") || "";
-    const limit = parseInt(url.searchParams.get("limit") || "5", 10);
+    // Parse request to get parameters
+    const { query, limit } = await req.json();
+    const searchLimit = limit || 5;
     
-    if (query.trim().length < 2) {
+    if (!query || query.trim().length < 2) {
       return new Response(
         JSON.stringify({ 
           users: [], 
@@ -41,7 +41,7 @@ serve(async (req) => {
         .from('profiles')
         .select('id, username, avatar_url, bio')
         .ilike('username', `%${query}%`)
-        .limit(limit),
+        .limit(searchLimit),
       
       // Search entities
       supabase
@@ -49,7 +49,7 @@ serve(async (req) => {
         .select('id, name, type, venue, image_url, description, slug')
         .or(`name.ilike.%${query}%, venue.ilike.%${query}%, slug.ilike.%${query}%`)
         .eq('is_deleted', false)
-        .limit(limit),
+        .limit(searchLimit),
       
       // Search reviews
       supabase
@@ -67,7 +67,7 @@ serve(async (req) => {
         .or(`title.ilike.%${query}%, description.ilike.%${query}%, subtitle.ilike.%${query}%`)
         .eq('status', 'published')
         .eq('visibility', 'public')
-        .limit(limit),
+        .limit(searchLimit),
       
       // Search recommendations
       supabase
@@ -83,7 +83,7 @@ serve(async (req) => {
         `)
         .or(`title.ilike.%${query}%, description.ilike.%${query}%`)
         .eq('visibility', 'public')
-        .limit(limit),
+        .limit(searchLimit),
     ]);
 
     // Handle any errors
