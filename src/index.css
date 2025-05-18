@@ -13,7 +13,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
  
-    --primary: 22 100% 50%; /* Changed from dark gray back to brand-orange */
+    --primary: 25 95% 53%; /* Changed to exact brand-orange color #F97316 */
     --primary-foreground: 210 40% 98%;
  
     --secondary: 210 40% 96.1%;
@@ -35,7 +35,7 @@
     --radius: 0.5rem;
     
     /* Brand Colors */
-    --brand-orange: 22 100% 50%;
+    --brand-orange: 25 95% 53%;
     --brand-violet: 250 95% 65%;
     
   }
@@ -50,7 +50,7 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
  
-    --primary: 22 100% 50%; /* Changed from dark gray back to brand-orange in dark mode */
+    --primary: 25 95% 53%; /* Changed to exact brand-orange color #F97316 in dark mode */
     --primary-foreground: 210 40% 98%;
  
     --secondary: 217.2 32.6% 17.5%;
