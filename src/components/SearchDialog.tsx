@@ -6,10 +6,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Search, X } from 'lucide-react';
-import { useSearch, SearchResult } from '@/hooks/use-search';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Link } from 'react-router-dom';
+import { useUnifiedSearch } from '@/hooks/use-unified-search';
 import { Skeleton } from '@/components/ui/skeleton';
+import { UserResultItem } from './search/UserResultItem';
+import { EntityResultItem } from './search/EntityResultItem';
+import { ReviewResultItem } from './search/ReviewResultItem';
+import { RecommendationResultItem } from './search/RecommendationResultItem';
 
 interface SearchDialogProps {
   open: boolean;
@@ -18,16 +20,54 @@ interface SearchDialogProps {
 
 export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState('');
-  const { results, isLoading, error, defaultUsers, loadingDefaultUsers } = useSearch(query);
+  const { 
+    results, 
+    isLoading, 
+    error, 
+    defaultUsers, 
+    loadingDefaultUsers,
+    hasResults
+  } = useUnifiedSearch(query);
 
-  const handleUserClick = () => {
+  const handleResultClick = () => {
     onOpenChange(false);
     setQuery('');
   };
 
-  // Determine which users to display
-  const usersToDisplay = query ? results : defaultUsers;
-  const isLoadingUsers = query ? isLoading : loadingDefaultUsers;
+  const renderSectionHeader = (title: string) => (
+    <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+      {title}
+    </div>
+  );
+
+  const renderLoadingSkeletons = (count: number = 3) => (
+    <div className="px-2">
+      {Array(count).fill(0).map((_, index) => (
+        <div key={index} className="flex items-center gap-2 px-2 py-1.5">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="flex-1">
+            <Skeleton className="h-3 w-20 mb-1" />
+            <Skeleton className="h-2 w-32" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderEmptyState = () => (
+    <div className="p-6 text-center">
+      <p className="text-sm text-muted-foreground">No results found. Try another name or topic.</p>
+    </div>
+  );
+
+  // Show default users when not searching
+  const shouldShowDefaultUsers = !query && defaultUsers.length > 0;
+  
+  // Determine if we should show an empty state
+  const showEmptyState = query && 
+                          query.length >= 2 && 
+                          !isLoading && 
+                          !hasResults;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -36,7 +76,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
           <Search className="w-4 h-4 text-muted-foreground shrink-0 mr-2" />
           <Input
             type="text"
-            placeholder="Search for people, products, food..."
+            placeholder="Search for people, places, food, products..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70 text-sm h-8 px-0"
@@ -59,58 +99,90 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             </div>
           )}
 
-          {isLoadingUsers && (
-            <div className="px-2">
-              <div className="px-2 py-2 text-xs font-medium text-muted-foreground">
-                People
-              </div>
-              {Array(3).fill(0).map((_, index) => (
-                <div key={index} className="flex items-center gap-2 px-2 py-1.5">
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                  <div className="flex-1">
-                    <Skeleton className="h-3 w-20 mb-1" />
-                    <Skeleton className="h-2 w-32" />
-                  </div>
-                </div>
-              ))}
-            </div>
+          {isLoading && (
+            <>
+              {renderSectionHeader('People')}
+              {renderLoadingSkeletons(2)}
+              {renderSectionHeader('Places')}
+              {renderLoadingSkeletons(2)}
+              {renderSectionHeader('Reviews')}
+              {renderLoadingSkeletons(1)}
+            </>
           )}
 
-          {!isLoadingUsers && query && usersToDisplay.length === 0 && (
-            <div className="p-6 text-center">
-              <p className="text-xs text-muted-foreground">No users found</p>
-            </div>
-          )}
+          {showEmptyState && renderEmptyState()}
 
-          {usersToDisplay.length > 0 && (
+          {shouldShowDefaultUsers && (
             <div className="flex flex-col">
-              <div className="px-4 py-1 text-xs font-medium text-muted-foreground">
-                People
-              </div>
+              {renderSectionHeader('People You May Know')}
               <div className="flex flex-col">
-                {usersToDisplay.map((user) => (
-                  <Link
+                {defaultUsers.map((user) => (
+                  <UserResultItem
                     key={user.id}
-                    to={`/profile/${user.id}`}
-                    className="flex items-center gap-2 px-4 py-1.5 hover:bg-muted/30 transition-colors"
-                    onClick={handleUserClick}
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar_url || undefined} alt={user.username || 'User'} />
-                      <AvatarFallback>
-                        {user.username?.[0]?.toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{user.username || 'Unknown User'}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {user.bio || 'No bio available'}
-                      </p>
-                    </div>
-                  </Link>
+                    user={user}
+                    onClick={handleResultClick}
+                  />
                 ))}
               </div>
             </div>
+          )}
+
+          {!isLoading && hasResults && (
+            <>
+              {results.entities.length > 0 && (
+                <div className="flex flex-col">
+                  {renderSectionHeader('Places & Things')}
+                  {results.entities.map((entity) => (
+                    <EntityResultItem
+                      key={entity.id}
+                      entity={entity}
+                      onClick={handleResultClick}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {results.reviews.length > 0 && (
+                <div className="flex flex-col">
+                  {renderSectionHeader('Reviews')}
+                  {results.reviews.map((review) => (
+                    <ReviewResultItem
+                      key={review.id}
+                      review={review}
+                      onClick={handleResultClick}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {results.recommendations.length > 0 && (
+                <div className="flex flex-col">
+                  {renderSectionHeader('Recommendations')}
+                  {results.recommendations.map((recommendation) => (
+                    <RecommendationResultItem
+                      key={recommendation.id}
+                      recommendation={recommendation}
+                      onClick={handleResultClick}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {results.users.length > 0 && (
+                <div className="flex flex-col">
+                  {renderSectionHeader('People')}
+                  <div className="flex flex-col">
+                    {results.users.map((user) => (
+                      <UserResultItem
+                        key={user.id}
+                        user={user}
+                        onClick={handleResultClick}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </DialogContent>

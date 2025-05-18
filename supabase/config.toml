@@ -1,12 +1,14 @@
 
 project_id = "uyjtgybbktgapspodajy"
 
-[functions.search-places]
-verify_jwt = false
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
 
-[functions.search-movies]
-verify_jwt = false
+[db]
+port = 54322
 
-# Add CORS headers to allow storage access
-[storage]
-file_size_limit = "5MB"
+[studio]
+enabled = true
+port = 54323
