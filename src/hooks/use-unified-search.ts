@@ -115,9 +115,9 @@ export function useUnifiedSearch(query: string) {
       setError(null);
 
       try {
-        // Fix: Use params object instead of query object for FunctionInvokeOptions
+        // Fix: Use body property instead of params for FunctionInvokeOptions
         const { data, error } = await supabase.functions.invoke('search-all', {
-          params: { query: query, limit: 5 }
+          body: { query: query, limit: 5 }
         });
 
         if (error) {
