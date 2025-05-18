@@ -19,10 +19,14 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     
     // Parse request to get parameters
-    const { query, limit } = await req.json();
-    const searchLimit = limit || 5;
+    const requestData = await req.json();
+    const query = requestData.query;
+    const limit = requestData.limit || 5;
+    
+    console.log(`Search query received: "${query}", limit: ${limit}`);
     
     if (!query || query.trim().length < 2) {
+      console.log("Search query too short, returning empty results");
       return new Response(
         JSON.stringify({ 
           users: [], 
@@ -34,6 +38,8 @@ serve(async (req) => {
       );
     }
 
+    console.log("Starting parallel search across all data types...");
+
     // Perform parallel searches across all data types
     const [usersResponse, entitiesResponse, reviewsResponse, recommendationsResponse] = await Promise.all([
       // Search users
@@ -41,7 +47,7 @@ serve(async (req) => {
         .from('profiles')
         .select('id, username, avatar_url, bio')
         .ilike('username', `%${query}%`)
-        .limit(searchLimit),
+        .limit(limit),
       
       // Search entities
       supabase
@@ -49,7 +55,7 @@ serve(async (req) => {
         .select('id, name, type, venue, image_url, description, slug')
         .or(`name.ilike.%${query}%, venue.ilike.%${query}%, slug.ilike.%${query}%`)
         .eq('is_deleted', false)
-        .limit(searchLimit),
+        .limit(limit),
       
       // Search reviews
       supabase
@@ -67,7 +73,7 @@ serve(async (req) => {
         .or(`title.ilike.%${query}%, description.ilike.%${query}%, subtitle.ilike.%${query}%`)
         .eq('status', 'published')
         .eq('visibility', 'public')
-        .limit(searchLimit),
+        .limit(limit),
       
       // Search recommendations
       supabase
@@ -83,15 +89,33 @@ serve(async (req) => {
         `)
         .or(`title.ilike.%${query}%, description.ilike.%${query}%`)
         .eq('visibility', 'public')
-        .limit(searchLimit),
+        .limit(limit),
     ]);
+
+    // Log search results
+    console.log(`Users search: ${usersResponse.data?.length ?? 0} results`);
+    console.log(`Entities search: ${entitiesResponse.data?.length ?? 0} results`);
+    console.log(`Reviews search: ${reviewsResponse.data?.length ?? 0} results`);
+    console.log(`Recommendations search: ${recommendationsResponse.data?.length ?? 0} results`);
 
     // Handle any errors
     const errors = [];
-    if (usersResponse.error) errors.push(`Users: ${usersResponse.error.message}`);
-    if (entitiesResponse.error) errors.push(`Entities: ${entitiesResponse.error.message}`);
-    if (reviewsResponse.error) errors.push(`Reviews: ${reviewsResponse.error.message}`);
-    if (recommendationsResponse.error) errors.push(`Recommendations: ${recommendationsResponse.error.message}`);
+    if (usersResponse.error) {
+      console.error("Users search error:", usersResponse.error);
+      errors.push(`Users: ${usersResponse.error.message}`);
+    }
+    if (entitiesResponse.error) {
+      console.error("Entities search error:", entitiesResponse.error);
+      errors.push(`Entities: ${entitiesResponse.error.message}`);
+    }
+    if (reviewsResponse.error) {
+      console.error("Reviews search error:", reviewsResponse.error);
+      errors.push(`Reviews: ${reviewsResponse.error.message}`);
+    }
+    if (recommendationsResponse.error) {
+      console.error("Recommendations search error:", recommendationsResponse.error);
+      errors.push(`Recommendations: ${recommendationsResponse.error.message}`);
+    }
     
     if (errors.length > 0) {
       console.error("Search errors:", errors);
@@ -105,6 +129,8 @@ serve(async (req) => {
       recommendations: recommendationsResponse.data || [],
       errors: errors.length > 0 ? errors : null
     };
+
+    console.log("Search completed successfully");
 
     return new Response(
       JSON.stringify(results),

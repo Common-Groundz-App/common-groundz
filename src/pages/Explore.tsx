@@ -19,19 +19,26 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { useSearch } from '@/hooks/use-search';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Link } from 'react-router-dom';
+import { useUnifiedSearch } from '@/hooks/use-unified-search';
+import { UserResultItem } from '@/components/search/UserResultItem';
+import { EntityResultItem } from '@/components/search/EntityResultItem';
+import { ReviewResultItem } from '@/components/search/ReviewResultItem';
+import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 
 const Explore = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
-  const { results, isLoading } = useSearch(searchQuery);
+  const { 
+    results, 
+    isLoading, 
+    error, 
+    hasResults 
+  } = useUnifiedSearch(searchQuery);
   
   const getInitialActiveTab = () => {
-    return 'Explore';  // Changed from 'People' to 'Explore'
+    return 'Explore';
   };
 
   if (!user) {
@@ -45,6 +52,10 @@ const Explore = () => {
       icon: Users
     }
   ];
+
+  const handleResultClick = () => {
+    setSearchQuery('');
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -95,7 +106,7 @@ const Explore = () => {
                 </div>
                 <Input
                   type="text"
-                  placeholder="Search for people..."
+                  placeholder="Search for people, places, food, products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -103,40 +114,88 @@ const Explore = () => {
               </div>
               
               {searchQuery && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-72 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
                   {isLoading && (
                     <div className="p-4 text-center">
                       <p className="text-sm text-muted-foreground">Searching...</p>
                     </div>
                   )}
                   
-                  {!isLoading && results.length === 0 && (
+                  {error && (
                     <div className="p-4 text-center">
-                      <p className="text-sm text-muted-foreground">No users found</p>
+                      <p className="text-sm text-destructive">{error}</p>
                     </div>
                   )}
                   
-                  {!isLoading && results.map(user => (
-                    <Link
-                      key={user.id}
-                      to={`/profile/${user.id}`}
-                      className="flex items-center gap-2 px-4 py-2 hover:bg-muted/30 transition-colors"
-                      onClick={() => setSearchQuery('')}
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.avatar_url || undefined} alt={user.username || 'User'} />
-                        <AvatarFallback>
-                          {user.username?.[0]?.toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{user.username || 'Unknown User'}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {user.bio || 'No bio available'}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
+                  {!isLoading && !error && !hasResults && searchQuery.length >= 2 && (
+                    <div className="p-4 text-center">
+                      <p className="text-sm text-muted-foreground">No results found</p>
+                    </div>
+                  )}
+                  
+                  {!isLoading && !error && (
+                    <>
+                      {results.entities.length > 0 && (
+                        <div className="border-b last:border-b-0">
+                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+                            Places & Things
+                          </div>
+                          {results.entities.map((entity) => (
+                            <EntityResultItem
+                              key={entity.id}
+                              entity={entity}
+                              onClick={handleResultClick}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
+                      {results.users.length > 0 && (
+                        <div className="border-b last:border-b-0">
+                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+                            People
+                          </div>
+                          {results.users.map((user) => (
+                            <UserResultItem
+                              key={user.id}
+                              user={user}
+                              onClick={handleResultClick}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
+                      {results.reviews.length > 0 && (
+                        <div className="border-b last:border-b-0">
+                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+                            Reviews
+                          </div>
+                          {results.reviews.map((review) => (
+                            <ReviewResultItem
+                              key={review.id}
+                              review={review}
+                              onClick={handleResultClick}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
+                      {results.recommendations.length > 0 && (
+                        <div className="border-b last:border-b-0">
+                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+                            Recommendations
+                          </div>
+                          {results.recommendations.map((recommendation) => (
+                            <RecommendationResultItem
+                              key={recommendation.id}
+                              recommendation={recommendation}
+                              onClick={handleResultClick}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
