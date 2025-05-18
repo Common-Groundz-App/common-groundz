@@ -685,7 +685,11 @@ const ReviewForm = ({
               )}
               
               {currentStep === 2 && (
-                <StepTwo category={category} onChange={handleCategoryChange} />
+                <StepTwo 
+                  category={category} 
+                  onChange={handleCategoryChange}
+                  disableCategoryChange={isFromEntityPage} // Pass this prop to disable category change
+                />
               )}
               
               {currentStep === 3 && (
@@ -702,7 +706,7 @@ const ReviewForm = ({
                   onMediaAdd={handleAddMedia}
                   onMediaRemove={handleRemoveMedia}
                   isUploading={isUploading}
-                  disableEntityChange={isFromEntityPage} // Pass the flag to disable entity change when from entity page
+                  disableEntityChange={isFromEntityPage} // This already exists
                 />
               )}
               
