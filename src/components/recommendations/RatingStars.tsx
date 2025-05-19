@@ -22,10 +22,11 @@ const RatingStars = ({
     <ConnectedRingsRating
       value={rating}
       size={size}
+      variant={variant}
       showValue={showValue}
       className={className}
+      isInteractive={false}
       minimal={true}
-      variant={variant}
     />
   );
 };

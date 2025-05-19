@@ -63,7 +63,7 @@ export function useEntitySearch(type: EntityTypeString) {
       const { data: localData, error: localError } = await supabase
         .from('entities')
         .select()
-        .eq('type', type as "movie" | "book" | "food" | "product" | "place") // Cast to allowed type literals
+        .eq('type', type) // String type is compatible with database
         .ilike('name', `%${query}%`)
         .order('name')
         .limit(5);
@@ -173,11 +173,11 @@ export function useEntitySearch(type: EntityTypeString) {
 
   const createEntityFromExternal = useCallback(async (externalData: any) => {
     try {
-      // Create a new entity record from external data
+      // Create a new entity record from external data - use string type as is
       const entityData = {
         id: uuidv4(),
         name: externalData.name,
-        type: type as "movie" | "book" | "food" | "product" | "place", // Cast to allowed type literals
+        type, // Use the string type as is for database compatibility
         venue: externalData.venue,
         description: externalData.description || null,
         image_url: externalData.image_url || null,
@@ -232,10 +232,10 @@ export function useEntitySearch(type: EntityTypeString) {
         throw new Error('Could not fetch metadata from URL');
       }
       
-      // Create entity from the metadata
+      // Create entity from the metadata - use string type
       const entityData = {
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
-        type: type as "movie" | "book" | "food" | "product" | "place", // Cast to allowed type literals
+        type, // Use string type for database compatibility
         venue: data.metadata.site_name || new URL(url).hostname,
         description: data.metadata.description || data.metadata.og_description || null,
         image_url: data.metadata.og_image || data.metadata.image || null,
