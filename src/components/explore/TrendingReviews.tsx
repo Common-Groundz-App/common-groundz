@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Star } from 'lucide-react';
+import { UserAvatar } from '@/components/ui/user-avatar';
 
 export function TrendingReviews() {
   const { data: reviews, isLoading } = useQuery({
@@ -17,7 +18,6 @@ export function TrendingReviews() {
         .from('reviews')
         .select(`
           *,
-          profiles:user_id(username, avatar_url),
           entities(name, slug, venue, type)
         `)
         .eq('status', 'published')
@@ -26,6 +26,28 @@ export function TrendingReviews() {
         .limit(6);
       
       if (error) throw error;
+
+      // Fetch user profiles separately
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(review => review.user_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', userIds);
+
+        // Create a map of profiles
+        const profilesMap = (profilesData || []).reduce((acc, profile) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {} as Record<string, any>);
+
+        // Merge profiles with reviews
+        return data.map(review => ({
+          ...review,
+          profiles: profilesMap[review.user_id] || null
+        }));
+      }
+      
       return data || [];
     },
   });
@@ -92,12 +114,11 @@ export function TrendingReviews() {
                   </CardContent>
                   <CardFooter className="p-4 pt-0">
                     <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={review.profiles?.avatar_url || undefined} />
-                        <AvatarFallback>
-                          {review.profiles?.username?.[0]?.toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar 
+                        username={review.profiles?.username || 'Anonymous'} 
+                        imageUrl={review.profiles?.avatar_url} 
+                        className="h-6 w-6"
+                      />
                       <span className="text-xs text-muted-foreground">
                         {review.profiles?.username || 'Anonymous'}
                       </span>

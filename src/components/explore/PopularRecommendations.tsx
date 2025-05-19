@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { ConnectedRingsRating } from '@/components/recommendations/ConnectedRingsRating';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 export function PopularRecommendations() {
   const { data: recommendations, isLoading } = useQuery({

@@ -5,9 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EntityType } from '@/services/recommendation/types';
 
 interface CategoryHighlightsProps {
-  category: string;
+  category: EntityType | string;
   limit?: number;
 }
 

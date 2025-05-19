@@ -9,7 +9,7 @@ import { EntityType } from '@/services/recommendation/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface FeaturedEntitiesProps {
-  type: string;
+  type: EntityType | string;
   limit?: number;
   title?: string;
 }
