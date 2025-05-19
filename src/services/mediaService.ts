@@ -1,7 +1,7 @@
-
 import { generateUUID } from '@/lib/uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';
+import { isAbsoluteUrl, shouldDownloadImage, generateEntityImagePath } from '@/utils/imageUtils';
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm'];
@@ -128,4 +128,115 @@ export const cleanupUnusedMedia = async (userId: string, sessionId: string): Pro
   } catch (error) {
     console.error('Error cleaning up unused media:', error);
   }
+};
+
+/**
+ * Download an image from a URL and store it in Supabase Storage
+ * 
+ * @param imageUrl The URL of the image to download
+ * @param entityId The ID of the entity this image belongs to
+ * @param apiSource The source API for the entity (e.g., 'google_places', 'omdb')
+ * @returns The public URL of the stored image or null if download failed
+ */
+export const downloadAndStoreEntityImage = async (
+  imageUrl: string,
+  entityId: string,
+  apiSource: string | null
+): Promise<string | null> => {
+  try {
+    // Validate URL
+    if (!isAbsoluteUrl(imageUrl)) {
+      console.error('Invalid image URL:', imageUrl);
+      return null;
+    }
+
+    console.log(`Downloading entity image from ${apiSource || 'unknown source'}:`, imageUrl);
+    
+    // Fetch the image
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      console.error(`Failed to download image (${response.status}):`, imageUrl);
+      return null;
+    }
+    
+    // Get the image as blob
+    const imageBlob = await response.blob();
+    
+    // Convert to file with a proper name
+    const file = new File(
+      [imageBlob], 
+      `entity_${entityId}_${Date.now()}.jpg`, 
+      { type: imageBlob.type || 'image/jpeg' }
+    );
+    
+    // Generate a path for this entity image
+    const filePath = generateEntityImagePath(entityId, apiSource);
+    
+    // Upload to storage
+    const { error: uploadError, data } = await supabase.storage
+      .from('entity_images')
+      .upload(filePath, file, {
+        cacheControl: '31536000', // Cache for 1 year
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Error uploading downloaded entity image:', uploadError);
+      return null;
+    }
+    
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('entity_images')
+      .getPublicUrl(filePath);
+      
+    console.log('Successfully stored entity image:', publicUrl);
+    return publicUrl;
+    
+  } catch (error) {
+    console.error('Error in downloadAndStoreEntityImage:', error);
+    return null;
+  }
+};
+
+/**
+ * Batch process multiple entity images, downloading and storing them
+ * For use in migration scripts or bulk operations
+ */
+export const batchProcessEntityImages = async (
+  entities: Array<{ id: string; image_url: string | null; api_source: string | null; }>
+): Promise<Record<string, string | null>> => {
+  const results: Record<string, string | null> = {};
+  
+  // Process in batches to avoid overwhelming services
+  const batchSize = 5;
+  for (let i = 0; i < entities.length; i += batchSize) {
+    const batch = entities.slice(i, i + batchSize);
+    
+    // Process this batch in parallel
+    const batchPromises = batch.map(async entity => {
+      if (!entity.image_url || !shouldDownloadImage(entity.image_url, entity.api_source)) {
+        results[entity.id] = entity.image_url; // Keep existing URL if not needing download
+        return;
+      }
+      
+      const storedUrl = await downloadAndStoreEntityImage(
+        entity.image_url,
+        entity.id,
+        entity.api_source
+      );
+      
+      results[entity.id] = storedUrl || entity.image_url; // Fall back to original if download fails
+    });
+    
+    // Wait for this batch to complete before moving to next
+    await Promise.all(batchPromises);
+    
+    // Small delay between batches to avoid rate limiting
+    if (i + batchSize < entities.length) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  
+  return results;
 };

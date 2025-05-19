@@ -1,8 +1,9 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
 import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
+import { shouldDownloadImage } from '@/utils/imageUtils';
+import { downloadAndStoreEntityImage } from '@/services/mediaService';
 
 // Fetch an entity by its ID
 export const fetchEntityById = async (entityId: string): Promise<Entity | null> => {
@@ -68,10 +69,19 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
         return false;
       }
 
-      // Update the entity with the new image URL
+      // Download and store the refreshed image
+      const storedImageUrl = await downloadAndStoreEntityImage(
+        data.imageUrl,
+        entityId,
+        entity.api_source
+      );
+      
+      // Update the entity with the new image URL (stored or original if failed)
+      const finalImageUrl = storedImageUrl || data.imageUrl;
+      
       const { error: updateError } = await supabase
         .from('entities')
-        .update({ image_url: data.imageUrl })
+        .update({ image_url: finalImageUrl })
         .eq('id', entityId);
 
       if (updateError) {
@@ -171,10 +181,10 @@ export const findOrCreateEntity = async (
   const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
 
   // Ensure we have a valid image URL or use fallback based on type
-  const finalImageUrl = imageUrl || getEntityTypeFallbackImage(typeAsString);
+  let finalImageUrl = imageUrl || getEntityTypeFallbackImage(typeAsString);
 
   // Create a new entity if not found or if we don't have API reference info
-  return createEntity({
+  const newEntity = await createEntity({
     name,
     type: typeAsString as any, // Cast to any to bypass type checking
     venue,
@@ -185,6 +195,35 @@ export const findOrCreateEntity = async (
     metadata,
     website_url: websiteUrl
   });
+  
+  // If entity was created successfully and the image URL is from an external API
+  // that might expire, download and store it for longevity
+  if (newEntity && shouldDownloadImage(finalImageUrl, apiSource)) {
+    console.log(`Downloading and storing image for new entity: ${newEntity.id}`);
+    
+    const storedImageUrl = await downloadAndStoreEntityImage(
+      finalImageUrl,
+      newEntity.id,
+      apiSource
+    );
+    
+    // If we successfully downloaded and stored the image, update the entity
+    if (storedImageUrl) {
+      const { error: updateError } = await supabase
+        .from('entities')
+        .update({ image_url: storedImageUrl })
+        .eq('id', newEntity.id);
+        
+      if (updateError) {
+        console.error('Error updating entity with stored image URL:', updateError);
+      } else {
+        // Update the local entity object with new image URL
+        newEntity.image_url = storedImageUrl;
+      }
+    }
+  }
+
+  return newEntity;
 };
 
 // Get entities by type (for searching/filtering)

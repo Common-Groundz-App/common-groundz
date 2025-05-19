@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ensureHttps, getEntityTypeFallbackImage } from '@/utils/urlUtils';
+import { isGooglePlacesUrl } from '@/utils/imageUtils';
 
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackSrc?: string;
@@ -49,14 +50,17 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   }, [src, actualFallback, entityType]);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    // For Google Places URLs, which can be problematic, try one retry
-    const isGooglePlacesUrl = imgSrc && imgSrc.includes('maps.googleapis.com');
+    // Check if the URL is from Google Places (which can expire)
+    const isGoogleImage = imgSrc && isGooglePlacesUrl(imgSrc);
     
-    if (!hasError && retryCount < maxRetries && imgSrc && !imgSrc.startsWith('data:')) {
+    // For Supabase Storage URLs, we don't need retries as they're permanent
+    const isSupabaseStorageUrl = imgSrc && imgSrc.includes('supabase.co/storage/v1/object/public/');
+    
+    if (!hasError && retryCount < maxRetries && imgSrc && !imgSrc.startsWith('data:') && !isSupabaseStorageUrl) {
       // Try once more (network issues)
       setRetryCount(prev => prev + 1);
       
-      if (isGooglePlacesUrl) {
+      if (isGoogleImage) {
         console.log("Google Places image failed to load, trying with cache buster:", imgSrc);
         // For Google Places URLs, add a cache buster
         setTimeout(() => {
