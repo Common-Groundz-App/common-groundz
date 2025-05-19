@@ -260,7 +260,7 @@ const Explore = () => {
                 <TabsContent value="entertainment">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <FeaturedEntities type="movie" title="Movies" />
-                    <FeaturedEntities type="tv" title="TV Shows" />
+                    <FeaturedEntities type={"tv" as EntityTypeString} title="TV Shows" />
                   </div>
                 </TabsContent>
               </TubelightTabs>

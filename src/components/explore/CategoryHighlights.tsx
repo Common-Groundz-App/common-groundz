@@ -24,6 +24,9 @@ export function CategoryHighlights({ category, limit = 6 }: CategoryHighlightsPr
         field = 'name'; // Fallback for products which might not have venue
       }
       
+      // Convert the category to string for the query
+      const categoryString = typeof category === 'string' ? category : category.toString();
+      
       const { data, error } = await supabase
         .from('entities')
         .select(`
@@ -32,7 +35,7 @@ export function CategoryHighlights({ category, limit = 6 }: CategoryHighlightsPr
           id,
           slug
         `)
-        .eq('type', category as string)
+        .eq('type', categoryString)
         .eq('is_deleted', false)
         .not('image_url', 'is', null)
         .order('popularity_score', { ascending: false })

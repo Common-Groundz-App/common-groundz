@@ -19,10 +19,13 @@ export function FeaturedEntities({ type, limit = 5, title }: FeaturedEntitiesPro
   const { data: entities, isLoading } = useQuery({
     queryKey: ['featured-entities', type],
     queryFn: async () => {
+      // Convert the type to string for the query
+      const typeString = typeof type === 'string' ? type : type.toString();
+      
       const { data, error } = await supabase
         .from('entities')
         .select('*')
-        .eq('type', type as string)
+        .eq('type', typeString)
         .eq('is_deleted', false)
         .order('popularity_score', { ascending: false })
         .limit(limit);

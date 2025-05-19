@@ -6,7 +6,7 @@ export * from '../types';
 import { EntityType } from '@/services/recommendation/types';
 
 // Add string literal compatibility types for existing components
-export type EntityTypeString = 'movie' | 'book' | 'food' | 'product' | 'place';
+export type EntityTypeString = 'movie' | 'book' | 'food' | 'product' | 'place' | 'tv' | 'activity';
 
 // Mapping functions to convert between string literals and enum values
 export function mapStringToEntityType(stringType: EntityTypeString): EntityType {
@@ -16,6 +16,8 @@ export function mapStringToEntityType(stringType: EntityTypeString): EntityType 
     case 'food': return EntityType.Food;
     case 'product': return EntityType.Product;
     case 'place': return EntityType.Place;
+    case 'tv': return EntityType.TV;
+    case 'activity': return EntityType.Activity;
     default: return EntityType.Place;
   }
 }
@@ -27,6 +29,8 @@ export function mapEntityTypeToString(enumType: EntityType): EntityTypeString {
     case EntityType.Food: return 'food';
     case EntityType.Product: return 'product';
     case EntityType.Place: return 'place';
+    case EntityType.TV: return 'tv';
+    case EntityType.Activity: return 'activity';
     default: return 'place';
   }
 }
