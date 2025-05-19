@@ -6,9 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EntityType } from '@/services/recommendation/types';
+import { EntityTypeString } from '@/hooks/feed/api/types';
 
 interface CategoryHighlightsProps {
-  category: EntityType | string;
+  category: EntityType | EntityTypeString;
   limit?: number;
 }
 
@@ -31,7 +32,7 @@ export function CategoryHighlights({ category, limit = 6 }: CategoryHighlightsPr
           id,
           slug
         `)
-        .eq('type', category as EntityType)
+        .eq('type', category as string)
         .eq('is_deleted', false)
         .not('image_url', 'is', null)
         .order('popularity_score', { ascending: false })

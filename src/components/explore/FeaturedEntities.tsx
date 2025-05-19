@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Link } from 'react-router-dom';
 import { EntityType } from '@/services/recommendation/types';
+import { EntityTypeString } from '@/hooks/feed/api/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface FeaturedEntitiesProps {
-  type: EntityType | string;
+  type: EntityType | EntityTypeString;
   limit?: number;
   title?: string;
 }
@@ -21,7 +22,7 @@ export function FeaturedEntities({ type, limit = 5, title }: FeaturedEntitiesPro
       const { data, error } = await supabase
         .from('entities')
         .select('*')
-        .eq('type', type as EntityType)
+        .eq('type', type as string)
         .eq('is_deleted', false)
         .order('popularity_score', { ascending: false })
         .limit(limit);
