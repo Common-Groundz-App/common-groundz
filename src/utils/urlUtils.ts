@@ -18,13 +18,6 @@ export const ensureHttps = (url: string): string => {
     return url;
   }
   
-  // Handle google API URLs with photo references directly
-  // We now replace these with type-specific fallbacks in the edge function
-  if (url.includes('maps.googleapis.com/maps/api/place/photo')) {
-    console.log("ensureHttps: Detected Google Maps photo API URL, this should not happen anymore", url);
-    return ''; // Empty string will trigger fallback image
-  }
-  
   // If it's already HTTPS, return as is
   if (url.startsWith('https://')) {
     return url;
@@ -33,14 +26,12 @@ export const ensureHttps = (url: string): string => {
   // If it's an HTTP URL, convert to HTTPS
   if (url.startsWith('http://')) {
     const httpsUrl = `https://${url.slice(7)}`;
-    console.log("ensureHttps: Converting HTTP to HTTPS", { from: url, to: httpsUrl });
     return httpsUrl;
   }
   
   // If there's no protocol, assume HTTPS
   if (!url.includes('://')) {
     const httpsUrl = `https://${url}`;
-    console.log("ensureHttps: Adding HTTPS protocol", { from: url, to: httpsUrl });
     return httpsUrl;
   }
   
