@@ -83,6 +83,19 @@ const EntityDetail = () => {
     return fallbacks[type] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
   };
 
+  // Helper function to get the proper location display
+  const getLocationDisplay = () => {
+    if (!entity) return null;
+    
+    // If this entity is from Google Places API and has formatted address in metadata
+    if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
+      return entity.metadata.formatted_address;
+    }
+    
+    // Otherwise, fall back to venue field
+    return entity.venue;
+  };
+
   const handleAddRecommendation = () => {
     if (!user) {
       toast({
@@ -207,10 +220,10 @@ const EntityDetail = () => {
                         </Badge>
                       )}
                     </div>
-                    {entity?.venue && (
+                    {getLocationDisplay() && (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <MapPin className="h-4 w-4" />
-                        <span>{entity.venue}</span>
+                        <span>{getLocationDisplay()}</span>
                       </div>
                     )}
                     
@@ -474,10 +487,10 @@ const EntityDetail = () => {
                       <div className="text-muted-foreground">{entity.type}</div>
                     </div>
                     
-                    {entity.venue && (
+                    {getLocationDisplay() && (
                       <div className="text-sm">
                         <div className="font-medium">Location</div>
-                        <div className="text-muted-foreground">{entity.venue}</div>
+                        <div className="text-muted-foreground">{getLocationDisplay()}</div>
                       </div>
                     )}
                     
