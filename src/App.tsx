@@ -12,6 +12,7 @@ import NotFound from './pages/NotFound';
 import PostView from './pages/PostView';
 import RecommendationView from './pages/RecommendationView';
 import EntityDetail from './pages/EntityDetail';
+import Admin from './pages/Admin'; // Add this import
 import './App.css';
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from './components/ui/tooltip';
@@ -97,6 +98,15 @@ function App() {
                 path="/entity/:slug" 
                 element={
                   <EntityDetail />
+                } 
+              />
+              {/* New admin route with protection */}
+              <Route 
+                path="/admin" 
+                element={
+                  <ProtectedRoute>
+                    <Admin />
+                  </ProtectedRoute>
                 } 
               />
               {/* Redirect old edit routes to profile */}
