@@ -10,6 +10,7 @@ import { useLocation } from '@/contexts/LocationContext';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { EntityAdapter } from '@/components/profile/circles/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface SimpleEntitySelectorProps {
   onEntitiesChange: (entities: EntityAdapter[]) => void;
@@ -34,6 +35,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     permissionStatus,
     formatDistance
   } = useLocation();
+  const { toast } = useToast();
 
   // Handle click outside to close results dropdown
   useEffect(() => {

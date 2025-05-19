@@ -11,6 +11,7 @@ import { useLocation } from '@/contexts/LocationContext';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { EntityAdapter } from '@/components/profile/circles/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface EntitySearchProps {
   type: EntityTypeString;
@@ -24,6 +25,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   const [showResults, setShowResults] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
   
   const {
     localResults,
