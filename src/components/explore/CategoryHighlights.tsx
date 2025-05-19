@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import ImageWithFallback from '@/components/common/ImageWithFallback';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 
@@ -118,7 +117,7 @@ export const CategoryHighlights = ({ type, limit = 3 }: CategoryHighlightsProps)
                   </p>
                 )}
                 <div className="mt-2 flex items-center">
-                  <ConnectedRingsRating rating={item.rating} size="sm" />
+                  <ConnectedRingsRating value={item.rating} size="sm" />
                   <Badge variant="outline" className="ml-2 text-xs font-normal">
                     {item.category}
                   </Badge>

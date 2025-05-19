@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
@@ -9,7 +8,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users, Search, Book, Movie, Place, Food, Product } from 'lucide-react';
+import { Filter, Users, Search, Book, Move, Plane, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -63,17 +62,17 @@ const Explore = () => {
     {
       value: "places",
       label: "Places",
-      icon: Place
+      icon: Plane
     },
     {
       value: "food",
       label: "Food",
-      icon: Food
+      icon: FileText
     },
     {
       value: "movies",
       label: "Movies",
-      icon: Movie
+      icon: Move
     },
     {
       value: "books",
@@ -83,7 +82,7 @@ const Explore = () => {
     {
       value: "products",
       label: "Products",
-      icon: Product
+      icon: FileText
     }
   ];
 
