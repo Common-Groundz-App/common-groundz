@@ -35,6 +35,7 @@ export const FeaturedEntities = () => {
           .limit(3);
         
         if (error) throw error;
+        console.log(`FeaturedEntities: Fetched ${data?.length || 0} featured entities`);
         setEntities(data || []);
       } catch (error) {
         console.error('Error fetching featured entities:', error);
@@ -89,6 +90,7 @@ export const FeaturedEntities = () => {
                 alt={entity.name}
                 className="h-full w-full object-cover"
                 fallbackSrc="/placeholder.svg"
+                entityType={entity.type}
               />
               <Badge className="absolute top-2 right-2 bg-background/80 text-foreground backdrop-blur-sm">
                 {entity.type.charAt(0).toUpperCase() + entity.type.slice(1)}

@@ -48,6 +48,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
         const { data, error } = await query;
         
         if (error) throw error;
+        console.log(`CategoryHighlights: Fetched ${data?.length || 0} entities for type: ${entityType || 'all'}`);
         setEntities(data || []);
       } catch (error) {
         console.error('Error fetching entities:', error);
@@ -117,6 +118,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                   alt={entity.name}
                   className="h-full w-full object-cover"
                   fallbackSrc="/placeholder.svg"
+                  entityType={entity.type}
                 />
               </div>
               <div className="p-3">
@@ -168,6 +170,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                     alt={entity.name}
                     className="h-full w-full object-cover"
                     fallbackSrc="/placeholder.svg"
+                    entityType={entity.type}
                   />
                 </div>
                 <div className="p-3">
