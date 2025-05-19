@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
@@ -28,6 +27,7 @@ import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
 import { TrendingReviews } from '@/components/explore/TrendingReviews';
 import { PopularRecommendations } from '@/components/explore/PopularRecommendations';
 import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
+import { EntityTypeString } from '@/hooks/feed/api/types';
 
 const Explore = () => {
   const { user } = useAuth();

@@ -190,7 +190,7 @@ export function useEntitySearch(type: EntityTypeString) {
       // Insert the entity into our database
       const { data, error } = await supabase
         .from('entities')
-        .insert({
+        .insert([{ // Use array format to ensure correct typing
           name: entityData.name,
           type: entityData.type,
           venue: entityData.venue,
@@ -199,7 +199,7 @@ export function useEntitySearch(type: EntityTypeString) {
           api_source: entityData.api_source,
           api_ref: entityData.api_ref,
           metadata: entityData.metadata
-        })
+        }])
         .select()
         .single();
       
@@ -235,7 +235,6 @@ export function useEntitySearch(type: EntityTypeString) {
       // Create entity from the metadata - use string type
       const entityData = {
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
-        type, // Use string type for database compatibility
         venue: data.metadata.site_name || new URL(url).hostname,
         description: data.metadata.description || data.metadata.og_description || null,
         image_url: data.metadata.og_image || data.metadata.image || null,
@@ -244,10 +243,19 @@ export function useEntitySearch(type: EntityTypeString) {
         metadata: data.metadata
       };
       
-      // Insert the entity into our database
+      // Insert the entity into our database - use array format to ensure correct typing
       const { data: insertData, error: insertError } = await supabase
         .from('entities')
-        .insert(entityData)
+        .insert([{
+          name: entityData.name,
+          type,
+          venue: entityData.venue,
+          description: entityData.description,
+          image_url: entityData.image_url,
+          api_source: entityData.api_source,
+          api_ref: entityData.api_ref,
+          metadata: entityData.metadata
+        }])
         .select()
         .single();
       

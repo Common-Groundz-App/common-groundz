@@ -25,7 +25,7 @@ export function CategoryHighlights({ category, limit = 6 }: CategoryHighlightsPr
       }
       
       // Convert the category to string for the query
-      const categoryString = typeof category === 'string' ? category : category.toString();
+      const categoryString = typeof category === 'string' ? category : String(category);
       
       const { data, error } = await supabase
         .from('entities')

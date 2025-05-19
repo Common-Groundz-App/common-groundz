@@ -20,7 +20,7 @@ export function FeaturedEntities({ type, limit = 5, title }: FeaturedEntitiesPro
     queryKey: ['featured-entities', type],
     queryFn: async () => {
       // Convert the type to string for the query
-      const typeString = typeof type === 'string' ? type : type.toString();
+      const typeString = typeof type === 'string' ? type : String(type);
       
       const { data, error } = await supabase
         .from('entities')
