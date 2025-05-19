@@ -9,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users, Search } from 'lucide-react';
+import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,6 +24,8 @@ import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
+import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
+import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
 
 const Explore = () => {
   const { user } = useAuth();
@@ -46,6 +48,36 @@ const Explore = () => {
   }
 
   const tabItems = [
+    {
+      value: "featured",
+      label: "Featured",
+      icon: MapPin
+    },
+    {
+      value: "places",
+      label: "Places",
+      icon: MapPin
+    },
+    {
+      value: "movies",
+      label: "Movies",
+      icon: Film
+    },
+    {
+      value: "books",
+      label: "Books",
+      icon: Book
+    },
+    {
+      value: "food",
+      label: "Food",
+      icon: ShoppingBag
+    },
+    {
+      value: "products",
+      label: "Products",
+      icon: ShoppingBag
+    },
     {
       value: "people",
       label: "People",
@@ -200,7 +232,28 @@ const Explore = () => {
               )}
             </div>
             
-            <TubelightTabs defaultValue="people" items={tabItems}>
+            <TubelightTabs defaultValue="featured" items={tabItems}>
+              <TabsContent value="featured">
+                <div className="space-y-8">
+                  <FeaturedEntities />
+                  <CategoryHighlights />
+                </div>
+              </TabsContent>
+              <TabsContent value="places">
+                <CategoryHighlights entityType="place" />
+              </TabsContent>
+              <TabsContent value="movies">
+                <CategoryHighlights entityType="movie" />
+              </TabsContent>
+              <TabsContent value="books">
+                <CategoryHighlights entityType="book" />
+              </TabsContent>
+              <TabsContent value="food">
+                <CategoryHighlights entityType="food" />
+              </TabsContent>
+              <TabsContent value="products">
+                <CategoryHighlights entityType="product" />
+              </TabsContent>
               <TabsContent value="people">
                 <UserDirectoryList sortOption={sortOption} />
               </TabsContent>
