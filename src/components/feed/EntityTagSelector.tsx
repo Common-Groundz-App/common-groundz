@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { EntitySearch } from '@/components/recommendations/EntitySearch';
 import { Entity } from '@/services/recommendation/types';
@@ -18,7 +17,7 @@ export function EntityTagSelector({ onEntitiesChange, initialEntities = [] }: En
   const [activeTab, setActiveTab] = useState<EntityTypeString>('place');
   
   const handleEntitySelect = (entity: Entity) => {
-    // Check if entity is already selected
+    // Check if entity is already selected based on ID (not just reference)
     if (!selectedEntities.some(e => e.id === entity.id)) {
       const newEntities = [...selectedEntities, entity];
       setSelectedEntities(newEntities);

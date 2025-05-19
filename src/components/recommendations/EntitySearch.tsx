@@ -119,12 +119,30 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     setShowResults(false);
   };
 
+  // Handle selecting an external result with better error handling
   const handleSelectExternal = async (result: any) => {
-    const entity = await createEntityFromExternal(result);
-    if (entity) {
-      onSelect(entity as EntityAdapter);
-      setSearchQuery('');
-      setShowResults(false);
+    try {
+      const entity = await createEntityFromExternal(result);
+      if (entity) {
+        onSelect(entity as EntityAdapter);
+        setSearchQuery('');
+        setShowResults(false);
+      } else {
+        // Handle the case where entity creation failed
+        console.error('Failed to create or retrieve entity');
+        toast({
+          title: 'Error',
+          description: 'Could not select this item. Please try again.',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('Error selecting external result:', error);
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive'
+      });
     }
   };
 

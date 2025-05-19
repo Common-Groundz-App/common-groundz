@@ -109,12 +109,24 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     }
   };
 
-  // Handle external result selection
+  // Handle external result selection with improved error handling
   const handleExternalResultSelect = async (result: any) => {
-    // Create an entity from the external result
-    const entity = await createEntityFromExternal(result);
-    if (entity) {
-      handleEntitySelect(entity as EntityAdapter);
+    try {
+      // Create an entity from the external result (or find existing)
+      const entity = await createEntityFromExternal(result);
+      if (entity) {
+        handleEntitySelect(entity as EntityAdapter);
+      } else {
+        console.error('Failed to create or retrieve entity');
+      }
+    } catch (error) {
+      console.error('Error selecting external result:', error);
+      // Show toast error message
+      toast({
+        title: 'Error',
+        description: 'Could not select this item. Please try again.',
+        variant: 'destructive'
+      });
     }
   };
   

@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -6,6 +5,7 @@ import { useToast } from './use-toast';
 import type { Entity as ServiceEntity } from '@/services/recommendation/types';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
 import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
+import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 
 // Define a simplified entity structure for the component's internal use
 interface Entity {
@@ -174,25 +174,34 @@ export function useEntitySearch(type: EntityTypeString) {
 
   const createEntityFromExternal = useCallback(async (externalData: any) => {
     try {
-      // Ensure the image_url is valid or use a fallback based on entity type
+      // Check if an entity with the same api_source and api_ref already exists
+      if (externalData.api_source && externalData.api_ref) {
+        const existingEntity = await findEntityByApiRef(externalData.api_source, externalData.api_ref);
+        
+        if (existingEntity) {
+          console.log(`Found existing entity: ${existingEntity.id} (${existingEntity.name})`);
+          // Return the existing entity instead of trying to create a new one
+          return existingEntity;
+        }
+      }
+
+      // Continue with creating a new entity if no existing one was found
       const imageUrl = externalData.image_url || getEntityTypeFallbackImage(type);
       console.log(`Creating entity with image: ${imageUrl} for type: ${type}`);
       
-      // Create a new entity record from external data - use string type as is
       const entityData = {
         id: uuidv4(),
         name: externalData.name,
-        type, // Use the string type as is for database compatibility
+        type,
         venue: externalData.venue,
         description: externalData.description || null,
-        image_url: imageUrl, // Use our processed image URL
+        image_url: imageUrl,
         api_source: externalData.api_source,
         api_ref: externalData.api_ref,
         metadata: externalData.metadata,
         is_deleted: false
       };
       
-      // Insert the entity into our database
       const { data, error } = await supabase
         .from('entities')
         .insert({
@@ -209,6 +218,7 @@ export function useEntitySearch(type: EntityTypeString) {
         .single();
       
       if (error) {
+        console.error('Error inserting entity:', error);
         throw error;
       }
       
@@ -243,7 +253,7 @@ export function useEntitySearch(type: EntityTypeString) {
       // Create entity from the metadata - use string type
       const entityData = {
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
-        type, // Use string type for database compatibility
+        type,
         venue: data.metadata.site_name || new URL(url).hostname,
         description: data.metadata.description || data.metadata.og_description || null,
         image_url: imageUrl,
