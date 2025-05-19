@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
@@ -260,7 +261,7 @@ const Explore = () => {
                 <TabsContent value="entertainment">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <FeaturedEntities type="movie" title="Movies" />
-                    <FeaturedEntities type={"tv" as EntityTypeString} title="TV Shows" />
+                    <FeaturedEntities type="tv" title="TV Shows" />
                   </div>
                 </TabsContent>
               </TubelightTabs>
