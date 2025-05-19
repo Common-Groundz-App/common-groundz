@@ -9,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users, Search } from 'lucide-react';
+import { Filter, Users, Search, Book, Movie, Place, Food, Product } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,12 +24,16 @@ import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
+import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
+import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
+import { EntityTypeString } from '@/hooks/feed/api/types';
 
 const Explore = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('explore');
   const { 
     results, 
     isLoading, 
@@ -45,16 +49,57 @@ const Explore = () => {
     return <div>Loading...</div>;
   }
 
-  const tabItems = [
+  const exploreTabItems = [
+    {
+      value: "explore",
+      label: "Explore",
+      icon: Search
+    },
     {
       value: "people",
       label: "People",
       icon: Users
+    },
+    {
+      value: "places",
+      label: "Places",
+      icon: Place
+    },
+    {
+      value: "food",
+      label: "Food",
+      icon: Food
+    },
+    {
+      value: "movies",
+      label: "Movies",
+      icon: Movie
+    },
+    {
+      value: "books",
+      label: "Books",
+      icon: Book
+    },
+    {
+      value: "products",
+      label: "Products",
+      icon: Product
     }
   ];
 
   const handleResultClick = () => {
     setSearchQuery('');
+  };
+
+  const getEntityTypeForTab = (tab: string): EntityTypeString => {
+    switch (tab) {
+      case 'places': return 'place';
+      case 'food': return 'food';
+      case 'movies': return 'movie';
+      case 'books': return 'book';
+      case 'products': return 'product';
+      default: return 'place';
+    }
   };
 
   return (
@@ -200,10 +245,57 @@ const Explore = () => {
               )}
             </div>
             
-            <TubelightTabs defaultValue="people" items={tabItems}>
+            <TubelightTabs 
+              defaultValue={activeTab} 
+              items={exploreTabItems}
+              onValueChange={(value) => setActiveTab(value)}
+            >
+              <TabsContent value="explore">
+                <div className="space-y-8">
+                  <FeaturedEntities 
+                    type="place"
+                    title="Popular Places"
+                    limit={5}
+                  />
+                  
+                  <CategoryHighlights 
+                    type="food"
+                    limit={3}
+                  />
+                  
+                  <FeaturedEntities
+                    type="movie"
+                    title="Popular Movies"
+                    limit={5}
+                  />
+                  
+                  <CategoryHighlights
+                    type="book"
+                    limit={3}
+                  />
+                </div>
+              </TabsContent>
+              
               <TabsContent value="people">
                 <UserDirectoryList sortOption={sortOption} />
               </TabsContent>
+              
+              {['places', 'food', 'movies', 'books', 'products'].map((tab) => (
+                <TabsContent key={tab} value={tab}>
+                  <div className="space-y-8">
+                    <FeaturedEntities 
+                      type={getEntityTypeForTab(tab)}
+                      title={`Popular ${tab.charAt(0).toUpperCase() + tab.slice(1)}`}
+                      limit={5}
+                    />
+                    
+                    <CategoryHighlights 
+                      type={getEntityTypeForTab(tab)}
+                      limit={3}
+                    />
+                  </div>
+                </TabsContent>
+              ))}
             </TubelightTabs>
           </div>
         </div>
