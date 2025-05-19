@@ -18,6 +18,12 @@ export const ensureHttps = (url: string): string => {
     return url;
   }
   
+  // Handle Google Maps photo URLs properly
+  // These are valid and should be processed normally, not rejected
+  if (url.includes('maps.googleapis.com/maps/api/place/photo')) {
+    return url; // Keep Google Maps photo URLs as they are
+  }
+  
   // If it's already HTTPS, return as is
   if (url.startsWith('https://')) {
     return url;

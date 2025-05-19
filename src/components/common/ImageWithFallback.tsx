@@ -23,11 +23,14 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 1; // One retry attempt for transient failures
 
   useEffect(() => {
     // Reset error state when src changes
     if (src) {
       setHasError(false);
+      setRetryCount(0);
       const secureUrl = ensureHttps(src);
       
       if (!secureUrl) {
@@ -46,12 +49,35 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   }, [src, actualFallback, entityType]);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.log("Image load error, using fallback for type:", entityType);
-    setImgSrc(actualFallback);
-    setHasError(true);
+    // For Google Places URLs, which can be problematic, try one retry
+    const isGooglePlacesUrl = imgSrc && imgSrc.includes('maps.googleapis.com');
     
-    if (onError) {
-      onError(e);
+    if (!hasError && retryCount < maxRetries && imgSrc && !imgSrc.startsWith('data:')) {
+      // Try once more (network issues)
+      setRetryCount(prev => prev + 1);
+      
+      if (isGooglePlacesUrl) {
+        console.log("Google Places image failed to load, trying with cache buster:", imgSrc);
+        // For Google Places URLs, add a cache buster
+        setTimeout(() => {
+          const cacheBuster = `cb=${Date.now()}`;
+          setImgSrc(`${imgSrc}${imgSrc?.includes('?') ? '&' : '?'}${cacheBuster}`);
+        }, 500);
+      } else {
+        // For other URLs, just retry once after a short delay
+        setTimeout(() => {
+          console.log(`Retrying image load (${retryCount + 1}/${maxRetries}):`, imgSrc);
+          setImgSrc(`${imgSrc}`);
+        }, 500);
+      }
+    } else {
+      console.log("Image load error, using fallback for type:", entityType);
+      setImgSrc(actualFallback);
+      setHasError(true);
+      
+      if (onError) {
+        onError(e);
+      }
     }
   };
 

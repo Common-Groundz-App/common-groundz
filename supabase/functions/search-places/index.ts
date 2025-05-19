@@ -36,21 +36,19 @@ function getTypeFallbackImage(category: string): string {
   }
 }
 
+// Build a Google Places photo URL from photo reference
+function buildGooglePhotoUrl(photoReference: string, apiKey: string): string {
+  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${photoReference}&key=${apiKey}`;
+}
+
 // Determine the best image to use for a place
-function determineImageUrl(place: any, category: string): string {
-  // If the place has photos, use the photo URL directly
+function determineImageUrl(place: any, category: string, apiKey: string): string {
+  // If the place has photos, use the Google Photos API
   if (place.photos && place.photos.length > 0) {
     const photoRef = place.photos[0].photo_reference;
     if (photoRef) {
-      // Return a direct Unsplash URL based on the business type instead of using Google Photos API
-      if (place.types && place.types.length > 0) {
-        // Check if any of the place types match food establishments
-        const isFood = place.types.some((type: string) => FOOD_PLACE_TYPES.includes(type));
-        if (isFood) {
-          return getTypeFallbackImage('food');
-        }
-      }
-      return getTypeFallbackImage(category || 'place');
+      // Use the photo reference to get the image from Google Places API
+      return buildGooglePhotoUrl(photoRef, apiKey);
     }
   }
 
@@ -146,8 +144,8 @@ serve(async (req) => {
       console.log(`Processing place: ${place.name}, Address: ${place.formatted_address}`);
       
       // Get the appropriate image URL using our helper function
-      const imageUrl = determineImageUrl(place, category);
-      console.log(`Determined image URL for ${place.name}:`, imageUrl);
+      const imageUrl = determineImageUrl(place, category, GOOGLE_PLACES_API_KEY);
+      console.log(`Determined image URL for ${place.name}: ${imageUrl.substring(0, 60)}...`);
 
       // Only calculate distance if locationEnabled is explicitly true and coordinates are available
       let distance = null;
@@ -159,6 +157,9 @@ serve(async (req) => {
           place.geometry.location.lng
         );
       }
+      
+      // Store the photo reference in metadata for future use
+      const photoReference = place.photos && place.photos.length > 0 ? place.photos[0].photo_reference : null;
       
       return {
         name: place.name,
@@ -177,6 +178,8 @@ serve(async (req) => {
           rating: place.rating,
           user_ratings_total: place.user_ratings_total,
           business_status: place.business_status,
+          // Store the photo reference for future use
+          photo_reference: photoReference,
           // Include distance only if locationEnabled is true and distance was calculated
           ...(distance !== null && { distance })
         }

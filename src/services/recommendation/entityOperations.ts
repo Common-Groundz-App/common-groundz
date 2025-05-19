@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
@@ -40,6 +41,52 @@ export const findEntityByApiRef = async (apiSource: string, apiRef: string): Pro
   }
 
   return data as Entity;
+};
+
+// Update entity image using the original API source
+export const refreshEntityImage = async (entityId: string): Promise<boolean> => {
+  try {
+    // First, fetch the entity
+    const entity = await fetchEntityById(entityId);
+    if (!entity) {
+      console.error('Entity not found for refreshing image:', entityId);
+      return false;
+    }
+
+    // For Google Places entities, fetch fresh photo from the API
+    if (entity.api_source === 'google_places' && entity.api_ref && entity.metadata?.photo_reference) {
+      // We need to call our Edge Function to get the fresh photo URL
+      const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
+        body: {
+          placeId: entity.api_ref,
+          photoReference: entity.metadata.photo_reference
+        }
+      });
+
+      if (error || !data?.imageUrl) {
+        console.error('Error refreshing entity image:', error);
+        return false;
+      }
+
+      // Update the entity with the new image URL
+      const { error: updateError } = await supabase
+        .from('entities')
+        .update({ image_url: data.imageUrl })
+        .eq('id', entityId);
+
+      if (updateError) {
+        console.error('Error updating entity image URL:', updateError);
+        return false;
+      }
+
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error in refreshEntityImage:', error);
+    return false;
+  }
 };
 
 // Create a new entity
@@ -100,6 +147,22 @@ export const findOrCreateEntity = async (
   if (apiSource && apiRef) {
     const existingEntity = await findEntityByApiRef(apiSource, apiRef);
     if (existingEntity) {
+      // If it's a Google Places entity and we want to ensure image is up to date
+      if (apiSource === 'google_places' && metadata?.photo_reference) {
+        // Store photo reference in metadata if it's not there already
+        if (!existingEntity.metadata?.photo_reference) {
+          const { error: updateError } = await supabase
+            .from('entities')
+            .update({ 
+              metadata: { ...existingEntity.metadata, photo_reference: metadata.photo_reference }
+            })
+            .eq('id', existingEntity.id);
+            
+          if (updateError) {
+            console.error('Error updating entity metadata with photo reference:', updateError);
+          }
+        }
+      }
       return existingEntity;
     }
   }
