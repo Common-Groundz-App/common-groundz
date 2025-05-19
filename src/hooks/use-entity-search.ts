@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -62,7 +63,7 @@ export function useEntitySearch(type: EntityTypeString) {
       const { data: localData, error: localError } = await supabase
         .from('entities')
         .select()
-        .eq('type', type) // String type is used directly
+        .eq('type', type) // String type is compatible with database
         .ilike('name', `%${query}%`)
         .order('name')
         .limit(5);
@@ -172,11 +173,11 @@ export function useEntitySearch(type: EntityTypeString) {
 
   const createEntityFromExternal = useCallback(async (externalData: any) => {
     try {
-      // Create a new entity record from external data - use string type
+      // Create a new entity record from external data - use string type as is
       const entityData = {
         id: uuidv4(),
         name: externalData.name,
-        type, // Use the string type directly
+        type, // Use the string type as is for database compatibility
         venue: externalData.venue,
         description: externalData.description || null,
         image_url: externalData.image_url || null,
@@ -186,12 +187,12 @@ export function useEntitySearch(type: EntityTypeString) {
         is_deleted: false
       };
       
-      // Insert the entity into our database - use type as a raw string
+      // Insert the entity into our database
       const { data, error } = await supabase
         .from('entities')
         .insert({
           name: entityData.name,
-          type: type as string, // Cast to string for Supabase
+          type: entityData.type,
           venue: entityData.venue,
           description: entityData.description,
           image_url: entityData.image_url,
@@ -231,9 +232,10 @@ export function useEntitySearch(type: EntityTypeString) {
         throw new Error('Could not fetch metadata from URL');
       }
       
-      // Create entity from the metadata
+      // Create entity from the metadata - use string type
       const entityData = {
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
+        type, // Use string type for database compatibility
         venue: data.metadata.site_name || new URL(url).hostname,
         description: data.metadata.description || data.metadata.og_description || null,
         image_url: data.metadata.og_image || data.metadata.image || null,
@@ -242,19 +244,10 @@ export function useEntitySearch(type: EntityTypeString) {
         metadata: data.metadata
       };
       
-      // Insert the entity into our database - use type as a raw string
+      // Insert the entity into our database
       const { data: insertData, error: insertError } = await supabase
         .from('entities')
-        .insert({
-          name: entityData.name,
-          type: type as string, // Cast to string for Supabase
-          venue: entityData.venue,
-          description: entityData.description,
-          image_url: entityData.image_url,
-          api_source: entityData.api_source,
-          api_ref: entityData.api_ref,
-          metadata: entityData.metadata
-        })
+        .insert(entityData)
         .select()
         .single();
       

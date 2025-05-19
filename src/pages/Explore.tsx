@@ -9,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users, Search, MapPin, Coffee, ShoppingBag, Film } from 'lucide-react';
+import { Filter, Users, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,11 +24,6 @@ import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
-import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
-import { TrendingReviews } from '@/components/explore/TrendingReviews';
-import { PopularRecommendations } from '@/components/explore/PopularRecommendations';
-import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
-import { EntityTypeString } from '@/hooks/feed/api/types';
 
 const Explore = () => {
   const { user } = useAuth();
@@ -39,8 +34,7 @@ const Explore = () => {
     results, 
     isLoading, 
     error, 
-    hasResults,
-    defaultUsers,
+    hasResults 
   } = useUnifiedSearch(searchQuery);
   
   const getInitialActiveTab = () => {
@@ -56,35 +50,12 @@ const Explore = () => {
       value: "people",
       label: "People",
       icon: Users
-    },
-    {
-      value: "places",
-      label: "Places",
-      icon: MapPin
-    },
-    {
-      value: "food",
-      label: "Food",
-      icon: Coffee
-    },
-    {
-      value: "products",
-      label: "Products",
-      icon: ShoppingBag
-    },
-    {
-      value: "entertainment",
-      label: "Entertainment",
-      icon: Film
     }
   ];
 
   const handleResultClick = () => {
     setSearchQuery('');
   };
-
-  // Determine if we should show search results or default content
-  const showingSearchResults = searchQuery.length > 0;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -229,50 +200,11 @@ const Explore = () => {
               )}
             </div>
             
-            {showingSearchResults ? (
-              // Show search results when searching
-              <TubelightTabs defaultValue="people" items={[tabItems[0]]}>
-                <TabsContent value="people">
-                  <UserDirectoryList sortOption={sortOption} />
-                </TabsContent>
-              </TubelightTabs>
-            ) : (
-              // Show enhanced explore content when not searching
-              <TubelightTabs defaultValue="people" items={tabItems}>
-                <TabsContent value="people">
-                  <UserDirectoryList sortOption={sortOption} />
-                </TabsContent>
-                
-                <TabsContent value="places">
-                  <CategoryHighlights category="place" />
-                  <FeaturedEntities type="place" />
-                </TabsContent>
-                
-                <TabsContent value="food">
-                  <CategoryHighlights category="food" />
-                  <FeaturedEntities type="food" />
-                </TabsContent>
-                
-                <TabsContent value="products">
-                  <CategoryHighlights category="product" />
-                  <FeaturedEntities type="product" />
-                </TabsContent>
-                
-                <TabsContent value="entertainment">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <FeaturedEntities type="movie" title="Movies" />
-                    <FeaturedEntities type="tv" title="TV Shows" />
-                  </div>
-                </TabsContent>
-              </TubelightTabs>
-            )}
-            
-            {!showingSearchResults && (
-              <div className="mt-12 space-y-12">
-                <TrendingReviews />
-                <PopularRecommendations />
-              </div>
-            )}
+            <TubelightTabs defaultValue="people" items={tabItems}>
+              <TabsContent value="people">
+                <UserDirectoryList sortOption={sortOption} />
+              </TabsContent>
+            </TubelightTabs>
           </div>
         </div>
       </div>
