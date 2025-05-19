@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -137,9 +136,9 @@ export function PopularRecommendations() {
                       )}
                       <div className="flex justify-center py-1">
                         <ConnectedRingsRating 
-                          rating={recommendation.rating} 
+                          value={recommendation.rating}
                           size="sm"
-                          readOnly 
+                          isInteractive={false}
                         />
                       </div>
                     </div>

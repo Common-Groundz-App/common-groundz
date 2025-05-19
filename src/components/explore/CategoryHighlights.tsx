@@ -31,7 +31,7 @@ export function CategoryHighlights({ category, limit = 6 }: CategoryHighlightsPr
           id,
           slug
         `)
-        .eq('type', category)
+        .eq('type', category as EntityType)
         .eq('is_deleted', false)
         .not('image_url', 'is', null)
         .order('popularity_score', { ascending: false })

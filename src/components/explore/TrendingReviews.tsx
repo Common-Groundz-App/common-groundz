@@ -10,8 +10,30 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { Star } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/user-avatar';
 
+// Define a type for the review with profiles
+interface ReviewWithProfile {
+  id: string;
+  title: string;
+  description?: string;
+  image_url?: string;
+  rating: number;
+  user_id: string;
+  entities?: {
+    name: string;
+    slug?: string;
+    venue?: string;
+    type?: string;
+  };
+  profiles?: {
+    username?: string;
+    avatar_url?: string;
+    id: string;
+  } | null;
+  [key: string]: any; // For other properties
+}
+
 export function TrendingReviews() {
-  const { data: reviews, isLoading } = useQuery({
+  const { data: reviews, isLoading } = useQuery<ReviewWithProfile[]>({
     queryKey: ['trending-reviews'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -45,10 +67,10 @@ export function TrendingReviews() {
         return data.map(review => ({
           ...review,
           profiles: profilesMap[review.user_id] || null
-        }));
+        })) as ReviewWithProfile[];
       }
       
-      return data || [];
+      return data as ReviewWithProfile[] || [];
     },
   });
 

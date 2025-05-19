@@ -21,7 +21,7 @@ export function FeaturedEntities({ type, limit = 5, title }: FeaturedEntitiesPro
       const { data, error } = await supabase
         .from('entities')
         .select('*')
-        .eq('type', type)
+        .eq('type', type as EntityType)
         .eq('is_deleted', false)
         .order('popularity_score', { ascending: false })
         .limit(limit);
