@@ -8,6 +8,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { StarIcon } from 'lucide-react';
+import { EntityTypeString } from '@/hooks/feed/api/types';
 
 interface Entity {
   id: string;
@@ -20,7 +21,7 @@ interface Entity {
 }
 
 interface CategoryHighlightsProps {
-  entityType?: string;
+  entityType?: EntityTypeString;
 }
 
 export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityType }) => {

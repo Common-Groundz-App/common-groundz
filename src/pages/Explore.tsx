@@ -26,6 +26,7 @@ import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
 import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
+import { EntityTypeString } from '@/hooks/feed/api/types';
 
 const Explore = () => {
   const { user } = useAuth();
