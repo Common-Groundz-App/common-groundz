@@ -10,20 +10,21 @@ interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElemen
 
 export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({ 
   src, 
-  fallbackSrc = 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07',
+  fallbackSrc,
   entityType,
   alt,
   onError,
   ...props 
 }) => {
   // Use entity-specific fallback if available
-  const typeFallback = entityType ? getEntityTypeFallbackImage(entityType) : fallbackSrc;
-  const actualFallback = fallbackSrc || typeFallback;
+  const typeFallback = entityType ? getEntityTypeFallbackImage(entityType) : undefined;
+  // Prioritize explicitly provided fallback, then type fallback
+  const actualFallback = fallbackSrc || typeFallback || 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07';
   
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 1; // Reduced to 1 retry to avoid excessive retries and console errors
+  const maxRetries = 1; // We keep a single retry for basic network issues
 
   useEffect(() => {
     // Reset error state when src changes
@@ -31,27 +32,25 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       setHasError(false);
       setRetryCount(0);
       const secureUrl = ensureHttps(src);
-      console.log("ImageWithFallback: Processing URL:", secureUrl, "Original:", src);
       
-      // Check if it's empty after ensureHttps processing (likely a Google Maps URL)
       if (!secureUrl) {
-        console.log("ImageWithFallback: URL was filtered out, using fallback for type:", entityType);
+        // If URL is empty after processing, use fallback
+        console.log("ImageWithFallback: Using fallback image for entity type:", entityType);
         setImgSrc(actualFallback);
         setHasError(true);
       } else {
         setImgSrc(secureUrl);
       }
     } else {
+      // No source provided, use fallback
       console.log("ImageWithFallback: No source URL provided, using fallback for type:", entityType);
       setImgSrc(actualFallback);
     }
   }, [src, actualFallback, entityType]);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.error("Image load error:", imgSrc, "Entity type:", entityType);
-    
     if (!hasError && retryCount < maxRetries && imgSrc && !imgSrc.startsWith('data:')) {
-      // Try again with a small delay (network issues)
+      // Try once more (network issues)
       setRetryCount(prev => prev + 1);
       setTimeout(() => {
         console.log(`Retrying image load (${retryCount + 1}/${maxRetries}):`, imgSrc);

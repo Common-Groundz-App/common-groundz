@@ -18,10 +18,10 @@ export const ensureHttps = (url: string): string => {
     return url;
   }
   
-  // Handle google API URLs with photo references by returning null
-  // This will trigger the fallback image mechanism
+  // Handle google API URLs with photo references directly
+  // We now replace these with type-specific fallbacks in the edge function
   if (url.includes('maps.googleapis.com/maps/api/place/photo')) {
-    console.log("ensureHttps: Detected Google Maps photo API URL, triggering fallback", url);
+    console.log("ensureHttps: Detected Google Maps photo API URL, this should not happen anymore", url);
     return ''; // Empty string will trigger fallback image
   }
   
@@ -94,4 +94,3 @@ export const getEntityTypeFallbackImage = (type: string | undefined): string => 
       return 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&q=80&w=1000';
   }
 };
-

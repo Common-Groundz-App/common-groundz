@@ -18,6 +18,46 @@ const FOOD_PLACE_TYPES = [
   'food'
 ];
 
+// Get a reliable fallback image based on entity type
+function getTypeFallbackImage(category: string): string {
+  switch(category.toLowerCase()) {
+    case 'food':
+      return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=80&w=1000';
+    case 'place':
+      return 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&q=80&w=1000';
+    case 'restaurant':
+      return 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1000';
+    case 'cafe':
+      return 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&q=80&w=1000';
+    case 'bar':
+      return 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=80&w=1000';
+    default:
+      return 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&q=80&w=1000';
+  }
+}
+
+// Determine the best image to use for a place
+function determineImageUrl(place: any, category: string): string {
+  // If the place has photos, use the photo URL directly
+  if (place.photos && place.photos.length > 0) {
+    const photoRef = place.photos[0].photo_reference;
+    if (photoRef) {
+      // Return a direct Unsplash URL based on the business type instead of using Google Photos API
+      if (place.types && place.types.length > 0) {
+        // Check if any of the place types match food establishments
+        const isFood = place.types.some((type: string) => FOOD_PLACE_TYPES.includes(type));
+        if (isFood) {
+          return getTypeFallbackImage('food');
+        }
+      }
+      return getTypeFallbackImage(category || 'place');
+    }
+  }
+
+  // If no usable photos are available, use a fallback image based on entity type
+  return getTypeFallbackImage(category || 'place');
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -105,16 +145,9 @@ serve(async (req) => {
       // Log the data structure for debugging
       console.log(`Processing place: ${place.name}, Address: ${place.formatted_address}`);
       
-      // Properly construct the photo URL if available
-      let imageUrl = null;
-      if (place.photos && place.photos.length > 0) {
-        const photoRef = place.photos[0].photo_reference;
-        if (photoRef) {
-          // Generate a direct URL for the photo
-          imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photoRef}&key=${GOOGLE_PLACES_API_KEY}`;
-          console.log(`Generated image URL for ${place.name}:`, imageUrl);
-        }
-      }
+      // Get the appropriate image URL using our helper function
+      const imageUrl = determineImageUrl(place, category);
+      console.log(`Determined image URL for ${place.name}:`, imageUrl);
 
       // Only calculate distance if locationEnabled is explicitly true and coordinates are available
       let distance = null;

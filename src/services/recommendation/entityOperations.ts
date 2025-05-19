@@ -1,7 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
+import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
 
 // Fetch an entity by its ID
 export const fetchEntityById = async (entityId: string): Promise<Entity | null> => {
@@ -53,13 +53,16 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     typeAsString = mapEntityTypeToString(entity.type as EntityType);
   }
   
+  // Ensure we have a valid image URL or use fallback based on type
+  const imageUrl = entity.image_url || getEntityTypeFallbackImage(typeAsString);
+  
   // For database insertion, prepare the entity data with only the fields that exist in the database
   const entityForDb = {
     name: entity.name,
     type: typeAsString as "movie" | "book" | "food" | "product" | "place", // Cast to allowed type literals
     venue: entity.venue || null,
     description: entity.description || null,
-    image_url: entity.image_url || null,
+    image_url: imageUrl,
     api_source: entity.api_source || null,
     api_ref: entity.api_ref || null,
     metadata: entity.metadata || null,
@@ -104,13 +107,16 @@ export const findOrCreateEntity = async (
   // Convert type to string if it's an enum
   const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
 
+  // Ensure we have a valid image URL or use fallback based on type
+  const finalImageUrl = imageUrl || getEntityTypeFallbackImage(typeAsString);
+
   // Create a new entity if not found or if we don't have API reference info
   return createEntity({
     name,
     type: typeAsString as any, // Cast to any to bypass type checking
     venue,
     description,
-    image_url: imageUrl,
+    image_url: finalImageUrl,
     api_source: apiSource,
     api_ref: apiRef,
     metadata,

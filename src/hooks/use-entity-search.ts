@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useToast } from './use-toast';
 import type { Entity as ServiceEntity } from '@/services/recommendation/types';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
+import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
 
 // Define a simplified entity structure for the component's internal use
 interface Entity {
@@ -173,6 +174,10 @@ export function useEntitySearch(type: EntityTypeString) {
 
   const createEntityFromExternal = useCallback(async (externalData: any) => {
     try {
+      // Ensure the image_url is valid or use a fallback based on entity type
+      const imageUrl = externalData.image_url || getEntityTypeFallbackImage(type);
+      console.log(`Creating entity with image: ${imageUrl} for type: ${type}`);
+      
       // Create a new entity record from external data - use string type as is
       const entityData = {
         id: uuidv4(),
@@ -180,7 +185,7 @@ export function useEntitySearch(type: EntityTypeString) {
         type, // Use the string type as is for database compatibility
         venue: externalData.venue,
         description: externalData.description || null,
-        image_url: externalData.image_url || null,
+        image_url: imageUrl, // Use our processed image URL
         api_source: externalData.api_source,
         api_ref: externalData.api_ref,
         metadata: externalData.metadata,
@@ -231,6 +236,9 @@ export function useEntitySearch(type: EntityTypeString) {
       if (!data?.metadata) {
         throw new Error('Could not fetch metadata from URL');
       }
+
+      // Get appropriate image or fallback
+      const imageUrl = data.metadata.og_image || data.metadata.image || getEntityTypeFallbackImage(type);
       
       // Create entity from the metadata - use string type
       const entityData = {
@@ -238,7 +246,7 @@ export function useEntitySearch(type: EntityTypeString) {
         type, // Use string type for database compatibility
         venue: data.metadata.site_name || new URL(url).hostname,
         description: data.metadata.description || data.metadata.og_description || null,
-        image_url: data.metadata.og_image || data.metadata.image || null,
+        image_url: imageUrl,
         api_source: 'url_metadata',
         api_ref: url,
         metadata: data.metadata
