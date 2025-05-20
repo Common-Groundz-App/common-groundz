@@ -66,6 +66,7 @@ export const useEntityOperations = () => {
         }
       }
 
+      // findOrCreateEntity will now automatically handle image processing
       const entity = await findOrCreateEntity(
         name,
         type,
