@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { refreshEntityImage } from '@/services/recommendation/entityOperations';
 import { supabase } from '@/integrations/supabase/client';
-import { AlertCircle, InfoIcon, CheckCircle2, Loader2, Search, XCircle } from 'lucide-react';
+import { AlertCircle, InfoIcon, CheckCircle2, Loader2, Search, XCircle, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,7 @@ type Entity = {
 
 type RecoveryStatus = {
   [key: string]: {
-    status: 'idle' | 'loading' | 'success' | 'error';
+    status: 'idle' | 'loading' | 'success' | 'error' | 'missing_reference';
     message?: string;
   };
 };
@@ -37,7 +38,7 @@ export const ManualEntityImageRecovery = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'success' | 'error'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'success' | 'error' | 'missing_reference'>('all');
 
   useEffect(() => {
     if (user) {
@@ -48,6 +49,11 @@ export const ManualEntityImageRecovery = () => {
   useEffect(() => {
     filterEntities();
   }, [entities, searchTerm, filter]);
+
+  useEffect(() => {
+    // Pre-check entities for missing photo references
+    checkPhotoReferences();
+  }, [entities]);
 
   const fetchEntities = async () => {
     setIsLoading(true);
@@ -85,6 +91,26 @@ export const ManualEntityImageRecovery = () => {
     }
   };
 
+  const checkPhotoReferences = () => {
+    // Check which entities have missing photo references and mark them
+    const newStatus = { ...recoveryStatus };
+    
+    entities.forEach(entity => {
+      const hasPhotoReference = entity.metadata?.photo_reference;
+      
+      if (!hasPhotoReference) {
+        newStatus[entity.id] = {
+          status: 'missing_reference',
+          message: 'Missing photo reference'
+        };
+      }
+    });
+    
+    if (Object.keys(newStatus).length > 0) {
+      setRecoveryStatus(newStatus);
+    }
+  };
+
   const filterEntities = () => {
     let results = [...entities];
     
@@ -105,9 +131,14 @@ export const ManualEntityImageRecovery = () => {
       results = results.filter(entity => 
         recoveryStatus[entity.id]?.status === 'error'
       );
+    } else if (filter === 'missing_reference') {
+      results = results.filter(entity => 
+        recoveryStatus[entity.id]?.status === 'missing_reference'
+      );
     } else if (filter === 'pending') {
       results = results.filter(entity => 
-        !recoveryStatus[entity.id] || recoveryStatus[entity.id]?.status === 'idle'
+        (!recoveryStatus[entity.id] || recoveryStatus[entity.id]?.status === 'idle') &&
+        entity.metadata?.photo_reference !== undefined
       );
     }
     
@@ -119,6 +150,34 @@ export const ManualEntityImageRecovery = () => {
       toast({
         title: 'Authentication Required',
         description: 'You must be logged in to perform this operation',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const entity = entities.find(e => e.id === entityId);
+    if (!entity) {
+      toast({
+        title: 'Error',
+        description: 'Entity not found',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if photo reference exists
+    if (!entity.metadata?.photo_reference) {
+      setRecoveryStatus(prev => ({
+        ...prev,
+        [entityId]: { 
+          status: 'missing_reference',
+          message: 'Missing photo reference, cannot recover' 
+        }
+      }));
+      
+      toast({
+        title: 'Missing Photo Reference',
+        description: `Entity "${entityName}" is missing a photo reference and cannot be recovered.`,
         variant: 'destructive',
       });
       return;
@@ -206,6 +265,10 @@ export const ManualEntityImageRecovery = () => {
       return <Badge variant="destructive">Failed</Badge>;
     }
     
+    if (status.status === 'missing_reference') {
+      return <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">Missing Reference</Badge>;
+    }
+    
     return null;
   };
 
@@ -223,6 +286,9 @@ export const ManualEntityImageRecovery = () => {
     }
     return null;
   };
+
+  // Count entities with missing photo references
+  const missingReferenceCount = entities.filter(entity => !entity.metadata?.photo_reference).length;
 
   return (
     <Card className="w-full">
@@ -249,6 +315,17 @@ export const ManualEntityImageRecovery = () => {
           </AlertDescription>
         </Alert>
         
+        {missingReferenceCount > 0 && (
+          <Alert variant="warning" className="mb-4 border-amber-300 bg-amber-50">
+            <AlertTriangle className="h-4 w-4 text-amber-800" />
+            <AlertTitle>Missing Photo References</AlertTitle>
+            <AlertDescription>
+              {missingReferenceCount} {missingReferenceCount === 1 ? 'entity is' : 'entities are'} missing a photo reference and cannot be recovered. 
+              These entities are marked with an "Missing Reference" badge.
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <div className="flex flex-col md:flex-row gap-4 items-center">
           <div className="relative w-full md:w-1/2">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -260,7 +337,7 @@ export const ManualEntityImageRecovery = () => {
             />
           </div>
           
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex gap-2 w-full md:w-auto flex-wrap">
             <Button 
               variant={filter === 'all' ? 'default' : 'outline'}
               onClick={() => setFilter('all')}
@@ -274,6 +351,14 @@ export const ManualEntityImageRecovery = () => {
               size="sm"
             >
               Pending
+            </Button>
+            <Button 
+              variant={filter === 'missing_reference' ? 'default' : 'outline'}
+              onClick={() => setFilter('missing_reference')}
+              size="sm"
+              className={filter === 'missing_reference' ? '' : 'border-amber-300 text-amber-800'}
+            >
+              Missing Reference
             </Button>
             <Button 
               variant={filter === 'success' ? 'default' : 'outline'}
@@ -329,13 +414,22 @@ export const ManualEntityImageRecovery = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEntities.map((entity) => (
-                  <TableRow key={entity.id}>
+                {filteredEntities.map((entity) => {
+                  const hasMissingReference = !entity.metadata?.photo_reference;
+                  
+                  return (
+                  <TableRow key={entity.id} className={hasMissingReference ? 'bg-amber-50' : undefined}>
                     <TableCell className="font-medium">
                       {entity.name}
                       <div className="text-xs text-muted-foreground">
                         Type: {entity.type}
                       </div>
+                      {hasMissingReference && (
+                        <div className="text-xs font-normal text-amber-800 mt-1">
+                          <AlertTriangle className="h-3 w-3 inline mr-1" />
+                          Missing photo reference
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       {entity.venue || (
@@ -350,7 +444,11 @@ export const ManualEntityImageRecovery = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={recoveryStatus[entity.id]?.status === 'loading'}
+                        disabled={
+                          hasMissingReference ||
+                          recoveryStatus[entity.id]?.status === 'loading' ||
+                          recoveryStatus[entity.id]?.status === 'missing_reference'
+                        }
                         onClick={() => handleRecoverImage(entity.id, entity.name)}
                       >
                         {recoveryStatus[entity.id]?.status === 'loading' ? (
@@ -368,13 +466,18 @@ export const ManualEntityImageRecovery = () => {
                             <XCircle className="mr-2 h-3 w-3" />
                             Try Again
                           </>
+                        ) : hasMissingReference || recoveryStatus[entity.id]?.status === 'missing_reference' ? (
+                          <>
+                            <AlertTriangle className="mr-2 h-3 w-3" />
+                            Can't Recover
+                          </>
                         ) : (
                           'Recover Image'
                         )}
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
           </div>
@@ -389,6 +492,7 @@ export const ManualEntityImageRecovery = () => {
       <CardFooter className="border-t p-4 text-sm text-muted-foreground">
         <div>
           Note: Successfully recovered images are saved to Supabase Storage and will be removed from this list.
+          Entities missing photo references cannot be recovered.
         </div>
       </CardFooter>
     </Card>

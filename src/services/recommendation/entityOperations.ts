@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
@@ -66,38 +65,12 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
       console.log('Photo reference from metadata:', photoReference);
       
       if (!photoReference) {
-        console.log('No photo reference found in metadata, fetching from API...');
-        
-        // Fetch a new photo reference from the Google Places API
-        try {
-          const result = await supabase.functions.invoke('refresh-entity-image', {
-            body: {
-              placeId: entity.api_ref
-            }
-          });
-          
-          if (result.error) {
-            console.error('Error fetching photo reference:', result.error);
-            return false;
-          }
-          
-          if (!result.data?.photoReference) {
-            console.error('No photo reference found for this place');
-            return false;
-          }
-          
-          // Directly use the download-google-photo function with the new photo reference
-          return await downloadGooglePhoto(entity.id, entity.api_ref, result.data.photoReference);
-          
-        } catch (invokeError) {
-          console.error('Error invoking refresh-entity-image function:', invokeError);
-          return false;
-        }
-      } else {
-        // Use existing photo reference to download the image
-        console.log('Using existing photo reference:', photoReference);
-        return await downloadGooglePhoto(entity.id, entity.api_ref, photoReference);
+        console.log('No photo reference found in metadata, cannot recover image');
+        return false;
       }
+      
+      // Directly use the download-google-photo function with the photo reference
+      return await downloadGooglePhoto(entity.id, entity.api_ref, photoReference);
     }
     
     return false;
