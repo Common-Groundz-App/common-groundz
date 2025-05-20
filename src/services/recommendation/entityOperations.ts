@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
@@ -55,33 +56,65 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
     }
 
     // For Google Places entities, fetch fresh photo from the API
-    if (entity.api_source === 'google_places' && entity.api_ref && entity.metadata?.photo_reference) {
+    if (entity.api_source === 'google_places' && entity.api_ref) {
+      // Log the current image state
+      console.log('Current image URL:', entity.image_url);
+      console.log('Is using fallback?', entity.image_url?.includes('unsplash.com'));
+      
+      // Check if photo_reference exists in metadata
+      let photoReference = entity.metadata?.photo_reference;
+      
       // We need to call our Edge Function to get the fresh photo URL
       const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
         body: {
           placeId: entity.api_ref,
-          photoReference: entity.metadata.photo_reference
+          photoReference: photoReference
         }
       });
 
       if (error || !data?.imageUrl) {
-        console.error('Error refreshing entity image:', error);
+        console.error('Error refreshing entity image:', error || 'No image URL returned');
         return false;
+      }
+      
+      console.log('Retrieved fresh image URL from Google Places:', data.imageUrl);
+      
+      // Store the new photo_reference if provided
+      if (data.photoReference && data.photoReference !== photoReference) {
+        console.log('Updating photo reference:', data.photoReference);
+        
+        // Update the entity metadata with the new photo_reference
+        const { error: metadataError } = await supabase
+          .from('entities')
+          .update({ 
+            metadata: { ...entity.metadata, photo_reference: data.photoReference }
+          })
+          .eq('id', entityId);
+          
+        if (metadataError) {
+          console.error('Error updating entity metadata with photo reference:', metadataError);
+        }
       }
 
       // Download and store the refreshed image
+      console.log('Downloading and storing image from:', data.imageUrl);
       const storedImageUrl = await downloadAndStoreEntityImage(
         data.imageUrl,
         entityId,
         entity.api_source
       );
       
-      // Update the entity with the new image URL (stored or original if failed)
-      const finalImageUrl = storedImageUrl || data.imageUrl;
+      if (!storedImageUrl) {
+        console.error('Failed to download and store the image');
+        return false;
+      }
       
+      console.log('Successfully stored image to Supabase:', storedImageUrl);
+      
+      // Update the entity with the new image URL
       const { error: updateError } = await supabase
         .from('entities')
-        .update({ image_url: finalImageUrl })
+        .update({ image_url: storedImageUrl })
         .eq('id', entityId);
 
       if (updateError) {
@@ -89,6 +122,7 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
         return false;
       }
 
+      console.log('Successfully updated entity with new image URL');
       return true;
     }
     

@@ -1,6 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { EntityImageMigration } from '@/components/admin/EntityImageMigration';
+import { EntityImageRecovery } from '@/components/admin/EntityImageRecovery';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -90,6 +91,19 @@ const Admin = () => {
       </div>
       
       <div className="space-y-8">
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">Entity Image Recovery</h2>
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Important</AlertTitle>
+            <AlertDescription>
+              This tool recovers original images for Google Places entities that are currently using 
+              Unsplash fallback images due to prior migration issues.
+            </AlertDescription>
+          </Alert>
+          <EntityImageRecovery />
+        </section>
+        
         <section>
           <h2 className="text-2xl font-semibold mb-4">Entity Image Migration</h2>
           <Alert className="mb-4">

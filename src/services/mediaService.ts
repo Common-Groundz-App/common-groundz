@@ -1,4 +1,3 @@
-
 import { generateUUID } from '@/lib/uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';
@@ -151,6 +150,12 @@ export const downloadAndStoreEntityImage = async (
       return null;
     }
 
+    // Check if this is an Unsplash fallback image - if so, don't store it as an entity image
+    if (imageUrl.includes('unsplash.com')) {
+      console.error('Refusing to store Unsplash fallback as entity image');
+      return null;
+    }
+
     console.log(`Downloading entity image from ${apiSource || 'unknown source'}:`, imageUrl);
     
     // Fetch the image with timeout and error handling
@@ -270,16 +275,30 @@ export const batchProcessEntityImages = async (
       }
       
       try {
+        // Don't store Unsplash fallback images as entity images
+        if (entity.image_url.includes('unsplash.com')) {
+          console.log(`Skipping Unsplash fallback image for entity ${entity.id}`);
+          results[entity.id] = entity.image_url;
+          return;
+        }
+        
         const storedUrl = await downloadAndStoreEntityImage(
           entity.image_url,
           entity.id,
           entity.api_source
         );
         
-        results[entity.id] = storedUrl || entity.image_url; // Fall back to original if download fails
+        // Only update the URL if we successfully stored the image
+        if (storedUrl) {
+          results[entity.id] = storedUrl;
+        } else {
+          // Keep the original URL if download fails, but don't replace with fallback
+          results[entity.id] = entity.image_url;
+          console.log(`Keeping original URL for entity ${entity.id} since download failed`);
+        }
       } catch (error) {
         console.error(`Error processing entity ${entity.id}:`, error);
-        results[entity.id] = entity.image_url; // Fall back to original on error
+        results[entity.id] = entity.image_url; // Keep original on error
       }
     });
     
