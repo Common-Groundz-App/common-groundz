@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { setupEntityImagesBucket, migrateExistingEntityImages } from '@/services/migration/setupEntityImages';
-import { AlertCircle, CheckCircle2, InfoIcon, ShieldAlert, Database } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { InfoIcon, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { migrateExistingEntityImages } from '@/services/migration/setupEntityImages';
 import { useAuth } from '@/contexts/AuthContext';
 
 type MigrationResults = {
@@ -20,61 +20,12 @@ export const EntityImageMigration = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
-  const [isBucketSetup, setIsBucketSetup] = useState<boolean | null>(null);
   const [results, setResults] = useState<MigrationResults | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verboseLog, setVerboseLog] = useState<string[]>([]);
-
-  const setupBucket = async () => {
-    if (!user) {
-      setError("You must be logged in to perform this operation");
-      toast({
-        title: "Authentication required",
-        description: "Please log in to access storage features",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsRunning(true);
-    setError(null);
-    
-    // Add to verbose log
-    addToLog("Starting bucket verification...");
-    
-    try {
-      const success = await setupEntityImagesBucket();
-      setIsBucketSetup(success);
-      
-      if (success) {
-        addToLog("✅ Storage bucket verification successful");
-        toast({
-          title: "Success",
-          description: "Entity images bucket access verified successfully",
-        });
-      } else {
-        const errorMsg = "Failed to verify entity-images bucket access. The bucket exists but you may not have proper permissions.";
-        setError(errorMsg);
-        addToLog("❌ " + errorMsg);
-        toast({
-          title: "Access Error",
-          description: "Permission denied. See logs for details.",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      const errorMsg = "An unexpected error occurred while verifying bucket access";
-      console.error("Error verifying bucket:", err);
-      setError(errorMsg);
-      addToLog("❌ " + errorMsg);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRunning(false);
-    }
+  
+  const addToLog = (message: string) => {
+    setVerboseLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
   };
 
   const runMigration = async () => {
@@ -85,67 +36,64 @@ export const EntityImageMigration = () => {
     
     setIsRunning(true);
     setError(null);
-    
-    // Add to verbose log
-    addToLog("Starting image migration...");
+    setResults(null);
     
     try {
+      addToLog("Starting entity image migration process...");
+      
       const migrationResults = await migrateExistingEntityImages();
+      
       setResults(migrationResults);
       
-      if (migrationResults.processed > 0) {
-        addToLog(`✅ Processed ${migrationResults.processed} images`);
-        addToLog(`✅ Stored ${migrationResults.storageSuccessful} images in Supabase`);
-        addToLog(`✅ Updated ${migrationResults.databaseUpdated} entity records in database`);
-        
+      addToLog(`✅ Migration process complete:`);
+      addToLog(`- ${migrationResults.total} total entities with images`);
+      addToLog(`- ${migrationResults.processed} entities needed migration`);
+      addToLog(`- ${migrationResults.storageSuccessful} images successfully stored in Supabase`);
+      addToLog(`- ${migrationResults.databaseUpdated} database records updated with new URLs`);
+      
+      if (migrationResults.storageSuccessful > 0) {
         toast({
           title: "Migration Complete",
-          description: `Processed ${migrationResults.processed} images, updated ${migrationResults.databaseUpdated} in database`,
+          description: `Successfully migrated ${migrationResults.storageSuccessful} entity images`,
+          variant: "default",
         });
       } else {
-        addToLog("ℹ️ No entity images needed migration");
         toast({
-          title: "No Images to Process",
+          title: "Migration Complete",
           description: "No entity images needed migration",
         });
       }
+      
     } catch (err) {
-      const errorMsg = "An unexpected error occurred during migration";
+      const errorMsg = "An unexpected error occurred during image migration";
       console.error("Error running migration:", err);
       setError(errorMsg);
-      addToLog("❌ " + errorMsg);
+      addToLog(`❌ ${errorMsg}: ${(err as Error).message}`);
       toast({
         title: "Error",
-        description: "An unexpected error occurred during migration",
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
       setIsRunning(false);
     }
   };
-  
-  const addToLog = (message: string) => {
-    setVerboseLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
-  };
 
-  const getStorageProgressPercentage = () => {
+  const getMigrationProgressPercentage = () => {
     if (!results || results.processed === 0) return 0;
-    return Math.round((results.storageSuccessful / results.processed) * 100);
-  };
-
-  const getDatabaseProgressPercentage = () => {
-    if (!results || results.storageSuccessful === 0) return 0;
-    return Math.round((results.databaseUpdated / results.storageSuccessful) * 100);
+    const totalProcessed = results.storageSuccessful + results.databaseUpdated;
+    const totalNeeded = results.processed * 2; // Each entity needs storage and DB update
+    return Math.round((totalProcessed / totalNeeded) * 100);
   };
 
   const renderAuthWarning = () => {
     if (!user) {
       return (
         <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
+          <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Authentication Required</AlertTitle>
           <AlertDescription>
-            You must be logged in to perform storage operations. Please log in and try again.
+            You must be logged in to perform migration operations. Please log in and try again.
           </AlertDescription>
         </Alert>
       );
@@ -158,62 +106,39 @@ export const EntityImageMigration = () => {
       <CardHeader>
         <CardTitle>Entity Image Migration Tool</CardTitle>
         <CardDescription>
-          Migrate external entity images (from Google, OMDB, etc.) to Supabase Storage for better reliability
+          Download entity images to Supabase Storage and update database records
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {renderAuthWarning()}
         
+        <Alert className="mb-4">
+          <InfoIcon className="h-4 w-4" />
+          <AlertTitle>How Migration Works</AlertTitle>
+          <AlertDescription>
+            <p>This tool handles the migration of entity images to Supabase Storage:</p>
+            <ol className="list-decimal ml-5 mt-2">
+              <li>Identifies all entity images that need migration (especially from Google Places API)</li>
+              <li>Downloads each image and stores it in Supabase Storage</li>
+              <li>Updates the database records with the new reliable URLs</li>
+              <li>Processes images in batches to avoid rate limiting</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+        
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">Step 1: Verify Storage Bucket</h3>
-          <p className="text-sm text-muted-foreground">
-            First, we need to verify access to the "entity-images" bucket in your Supabase project.
-            The bucket should exist with proper permissions for authenticated users.
-          </p>
-          <Alert className="mb-4">
-            <ShieldAlert className="h-4 w-4" />
-            <AlertTitle>Permissions Required</AlertTitle>
-            <AlertDescription>
-              This tool requires full access to the entity-images bucket.
-              We've added policies to grant authenticated users access to this bucket.
-            </AlertDescription>
-          </Alert>
-          <Button 
-            onClick={setupBucket} 
-            disabled={isRunning || isBucketSetup === true || !user}
-            variant={isBucketSetup === true ? "outline" : "default"}
-          >
-            {isRunning && "Checking..."}
-            {!isRunning && isBucketSetup === true && "✓ Bucket Ready"}
-            {!isRunning && isBucketSetup !== true && "Verify Storage Bucket"}
-          </Button>
-          {isBucketSetup === true && (
-            <div className="flex items-center gap-2 text-sm text-green-600">
-              <CheckCircle2 className="w-4 h-4" />
-              <p>Storage bucket access verified successfully!</p>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Step 2: Run Migration</h3>
-          <p className="text-sm text-muted-foreground">
-            This will find all entities with external image URLs (like Google Places photos) 
-            and download them to Supabase Storage for reliability. Then, it will update the
-            database to point to the new URLs. The process runs in small batches
-            to avoid rate limiting.
-          </p>
           <Button 
             onClick={runMigration} 
-            disabled={isRunning || isBucketSetup !== true || !user}
+            disabled={isRunning || !user}
+            className="w-full"
           >
-            {isRunning ? "Running Migration..." : "Start Migration"}
+            {isRunning ? "Running Migration..." : "Start Entity Image Migration"}
           </Button>
         </div>
 
         {results && (
           <div className="space-y-4 pt-4 border-t">
-            <h3 className="text-lg font-medium">Migration Results</h3>
+            <h3 className="text-lg font-medium">Migration Progress</h3>
             <div className="grid grid-cols-4 gap-4 text-center">
               <div className="bg-muted p-3 rounded-md">
                 <p className="text-2xl font-bold">{results.total}</p>
@@ -221,53 +146,33 @@ export const EntityImageMigration = () => {
               </div>
               <div className="bg-muted p-3 rounded-md">
                 <p className="text-2xl font-bold">{results.processed}</p>
-                <p className="text-xs text-muted-foreground">Needed Migration</p>
+                <p className="text-xs text-muted-foreground">Need Migration</p>
               </div>
               <div className="bg-muted p-3 rounded-md">
                 <p className="text-2xl font-bold">{results.storageSuccessful}</p>
-                <p className="text-xs text-muted-foreground">Stored in Supabase</p>
+                <p className="text-xs text-muted-foreground">Storage Success</p>
               </div>
               <div className="bg-muted p-3 rounded-md">
                 <p className="text-2xl font-bold">{results.databaseUpdated}</p>
-                <p className="text-xs text-muted-foreground">Database Updated</p>
+                <p className="text-xs text-muted-foreground">DB Updated</p>
               </div>
             </div>
             
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm items-center">
-                  <span className="flex items-center gap-1">
-                    <InfoIcon className="h-3 w-3" /> Storage Migration
-                  </span>
-                  <span>{getStorageProgressPercentage()}%</span>
-                </div>
-                <Progress value={getStorageProgressPercentage()} className="h-2" />
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm items-center">
+                <span>Migration Progress</span>
+                <span>{getMigrationProgressPercentage()}%</span>
               </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm items-center">
-                  <span className="flex items-center gap-1">
-                    <Database className="h-3 w-3" /> Database Update
-                  </span>
-                  <span>{getDatabaseProgressPercentage()}%</span>
-                </div>
-                <Progress value={getDatabaseProgressPercentage()} className="h-2" />
-              </div>
+              <Progress value={getMigrationProgressPercentage()} className="h-2" />
             </div>
           </div>
         )}
 
         {error && (
           <Alert variant="destructive" className="my-4">
-            <AlertCircle className="h-4 w-4" />
+            <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
-              <p>{error}</p>
-              <p className="text-sm mt-2">
-                Check that you're logged in and have proper permissions to access the 
-                entity-images bucket.
-              </p>
-            </AlertDescription>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
         
@@ -275,7 +180,7 @@ export const EntityImageMigration = () => {
           <div className="space-y-2 mt-6">
             <div className="flex items-center gap-2">
               <InfoIcon className="h-4 w-4" />
-              <h4 className="text-sm font-medium">Diagnostic Log</h4>
+              <h4 className="text-sm font-medium">Operation Log</h4>
             </div>
             <div className="bg-muted p-2 rounded-md max-h-48 overflow-y-auto">
               {verboseLog.map((log, index) => (
@@ -287,8 +192,11 @@ export const EntityImageMigration = () => {
       </CardContent>
       <CardFooter className="flex justify-between text-sm text-muted-foreground">
         <div>
-          <p>This tool only needs to be run once to migrate all existing entity images.</p>
-          <p>New entities will automatically have their images downloaded and stored.</p>
+          <p>Storage bucket: <code>entity-images</code></p>
+        </div>
+        <div className="flex items-center gap-1">
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <p>Images stored in Supabase are permanent and reliable</p>
         </div>
       </CardFooter>
     </Card>
