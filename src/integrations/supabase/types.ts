@@ -47,6 +47,42 @@ export type Database = {
           },
         ]
       }
+      deleted_entities_log: {
+        Row: {
+          api_ref: string | null
+          api_source: string | null
+          id: string | null
+          name: string | null
+          photo_reference: string | null
+          post_entity_count: number | null
+          recommendation_count: number | null
+          review_count: number | null
+          type: Database["public"]["Enums"]["entity_type"] | null
+        }
+        Insert: {
+          api_ref?: string | null
+          api_source?: string | null
+          id?: string | null
+          name?: string | null
+          photo_reference?: string | null
+          post_entity_count?: number | null
+          recommendation_count?: number | null
+          review_count?: number | null
+          type?: Database["public"]["Enums"]["entity_type"] | null
+        }
+        Update: {
+          api_ref?: string | null
+          api_source?: string | null
+          id?: string | null
+          name?: string | null
+          photo_reference?: string | null
+          post_entity_count?: number | null
+          recommendation_count?: number | null
+          review_count?: number | null
+          type?: Database["public"]["Enums"]["entity_type"] | null
+        }
+        Relationships: []
+      }
       entities: {
         Row: {
           api_ref: string | null
@@ -130,6 +166,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      entities_backup: {
+        Row: {
+          api_ref: string | null
+          api_source: string | null
+          category_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string | null
+          image_url: string | null
+          is_deleted: boolean | null
+          is_verified: boolean | null
+          metadata: Json | null
+          name: string | null
+          open_graph_data: Json | null
+          popularity_score: number | null
+          slug: string | null
+          type: Database["public"]["Enums"]["entity_type"] | null
+          updated_at: string | null
+          venue: string | null
+          verification_date: string | null
+          website_url: string | null
+        }
+        Insert: {
+          api_ref?: string | null
+          api_source?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_deleted?: boolean | null
+          is_verified?: boolean | null
+          metadata?: Json | null
+          name?: string | null
+          open_graph_data?: Json | null
+          popularity_score?: number | null
+          slug?: string | null
+          type?: Database["public"]["Enums"]["entity_type"] | null
+          updated_at?: string | null
+          venue?: string | null
+          verification_date?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          api_ref?: string | null
+          api_source?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_deleted?: boolean | null
+          is_verified?: boolean | null
+          metadata?: Json | null
+          name?: string | null
+          open_graph_data?: Json | null
+          popularity_score?: number | null
+          slug?: string | null
+          type?: Database["public"]["Enums"]["entity_type"] | null
+          updated_at?: string | null
+          venue?: string | null
+          verification_date?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
       }
       follows: {
         Row: {
@@ -276,6 +381,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      post_entities_backup: {
+        Row: {
+          created_at: string | null
+          entity_id: string | null
+          id: string | null
+          post_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_id?: string | null
+          id?: string | null
+          post_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_id?: string | null
+          id?: string | null
+          post_id?: string | null
+        }
+        Relationships: []
       }
       post_likes: {
         Row: {
@@ -619,6 +745,72 @@ export type Database = {
           },
         ]
       }
+      recommendations_backup: {
+        Row: {
+          category:
+            | Database["public"]["Enums"]["recommendation_category"]
+            | null
+          comment_count: number | null
+          created_at: string | null
+          description: string | null
+          entity_id: string | null
+          id: string | null
+          image_url: string | null
+          is_certified: boolean | null
+          rating: number | null
+          title: string | null
+          updated_at: string | null
+          user_id: string | null
+          venue: string | null
+          view_count: number | null
+          visibility:
+            | Database["public"]["Enums"]["recommendation_visibility"]
+            | null
+        }
+        Insert: {
+          category?:
+            | Database["public"]["Enums"]["recommendation_category"]
+            | null
+          comment_count?: number | null
+          created_at?: string | null
+          description?: string | null
+          entity_id?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_certified?: boolean | null
+          rating?: number | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          venue?: string | null
+          view_count?: number | null
+          visibility?:
+            | Database["public"]["Enums"]["recommendation_visibility"]
+            | null
+        }
+        Update: {
+          category?:
+            | Database["public"]["Enums"]["recommendation_category"]
+            | null
+          comment_count?: number | null
+          created_at?: string | null
+          description?: string | null
+          entity_id?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_certified?: boolean | null
+          rating?: number | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          venue?: string | null
+          view_count?: number | null
+          visibility?:
+            | Database["public"]["Enums"]["recommendation_visibility"]
+            | null
+        }
+        Relationships: []
+      }
       review_likes: {
         Row: {
           created_at: string
@@ -757,6 +949,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reviews_backup: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          entity_id: string | null
+          experience_date: string | null
+          id: string | null
+          image_url: string | null
+          is_converted: boolean | null
+          media: Json | null
+          metadata: Json | null
+          rating: number | null
+          recommendation_id: string | null
+          status: string | null
+          subtitle: string | null
+          title: string | null
+          updated_at: string | null
+          user_id: string | null
+          venue: string | null
+          visibility:
+            | Database["public"]["Enums"]["recommendation_visibility"]
+            | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          entity_id?: string | null
+          experience_date?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_converted?: boolean | null
+          media?: Json | null
+          metadata?: Json | null
+          rating?: number | null
+          recommendation_id?: string | null
+          status?: string | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          venue?: string | null
+          visibility?:
+            | Database["public"]["Enums"]["recommendation_visibility"]
+            | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          entity_id?: string | null
+          experience_date?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_converted?: boolean | null
+          media?: Json | null
+          metadata?: Json | null
+          rating?: number | null
+          recommendation_id?: string | null
+          status?: string | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          venue?: string | null
+          visibility?:
+            | Database["public"]["Enums"]["recommendation_visibility"]
+            | null
+        }
+        Relationships: []
       }
     }
     Views: {

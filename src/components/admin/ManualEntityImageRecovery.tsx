@@ -5,11 +5,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { refreshEntityImage } from '@/services/recommendation/entityOperations';
 import { supabase } from '@/integrations/supabase/client';
-import { AlertCircle, InfoIcon, CheckCircle2, Loader2, Search, XCircle, AlertTriangle } from 'lucide-react';
+import { AlertCircle, InfoIcon, CheckCircle2, Loader2, Search, XCircle, AlertTriangle, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 type Entity = {
   id: string;
@@ -38,6 +40,9 @@ export const ManualEntityImageRecovery = () => {
   const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending' | 'success' | 'error' | 'missing_reference'>('all');
+  const [isBulkRecoveryRunning, setIsBulkRecoveryRunning] = useState(false);
+  const [bulkRecoveryProgress, setBulkRecoveryProgress] = useState({ total: 0, processed: 0, success: 0, failed: 0 });
+  const [includeWithoutReference, setIncludeWithoutReference] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -245,6 +250,131 @@ export const ManualEntityImageRecovery = () => {
     }
   };
 
+  const startBulkRecovery = async () => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'You must be logged in to perform this operation',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Filter entities that can be recovered (have photo references)
+    const recoverableEntities = entities.filter(entity => {
+      // If includeWithoutReference is true, include all entities
+      // Otherwise, only include entities with photo references
+      return includeWithoutReference || entity.metadata?.photo_reference;
+    });
+
+    if (recoverableEntities.length === 0) {
+      toast({
+        title: 'No Entities to Recover',
+        description: 'There are no entities that can be recovered.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Initialize bulk recovery
+    setIsBulkRecoveryRunning(true);
+    setBulkRecoveryProgress({
+      total: recoverableEntities.length,
+      processed: 0,
+      success: 0,
+      failed: 0
+    });
+
+    let successCount = 0;
+    let failedCount = 0;
+    const processedEntityIds: string[] = [];
+
+    // Process entities in batches of 5 to avoid overloading
+    const batchSize = 5;
+    for (let i = 0; i < recoverableEntities.length; i += batchSize) {
+      const batch = recoverableEntities.slice(i, i + batchSize);
+      
+      // Process batch in parallel
+      await Promise.all(batch.map(async (entity) => {
+        // Skip entities without photo references if includeWithoutReference is false
+        if (!entity.metadata?.photo_reference && !includeWithoutReference) {
+          return;
+        }
+
+        // Update status to loading
+        setRecoveryStatus(prev => ({
+          ...prev,
+          [entity.id]: { status: 'loading' }
+        }));
+
+        try {
+          // If entity has photo reference, try to recover it
+          if (entity.metadata?.photo_reference) {
+            const success = await refreshEntityImage(entity.id);
+            
+            if (success) {
+              setRecoveryStatus(prev => ({
+                ...prev,
+                [entity.id]: { status: 'success', message: 'Image recovered successfully' }
+              }));
+              successCount++;
+            } else {
+              setRecoveryStatus(prev => ({
+                ...prev,
+                [entity.id]: { status: 'error', message: 'Failed to recover image' }
+              }));
+              failedCount++;
+            }
+          } else {
+            // Mark as missing reference if includeWithoutReference is true
+            if (includeWithoutReference) {
+              setRecoveryStatus(prev => ({
+                ...prev,
+                [entity.id]: { status: 'missing_reference', message: 'Missing photo reference' }
+              }));
+              failedCount++;
+            }
+          }
+        } catch (error) {
+          console.error(`Error recovering image for entity ${entity.id}:`, error);
+          setRecoveryStatus(prev => ({
+            ...prev,
+            [entity.id]: { status: 'error', message: `Error: ${(error as Error).message}` }
+          }));
+          failedCount++;
+        }
+
+        // Add to processed entities
+        processedEntityIds.push(entity.id);
+
+        // Update progress
+        setBulkRecoveryProgress(prev => ({
+          ...prev,
+          processed: prev.processed + 1,
+          success: successCount,
+          failed: failedCount
+        }));
+      }));
+
+      // Pause between batches to avoid rate limiting
+      if (i + batchSize < recoverableEntities.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    // Remove successfully processed entities from the list
+    setEntities(prev => prev.filter(e => !processedEntityIds.includes(e.id)));
+
+    // Complete bulk recovery
+    setIsBulkRecoveryRunning(false);
+    
+    toast({
+      title: 'Bulk Recovery Complete',
+      description: `Processed ${recoverableEntities.length} entities: ${successCount} successful, ${failedCount} failed`,
+      variant: successCount > 0 ? 'default' : 'destructive',
+    });
+  };
+
   const renderStatusBadge = (entityId: string) => {
     const status = recoveryStatus[entityId];
     
@@ -294,7 +424,7 @@ export const ManualEntityImageRecovery = () => {
       <CardHeader>
         <CardTitle>Manual Entity Image Recovery</CardTitle>
         <CardDescription>
-          Manually recover images for Google Places entities one by one
+          Recover images for Google Places entities individually or in bulk
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -302,13 +432,12 @@ export const ManualEntityImageRecovery = () => {
         
         <Alert className="mb-4">
           <InfoIcon className="h-4 w-4" />
-          <AlertTitle>How Manual Recovery Works</AlertTitle>
+          <AlertTitle>Entity Image Recovery</AlertTitle>
           <AlertDescription>
-            <p>This tool allows you to recover Google Places images one at a time:</p>
+            <p>This tool allows you to recover Google Places images:</p>
             <ol className="list-decimal ml-5 mt-2">
-              <li>Each entity is listed below with its details</li>
-              <li>Click the "Recover Image" button next to an entity</li>
-              <li>The system will attempt to fetch and store a fresh image</li>
+              <li>Recover images one at a time or use bulk recovery</li>
+              <li>Filter by status to focus on specific entities</li>
               <li>Successfully recovered entities will be removed from the list</li>
             </ol>
           </AlertDescription>
@@ -324,72 +453,127 @@ export const ManualEntityImageRecovery = () => {
             </AlertDescription>
           </Alert>
         )}
-        
-        <div className="flex flex-col md:flex-row gap-4 items-center">
-          <div className="relative w-full md:w-1/2">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or venue..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative w-full md:w-1/2">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or venue..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex gap-2 w-full md:w-auto flex-wrap">
+              <Button 
+                variant={filter === 'all' ? 'default' : 'outline'}
+                onClick={() => setFilter('all')}
+                size="sm"
+              >
+                All
+              </Button>
+              <Button 
+                variant={filter === 'pending' ? 'default' : 'outline'}
+                onClick={() => setFilter('pending')}
+                size="sm"
+              >
+                Pending
+              </Button>
+              <Button 
+                variant={filter === 'missing_reference' ? 'default' : 'outline'}
+                onClick={() => setFilter('missing_reference')}
+                size="sm"
+                className={filter === 'missing_reference' ? '' : 'border-amber-300 text-amber-800'}
+              >
+                Missing Reference
+              </Button>
+              <Button 
+                variant={filter === 'success' ? 'default' : 'outline'}
+                onClick={() => setFilter('success')}
+                size="sm"
+              >
+                Success
+              </Button>
+              <Button 
+                variant={filter === 'error' ? 'default' : 'outline'}
+                onClick={() => setFilter('error')}
+                size="sm"
+              >
+                Failed
+              </Button>
+            </div>
+            
+            <Button 
+              onClick={fetchEntities} 
+              disabled={isLoading}
+              size="sm"
+              className="w-full md:w-auto"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                'Refresh List'
+              )}
+            </Button>
           </div>
           
-          <div className="flex gap-2 w-full md:w-auto flex-wrap">
+          {/* Bulk Recovery Section */}
+          <div className="bg-slate-50 p-4 rounded-lg border">
+            <h3 className="text-lg font-medium mb-4">Bulk Recovery Options</h3>
+            
+            <div className="flex items-center space-x-2 mb-4">
+              <Switch 
+                id="include-without-reference" 
+                checked={includeWithoutReference}
+                onCheckedChange={setIncludeWithoutReference}
+              />
+              <Label htmlFor="include-without-reference">
+                Include entities without photo references (will attempt recovery via API)
+              </Label>
+            </div>
+
             <Button 
-              variant={filter === 'all' ? 'default' : 'outline'}
-              onClick={() => setFilter('all')}
-              size="sm"
+              onClick={startBulkRecovery}
+              disabled={isBulkRecoveryRunning || entities.length === 0}
+              className="w-full sm:w-auto"
+              variant="default"
             >
-              All
+              {isBulkRecoveryRunning ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing ({bulkRecoveryProgress.processed}/{bulkRecoveryProgress.total})...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Bulk Recover All Images
+                </>
+              )}
             </Button>
-            <Button 
-              variant={filter === 'pending' ? 'default' : 'outline'}
-              onClick={() => setFilter('pending')}
-              size="sm"
-            >
-              Pending
-            </Button>
-            <Button 
-              variant={filter === 'missing_reference' ? 'default' : 'outline'}
-              onClick={() => setFilter('missing_reference')}
-              size="sm"
-              className={filter === 'missing_reference' ? '' : 'border-amber-300 text-amber-800'}
-            >
-              Missing Reference
-            </Button>
-            <Button 
-              variant={filter === 'success' ? 'default' : 'outline'}
-              onClick={() => setFilter('success')}
-              size="sm"
-            >
-              Success
-            </Button>
-            <Button 
-              variant={filter === 'error' ? 'default' : 'outline'}
-              onClick={() => setFilter('error')}
-              size="sm"
-            >
-              Failed
-            </Button>
-          </div>
-          
-          <Button 
-            onClick={fetchEntities} 
-            disabled={isLoading}
-            size="sm"
-            className="w-full md:w-auto"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              'Refresh List'
+            
+            {isBulkRecoveryRunning && (
+              <div className="mt-4 text-sm">
+                <div className="flex justify-between mb-1">
+                  <span>Processing: {bulkRecoveryProgress.processed}/{bulkRecoveryProgress.total}</span>
+                  <span>
+                    Success: {bulkRecoveryProgress.success} | 
+                    Failed: {bulkRecoveryProgress.failed}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className="bg-blue-600 h-2.5 rounded-full" 
+                    style={{ width: `${(bulkRecoveryProgress.processed / bulkRecoveryProgress.total) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
             )}
-          </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -444,7 +628,7 @@ export const ManualEntityImageRecovery = () => {
                         variant="outline"
                         size="sm"
                         disabled={
-                          hasMissingReference ||
+                          (hasMissingReference && !includeWithoutReference) ||
                           recoveryStatus[entity.id]?.status === 'loading' ||
                           recoveryStatus[entity.id]?.status === 'missing_reference'
                         }
@@ -465,7 +649,7 @@ export const ManualEntityImageRecovery = () => {
                             <XCircle className="mr-2 h-3 w-3" />
                             Try Again
                           </>
-                        ) : hasMissingReference || recoveryStatus[entity.id]?.status === 'missing_reference' ? (
+                        ) : hasMissingReference && !includeWithoutReference ? (
                           <>
                             <AlertTriangle className="mr-2 h-3 w-3" />
                             Can't Recover
@@ -491,7 +675,6 @@ export const ManualEntityImageRecovery = () => {
       <CardFooter className="border-t p-4 text-sm text-muted-foreground">
         <div>
           Note: Successfully recovered images are saved to Supabase Storage and will be removed from this list.
-          Entities missing photo references cannot be recovered.
         </div>
       </CardFooter>
     </Card>
