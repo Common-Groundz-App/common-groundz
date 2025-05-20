@@ -98,6 +98,7 @@ export type Database = {
           metadata: Json | null
           name: string
           open_graph_data: Json | null
+          photo_reference: string | null
           popularity_score: number | null
           slug: string | null
           type: Database["public"]["Enums"]["entity_type"]
@@ -120,6 +121,7 @@ export type Database = {
           metadata?: Json | null
           name: string
           open_graph_data?: Json | null
+          photo_reference?: string | null
           popularity_score?: number | null
           slug?: string | null
           type: Database["public"]["Enums"]["entity_type"]
@@ -142,6 +144,7 @@ export type Database = {
           metadata?: Json | null
           name?: string
           open_graph_data?: Json | null
+          photo_reference?: string | null
           popularity_score?: number | null
           slug?: string | null
           type?: Database["public"]["Enums"]["entity_type"]

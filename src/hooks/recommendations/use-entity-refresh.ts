@@ -37,7 +37,19 @@ export const useEntityImageRefresh = () => {
           throw new Error(errorData.error || 'Failed to refresh entity image');
         }
 
-        const { imageUrl } = await response.json();
+        const { imageUrl, photoReference: newPhotoRef } = await response.json();
+        
+        // Update the photo_reference in the entity record
+        if (newPhotoRef && newPhotoRef !== photoReference) {
+          const { error: updateError } = await supabase
+            .from('entities')
+            .update({ photo_reference: newPhotoRef })
+            .eq('id', entityId);
+            
+          if (updateError) {
+            console.warn(`Error updating photo reference: ${updateError.message}`);
+          }
+        }
         
         toast({
           title: 'Image refreshed',
@@ -107,5 +119,64 @@ export const useEntityImageRefresh = () => {
     }
   };
 
-  return { refreshEntityImage, isRefreshing };
+  // New function to check if entity image is stored in our storage
+  const isEntityImageMigrated = (imageUrl?: string): boolean => {
+    if (!imageUrl) return false;
+    return imageUrl.includes('entity-images') || imageUrl.includes('storage.googleapis.com');
+  };
+
+  // New function to migrate a batch of entity images
+  const migrateEntityImages = async (limit: number = 10): Promise<{ 
+    success: number, 
+    failed: number,
+    total: number 
+  }> => {
+    try {
+      setIsRefreshing(true);
+      
+      const response = await supabase.functions.invoke('migrate-entity-images', {
+        body: { limit }
+      });
+      
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      
+      const result = response.data;
+      
+      toast({
+        title: 'Image Migration Batch Complete',
+        description: `Successfully migrated ${result.successful} of ${result.processed} images.`
+      });
+      
+      return {
+        success: result.successful,
+        failed: result.failed,
+        total: result.processed
+      };
+    } catch (error) {
+      console.error('Error migrating entity images:', error);
+      
+      toast({
+        title: 'Migration Error',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive'
+      });
+      
+      return {
+        success: 0,
+        failed: 0,
+        total: 0
+      };
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  return { 
+    refreshEntityImage, 
+    isRefreshing, 
+    isEntityImageMigrated,
+    migrateEntityImages
+  };
 };
