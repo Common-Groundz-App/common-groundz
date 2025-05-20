@@ -1,10 +1,8 @@
-
 import React, { useEffect } from 'react';
 import { EntityImageMigration } from '@/components/admin/EntityImageMigration';
 import { EntityImageRecovery } from '@/components/admin/EntityImageRecovery';
 import { ManualEntityImageRecovery } from '@/components/admin/ManualEntityImageRecovery';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, InfoIcon, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -25,11 +23,11 @@ const Admin = () => {
     }
   }, [user, toast]);
   
-  // Simple admin check - in a real app, you'd use roles
-  // This is just a basic protection to avoid accidental access
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
+  // Temporarily disabled admin check to allow access
+  // In a real app, you'd use roles or other security measures
+  // if (!user) {
+  //   return <Navigate to="/auth" replace />;
+  // }
   
   return (
     <div className="container mx-auto py-8 px-4">
