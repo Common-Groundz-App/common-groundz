@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
@@ -292,6 +291,8 @@ export const findOrCreateEntity = async (
           
         if (updateError) {
           console.error('Error updating entity with processed image URL:', updateError);
+        } else {
+          console.log(`Successfully updated entity with processed image URL: ${processedImageUrl}`);
         }
         
         // Return updated entity
@@ -317,6 +318,8 @@ export const findOrCreateEntity = async (
           
         if (updateError) {
           console.error('Error updating entity with processed image URL:', updateError);
+        } else {
+          console.log(`Successfully updated entity with processed image URL: ${processedImageUrl}`);
         }
         
         // Return updated entity
