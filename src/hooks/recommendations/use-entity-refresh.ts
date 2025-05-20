@@ -26,14 +26,25 @@ export const useEntityImageRefresh = () => {
     setIsRefreshing(true);
     
     try {
+      console.log(`Starting image refresh for entity ${entityId}`, { placeId, photoReference });
+      
       // For Google Places entities, use the edge function
       if (placeId) {
         console.log(`Refreshing Google Places image for entity ${entityId} with place ID ${placeId}`);
+        
+        // Get current session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.error('No active session found for edge function authorization');
+          throw new Error('Authentication required to refresh image');
+        }
+        
         const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabase.auth.getSession()}`
+            'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
             placeId,
@@ -43,11 +54,21 @@ export const useEntityImageRefresh = () => {
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
+          const errorText = await response.text();
+          console.error('Error response from refresh-entity-image:', errorText);
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || 'Failed to refresh entity image' };
+          }
           throw new Error(errorData.error || 'Failed to refresh entity image');
         }
 
-        const { imageUrl, photoReference: newPhotoRef } = await response.json();
+        const responseData = await response.json();
+        console.log('Successful image refresh response:', responseData);
+        
+        const { imageUrl, photoReference: newPhotoRef } = responseData;
         
         // Update the photo_reference in the entity record
         if (newPhotoRef && newPhotoRef !== photoReference) {
@@ -78,10 +99,12 @@ export const useEntityImageRefresh = () => {
           .single();
 
         if (error) {
+          console.error(`Error fetching entity: ${error.message}`);
           throw new Error(`Error fetching entity: ${error.message}`);
         }
 
         if (!entity?.image_url) {
+          console.warn('No image URL found for entity:', entityId);
           toast({
             title: 'No image to refresh',
             description: 'This entity does not have an image to refresh.',
@@ -92,6 +115,7 @@ export const useEntityImageRefresh = () => {
 
         // Check if the image is already stored in our storage
         if (isEntityImageMigrated(entity.image_url)) {
+          console.log('Image already saved in storage:', entity.image_url);
           toast({
             title: 'Image already saved',
             description: 'This image is already stored securely in our system.',
@@ -105,8 +129,11 @@ export const useEntityImageRefresh = () => {
         const newImageUrl = await saveExternalImageToStorage(entity.image_url, entityId);
         
         if (!newImageUrl) {
+          console.error('Failed to save entity image to storage');
           throw new Error('Failed to save entity image to storage');
         }
+        
+        console.log('Image saved successfully, updating entity record with new URL:', newImageUrl);
         
         // Update the entity record with the new image URL
         const { error: updateError } = await supabase
@@ -115,6 +142,7 @@ export const useEntityImageRefresh = () => {
           .eq('id', entityId);
           
         if (updateError) {
+          console.error(`Error updating entity: ${updateError.message}`);
           throw new Error(`Error updating entity: ${updateError.message}`);
         }
 
@@ -157,3 +185,4 @@ export const useEntityImageRefresh = () => {
     isEntityImageMigrated
   };
 };
+

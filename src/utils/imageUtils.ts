@@ -99,6 +99,8 @@ export const getEntityTypeFallbackImage = (entityType: string): string => {
  */
 export const saveExternalImageToStorage = async (imageUrl: string, entityId: string): Promise<string | null> => {
   try {
+    console.log('Starting image save process for entity:', entityId);
+    
     // Convert any non-HTTPS URLs to HTTPS
     const secureUrl = ensureHttps(imageUrl);
     
@@ -120,6 +122,20 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
     }
     
     console.log('Fetching external image for storage:', secureUrl);
+    
+    // Check if the entity-images bucket exists
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    
+    if (bucketsError) {
+      console.error('Error listing storage buckets:', bucketsError);
+      return null;
+    }
+    
+    const bucketExists = buckets.some(b => b.name === 'entity-images');
+    if (!bucketExists) {
+      console.error('entity-images bucket does not exist. Please create it first.');
+      return null;
+    }
     
     // Fetch the image with retries
     let response;
@@ -146,6 +162,8 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
         if (response.ok) {
           break; // Successful response, exit retry loop
         }
+        
+        console.warn(`Fetch attempt ${retryCount + 1} failed with status: ${response.status}`);
         
         // If status is 429 (Too Many Requests) wait longer
         if (response.status === 429) {
@@ -193,7 +211,22 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       });
       
     if (error) {
+      // Log detailed error information
       console.error('Failed to upload image to storage:', error);
+      
+      if (error.message.includes('storage/duplicate_file')) {
+        console.log('Duplicate file detected, attempting to get public URL anyway');
+        const { data: { publicUrl } } = supabase.storage
+          .from('entity-images')
+          .getPublicUrl(filePath);
+        return publicUrl;
+      }
+      
+      // Check if it's a permission error
+      if (error.message.includes('storage/permission_denied')) {
+        console.error('Permission denied error. Check RLS policies for entity-images bucket');
+      }
+      
       return null;
     }
     
@@ -202,10 +235,11 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       .from('entity-images')
       .getPublicUrl(filePath);
       
-    console.log('Image saved to storage:', publicUrl);
+    console.log('Image saved to storage successfully:', publicUrl);
     return publicUrl;
   } catch (error) {
     console.error('Error saving image to storage:', error);
     return null;
   }
 };
+

@@ -30,7 +30,7 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
     const fileName = `${entityId}_${Date.now()}.${fileExt}`;
     const filePath = `${entityId}/${fileName}`;
     
-    console.log(`Uploading image to storage: ${filePath}`);
+    console.log(`Uploading image to storage: ${filePath} (${contentType}, size: ${imageBlob.size} bytes)`);
     
     // Upload to our storage
     const { data, error: uploadError } = await supabase.storage
@@ -41,6 +41,7 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
       });
       
     if (uploadError) {
+      console.error("Storage upload error:", uploadError);
       throw new Error(`Storage upload failed: ${uploadError.message}`);
     }
     
@@ -54,6 +55,47 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
   } catch (error) {
     console.error(`Error saving image to storage:`, error);
     return null;
+  }
+}
+
+// Create a bucket if it doesn't exist
+async function ensureBucketExists(supabase: any, bucketName: string) {
+  try {
+    // List buckets to check if our bucket exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      console.error("Error listing buckets:", listError);
+      throw listError;
+    }
+    
+    // Check if bucket exists
+    const bucketExists = buckets.some(bucket => bucket.name === bucketName);
+    
+    if (!bucketExists) {
+      console.log(`Bucket ${bucketName} doesn't exist, creating it...`);
+      
+      // Create the bucket
+      const { data, error: createError } = await supabase.storage.createBucket(bucketName, {
+        public: true,
+        fileSizeLimit: 10485760, // 10MB
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      });
+      
+      if (createError) {
+        console.error(`Error creating bucket ${bucketName}:`, createError);
+        throw createError;
+      }
+      
+      console.log(`Bucket ${bucketName} created successfully`);
+    } else {
+      console.log(`Bucket ${bucketName} already exists`);
+    }
+    
+    return bucketExists;
+  } catch (error) {
+    console.error("Error ensuring bucket exists:", error);
+    return false;
   }
 }
 
@@ -79,7 +121,10 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Get request data
-    const { placeId, photoReference, entityId } = await req.json();
+    const requestData = await req.json();
+    const { placeId, photoReference, entityId } = requestData;
+    
+    console.log("Request received:", { placeId, photoReference, entityId });
     
     if (!placeId) {
       return new Response(
@@ -101,9 +146,14 @@ serve(async (req) => {
       );
     }
 
+    // Ensure the entity-images bucket exists
+    await ensureBucketExists(supabase, ENTITY_IMAGES_BUCKET);
+
     // If we have a photo reference, use it directly
     if (photoReference) {
       const googleImageUrl = buildGooglePhotoUrl(photoReference, GOOGLE_PLACES_API_KEY);
+      
+      console.log("Using provided photo reference to fetch image:", photoReference);
       
       // Save image to our storage
       const storedImageUrl = await saveImageToStorage(googleImageUrl, entityId, supabase);
@@ -135,6 +185,8 @@ serve(async (req) => {
     }
 
     // If no photo reference, fetch place details to get one
+    console.log("No photo reference provided, fetching place details for:", placeId);
+    
     const detailsUrl = new URL("https://maps.googleapis.com/maps/api/place/details/json");
     detailsUrl.searchParams.append("place_id", placeId);
     detailsUrl.searchParams.append("fields", "photos");
@@ -152,6 +204,8 @@ serve(async (req) => {
       const newPhotoRef = data.result.photos[0].photo_reference;
       
       if (newPhotoRef) {
+        console.log("Found new photo reference:", newPhotoRef);
+        
         const googleImageUrl = buildGooglePhotoUrl(newPhotoRef, GOOGLE_PLACES_API_KEY);
         
         // Save image to our storage
@@ -204,3 +258,4 @@ serve(async (req) => {
     );
   }
 });
+

@@ -2,129 +2,35 @@
 project_id = "uyjtgybbktgapspodajy"
 
 [api]
-# Port to use for the API URL.
+enabled = true
 port = 54321
-# Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
-# endpoints. public and storage are always included.
 schemas = ["public", "storage", "graphql_public"]
-# Extra schemas to add to the search_path of every request. public is always included.
-extra_search_path = ["public", "extensions"]
-# Maximum rows returns in a single REST request.
-max_rows = 1000
 
 [db]
-# Port to use for the local database URL.
 port = 54322
-# Port used by the API to connect to the database.
-shadow_port = 54320
-# The database major version to use. This has to be the same as your remote database's. Run `SHOW
-# server_version;` on the remote database to check.
-major_version = 15
 
 [studio]
 enabled = true
-# Port to use for Supabase Studio.
 port = 54323
-# External URL of the API server that frontend connects to.
-api_url = "http://localhost"
 
-# Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
-# are monitored, and you can view the emails that would have been sent from the web interface.
 [inbucket]
-# Port to use for the email testing server web interface.
+enabled = true
 port = 54324
-# Uncomment to expose additional ports for testing user applications that send emails.
-# smtp_port = 54325
-# pop3_port = 54326
 
 [auth]
-# The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
-# in emails.
-site_url = "http://localhost:3000"
-# A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://localhost:3000"]
-# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
-jwt_expiry = 3600
-# If disabled, the refresh token will never expire.
-enable_refresh_token_rotation = true
-# Allows refresh tokens to be reused after expiry, up to the specified interval in seconds.
-# Requires enable_refresh_token_rotation = true.
-refresh_token_reuse_interval = 10
-# Whether to enable email confirmations. If enabled, users need to confirm their email address
-# before signing in.
-enable_email_signup = true
-# Allow/disallow new user signups to your project.
-enable_signup = true
+enabled = true
+port = 54325
 
-[auth.email]
-# Allow/disallow new user signups via email to your project.
-enable_signup = true
-# If enabled, a user will be required to confirm any email change on both the old, and new email
-# addresses. If disabled, only the new email is required to confirm.
-double_confirm_changes = true
-# If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+[storage]
+enabled = true
+port = 54326
 
-# Configure one of the supported auth providers.
-# [auth.external.apple]
-# enabled = false
-# client_id = ""
-# secret = ""
-# # Overrides the default auth redirectUrl.
-# redirect_uri = ""
-# # Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,
-# # or any other third-party OIDC providers.
-# url = ""
-
-[functions]
-# Port to use for Functions API URL.
-port = 9999
+[realtime]
+enabled = true
+port = 54327
 
 [functions.refresh-entity-image]
 verify_jwt = true
 
-[functions.fetch-url-metadata]
+[functions.ensure-bucket-policies]
 verify_jwt = true
-
-[functions.search-all]
-verify_jwt = true
-
-[functions.search-places]
-verify_jwt = true
-
-[functions.search-books]
-verify_jwt = true
-
-[functions.search-food]
-verify_jwt = true
-
-[functions.search-products]
-verify_jwt = true
-
-[functions.search-movies]
-verify_jwt = true
-
-[functions.migrate-entity-images]
-verify_jwt = true
-
-[[metadata.functions]]
-name = "migrate-entity-images"
-id = "migrate-entity-images"
-slug = "migrate-entity-images"
-version = "1.0.0"
-status = "active"
-verify_jwt = true
-
-[storage]
-# The maximum file size allowed (e.g. "5MB", "500KB").
-file_size_limit = "50MiB"
-
-[storage.uploads]
-file_size_limit = "50MiB"
-
-[[metadata.buckets]]
-name = "entity-images"
-id = "entity-images"
-public = true
-file_size_limit = "10MiB"
-allowed_mime_types = ["image/jpg", "image/jpeg", "image/png", "image/gif", "image/webp"]

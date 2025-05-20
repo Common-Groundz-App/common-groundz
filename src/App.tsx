@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,8 +17,15 @@ import { TooltipProvider } from './components/ui/tooltip';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ContentViewerProvider } from './contexts/ContentViewerContext';
 import ContentViewerModal from './components/content/ContentViewerModal';
+import { useEffect } from 'react';
+import { initializeStorageService } from './services/storageService';
 
 function App() {
+  useEffect(() => {
+    // Initialize storage service on app start
+    initializeStorageService();
+  }, []);
+
   return (
     <ThemeProvider>
       <ContentViewerProvider>
