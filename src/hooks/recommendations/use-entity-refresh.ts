@@ -8,6 +8,15 @@ export const useEntityImageRefresh = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
+  /**
+   * Refreshes an entity's image by either fetching a new Google Places image
+   * or downloading the existing external URL to our storage.
+   * 
+   * @param entityId The ID of the entity
+   * @param placeId Optional Google Places ID for Google Places entities
+   * @param photoReference Optional photo reference for Google Places images
+   * @returns The URL of the refreshed image or null if the refresh failed
+   */
   const refreshEntityImage = async (entityId: string, placeId?: string, photoReference?: string): Promise<string | null> => {
     if (!entityId) {
       console.error('Entity ID is required to refresh image');
@@ -19,6 +28,7 @@ export const useEntityImageRefresh = () => {
     try {
       // For Google Places entities, use the edge function
       if (placeId) {
+        console.log(`Refreshing Google Places image for entity ${entityId} with place ID ${placeId}`);
         const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
           method: 'POST',
           headers: {
@@ -52,8 +62,8 @@ export const useEntityImageRefresh = () => {
         }
         
         toast({
-          title: 'Image refreshed',
-          description: 'The entity image has been successfully updated.'
+          title: 'Google Places image refreshed',
+          description: 'The entity image has been successfully updated from Google Places.'
         });
 
         return imageUrl;
@@ -63,7 +73,7 @@ export const useEntityImageRefresh = () => {
         // Get current entity data
         const { data: entity, error } = await supabase
           .from('entities')
-          .select('image_url')
+          .select('image_url, name')
           .eq('id', entityId)
           .single();
 
@@ -79,6 +89,17 @@ export const useEntityImageRefresh = () => {
           });
           return null;
         }
+
+        // Check if the image is already stored in our storage
+        if (isEntityImageMigrated(entity.image_url)) {
+          toast({
+            title: 'Image already saved',
+            description: 'This image is already stored securely in our system.',
+          });
+          return entity.image_url;
+        }
+
+        console.log(`Migrating external image to storage for entity ${entityId}: ${entity.image_url}`);
 
         // Migrate the external image to our storage
         const newImageUrl = await saveExternalImageToStorage(entity.image_url, entityId);
@@ -98,13 +119,13 @@ export const useEntityImageRefresh = () => {
         }
 
         toast({
-          title: 'Image saved',
-          description: 'The entity image has been saved to our storage.'
+          title: 'Image saved locally',
+          description: `The image for "${entity.name}" has been saved to our secure storage.`
         });
         
         return newImageUrl;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error refreshing entity image:', error);
       
       toast({
@@ -119,7 +140,12 @@ export const useEntityImageRefresh = () => {
     }
   };
 
-  // Function to check if entity image is stored in our storage
+  /**
+   * Checks if an entity image is stored in our storage system
+   * 
+   * @param imageUrl The image URL to check
+   * @returns True if the image is stored in our system, false otherwise
+   */
   const isEntityImageMigrated = (imageUrl?: string): boolean => {
     if (!imageUrl) return false;
     return imageUrl.includes('entity-images') || imageUrl.includes('storage.googleapis.com');

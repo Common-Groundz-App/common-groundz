@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart } from 'lucide-react';
+import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
@@ -22,6 +22,7 @@ import NavBarComponent from '@/components/NavBarComponent';
 import Footer from '@/components/Footer';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { formatRelativeDate } from '@/utils/dateUtils';
+import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -34,6 +35,12 @@ const EntityDetail = () => {
   // New state variables to control the visibility of forms
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
+  
+  // Add state for image refresh
+  const [isRefreshingImage, setIsRefreshingImage] = useState(false);
+  
+  // Import the entity image refresh hook
+  const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
   
   const {
     entity,
@@ -169,6 +176,47 @@ const EntityDetail = () => {
     }
   };
 
+  // New function to handle image refresh
+  const handleImageRefresh = async () => {
+    if (!entity) return;
+    
+    setIsRefreshingImage(true);
+    
+    try {
+      // Call the refresh function from the hook
+      const newImageUrl = await refreshEntityImage(
+        entity.id, 
+        entity.api_source === 'google_places' ? entity.api_ref : undefined, 
+        entity.photo_reference
+      );
+      
+      if (newImageUrl) {
+        toast({
+          title: 'Image refreshed',
+          description: 'The image has been successfully updated.',
+        });
+        
+        // Refresh the entity data to show the new image
+        refreshData();
+      } else {
+        toast({
+          title: 'Image refresh failed',
+          description: 'Unable to refresh the image. Please try again later.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing image:', error);
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred while refreshing the image.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshingImage(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
@@ -188,13 +236,45 @@ const EntityDetail = () => {
               <div className="flex flex-col md:flex-row gap-8">
                 {/* Entity Image */}
                 <div className="w-full md:w-1/3 lg:w-1/4">
-                  <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20">
+                  <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
                     <ImageWithFallback
                       src={entity?.image_url || ''}
                       alt={entity?.name || 'Entity image'}
                       className="w-full h-full object-cover"
                       fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
                     />
+                    
+                    {/* Image source indicator and refresh button */}
+                    {entity?.image_url && (
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        {/* Image source indicator */}
+                        <Badge 
+                          variant="outline" 
+                          className={`${
+                            isEntityImageMigrated(entity.image_url) 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' 
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
+                          } opacity-80 group-hover:opacity-100`}
+                        >
+                          <Image className="h-3 w-3 mr-1" />
+                          {isEntityImageMigrated(entity.image_url) ? 'Local' : 'External'}
+                        </Badge>
+                        
+                        {/* Refresh button - only show for users */}
+                        {user && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 bg-white/80 dark:bg-black/50 opacity-80 group-hover:opacity-100"
+                            onClick={handleImageRefresh}
+                            disabled={isRefreshing || isRefreshingImage}
+                          >
+                            <RefreshCw className={`h-3 w-3 ${(isRefreshing || isRefreshingImage) ? 'animate-spin' : ''}`} />
+                            <span className="sr-only">Refresh image</span>
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </AspectRatio>
                 </div>
                 

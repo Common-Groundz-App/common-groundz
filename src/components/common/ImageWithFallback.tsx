@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { ensureHttps, getEntityTypeFallbackImage } from '@/utils/urlUtils';
-import { isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
+import { ensureHttps } from '@/utils/urlUtils';
+import { isValidImageUrl, isGooglePlacesImage, getEntityTypeFallbackImage } from '@/utils/imageUtils';
 
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackSrc?: string;

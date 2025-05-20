@@ -113,13 +113,60 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       return secureUrl;
     }
     
+    // Skip Google Places images - they need to be handled by the refresh-entity-image function
+    if (isGooglePlacesImage(secureUrl)) {
+      console.log('Google Places image detected, should be handled by refresh-entity-image function:', secureUrl);
+      return secureUrl;
+    }
+    
     console.log('Fetching external image for storage:', secureUrl);
     
-    // Fetch the image
-    const response = await fetch(secureUrl);
-    if (!response.ok) {
-      console.error('Failed to fetch image for storage migration:', secureUrl, response.status, response.statusText);
-      return null;
+    // Fetch the image with retries
+    let response;
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    while (retryCount <= maxRetries) {
+      try {
+        // Using AbortController to set a timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        response = await fetch(secureUrl, { 
+          signal: controller.signal,
+          headers: {
+            // Add a cache-busting query parameter to the URL
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          break; // Successful response, exit retry loop
+        }
+        
+        // If status is 429 (Too Many Requests) wait longer
+        if (response.status === 429) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
+        }
+      } catch (fetchError) {
+        console.warn(`Fetch attempt ${retryCount + 1} failed:`, fetchError);
+        
+        // If it's the last retry, re-throw the error
+        if (retryCount >= maxRetries) {
+          throw fetchError;
+        }
+      }
+      
+      retryCount++;
+      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+    }
+    
+    if (!response || !response.ok) {
+      console.error('Failed to fetch image for storage migration:', response?.status, response?.statusText);
+      throw new Error(`Failed to fetch image: ${response?.status} ${response?.statusText}`);
     }
     
     // Get image data
@@ -129,7 +176,13 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
     const fileName = `${entityId}_${Date.now()}.${fileExt}`;
     const filePath = `${entityId}/${fileName}`;
     
-    console.log(`Uploading image to storage: ${filePath} (${contentType})`);
+    console.log(`Uploading image to storage: ${filePath} (${contentType}, size: ${blob.size} bytes)`);
+    
+    // Validate blob size
+    if (blob.size <= 0) {
+      console.error('Received empty image blob from', secureUrl);
+      return null;
+    }
     
     // Upload to Supabase storage
     const { data, error } = await supabase.storage
