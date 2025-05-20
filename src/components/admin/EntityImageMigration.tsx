@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { setupEntityImagesBucket, migrateExistingEntityImages } from '@/services/migration/setupEntityImages';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, InfoIcon } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/AuthContext';
 
 type MigrationResults = {
   total: number;
@@ -15,26 +17,44 @@ type MigrationResults = {
 
 export const EntityImageMigration = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
   const [isBucketSetup, setIsBucketSetup] = useState<boolean | null>(null);
   const [results, setResults] = useState<MigrationResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [verboseLog, setVerboseLog] = useState<string[]>([]);
 
   const setupBucket = async () => {
+    if (!user) {
+      setError("You must be logged in to perform this operation");
+      toast({
+        title: "Authentication required",
+        description: "Please log in to access storage features",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsRunning(true);
     setError(null);
+    
+    // Add to verbose log
+    addToLog("Starting bucket verification...");
     
     try {
       const success = await setupEntityImagesBucket();
       setIsBucketSetup(success);
       
       if (success) {
+        addToLog("✅ Storage bucket verification successful");
         toast({
           title: "Success",
           description: "Entity images bucket access verified successfully",
         });
       } else {
-        setError("Failed to verify entity-images bucket access. Please check the console for details.");
+        const errorMsg = "Failed to verify entity-images bucket access. Please check the console for details.";
+        setError(errorMsg);
+        addToLog("❌ " + errorMsg);
         toast({
           title: "Error",
           description: "Failed to verify bucket access. See console for details.",
@@ -42,8 +62,10 @@ export const EntityImageMigration = () => {
         });
       }
     } catch (err) {
+      const errorMsg = "An unexpected error occurred while verifying bucket access";
       console.error("Error verifying bucket:", err);
-      setError("An unexpected error occurred while verifying bucket access");
+      setError(errorMsg);
+      addToLog("❌ " + errorMsg);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -55,27 +77,39 @@ export const EntityImageMigration = () => {
   };
 
   const runMigration = async () => {
+    if (!user) {
+      setError("You must be logged in to perform this operation");
+      return;
+    }
+    
     setIsRunning(true);
     setError(null);
+    
+    // Add to verbose log
+    addToLog("Starting image migration...");
     
     try {
       const migrationResults = await migrateExistingEntityImages();
       setResults(migrationResults);
       
       if (migrationResults.processed > 0) {
+        addToLog(`✅ Processed ${migrationResults.processed} images, ${migrationResults.successful} successful`);
         toast({
           title: "Migration Complete",
           description: `Processed ${migrationResults.processed} images, ${migrationResults.successful} successful`,
         });
       } else {
+        addToLog("ℹ️ No entity images needed migration");
         toast({
           title: "No Images to Process",
           description: "No entity images needed migration",
         });
       }
     } catch (err) {
+      const errorMsg = "An unexpected error occurred during migration";
       console.error("Error running migration:", err);
-      setError("An unexpected error occurred during migration");
+      setError(errorMsg);
+      addToLog("❌ " + errorMsg);
       toast({
         title: "Error",
         description: "An unexpected error occurred during migration",
@@ -85,10 +119,29 @@ export const EntityImageMigration = () => {
       setIsRunning(false);
     }
   };
+  
+  const addToLog = (message: string) => {
+    setVerboseLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+  };
 
   const getProgressPercentage = () => {
     if (!results || results.processed === 0) return 0;
     return Math.round((results.successful / results.processed) * 100);
+  };
+
+  const renderAuthWarning = () => {
+    if (!user) {
+      return (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Authentication Required</AlertTitle>
+          <AlertDescription>
+            You must be logged in to perform storage operations. Please log in and try again.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    return null;
   };
 
   return (
@@ -100,6 +153,8 @@ export const EntityImageMigration = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {renderAuthWarning()}
+        
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Step 1: Verify Storage Bucket</h3>
           <p className="text-sm text-muted-foreground">
@@ -108,10 +163,12 @@ export const EntityImageMigration = () => {
           </p>
           <Button 
             onClick={setupBucket} 
-            disabled={isRunning || isBucketSetup === true}
+            disabled={isRunning || isBucketSetup === true || !user}
             variant={isBucketSetup === true ? "outline" : "default"}
           >
-            {isBucketSetup === true ? "✓ Bucket Ready" : "Verify Storage Bucket"}
+            {isRunning && "Checking..."}
+            {!isRunning && isBucketSetup === true && "✓ Bucket Ready"}
+            {!isRunning && isBucketSetup !== true && "Verify Storage Bucket"}
           </Button>
           {isBucketSetup === true && (
             <div className="flex items-center gap-2 text-sm text-green-600">
@@ -129,7 +186,7 @@ export const EntityImageMigration = () => {
           </p>
           <Button 
             onClick={runMigration} 
-            disabled={isRunning || isBucketSetup !== true}
+            disabled={isRunning || isBucketSetup !== true || !user}
           >
             {isRunning ? "Running Migration..." : "Start Migration"}
           </Button>
@@ -164,16 +221,30 @@ export const EntityImageMigration = () => {
         )}
 
         {error && (
-          <div className="p-4 border border-red-200 bg-red-50 text-red-700 rounded-md">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="w-5 h-5" />
-              <p className="font-medium">Error</p>
+          <Alert variant="destructive" className="my-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              <p>{error}</p>
+              <p className="text-sm mt-2">
+                Check that the "entity-images" bucket exists in your Supabase project and 
+                has the correct RLS policies for public access.
+              </p>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {verboseLog.length > 0 && (
+          <div className="space-y-2 mt-6">
+            <div className="flex items-center gap-2">
+              <InfoIcon className="h-4 w-4" />
+              <h4 className="text-sm font-medium">Diagnostic Log</h4>
             </div>
-            <p className="text-sm">{error}</p>
-            <p className="text-sm mt-2">
-              Check that the "entity-images" bucket exists in your Supabase project and 
-              has the correct RLS policies for public access.
-            </p>
+            <div className="bg-muted p-2 rounded-md max-h-48 overflow-y-auto">
+              {verboseLog.map((log, index) => (
+                <div key={index} className="text-xs font-mono py-1">{log}</div>
+              ))}
+            </div>
           </div>
         )}
       </CardContent>

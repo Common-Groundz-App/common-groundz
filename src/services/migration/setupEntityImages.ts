@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { shouldDownloadImage } from '@/utils/imageUtils';
 import { batchProcessEntityImages } from '@/services/mediaService';
@@ -8,41 +9,58 @@ import { batchProcessEntityImages } from '@/services/mediaService';
  */
 export const setupEntityImagesBucket = async (): Promise<boolean> => {
   try {
-    // Check if the bucket exists (we expect it to exist after manual creation)
-    const { data: buckets, error } = await supabase.storage.listBuckets();
+    console.log('Verifying entity-images bucket access...');
     
-    if (error) {
-      console.error('Error checking storage buckets:', error);
+    // First check if the user is authenticated - needed for some storage operations
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('Authentication required: User must be logged in to verify bucket access');
       return false;
     }
     
-    // Find if our bucket exists
+    console.log('Authenticated as user:', user.id);
+    
+    // Test bucket existence by trying to list files (simplest permission test)
+    const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+    
+    if (bucketError) {
+      console.error('Error accessing storage buckets:', bucketError.message);
+      console.error('Storage API error details:', bucketError);
+      return false;
+    }
+    
+    // Check if our specific bucket exists
+    console.log('Available buckets:', buckets.map(b => b.name).join(', '));
     const bucketExists = buckets.some(bucket => bucket.name === 'entity-images');
     
     if (!bucketExists) {
       console.error('The entity-images bucket does not exist in your Supabase project.');
       console.error('Please create it manually in the Supabase dashboard with public access.');
       return false;
-    } else {
-      console.log('entity-images bucket found');
-      
-      // Test bucket access by listing files (to verify permissions)
-      const { error: listError } = await supabase.storage
-        .from('entity-images')
-        .list();
-        
-      if (listError) {
-        console.error('Error accessing entity-images bucket:', listError);
-        console.error('Please check bucket permissions in the Supabase dashboard.');
-        return false;
-      }
-      
-      console.log('Successfully verified entity-images bucket access');
     }
     
+    console.log('entity-images bucket found');
+    
+    // Test bucket access by trying to list files
+    const { data: files, error: listError } = await supabase.storage
+      .from('entity-images')
+      .list('', {
+        limit: 1,
+        offset: 0,
+        sortBy: { column: 'name', order: 'asc' }
+      });
+      
+    if (listError) {
+      console.error('Error accessing entity-images bucket:', listError.message);
+      console.error('This may be a permissions issue with your bucket policies');
+      console.error('Make sure public access is enabled and the bucket has appropriate RLS policies');
+      return false;
+    }
+    
+    console.log('Successfully verified entity-images bucket access, found', files?.length || 0, 'files');
     return true;
   } catch (error) {
-    console.error('Error in setupEntityImagesBucket:', error);
+    console.error('Unexpected error in setupEntityImagesBucket:', error);
     return false;
   }
 };
@@ -64,10 +82,11 @@ export const migrateExistingEntityImages = async (): Promise<{
   try {
     console.log('Starting migration of existing entity images...');
     
-    // First, make sure our bucket exists
+    // First, make sure our bucket exists and is accessible
     const bucketSetup = await setupEntityImagesBucket();
     if (!bucketSetup) {
-      console.error('Failed to set up storage bucket, canceling migration');
+      console.error('Failed to verify storage bucket access, canceling migration');
+      console.error('Please check that the entity-images bucket exists and has proper permissions');
       return results;
     }
     
@@ -79,7 +98,7 @@ export const migrateExistingEntityImages = async (): Promise<{
       .eq('is_deleted', false);
       
     if (error) {
-      console.error('Error fetching entities for migration:', error);
+      console.error('Error fetching entities for migration:', error.message);
       return results;
     }
     
