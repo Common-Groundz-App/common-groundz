@@ -1,6 +1,6 @@
 
 import * as React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import HeroSection from '@/components/HeroSection';
 import FeaturesSection from '@/components/FeaturesSection';
@@ -11,9 +11,11 @@ import NavBarComponent from '@/components/NavBarComponent';
 
 const Index = () => {
   const { user } = useAuth();
+  const location = useLocation();
 
-  // Redirect to /home if user is logged in
-  if (user) {
+  // Don't redirect to /home if the user is trying to access /admin
+  // Only redirect to /home if we're on the exact root path
+  if (user && location.pathname === '/') {
     return <Navigate to="/home" replace />;
   }
 
