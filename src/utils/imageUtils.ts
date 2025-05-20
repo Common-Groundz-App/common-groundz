@@ -138,7 +138,7 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
           return secureUrl; // Return original URL as fallback
         }
         
-        // Call the refresh-entity-image edge function with the photo reference
+        // Call the refresh-entity-image edge function with the photo reference and improved headers
         console.log('Calling refresh-entity-image with photo reference:', photoReference);
         
         const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
@@ -176,6 +176,27 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
             
           if (updateError) {
             console.error('Error updating entity with processed image URL:', updateError);
+            
+            // Implement retry logic for critical updates
+            console.log('Retrying entity image update...');
+            let retrySuccess = false;
+            
+            for (let i = 0; i < 3 && !retrySuccess; i++) {
+              // Wait before retrying (exponential backoff)
+              await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, i)));
+              
+              const { error: retryError } = await supabase
+                .from('entities')
+                .update({ image_url: data.imageUrl })
+                .eq('id', entityId);
+                
+              if (!retryError) {
+                console.log(`Successfully updated entity image URL on retry attempt ${i + 1}`);
+                retrySuccess = true;
+              } else {
+                console.error(`Retry attempt ${i + 1} failed:`, retryError);
+              }
+            }
           } else {
             console.log('Entity updated with new image URL after processing');
           }

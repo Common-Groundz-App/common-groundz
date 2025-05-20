@@ -48,7 +48,7 @@ export const useEntityImageRefresh = () => {
           throw new Error('Authentication required to refresh image');
         }
         
-        // Use supabase.functions.invoke for better integration and error handling
+        // Use supabase.functions.invoke with proper headers for better integration and error handling
         const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
           headers: {
             'Accept': 'application/json',
@@ -120,7 +120,32 @@ export const useEntityImageRefresh = () => {
           
         if (imageUpdateError) {
           console.error('Error updating entity image URL:', imageUpdateError);
-          // We'll still return the URL even if the update failed
+          
+          // Implement retry logic for critical updates
+          console.log('Retrying entity image update...');
+          const retryAttempts = 3;
+          let retrySuccess = false;
+          
+          for (let i = 0; i < retryAttempts && !retrySuccess; i++) {
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, i)));
+            
+            const { error: retryError } = await supabase
+              .from('entities')
+              .update({ image_url: imageUrl })
+              .eq('id', entityId);
+              
+            if (!retryError) {
+              console.log(`Successfully updated entity image URL on retry attempt ${i + 1}`);
+              retrySuccess = true;
+            } else {
+              console.error(`Retry attempt ${i + 1} failed:`, retryError);
+            }
+          }
+          
+          if (!retrySuccess) {
+            console.error(`Failed to update entity image URL after ${retryAttempts} attempts`);
+          }
         } else {
           console.log('Successfully updated entity with new image URL:', imageUrl);
         }

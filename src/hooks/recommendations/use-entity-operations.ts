@@ -49,8 +49,15 @@ export const useEntityOperations = () => {
         title: 'Refreshing image...',
         description: 'This may take a few seconds'
       });
+
+      // Get current session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('[useEntityOperations] No active session found for edge function authorization');
+        throw new Error('Authentication required to refresh image');
+      }
       
-      // Use the processEntityImage function from the service
+      // Use the processEntityImage function from the service with improved headers
       const processedImageUrl = await processEntityImage(
         entityId,
         imageUrl,
@@ -82,7 +89,7 @@ export const useEntityOperations = () => {
             
             // Wait a bit before retrying
             if (attempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, 500 * attempts));
+              await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempts)));
             }
           } else {
             updateSuccess = true;
@@ -145,6 +152,13 @@ export const useEntityOperations = () => {
 
     try {
       setIsLoading(true);
+
+      // Get session for authentication checks
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('[useEntityOperations] No active session found for entity creation');
+        throw new Error('Authentication required to create entity');
+      }
 
       if (websiteUrl) {
         const urlMetadata = await fetchUrlMetadata(websiteUrl);
@@ -216,6 +230,14 @@ export const useEntityOperations = () => {
         // Use a Promise to ensure we wait for the image refresh to complete
         const refreshImagePromise = new Promise<Entity>(async (resolve) => {
           try {
+            // Get a new session since we might be in a different context now
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            if (!currentSession) {
+              console.error('[useEntityOperations] No active session found for image refresh');
+              resolve(entity); // Return the entity without trying to refresh
+              return;
+            }
+            
             const refreshedImageUrl = await refreshEntityImage(
               entity.id,
               entity.image_url,

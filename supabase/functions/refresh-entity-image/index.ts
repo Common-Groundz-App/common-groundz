@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.33.2";
 
@@ -28,6 +27,7 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
     });
     
     if (!imageResponse.ok) {
+      console.error(`[refresh-entity-image] Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
       throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
     }
     
@@ -36,6 +36,11 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
     
     const imageBlob = await imageResponse.blob();
     console.log(`[refresh-entity-image] Image downloaded, size: ${imageBlob.size} bytes`);
+    
+    if (imageBlob.size === 0) {
+      console.error('[refresh-entity-image] Downloaded image has zero size');
+      throw new Error('Downloaded image has zero size');
+    }
     
     const fileExt = contentType?.split("/")[1] || "jpeg";
     const fileName = `${entityId}_${Date.now()}.${fileExt}`;
@@ -94,6 +99,29 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
       
     if (updateError) {
       console.error("[refresh-entity-image] Error updating entity with new image URL:", updateError);
+      
+      // Try a few more times in case of transient issues
+      let retrySuccess = false;
+      for (let i = 0; i < 3 && !retrySuccess; i++) {
+        await new Promise(r => setTimeout(r, 500 * Math.pow(2, i)));
+        
+        const { error: retryError } = await supabase
+          .from('entities')
+          .update({ image_url: publicUrl })
+          .eq('id', entityId);
+          
+        if (!retryError) {
+          console.log(`[refresh-entity-image] Successfully updated entity on retry attempt ${i + 1}`);
+          retrySuccess = true;
+          break;
+        } else {
+          console.error(`[refresh-entity-image] Retry attempt ${i + 1} failed:`, retryError);
+        }
+      }
+      
+      if (!retrySuccess) {
+        console.error("[refresh-entity-image] All update attempts failed");
+      }
     } else {
       console.log("[refresh-entity-image] Successfully updated entity with new image URL");
     }
@@ -307,6 +335,23 @@ serve(async (req) => {
           
         if (updateImageError) {
           console.error("[refresh-entity-image] Error updating entity image:", updateImageError);
+          
+          // Try with retries for critical updates
+          let retrySuccess = false;
+          for (let i = 0; i < 3 && !retrySuccess; i++) {
+            await new Promise(r => setTimeout(r, 500 * Math.pow(2, i)));
+            
+            const { error: retryError } = await supabase
+              .from('entities')
+              .update({ image_url: storedImageUrl })
+              .eq('id', entityId);
+              
+            if (!retryError) {
+              console.log(`[refresh-entity-image] Successfully updated entity image on retry ${i+1}`);
+              retrySuccess = true;
+              break;
+            }
+          }
         }
         
         return new Response(
