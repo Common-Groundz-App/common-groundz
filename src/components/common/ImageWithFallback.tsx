@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ensureHttps, getEntityTypeFallbackImage } from '@/utils/urlUtils';
+import { isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
 
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackSrc?: string;
@@ -31,6 +32,15 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     if (src) {
       setHasError(false);
       setRetryCount(0);
+      
+      if (!isValidImageUrl(src)) {
+        // If URL is invalid after processing, use fallback
+        console.log("ImageWithFallback: Invalid image URL, using fallback for entity type:", entityType);
+        setImgSrc(actualFallback);
+        setHasError(true);
+        return;
+      }
+      
       const secureUrl = ensureHttps(src);
       
       if (!secureUrl) {
@@ -50,13 +60,13 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     // For Google Places URLs, which can be problematic, try one retry
-    const isGooglePlacesUrl = imgSrc && imgSrc.includes('maps.googleapis.com');
+    const isGooglePlaces = imgSrc && isGooglePlacesImage(imgSrc);
     
     if (!hasError && retryCount < maxRetries && imgSrc && !imgSrc.startsWith('data:')) {
       // Try once more (network issues)
       setRetryCount(prev => prev + 1);
       
-      if (isGooglePlacesUrl) {
+      if (isGooglePlaces) {
         console.log("Google Places image failed to load, trying with cache buster:", imgSrc);
         // For Google Places URLs, add a cache buster
         setTimeout(() => {

@@ -7,9 +7,54 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ENTITY_IMAGES_BUCKET = 'entity-images';
+
 // Build a Google Places photo URL from photo reference
 function buildGooglePhotoUrl(photoReference: string, apiKey: string): string {
   return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${photoReference}&key=${apiKey}`;
+}
+
+// Function to save an image from URL to our storage bucket
+async function saveImageToStorage(imageUrl: string, entityId: string, supabase: any) {
+  try {
+    console.log(`Downloading image from: ${imageUrl}`);
+    
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
+    }
+    
+    const contentType = imageResponse.headers.get("content-type");
+    const imageBlob = await imageResponse.blob();
+    const fileExt = contentType?.split("/")[1] || "jpeg";
+    const fileName = `${entityId}_${Date.now()}.${fileExt}`;
+    const filePath = `${entityId}/${fileName}`;
+    
+    console.log(`Uploading image to storage: ${filePath}`);
+    
+    // Upload to our storage
+    const { data, error: uploadError } = await supabase.storage
+      .from(ENTITY_IMAGES_BUCKET)
+      .upload(filePath, imageBlob, {
+        contentType,
+        upsert: false,
+      });
+      
+    if (uploadError) {
+      throw new Error(`Storage upload failed: ${uploadError.message}`);
+    }
+    
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from(ENTITY_IMAGES_BUCKET)
+      .getPublicUrl(filePath);
+      
+    console.log(`Image saved to storage: ${publicUrl}`);
+    return publicUrl;
+  } catch (error) {
+    console.error(`Error saving image to storage:`, error);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -34,7 +79,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Get request data
-    const { placeId, photoReference } = await req.json();
+    const { placeId, photoReference, entityId } = await req.json();
     
     if (!placeId) {
       return new Response(
@@ -45,12 +90,46 @@ serve(async (req) => {
         }
       );
     }
+    
+    if (!entityId) {
+      return new Response(
+        JSON.stringify({ error: "Entity ID is required" }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
 
     // If we have a photo reference, use it directly
     if (photoReference) {
-      const imageUrl = buildGooglePhotoUrl(photoReference, GOOGLE_PLACES_API_KEY);
+      const googleImageUrl = buildGooglePhotoUrl(photoReference, GOOGLE_PLACES_API_KEY);
+      
+      // Save image to our storage
+      const storedImageUrl = await saveImageToStorage(googleImageUrl, entityId, supabase);
+      
+      if (!storedImageUrl) {
+        throw new Error("Failed to save Google Places image to storage");
+      }
+      
+      // Update entity record with new image URL
+      const { error: updateError } = await supabase
+        .from('entities')
+        .update({ 
+          image_url: storedImageUrl, 
+          photo_reference: photoReference 
+        })
+        .eq('id', entityId);
+        
+      if (updateError) {
+        console.error("Error updating entity record:", updateError);
+      }
+      
       return new Response(
-        JSON.stringify({ imageUrl }),
+        JSON.stringify({ 
+          imageUrl: storedImageUrl,
+          photoReference 
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -73,11 +152,31 @@ serve(async (req) => {
       const newPhotoRef = data.result.photos[0].photo_reference;
       
       if (newPhotoRef) {
-        const imageUrl = buildGooglePhotoUrl(newPhotoRef, GOOGLE_PLACES_API_KEY);
+        const googleImageUrl = buildGooglePhotoUrl(newPhotoRef, GOOGLE_PLACES_API_KEY);
+        
+        // Save image to our storage
+        const storedImageUrl = await saveImageToStorage(googleImageUrl, entityId, supabase);
+        
+        if (!storedImageUrl) {
+          throw new Error("Failed to save Google Places image to storage");
+        }
+        
+        // Update entity record with new image URL and photo reference
+        const { error: updateError } = await supabase
+          .from('entities')
+          .update({ 
+            image_url: storedImageUrl, 
+            photo_reference: newPhotoRef 
+          })
+          .eq('id', entityId);
+          
+        if (updateError) {
+          console.error("Error updating entity record:", updateError);
+        }
         
         return new Response(
           JSON.stringify({ 
-            imageUrl, 
+            imageUrl: storedImageUrl, 
             photoReference: newPhotoRef 
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -8,6 +8,8 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { StarIcon } from 'lucide-react';
+import { isGooglePlacesImage } from '@/utils/imageUtils';
+import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 
 interface Entity {
   id: string;
@@ -18,12 +20,16 @@ interface Entity {
   venue?: string;
   metadata?: any;
   popularity_score?: number;
+  api_ref?: string;
+  api_source?: string;
+  photo_reference?: string;
 }
 
 export const FeaturedEntities = () => {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const { refreshEntityImage } = useEntityImageRefresh();
 
   useEffect(() => {
     const fetchFeaturedEntities = async () => {
@@ -36,6 +42,44 @@ export const FeaturedEntities = () => {
         
         if (error) throw error;
         console.log(`FeaturedEntities: Fetched ${data?.length || 0} featured entities`);
+        
+        // Check if any entities have Google Places images that might need refreshing
+        const entitiesToUpdate = data?.filter(entity => 
+          entity.image_url && 
+          isGooglePlacesImage(entity.image_url) && 
+          entity.api_source === 'google_places' && 
+          entity.api_ref
+        );
+        
+        if (entitiesToUpdate && entitiesToUpdate.length > 0) {
+          console.log(`Found ${entitiesToUpdate.length} entities with Google Places images that may need refreshing`);
+          
+          // Process one entity to avoid rate limiting
+          const entityToRefresh = entitiesToUpdate[0];
+          
+          try {
+            const newImageUrl = await refreshEntityImage(
+              entityToRefresh.id, 
+              entityToRefresh.api_ref,
+              entityToRefresh.photo_reference
+            );
+            
+            if (newImageUrl) {
+              // Update the image URL in our local state
+              const updatedEntities = data.map(entity => 
+                entity.id === entityToRefresh.id 
+                  ? { ...entity, image_url: newImageUrl } 
+                  : entity
+              );
+              
+              setEntities(updatedEntities);
+              return;
+            }
+          } catch (refreshError) {
+            console.error("Error refreshing entity image:", refreshError);
+          }
+        }
+        
         setEntities(data || []);
       } catch (error) {
         console.error('Error fetching featured entities:', error);
