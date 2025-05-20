@@ -6,6 +6,7 @@ import type { Entity as ServiceEntity } from '@/services/recommendation/types';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
 import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
+import { saveExternalImageToStorage, isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
 
 // Define a simplified entity structure for the component's internal use
 interface Entity {
@@ -185,12 +186,39 @@ export function useEntitySearch(type: EntityTypeString) {
         }
       }
 
-      // Continue with creating a new entity if no existing one was found
-      const imageUrl = externalData.image_url || getEntityTypeFallbackImage(type);
-      console.log(`Creating entity with image: ${imageUrl} for type: ${type}`);
+      // Generate a new entity ID
+      const entityId = uuidv4();
       
+      // Set initial image URL from external data or use fallback
+      let imageUrl = externalData.image_url || getEntityTypeFallbackImage(type);
+      let storedImageUrl = null;
+      
+      console.log(`Processing image for entity: ${externalData.name}`, { originalUrl: imageUrl });
+      
+      // If we have an image URL and it's not a Google Places image, try to save it to our storage
+      // Google Places images need special handling via the refresh-entity-image function
+      if (imageUrl && isValidImageUrl(imageUrl) && !isGooglePlacesImage(imageUrl)) {
+        try {
+          // Download and store the external image
+          storedImageUrl = await saveExternalImageToStorage(imageUrl, entityId);
+          
+          if (storedImageUrl) {
+            console.log(`Successfully saved image to storage: ${storedImageUrl}`);
+            imageUrl = storedImageUrl;
+          } else {
+            console.warn(`Failed to save image to storage for ${externalData.name}, using original URL`);
+          }
+        } catch (imageError) {
+          console.error('Error saving image to storage:', imageError);
+          // Keep the original URL if storage fails
+        }
+      } else if (isGooglePlacesImage(imageUrl)) {
+        console.log(`Google Places image detected, will be processed via refresh-entity-image later`);
+      }
+      
+      // Prepare entity data for insertion
       const entityData = {
-        id: uuidv4(),
+        id: entityId,
         name: externalData.name,
         type,
         venue: externalData.venue,
@@ -198,13 +226,16 @@ export function useEntitySearch(type: EntityTypeString) {
         image_url: imageUrl,
         api_source: externalData.api_source,
         api_ref: externalData.api_ref,
+        photo_reference: externalData.metadata?.photos?.[0]?.photo_reference,
         metadata: externalData.metadata,
         is_deleted: false
       };
       
+      // Insert the entity into the database
       const { data, error } = await supabase
         .from('entities')
         .insert({
+          id: entityData.id, // Include the ID in the insert
           name: entityData.name,
           type: entityData.type,
           venue: entityData.venue,
@@ -212,6 +243,7 @@ export function useEntitySearch(type: EntityTypeString) {
           image_url: entityData.image_url,
           api_source: entityData.api_source,
           api_ref: entityData.api_ref,
+          photo_reference: entityData.photo_reference,
           metadata: entityData.metadata
         })
         .select()
@@ -221,6 +253,9 @@ export function useEntitySearch(type: EntityTypeString) {
         console.error('Error inserting entity:', error);
         throw error;
       }
+      
+      // For Google Places entities with photo_reference, we could refresh the image
+      // but we'll leave that for phase 5 with the manual refresh button
       
       return data as Entity;
     } catch (error) {
@@ -247,11 +282,34 @@ export function useEntitySearch(type: EntityTypeString) {
         throw new Error('Could not fetch metadata from URL');
       }
 
+      // Generate a new entity ID
+      const entityId = uuidv4();
+      
       // Get appropriate image or fallback
-      const imageUrl = data.metadata.og_image || data.metadata.image || getEntityTypeFallbackImage(type);
+      let imageUrl = data.metadata.og_image || data.metadata.image || getEntityTypeFallbackImage(type);
+      let storedImageUrl = null;
+      
+      // If we have a valid image URL, try to save it to our storage
+      if (imageUrl && isValidImageUrl(imageUrl)) {
+        try {
+          // Download and store the external image
+          storedImageUrl = await saveExternalImageToStorage(imageUrl, entityId);
+          
+          if (storedImageUrl) {
+            console.log(`Successfully saved image from URL metadata to storage: ${storedImageUrl}`);
+            imageUrl = storedImageUrl;
+          } else {
+            console.warn(`Failed to save image from URL metadata to storage, using original URL`);
+          }
+        } catch (imageError) {
+          console.error('Error saving image from URL metadata to storage:', imageError);
+          // Keep the original URL if storage fails
+        }
+      }
       
       // Create entity from the metadata - use string type
       const entityData = {
+        id: entityId,
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
         type,
         venue: data.metadata.site_name || new URL(url).hostname,
@@ -265,7 +323,17 @@ export function useEntitySearch(type: EntityTypeString) {
       // Insert the entity into our database
       const { data: insertData, error: insertError } = await supabase
         .from('entities')
-        .insert(entityData)
+        .insert({
+          id: entityData.id,
+          name: entityData.name,
+          type: entityData.type,
+          venue: entityData.venue,
+          description: entityData.description,
+          image_url: entityData.image_url,
+          api_source: entityData.api_source,
+          api_ref: entityData.api_ref,
+          metadata: entityData.metadata
+        })
         .select()
         .single();
       

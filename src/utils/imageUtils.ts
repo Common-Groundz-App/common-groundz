@@ -107,10 +107,18 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       return null;
     }
     
+    // Skip URLs that are already in our storage
+    if (secureUrl.includes('entity-images') || secureUrl.includes('storage.googleapis.com')) {
+      console.log('Image already in storage, skipping:', secureUrl);
+      return secureUrl;
+    }
+    
+    console.log('Fetching external image for storage:', secureUrl);
+    
     // Fetch the image
     const response = await fetch(secureUrl);
     if (!response.ok) {
-      console.error('Failed to fetch image for storage migration:', secureUrl);
+      console.error('Failed to fetch image for storage migration:', secureUrl, response.status, response.statusText);
       return null;
     }
     
@@ -120,6 +128,8 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
     const fileExt = contentType.split('/')[1] || 'jpg';
     const fileName = `${entityId}_${Date.now()}.${fileExt}`;
     const filePath = `${entityId}/${fileName}`;
+    
+    console.log(`Uploading image to storage: ${filePath} (${contentType})`);
     
     // Upload to Supabase storage
     const { data, error } = await supabase.storage
