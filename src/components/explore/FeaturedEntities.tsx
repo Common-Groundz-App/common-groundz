@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,23 +9,15 @@ import { cn } from '@/lib/utils';
 import { StarIcon } from 'lucide-react';
 import { isGooglePlacesImage } from '@/utils/imageUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
+import { Entity } from '@/services/recommendation/types'; 
 
-interface Entity {
-  id: string;
-  name: string;
-  type: string;
-  description?: string;
-  image_url?: string;
-  venue?: string;
-  metadata?: any;
-  popularity_score?: number;
-  api_ref?: string;
-  api_source?: string;
-  photo_reference?: string; // Added this property to match what's used in the code
+// Extended entity interface with photo_reference which might come from Google Places API
+interface ExtendedEntity extends Entity {
+  photo_reference?: string;
 }
 
 export const FeaturedEntities = () => {
-  const [entities, setEntities] = useState<Entity[]>([]);
+  const [entities, setEntities] = useState<ExtendedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { refreshEntityImage } = useEntityImageRefresh();
@@ -61,7 +52,8 @@ export const FeaturedEntities = () => {
             const newImageUrl = await refreshEntityImage(
               entityToRefresh.id, 
               entityToRefresh.api_ref,
-              entityToRefresh.photo_reference
+              // Cast to access the photo_reference property that might exist in metadata
+              (entityToRefresh as any).photo_reference || entityToRefresh.metadata?.photo_reference
             );
             
             if (newImageUrl) {
