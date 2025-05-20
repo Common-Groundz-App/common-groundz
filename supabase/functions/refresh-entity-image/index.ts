@@ -164,7 +164,10 @@ async function ensureBucketPolicies(supabase: any, bucketName: string) {
     
     if (error) {
       console.error(`Error updating bucket ${bucketName} to public:`, error);
-      return false;
+      // Try creating open policies as alternative approach
+      await supabase.rpc('create_storage_open_policy', {
+        bucket_id: bucketName
+      });
     }
     
     console.log(`Successfully updated bucket ${bucketName} to be public`);
@@ -182,6 +185,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Edge function refresh-entity-image started");
+    
     const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
     if (!GOOGLE_PLACES_API_KEY) {
       throw new Error("GOOGLE_PLACES_API_KEY is not set");
@@ -217,8 +222,7 @@ serve(async (req) => {
     const bucketPrepared = await ensureBucketPolicies(supabase, ENTITY_IMAGES_BUCKET);
     
     if (!bucketPrepared) {
-      console.error("Failed to prepare storage bucket");
-      // Continue anyway and see if we can still upload
+      console.error("Failed to prepare storage bucket. Will try to continue anyway.");
     }
 
     // If we have a photo reference, use it directly
@@ -234,18 +238,33 @@ serve(async (req) => {
         throw new Error("Failed to save Google Places image to storage");
       }
       
-      // Update entity record with new image URL
+      // Update entity record with new image URL and store the photo reference
       const { error: updateError } = await supabase
         .from('entities')
         .update({ 
-          image_url: storedImageUrl, 
-          photo_reference: photoReference 
+          image_url: storedImageUrl,
+          metadata: supabase.rpc('jsonb_set_key', {
+            json_data: supabase.rpc('get_entity_metadata', { entity_id: entityId }),
+            key_name: 'photo_reference',
+            new_value: photoReference
+          })
         })
         .eq('id', entityId);
         
       if (updateError) {
         console.error("Error updating entity record:", updateError);
+        // Try a simpler update without the metadata manipulation
+        const { error: simpleUpdateError } = await supabase
+          .from('entities')
+          .update({ image_url: storedImageUrl })
+          .eq('id', entityId);
+          
+        if (simpleUpdateError) {
+          console.error("Error with simple entity update:", simpleUpdateError);
+        }
       }
+      
+      console.log("Successfully updated entity image:", storedImageUrl);
       
       return new Response(
         JSON.stringify({ 
@@ -266,10 +285,16 @@ serve(async (req) => {
       detailsUrl.searchParams.append("key", GOOGLE_PLACES_API_KEY);
 
       const response = await fetch(detailsUrl.toString());
+      
+      if (!response.ok) {
+        throw new Error(`Google Places API error: ${response.status} ${response.statusText}`);
+      }
+      
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(`Google Places API error: ${data.error_message || "Unknown error"}`);
+      // Check response status
+      if (data.status !== "OK") {
+        throw new Error(`Google Places API error: ${data.status} - ${data.error_message || "Unknown error"}`);
       }
 
       // Check if the place has photos
@@ -333,7 +358,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in refresh-entity-image function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || "Unknown error occurred" }),
       { 
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
