@@ -141,29 +141,30 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
         // Call the refresh-entity-image edge function with the photo reference
         console.log('Calling refresh-entity-image with photo reference:', photoReference);
         
-        const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
-          method: 'POST',
+        const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
+            'Accept': 'application/json'
           },
-          body: JSON.stringify({
+          body: {
             photoReference,
             placeId, // This might be null, but that's okay
             entityId
-          })
+          }
         });
         
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error('Error response from refresh-entity-image:', errorData);
+        if (error) {
+          console.error('Error response from refresh-entity-image:', error);
           return secureUrl; // Return original URL as fallback
         }
         
-        const responseData = await response.json();
-        console.log('Successfully processed Google Places image:', responseData);
+        if (!data) {
+          console.error('No data returned from refresh-entity-image');
+          return secureUrl; // Return original URL as fallback
+        }
         
-        return responseData.imageUrl || secureUrl;
+        console.log('Successfully processed Google Places image:', data);
+        
+        return data.imageUrl || secureUrl;
       } catch (googlePlacesError) {
         console.error('Error processing Google Places image:', googlePlacesError);
         return secureUrl; // Return original URL as fallback
@@ -191,7 +192,8 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
           headers: {
             // Add a cache-busting query parameter to the URL
             'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            'Accept': '*/*'
           }
         });
         

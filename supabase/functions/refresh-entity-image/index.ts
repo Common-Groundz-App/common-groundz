@@ -1,9 +1,12 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.33.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Content-Type": "application/json",
+  "Accept": "application/json"
 };
 
 const ENTITY_IMAGES_BUCKET = 'entity-images';
@@ -18,7 +21,12 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
   try {
     console.log(`[refresh-entity-image] Downloading image from: ${imageUrl}`);
     
-    const imageResponse = await fetch(imageUrl);
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        "Accept": "*/*"
+      }
+    });
+    
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
     }
@@ -203,7 +211,14 @@ serve(async (req) => {
     }
 
     // We need to use the service role key to manage storage
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      global: { 
+        headers: { 
+          "Accept": "application/json",
+          "Content-Type": "application/json" 
+        } 
+      }
+    });
 
     // Get request data
     let requestData;
@@ -216,7 +231,7 @@ serve(async (req) => {
         JSON.stringify({ error: "Invalid JSON in request body" }),
         { 
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+          headers: corsHeaders
         }
       );
     }
@@ -234,7 +249,7 @@ serve(async (req) => {
         JSON.stringify({ error: "Entity ID is required" }),
         { 
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+          headers: corsHeaders
         }
       );
     }
@@ -262,42 +277,62 @@ serve(async (req) => {
         throw new Error("Failed to save Google Places image to storage");
       }
       
+      // First, fetch current entity data to get existing metadata
+      const { data: entity, error: entityError } = await supabase
+        .from('entities')
+        .select('*')
+        .eq('id', entityId)
+        .single();
+        
+      if (entityError) {
+        console.error("[refresh-entity-image] Error fetching entity:", entityError);
+        // Try to update just the image URL if we can't get the full entity data
+        const { error: updateImageError } = await supabase
+          .from('entities')
+          .update({ image_url: storedImageUrl })
+          .eq('id', entityId);
+          
+        if (updateImageError) {
+          console.error("[refresh-entity-image] Error updating entity image:", updateImageError);
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            imageUrl: storedImageUrl,
+            photoReference,
+            warning: "Updated image URL only, metadata update failed"
+          }),
+          { headers: corsHeaders }
+        );
+      }
+      
+      // Prepare updated metadata object
+      const currentMetadata = typeof entity.metadata === 'object' ? entity.metadata || {} : {};
+      const updatedMetadata = {
+        ...currentMetadata,
+        photo_reference: photoReference
+      };
+      
       // Update entity record with new image URL and store the photo reference
       const { error: updateError } = await supabase
         .from('entities')
         .update({ 
           image_url: storedImageUrl,
-          metadata: supabase.rpc('jsonb_set_key', {
-            json_data: supabase.rpc('get_entity_metadata', { entity_id: entityId }),
-            key_name: 'photo_reference',
-            new_value: photoReference
-          })
+          metadata: updatedMetadata
         })
         .eq('id', entityId);
         
       if (updateError) {
-        console.error("[refresh-entity-image] Error updating entity record with metadata:", updateError);
-        // Try a simpler update without the metadata manipulation
-        const { error: simpleUpdateError } = await supabase
+        console.error("[refresh-entity-image] Error updating entity record:", updateError);
+        
+        // Try one more time with just the image URL
+        const { error: imageOnlyUpdateError } = await supabase
           .from('entities')
-          .update({ 
-            image_url: storedImageUrl,
-            metadata: { photo_reference: photoReference }
-          })
+          .update({ image_url: storedImageUrl })
           .eq('id', entityId);
           
-        if (simpleUpdateError) {
-          console.error("[refresh-entity-image] Error with simple entity update:", simpleUpdateError);
-          
-          // Try one more time with just the image URL
-          const { error: imageOnlyUpdateError } = await supabase
-            .from('entities')
-            .update({ image_url: storedImageUrl })
-            .eq('id', entityId);
-            
-          if (imageOnlyUpdateError) {
-            console.error("[refresh-entity-image] Failed to update entity even with just image URL:", imageOnlyUpdateError);
-          }
+        if (imageOnlyUpdateError) {
+          console.error("[refresh-entity-image] Failed to update entity even with just image URL:", imageOnlyUpdateError);
         }
       }
       
@@ -308,7 +343,7 @@ serve(async (req) => {
           imageUrl: storedImageUrl,
           photoReference 
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: corsHeaders }
       );
     }
 
@@ -324,7 +359,11 @@ serve(async (req) => {
       console.log("[refresh-entity-image] Fetching place details from Google Places API");
       
       try {
-        const response = await fetch(detailsUrl.toString());
+        const response = await fetch(detailsUrl.toString(), {
+          headers: {
+            "Accept": "application/json"
+          }
+        });
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -356,23 +395,16 @@ serve(async (req) => {
               throw new Error("Failed to save Google Places image to storage");
             }
             
-            // Update entity record with new image URL and photo reference
-            const { error: updateError } = await supabase
+            // First, fetch current entity data to get existing metadata
+            const { data: entity, error: entityError } = await supabase
               .from('entities')
-              .update({ 
-                image_url: storedImageUrl,
-                metadata: supabase.rpc('jsonb_set_key', {
-                  json_data: supabase.rpc('get_entity_metadata', { entity_id: entityId }),
-                  key_name: 'photo_reference',
-                  new_value: newPhotoRef
-                })
-              })
-              .eq('id', entityId);
+              .select('*')
+              .eq('id', entityId)
+              .single();
               
-            if (updateError) {
-              console.error("[refresh-entity-image] Error updating entity record:", updateError);
-              
-              // Try a simpler approach with direct metadata
+            if (entityError) {
+              console.error("[refresh-entity-image] Error fetching entity:", entityError);
+              // Try to update just the image URL and photo reference
               const { error: simpleUpdateError } = await supabase
                 .from('entities')
                 .update({ 
@@ -382,14 +414,53 @@ serve(async (req) => {
                 .eq('id', entityId);
                 
               if (simpleUpdateError) {
-                console.error("[refresh-entity-image] Error with simple entity update:", simpleUpdateError);
+                console.error("[refresh-entity-image] Error with simple update:", simpleUpdateError);
                 
                 // Try one more time with just the image URL
                 const { error: imageOnlyUpdateError } = await supabase
                   .from('entities')
                   .update({ image_url: storedImageUrl })
                   .eq('id', entityId);
+                  
+                if (imageOnlyUpdateError) {
+                  console.error("[refresh-entity-image] Failed to update entity:", imageOnlyUpdateError);
+                }
               }
+              
+              return new Response(
+                JSON.stringify({ 
+                  imageUrl: storedImageUrl, 
+                  photoReference: newPhotoRef,
+                  warning: "Updated image but metadata update may have failed"
+                }),
+                { headers: corsHeaders }
+              );
+            }
+            
+            // Prepare updated metadata object
+            const currentMetadata = typeof entity.metadata === 'object' ? entity.metadata || {} : {};
+            const updatedMetadata = {
+              ...currentMetadata,
+              photo_reference: newPhotoRef
+            };
+            
+            // Update entity record with new image URL and photo reference
+            const { error: updateError } = await supabase
+              .from('entities')
+              .update({ 
+                image_url: storedImageUrl,
+                metadata: updatedMetadata
+              })
+              .eq('id', entityId);
+              
+            if (updateError) {
+              console.error("[refresh-entity-image] Error updating entity record:", updateError);
+              
+              // Try one more time with just the image URL
+              const { error: imageOnlyUpdateError } = await supabase
+                .from('entities')
+                .update({ image_url: storedImageUrl })
+                .eq('id', entityId);
             }
             
             return new Response(
@@ -397,7 +468,7 @@ serve(async (req) => {
                 imageUrl: storedImageUrl, 
                 photoReference: newPhotoRef 
               }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              { headers: corsHeaders }
             );
           }
         }
@@ -409,7 +480,7 @@ serve(async (req) => {
           JSON.stringify({ error: "No photos available for this place" }),
           { 
             status: 404,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
+            headers: corsHeaders
           }
         );
       } catch (googleApiError) {
@@ -423,7 +494,7 @@ serve(async (req) => {
       JSON.stringify({ error: "Either placeId or photoReference is required" }),
       { 
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        headers: corsHeaders
       }
     );
 
@@ -433,7 +504,7 @@ serve(async (req) => {
       JSON.stringify({ error: error.message || "Unknown error occurred" }),
       { 
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        headers: corsHeaders
       }
     );
   }

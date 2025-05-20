@@ -411,7 +411,7 @@ export const findOrCreateEntity = async (
           .from('entities')
           .update({
             metadata: {
-              ...metadata,
+              ...(typeof metadata === 'object' ? metadata : {}),
               photo_reference: metadata.photo_reference
             }
           })
@@ -432,7 +432,7 @@ export const findOrCreateEntity = async (
             .from('entities')
             .update({
               metadata: {
-                ...(metadata || {}),
+                ...(typeof metadata === 'object' ? metadata || {} : {}),
                 photo_reference: extractedPhotoRef
               }
             })
