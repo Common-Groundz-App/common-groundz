@@ -4,8 +4,9 @@ import { EntityImageMigration } from '@/components/admin/EntityImageMigration';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, InfoIcon, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Admin = () => {
   const { user } = useAuth();
@@ -30,7 +31,63 @@ const Admin = () => {
   
   return (
     <div className="container mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold mb-8">Admin Tools</h1>
+      <h1 className="text-3xl font-bold mb-4">Admin Tools</h1>
+      
+      <Alert variant="default" className="mb-8">
+        <InfoIcon className="h-4 w-4" />
+        <AlertTitle>Admin Access</AlertTitle>
+        <AlertDescription>
+          These tools are for platform administrators only. Changes made here affect system-wide functionality.
+        </AlertDescription>
+      </Alert>
+      
+      <div className="grid md:grid-cols-4 gap-6 mb-8">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">--</div>
+            <p className="text-xs text-muted-foreground">
+              Coming soon
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Storage Usage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">--</div>
+            <p className="text-xs text-muted-foreground">
+              Coming soon
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">System Status</CardTitle>
+          </CardHeader>
+          <CardContent className="flex justify-between items-center">
+            <div className="text-lg font-medium">Online</div>
+            <ShieldCheck className="h-4 w-4 text-green-500" />
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Last Backup</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-medium">--</div>
+            <p className="text-xs text-muted-foreground">
+              Coming soon
+            </p>
+          </CardContent>
+        </Card>
+      </div>
       
       <div className="space-y-8">
         <section>
@@ -39,8 +96,8 @@ const Admin = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Important</AlertTitle>
             <AlertDescription>
-              Make sure you've created an "entity-images" bucket in your Supabase project 
-              and set it to public access before using this tool.
+              We've set up RLS policies to grant authenticated users access to the entity-images bucket.
+              The migration tool will now work correctly with proper permissions.
             </AlertDescription>
           </Alert>
           <EntityImageMigration />

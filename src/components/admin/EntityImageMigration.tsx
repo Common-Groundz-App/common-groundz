@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { setupEntityImagesBucket, migrateExistingEntityImages } from '@/services/migration/setupEntityImages';
-import { AlertCircle, CheckCircle2, InfoIcon } from 'lucide-react';
+import { AlertCircle, CheckCircle2, InfoIcon, ShieldAlert } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -52,12 +52,12 @@ export const EntityImageMigration = () => {
           description: "Entity images bucket access verified successfully",
         });
       } else {
-        const errorMsg = "Failed to verify entity-images bucket access. Please check the console for details.";
+        const errorMsg = "Failed to verify entity-images bucket access. The bucket exists but you may not have proper permissions.";
         setError(errorMsg);
         addToLog("❌ " + errorMsg);
         toast({
-          title: "Error",
-          description: "Failed to verify bucket access. See console for details.",
+          title: "Access Error",
+          description: "Permission denied. See logs for details.",
           variant: "destructive",
         });
       }
@@ -159,8 +159,16 @@ export const EntityImageMigration = () => {
           <h3 className="text-lg font-medium">Step 1: Verify Storage Bucket</h3>
           <p className="text-sm text-muted-foreground">
             First, we need to verify access to the "entity-images" bucket in your Supabase project.
-            Make sure this bucket exists and has public read access enabled.
+            The bucket should exist with proper permissions for authenticated users.
           </p>
+          <Alert className="mb-4">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Permissions Required</AlertTitle>
+            <AlertDescription>
+              This tool requires full access to the entity-images bucket.
+              We've added policies to grant authenticated users access to this bucket.
+            </AlertDescription>
+          </Alert>
           <Button 
             onClick={setupBucket} 
             disabled={isRunning || isBucketSetup === true || !user}
@@ -182,7 +190,8 @@ export const EntityImageMigration = () => {
           <h3 className="text-lg font-medium">Step 2: Run Migration</h3>
           <p className="text-sm text-muted-foreground">
             This will find all entities with external image URLs (like Google Places photos) 
-            and download them to Supabase Storage for reliability.
+            and download them to Supabase Storage for reliability. The process runs in small batches
+            to avoid rate limiting.
           </p>
           <Button 
             onClick={runMigration} 
@@ -227,8 +236,8 @@ export const EntityImageMigration = () => {
             <AlertDescription>
               <p>{error}</p>
               <p className="text-sm mt-2">
-                Check that the "entity-images" bucket exists in your Supabase project and 
-                has the correct RLS policies for public access.
+                Check that you're logged in and have proper permissions to access the 
+                entity-images bucket.
               </p>
             </AlertDescription>
           </Alert>

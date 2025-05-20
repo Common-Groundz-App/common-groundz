@@ -1,3 +1,4 @@
+
 import { generateUUID } from '@/lib/uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';
@@ -152,46 +153,92 @@ export const downloadAndStoreEntityImage = async (
 
     console.log(`Downloading entity image from ${apiSource || 'unknown source'}:`, imageUrl);
     
-    // Fetch the image
-    const response = await fetch(imageUrl);
-    if (!response.ok) {
-      console.error(`Failed to download image (${response.status}):`, imageUrl);
-      return null;
-    }
-    
-    // Get the image as blob
-    const imageBlob = await response.blob();
-    
-    // Convert to file with a proper name
-    const file = new File(
-      [imageBlob], 
-      `entity_${entityId}_${Date.now()}.jpg`, 
-      { type: imageBlob.type || 'image/jpeg' }
-    );
-    
-    // Generate a path for this entity image
-    const filePath = generateEntityImagePath(entityId, apiSource);
-    
-    // Upload to storage
-    const { error: uploadError, data } = await supabase.storage
-      .from('entity-images')
-      .upload(filePath, file, {
-        cacheControl: '31536000', // Cache for 1 year
-        upsert: true
-      });
-
-    if (uploadError) {
-      console.error('Error uploading downloaded entity image:', uploadError);
-      return null;
-    }
-    
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('entity-images')
-      .getPublicUrl(filePath);
+    // Fetch the image with timeout and error handling
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-    console.log('Successfully stored entity image:', publicUrl);
-    return publicUrl;
+      const response = await fetch(imageUrl, { 
+        signal: controller.signal,
+        headers: {
+          // Add referrer and user agent to avoid being blocked
+          'Referer': 'https://lovable.dev/',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.error(`Failed to download image (${response.status}):`, imageUrl);
+        return null;
+      }
+      
+      // Get the image as blob
+      const imageBlob = await response.blob();
+      if (imageBlob.size === 0) {
+        console.error('Downloaded image has zero size');
+        return null;
+      }
+      
+      // Convert to file with a proper name
+      const file = new File(
+        [imageBlob], 
+        `entity_${entityId}_${Date.now()}.jpg`, 
+        { type: imageBlob.type || 'image/jpeg' }
+      );
+      
+      // Generate a path for this entity image
+      const filePath = generateEntityImagePath(entityId, apiSource);
+      
+      // Upload to storage with retry logic
+      let uploadAttempts = 0;
+      let uploadSuccess = false;
+      let uploadError = null;
+      let data = null;
+      
+      while (uploadAttempts < 3 && !uploadSuccess) {
+        try {
+          const result = await supabase.storage
+            .from('entity-images')
+            .upload(filePath, file, {
+              cacheControl: '31536000', // Cache for 1 year
+              upsert: true
+            });
+            
+          uploadError = result.error;
+          data = result.data;
+          
+          if (!uploadError) {
+            uploadSuccess = true;
+          } else {
+            uploadAttempts++;
+            console.log(`Upload attempt ${uploadAttempts} failed, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts)); // Exponential backoff
+          }
+        } catch (err) {
+          uploadAttempts++;
+          console.error('Upload attempt error:', err);
+          await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts));
+        }
+      }
+
+      if (uploadError) {
+        console.error('Error uploading downloaded entity image after retries:', uploadError);
+        return null;
+      }
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('entity-images')
+        .getPublicUrl(filePath);
+        
+      console.log('Successfully stored entity image:', publicUrl);
+      return publicUrl;
+    } catch (fetchError) {
+      console.error('Error fetching image:', fetchError);
+      return null;
+    }
     
   } catch (error) {
     console.error('Error in downloadAndStoreEntityImage:', error);
@@ -208,10 +255,12 @@ export const batchProcessEntityImages = async (
 ): Promise<Record<string, string | null>> => {
   const results: Record<string, string | null> = {};
   
-  // Process in batches to avoid overwhelming services
-  const batchSize = 5;
+  // Process in smaller batches with larger delays to avoid overwhelming services
+  const batchSize = 3; // Reduced batch size
   for (let i = 0; i < entities.length; i += batchSize) {
     const batch = entities.slice(i, i + batchSize);
+    
+    console.log(`Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(entities.length/batchSize)}`);
     
     // Process this batch in parallel
     const batchPromises = batch.map(async entity => {
@@ -220,21 +269,27 @@ export const batchProcessEntityImages = async (
         return;
       }
       
-      const storedUrl = await downloadAndStoreEntityImage(
-        entity.image_url,
-        entity.id,
-        entity.api_source
-      );
-      
-      results[entity.id] = storedUrl || entity.image_url; // Fall back to original if download fails
+      try {
+        const storedUrl = await downloadAndStoreEntityImage(
+          entity.image_url,
+          entity.id,
+          entity.api_source
+        );
+        
+        results[entity.id] = storedUrl || entity.image_url; // Fall back to original if download fails
+      } catch (error) {
+        console.error(`Error processing entity ${entity.id}:`, error);
+        results[entity.id] = entity.image_url; // Fall back to original on error
+      }
     });
     
     // Wait for this batch to complete before moving to next
     await Promise.all(batchPromises);
     
-    // Small delay between batches to avoid rate limiting
+    // Larger delay between batches to avoid rate limiting
     if (i + batchSize < entities.length) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log(`Waiting before processing next batch...`);
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay between batches
     }
   }
   

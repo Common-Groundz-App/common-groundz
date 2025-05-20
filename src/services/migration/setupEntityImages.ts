@@ -6,12 +6,13 @@ import { batchProcessEntityImages } from '@/services/mediaService';
 /**
  * Verify access to the entity-images storage bucket
  * This assumes the bucket has been manually created in the Supabase dashboard
+ * with proper RLS policies for authenticated users
  */
 export const setupEntityImagesBucket = async (): Promise<boolean> => {
   try {
     console.log('Verifying entity-images bucket access...');
     
-    // First check if the user is authenticated - needed for some storage operations
+    // First check if the user is authenticated - needed for storage operations
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       console.error('Authentication required: User must be logged in to verify bucket access');
@@ -20,45 +21,26 @@ export const setupEntityImagesBucket = async (): Promise<boolean> => {
     
     console.log('Authenticated as user:', user.id);
     
-    // Test bucket existence by trying to list files (simplest permission test)
-    const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
-    
-    if (bucketError) {
-      console.error('Error accessing storage buckets:', bucketError.message);
-      console.error('Storage API error details:', bucketError);
-      return false;
-    }
-    
-    // Check if our specific bucket exists
-    console.log('Available buckets:', buckets.map(b => b.name).join(', '));
-    const bucketExists = buckets.some(bucket => bucket.name === 'entity-images');
-    
-    if (!bucketExists) {
-      console.error('The entity-images bucket does not exist in your Supabase project.');
-      console.error('Please create it manually in the Supabase dashboard with public access.');
-      return false;
-    }
-    
-    console.log('entity-images bucket found');
-    
-    // Test bucket access by trying to list files
-    const { data: files, error: listError } = await supabase.storage
-      .from('entity-images')
-      .list('', {
-        limit: 1,
-        offset: 0,
-        sortBy: { column: 'name', order: 'asc' }
-      });
+    // Simplified bucket verification - Just try a basic operation
+    // This approach focuses on permissions rather than bucket existence
+    try {
+      // Just try to list a single file to test permissions
+      const { data, error } = await supabase.storage
+        .from('entity-images')
+        .list('', { limit: 1 });
       
-    if (listError) {
-      console.error('Error accessing entity-images bucket:', listError.message);
-      console.error('This may be a permissions issue with your bucket policies');
-      console.error('Make sure public access is enabled and the bucket has appropriate RLS policies');
+      if (error) {
+        console.error('Error accessing entity-images bucket:', error.message);
+        console.error('This is likely a permissions issue. Please check that RLS policies are properly set.');
+        return false;
+      }
+      
+      console.log('Successfully verified entity-images bucket access');
+      return true;
+    } catch (storageError) {
+      console.error('Storage API error:', storageError);
       return false;
     }
-    
-    console.log('Successfully verified entity-images bucket access, found', files?.length || 0, 'files');
-    return true;
   } catch (error) {
     console.error('Unexpected error in setupEntityImagesBucket:', error);
     return false;
@@ -86,7 +68,7 @@ export const migrateExistingEntityImages = async (): Promise<{
     const bucketSetup = await setupEntityImagesBucket();
     if (!bucketSetup) {
       console.error('Failed to verify storage bucket access, canceling migration');
-      console.error('Please check that the entity-images bucket exists and has proper permissions');
+      console.error('Please ensure you are logged in and that the entity-images bucket exists with proper permissions');
       return results;
     }
     
