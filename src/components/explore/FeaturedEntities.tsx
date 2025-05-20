@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,7 +13,8 @@ import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refres
 import { Entity } from '@/services/recommendation/types'; 
 
 // Extended entity interface with photo_reference which might come from Google Places API
-interface ExtendedEntity extends Entity {
+interface ExtendedEntity extends Omit<Entity, 'metadata'> {
+  metadata?: Record<string, any>;
   photo_reference?: string;
 }
 
@@ -49,11 +51,15 @@ export const FeaturedEntities = () => {
           const entityToRefresh = entitiesToUpdate[0];
           
           try {
+            // Safely extract photo_reference from metadata if it exists
+            const photoRef = entityToRefresh.metadata && 
+              typeof entityToRefresh.metadata === 'object' ? 
+              entityToRefresh.metadata.photo_reference : undefined;
+            
             const newImageUrl = await refreshEntityImage(
               entityToRefresh.id, 
               entityToRefresh.api_ref,
-              // Cast to access the photo_reference property that might exist in metadata
-              (entityToRefresh as any).photo_reference || entityToRefresh.metadata?.photo_reference
+              photoRef
             );
             
             if (newImageUrl) {
@@ -62,7 +68,7 @@ export const FeaturedEntities = () => {
                 entity.id === entityToRefresh.id 
                   ? { ...entity, image_url: newImageUrl } 
                   : entity
-              );
+              ) as ExtendedEntity[];
               
               setEntities(updatedEntities);
               return;
@@ -72,7 +78,8 @@ export const FeaturedEntities = () => {
           }
         }
         
-        setEntities(data || []);
+        // Cast the data to ExtendedEntity[] to satisfy TypeScript
+        setEntities(data as ExtendedEntity[] || []);
       } catch (error) {
         console.error('Error fetching featured entities:', error);
       } finally {
