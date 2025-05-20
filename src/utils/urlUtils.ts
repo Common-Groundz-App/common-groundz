@@ -1,93 +1,66 @@
+/**
+ * Utilities for handling URLs, especially ensuring HTTPS and providing fallback images
+ */
 
 /**
- * Ensures a URL uses HTTPS instead of HTTP
+ * Ensure a URL is HTTPS by replacing HTTP with HTTPS.
+ * If the URL is already HTTPS or is a data URL, it is returned unchanged.
  */
-export const ensureHttps = (url: string): string => {
+export const ensureHttps = (url: string | null | undefined): string | null => {
   if (!url) {
-    console.log("ensureHttps: Empty URL provided");
+    return null;
+  }
+
+  if (url.startsWith('https://') || url.startsWith('data:')) {
     return url;
   }
-  
-  // If it's a relative URL, return as is
-  if (url.startsWith('/')) {
-    return url;
-  }
-  
-  // If it's a data URL, return as is
-  if (url.startsWith('data:')) {
-    return url;
-  }
-  
-  // Handle Google Maps photo URLs properly
-  // These are valid and should be processed normally, not rejected
-  if (url.includes('maps.googleapis.com/maps/api/place/photo')) {
-    return url; // Keep Google Maps photo URLs as they are
-  }
-  
-  // If it's already HTTPS, return as is
-  if (url.startsWith('https://')) {
-    return url;
-  }
-  
-  // If it's an HTTP URL, convert to HTTPS
+
   if (url.startsWith('http://')) {
-    const httpsUrl = `https://${url.slice(7)}`;
-    return httpsUrl;
+    return url.replace('http://', 'https://');
   }
-  
-  // If there's no protocol, assume HTTPS
-  if (!url.includes('://')) {
-    const httpsUrl = `https://${url}`;
-    return httpsUrl;
-  }
-  
+
   return url;
 };
 
 /**
- * Validate if a URL is properly formatted
+ * Check if a URL is a Google Places URL
  */
-export const isValidUrl = (url: string): boolean => {
-  try {
-    if (!url) return false;
-    
-    // Data URLs are always valid
-    if (url.startsWith('data:')) return true;
-    
-    new URL(url);
-    return true;
-  } catch {
-    // Try adding https:// if missing protocol
-    try {
-      if (!url.includes('://')) {
-        new URL(`https://${url}`);
-        return true;
-      }
-    } catch {
-      return false;
-    }
-    return false;
-  }
+export const isGooglePlacesUrl = (url: string): boolean => {
+  return url.includes('maps.googleapis.com/maps/api/place/photo') || url.includes('googleusercontent.com');
 };
 
 /**
- * Get fallback image based on entity type
+ * Get a fallback image for an entity type
  */
-export const getEntityTypeFallbackImage = (type: string | undefined): string => {
-  if (!type) return 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&q=80&w=1000';
+export const getEntityTypeFallbackImage = (entityType: string): string | null => {
+  // Return null to disable fallback images during manual recovery
+  return null;
   
-  switch (type.toLowerCase()) {
+  // Original fallback image logic is commented out during manual recovery mode
+  /*
+  if (!entityType) return 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&q=80&w=1000';
+  
+  switch (entityType.toLowerCase()) {
     case 'book':
+    case 'books':
       return 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=1000';
     case 'movie':
+    case 'movies':
+    case 'tv':
+    case 'tv show':
+    case 'tv shows':
       return 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&q=80&w=1000';
     case 'place':
+    case 'places':
+    case 'location':
+    case 'travel':
       return 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&q=80&w=1000';
     case 'food':
+    case 'restaurant':
+    case 'restaurants':
       return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=80&w=1000';
-    case 'product':
-      return 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&q=80&w=1000';
     default:
       return 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&q=80&w=1000';
   }
+  */
 };
