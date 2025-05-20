@@ -13,14 +13,14 @@ const extractPhotoReferenceFromUrl = (url: string): string | null => {
       return null;
     }
 
-    console.log(`Attempting to extract photo reference from URL: ${url}`);
+    console.log(`[extractPhotoReferenceFromUrl] Attempting to extract photo reference from URL: ${url}`);
     
     // Extract using URLSearchParams
     const urlObj = new URL(url);
     const photoReference = urlObj.searchParams.get('photoreference');
     
     if (photoReference) {
-      console.log(`Successfully extracted photo reference: ${photoReference}`);
+      console.log(`[extractPhotoReferenceFromUrl] Successfully extracted photo reference: ${photoReference}`);
       return photoReference;
     }
     
@@ -29,14 +29,14 @@ const extractPhotoReferenceFromUrl = (url: string): string | null => {
     const match = url.match(regex);
     
     if (match && match[1]) {
-      console.log(`Extracted photo reference via regex: ${match[1]}`);
+      console.log(`[extractPhotoReferenceFromUrl] Extracted photo reference via regex: ${match[1]}`);
       return match[1];
     }
     
-    console.warn('Failed to extract photo reference from URL');
+    console.warn('[extractPhotoReferenceFromUrl] Failed to extract photo reference from URL');
     return null;
   } catch (error) {
-    console.error('Error extracting photo reference:', error);
+    console.error('[extractPhotoReferenceFromUrl] Error extracting photo reference:', error);
     return null;
   }
 };
@@ -151,6 +151,28 @@ export const processEntityImage = async (entityId: string, imageUrl: string, pho
     
     // Ensure the entity-images bucket exists with proper policies
     await ensureBucketPolicies('entity-images');
+
+    // Check if the entity exists and get its current metadata
+    const { data: entity, error: entityError } = await supabase
+      .from('entities')
+      .select('*')
+      .eq('id', entityId)
+      .single();
+
+    if (entityError) {
+      console.error('[processEntityImage] Error fetching entity metadata:', entityError);
+      // Continue without the metadata since we still want to try processing the image
+    } else {
+      console.log('[processEntityImage] Entity data:', {
+        id: entity.id,
+        name: entity.name,
+        type: entity.type,
+        hasMetadata: entity.metadata ? true : false,
+        metadata: entity.metadata,
+        api_source: entity.api_source,
+        api_ref: entity.api_ref
+      });
+    }
     
     // For Google Places images, use the refresh-entity-image function directly
     if (isGooglePlacesImage(imageUrl) || (photoReference && placeId)) {
@@ -165,14 +187,19 @@ export const processEntityImage = async (entityId: string, imageUrl: string, pho
             
             // Update the entity metadata with the extracted photo reference
             if (entityId) {
+              // Get the current metadata first
+              const currentMetadata = entity?.metadata || {};
+              
+              // Update the metadata with the extracted photo reference
+              const updatedMetadata = { 
+                ...currentMetadata,
+                photo_reference: extractedPhotoRef 
+              };
+              
               const { error: updateError } = await supabase
                 .from('entities')
                 .update({ 
-                  metadata: supabase.rpc('jsonb_set_key', {
-                    json_data: supabase.rpc('get_entity_metadata', { entity_id: entityId }),
-                    key_name: 'photo_reference',
-                    new_value: extractedPhotoRef
-                  })
+                  metadata: updatedMetadata
                 })
                 .eq('id', entityId);
                 
