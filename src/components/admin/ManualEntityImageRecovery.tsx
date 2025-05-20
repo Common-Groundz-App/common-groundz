@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -148,6 +147,12 @@ export const ManualEntityImageRecovery = () => {
         
         // Remove this entity from the list as it now has an image
         setEntities(prev => prev.filter(e => e.id !== entityId));
+        
+        toast({
+          title: 'Image Recovered',
+          description: `Successfully recovered image for ${entityName}`,
+          variant: 'default',
+        });
       } else {
         console.log(`❌ Failed to recover image for: ${entityName}`);
         setRecoveryStatus(prev => ({
@@ -157,6 +162,12 @@ export const ManualEntityImageRecovery = () => {
             message: 'Failed to recover image' 
           }
         }));
+        
+        toast({
+          title: 'Recovery Failed',
+          description: `Could not recover image for ${entityName}`,
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error(`Error recovering image for entity ${entityId}:`, error);
@@ -167,6 +178,12 @@ export const ManualEntityImageRecovery = () => {
           message: `Error: ${(error as Error).message}` 
         }
       }));
+      
+      toast({
+        title: 'Error',
+        description: `An error occurred: ${(error as Error).message}`,
+        variant: 'destructive',
+      });
     }
   };
 

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
@@ -64,122 +63,84 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
       // Check if photo_reference exists in metadata
       let photoReference = entity.metadata?.photo_reference;
       
-      // Add retry logic for edge function invocation
-      let attempts = 0;
-      const maxAttempts = 3;
-      let success = false;
-      let data = null;
-      let error = null;
-      
-      while (attempts < maxAttempts && !success) {
+      // If we don't have a photo_reference, fetch it from the Google Places API via refresh-entity-image edge function
+      if (!photoReference) {
+        console.log('No photo reference found, fetching place details...');
+        
         try {
-          console.log(`Attempt ${attempts + 1}/${maxAttempts} to refresh entity image`);
-          
-          // We need to call our Edge Function to get the fresh photo URL
           const result = await supabase.functions.invoke('refresh-entity-image', {
             body: {
-              placeId: entity.api_ref,
-              photoReference: photoReference
+              placeId: entity.api_ref
             }
           });
           
-          error = result.error;
-          data = result.data;
+          if (result.error) {
+            console.error('Error fetching place details:', result.error);
+            return false;
+          }
           
-          if (!error && data?.imageUrl) {
-            success = true;
-          } else {
-            attempts++;
-            if (attempts < maxAttempts) {
-              console.log(`Retrying after error: ${error || 'No image URL returned'}`);
-              // Exponential backoff
-              await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
-            }
+          if (!result.data?.photoReference) {
+            console.error('No photo reference found for this place');
+            return false;
           }
+          
+          photoReference = result.data.photoReference;
+          console.log('Retrieved new photo reference:', photoReference);
         } catch (invokeError) {
-          console.error('Error invoking edge function:', invokeError);
-          attempts++;
-          if (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
-          }
+          console.error('Error invoking refresh-entity-image function:', invokeError);
+          return false;
         }
       }
-
-      if (!success) {
-        console.error('Error refreshing entity image after multiple attempts:', error || 'No image URL returned');
+      
+      if (!photoReference) {
+        console.error('Failed to obtain photo reference');
         return false;
       }
-      
-      console.log('Retrieved fresh image URL from Google Places:', data.imageUrl);
-      console.log('Place name:', data.placeName || entity.name);
-      
-      // Store the new photo_reference if provided
-      if (data.photoReference && data.photoReference !== photoReference) {
-        console.log('Updating photo reference:', data.photoReference);
+
+      // Now use the new download-google-photo edge function to fetch and store the image
+      try {
+        console.log('Calling download-google-photo function with photo reference:', photoReference);
         
-        // Update the entity metadata with the new photo_reference
-        const { error: metadataError } = await supabase
+        const result = await supabase.functions.invoke('download-google-photo', {
+          body: {
+            placeId: entity.api_ref,
+            photoRef: photoReference
+          }
+        });
+        
+        if (result.error) {
+          console.error('Error calling download-google-photo function:', result.error);
+          return false;
+        }
+        
+        if (!result.data?.publicUrl) {
+          console.error('No public URL returned from download-google-photo function');
+          return false;
+        }
+        
+        const storedImageUrl = result.data.publicUrl;
+        console.log('Successfully stored image to Supabase:', storedImageUrl);
+        
+        // Update the entity with the new image URL
+        const { error: updateError } = await supabase
           .from('entities')
           .update({ 
-            metadata: { ...entity.metadata, photo_reference: data.photoReference }
+            image_url: storedImageUrl,
+            metadata: { ...entity.metadata, photo_reference: photoReference }
           })
           .eq('id', entityId);
-          
-        if (metadataError) {
-          console.error('Error updating entity metadata with photo reference:', metadataError);
-        }
-      }
 
-      // Download and store the refreshed image with retry logic
-      console.log('Downloading and storing image from:', data.imageUrl);
-      let downloadAttempts = 0;
-      const maxDownloadAttempts = 3;
-      let storedImageUrl = null;
-      
-      while (downloadAttempts < maxDownloadAttempts && !storedImageUrl) {
-        try {
-          storedImageUrl = await downloadAndStoreEntityImage(
-            data.imageUrl,
-            entityId,
-            entity.api_source
-          );
-          
-          if (!storedImageUrl) {
-            downloadAttempts++;
-            if (downloadAttempts < maxDownloadAttempts) {
-              console.log(`Retrying download attempt ${downloadAttempts + 1}/${maxDownloadAttempts}`);
-              await new Promise(resolve => setTimeout(resolve, Math.pow(2, downloadAttempts) * 1000));
-            }
-          }
-        } catch (downloadError) {
-          console.error('Error downloading image:', downloadError);
-          downloadAttempts++;
-          if (downloadAttempts < maxDownloadAttempts) {
-            await new Promise(resolve => setTimeout(resolve, Math.pow(2, downloadAttempts) * 1000));
-          }
+        if (updateError) {
+          console.error('Error updating entity image URL:', updateError);
+          return false;
         }
-      }
-      
-      if (!storedImageUrl) {
-        console.error('Failed to download and store the image after multiple attempts');
+
+        console.log('Successfully updated entity with new image URL');
+        return true;
+      } catch (downloadError) {
+        console.error('Error in download-google-photo function:', downloadError);
         return false;
       }
-      
-      console.log('Successfully stored image to Supabase:', storedImageUrl);
-      
-      // Update the entity with the new image URL
-      const { error: updateError } = await supabase
-        .from('entities')
-        .update({ image_url: storedImageUrl })
-        .eq('id', entityId);
-
-      if (updateError) {
-        console.error('Error updating entity image URL:', updateError);
-        return false;
-      }
-
-      console.log('Successfully updated entity with new image URL');
-      return true;
     }
     
     return false;
