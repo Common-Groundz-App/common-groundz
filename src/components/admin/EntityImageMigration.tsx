@@ -131,7 +131,7 @@ export const EntityImageMigration = () => {
       toast({
         title: 'Migration Complete',
         description: `Migrated ${stats.migrated} entities, ${errors.length} errors.`,
-        variant: errors.length > 0 ? 'default' : 'success'
+        variant: errors.length > 0 ? 'destructive' : 'default'
       });
       
     } catch (error) {
@@ -263,3 +263,4 @@ export const EntityImageMigration = () => {
     </Card>
   );
 };
+
