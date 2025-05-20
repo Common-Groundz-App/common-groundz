@@ -17,7 +17,7 @@ function buildGooglePhotoUrl(photoReference: string, apiKey: string): string {
 // Function to save an image from URL to our storage bucket
 async function saveImageToStorage(imageUrl: string, entityId: string, supabase: any) {
   try {
-    console.log(`Downloading image from: ${imageUrl}`);
+    console.log(`[refresh-entity-image] Downloading image from: ${imageUrl}`);
     
     const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) {
@@ -25,12 +25,16 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
     }
     
     const contentType = imageResponse.headers.get("content-type");
+    console.log(`[refresh-entity-image] Image content type: ${contentType}`);
+    
     const imageBlob = await imageResponse.blob();
+    console.log(`[refresh-entity-image] Image downloaded, size: ${imageBlob.size} bytes`);
+    
     const fileExt = contentType?.split("/")[1] || "jpeg";
     const fileName = `${entityId}_${Date.now()}.${fileExt}`;
     const filePath = `${entityId}/${fileName}`;
     
-    console.log(`Uploading image to storage: ${filePath} (${contentType}, size: ${imageBlob.size} bytes)`);
+    console.log(`[refresh-entity-image] Uploading image to storage: ${filePath} (${contentType}, size: ${imageBlob.size} bytes)`);
     
     // Ensure the bucket has proper policies before upload
     await ensureBucketPolicies(supabase, ENTITY_IMAGES_BUCKET);
@@ -44,11 +48,11 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
       });
       
     if (uploadError) {
-      console.error("Storage upload error:", uploadError);
+      console.error("[refresh-entity-image] Storage upload error:", uploadError);
       
       // Try to troubleshoot the error
       if (uploadError.message.includes('permission_denied')) {
-        console.error('Upload permission denied. Attempting to fix bucket policies...');
+        console.error('[refresh-entity-image] Upload permission denied. Attempting to fix bucket policies...');
         await createBucketWithPolicies(supabase, ENTITY_IMAGES_BUCKET);
         
         // Try upload one more time
@@ -60,7 +64,7 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
           });
           
         if (retryError) {
-          console.error("Retry upload still failed:", retryError);
+          console.error("[refresh-entity-image] Retry upload still failed:", retryError);
           throw new Error(`Storage upload failed after policy fix: ${retryError.message}`);
         }
       } else {
@@ -73,10 +77,10 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
       .from(ENTITY_IMAGES_BUCKET)
       .getPublicUrl(filePath);
       
-    console.log(`Image saved to storage: ${publicUrl}`);
+    console.log(`[refresh-entity-image] Image saved to storage: ${publicUrl}`);
     return publicUrl;
   } catch (error) {
-    console.error(`Error saving image to storage:`, error);
+    console.error(`[refresh-entity-image] Error saving image to storage:`, error);
     return null;
   }
 }
@@ -98,14 +102,14 @@ async function createBucketWithPolicies(supabase: any, bucketName: string) {
     });
     
     if (error) {
-      console.error(`Error creating open policy for ${bucketName}:`, error);
+      console.error(`[refresh-entity-image] Error creating open policy for ${bucketName}:`, error);
       return false;
     }
     
-    console.log(`Successfully created open policy for bucket ${bucketName}`);
+    console.log(`[refresh-entity-image] Successfully created open policy for bucket ${bucketName}`);
     return true;
   } catch (error) {
-    console.error(`Error creating bucket with policies:`, error);
+    console.error(`[refresh-entity-image] Error creating bucket with policies:`, error);
     return false;
   }
 }
@@ -117,7 +121,7 @@ async function ensureBucketExists(supabase: any, bucketName: string) {
     const { data: buckets, error: listError } = await supabase.storage.listBuckets();
     
     if (listError) {
-      console.error("Error listing buckets:", listError);
+      console.error("[refresh-entity-image] Error listing buckets:", listError);
       throw listError;
     }
     
@@ -125,7 +129,7 @@ async function ensureBucketExists(supabase: any, bucketName: string) {
     const bucketExists = buckets.some(bucket => bucket.name === bucketName);
     
     if (!bucketExists) {
-      console.log(`Bucket ${bucketName} doesn't exist, creating it...`);
+      console.log(`[refresh-entity-image] Bucket ${bucketName} doesn't exist, creating it...`);
       
       // Create the bucket
       const { data, error: createError } = await supabase.storage.createBucket(bucketName, {
@@ -135,18 +139,18 @@ async function ensureBucketExists(supabase: any, bucketName: string) {
       });
       
       if (createError) {
-        console.error(`Error creating bucket ${bucketName}:`, createError);
+        console.error(`[refresh-entity-image] Error creating bucket ${bucketName}:`, createError);
         throw createError;
       }
       
-      console.log(`Bucket ${bucketName} created successfully`);
+      console.log(`[refresh-entity-image] Bucket ${bucketName} created successfully`);
     } else {
-      console.log(`Bucket ${bucketName} already exists`);
+      console.log(`[refresh-entity-image] Bucket ${bucketName} already exists`);
     }
     
     return true;
   } catch (error) {
-    console.error("Error ensuring bucket exists:", error);
+    console.error("[refresh-entity-image] Error ensuring bucket exists:", error);
     return false;
   }
 }
@@ -163,17 +167,17 @@ async function ensureBucketPolicies(supabase: any, bucketName: string) {
     });
     
     if (error) {
-      console.error(`Error updating bucket ${bucketName} to public:`, error);
+      console.error(`[refresh-entity-image] Error updating bucket ${bucketName} to public:`, error);
       // Try creating open policies as alternative approach
       await supabase.rpc('create_storage_open_policy', {
         bucket_id: bucketName
       });
     }
     
-    console.log(`Successfully updated bucket ${bucketName} to be public`);
+    console.log(`[refresh-entity-image] Successfully updated bucket ${bucketName} to be public`);
     return true;
   } catch (error) {
-    console.error("Error ensuring bucket policies:", error);
+    console.error("[refresh-entity-image] Error ensuring bucket policies:", error);
     return false;
   }
 }
@@ -185,7 +189,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Edge function refresh-entity-image started");
+    console.log("[refresh-entity-image] Edge function started");
     
     const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
     if (!GOOGLE_PLACES_API_KEY) {
@@ -203,10 +207,28 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Get request data
-    const requestData = await req.json();
+    let requestData;
+    try {
+      requestData = await req.json();
+      console.log("[refresh-entity-image] Request payload:", JSON.stringify(requestData));
+    } catch (parseError) {
+      console.error("[refresh-entity-image] Error parsing request JSON:", parseError);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON in request body" }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+    
     const { placeId, photoReference, entityId } = requestData;
     
-    console.log("Request received:", { placeId, photoReference, entityId });
+    console.log("[refresh-entity-image] Processing request:", { 
+      placeId: placeId || 'null', 
+      photoReference: photoReference || 'null', 
+      entityId 
+    });
     
     if (!entityId) {
       return new Response(
@@ -222,14 +244,17 @@ serve(async (req) => {
     const bucketPrepared = await ensureBucketPolicies(supabase, ENTITY_IMAGES_BUCKET);
     
     if (!bucketPrepared) {
-      console.error("Failed to prepare storage bucket. Will try to continue anyway.");
+      console.error("[refresh-entity-image] Failed to prepare storage bucket. Will try to continue anyway.");
     }
 
     // If we have a photo reference, use it directly
     if (photoReference) {
       const googleImageUrl = buildGooglePhotoUrl(photoReference, GOOGLE_PLACES_API_KEY);
       
-      console.log("Using provided photo reference to fetch image:", photoReference);
+      console.log("[refresh-entity-image] Using provided photo reference to fetch image:", {
+        photoReference,
+        googleImageUrl: googleImageUrl.substring(0, 100) + '...'
+      });
       
       // Save image to our storage
       const storedImageUrl = await saveImageToStorage(googleImageUrl, entityId, supabase);
@@ -252,19 +277,32 @@ serve(async (req) => {
         .eq('id', entityId);
         
       if (updateError) {
-        console.error("Error updating entity record:", updateError);
+        console.error("[refresh-entity-image] Error updating entity record with metadata:", updateError);
         // Try a simpler update without the metadata manipulation
         const { error: simpleUpdateError } = await supabase
           .from('entities')
-          .update({ image_url: storedImageUrl })
+          .update({ 
+            image_url: storedImageUrl,
+            metadata: { photo_reference: photoReference }
+          })
           .eq('id', entityId);
           
         if (simpleUpdateError) {
-          console.error("Error with simple entity update:", simpleUpdateError);
+          console.error("[refresh-entity-image] Error with simple entity update:", simpleUpdateError);
+          
+          // Try one more time with just the image URL
+          const { error: imageOnlyUpdateError } = await supabase
+            .from('entities')
+            .update({ image_url: storedImageUrl })
+            .eq('id', entityId);
+            
+          if (imageOnlyUpdateError) {
+            console.error("[refresh-entity-image] Failed to update entity even with just image URL:", imageOnlyUpdateError);
+          }
         }
       }
       
-      console.log("Successfully updated entity image:", storedImageUrl);
+      console.log("[refresh-entity-image] Successfully updated entity image:", storedImageUrl);
       
       return new Response(
         JSON.stringify({ 
@@ -277,73 +315,108 @@ serve(async (req) => {
 
     // If no photo reference but we have a place ID, fetch place details to get one
     if (placeId) {
-      console.log("No photo reference provided, fetching place details for:", placeId);
+      console.log("[refresh-entity-image] No photo reference provided, fetching place details for:", placeId);
       
       const detailsUrl = new URL("https://maps.googleapis.com/maps/api/place/details/json");
       detailsUrl.searchParams.append("place_id", placeId);
       detailsUrl.searchParams.append("fields", "photos");
       detailsUrl.searchParams.append("key", GOOGLE_PLACES_API_KEY);
 
-      const response = await fetch(detailsUrl.toString());
+      console.log("[refresh-entity-image] Fetching place details from Google Places API");
       
-      if (!response.ok) {
-        throw new Error(`Google Places API error: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-
-      // Check response status
-      if (data.status !== "OK") {
-        throw new Error(`Google Places API error: ${data.status} - ${data.error_message || "Unknown error"}`);
-      }
-
-      // Check if the place has photos
-      if (data.result?.photos && data.result.photos.length > 0) {
-        const newPhotoRef = data.result.photos[0].photo_reference;
+      try {
+        const response = await fetch(detailsUrl.toString());
         
-        if (newPhotoRef) {
-          console.log("Found new photo reference:", newPhotoRef);
-          
-          const googleImageUrl = buildGooglePhotoUrl(newPhotoRef, GOOGLE_PLACES_API_KEY);
-          
-          // Save image to our storage
-          const storedImageUrl = await saveImageToStorage(googleImageUrl, entityId, supabase);
-          
-          if (!storedImageUrl) {
-            throw new Error("Failed to save Google Places image to storage");
-          }
-          
-          // Update entity record with new image URL and photo reference
-          const { error: updateError } = await supabase
-            .from('entities')
-            .update({ 
-              image_url: storedImageUrl, 
-              photo_reference: newPhotoRef 
-            })
-            .eq('id', entityId);
-            
-          if (updateError) {
-            console.error("Error updating entity record:", updateError);
-          }
-          
-          return new Response(
-            JSON.stringify({ 
-              imageUrl: storedImageUrl, 
-              photoReference: newPhotoRef 
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[refresh-entity-image] Google Places API error: ${response.status} ${response.statusText}`, errorText);
+          throw new Error(`Google Places API error: ${response.status} ${response.statusText}`);
         }
-      }
+        
+        const data = await response.json();
+        console.log("[refresh-entity-image] Google Places API response status:", data.status);
 
-      // No photos available
-      return new Response(
-        JSON.stringify({ error: "No photos available for this place" }),
-        { 
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        // Check response status
+        if (data.status !== "OK") {
+          throw new Error(`Google Places API error: ${data.status} - ${data.error_message || "Unknown error"}`);
         }
-      );
+
+        // Check if the place has photos
+        if (data.result?.photos && data.result.photos.length > 0) {
+          const newPhotoRef = data.result.photos[0].photo_reference;
+          
+          if (newPhotoRef) {
+            console.log("[refresh-entity-image] Found new photo reference:", newPhotoRef);
+            
+            const googleImageUrl = buildGooglePhotoUrl(newPhotoRef, GOOGLE_PLACES_API_KEY);
+            
+            // Save image to our storage
+            const storedImageUrl = await saveImageToStorage(googleImageUrl, entityId, supabase);
+            
+            if (!storedImageUrl) {
+              throw new Error("Failed to save Google Places image to storage");
+            }
+            
+            // Update entity record with new image URL and photo reference
+            const { error: updateError } = await supabase
+              .from('entities')
+              .update({ 
+                image_url: storedImageUrl,
+                metadata: supabase.rpc('jsonb_set_key', {
+                  json_data: supabase.rpc('get_entity_metadata', { entity_id: entityId }),
+                  key_name: 'photo_reference',
+                  new_value: newPhotoRef
+                })
+              })
+              .eq('id', entityId);
+              
+            if (updateError) {
+              console.error("[refresh-entity-image] Error updating entity record:", updateError);
+              
+              // Try a simpler approach with direct metadata
+              const { error: simpleUpdateError } = await supabase
+                .from('entities')
+                .update({ 
+                  image_url: storedImageUrl,
+                  metadata: { photo_reference: newPhotoRef }
+                })
+                .eq('id', entityId);
+                
+              if (simpleUpdateError) {
+                console.error("[refresh-entity-image] Error with simple entity update:", simpleUpdateError);
+                
+                // Try one more time with just the image URL
+                const { error: imageOnlyUpdateError } = await supabase
+                  .from('entities')
+                  .update({ image_url: storedImageUrl })
+                  .eq('id', entityId);
+              }
+            }
+            
+            return new Response(
+              JSON.stringify({ 
+                imageUrl: storedImageUrl, 
+                photoReference: newPhotoRef 
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+        
+        console.warn("[refresh-entity-image] No photos available for this place");
+        
+        // No photos available
+        return new Response(
+          JSON.stringify({ error: "No photos available for this place" }),
+          { 
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
+      } catch (googleApiError) {
+        console.error("[refresh-entity-image] Error fetching from Google Places API:", googleApiError);
+        throw new Error(`Error fetching place details: ${googleApiError.message}`);
+      }
     }
     
     // If we get here, we have no photo reference and no place ID
@@ -356,7 +429,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("Error in refresh-entity-image function:", error);
+    console.error("[refresh-entity-image] Error in refresh-entity-image function:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Unknown error occurred" }),
       { 

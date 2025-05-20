@@ -26,14 +26,19 @@ export const useEntityOperations = () => {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error fetching URL metadata:', error);
+      console.error('[useEntityOperations] Error fetching URL metadata:', error);
       return null;
     }
   };
 
   const refreshEntityImage = async (entityId: string, imageUrl: string, photoReference?: string, placeId?: string): Promise<string | null> => {
     try {
-      console.log(`Manually refreshing image for entity ${entityId}`);
+      console.log(`[useEntityOperations] Manually refreshing image for entity ${entityId}`, {
+        entityId, 
+        imageUrl, 
+        photoReference: photoReference || 'null', 
+        placeId: placeId || 'null'
+      });
       
       // Show a toast to let the user know we're processing
       toast({
@@ -50,7 +55,7 @@ export const useEntityOperations = () => {
       );
       
       if (processedImageUrl && processedImageUrl !== imageUrl) {
-        console.log(`Successfully refreshed image to: ${processedImageUrl}`);
+        console.log(`[useEntityOperations] Successfully refreshed image to: ${processedImageUrl}`);
         
         // Update the entity with the refreshed URL
         const { error: updateError } = await supabase
@@ -59,7 +64,7 @@ export const useEntityOperations = () => {
           .eq('id', entityId);
           
         if (updateError) {
-          console.error('Error updating entity with refreshed image:', updateError);
+          console.error('[useEntityOperations] Error updating entity with refreshed image:', updateError);
           toast({
             title: 'Error updating entity',
             description: 'The image was saved but could not update the entity record',
@@ -75,14 +80,14 @@ export const useEntityOperations = () => {
         return processedImageUrl;
       }
       
-      console.warn(`Image refresh did not change URL: ${imageUrl}`);
+      console.warn(`[useEntityOperations] Image refresh did not change URL: ${imageUrl}`);
       toast({
         title: 'No change needed',
         description: 'The image is already up to date'
       });
       return imageUrl; // Return original URL as it didn't change
     } catch (error) {
-      console.error('Error refreshing entity image:', error);
+      console.error('[useEntityOperations] Error refreshing entity image:', error);
       toast({
         title: 'Error refreshing image',
         description: 'Could not refresh the entity image. Please try again.',
@@ -128,14 +133,15 @@ export const useEntityOperations = () => {
         }
       }
 
-      console.log('Creating entity with details:', {
+      console.log('[useEntityOperations] Creating entity with details:', {
         name,
         type,
         apiSource,
         apiRef,
         venue,
         imageUrl: imageUrl ? (imageUrl.length > 100 ? imageUrl.substring(0, 100) + '...' : imageUrl) : null,
-        hasMetadata: metadata ? true : false
+        hasMetadata: metadata ? true : false,
+        photoReference: metadata?.photo_reference || 'null'
       });
 
       // Create the entity
@@ -161,6 +167,17 @@ export const useEntityOperations = () => {
         return null;
       }
 
+      console.log('[useEntityOperations] Entity created:', {
+        id: entity.id,
+        name: entity.name,
+        type: entity.type,
+        api_source: entity.api_source,
+        image_url: entity.image_url,
+        has_metadata: entity.metadata ? true : false,
+        metadata_keys: entity.metadata ? Object.keys(entity.metadata) : [],
+        photo_reference: entity.metadata?.photo_reference || 'null'
+      });
+
       // Special handling for Google Places entities: if the image is still from Google Maps
       // and we have a photo reference, try to manually refresh it
       if (
@@ -169,7 +186,7 @@ export const useEntityOperations = () => {
         entity.image_url.includes('maps.googleapis.com') &&
         metadata?.photo_reference
       ) {
-        console.log('Entity created, but image is still from Google Maps API. Manually refreshing...');
+        console.log('[useEntityOperations] Entity created, but image is still from Google Maps API. Manually refreshing...');
         
         // Wait a moment before refreshing (to ensure entity is fully created)
         setTimeout(async () => {
@@ -181,16 +198,16 @@ export const useEntityOperations = () => {
           );
           
           if (refreshedImageUrl && refreshedImageUrl !== entity.image_url) {
-            console.log('Successfully refreshed entity image after creation:', refreshedImageUrl);
+            console.log('[useEntityOperations] Successfully refreshed entity image after creation:', refreshedImageUrl);
           } else {
-            console.warn('Manual refresh after creation did not change the image URL');
+            console.warn('[useEntityOperations] Manual refresh after creation did not change the image URL');
           }
         }, 1000);
       }
 
       return entity;
     } catch (error) {
-      console.error('Error in handleEntityCreation:', error);
+      console.error('[useEntityOperations] Error in handleEntityCreation:', error);
       toast({
         title: 'Error',
         description: 'Failed to create entity. Please try again.',
@@ -209,7 +226,7 @@ export const useEntityOperations = () => {
       setEntities(searchResults);
       return searchResults;
     } catch (error) {
-      console.error('Error searching entities:', error);
+      console.error('[useEntityOperations] Error searching entities:', error);
       toast({
         title: 'Error',
         description: 'Failed to search entities. Please try again.',
