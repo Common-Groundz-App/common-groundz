@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -316,7 +315,7 @@ export const ManualEntityImageRecovery = () => {
         </Alert>
         
         {missingReferenceCount > 0 && (
-          <Alert variant="warning" className="mb-4 border-amber-300 bg-amber-50">
+          <Alert variant="default" className="mb-4 border-amber-300 bg-amber-50">
             <AlertTriangle className="h-4 w-4 text-amber-800" />
             <AlertTitle>Missing Photo References</AlertTitle>
             <AlertDescription>
