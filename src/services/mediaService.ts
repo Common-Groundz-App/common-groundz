@@ -174,7 +174,7 @@ export const downloadAndStoreEntityImage = async (
     
     // Upload to storage
     const { error: uploadError, data } = await supabase.storage
-      .from('entity_images')
+      .from('entity-images')
       .upload(filePath, file, {
         cacheControl: '31536000', // Cache for 1 year
         upsert: true
@@ -187,7 +187,7 @@ export const downloadAndStoreEntityImage = async (
     
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
-      .from('entity_images')
+      .from('entity-images')
       .getPublicUrl(filePath);
       
     console.log('Successfully stored entity image:', publicUrl);

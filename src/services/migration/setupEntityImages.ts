@@ -4,7 +4,7 @@ import { shouldDownloadImage } from '@/utils/imageUtils';
 import { batchProcessEntityImages } from '@/services/mediaService';
 
 /**
- * Create the entity_images storage bucket if it doesn't exist
+ * Create the entity-images storage bucket if it doesn't exist
  */
 export const setupEntityImagesBucket = async (): Promise<boolean> => {
   try {
@@ -17,14 +17,14 @@ export const setupEntityImagesBucket = async (): Promise<boolean> => {
     }
     
     // Find if our bucket already exists
-    const bucketExists = buckets.some(bucket => bucket.name === 'entity_images');
+    const bucketExists = buckets.some(bucket => bucket.name === 'entity-images');
     
     if (!bucketExists) {
-      console.log('Creating entity_images bucket...');
+      console.log('Creating entity-images bucket...');
       
       // Create the bucket
       const { error: createError } = await supabase.storage.createBucket(
-        'entity_images',
+        'entity-images',
         {
           public: true,
           fileSizeLimit: 10485760, // 10MB
@@ -33,13 +33,13 @@ export const setupEntityImagesBucket = async (): Promise<boolean> => {
       );
       
       if (createError) {
-        console.error('Error creating entity_images bucket:', createError);
+        console.error('Error creating entity-images bucket:', createError);
         return false;
       }
       
-      console.log('entity_images bucket created successfully');
+      console.log('entity-images bucket created successfully');
     } else {
-      console.log('entity_images bucket already exists');
+      console.log('entity-images bucket already exists');
     }
     
     return true;
