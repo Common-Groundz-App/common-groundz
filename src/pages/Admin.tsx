@@ -96,8 +96,8 @@ const Admin = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Important</AlertTitle>
             <AlertDescription>
-              We've set up RLS policies to grant authenticated users access to the entity-images bucket.
-              The migration tool will now work correctly with proper permissions.
+              This tool downloads entity images to Supabase Storage and updates your database records 
+              to point to the new reliable URLs.
             </AlertDescription>
           </Alert>
           <EntityImageMigration />

@@ -48,17 +48,86 @@ export const setupEntityImagesBucket = async (): Promise<boolean> => {
 };
 
 /**
+ * Update entity records in database with their new storage URLs
+ * This is critical to point the entities to their new Supabase-hosted images
+ */
+export const updateEntityImagesInDatabase = async (
+  imageUrlMap: Record<string, string | null>
+): Promise<{
+  total: number;
+  successful: number;
+}> => {
+  const results = {
+    total: Object.keys(imageUrlMap).length,
+    successful: 0
+  };
+
+  if (results.total === 0) {
+    console.log('No entity images to update in database');
+    return results;
+  }
+
+  console.log(`Updating ${results.total} entities in database with new image URLs...`);
+
+  try {
+    // Process in smaller batches to avoid overwhelming the database
+    const batchSize = 10;
+    const entityIds = Object.keys(imageUrlMap);
+    
+    for (let i = 0; i < entityIds.length; i += batchSize) {
+      const batchIds = entityIds.slice(i, i + batchSize);
+      const updatePromises = batchIds.map(async (entityId) => {
+        const newImageUrl = imageUrlMap[entityId];
+        
+        // Only update if we have a valid new URL (non-null)
+        if (newImageUrl) {
+          const { error } = await supabase
+            .from('entities')
+            .update({ image_url: newImageUrl })
+            .eq('id', entityId);
+          
+          if (error) {
+            console.error(`Failed to update image_url for entity ${entityId}:`, error.message);
+            return false;
+          }
+          return true;
+        }
+        return false;
+      });
+      
+      // Wait for all updates in this batch to complete
+      const batchResults = await Promise.all(updatePromises);
+      results.successful += batchResults.filter(Boolean).length;
+      
+      // Add a small delay between batches
+      if (i + batchSize < entityIds.length) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }
+    
+    console.log(`Database update completed: ${results.successful}/${results.total} entities updated successfully`);
+    return results;
+  } catch (error) {
+    console.error('Error in updateEntityImagesInDatabase:', error);
+    return results;
+  }
+};
+
+/**
  * Migrate existing entity images from external sources to our storage
+ * and update database records to point to the new URLs
  */
 export const migrateExistingEntityImages = async (): Promise<{
   total: number;
   processed: number;
-  successful: number;
+  storageSuccessful: number;
+  databaseUpdated: number;
 }> => {
   const results = {
     total: 0,
     processed: 0,
-    successful: 0
+    storageSuccessful: 0,
+    databaseUpdated: 0
   };
   
   try {
@@ -100,13 +169,28 @@ export const migrateExistingEntityImages = async (): Promise<{
       return results;
     }
     
-    // Process the entities in batches
+    // Process the entities in batches - Download and store in Supabase Storage
     const updatedUrls = await batchProcessEntityImages(entitiesToProcess);
     
-    // Count successful downloads
-    results.successful = Object.values(updatedUrls).filter(url => !!url).length;
+    // Count successful downloads to storage
+    results.storageSuccessful = Object.values(updatedUrls).filter(url => !!url).length;
+    console.log(`Storage migration completed: ${results.storageSuccessful}/${results.processed} images stored successfully`);
     
-    console.log(`Migration completed: ${results.successful}/${results.processed} images migrated successfully`);
+    // Now update the database to point to the new URLs
+    if (results.storageSuccessful > 0) {
+      console.log('Now updating database records with new image URLs...');
+      const dbUpdateResults = await updateEntityImagesInDatabase(updatedUrls);
+      results.databaseUpdated = dbUpdateResults.successful;
+      
+      console.log(`Database update completed: ${results.databaseUpdated}/${results.storageSuccessful} entities updated successfully`);
+    }
+    
+    console.log(`Migration process complete:
+      - ${results.total} total entities with images
+      - ${results.processed} entities needed migration
+      - ${results.storageSuccessful} images successfully stored in Supabase
+      - ${results.databaseUpdated} database records updated with new URLs`);
+    
     return results;
     
   } catch (error) {

@@ -5,14 +5,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { setupEntityImagesBucket, migrateExistingEntityImages } from '@/services/migration/setupEntityImages';
-import { AlertCircle, CheckCircle2, InfoIcon, ShieldAlert } from 'lucide-react';
+import { AlertCircle, CheckCircle2, InfoIcon, ShieldAlert, Database } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 
 type MigrationResults = {
   total: number;
   processed: number;
-  successful: number;
+  storageSuccessful: number;
+  databaseUpdated: number;
 };
 
 export const EntityImageMigration = () => {
@@ -93,10 +94,13 @@ export const EntityImageMigration = () => {
       setResults(migrationResults);
       
       if (migrationResults.processed > 0) {
-        addToLog(`✅ Processed ${migrationResults.processed} images, ${migrationResults.successful} successful`);
+        addToLog(`✅ Processed ${migrationResults.processed} images`);
+        addToLog(`✅ Stored ${migrationResults.storageSuccessful} images in Supabase`);
+        addToLog(`✅ Updated ${migrationResults.databaseUpdated} entity records in database`);
+        
         toast({
           title: "Migration Complete",
-          description: `Processed ${migrationResults.processed} images, ${migrationResults.successful} successful`,
+          description: `Processed ${migrationResults.processed} images, updated ${migrationResults.databaseUpdated} in database`,
         });
       } else {
         addToLog("ℹ️ No entity images needed migration");
@@ -124,9 +128,14 @@ export const EntityImageMigration = () => {
     setVerboseLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
   };
 
-  const getProgressPercentage = () => {
+  const getStorageProgressPercentage = () => {
     if (!results || results.processed === 0) return 0;
-    return Math.round((results.successful / results.processed) * 100);
+    return Math.round((results.storageSuccessful / results.processed) * 100);
+  };
+
+  const getDatabaseProgressPercentage = () => {
+    if (!results || results.storageSuccessful === 0) return 0;
+    return Math.round((results.databaseUpdated / results.storageSuccessful) * 100);
   };
 
   const renderAuthWarning = () => {
@@ -190,7 +199,8 @@ export const EntityImageMigration = () => {
           <h3 className="text-lg font-medium">Step 2: Run Migration</h3>
           <p className="text-sm text-muted-foreground">
             This will find all entities with external image URLs (like Google Places photos) 
-            and download them to Supabase Storage for reliability. The process runs in small batches
+            and download them to Supabase Storage for reliability. Then, it will update the
+            database to point to the new URLs. The process runs in small batches
             to avoid rate limiting.
           </p>
           <Button 
@@ -204,7 +214,7 @@ export const EntityImageMigration = () => {
         {results && (
           <div className="space-y-4 pt-4 border-t">
             <h3 className="text-lg font-medium">Migration Results</h3>
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-4 gap-4 text-center">
               <div className="bg-muted p-3 rounded-md">
                 <p className="text-2xl font-bold">{results.total}</p>
                 <p className="text-xs text-muted-foreground">Total Entities</p>
@@ -214,17 +224,35 @@ export const EntityImageMigration = () => {
                 <p className="text-xs text-muted-foreground">Needed Migration</p>
               </div>
               <div className="bg-muted p-3 rounded-md">
-                <p className="text-2xl font-bold">{results.successful}</p>
-                <p className="text-xs text-muted-foreground">Successfully Migrated</p>
+                <p className="text-2xl font-bold">{results.storageSuccessful}</p>
+                <p className="text-xs text-muted-foreground">Stored in Supabase</p>
+              </div>
+              <div className="bg-muted p-3 rounded-md">
+                <p className="text-2xl font-bold">{results.databaseUpdated}</p>
+                <p className="text-xs text-muted-foreground">Database Updated</p>
               </div>
             </div>
             
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Progress</span>
-                <span>{getProgressPercentage()}%</span>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm items-center">
+                  <span className="flex items-center gap-1">
+                    <InfoIcon className="h-3 w-3" /> Storage Migration
+                  </span>
+                  <span>{getStorageProgressPercentage()}%</span>
+                </div>
+                <Progress value={getStorageProgressPercentage()} className="h-2" />
               </div>
-              <Progress value={getProgressPercentage()} />
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm items-center">
+                  <span className="flex items-center gap-1">
+                    <Database className="h-3 w-3" /> Database Update
+                  </span>
+                  <span>{getDatabaseProgressPercentage()}%</span>
+                </div>
+                <Progress value={getDatabaseProgressPercentage()} className="h-2" />
+              </div>
             </div>
           </div>
         )}
