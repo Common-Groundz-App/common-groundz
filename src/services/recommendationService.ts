@@ -24,7 +24,8 @@ export {
 
 export { 
   findOrCreateEntity,
-  getEntitiesByType 
+  getEntitiesByType,
+  processEntityImage  // Added export for processEntityImage
 } from './recommendation/entityOperations';
 
 export { 
