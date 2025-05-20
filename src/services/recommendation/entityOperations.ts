@@ -187,8 +187,8 @@ export const processEntityImage = async (entityId: string, imageUrl: string, pho
             
             // Update the entity metadata with the extracted photo reference
             if (entityId) {
-              // Get the current metadata first
-              const currentMetadata = entity?.metadata || {};
+              // Get the current metadata first - ensure it's an object
+              const currentMetadata = typeof entity?.metadata === 'object' ? entity.metadata || {} : {};
               
               // Update the metadata with the extracted photo reference
               const updatedMetadata = { 
