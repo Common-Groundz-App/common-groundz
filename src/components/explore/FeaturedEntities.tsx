@@ -51,13 +51,15 @@ export const FeaturedEntities = () => {
           const entityToRefresh = entitiesToUpdate[0];
           
           try {
-            // Safely extract photo_reference from metadata
+            // Safely extract photo_reference from metadata and ensure it's a string
             let photoRef: string | undefined = undefined;
             
             if (entityToRefresh.metadata && 
                 typeof entityToRefresh.metadata === 'object' && 
-                !Array.isArray(entityToRefresh.metadata)) {
-              photoRef = entityToRefresh.metadata.photo_reference;
+                !Array.isArray(entityToRefresh.metadata) &&
+                entityToRefresh.metadata.photo_reference !== undefined) {
+              // Convert to string if it's a number or boolean
+              photoRef = String(entityToRefresh.metadata.photo_reference);
             }
             
             const newImageUrl = await refreshEntityImage(
