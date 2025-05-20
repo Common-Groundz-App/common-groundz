@@ -65,7 +65,7 @@ export const isValidImageUrl = (url: string): boolean => {
  * @returns True if the URL is a Google Places image URL, false otherwise.
  */
 export const isGooglePlacesImage = (url: string): boolean => {
-  return url.includes('maps.googleapis.com/maps/api/place/photo');
+  return url?.includes('maps.googleapis.com/maps/api/place/photo');
 };
 
 /**
@@ -115,27 +115,65 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       return secureUrl;
     }
     
-    // Skip Google Places images - they need to be handled by the refresh-entity-image function
+    // Check if it's a Google Places image
     if (isGooglePlacesImage(secureUrl)) {
-      console.log('Google Places image detected, should be handled by refresh-entity-image function:', secureUrl);
-      return secureUrl;
+      console.log('Google Places image detected. These should be handled by the refresh-entity-image function:', secureUrl);
+      
+      try {
+        // Get current session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.error('No active session found to process Google Places image');
+          return secureUrl; // Return original URL as fallback
+        }
+        
+        // Extract the photo reference from the URL
+        const url = new URL(secureUrl);
+        const photoReference = url.searchParams.get('photoreference');
+        const placeId = url.searchParams.get('placeid'); // Some URLs might include this
+        
+        if (!photoReference) {
+          console.warn('No photo reference found in Google Places URL');
+          return secureUrl; // Return original URL as fallback
+        }
+        
+        // Call the refresh-entity-image edge function with the photo reference
+        console.log('Calling refresh-entity-image with photo reference:', photoReference);
+        
+        const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            photoReference,
+            placeId, // This might be null, but that's okay
+            entityId
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error('Error response from refresh-entity-image:', errorData);
+          return secureUrl; // Return original URL as fallback
+        }
+        
+        const responseData = await response.json();
+        console.log('Successfully processed Google Places image:', responseData);
+        
+        return responseData.imageUrl || secureUrl;
+      } catch (googlePlacesError) {
+        console.error('Error processing Google Places image:', googlePlacesError);
+        return secureUrl; // Return original URL as fallback
+      }
     }
     
     console.log('Fetching external image for storage:', secureUrl);
     
-    // Check if the entity-images bucket exists
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-    
-    if (bucketsError) {
-      console.error('Error listing storage buckets:', bucketsError);
-      return null;
-    }
-    
-    const bucketExists = buckets.some(b => b.name === 'entity-images');
-    if (!bucketExists) {
-      console.error('entity-images bucket does not exist. Please create it first.');
-      return null;
-    }
+    // Check if the entity-images bucket exists and ensure bucket policies
+    await ensureBucketForImage();
     
     // Fetch the image with retries
     let response;
@@ -225,6 +263,27 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       // Check if it's a permission error
       if (error.message.includes('storage/permission_denied')) {
         console.error('Permission denied error. Check RLS policies for entity-images bucket');
+        
+        // Try to ensure bucket policies as a recovery step
+        await ensureBucketPolicies();
+        
+        // Try the upload one more time
+        const { data: retryData, error: retryError } = await supabase.storage
+          .from('entity-images')
+          .upload(filePath, blob, {
+            contentType,
+            upsert: false
+          });
+          
+        if (retryError) {
+          console.error('Retry upload still failed:', retryError);
+          return null;
+        }
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('entity-images')
+          .getPublicUrl(filePath);
+        return publicUrl;
       }
       
       return null;
@@ -243,3 +302,41 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
   }
 };
 
+// Helper function to ensure the entity-images bucket exists with proper policies
+async function ensureBucketForImage() {
+  try {
+    // Import the needed functions
+    const { ensureBucketExists, ensureBucketPolicies } = await import('@/services/storageService');
+    
+    // Ensure the bucket exists
+    const bucketExists = await ensureBucketExists('entity-images', true);
+    
+    if (!bucketExists) {
+      console.error('Failed to ensure entity-images bucket exists');
+      return false;
+    }
+    
+    // Ensure the bucket has proper policies
+    const policiesSet = await ensureBucketPolicies('entity-images');
+    
+    if (!policiesSet) {
+      console.warn('Could not set policies for entity-images bucket');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error ensuring bucket for image:', error);
+    return false;
+  }
+}
+
+// Helper function to ensure bucket policies
+async function ensureBucketPolicies() {
+  try {
+    const { ensureBucketPolicies } = await import('@/services/storageService');
+    return await ensureBucketPolicies('entity-images');
+  } catch (error) {
+    console.error('Error ensuring bucket policies:', error);
+    return false;
+  }
+}

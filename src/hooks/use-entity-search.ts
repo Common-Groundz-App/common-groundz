@@ -7,6 +7,7 @@ import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types'
 import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { saveExternalImageToStorage, isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
+import { ensureBucketPolicies } from '@/services/storageService';
 
 // Define a simplified entity structure for the component's internal use
 interface Entity {
@@ -189,15 +190,22 @@ export function useEntitySearch(type: EntityTypeString) {
       // Generate a new entity ID
       const entityId = uuidv4();
       
+      // Ensure the entity-images bucket exists with proper policies
+      await ensureBucketPolicies('entity-images');
+      
       // Set initial image URL from external data or use fallback
       let imageUrl = externalData.image_url || getEntityTypeFallbackImage(type);
       let storedImageUrl = null;
       
       console.log(`Processing image for entity: ${externalData.name}`, { originalUrl: imageUrl });
       
-      // If we have an image URL and it's not a Google Places image, try to save it to our storage
-      // Google Places images need special handling via the refresh-entity-image function
-      if (imageUrl && isValidImageUrl(imageUrl) && !isGooglePlacesImage(imageUrl)) {
+      // Handle Google Places images special case - these require the refresh-entity-image function
+      if (isGooglePlacesImage(imageUrl)) {
+        console.log(`Google Places image detected for ${externalData.name}, will be stored via refresh later`);
+        // Keep the original URL for now, but store the photo reference for later refresh
+      } 
+      // For non-Google Places images with a valid URL, try to save to storage immediately
+      else if (imageUrl && isValidImageUrl(imageUrl) && !isGooglePlacesImage(imageUrl)) {
         try {
           // Download and store the external image
           storedImageUrl = await saveExternalImageToStorage(imageUrl, entityId);
@@ -212,8 +220,6 @@ export function useEntitySearch(type: EntityTypeString) {
           console.error('Error saving image to storage:', imageError);
           // Keep the original URL if storage fails
         }
-      } else if (isGooglePlacesImage(imageUrl)) {
-        console.log(`Google Places image detected, will be processed via refresh-entity-image later`);
       }
       
       // Prepare entity data for insertion
@@ -254,8 +260,51 @@ export function useEntitySearch(type: EntityTypeString) {
         throw error;
       }
       
-      // For Google Places entities with photo_reference, we could refresh the image
-      // but we'll leave that for phase 5 with the manual refresh button
+      // For Google Places entities, if we have a photo reference, refresh the image immediately
+      if (isGooglePlacesImage(imageUrl) && entityData.photo_reference) {
+        try {
+          console.log(`Refreshing Google Places image for new entity ${entityData.id}`);
+          
+          // Get current session for authentication
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session) {
+            // Call the refresh-entity-image edge function to store the image properly
+            const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                photoReference: entityData.photo_reference,
+                placeId: entityData.api_ref,
+                entityId: entityData.id
+              })
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              console.log('Successfully refreshed Google Places image for new entity:', result);
+              
+              // Update the entity with the new image URL if one was returned
+              if (result.imageUrl) {
+                await supabase
+                  .from('entities')
+                  .update({ image_url: result.imageUrl })
+                  .eq('id', entityData.id);
+              }
+            } else {
+              console.error('Failed to refresh Google Places image for new entity:', await response.text());
+            }
+          } else {
+            console.warn('No active session to refresh Google Places image for new entity');
+          }
+        } catch (refreshError) {
+          console.error('Error refreshing Google Places image for new entity:', refreshError);
+          // Continue with original URL if refresh fails
+        }
+      }
       
       return data as Entity;
     } catch (error) {

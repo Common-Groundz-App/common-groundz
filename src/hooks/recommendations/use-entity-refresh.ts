@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
+import { ensureBucketPolicies } from '@/services/storageService';
 
 export const useEntityImageRefresh = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -27,6 +28,9 @@ export const useEntityImageRefresh = () => {
     
     try {
       console.log(`Starting image refresh for entity ${entityId}`, { placeId, photoReference });
+      
+      // First, ensure the entity-images bucket has correct policies
+      await ensureBucketPolicies('entity-images');
       
       // For Google Places entities, use the edge function
       if (placeId) {
@@ -185,4 +189,3 @@ export const useEntityImageRefresh = () => {
     isEntityImageMigrated
   };
 };
-
