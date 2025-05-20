@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
@@ -133,12 +134,19 @@ const downloadGooglePhoto = async (entityId: string, placeId: string, photoRef: 
     const storedImageUrl = result.data.publicUrl;
     console.log('Successfully stored image to Supabase:', storedImageUrl);
     
+    // Fetch the entity again to ensure we have the latest data before updating
+    const entityToUpdate = await fetchEntityById(entityId);
+    if (!entityToUpdate) {
+      console.error('Could not find entity to update with new image URL');
+      return false;
+    }
+    
     // Update the entity with the new image URL
     const { error: updateError } = await supabase
       .from('entities')
       .update({ 
         image_url: storedImageUrl,
-        metadata: { ...entity.metadata, photo_reference: photoRef }
+        metadata: { ...entityToUpdate.metadata, photo_reference: photoRef }
       })
       .eq('id', entityId);
 
