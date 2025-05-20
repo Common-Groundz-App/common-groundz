@@ -29,54 +29,68 @@ export const EntityImageRecovery = () => {
     setVerboseLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
   };
 
-  const identifyFallbackEntities = async (): Promise<{
-    entities: Array<{ id: string; name: string; api_source: string | null; api_ref: string | null; }>;
+  const identifyGooglePlacesEntities = async (): Promise<{
+    entities: Array<{ id: string; name: string; api_source: string | null; api_ref: string | null; image_url: string | null; }>;
     needsRecovery: number;
     total: number;
   }> => {
     try {
-      addToLog("Analyzing entity images to identify those using fallback images...");
+      addToLog("Finding Google Places entities that need image recovery...");
       
-      // Get Google Places entities that are using Unsplash fallback images
+      // Get ALL Google Places entities
       const { data, error } = await supabase
         .from('entities')
         .select('id, name, api_source, api_ref, image_url')
         .eq('is_deleted', false)
-        .eq('api_source', 'google_places')
-        .filter('image_url', 'ilike', '%unsplash.com%');
+        .eq('api_source', 'google_places');
       
       if (error) {
         throw error;
       }
 
-      // Get total number of Google Places entities for comparison
-      const { count, error: countError } = await supabase
-        .from('entities')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_deleted', false)
-        .eq('api_source', 'google_places');
+      // Check which entities likely have fallback images or expired Google URLs
+      const needsRecovery = data.filter(entity => {
+        // Check for Unsplash fallbacks explicitly
+        if (entity.image_url?.includes('unsplash.com')) return true;
+        
+        // Check for likely expired Google URLs (or other issues)
+        if (entity.image_url?.includes('googleapis.com') || 
+            entity.image_url?.includes('googleusercontent.com')) {
+          return true;
+        }
+        
+        // Consider missing images as needing recovery
+        if (!entity.image_url) return true;
+        
+        return false;
+      });
       
-      if (countError) {
-        throw countError;
-      }
-      
-      addToLog(`Found ${data.length} entities with fallback Unsplash images out of ${count} Google Places entities`);
+      addToLog(`Found ${needsRecovery.length} Google Places entities that need image recovery out of ${data.length} total`);
       
       return {
         entities: data,
-        needsRecovery: data.length,
-        total: count || 0
+        needsRecovery: needsRecovery.length,
+        total: data.length
       };
     } catch (err) {
-      console.error("Error identifying fallback entities:", err);
+      console.error("Error identifying Google Places entities:", err);
       setError("Failed to analyze entities. See console for details.");
       return { entities: [], needsRecovery: 0, total: 0 };
     }
   };
   
-  const recoverEntityImage = async (entityId: string, entityName: string): Promise<boolean> => {
+  const recoverEntityImage = async (entityId: string, entityName: string, currentImageUrl: string | null): Promise<boolean> => {
     try {
       addToLog(`Attempting to recover image for entity: ${entityName} (${entityId})`);
+      
+      if (currentImageUrl) {
+        addToLog(`Current image URL: ${currentImageUrl.substring(0, 60)}...`);
+      } else {
+        addToLog(`Current image URL: null`);
+      }
+      
+      // Add delay between each entity to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       const success = await refreshEntityImage(entityId);
       
@@ -103,12 +117,13 @@ export const EntityImageRecovery = () => {
     setIsRunning(true);
     setError(null);
     setResults(null);
+    setVerboseLog([]); // Clear previous logs
     
     try {
-      addToLog("Starting image recovery process...");
+      addToLog("Starting image recovery process for all Google Places entities...");
       
-      // Step 1: Identify entities with fallback images
-      const { entities, needsRecovery, total } = await identifyFallbackEntities();
+      // Step 1: Identify all Google Places entities
+      const { entities, needsRecovery, total } = await identifyGooglePlacesEntities();
       
       const initialResults: RecoveryResults = {
         total,
@@ -120,16 +135,17 @@ export const EntityImageRecovery = () => {
       setResults(initialResults);
       
       if (entities.length === 0) {
-        addToLog("No entities need image recovery");
+        addToLog("No Google Places entities found");
         toast({
-          title: "No Recovery Needed",
-          description: "No entities were found that need image recovery",
+          title: "No Entities Found",
+          description: "No Google Places entities were found in the database",
+          variant: "destructive",
         });
         setIsRunning(false);
         return;
       }
       
-      // Step 2: Process entities in batches to avoid rate limiting
+      // Step 2: Process entities in small batches to avoid rate limiting
       const batchSize = 2; // Small batch size to avoid rate limiting
       let recovered = 0;
       let failed = 0;
@@ -140,7 +156,7 @@ export const EntityImageRecovery = () => {
         
         // Process each entity in the batch
         const batchPromises = batch.map(async entity => {
-          const success = await recoverEntityImage(entity.id, entity.name);
+          const success = await recoverEntityImage(entity.id, entity.name, entity.image_url);
           
           if (success) {
             recovered++;
@@ -171,7 +187,7 @@ export const EntityImageRecovery = () => {
       
       toast({
         title: "Recovery Complete",
-        description: `Successfully recovered ${recovered} entity images out of ${needsRecovery}`,
+        description: `Successfully recovered ${recovered} entity images out of ${entities.length}`,
         variant: recovered === 0 ? "destructive" : "default",
       });
       
@@ -191,8 +207,8 @@ export const EntityImageRecovery = () => {
   };
 
   const getRecoveryProgressPercentage = () => {
-    if (!results || results.needsRecovery === 0) return 0;
-    return Math.round(((results.recovered + results.failed) / results.needsRecovery) * 100);
+    if (!results || results.total === 0) return 0;
+    return Math.round(((results.recovered + results.failed) / results.total) * 100);
   };
 
   const renderAuthWarning = () => {
@@ -215,7 +231,7 @@ export const EntityImageRecovery = () => {
       <CardHeader>
         <CardTitle>Entity Image Recovery Tool</CardTitle>
         <CardDescription>
-          Recover original images for entities that are currently using fallback Unsplash images
+          Recover original images for Google Places entities
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -225,10 +241,10 @@ export const EntityImageRecovery = () => {
           <InfoIcon className="h-4 w-4" />
           <AlertTitle>How Recovery Works</AlertTitle>
           <AlertDescription>
-            <p>This tool identifies entities with fallback Unsplash images and attempts to recover the original images by:</p>
+            <p>This tool recovers images for all Google Places entities by:</p>
             <ol className="list-decimal ml-5 mt-2">
-              <li>Finding Google Places entities using Unsplash fallback images</li>
-              <li>Using the stored Place ID to re-fetch the original image from Google Places</li>
+              <li>Finding all Google Places entities in the database</li>
+              <li>Using the stored Place ID to fetch fresh images from Google Places API</li>
               <li>Storing the recovered image in Supabase Storage</li>
               <li>Updating the database with the new image URL</li>
             </ol>
@@ -301,7 +317,7 @@ export const EntityImageRecovery = () => {
       </CardContent>
       <CardFooter className="flex justify-between text-sm text-muted-foreground">
         <div>
-          <p>This tool only recovers images for Google Places entities that currently use Unsplash fallback images.</p>
+          <p>This tool processes all Google Places entities, not just those using Unsplash fallback images.</p>
         </div>
       </CardFooter>
     </Card>

@@ -64,20 +64,54 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
       // Check if photo_reference exists in metadata
       let photoReference = entity.metadata?.photo_reference;
       
-      // We need to call our Edge Function to get the fresh photo URL
-      const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
-        body: {
-          placeId: entity.api_ref,
-          photoReference: photoReference
+      // Add retry logic for edge function invocation
+      let attempts = 0;
+      const maxAttempts = 3;
+      let success = false;
+      let data = null;
+      let error = null;
+      
+      while (attempts < maxAttempts && !success) {
+        try {
+          console.log(`Attempt ${attempts + 1}/${maxAttempts} to refresh entity image`);
+          
+          // We need to call our Edge Function to get the fresh photo URL
+          const result = await supabase.functions.invoke('refresh-entity-image', {
+            body: {
+              placeId: entity.api_ref,
+              photoReference: photoReference
+            }
+          });
+          
+          error = result.error;
+          data = result.data;
+          
+          if (!error && data?.imageUrl) {
+            success = true;
+          } else {
+            attempts++;
+            if (attempts < maxAttempts) {
+              console.log(`Retrying after error: ${error || 'No image URL returned'}`);
+              // Exponential backoff
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+            }
+          }
+        } catch (invokeError) {
+          console.error('Error invoking edge function:', invokeError);
+          attempts++;
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+          }
         }
-      });
+      }
 
-      if (error || !data?.imageUrl) {
-        console.error('Error refreshing entity image:', error || 'No image URL returned');
+      if (!success) {
+        console.error('Error refreshing entity image after multiple attempts:', error || 'No image URL returned');
         return false;
       }
       
       console.log('Retrieved fresh image URL from Google Places:', data.imageUrl);
+      console.log('Place name:', data.placeName || entity.name);
       
       // Store the new photo_reference if provided
       if (data.photoReference && data.photoReference !== photoReference) {
@@ -96,16 +130,38 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
         }
       }
 
-      // Download and store the refreshed image
+      // Download and store the refreshed image with retry logic
       console.log('Downloading and storing image from:', data.imageUrl);
-      const storedImageUrl = await downloadAndStoreEntityImage(
-        data.imageUrl,
-        entityId,
-        entity.api_source
-      );
+      let downloadAttempts = 0;
+      const maxDownloadAttempts = 3;
+      let storedImageUrl = null;
+      
+      while (downloadAttempts < maxDownloadAttempts && !storedImageUrl) {
+        try {
+          storedImageUrl = await downloadAndStoreEntityImage(
+            data.imageUrl,
+            entityId,
+            entity.api_source
+          );
+          
+          if (!storedImageUrl) {
+            downloadAttempts++;
+            if (downloadAttempts < maxDownloadAttempts) {
+              console.log(`Retrying download attempt ${downloadAttempts + 1}/${maxDownloadAttempts}`);
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, downloadAttempts) * 1000));
+            }
+          }
+        } catch (downloadError) {
+          console.error('Error downloading image:', downloadError);
+          downloadAttempts++;
+          if (downloadAttempts < maxDownloadAttempts) {
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, downloadAttempts) * 1000));
+          }
+        }
+      }
       
       if (!storedImageUrl) {
-        console.error('Failed to download and store the image');
+        console.error('Failed to download and store the image after multiple attempts');
         return false;
       }
       
