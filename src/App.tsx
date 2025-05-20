@@ -12,7 +12,6 @@ import NotFound from './pages/NotFound';
 import PostView from './pages/PostView';
 import RecommendationView from './pages/RecommendationView';
 import EntityDetail from './pages/EntityDetail';
-import Admin from './pages/Admin';
 import './App.css';
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from './components/ui/tooltip';
@@ -90,15 +89,6 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <RecommendationView />
-                  </ProtectedRoute>
-                } 
-              />
-              {/* Admin route */}
-              <Route 
-                path="/admin" 
-                element={
-                  <ProtectedRoute>
-                    <Admin />
                   </ProtectedRoute>
                 } 
               />
