@@ -1,9 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
 import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
-import { shouldDownloadImage } from '@/utils/imageUtils';
-import { downloadAndStoreEntityImage } from '@/services/mediaService';
 
 // Fetch an entity by its ID
 export const fetchEntityById = async (entityId: string): Promise<Entity | null> => {
@@ -55,83 +54,37 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
     }
 
     // For Google Places entities, fetch fresh photo from the API
-    if (entity.api_source === 'google_places' && entity.api_ref) {
-      // Log the current image state
-      console.log('Current image URL:', entity.image_url);
-      console.log('Is using fallback?', entity.image_url?.includes('unsplash.com'));
-      
-      // Check if photo_reference exists in metadata
-      const photoReference = entity.metadata?.photo_reference;
-      console.log('Photo reference from metadata:', photoReference);
-      
-      if (!photoReference) {
-        console.log('No photo reference found in metadata, cannot recover image');
+    if (entity.api_source === 'google_places' && entity.api_ref && entity.metadata?.photo_reference) {
+      // We need to call our Edge Function to get the fresh photo URL
+      const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
+        body: {
+          placeId: entity.api_ref,
+          photoReference: entity.metadata.photo_reference
+        }
+      });
+
+      if (error || !data?.imageUrl) {
+        console.error('Error refreshing entity image:', error);
         return false;
       }
-      
-      // Directly use the download-google-photo function with the photo reference
-      return await downloadGooglePhoto(entity.id, entity.api_ref, photoReference);
+
+      // Update the entity with the new image URL
+      const { error: updateError } = await supabase
+        .from('entities')
+        .update({ image_url: data.imageUrl })
+        .eq('id', entityId);
+
+      if (updateError) {
+        console.error('Error updating entity image URL:', updateError);
+        return false;
+      }
+
+      return true;
     }
     
     return false;
   } catch (error) {
     console.error('Error in refreshEntityImage:', error);
-    return false;
-  }
-};
-
-// Helper function to download Google photo using the download-google-photo edge function
-const downloadGooglePhoto = async (entityId: string, placeId: string, photoRef: string): Promise<boolean> => {
-  try {
-    console.log(`Calling download-google-photo with placeId: ${placeId}, photoRef: ${photoRef}`);
-    
-    const result = await supabase.functions.invoke('download-google-photo', {
-      body: {
-        placeId: placeId,
-        photoRef: photoRef
-      }
-    });
-    
-    if (result.error) {
-      console.error('Error calling download-google-photo function:', result.error);
-      return false;
-    }
-    
-    console.log('download-google-photo response:', result);
-    
-    if (!result.data?.publicUrl) {
-      console.error('No public URL returned from download-google-photo function');
-      return false;
-    }
-    
-    const storedImageUrl = result.data.publicUrl;
-    console.log('Successfully stored image to Supabase:', storedImageUrl);
-    
-    // Fetch the entity again to ensure we have the latest data before updating
-    const entityToUpdate = await fetchEntityById(entityId);
-    if (!entityToUpdate) {
-      console.error('Could not find entity to update with new image URL');
-      return false;
-    }
-    
-    // Update the entity with the new image URL
-    const { error: updateError } = await supabase
-      .from('entities')
-      .update({ 
-        image_url: storedImageUrl,
-        metadata: { ...entityToUpdate.metadata, photo_reference: photoRef }
-      })
-      .eq('id', entityId);
-
-    if (updateError) {
-      console.error('Error updating entity image URL:', updateError);
-      return false;
-    }
-
-    console.log('Successfully updated entity with new image URL');
-    return true;
-  } catch (downloadError) {
-    console.error('Error downloading Google photo:', downloadError);
     return false;
   }
 };
@@ -218,10 +171,10 @@ export const findOrCreateEntity = async (
   const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
 
   // Ensure we have a valid image URL or use fallback based on type
-  let finalImageUrl = imageUrl || getEntityTypeFallbackImage(typeAsString);
+  const finalImageUrl = imageUrl || getEntityTypeFallbackImage(typeAsString);
 
   // Create a new entity if not found or if we don't have API reference info
-  const newEntity = await createEntity({
+  return createEntity({
     name,
     type: typeAsString as any, // Cast to any to bypass type checking
     venue,
@@ -232,35 +185,6 @@ export const findOrCreateEntity = async (
     metadata,
     website_url: websiteUrl
   });
-  
-  // If entity was created successfully and the image URL is from an external API
-  // that might expire, download and store it for longevity
-  if (newEntity && shouldDownloadImage(finalImageUrl, apiSource)) {
-    console.log(`Downloading and storing image for new entity: ${newEntity.id}`);
-    
-    const storedImageUrl = await downloadAndStoreEntityImage(
-      finalImageUrl,
-      newEntity.id,
-      apiSource
-    );
-    
-    // If we successfully downloaded and stored the image, update the entity
-    if (storedImageUrl) {
-      const { error: updateError } = await supabase
-        .from('entities')
-        .update({ image_url: storedImageUrl })
-        .eq('id', newEntity.id);
-        
-      if (updateError) {
-        console.error('Error updating entity with stored image URL:', updateError);
-      } else {
-        // Update the local entity object with new image URL
-        newEntity.image_url = storedImageUrl;
-      }
-    }
-  }
-
-  return newEntity;
 };
 
 // Get entities by type (for searching/filtering)
