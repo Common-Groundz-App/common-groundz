@@ -85,6 +85,19 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
       .getPublicUrl(filePath);
       
     console.log(`[refresh-entity-image] Image saved to storage: ${publicUrl}`);
+    
+    // Update the entity directly with the new image URL to ensure it's saved
+    const { error: updateError } = await supabase
+      .from('entities')
+      .update({ image_url: publicUrl })
+      .eq('id', entityId);
+      
+    if (updateError) {
+      console.error("[refresh-entity-image] Error updating entity with new image URL:", updateError);
+    } else {
+      console.log("[refresh-entity-image] Successfully updated entity with new image URL");
+    }
+    
     return publicUrl;
   } catch (error) {
     console.error(`[refresh-entity-image] Error saving image to storage:`, error);

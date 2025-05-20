@@ -20,6 +20,10 @@ export const useEntityOperations = () => {
   const fetchUrlMetadata = async (url: string): Promise<any> => {
     try {
       const { data, error } = await supabase.functions.invoke('fetch-url-metadata', {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
         body: { url }
       });
 
@@ -54,20 +58,42 @@ export const useEntityOperations = () => {
         placeId
       );
       
+      console.log(`[useEntityOperations] Process entity image returned:`, processedImageUrl);
+      
       if (processedImageUrl && processedImageUrl !== imageUrl) {
         console.log(`[useEntityOperations] Successfully refreshed image to: ${processedImageUrl}`);
         
-        // Update the entity with the refreshed URL
-        const { error: updateError } = await supabase
-          .from('entities')
-          .update({ image_url: processedImageUrl })
-          .eq('id', entityId);
+        // Update the entity with the refreshed URL - using multiple attempts if needed
+        let updateSuccess = false;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (!updateSuccess && attempts < maxAttempts) {
+          attempts++;
+          console.log(`[useEntityOperations] Updating entity with new image URL (attempt ${attempts})...`);
           
-        if (updateError) {
-          console.error('[useEntityOperations] Error updating entity with refreshed image:', updateError);
+          const { error: updateError } = await supabase
+            .from('entities')
+            .update({ image_url: processedImageUrl })
+            .eq('id', entityId);
+            
+          if (updateError) {
+            console.error(`[useEntityOperations] Error updating entity with refreshed image (attempt ${attempts}):`, updateError);
+            
+            // Wait a bit before retrying
+            if (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 500 * attempts));
+            }
+          } else {
+            updateSuccess = true;
+            console.log(`[useEntityOperations] Successfully updated entity with new image URL on attempt ${attempts}`);
+          }
+        }
+        
+        if (!updateSuccess) {
           toast({
-            title: 'Error updating entity',
-            description: 'The image was saved but could not update the entity record',
+            title: 'Image partially refreshed',
+            description: 'The image was processed but could not update the entity record',
             variant: 'destructive'
           });
         } else {
@@ -179,30 +205,53 @@ export const useEntityOperations = () => {
       });
 
       // Special handling for Google Places entities: if the image is still from Google Maps
-      // and we have a photo reference, try to manually refresh it
+      // and we have a photo reference, try to manually refresh it immediately after creation
       if (
         entity.api_source === 'google_places' && 
         entity.image_url && 
-        entity.image_url.includes('maps.googleapis.com') &&
-        metadata?.photo_reference
+        (entity.image_url.includes('maps.googleapis.com') || entity.metadata?.photo_reference)
       ) {
         console.log('[useEntityOperations] Entity created, but image is still from Google Maps API. Manually refreshing...');
         
-        // Wait a moment before refreshing (to ensure entity is fully created)
-        setTimeout(async () => {
-          const refreshedImageUrl = await refreshEntityImage(
-            entity.id,
-            entity.image_url,
-            metadata.photo_reference,
-            entity.api_ref
-          );
-          
-          if (refreshedImageUrl && refreshedImageUrl !== entity.image_url) {
-            console.log('[useEntityOperations] Successfully refreshed entity image after creation:', refreshedImageUrl);
-          } else {
-            console.warn('[useEntityOperations] Manual refresh after creation did not change the image URL');
+        // Use a Promise to ensure we wait for the image refresh to complete
+        const refreshImagePromise = new Promise<Entity>(async (resolve) => {
+          try {
+            const refreshedImageUrl = await refreshEntityImage(
+              entity.id,
+              entity.image_url,
+              entity.metadata?.photo_reference,
+              entity.api_ref
+            );
+            
+            if (refreshedImageUrl && refreshedImageUrl !== entity.image_url) {
+              console.log('[useEntityOperations] Successfully refreshed entity image after creation:', refreshedImageUrl);
+              
+              // Fetch the updated entity to return
+              const { data: updatedEntity, error } = await supabase
+                .from('entities')
+                .select('*')
+                .eq('id', entity.id)
+                .single();
+                
+              if (!error && updatedEntity) {
+                resolve(updatedEntity as Entity);
+              } else {
+                // If we can't fetch the updated entity, just update our local copy
+                entity.image_url = refreshedImageUrl;
+                resolve(entity);
+              }
+            } else {
+              console.warn('[useEntityOperations] Manual refresh after creation did not change the image URL');
+              resolve(entity);
+            }
+          } catch (error) {
+            console.error('[useEntityOperations] Error during image refresh after creation:', error);
+            resolve(entity);
           }
-        }, 1000);
+        });
+        
+        // Wait for the image refresh to complete before returning
+        return await refreshImagePromise;
       }
 
       return entity;

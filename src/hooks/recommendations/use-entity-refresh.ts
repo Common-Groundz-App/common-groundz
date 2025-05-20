@@ -81,6 +81,8 @@ export const useEntityImageRefresh = () => {
         
         // Update the photo_reference in the entity record if we got a new one
         if (newPhotoRef && newPhotoRef !== photoReference) {
+          console.log('Updating entity with new photo reference:', newPhotoRef);
+          
           // First fetch entity to get current metadata
           const { data: entity, error: entityError } = await supabase
             .from('entities')
@@ -104,8 +106,23 @@ export const useEntityImageRefresh = () => {
               
             if (updateError) {
               console.warn(`Error updating photo reference: ${updateError.message}`);
+            } else {
+              console.log('Successfully updated entity metadata with new photo reference');
             }
           }
+        }
+        
+        // Now update the image_url regardless of photo reference update
+        const { error: imageUpdateError } = await supabase
+          .from('entities')
+          .update({ image_url: imageUrl })
+          .eq('id', entityId);
+          
+        if (imageUpdateError) {
+          console.error('Error updating entity image URL:', imageUpdateError);
+          // We'll still return the URL even if the update failed
+        } else {
+          console.log('Successfully updated entity with new image URL:', imageUrl);
         }
         
         toast({
@@ -170,6 +187,8 @@ export const useEntityImageRefresh = () => {
         if (updateError) {
           console.error(`Error updating entity: ${updateError.message}`);
           throw new Error(`Error updating entity: ${updateError.message}`);
+        } else {
+          console.log('Successfully updated entity with new image URL');
         }
 
         toast({

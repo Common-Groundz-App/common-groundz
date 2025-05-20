@@ -143,7 +143,8 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
         
         const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
           headers: {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
           },
           body: {
             photoReference,
@@ -151,6 +152,8 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
             entityId
           }
         });
+        
+        console.log('Edge function response:', data, 'Error:', error);
         
         if (error) {
           console.error('Error response from refresh-entity-image:', error);
@@ -163,6 +166,20 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
         }
         
         console.log('Successfully processed Google Places image:', data);
+        
+        // Also update the entity directly to ensure it's saved
+        if (data.imageUrl) {
+          const { error: updateError } = await supabase
+            .from('entities')
+            .update({ image_url: data.imageUrl })
+            .eq('id', entityId);
+            
+          if (updateError) {
+            console.error('Error updating entity with processed image URL:', updateError);
+          } else {
+            console.log('Entity updated with new image URL after processing');
+          }
+        }
         
         return data.imageUrl || secureUrl;
       } catch (googlePlacesError) {
@@ -297,6 +314,19 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       .getPublicUrl(filePath);
       
     console.log('Image saved to storage successfully:', publicUrl);
+    
+    // Also update the entity directly to ensure it's saved
+    const { error: updateError } = await supabase
+      .from('entities')
+      .update({ image_url: publicUrl })
+      .eq('id', entityId);
+      
+    if (updateError) {
+      console.error('Error updating entity with saved image URL:', updateError);
+    } else {
+      console.log('Entity updated with new image URL after storage save');
+    }
+    
     return publicUrl;
   } catch (error) {
     console.error('Error saving image to storage:', error);
