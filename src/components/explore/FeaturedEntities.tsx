@@ -22,7 +22,7 @@ interface Entity {
   popularity_score?: number;
   api_ref?: string;
   api_source?: string;
-  photo_reference?: string;
+  photo_reference?: string; // Added this property to match what's used in the code
 }
 
 export const FeaturedEntities = () => {
