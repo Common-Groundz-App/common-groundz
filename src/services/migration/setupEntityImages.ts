@@ -1,14 +1,14 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { shouldDownloadImage } from '@/utils/imageUtils';
 import { batchProcessEntityImages } from '@/services/mediaService';
 
 /**
- * Create the entity-images storage bucket if it doesn't exist
+ * Verify access to the entity-images storage bucket
+ * This assumes the bucket has been manually created in the Supabase dashboard
  */
 export const setupEntityImagesBucket = async (): Promise<boolean> => {
   try {
-    // Check if the bucket already exists
+    // Check if the bucket exists (we expect it to exist after manual creation)
     const { data: buckets, error } = await supabase.storage.listBuckets();
     
     if (error) {
@@ -16,30 +16,28 @@ export const setupEntityImagesBucket = async (): Promise<boolean> => {
       return false;
     }
     
-    // Find if our bucket already exists
+    // Find if our bucket exists
     const bucketExists = buckets.some(bucket => bucket.name === 'entity-images');
     
     if (!bucketExists) {
-      console.log('Creating entity-images bucket...');
+      console.error('The entity-images bucket does not exist in your Supabase project.');
+      console.error('Please create it manually in the Supabase dashboard with public access.');
+      return false;
+    } else {
+      console.log('entity-images bucket found');
       
-      // Create the bucket
-      const { error: createError } = await supabase.storage.createBucket(
-        'entity-images',
-        {
-          public: true,
-          fileSizeLimit: 10485760, // 10MB
-          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-        }
-      );
-      
-      if (createError) {
-        console.error('Error creating entity-images bucket:', createError);
+      // Test bucket access by listing files (to verify permissions)
+      const { error: listError } = await supabase.storage
+        .from('entity-images')
+        .list();
+        
+      if (listError) {
+        console.error('Error accessing entity-images bucket:', listError);
+        console.error('Please check bucket permissions in the Supabase dashboard.');
         return false;
       }
       
-      console.log('entity-images bucket created successfully');
-    } else {
-      console.log('entity-images bucket already exists');
+      console.log('Successfully verified entity-images bucket access');
     }
     
     return true;

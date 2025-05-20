@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { setupEntityImagesBucket, migrateExistingEntityImages } from '@/services/migration/setupEntityImages';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 type MigrationResults = {
   total: number;
@@ -30,19 +31,19 @@ export const EntityImageMigration = () => {
       if (success) {
         toast({
           title: "Success",
-          description: "Entity images bucket setup successfully",
+          description: "Entity images bucket access verified successfully",
         });
       } else {
-        setError("Failed to set up storage bucket");
+        setError("Failed to verify entity-images bucket access. Please check the console for details.");
         toast({
           title: "Error",
-          description: "Failed to set up storage bucket",
+          description: "Failed to verify bucket access. See console for details.",
           variant: "destructive",
         });
       }
     } catch (err) {
-      console.error("Error setting up bucket:", err);
-      setError("An unexpected error occurred while setting up the bucket");
+      console.error("Error verifying bucket:", err);
+      setError("An unexpected error occurred while verifying bucket access");
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -100,19 +101,23 @@ export const EntityImageMigration = () => {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">Step 1: Set up Storage Bucket</h3>
+          <h3 className="text-lg font-medium">Step 1: Verify Storage Bucket</h3>
           <p className="text-sm text-muted-foreground">
-            First, we need to make sure the entity_images storage bucket exists in your Supabase project.
+            First, we need to verify access to the "entity-images" bucket in your Supabase project.
+            Make sure this bucket exists and has public read access enabled.
           </p>
           <Button 
             onClick={setupBucket} 
             disabled={isRunning || isBucketSetup === true}
             variant={isBucketSetup === true ? "outline" : "default"}
           >
-            {isBucketSetup === true ? "✓ Bucket Ready" : "Setup Storage Bucket"}
+            {isBucketSetup === true ? "✓ Bucket Ready" : "Verify Storage Bucket"}
           </Button>
           {isBucketSetup === true && (
-            <p className="text-sm text-green-600">Storage bucket is set up and ready!</p>
+            <div className="flex items-center gap-2 text-sm text-green-600">
+              <CheckCircle2 className="w-4 h-4" />
+              <p>Storage bucket access verified successfully!</p>
+            </div>
           )}
         </div>
 
@@ -160,8 +165,15 @@ export const EntityImageMigration = () => {
 
         {error && (
           <div className="p-4 border border-red-200 bg-red-50 text-red-700 rounded-md">
-            <p className="font-medium">Error</p>
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="w-5 h-5" />
+              <p className="font-medium">Error</p>
+            </div>
             <p className="text-sm">{error}</p>
+            <p className="text-sm mt-2">
+              Check that the "entity-images" bucket exists in your Supabase project and 
+              has the correct RLS policies for public access.
+            </p>
           </div>
         )}
       </CardContent>
