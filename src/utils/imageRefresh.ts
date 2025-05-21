@@ -122,3 +122,45 @@ export const deferEntityImageRefresh = (entityId: string, retryCount: number = 0
     }
   }, delay);
 };
+
+/**
+ * Triggers a batch refresh of Google Places entity images using the daily-refresh-entity-images edge function.
+ * This requires appropriate admin permissions and should not be called from client code directly.
+ * 
+ * @param apiKey The secret API key required to call the function
+ * @param options Configuration options including batchSize, maxRetries, and dryRun flags
+ * @returns The response from the edge function containing statistics on the refresh operation
+ */
+export const triggerBatchEntityImageRefresh = async (
+  apiKey: string,
+  options: { 
+    batchSize?: number;
+    maxRetries?: number;
+    dryRun?: boolean;
+  } = {}
+): Promise<any> => {
+  try {
+    if (!apiKey) {
+      throw new Error('API key is required for batch entity image refresh');
+    }
+    
+    const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/daily-refresh-entity-images`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(options)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error triggering batch image refresh: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error triggering batch entity image refresh:', error);
+    throw error;
+  }
+};

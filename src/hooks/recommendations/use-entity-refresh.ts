@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
 import { ensureBucketPolicies } from '@/services/storageService';
+import { triggerBatchEntityImageRefresh } from '@/utils/imageRefresh';
 
 export const useEntityImageRefresh = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -179,6 +180,48 @@ export const useEntityImageRefresh = () => {
   };
 
   /**
+   * Initiates a batch refresh of Google Places entity images.
+   * This is an admin-only function that requires an API key.
+   *
+   * @param apiKey The secret API key for authenticating with the edge function
+   * @param options Configuration options for the batch refresh
+   * @returns Statistics about the refresh operation
+   */
+  const refreshBatchEntityImages = async (
+    apiKey: string,
+    options: {
+      batchSize?: number;
+      maxRetries?: number;
+      dryRun?: boolean;
+    } = {}
+  ) => {
+    setIsRefreshing(true);
+    
+    try {
+      const result = await triggerBatchEntityImageRefresh(apiKey, options);
+      
+      toast({
+        title: 'Batch refresh completed',
+        description: `Processed ${result.processed} entities: ${result.succeeded} succeeded, ${result.failed} failed, ${result.skipped} skipped.`
+      });
+      
+      return result;
+    } catch (error: any) {
+      console.error('Error in batch entity image refresh:', error);
+      
+      toast({
+        title: 'Batch refresh failed',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive'
+      });
+      
+      return null;
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  /**
    * Checks if an entity image is stored in our storage system
    * 
    * @param imageUrl The image URL to check
@@ -191,6 +234,7 @@ export const useEntityImageRefresh = () => {
 
   return { 
     refreshEntityImage, 
+    refreshBatchEntityImages,
     isRefreshing, 
     isEntityImageMigrated
   };
