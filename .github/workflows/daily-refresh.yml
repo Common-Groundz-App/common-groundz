@@ -1,0 +1,17 @@
+name: Daily Entity Image Refresh
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
+  workflow_dispatch:     # Allows manual trigger from GitHub UI
+
+jobs:
+  refresh-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Supabase Edge Function
+        run: |
+          curl -X POST https://uyjtgybbktgapspodajy.supabase.co/functions/v1/daily-refresh-entity-images \
+            -H "Authorization: Bearer ${{ secrets.REFRESH_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"batchSize": 10, "dryRun": false}'
