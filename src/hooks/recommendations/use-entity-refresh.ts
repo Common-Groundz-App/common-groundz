@@ -112,42 +112,34 @@ export const useEntityImageRefresh = () => {
           }
         }
         
-        // Now update the image_url regardless of photo reference update
-        const { error: imageUpdateError } = await supabase
-          .from('entities')
-          .update({ image_url: imageUrl })
-          .eq('id', entityId);
-          
-        if (imageUpdateError) {
-          console.error('Error updating entity image URL:', imageUpdateError);
-          
-          // Implement retry logic for critical updates
-          console.log('Retrying entity image update...');
-          const retryAttempts = 3;
-          let retrySuccess = false;
-          
-          for (let i = 0; i < retryAttempts && !retrySuccess; i++) {
-            // Wait before retrying (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, i)));
+        // Now update the image_url with retry logic
+        let updateSuccess = false;
+        let retryAttempt = 0;
+        const maxRetries = 3;
+        
+        while (!updateSuccess && retryAttempt < maxRetries) {
+          const { error: imageUpdateError } = await supabase
+            .from('entities')
+            .update({ image_url: imageUrl })
+            .eq('id', entityId);
             
-            const { error: retryError } = await supabase
-              .from('entities')
-              .update({ image_url: imageUrl })
-              .eq('id', entityId);
-              
-            if (!retryError) {
-              console.log(`Successfully updated entity image URL on retry attempt ${i + 1}`);
-              retrySuccess = true;
-            } else {
-              console.error(`Retry attempt ${i + 1} failed:`, retryError);
-            }
+          if (imageUpdateError) {
+            console.error(`Error updating entity image URL (attempt ${retryAttempt + 1}):`, imageUpdateError);
+            console.error('Error details:', JSON.stringify(imageUpdateError));
+            
+            // Wait before retrying (exponential backoff)
+            const backoffTime = 500 * Math.pow(2, retryAttempt);
+            console.log(`Waiting ${backoffTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, backoffTime));
+            retryAttempt++;
+          } else {
+            console.log('Successfully updated entity with new image URL:', imageUrl);
+            updateSuccess = true;
           }
-          
-          if (!retrySuccess) {
-            console.error(`Failed to update entity image URL after ${retryAttempts} attempts`);
-          }
-        } else {
-          console.log('Successfully updated entity with new image URL:', imageUrl);
+        }
+        
+        if (!updateSuccess) {
+          console.error(`Failed to update entity image URL after ${maxRetries} attempts`);
         }
         
         toast({
@@ -203,17 +195,35 @@ export const useEntityImageRefresh = () => {
         
         console.log('Image saved successfully, updating entity record with new URL:', newImageUrl);
         
-        // Update the entity record with the new image URL
-        const { error: updateError } = await supabase
-          .from('entities')
-          .update({ image_url: newImageUrl })
-          .eq('id', entityId);
+        // Update the entity record with the new image URL - with retry logic
+        let updateSuccess = false;
+        let retryAttempt = 0;
+        const maxRetries = 3;
+        
+        while (!updateSuccess && retryAttempt < maxRetries) {
+          const { error: updateError } = await supabase
+            .from('entities')
+            .update({ image_url: newImageUrl })
+            .eq('id', entityId);
+            
+          if (updateError) {
+            console.error(`Error updating entity image URL (attempt ${retryAttempt + 1}):`, updateError);
+            console.error('Error details:', JSON.stringify(updateError));
+            
+            // Wait before retrying (exponential backoff)
+            const backoffTime = 500 * Math.pow(2, retryAttempt);
+            console.log(`Waiting ${backoffTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, backoffTime));
+            retryAttempt++;
+          } else {
+            console.log('Successfully updated entity with new image URL');
+            updateSuccess = true;
+          }
+        }
           
-        if (updateError) {
-          console.error(`Error updating entity: ${updateError.message}`);
-          throw new Error(`Error updating entity: ${updateError.message}`);
-        } else {
-          console.log('Successfully updated entity with new image URL');
+        if (!updateSuccess) {
+          console.error(`Failed to update entity image URL after ${maxRetries} attempts`);
+          throw new Error(`Failed to update entity image URL after ${maxRetries} attempts`);
         }
 
         toast({

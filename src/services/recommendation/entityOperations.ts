@@ -96,6 +96,10 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
       
       // We need to call our Edge Function to get the fresh photo URL
       const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
         body: {
           placeId: entity.api_ref,
           photoReference: entity.metadata.photo_reference,
@@ -230,6 +234,10 @@ export const processEntityImage = async (entityId: string, imageUrl: string, pho
         
         // Call the refresh-entity-image edge function directly
         const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
           body: {
             photoReference,
             placeId,
@@ -466,24 +474,48 @@ export const findOrCreateEntity = async (
       );
       
       if (processedImageUrl && processedImageUrl !== finalImageUrl) {
-        // Update the entity with the processed image URL
+        // Update the entity with the processed image URL - FIXED: Adding retry mechanism
         console.log(`[findOrCreateEntity] Image processed successfully, updating entity with new URL: ${processedImageUrl}`);
         
-        const { error: updateError } = await supabase
-          .from('entities')
-          .update({ image_url: processedImageUrl })
-          .eq('id', newEntity.id);
+        let updateSuccess = false;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (!updateSuccess && attempts < maxAttempts) {
+          attempts++;
+          console.log(`[findOrCreateEntity] Updating entity with new image URL (attempt ${attempts})...`);
           
-        if (updateError) {
-          console.error('[findOrCreateEntity] Error updating entity with processed image URL:', updateError);
-        } else {
-          console.log(`[findOrCreateEntity] Successfully updated entity with processed image URL: ${processedImageUrl}`);
-          
-          // Return updated entity
-          return {
-            ...newEntity,
-            image_url: processedImageUrl
-          };
+          const { error: updateError } = await supabase
+            .from('entities')
+            .update({ 
+              image_url: processedImageUrl 
+            })
+            .eq('id', newEntity.id);
+            
+          if (updateError) {
+            console.error(`[findOrCreateEntity] Error updating entity with processed image URL (attempt ${attempts}):`, updateError);
+            console.error(`[findOrCreateEntity] Error details:`, JSON.stringify(updateError));
+            
+            // Wait a bit before retrying with exponential backoff
+            if (attempts < maxAttempts) {
+              const backoffTime = 500 * Math.pow(2, attempts);
+              console.log(`[findOrCreateEntity] Waiting ${backoffTime}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, backoffTime));
+            }
+          } else {
+            updateSuccess = true;
+            console.log(`[findOrCreateEntity] Successfully updated entity with processed image URL on attempt ${attempts}`);
+            
+            // Return updated entity
+            return {
+              ...newEntity,
+              image_url: processedImageUrl
+            };
+          }
+        }
+        
+        if (!updateSuccess) {
+          console.error('[findOrCreateEntity] Failed to update entity with processed image URL after multiple attempts');
         }
       } else {
         console.warn('[findOrCreateEntity] Image processing did not change the URL or failed');
@@ -501,22 +533,46 @@ export const findOrCreateEntity = async (
       const processedImageUrl = await processEntityImage(newEntity.id, imageUrl);
       
       if (processedImageUrl && processedImageUrl !== imageUrl) {
-        // Update the entity with the processed image URL
-        const { error: updateError } = await supabase
-          .from('entities')
-          .update({ image_url: processedImageUrl })
-          .eq('id', newEntity.id);
+        // Update the entity with the processed image URL - FIXED: Adding retry mechanism
+        let updateSuccess = false;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (!updateSuccess && attempts < maxAttempts) {
+          attempts++;
+          console.log(`[findOrCreateEntity] Updating entity with new image URL (attempt ${attempts})...`);
           
-        if (updateError) {
-          console.error('[findOrCreateEntity] Error updating entity with processed image URL:', updateError);
-        } else {
-          console.log(`[findOrCreateEntity] Successfully updated entity with processed image URL: ${processedImageUrl}`);
-          
-          // Return updated entity
-          return {
-            ...newEntity,
-            image_url: processedImageUrl
-          };
+          const { error: updateError } = await supabase
+            .from('entities')
+            .update({ 
+              image_url: processedImageUrl 
+            })
+            .eq('id', newEntity.id);
+            
+          if (updateError) {
+            console.error(`[findOrCreateEntity] Error updating entity with processed image URL (attempt ${attempts}):`, updateError);
+            console.error(`[findOrCreateEntity] Error details:`, JSON.stringify(updateError));
+            
+            // Wait a bit before retrying with exponential backoff
+            if (attempts < maxAttempts) {
+              const backoffTime = 500 * Math.pow(2, attempts);
+              console.log(`[findOrCreateEntity] Waiting ${backoffTime}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, backoffTime));
+            }
+          } else {
+            updateSuccess = true;
+            console.log(`[findOrCreateEntity] Successfully updated entity with processed image URL on attempt ${attempts}`);
+            
+            // Return updated entity
+            return {
+              ...newEntity,
+              image_url: processedImageUrl
+            };
+          }
+        }
+        
+        if (!updateSuccess) {
+          console.error('[findOrCreateEntity] Failed to update entity with processed image URL after multiple attempts');
         }
       }
     } catch (imageError) {

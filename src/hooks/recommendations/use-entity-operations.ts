@@ -86,10 +86,13 @@ export const useEntityOperations = () => {
             
           if (updateError) {
             console.error(`[useEntityOperations] Error updating entity with refreshed image (attempt ${attempts}):`, updateError);
+            console.error('[useEntityOperations] Error details:', JSON.stringify(updateError));
             
             // Wait a bit before retrying
             if (attempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempts)));
+              const backoffTime = 500 * Math.pow(2, attempts);
+              console.log(`[useEntityOperations] Waiting ${backoffTime}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, backoffTime));
             }
           } else {
             updateSuccess = true;
