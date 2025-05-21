@@ -50,7 +50,10 @@ export const deferEntityImageRefresh = (entityId: string): void => {
         }
 
         // Prepare the data for the edge function
-        const photoReference = entity.metadata?.photo_reference;
+        // Use type assertion for the metadata to access photo_reference
+        const photoReference = entity.metadata && typeof entity.metadata === 'object' 
+          ? (entity.metadata as Record<string, any>).photo_reference 
+          : undefined;
         const placeId = entity.api_ref;
 
         // Call the refresh-entity-image edge function
