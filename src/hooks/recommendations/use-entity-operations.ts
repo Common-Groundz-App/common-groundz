@@ -6,8 +6,7 @@ import {
   Entity,
   EntityType,
   findOrCreateEntity,
-  getEntitiesByType,
-  processEntityImage
+  getEntitiesByType
 } from '@/services/recommendationService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -20,116 +19,14 @@ export const useEntityOperations = () => {
   const fetchUrlMetadata = async (url: string): Promise<any> => {
     try {
       const { data, error } = await supabase.functions.invoke('fetch-url-metadata', {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
         body: { url }
       });
 
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('[useEntityOperations] Error fetching URL metadata:', error);
+      console.error('Error fetching URL metadata:', error);
       return null;
-    }
-  };
-
-  const refreshEntityImage = async (entityId: string, imageUrl: string, photoReference?: string, placeId?: string): Promise<string | null> => {
-    try {
-      console.log(`[useEntityOperations] Manually refreshing image for entity ${entityId}`, {
-        entityId, 
-        imageUrl, 
-        photoReference: photoReference || 'null', 
-        placeId: placeId || 'null'
-      });
-      
-      // Show a toast to let the user know we're processing
-      toast({
-        title: 'Refreshing image...',
-        description: 'This may take a few seconds'
-      });
-
-      // Get current session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('[useEntityOperations] No active session found for edge function authorization');
-        throw new Error('Authentication required to refresh image');
-      }
-      
-      // Use the processEntityImage function from the service with improved headers
-      const processedImageUrl = await processEntityImage(
-        entityId,
-        imageUrl,
-        photoReference,
-        placeId
-      );
-      
-      console.log(`[useEntityOperations] Process entity image returned:`, processedImageUrl);
-      
-      if (processedImageUrl && processedImageUrl !== imageUrl) {
-        console.log(`[useEntityOperations] Successfully refreshed image to: ${processedImageUrl}`);
-        
-        // Update the entity with the refreshed URL - using multiple attempts if needed
-        let updateSuccess = false;
-        let attempts = 0;
-        const maxAttempts = 3;
-        
-        while (!updateSuccess && attempts < maxAttempts) {
-          attempts++;
-          console.log(`[useEntityOperations] Updating entity with new image URL (attempt ${attempts})...`);
-          
-          const { error: updateError } = await supabase
-            .from('entities')
-            .update({ image_url: processedImageUrl })
-            .eq('id', entityId);
-            
-          if (updateError) {
-            console.error(`[useEntityOperations] Error updating entity with refreshed image (attempt ${attempts}):`, updateError);
-            console.error('[useEntityOperations] Error details:', JSON.stringify(updateError));
-            
-            // Wait a bit before retrying
-            if (attempts < maxAttempts) {
-              const backoffTime = 500 * Math.pow(2, attempts);
-              console.log(`[useEntityOperations] Waiting ${backoffTime}ms before retry...`);
-              await new Promise(resolve => setTimeout(resolve, backoffTime));
-            }
-          } else {
-            updateSuccess = true;
-            console.log(`[useEntityOperations] Successfully updated entity with new image URL on attempt ${attempts}`);
-          }
-        }
-        
-        if (!updateSuccess) {
-          toast({
-            title: 'Image partially refreshed',
-            description: 'The image was processed but could not update the entity record',
-            variant: 'destructive'
-          });
-        } else {
-          toast({
-            title: 'Image refreshed',
-            description: 'The entity image has been successfully updated'
-          });
-        }
-        
-        return processedImageUrl;
-      }
-      
-      console.warn(`[useEntityOperations] Image refresh did not change URL: ${imageUrl}`);
-      toast({
-        title: 'No change needed',
-        description: 'The image is already up to date'
-      });
-      return imageUrl; // Return original URL as it didn't change
-    } catch (error) {
-      console.error('[useEntityOperations] Error refreshing entity image:', error);
-      toast({
-        title: 'Error refreshing image',
-        description: 'Could not refresh the entity image. Please try again.',
-        variant: 'destructive'
-      });
-      return imageUrl; // Return original URL as fallback
     }
   };
 
@@ -156,13 +53,6 @@ export const useEntityOperations = () => {
     try {
       setIsLoading(true);
 
-      // Get session for authentication checks
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('[useEntityOperations] No active session found for entity creation');
-        throw new Error('Authentication required to create entity');
-      }
-
       if (websiteUrl) {
         const urlMetadata = await fetchUrlMetadata(websiteUrl);
         if (urlMetadata) {
@@ -176,18 +66,6 @@ export const useEntityOperations = () => {
         }
       }
 
-      console.log('[useEntityOperations] Creating entity with details:', {
-        name,
-        type,
-        apiSource,
-        apiRef,
-        venue,
-        imageUrl: imageUrl ? (imageUrl.length > 100 ? imageUrl.substring(0, 100) + '...' : imageUrl) : null,
-        hasMetadata: metadata ? true : false,
-        photoReference: metadata?.photo_reference || 'null'
-      });
-
-      // Create the entity
       const entity = await findOrCreateEntity(
         name,
         type,
@@ -210,78 +88,9 @@ export const useEntityOperations = () => {
         return null;
       }
 
-      console.log('[useEntityOperations] Entity created:', {
-        id: entity.id,
-        name: entity.name,
-        type: entity.type,
-        api_source: entity.api_source,
-        image_url: entity.image_url,
-        has_metadata: entity.metadata ? true : false,
-        metadata_keys: entity.metadata ? Object.keys(entity.metadata) : [],
-        photo_reference: entity.metadata?.photo_reference || 'null'
-      });
-
-      // Special handling for Google Places entities: if the image is still from Google Maps
-      // and we have a photo reference, try to manually refresh it immediately after creation
-      if (
-        entity.api_source === 'google_places' && 
-        entity.image_url && 
-        (entity.image_url.includes('maps.googleapis.com') || entity.metadata?.photo_reference)
-      ) {
-        console.log('[useEntityOperations] Entity created, but image is still from Google Maps API. Manually refreshing...');
-        
-        // Use a Promise to ensure we wait for the image refresh to complete
-        const refreshImagePromise = new Promise<Entity>(async (resolve) => {
-          try {
-            // Get a new session since we might be in a different context now
-            const { data: { session: currentSession } } = await supabase.auth.getSession();
-            if (!currentSession) {
-              console.error('[useEntityOperations] No active session found for image refresh');
-              resolve(entity); // Return the entity without trying to refresh
-              return;
-            }
-            
-            const refreshedImageUrl = await refreshEntityImage(
-              entity.id,
-              entity.image_url,
-              entity.metadata?.photo_reference,
-              entity.api_ref
-            );
-            
-            if (refreshedImageUrl && refreshedImageUrl !== entity.image_url) {
-              console.log('[useEntityOperations] Successfully refreshed entity image after creation:', refreshedImageUrl);
-              
-              // Fetch the updated entity to return
-              const { data: updatedEntity, error } = await supabase
-                .from('entities')
-                .select('*')
-                .eq('id', entity.id)
-                .single();
-                
-              if (!error && updatedEntity) {
-                resolve(updatedEntity as Entity);
-              } else {
-                // If we can't fetch the updated entity, just update our local copy
-                entity.image_url = refreshedImageUrl;
-                resolve(entity);
-              }
-            } else {
-              console.warn('[useEntityOperations] Manual refresh after creation did not change the image URL');
-              resolve(entity);
-            }
-          } catch (error) {
-            console.error('[useEntityOperations] Error during image refresh after creation:', error);
-            resolve(entity);
-          }
-        });
-        
-        // Wait for the image refresh to complete before returning
-        return await refreshImagePromise;
-      }
-
       return entity;
     } catch (error) {
-      console.error('[useEntityOperations] Error in handleEntityCreation:', error);
+      console.error('Error in handleEntityCreation:', error);
       toast({
         title: 'Error',
         description: 'Failed to create entity. Please try again.',
@@ -300,7 +109,7 @@ export const useEntityOperations = () => {
       setEntities(searchResults);
       return searchResults;
     } catch (error) {
-      console.error('[useEntityOperations] Error searching entities:', error);
+      console.error('Error searching entities:', error);
       toast({
         title: 'Error',
         description: 'Failed to search entities. Please try again.',
@@ -316,7 +125,6 @@ export const useEntityOperations = () => {
     entities,
     isLoading,
     handleEntityCreation,
-    searchEntities,
-    refreshEntityImage
+    searchEntities
   };
 };

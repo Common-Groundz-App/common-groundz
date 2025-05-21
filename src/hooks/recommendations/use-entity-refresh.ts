@@ -27,18 +27,14 @@ export const useEntityImageRefresh = () => {
     setIsRefreshing(true);
     
     try {
-      console.log(`Starting image refresh for entity ${entityId}`, {
-        entityId, 
-        placeId: placeId || 'null', 
-        photoReference: photoReference || 'null'
-      });
+      console.log(`Starting image refresh for entity ${entityId}`, { placeId, photoReference });
       
       // First, ensure the entity-images bucket has correct policies
       await ensureBucketPolicies('entity-images');
       
       // For Google Places entities, use the edge function
-      if (placeId || photoReference) {
-        console.log(`Refreshing Google Places image for entity ${entityId} with place ID ${placeId || 'N/A'} and photo reference ${photoReference || 'N/A'}`);
+      if (placeId) {
+        console.log(`Refreshing Google Places image for entity ${entityId} with place ID ${placeId}`);
         
         // Get current session
         const { data: { session } } = await supabase.auth.getSession();
@@ -48,98 +44,46 @@ export const useEntityImageRefresh = () => {
           throw new Error('Authentication required to refresh image');
         }
         
-        // Use supabase.functions.invoke with proper headers for better integration and error handling
-        const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
+        const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
+          method: 'POST',
           headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
           },
-          body: {
+          body: JSON.stringify({
             placeId,
             photoReference,
             entityId
-          }
+          })
         });
 
-        if (error) {
-          console.error('Error response from refresh-entity-image:', error);
-          throw new Error(error.message || 'Failed to refresh entity image');
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error response from refresh-entity-image:', errorText);
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || 'Failed to refresh entity image' };
+          }
+          throw new Error(errorData.error || 'Failed to refresh entity image');
         }
 
-        if (!data) {
-          console.error('No data returned from refresh-entity-image');
-          throw new Error('No response data from image refresh service');
-        }
+        const responseData = await response.json();
+        console.log('Successful image refresh response:', responseData);
         
-        console.log('Successful image refresh response:', data);
+        const { imageUrl, photoReference: newPhotoRef } = responseData;
         
-        const { imageUrl, photoReference: newPhotoRef } = data;
-        
-        if (!imageUrl) {
-          throw new Error('No image URL returned from image refresh service');
-        }
-        
-        // Update the photo_reference in the entity record if we got a new one
+        // Update the photo_reference in the entity record
         if (newPhotoRef && newPhotoRef !== photoReference) {
-          console.log('Updating entity with new photo reference:', newPhotoRef);
-          
-          // First fetch entity to get current metadata
-          const { data: entity, error: entityError } = await supabase
+          const { error: updateError } = await supabase
             .from('entities')
-            .select('metadata')
-            .eq('id', entityId)
-            .single();
-            
-          if (!entityError && entity) {
-            const currentMetadata = typeof entity.metadata === 'object' ? entity.metadata || {} : {};
-            
-            // Update metadata with new photo reference
-            const { error: updateError } = await supabase
-              .from('entities')
-              .update({ 
-                metadata: {
-                  ...currentMetadata,
-                  photo_reference: newPhotoRef
-                }
-              })
-              .eq('id', entityId);
-              
-            if (updateError) {
-              console.warn(`Error updating photo reference: ${updateError.message}`);
-            } else {
-              console.log('Successfully updated entity metadata with new photo reference');
-            }
-          }
-        }
-        
-        // Now update the image_url with retry logic
-        let updateSuccess = false;
-        let retryAttempt = 0;
-        const maxRetries = 3;
-        
-        while (!updateSuccess && retryAttempt < maxRetries) {
-          const { error: imageUpdateError } = await supabase
-            .from('entities')
-            .update({ image_url: imageUrl })
+            .update({ photo_reference: newPhotoRef })
             .eq('id', entityId);
             
-          if (imageUpdateError) {
-            console.error(`Error updating entity image URL (attempt ${retryAttempt + 1}):`, imageUpdateError);
-            console.error('Error details:', JSON.stringify(imageUpdateError));
-            
-            // Wait before retrying (exponential backoff)
-            const backoffTime = 500 * Math.pow(2, retryAttempt);
-            console.log(`Waiting ${backoffTime}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, backoffTime));
-            retryAttempt++;
-          } else {
-            console.log('Successfully updated entity with new image URL:', imageUrl);
-            updateSuccess = true;
+          if (updateError) {
+            console.warn(`Error updating photo reference: ${updateError.message}`);
           }
-        }
-        
-        if (!updateSuccess) {
-          console.error(`Failed to update entity image URL after ${maxRetries} attempts`);
         }
         
         toast({
@@ -195,35 +139,15 @@ export const useEntityImageRefresh = () => {
         
         console.log('Image saved successfully, updating entity record with new URL:', newImageUrl);
         
-        // Update the entity record with the new image URL - with retry logic
-        let updateSuccess = false;
-        let retryAttempt = 0;
-        const maxRetries = 3;
-        
-        while (!updateSuccess && retryAttempt < maxRetries) {
-          const { error: updateError } = await supabase
-            .from('entities')
-            .update({ image_url: newImageUrl })
-            .eq('id', entityId);
-            
-          if (updateError) {
-            console.error(`Error updating entity image URL (attempt ${retryAttempt + 1}):`, updateError);
-            console.error('Error details:', JSON.stringify(updateError));
-            
-            // Wait before retrying (exponential backoff)
-            const backoffTime = 500 * Math.pow(2, retryAttempt);
-            console.log(`Waiting ${backoffTime}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, backoffTime));
-            retryAttempt++;
-          } else {
-            console.log('Successfully updated entity with new image URL');
-            updateSuccess = true;
-          }
-        }
+        // Update the entity record with the new image URL
+        const { error: updateError } = await supabase
+          .from('entities')
+          .update({ image_url: newImageUrl })
+          .eq('id', entityId);
           
-        if (!updateSuccess) {
-          console.error(`Failed to update entity image URL after ${maxRetries} attempts`);
-          throw new Error(`Failed to update entity image URL after ${maxRetries} attempts`);
+        if (updateError) {
+          console.error(`Error updating entity: ${updateError.message}`);
+          throw new Error(`Error updating entity: ${updateError.message}`);
         }
 
         toast({

@@ -69,3 +69,25 @@ export const isValidUrl = (url: string): boolean => {
     return false;
   }
 };
+
+/**
+ * Get fallback image based on entity type
+ */
+export const getEntityTypeFallbackImage = (type: string | undefined): string => {
+  if (!type) return 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&q=80&w=1000';
+  
+  switch (type.toLowerCase()) {
+    case 'book':
+      return 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=1000';
+    case 'movie':
+      return 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&q=80&w=1000';
+    case 'place':
+      return 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&q=80&w=1000';
+    case 'food':
+      return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=80&w=1000';
+    case 'product':
+      return 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&q=80&w=1000';
+    default:
+      return 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&q=80&w=1000';
+  }
+};

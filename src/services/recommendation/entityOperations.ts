@@ -1,44 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
-import { getEntityTypeFallbackImage } from '@/utils/imageUtils';
-import { saveExternalImageToStorage, isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
-import { ensureBucketPolicies } from '@/services/storageService';
-
-// Helper function to extract photo reference from Google Maps image URL
-const extractPhotoReferenceFromUrl = (url: string): string | null => {
-  try {
-    if (!url || !url.includes('maps.googleapis.com/maps/api/place/photo')) {
-      return null;
-    }
-
-    console.log(`[extractPhotoReferenceFromUrl] Attempting to extract photo reference from URL: ${url}`);
-    
-    // Extract using URLSearchParams
-    const urlObj = new URL(url);
-    const photoReference = urlObj.searchParams.get('photoreference');
-    
-    if (photoReference) {
-      console.log(`[extractPhotoReferenceFromUrl] Successfully extracted photo reference: ${photoReference}`);
-      return photoReference;
-    }
-    
-    // Fallback to regex if URLSearchParams fails
-    const regex = /photoreference=([^&]+)/;
-    const match = url.match(regex);
-    
-    if (match && match[1]) {
-      console.log(`[extractPhotoReferenceFromUrl] Extracted photo reference via regex: ${match[1]}`);
-      return match[1];
-    }
-    
-    console.warn('[extractPhotoReferenceFromUrl] Failed to extract photo reference from URL');
-    return null;
-  } catch (error) {
-    console.error('[extractPhotoReferenceFromUrl] Error extracting photo reference:', error);
-    return null;
-  }
-};
+import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
 
 // Fetch an entity by its ID
 export const fetchEntityById = async (entityId: string): Promise<Entity | null> => {
@@ -79,7 +43,7 @@ export const findEntityByApiRef = async (apiSource: string, apiRef: string): Pro
   return data as Entity;
 };
 
-// Refresh entity image using the original API source
+// Update entity image using the original API source
 export const refreshEntityImage = async (entityId: string): Promise<boolean> => {
   try {
     // First, fetch the entity
@@ -91,32 +55,18 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
 
     // For Google Places entities, fetch fresh photo from the API
     if (entity.api_source === 'google_places' && entity.api_ref && entity.metadata?.photo_reference) {
-      console.log('Refreshing Google Places image for entity:', entityId);
-      
       // We need to call our Edge Function to get the fresh photo URL
       const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
         body: {
           placeId: entity.api_ref,
-          photoReference: entity.metadata.photo_reference,
-          entityId: entity.id
+          photoReference: entity.metadata.photo_reference
         }
       });
 
-      if (error) {
+      if (error || !data?.imageUrl) {
         console.error('Error refreshing entity image:', error);
         return false;
       }
-      
-      if (!data?.imageUrl) {
-        console.error('No image URL returned from refresh-entity-image function');
-        return false;
-      }
-
-      console.log('Successfully refreshed image for entity:', entityId, 'New URL:', data.imageUrl);
 
       // Update the entity with the new image URL
       const { error: updateError } = await supabase
@@ -136,154 +86,6 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
   } catch (error) {
     console.error('Error in refreshEntityImage:', error);
     return false;
-  }
-};
-
-/**
- * Process and store an entity's image to Supabase storage
- * This is used both during entity creation and manual refresh
- */
-export const processEntityImage = async (entityId: string, imageUrl: string, photoReference?: string, placeId?: string): Promise<string | null> => {
-  try {
-    console.log(`[processEntityImage] Starting with params:`, { 
-      entityId, 
-      imageUrl: imageUrl || 'null', 
-      photoReference: photoReference || 'null', 
-      placeId: placeId || 'null' 
-    });
-    
-    // Ensure the entity-images bucket exists with proper policies
-    await ensureBucketPolicies('entity-images');
-
-    // Check if the entity exists and get its current metadata
-    const { data: entity, error: entityError } = await supabase
-      .from('entities')
-      .select('*')
-      .eq('id', entityId)
-      .single();
-
-    if (entityError) {
-      console.error('[processEntityImage] Error fetching entity metadata:', entityError);
-      // Continue without the metadata since we still want to try processing the image
-    } else {
-      console.log('[processEntityImage] Entity data:', {
-        id: entity.id,
-        name: entity.name,
-        type: entity.type,
-        hasMetadata: entity.metadata ? true : false,
-        metadata: entity.metadata,
-        api_source: entity.api_source,
-        api_ref: entity.api_ref
-      });
-    }
-    
-    // For Google Places images, use the refresh-entity-image function directly
-    if (isGooglePlacesImage(imageUrl) || (photoReference && placeId)) {
-      try {
-        // If no photo reference is provided but the URL is a Google Maps URL, try to extract it
-        if (!photoReference && isGooglePlacesImage(imageUrl)) {
-          const extractedPhotoRef = extractPhotoReferenceFromUrl(imageUrl);
-          
-          if (extractedPhotoRef) {
-            console.log(`[processEntityImage] Extracted photo reference from URL: ${extractedPhotoRef}`);
-            photoReference = extractedPhotoRef;
-            
-            // Update the entity metadata with the extracted photo reference
-            if (entityId) {
-              // Get the current metadata first - ensure it's an object
-              const currentMetadata = typeof entity?.metadata === 'object' ? entity.metadata || {} : {};
-              
-              // Update the metadata with the extracted photo reference
-              const updatedMetadata = { 
-                ...currentMetadata,
-                photo_reference: extractedPhotoRef 
-              };
-              
-              const { error: updateError } = await supabase
-                .from('entities')
-                .update({ 
-                  metadata: updatedMetadata
-                })
-                .eq('id', entityId);
-                
-              if (updateError) {
-                console.error('[processEntityImage] Error updating entity metadata with extracted photo reference:', updateError);
-              } else {
-                console.log(`[processEntityImage] Updated entity metadata with extracted photo reference: ${extractedPhotoRef}`);
-              }
-            }
-          } else {
-            console.warn('[processEntityImage] Failed to extract photo reference from Google Maps URL');
-          }
-        }
-        
-        if (!photoReference) {
-          console.warn('[processEntityImage] No photo reference available, edge function might fail');
-        }
-        
-        if (!placeId && photoReference) {
-          console.warn('[processEntityImage] Photo reference available but no Place ID, image quality might be limited');
-        }
-        
-        console.log(`[processEntityImage] Calling refresh-entity-image with params:`, {
-          photoReference: photoReference || 'null',
-          placeId: placeId || 'null',
-          entityId
-        });
-        
-        // Call the refresh-entity-image edge function directly
-        const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: {
-            photoReference,
-            placeId,
-            entityId
-          }
-        });
-        
-        if (error) {
-          console.error('[processEntityImage] Error invoking refresh-entity-image function:', error);
-          return imageUrl; // Return original URL as fallback
-        }
-        
-        if (!data?.imageUrl) {
-          console.error('[processEntityImage] No image URL returned from refresh-entity-image function');
-          return imageUrl; // Return original URL as fallback
-        }
-        
-        console.log('[processEntityImage] Successfully processed Google Places image:', data.imageUrl);
-        return data.imageUrl;
-      } catch (googlePlacesError) {
-        console.error('[processEntityImage] Error processing Google Places image:', googlePlacesError);
-        return imageUrl; // Return original URL as fallback
-      }
-    } 
-    // For non-Google Places images with a valid URL, save to storage
-    else if (imageUrl && isValidImageUrl(imageUrl)) {
-      try {
-        // Download and store the external image
-        const storedImageUrl = await saveExternalImageToStorage(imageUrl, entityId);
-        
-        if (storedImageUrl) {
-          console.log(`[processEntityImage] Successfully saved image to storage: ${storedImageUrl}`);
-          return storedImageUrl;
-        } else {
-          console.warn(`[processEntityImage] Failed to save image to storage for entity ${entityId}, using original URL`);
-          return imageUrl;
-        }
-      } catch (imageError) {
-        console.error('[processEntityImage] Error saving image to storage:', imageError);
-        return imageUrl; // Return original URL as fallback
-      }
-    }
-    
-    return imageUrl;
-  } catch (error) {
-    console.error('[processEntityImage] Error in processEntityImage:', error);
-    return imageUrl; // Return original URL as fallback
   }
 };
 
@@ -371,18 +173,8 @@ export const findOrCreateEntity = async (
   // Ensure we have a valid image URL or use fallback based on type
   const finalImageUrl = imageUrl || getEntityTypeFallbackImage(typeAsString);
 
-  // Check if it's a Google Places image and extract photo reference if needed
-  if (apiSource === 'google_places' && isGooglePlacesImage(finalImageUrl) && !metadata?.photo_reference) {
-    const extractedPhotoRef = extractPhotoReferenceFromUrl(finalImageUrl);
-    if (extractedPhotoRef) {
-      console.log(`[findOrCreateEntity] Extracted photo reference from URL: ${extractedPhotoRef}`);
-      metadata = metadata || {};
-      metadata.photo_reference = extractedPhotoRef;
-    }
-  }
-
   // Create a new entity if not found or if we don't have API reference info
-  const newEntity = await createEntity({
+  return createEntity({
     name,
     type: typeAsString as any, // Cast to any to bypass type checking
     venue,
@@ -393,193 +185,6 @@ export const findOrCreateEntity = async (
     metadata,
     website_url: websiteUrl
   });
-  
-  if (!newEntity) {
-    return null;
-  }
-  
-  // For Google Places entities, immediately process the image after entity creation
-  if (apiSource === 'google_places' && finalImageUrl) {
-    console.log(`[findOrCreateEntity] Starting image processing for Google Places entity: ${newEntity.id}`);
-    console.log(`[findOrCreateEntity] Entity data:`, {
-      id: newEntity.id,
-      image_url: finalImageUrl,
-      api_source: apiSource,
-      api_ref: apiRef,
-      photo_reference: metadata?.photo_reference || 'missing',
-      has_metadata: metadata ? true : false,
-      metadata_keys: metadata ? Object.keys(metadata) : []
-    });
-    
-    try {
-      // First update metadata to ensure photo_reference is stored
-      if (metadata?.photo_reference) {
-        const { error: updateError } = await supabase
-          .from('entities')
-          .update({
-            metadata: {
-              ...(typeof metadata === 'object' ? metadata : {}),
-              photo_reference: metadata.photo_reference
-            }
-          })
-          .eq('id', newEntity.id);
-          
-        if (updateError) {
-          console.error('[findOrCreateEntity] Error updating entity metadata with photo reference:', updateError);
-        } else {
-          console.log(`[findOrCreateEntity] Updated entity metadata with photo reference: ${metadata.photo_reference}`);
-        }
-      } else if (isGooglePlacesImage(finalImageUrl)) {
-        // Try to extract photo reference from image URL if not provided
-        const extractedPhotoRef = extractPhotoReferenceFromUrl(finalImageUrl);
-        if (extractedPhotoRef) {
-          console.log(`[findOrCreateEntity] Extracted photo reference from URL: ${extractedPhotoRef}`);
-          
-          const { error: updateError } = await supabase
-            .from('entities')
-            .update({
-              metadata: {
-                ...(typeof metadata === 'object' ? metadata || {} : {}),
-                photo_reference: extractedPhotoRef
-              }
-            })
-            .eq('id', newEntity.id);
-            
-          if (updateError) {
-            console.error('[findOrCreateEntity] Error updating entity with extracted photo reference:', updateError);
-          } else {
-            console.log(`[findOrCreateEntity] Updated entity with extracted photo reference: ${extractedPhotoRef}`);
-            // Update the local metadata object to be used in the next step
-            metadata = metadata || {};
-            metadata.photo_reference = extractedPhotoRef;
-          }
-        }
-      }
-      
-      // Now process the image with the photo reference (original or extracted)
-      console.log(`[findOrCreateEntity] Calling processEntityImage with:`, {
-        entityId: newEntity.id,
-        imageUrl: finalImageUrl,
-        photoReference: metadata?.photo_reference || null,
-        placeId: apiRef
-      });
-      
-      // Process the image using our helper function
-      const processedImageUrl = await processEntityImage(
-        newEntity.id, 
-        finalImageUrl,
-        metadata?.photo_reference,
-        apiRef
-      );
-      
-      if (processedImageUrl && processedImageUrl !== finalImageUrl) {
-        // Update the entity with the processed image URL - FIXED: Adding retry mechanism
-        console.log(`[findOrCreateEntity] Image processed successfully, updating entity with new URL: ${processedImageUrl}`);
-        
-        let updateSuccess = false;
-        let attempts = 0;
-        const maxAttempts = 3;
-        
-        while (!updateSuccess && attempts < maxAttempts) {
-          attempts++;
-          console.log(`[findOrCreateEntity] Updating entity with new image URL (attempt ${attempts})...`);
-          
-          const { error: updateError } = await supabase
-            .from('entities')
-            .update({ 
-              image_url: processedImageUrl 
-            })
-            .eq('id', newEntity.id);
-            
-          if (updateError) {
-            console.error(`[findOrCreateEntity] Error updating entity with processed image URL (attempt ${attempts}):`, updateError);
-            console.error(`[findOrCreateEntity] Error details:`, JSON.stringify(updateError));
-            
-            // Wait a bit before retrying with exponential backoff
-            if (attempts < maxAttempts) {
-              const backoffTime = 500 * Math.pow(2, attempts);
-              console.log(`[findOrCreateEntity] Waiting ${backoffTime}ms before retry...`);
-              await new Promise(resolve => setTimeout(resolve, backoffTime));
-            }
-          } else {
-            updateSuccess = true;
-            console.log(`[findOrCreateEntity] Successfully updated entity with processed image URL on attempt ${attempts}`);
-            
-            // Return updated entity
-            return {
-              ...newEntity,
-              image_url: processedImageUrl
-            };
-          }
-        }
-        
-        if (!updateSuccess) {
-          console.error('[findOrCreateEntity] Failed to update entity with processed image URL after multiple attempts');
-        }
-      } else {
-        console.warn('[findOrCreateEntity] Image processing did not change the URL or failed');
-      }
-    } catch (googlePlacesError) {
-      console.error('[findOrCreateEntity] Error automatically processing Google Places entity image:', googlePlacesError);
-    }
-  }
-  // For non-Google Places entities with external image URLs
-  else if (imageUrl && isValidImageUrl(imageUrl)) {
-    console.log(`[findOrCreateEntity] Processing external image URL for new entity: ${newEntity.id}`);
-    
-    try {
-      // Process the image using our helper function
-      const processedImageUrl = await processEntityImage(newEntity.id, imageUrl);
-      
-      if (processedImageUrl && processedImageUrl !== imageUrl) {
-        // Update the entity with the processed image URL - FIXED: Adding retry mechanism
-        let updateSuccess = false;
-        let attempts = 0;
-        const maxAttempts = 3;
-        
-        while (!updateSuccess && attempts < maxAttempts) {
-          attempts++;
-          console.log(`[findOrCreateEntity] Updating entity with new image URL (attempt ${attempts})...`);
-          
-          const { error: updateError } = await supabase
-            .from('entities')
-            .update({ 
-              image_url: processedImageUrl 
-            })
-            .eq('id', newEntity.id);
-            
-          if (updateError) {
-            console.error(`[findOrCreateEntity] Error updating entity with processed image URL (attempt ${attempts}):`, updateError);
-            console.error(`[findOrCreateEntity] Error details:`, JSON.stringify(updateError));
-            
-            // Wait a bit before retrying with exponential backoff
-            if (attempts < maxAttempts) {
-              const backoffTime = 500 * Math.pow(2, attempts);
-              console.log(`[findOrCreateEntity] Waiting ${backoffTime}ms before retry...`);
-              await new Promise(resolve => setTimeout(resolve, backoffTime));
-            }
-          } else {
-            updateSuccess = true;
-            console.log(`[findOrCreateEntity] Successfully updated entity with processed image URL on attempt ${attempts}`);
-            
-            // Return updated entity
-            return {
-              ...newEntity,
-              image_url: processedImageUrl
-            };
-          }
-        }
-        
-        if (!updateSuccess) {
-          console.error('[findOrCreateEntity] Failed to update entity with processed image URL after multiple attempts');
-        }
-      }
-    } catch (imageError) {
-      console.error('[findOrCreateEntity] Error automatically processing entity image:', imageError);
-    }
-  }
-  
-  return newEntity;
 };
 
 // Get entities by type (for searching/filtering)

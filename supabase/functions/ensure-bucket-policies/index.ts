@@ -10,8 +10,9 @@ const corsHeaders = {
 // Helper to create policy if it doesn't exist
 async function createPolicyIfNotExists(supabase, bucketName, policyName, definition) {
   try {
-    // Call the public schema function now
-    const { data, error } = await supabase.rpc('create_storage_policy', {
+    // Unfortunately there's no easy way to check if a policy exists through the JS client
+    // So we'll create it and handle the error if it already exists
+    const { error } = await supabase.rpc('create_storage_policy', {
       bucket_name: bucketName,
       policy_name: policyName,
       definition: definition
@@ -23,8 +24,7 @@ async function createPolicyIfNotExists(supabase, bucketName, policyName, definit
         console.log(`Policy '${policyName}' already exists for bucket '${bucketName}'`);
         return true;
       }
-      console.error(`Error creating policy '${policyName}':`, error);
-      return false;
+      throw error;
     }
     
     console.log(`Created policy '${policyName}' for bucket '${bucketName}'`);
@@ -89,38 +89,18 @@ serve(async (req) => {
       console.log(`Bucket ${bucketName} created successfully`);
     }
 
+    // With a service role, we can create proper RLS policies for the bucket
+    // We'll do this by calling a custom function we'll create
+    
     // First, we need to set up the custom function to create policies
     // This is because the storage module in the JS client doesn't expose direct policy creation
     const { error: functionError } = await supabase.rpc('create_storage_helper_functions', {});
     
     if (functionError && !functionError.message.includes('already exists')) {
-      console.error("Error initializing helper functions:", functionError);
-      // Still try to continue with bucket creation
-    } else {
-      console.log("Helper functions initialized successfully");
+      throw new Error(`Failed to create helper functions: ${functionError.message}`);
     }
 
-    // Try to set a simple open policy for now just to unblock users
-    const { data, error } = await supabase.rpc('create_storage_open_policy', {
-      bucket_id: bucketName
-    });
-    
-    if (error) {
-      console.error(`Error creating open policy for ${bucketName}:`, error);
-      // Still try to continue with specific policies
-    } else {
-      console.log(`Successfully created open policy for bucket ${bucketName}`);
-      // Open policy created, we can return now
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          message: `Successfully configured bucket ${bucketName} with open policy`
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Now create specific bucket policies as fallback
+    // Now create the bucket policies
     // 1. SELECT policy - anyone can view files
     await createPolicyIfNotExists(
       supabase,

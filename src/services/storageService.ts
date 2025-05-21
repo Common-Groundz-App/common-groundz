@@ -42,8 +42,6 @@ export const ensureBucketPolicies = async (bucketName: string): Promise<boolean>
       return false;
     }
     
-    console.log(`Ensuring policies for bucket ${bucketName}...`);
-    
     const { data, error } = await supabase.functions.invoke('ensure-bucket-policies', {
       body: { bucketName }
     });
@@ -57,25 +55,6 @@ export const ensureBucketPolicies = async (bucketName: string): Promise<boolean>
     return data?.success || false;
   } catch (error) {
     console.error(`Error calling ensure-bucket-policies function:`, error);
-    return false;
-  }
-};
-
-// Create a bucket with public access and open policies
-export const createPublicBucket = async (bucketName: string): Promise<boolean> => {
-  try {
-    // First create the bucket (or ensure it exists)
-    const bucketExists = await ensureBucketExists(bucketName, true);
-    
-    if (!bucketExists) {
-      console.error(`Failed to create bucket ${bucketName}`);
-      return false;
-    }
-    
-    // Then ensure it has the right policies
-    return await ensureBucketPolicies(bucketName);
-  } catch (error) {
-    console.error(`Error creating public bucket ${bucketName}:`, error);
     return false;
   }
 };

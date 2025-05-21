@@ -1047,18 +1047,6 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: boolean
       }
-      create_storage_helper_functions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      create_storage_open_policy: {
-        Args: { bucket_id: string }
-        Returns: boolean
-      }
-      create_storage_policy: {
-        Args: { bucket_name: string; policy_name: string; definition: string }
-        Returns: boolean
-      }
       delete_comment: {
         Args: { p_comment_id: string; p_user_id: string; p_item_type: string }
         Returns: boolean
