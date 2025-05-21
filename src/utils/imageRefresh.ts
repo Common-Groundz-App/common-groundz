@@ -7,33 +7,52 @@ import { ensureHttps } from '@/utils/urlUtils';
  * after a delay, preventing blocking of the main application flow.
  * 
  * @param entityId The ID of the entity to refresh the image for
+ * @param retryCount Optional retry count, used internally for exponential backoff
  * @returns void - this function runs asynchronously and doesn't return anything
  */
-export const deferEntityImageRefresh = (entityId: string): void => {
+export const deferEntityImageRefresh = (entityId: string, retryCount: number = 0): void => {
   if (!entityId) {
     console.error('deferEntityImageRefresh: No entityId provided');
     return;
   }
 
-  console.log(`Scheduling deferred image refresh for entity ${entityId} in 5 seconds`);
+  const maxRetries = 3;
+  const baseDelay = 5000; // 5 seconds initial delay
+  const delay = retryCount === 0 ? baseDelay : Math.min(baseDelay * Math.pow(2, retryCount), 30000);
   
-  // Use setTimeout to delay the execution by 5 seconds
+  console.log(`Scheduling deferred image refresh for entity ${entityId} in ${delay/1000} seconds (attempt ${retryCount + 1})`);
+  
+  // Use setTimeout to delay the execution by the calculated delay
   setTimeout(async () => {
     try {
-      // Fetch the entity by ID
+      // Fetch the entity by ID using maybeSingle() instead of single() to prevent 406 errors
       const { data: entity, error } = await supabase
         .from('entities')
         .select('*')
         .eq('id', entityId)
-        .single();
+        .eq('is_deleted', false)
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         console.error(`Error fetching entity for image refresh: ${error.message}`);
+        
+        // If we haven't exceeded max retries, try again with exponential backoff
+        if (retryCount < maxRetries) {
+          console.log(`Retrying entity image refresh for ${entityId} (attempt ${retryCount + 2})`);
+          deferEntityImageRefresh(entityId, retryCount + 1);
+        }
         return;
       }
 
       if (!entity) {
-        console.error(`Entity not found for image refresh: ${entityId}`);
+        console.log(`Entity not found for image refresh: ${entityId}. This might be due to a race condition.`);
+        
+        // If entity is not found and we haven't exceeded max retries, try again
+        if (retryCount < maxRetries) {
+          console.log(`Retrying entity image refresh for ${entityId} (attempt ${retryCount + 2})`);
+          deferEntityImageRefresh(entityId, retryCount + 1);
+        }
         return;
       }
 
@@ -57,6 +76,8 @@ export const deferEntityImageRefresh = (entityId: string): void => {
         const placeId = entity.api_ref;
 
         // Call the refresh-entity-image edge function
+        console.log(`Calling refresh-entity-image edge function for entity ${entityId} with:`, { placeId, photoReference });
+        
         const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
           method: 'POST',
           headers: {
@@ -74,6 +95,12 @@ export const deferEntityImageRefresh = (entityId: string): void => {
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`Error from refresh-entity-image edge function: ${response.status} ${response.statusText}`, errorText);
+          
+          // If we get a server error (5xx) and haven't exceeded max retries, try again
+          if (response.status >= 500 && retryCount < maxRetries) {
+            console.log(`Server error, retrying entity image refresh for ${entityId} (attempt ${retryCount + 2})`);
+            deferEntityImageRefresh(entityId, retryCount + 1);
+          }
           return;
         }
 
@@ -86,6 +113,12 @@ export const deferEntityImageRefresh = (entityId: string): void => {
       }
     } catch (error) {
       console.error('Error in deferred entity image refresh:', error);
+      
+      // If we haven't exceeded max retries, try again for unexpected errors
+      if (retryCount < maxRetries) {
+        console.log(`Exception occurred, retrying entity image refresh for ${entityId} (attempt ${retryCount + 2})`);
+        deferEntityImageRefresh(entityId, retryCount + 1);
+      }
     }
-  }, 5000);
+  }, delay);
 };

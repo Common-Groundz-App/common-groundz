@@ -47,13 +47,14 @@ export const useEntityImageRefresh = () => {
         const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
           method: 'POST',
           headers: {
+            'Accept': 'application/json',
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
+            entityId,
             placeId,
-            photoReference,
-            entityId
+            photoReference
           })
         });
 
@@ -78,7 +79,11 @@ export const useEntityImageRefresh = () => {
         if (newPhotoRef && newPhotoRef !== photoReference) {
           const { error: updateError } = await supabase
             .from('entities')
-            .update({ photo_reference: newPhotoRef })
+            .update({ 
+              metadata: {
+                photo_reference: newPhotoRef
+              }
+            })
             .eq('id', entityId);
             
           if (updateError) {
@@ -100,7 +105,8 @@ export const useEntityImageRefresh = () => {
           .from('entities')
           .select('image_url, name')
           .eq('id', entityId)
-          .single();
+          .limit(1)
+          .maybeSingle();
 
         if (error) {
           console.error(`Error fetching entity: ${error.message}`);

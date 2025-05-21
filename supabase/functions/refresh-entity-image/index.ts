@@ -19,7 +19,12 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
   try {
     console.log(`Downloading image from: ${imageUrl}`);
     
-    const imageResponse = await fetch(imageUrl);
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        'Accept': 'image/*',
+      }
+    });
+    
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
     }
@@ -238,8 +243,10 @@ serve(async (req) => {
       const { error: updateError } = await supabase
         .from('entities')
         .update({ 
-          image_url: storedImageUrl, 
-          photo_reference: photoReference 
+          image_url: storedImageUrl,
+          metadata: {
+            photo_reference: photoReference
+          }
         })
         .eq('id', entityId);
         
@@ -265,7 +272,12 @@ serve(async (req) => {
       detailsUrl.searchParams.append("fields", "photos");
       detailsUrl.searchParams.append("key", GOOGLE_PLACES_API_KEY);
 
-      const response = await fetch(detailsUrl.toString());
+      const response = await fetch(detailsUrl.toString(), {
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
       const data = await response.json();
 
       if (!response.ok) {
@@ -292,8 +304,10 @@ serve(async (req) => {
           const { error: updateError } = await supabase
             .from('entities')
             .update({ 
-              image_url: storedImageUrl, 
-              photo_reference: newPhotoRef 
+              image_url: storedImageUrl,
+              metadata: {
+                photo_reference: newPhotoRef
+              }
             })
             .eq('id', entityId);
             
