@@ -1,8 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
-import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
+import { getEntityTypeFallbackImage } from '@/utils/imageUtils';
+import { deferEntityImageRefresh } from '@/utils/imageRefresh';
 
 // Fetch an entity by its ID
 export const fetchEntityById = async (entityId: string): Promise<Entity | null> => {
@@ -174,7 +174,7 @@ export const findOrCreateEntity = async (
   const finalImageUrl = imageUrl || getEntityTypeFallbackImage(typeAsString);
 
   // Create a new entity if not found or if we don't have API reference info
-  return createEntity({
+  const entity = await createEntity({
     name,
     type: typeAsString as any, // Cast to any to bypass type checking
     venue,
@@ -185,6 +185,15 @@ export const findOrCreateEntity = async (
     metadata,
     website_url: websiteUrl
   });
+  
+  // If entity creation was successful and it's a Google Places entity,
+  // schedule a background image refresh after a delay
+  if (entity && apiSource === 'google_places' && apiRef) {
+    console.log(`Scheduling deferred image refresh for newly created entity: ${entity.id}`);
+    deferEntityImageRefresh(entity.id);
+  }
+  
+  return entity;
 };
 
 // Get entities by type (for searching/filtering)
