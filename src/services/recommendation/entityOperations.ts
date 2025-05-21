@@ -1,8 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
-import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
+import { getEntityTypeFallbackImage } from '@/utils/imageUtils';
 import { saveExternalImageToStorage, isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
 import { ensureBucketPolicies } from '@/services/storageService';
 

@@ -1,10 +1,11 @@
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from './use-toast';
 import type { Entity as ServiceEntity } from '@/services/recommendation/types';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
-import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
+import { getEntityTypeFallbackImage } from '@/utils/imageUtils';
 import { findEntityByApiRef, processEntityImage } from '@/services/recommendation/entityOperations';
 import { isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
 import { ensureBucketPolicies } from '@/services/storageService';
