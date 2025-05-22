@@ -42,7 +42,17 @@ const PreferencesOnboardingModal = () => {
   };
 
   return (
-    <Dialog open={openModal} onOpenChange={setOpenModal}>
+    <Dialog open={openModal} onOpenChange={(open) => {
+      // Only allow closing via dialog if form is not showing
+      if (!open && !showForm) {
+        handleClose();
+      } else if (!open && showForm) {
+        // Don't close directly when form is showing - let DeleteConfirmationDialog handle it
+        setOpenModal(true);
+      } else {
+        setOpenModal(open);
+      }
+    }}>
       <DialogContent className="sm:max-w-md">
         {!showForm ? (
           <>
@@ -73,7 +83,19 @@ const PreferencesOnboardingModal = () => {
             </div>
           </>
         ) : (
-          <PreferencesForm onSaveSuccess={handleSaveSuccess} onCancel={handleClose} isModal />
+          <>
+            <DialogHeader>
+              <DialogTitle className="sr-only">Personalize Your Experience</DialogTitle>
+              <DialogDescription className="sr-only">
+                Set your preferences to get personalized recommendations
+              </DialogDescription>
+            </DialogHeader>
+            <PreferencesForm 
+              onSaveSuccess={handleSaveSuccess} 
+              onCancel={handleClose} 
+              isModal 
+            />
+          </>
         )}
       </DialogContent>
     </Dialog>

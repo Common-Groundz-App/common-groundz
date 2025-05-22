@@ -28,6 +28,20 @@ const CONFLICT_GROUPS = {
   diet_type: ['vegetarian', 'vegan', 'non-vegetarian']
 };
 
+// Define suggested goals for the pills component - MOVED UP HERE to prevent the reference error
+const goalOptions = [
+  { label: "Improve sleep", value: "Improve sleep", emoji: "😴" },
+  { label: "Improve skin", value: "Improve skin", emoji: "✨" },
+  { label: "Build muscle", value: "Build muscle", emoji: "💪" },
+  { label: "Lose fat", value: "Lose fat", emoji: "🏃" },
+  { label: "Read more", value: "Read more", emoji: "📚" },
+  { label: "Reduce screen time", value: "Reduce screen time", emoji: "📵" },
+  { label: "Wake up early", value: "Wake up early", emoji: "🌅" },
+  { label: "Drink more water", value: "Drink more water", emoji: "💧" },
+  { label: "Write daily", value: "Write daily", emoji: "✍️" },
+  { label: "Reduce anxiety", value: "Reduce anxiety", emoji: "🧘" }
+];
+
 const PreferencesForm: React.FC<PreferencesFormProps> = ({
   initialPreferences = {},
   onSaveSuccess,
@@ -73,9 +87,14 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
     setFormError(null);
     
     try {
-      // Combine goals and other_goals back into a single array for saving
-      const combinedGoals = [...formData.goals, ...formData.other_goals];
+      // Declare variables before using them - Fixed order to prevent ReferenceError
+      const goals = formData.goals || [];
+      const other_goals = formData.other_goals || [];
       
+      // Combine goals and other_goals back into a single array for saving
+      const combinedGoals = [...goals, ...other_goals];
+      
+      // Create a new object instead of modifying the original
       const dataToSubmit = {
         ...formData,
         goals: combinedGoals
@@ -133,20 +152,6 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
         return true;
     }
   };
-
-  // Define suggested goals for the pills component
-  const goalOptions = [
-    { label: "Improve sleep", value: "Improve sleep", emoji: "😴" },
-    { label: "Improve skin", value: "Improve skin", emoji: "✨" },
-    { label: "Build muscle", value: "Build muscle", emoji: "💪" },
-    { label: "Lose fat", value: "Lose fat", emoji: "🏃" },
-    { label: "Read more", value: "Read more", emoji: "📚" },
-    { label: "Reduce screen time", value: "Reduce screen time", emoji: "📵" },
-    { label: "Wake up early", value: "Wake up early", emoji: "🌅" },
-    { label: "Drink more water", value: "Drink more water", emoji: "💧" },
-    { label: "Write daily", value: "Write daily", emoji: "✍️" },
-    { label: "Reduce anxiety", value: "Reduce anxiety", emoji: "🧘" }
-  ];
   
   const handleCancel = () => {
     // Only show confirmation if there are changes to discard

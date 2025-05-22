@@ -49,6 +49,21 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
     };
   }, [isOpen]);
 
+  // Specifically handle ESC key to ensure dialog closes properly
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (isOpen && event.key === 'Escape' && !isLoading) {
+        onClose();
+        resetBodyPointerEvents();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, [isOpen, onClose, isLoading]);
+
   return (
     <AlertDialog 
       open={isOpen} 
@@ -67,10 +82,19 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading} onClick={() => resetBodyPointerEvents()}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel 
+            disabled={isLoading} 
+            onClick={() => {
+              resetBodyPointerEvents();
+              onClose();
+            }}
+          >
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction 
             onClick={(e) => {
               e.preventDefault();
+              resetBodyPointerEvents();
               onConfirm();
             }}
             disabled={isLoading}
