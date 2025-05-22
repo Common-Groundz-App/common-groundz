@@ -565,7 +565,6 @@ export type Database = {
           created_at: string
           id: string
           location: string | null
-          preferences: Json | null
           updated_at: string
           username: string | null
         }
@@ -576,7 +575,6 @@ export type Database = {
           created_at?: string
           id: string
           location?: string | null
-          preferences?: Json | null
           updated_at?: string
           username?: string | null
         }
@@ -587,7 +585,6 @@ export type Database = {
           created_at?: string
           id?: string
           location?: string | null
-          preferences?: Json | null
           updated_at?: string
           username?: string | null
         }
@@ -1217,10 +1214,6 @@ export type Database = {
           p_user_id: string
           p_item_type: string
         }
-        Returns: boolean
-      }
-      update_profile_preferences: {
-        Args: { user_id: string; preferences: Json }
         Returns: boolean
       }
     }

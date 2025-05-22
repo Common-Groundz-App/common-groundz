@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 
@@ -83,28 +84,6 @@ export const updateUserProfile = async (userId: string, updates: any) => {
   }
   
   return true;
-};
-
-/**
- * Updates a user's preferences
- */
-export const updateProfilePreferences = async (userId: string, preferences: Record<string, any>) => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ preferences })
-      .eq('id', userId);
-      
-    if (error) {
-      console.error('Error updating preferences:', error);
-      throw error;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error in updateProfilePreferences:', error);
-    throw error;
-  }
 };
 
 /**

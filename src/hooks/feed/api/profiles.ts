@@ -7,14 +7,6 @@ export const fetchProfiles = async (userIds: string[]) => {
   
   return await supabase
     .from('profiles')
-    .select('id, username, avatar_url, preferences')
+    .select('id, username, avatar_url')
     .in('id', userIds);
-};
-
-// Update user profile preferences
-export const updateProfilePreferences = async (userId: string, preferences: Record<string, any>) => {
-  return await supabase
-    .from('profiles')
-    .update({ preferences })
-    .eq('id', userId);
 };
