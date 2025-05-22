@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import SelectablePills from './SelectablePills';
