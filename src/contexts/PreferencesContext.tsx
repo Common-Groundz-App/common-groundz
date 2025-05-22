@@ -50,8 +50,14 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ childr
         const profile = await fetchUserProfile(user.id);
         
         if (profile) {
-          // Fix: Ensure we're setting an object even if preferences is null
-          const userPreferences = profile.preferences || {};
+          // Ensure we're handling any type of preferences value safely
+          // by explicitly converting to an object if needed
+          let userPreferences: Record<string, any> = {};
+          
+          if (profile.preferences && typeof profile.preferences === 'object' && !Array.isArray(profile.preferences)) {
+            userPreferences = profile.preferences as Record<string, any>;
+          }
+          
           setPreferences(userPreferences);
           
           // Show onboarding if preferences is empty and user hasn't completed onboarding
