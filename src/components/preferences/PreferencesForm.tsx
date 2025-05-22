@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import SelectablePills from './SelectablePills';
 import TagInput from './TagInput';
 import { Button } from '@/components/ui/button';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { useToast } from '@/hooks/use-toast';
 
 // Define the step interface
 interface Step {
@@ -34,6 +35,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
   isModal = false
 }) => {
   const { updatePreferences } = usePreferences();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
     skin_type: initialPreferences.skin_type || [],
@@ -55,6 +57,12 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Reset form error when step changes
+  useEffect(() => {
+    setFormError(null);
+  }, [currentStep]);
 
   const updateFormData = (key: string, value: any) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -62,6 +70,8 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    setFormError(null);
+    
     try {
       // Combine goals and other_goals back into a single array for saving
       const combinedGoals = [...formData.goals, ...formData.other_goals];
@@ -75,9 +85,21 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
       delete dataToSubmit.other_goals;
       
       await updatePreferences(dataToSubmit);
-      onSaveSuccess?.();
+      toast({
+        title: "Preferences saved",
+        description: "Your preferences have been updated successfully."
+      });
+      if (onSaveSuccess) {
+        onSaveSuccess();
+      }
     } catch (error) {
       console.error('Error submitting preferences:', error);
+      setFormError('Failed to save preferences. Please try again.');
+      toast({
+        title: "Error saving preferences",
+        description: "There was a problem saving your preferences. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -127,7 +149,19 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
   ];
   
   const handleCancel = () => {
+    // Only show confirmation if there are changes to discard
+    if (isSubmitting) return; // Don't allow cancelling during submission
+    
     setShowExitConfirmation(true);
+  };
+  
+  const handleExitConfirm = () => {
+    setShowExitConfirmation(false);
+    if (onCancel) {
+      setTimeout(() => {
+        onCancel();
+      }, 0);
+    }
   };
   
   // Define the step components
@@ -300,12 +334,19 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
 
       <div className="my-6">{steps[currentStep].component}</div>
 
+      {formError && (
+        <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
+          {formError}
+        </div>
+      )}
+
       <div className="flex justify-between mt-8">
         {currentStep > 0 ? (
           <Button
             variant="outline"
             onClick={() => setCurrentStep(currentStep - 1)}
             className="focus-visible:ring-0 focus-visible:ring-offset-0"
+            disabled={isSubmitting}
           >
             Back
           </Button>
@@ -314,6 +355,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
             variant="outline" 
             onClick={handleCancel}
             className="focus-visible:ring-0 focus-visible:ring-offset-0"
+            disabled={isSubmitting}
           >
             Cancel
           </Button>
@@ -322,7 +364,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
         {currentStep < steps.length - 1 ? (
           <Button
             onClick={() => setCurrentStep(currentStep + 1)}
-            disabled={!canProceed()}
+            disabled={isSubmitting || !canProceed()}
             className="focus-visible:ring-0 focus-visible:ring-offset-0"
           >
             Next
@@ -342,10 +384,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
       <DeleteConfirmationDialog
         isOpen={showExitConfirmation}
         onClose={() => setShowExitConfirmation(false)}
-        onConfirm={() => {
-          setShowExitConfirmation(false);
-          onCancel?.();
-        }}
+        onConfirm={handleExitConfirm}
         title="Discard changes?"
         description="You will lose all unsaved changes if you exit now."
         isLoading={false}

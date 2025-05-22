@@ -20,7 +20,6 @@ import { ContentViewerProvider } from './contexts/ContentViewerContext';
 import ContentViewerModal from './components/content/ContentViewerModal';
 import { useEffect } from 'react';
 import { initializeStorageService } from './services/storageService';
-import { PreferencesProvider } from './contexts/PreferencesContext';
 import PreferencesOnboardingModal from './components/preferences/PreferencesOnboardingModal';
 
 function App() {
@@ -31,96 +30,94 @@ function App() {
 
   return (
     <ThemeProvider>
-      <PreferencesProvider>
-        <ContentViewerProvider>
-          <BrowserRouter>
-            <TooltipProvider>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route 
-                  path="/feed" 
-                  element={
-                    <ProtectedRoute>
-                      <Feed />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/home" 
-                  element={
-                    <ProtectedRoute>
-                      <Feed />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/profile" 
-                  element={
-                    <ProtectedRoute>
-                      <Profile />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/profile/:userId" 
-                  element={
-                    <ProtectedRoute>
-                      <Profile />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/settings" 
-                  element={
-                    <ProtectedRoute>
-                      <Settings />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/explore" 
-                  element={
-                    <ProtectedRoute>
-                      <Explore />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/post/:postId" 
-                  element={
-                    <ProtectedRoute>
-                      <PostView />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/recommendation/:recommendationId" 
-                  element={
-                    <ProtectedRoute>
-                      <RecommendationView />
-                    </ProtectedRoute>
-                  } 
-                />
-                {/* New route for entity details */}
-                <Route 
-                  path="/entity/:slug" 
-                  element={
-                    <EntityDetail />
-                  } 
-                />
-                {/* Redirect old edit routes to profile */}
-                <Route path="/recommendations/edit/:id" element={<Navigate to="/profile" />} />
-                <Route path="/posts/edit/:id" element={<Navigate to="/profile" />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              <Toaster />
-              <ContentViewerModal />
-              <PreferencesOnboardingModal />
-            </TooltipProvider>
-          </BrowserRouter>
-        </ContentViewerProvider>
-      </PreferencesProvider>
+      <ContentViewerProvider>
+        <BrowserRouter>
+          <TooltipProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route 
+                path="/feed" 
+                element={
+                  <ProtectedRoute>
+                    <Feed />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/home" 
+                element={
+                  <ProtectedRoute>
+                    <Feed />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profile/:userId" 
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/explore" 
+                element={
+                  <ProtectedRoute>
+                    <Explore />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/post/:postId" 
+                element={
+                  <ProtectedRoute>
+                    <PostView />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/recommendation/:recommendationId" 
+                element={
+                  <ProtectedRoute>
+                    <RecommendationView />
+                  </ProtectedRoute>
+                } 
+              />
+              {/* New route for entity details */}
+              <Route 
+                path="/entity/:slug" 
+                element={
+                  <EntityDetail />
+                } 
+              />
+              {/* Redirect old edit routes to profile */}
+              <Route path="/recommendations/edit/:id" element={<Navigate to="/profile" />} />
+              <Route path="/posts/edit/:id" element={<Navigate to="/profile" />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+            <ContentViewerModal />
+            <PreferencesOnboardingModal />
+          </TooltipProvider>
+        </BrowserRouter>
+      </ContentViewerProvider>
     </ThemeProvider>
   );
 }
