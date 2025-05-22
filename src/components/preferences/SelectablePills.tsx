@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,14 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
 }) => {
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherInput, setOtherInput] = useState('');
+  
+  // Reset "Other" state when selectedValues change (which happens on step change)
+  useEffect(() => {
+    // Only reset if "other" is not in selectedValues
+    if (!selectedValues.includes('other')) {
+      setShowOtherInput(false);
+    }
+  }, [selectedValues]);
 
   const handlePillClick = (value: string) => {
     if (value === 'other') {

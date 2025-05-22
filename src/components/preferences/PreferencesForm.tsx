@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import SelectablePills from './SelectablePills';
@@ -230,16 +229,26 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
         <div className="space-y-3">
           <SelectablePills
             options={goalOptions}
-            selectedValues={formData.goals}
-            onChange={(values) => updateFormData('goals', values)}
+            selectedValues={formData.goals.filter(goal => 
+              goalOptions.some(option => option.value === goal)
+            )}
+            onChange={(values) => {
+              // Keep custom goals and add selected preset goals
+              const customGoals = formData.goals.filter(goal => 
+                !goalOptions.some(option => option.value === goal)
+              );
+              updateFormData('goals', [...customGoals, ...values]);
+            }}
             allowOther={true}
-            otherValues={[]}
+            otherValues={formData.goals.filter(goal => 
+              !goalOptions.some(option => option.value === goal)
+            )}
             onOtherChange={(values) => {
-              // Add custom values to the goals array directly
-              setFormData(prev => ({
-                ...prev,
-                goals: [...prev.goals.filter(g => !values.includes(g)), ...values]
-              }));
+              // Preserve preset goals and update custom goals
+              const presetGoals = formData.goals.filter(goal => 
+                goalOptions.some(option => option.value === goal)
+              );
+              updateFormData('goals', [...presetGoals, ...values]);
             }}
           />
         </div>
