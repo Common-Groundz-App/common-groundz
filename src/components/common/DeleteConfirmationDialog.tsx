@@ -53,6 +53,7 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (isOpen && event.key === 'Escape' && !isLoading) {
+        event.preventDefault(); // Prevent default ESC behavior
         onClose();
         resetBodyPointerEvents();
       }
@@ -63,6 +64,9 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
       document.removeEventListener('keydown', handleEscKey);
     };
   }, [isOpen, onClose, isLoading]);
+
+  // Only render if the dialog is open
+  if (!isOpen) return null;
 
   return (
     <AlertDialog 
