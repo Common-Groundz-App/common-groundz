@@ -50,10 +50,12 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ childr
         const profile = await fetchUserProfile(user.id);
         
         if (profile) {
-          setPreferences(profile.preferences || {});
+          // Fix: Ensure we're setting an object even if preferences is null
+          const userPreferences = profile.preferences || {};
+          setPreferences(userPreferences);
           
           // Show onboarding if preferences is empty and user hasn't completed onboarding
-          if (Object.keys(profile.preferences || {}).length === 0 && !hasCompletedOnboarding) {
+          if (Object.keys(userPreferences).length === 0 && !hasCompletedOnboarding) {
             setShowOnboarding(true);
           }
         }
