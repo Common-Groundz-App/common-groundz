@@ -14,6 +14,7 @@ interface SelectablePillsProps {
   otherValues?: string[];
   onOtherChange?: (values: string[]) => void;
   conflictGroups?: Record<string, string[]>;
+  otherPlaceholder?: string;
 }
 
 const SelectablePills: React.FC<SelectablePillsProps> = ({
@@ -24,18 +25,20 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
   allowOther = true,
   otherValues = [],
   onOtherChange,
-  conflictGroups = {}
+  conflictGroups = {},
+  otherPlaceholder = "Add custom option..."
 }) => {
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherInput, setOtherInput] = useState('');
   
-  // Reset "Other" state when selectedValues change (which happens on step change)
+  // Set showOtherInput to true if there are custom values or "other" is selected
   useEffect(() => {
-    // Only reset if "other" is not in selectedValues
-    if (!selectedValues.includes('other')) {
+    if (selectedValues.includes('other') || otherValues.length > 0) {
+      setShowOtherInput(true);
+    } else {
       setShowOtherInput(false);
     }
-  }, [selectedValues]);
+  }, [selectedValues, otherValues]);
 
   const handlePillClick = (value: string) => {
     if (value === 'other') {
@@ -96,11 +99,9 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
     onOtherChange?.(newOtherValues);
     setOtherInput('');
     
-    // Auto-deselect "other" once a custom value is added
-    const otherIndex = selectedValues.indexOf('other');
-    if (otherIndex !== -1) {
-      const newSelectedValues = [...selectedValues];
-      newSelectedValues.splice(otherIndex, 1);
+    // Ensure that "other" remains selected when adding custom values
+    if (!selectedValues.includes('other')) {
+      const newSelectedValues = [...selectedValues, 'other'];
       onChange(newSelectedValues);
     }
   };
@@ -108,6 +109,16 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
   const handleRemoveOtherValue = (valueToRemove: string) => {
     const newOtherValues = otherValues.filter(v => v !== valueToRemove);
     onOtherChange?.(newOtherValues);
+    
+    // If no more custom values and "other" is selected, remove "other" from selection
+    if (newOtherValues.length === 0) {
+      const otherIndex = selectedValues.indexOf('other');
+      if (otherIndex !== -1) {
+        const newSelectedValues = [...selectedValues];
+        newSelectedValues.splice(otherIndex, 1);
+        onChange(newSelectedValues);
+      }
+    }
   };
 
   return (
@@ -132,10 +143,10 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
         {allowOther && (
           <Button
             type="button"
-            variant={showOtherInput ? "default" : "outline"}
+            variant={showOtherInput || selectedValues.includes('other') ? "default" : "outline"}
             className={cn(
               "rounded-full h-auto py-1 px-3 text-sm focus-visible:ring-0 focus-visible:ring-offset-0", 
-              showOtherInput ? "bg-brand-orange text-white" : ""
+              showOtherInput || selectedValues.includes('other') ? "bg-brand-orange text-white" : ""
             )}
             onClick={() => setShowOtherInput(!showOtherInput)}
           >
@@ -150,7 +161,7 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
             <Input
               value={otherInput}
               onChange={e => setOtherInput(e.target.value)}
-              placeholder="Add custom option..."
+              placeholder={otherPlaceholder}
               className="flex-1"
             />
             <Button 

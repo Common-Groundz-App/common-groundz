@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import SelectablePills from './SelectablePills';
 import TagInput from './TagInput';
 import { Button } from '@/components/ui/button';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 
 // Define the step interface
 interface Step {
@@ -48,6 +50,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
     goals: initialPreferences.goals || [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showExitConfirmation, setShowExitConfirmation] = useState(false);
 
   const updateFormData = (key: string, value: any) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -107,6 +110,10 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
     { label: "Reduce anxiety", value: "Reduce anxiety", emoji: "🧘" }
   ];
   
+  const handleCancel = () => {
+    setShowExitConfirmation(true);
+  };
+  
   // Define the step components
   const steps: Step[] = [
     {
@@ -128,6 +135,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           otherValues={formData.other_skin_type}
           onOtherChange={(values) => updateFormData('other_skin_type', values)}
           conflictGroups={CONFLICT_GROUPS}
+          otherPlaceholder="E.g., Eczema-prone, Acne-prone..."
         />
       )
     },
@@ -151,6 +159,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           otherValues={formData.other_hair_type}
           onOtherChange={(values) => updateFormData('other_hair_type', values)}
           conflictGroups={CONFLICT_GROUPS}
+          otherPlaceholder="E.g., Thin, Color treated..."
         />
       )
     },
@@ -173,6 +182,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           otherValues={formData.other_food_preferences}
           onOtherChange={(values) => updateFormData('other_food_preferences', values)}
           conflictGroups={CONFLICT_GROUPS}
+          otherPlaceholder="E.g., Keto, Dairy-free..."
         />
       )
     },
@@ -195,6 +205,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           otherValues={formData.other_lifestyle}
           onOtherChange={(values) => updateFormData('other_lifestyle', values)}
           conflictGroups={CONFLICT_GROUPS}
+          otherPlaceholder="E.g., Outdoor enthusiast, Night owl..."
         />
       )
     },
@@ -218,6 +229,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           otherValues={formData.other_genre_preferences}
           onOtherChange={(values) => updateFormData('other_genre_preferences', values)}
           conflictGroups={CONFLICT_GROUPS}
+          otherPlaceholder="E.g., Documentary, Horror, Fantasy..."
         />
       )
     },
@@ -250,6 +262,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
               );
               updateFormData('goals', [...presetGoals, ...values]);
             }}
+            otherPlaceholder="E.g., Learn a new language..."
           />
         </div>
       )
@@ -299,7 +312,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
         ) : (
           <Button 
             variant="outline" 
-            onClick={onCancel}
+            onClick={handleCancel}
             className="focus-visible:ring-0 focus-visible:ring-offset-0"
           >
             Cancel
@@ -324,6 +337,19 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           </Button>
         )}
       </div>
+
+      {/* Exit Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={showExitConfirmation}
+        onClose={() => setShowExitConfirmation(false)}
+        onConfirm={() => {
+          setShowExitConfirmation(false);
+          onCancel?.();
+        }}
+        title="Discard changes?"
+        description="You will lose all unsaved changes if you exit now."
+        isLoading={false}
+      />
     </div>
   );
 };
