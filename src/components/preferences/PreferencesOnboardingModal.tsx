@@ -57,10 +57,17 @@ const PreferencesOnboardingModal = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 mt-4">
-              <Button onClick={handleStartClick} className="w-full bg-gradient-to-r from-brand-orange to-brand-orange/90 hover:opacity-90">
+              <Button 
+                onClick={handleStartClick} 
+                className="w-full bg-gradient-to-r from-brand-orange to-brand-orange/90 hover:opacity-90 focus-visible:ring-0 focus-visible:ring-offset-0"
+              >
                 Get Started
               </Button>
-              <Button variant="outline" onClick={handleSkip} className="w-full">
+              <Button 
+                variant="outline" 
+                onClick={handleSkip} 
+                className="w-full focus-visible:ring-0 focus-visible:ring-offset-0"
+              >
                 Skip for now
               </Button>
             </div>

@@ -4,7 +4,6 @@ import { usePreferences } from '@/contexts/PreferencesContext';
 import SelectablePills from './SelectablePills';
 import TagInput from './TagInput';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 
 // Define the step interface
 interface Step {
@@ -20,6 +19,13 @@ interface PreferencesFormProps {
   onCancel?: () => void;
   isModal?: boolean;
 }
+
+// Define conflict groups for mutually exclusive options
+const CONFLICT_GROUPS = {
+  skin_consistency: ['normal', 'dry', 'oily', 'combination'],
+  hair_type: ['straight', 'wavy', 'curly', 'frizzy'],
+  diet_type: ['vegetarian', 'vegan', 'non-vegetarian']
+};
 
 const PreferencesForm: React.FC<PreferencesFormProps> = ({
   initialPreferences = {},
@@ -67,10 +73,19 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
       case 1: // Hair Type
         return formData.hair_type.length > 0 || formData.other_hair_type.length > 0;
       case 2: // Food Preferences
+        if (formData.food_preferences.includes('other') && formData.other_food_preferences.length === 0) {
+          return false; // Can't proceed if "other" is selected but no custom values added
+        }
         return formData.food_preferences.length > 0 || formData.other_food_preferences.length > 0;
       case 3: // Lifestyle
+        if (formData.lifestyle.includes('other') && formData.other_lifestyle.length === 0) {
+          return false; // Can't proceed if "other" is selected but no custom values added
+        }
         return formData.lifestyle.length > 0 || formData.other_lifestyle.length > 0;
       case 4: // Genre Preferences
+        if (formData.genre_preferences.includes('other') && formData.other_genre_preferences.length === 0) {
+          return false; // Can't proceed if "other" is selected but no custom values added
+        }
         return formData.genre_preferences.length > 0 || formData.other_genre_preferences.length > 0;
       case 5: // Goals
         return formData.goals.length > 0;
@@ -78,6 +93,20 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
         return true;
     }
   };
+
+  // Define suggested goals for the pills component
+  const goalOptions = [
+    { label: "Improve sleep", value: "Improve sleep", emoji: "😴" },
+    { label: "Improve skin", value: "Improve skin", emoji: "✨" },
+    { label: "Build muscle", value: "Build muscle", emoji: "💪" },
+    { label: "Lose fat", value: "Lose fat", emoji: "🏃" },
+    { label: "Read more", value: "Read more", emoji: "📚" },
+    { label: "Reduce screen time", value: "Reduce screen time", emoji: "📵" },
+    { label: "Wake up early", value: "Wake up early", emoji: "🌅" },
+    { label: "Drink more water", value: "Drink more water", emoji: "💧" },
+    { label: "Write daily", value: "Write daily", emoji: "✍️" },
+    { label: "Reduce anxiety", value: "Reduce anxiety", emoji: "🧘" }
+  ];
   
   // Define the step components
   const steps: Step[] = [
@@ -99,6 +128,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           allowOther={true}
           otherValues={formData.other_skin_type}
           onOtherChange={(values) => updateFormData('other_skin_type', values)}
+          conflictGroups={CONFLICT_GROUPS}
         />
       )
     },
@@ -121,6 +151,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           allowOther={true}
           otherValues={formData.other_hair_type}
           onOtherChange={(values) => updateFormData('other_hair_type', values)}
+          conflictGroups={CONFLICT_GROUPS}
         />
       )
     },
@@ -142,6 +173,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           allowOther={true}
           otherValues={formData.other_food_preferences}
           onOtherChange={(values) => updateFormData('other_food_preferences', values)}
+          conflictGroups={CONFLICT_GROUPS}
         />
       )
     },
@@ -163,6 +195,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           allowOther={true}
           otherValues={formData.other_lifestyle}
           onOtherChange={(values) => updateFormData('other_lifestyle', values)}
+          conflictGroups={CONFLICT_GROUPS}
         />
       )
     },
@@ -185,6 +218,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           allowOther={true}
           otherValues={formData.other_genre_preferences}
           onOtherChange={(values) => updateFormData('other_genre_preferences', values)}
+          conflictGroups={CONFLICT_GROUPS}
         />
       )
     },
@@ -194,23 +228,19 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
       emoji: "🎯",
       component: (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Enter your goals or choose from suggestions:</p>
-          <TagInput
-            tags={formData.goals}
-            onChange={(tags) => updateFormData('goals', tags)}
-            suggestions={[
-              "Improve sleep",
-              "Improve skin",
-              "Build muscle",
-              "Lose fat",
-              "Read more",
-              "Reduce screen time",
-              "Wake up early",
-              "Drink more water", 
-              "Write daily", 
-              "Reduce anxiety"
-            ]}
-            placeholder="Type a goal and press Enter..."
+          <SelectablePills
+            options={goalOptions}
+            selectedValues={formData.goals}
+            onChange={(values) => updateFormData('goals', values)}
+            allowOther={true}
+            otherValues={[]}
+            onOtherChange={(values) => {
+              // Add custom values to the goals array directly
+              setFormData(prev => ({
+                ...prev,
+                goals: [...prev.goals.filter(g => !values.includes(g)), ...values]
+              }));
+            }}
           />
         </div>
       )
@@ -253,11 +283,16 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           <Button
             variant="outline"
             onClick={() => setCurrentStep(currentStep - 1)}
+            className="focus-visible:ring-0 focus-visible:ring-offset-0"
           >
             Back
           </Button>
         ) : (
-          <Button variant="outline" onClick={onCancel}>
+          <Button 
+            variant="outline" 
+            onClick={onCancel}
+            className="focus-visible:ring-0 focus-visible:ring-offset-0"
+          >
             Cancel
           </Button>
         )}
@@ -266,6 +301,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           <Button
             onClick={() => setCurrentStep(currentStep + 1)}
             disabled={!canProceed()}
+            className="focus-visible:ring-0 focus-visible:ring-offset-0"
           >
             Next
           </Button>
@@ -273,6 +309,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !canProceed()}
+            className="focus-visible:ring-0 focus-visible:ring-offset-0"
           >
             {isSubmitting ? "Saving..." : "Save Preferences"}
           </Button>

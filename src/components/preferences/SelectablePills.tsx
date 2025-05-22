@@ -13,6 +13,7 @@ interface SelectablePillsProps {
   allowOther?: boolean;
   otherValues?: string[];
   onOtherChange?: (values: string[]) => void;
+  conflictGroups?: Record<string, string[]>;
 }
 
 const SelectablePills: React.FC<SelectablePillsProps> = ({
@@ -22,7 +23,8 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
   allowMultiple = true,
   allowOther = true,
   otherValues = [],
-  onOtherChange
+  onOtherChange,
+  conflictGroups = {}
 }) => {
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherInput, setOtherInput] = useState('');
@@ -34,7 +36,39 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
     }
 
     let newSelectedValues;
-    if (allowMultiple) {
+    
+    // Handle conflicts
+    if (conflictGroups) {
+      // Find if the clicked value belongs to a conflict group
+      const conflictingGroup = Object.entries(conflictGroups).find(([groupName, values]) => 
+        values.includes(value)
+      );
+      
+      if (conflictingGroup) {
+        const [groupName, conflictValues] = conflictingGroup;
+        
+        // If the value is already selected, just remove it
+        if (selectedValues.includes(value)) {
+          newSelectedValues = selectedValues.filter(v => v !== value);
+        } else {
+          // If selecting a new value from a conflict group, remove other values from the same group
+          newSelectedValues = [
+            ...selectedValues.filter(v => !conflictValues.includes(v)),
+            value
+          ];
+        }
+      } else if (allowMultiple) {
+        // Normal toggle behavior for non-conflicting values
+        if (selectedValues.includes(value)) {
+          newSelectedValues = selectedValues.filter(v => v !== value);
+        } else {
+          newSelectedValues = [...selectedValues, value];
+        }
+      } else {
+        newSelectedValues = [value];
+      }
+    } else if (allowMultiple) {
+      // Fall back to original behavior if no conflict groups defined
       if (selectedValues.includes(value)) {
         newSelectedValues = selectedValues.filter(v => v !== value);
       } else {
@@ -53,6 +87,14 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
     const newOtherValues = [...otherValues, otherInput.trim()];
     onOtherChange?.(newOtherValues);
     setOtherInput('');
+    
+    // Auto-deselect "other" once a custom value is added
+    const otherIndex = selectedValues.indexOf('other');
+    if (otherIndex !== -1) {
+      const newSelectedValues = [...selectedValues];
+      newSelectedValues.splice(otherIndex, 1);
+      onChange(newSelectedValues);
+    }
   };
 
   const handleRemoveOtherValue = (valueToRemove: string) => {
@@ -62,14 +104,14 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         {options.map(option => (
           <Button
             key={option.value}
             type="button"
             variant={selectedValues.includes(option.value) ? "default" : "outline"}
             className={cn(
-              "rounded-full h-auto py-1 px-3 text-sm", 
+              "rounded-full h-auto py-1 px-3 text-sm focus-visible:ring-0 focus-visible:ring-offset-0", 
               selectedValues.includes(option.value) ? "bg-brand-orange text-white" : ""
             )}
             onClick={() => handlePillClick(option.value)}
@@ -84,7 +126,7 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
             type="button"
             variant={showOtherInput ? "default" : "outline"}
             className={cn(
-              "rounded-full h-auto py-1 px-3 text-sm", 
+              "rounded-full h-auto py-1 px-3 text-sm focus-visible:ring-0 focus-visible:ring-offset-0", 
               showOtherInput ? "bg-brand-orange text-white" : ""
             )}
             onClick={() => setShowOtherInput(!showOtherInput)}
@@ -107,13 +149,14 @@ const SelectablePills: React.FC<SelectablePillsProps> = ({
               type="button" 
               onClick={handleAddOtherValue} 
               disabled={!otherInput.trim()}
+              className="focus-visible:ring-0 focus-visible:ring-offset-0"
             >
               Add
             </Button>
           </div>
           
           {otherValues.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
+            <div className="flex flex-wrap justify-center gap-2 mt-2">
               {otherValues.map((value, index) => (
                 <div 
                   key={index}

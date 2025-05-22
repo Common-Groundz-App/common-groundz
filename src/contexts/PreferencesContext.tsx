@@ -10,6 +10,7 @@ interface PreferencesContextType {
   isLoading: boolean;
   hasPreferences: boolean;
   updatePreferences: (preferences: any) => Promise<boolean>;
+  resetPreferences: () => Promise<boolean>;
   shouldShowOnboarding: boolean;
   setShouldShowOnboarding: (show: boolean) => void;
 }
@@ -67,14 +68,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     if (!user) return false;
 
     try {
-      // Merge existing preferences with new ones
-      const updatedPreferences = {
-        ...preferences,
-        ...newPreferences
-      };
-      
-      await updateUserPreferences(user.id, updatedPreferences);
-      setPreferences(updatedPreferences);
+      await updateUserPreferences(user.id, newPreferences);
+      setPreferences(newPreferences);
       toast({
         title: "Preferences updated",
         description: "Your personalization preferences have been saved."
@@ -90,12 +85,28 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       return false;
     }
   };
+  
+  // Add a specific function to reset preferences
+  const resetPreferences = async () => {
+    if (!user) return false;
+    
+    try {
+      await updateUserPreferences(user.id, {});
+      setPreferences({});
+      setShouldShowOnboarding(true);
+      return true;
+    } catch (error) {
+      console.error('Error resetting preferences:', error);
+      return false;
+    }
+  };
 
   const value = {
     preferences,
     isLoading,
     hasPreferences,
     updatePreferences,
+    resetPreferences,
     shouldShowOnboarding,
     setShouldShowOnboarding
   };
