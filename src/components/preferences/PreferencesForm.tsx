@@ -46,7 +46,12 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
     other_lifestyle: initialPreferences.other_lifestyle || [],
     genre_preferences: initialPreferences.genre_preferences || [],
     other_genre_preferences: initialPreferences.other_genre_preferences || [],
-    goals: initialPreferences.goals || [],
+    goals: initialPreferences.goals ? initialPreferences.goals.filter(goal => 
+      goalOptions.some(option => option.value === goal)
+    ) : [],
+    other_goals: initialPreferences.goals ? initialPreferences.goals.filter(goal => 
+      !goalOptions.some(option => option.value === goal)
+    ) : [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
@@ -58,7 +63,18 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await updatePreferences(formData);
+      // Combine goals and other_goals back into a single array for saving
+      const combinedGoals = [...formData.goals, ...formData.other_goals];
+      
+      const dataToSubmit = {
+        ...formData,
+        goals: combinedGoals
+      };
+      
+      // Remove the other_goals field as it's not needed in the final data
+      delete dataToSubmit.other_goals;
+      
+      await updatePreferences(dataToSubmit);
       onSaveSuccess?.();
     } catch (error) {
       console.error('Error submitting preferences:', error);
@@ -89,7 +105,8 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
         }
         return formData.genre_preferences.length > 0 || formData.other_genre_preferences.length > 0;
       case 5: // Goals
-        return formData.goals.length > 0;
+        // Check both goals and other_goals arrays
+        return formData.goals.length > 0 || formData.other_goals.length > 0;
       default:
         return true;
     }
@@ -240,27 +257,11 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
         <div className="space-y-3">
           <SelectablePills
             options={goalOptions}
-            selectedValues={formData.goals.filter(goal => 
-              goalOptions.some(option => option.value === goal)
-            )}
-            onChange={(values) => {
-              // Keep custom goals and add selected preset goals
-              const customGoals = formData.goals.filter(goal => 
-                !goalOptions.some(option => option.value === goal)
-              );
-              updateFormData('goals', [...customGoals, ...values]);
-            }}
+            selectedValues={formData.goals}
+            onChange={(values) => updateFormData('goals', values)}
             allowOther={true}
-            otherValues={formData.goals.filter(goal => 
-              !goalOptions.some(option => option.value === goal)
-            )}
-            onOtherChange={(values) => {
-              // Preserve preset goals and update custom goals
-              const presetGoals = formData.goals.filter(goal => 
-                goalOptions.some(option => option.value === goal)
-              );
-              updateFormData('goals', [...presetGoals, ...values]);
-            }}
+            otherValues={formData.other_goals}
+            onOtherChange={(values) => updateFormData('other_goals', values)}
             otherPlaceholder="E.g., Learn a new language..."
           />
         </div>
