@@ -87,6 +87,28 @@ export const updateUserProfile = async (userId: string, updates: any) => {
 };
 
 /**
+ * Updates a user's preferences
+ */
+export const updateUserPreferences = async (userId: string, preferences: any) => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ preferences })
+      .eq('id', userId);
+    
+    if (error) {
+      console.error('Error updating preferences:', error);
+      throw error;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error in updateUserPreferences:', error);
+    throw error;
+  }
+};
+
+/**
  * Gets the formatted display name from user data
  */
 export const getDisplayName = (user: User | null, profileData: any): string => {

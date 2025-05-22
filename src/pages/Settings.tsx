@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation, setLocationStatus } from '@/contexts/LocationContext';
@@ -18,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { locationEventBus } from '@/hooks/use-geolocation';
+import PreferencesSection from '@/components/preferences/PreferencesSection';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -121,7 +123,7 @@ const Settings = () => {
             
             <TubelightTabs defaultValue="account" items={tabItems}>
               <TabsContent value="account">
-                <Card>
+                <Card className="mb-6">
                   <CardHeader>
                     <CardTitle>Account Settings</CardTitle>
                   </CardHeader>
@@ -153,6 +155,8 @@ const Settings = () => {
                     </div>
                   </CardContent>
                 </Card>
+                
+                <PreferencesSection />
               </TabsContent>
               
               <TabsContent value="notifications">
