@@ -30,7 +30,6 @@ import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
 import { ProductCard } from '@/components/explore/ProductCard';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { supabase } from '@/integrations/supabase/client';
-import { useLocalSuggestions } from '@/hooks/use-local-suggestions';
 
 const Explore = () => {
   const { user } = useAuth();
@@ -39,16 +38,7 @@ const Explore = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [productResults, setProductResults] = useState<any[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  const [showProductSearch, setShowProductSearch] = useState(false);
 
-  // Use local suggestions for search dropdown
-  const { 
-    suggestions, 
-    isLoading: isLoadingSuggestions, 
-    error: suggestionsError 
-  } = useLocalSuggestions(searchQuery);
-
-  // Unified search for comprehensive search results
   const { 
     results, 
     isLoading, 
@@ -65,7 +55,7 @@ const Explore = () => {
     setIsLoadingProducts(true);
     try {
       const { data, error } = await supabase.functions.invoke('search-products', {
-        body: { query, bypassCache: false }
+        body: { query }
       });
       
       if (error) throw error;
@@ -78,38 +68,21 @@ const Explore = () => {
     }
   };
 
-  // Handle explicit search submission
-  const handleSearchSubmit = () => {
-    if (searchQuery.trim().length >= 2) {
-      setShowProductSearch(true);
+  // Effect to search products when in the Products tab
+  useEffect(() => {
+    if (searchQuery.length >= 2) {
       searchProducts(searchQuery);
     }
-  };
-
-  // Handle Enter key press
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSearchSubmit();
-    }
-  };
+  }, [searchQuery]);
   
   const getInitialActiveTab = () => {
     return 'Explore';
   };
 
-  // Reset product search when query is cleared
-  useEffect(() => {
-    if (!searchQuery) {
-      setShowProductSearch(false);
-    }
-  }, [searchQuery]);
-
   if (!user) {
     return <div>Loading...</div>;
   }
 
-  const productSuggestions = suggestions.filter(s => s.type === 'product');
-  
   const tabItems = [
     {
       value: "featured",
@@ -204,121 +177,107 @@ const Explore = () => {
                   placeholder="Search for people, places, food, products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
                   className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
-                {searchQuery && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="mr-1"
-                    onClick={handleSearchSubmit}
-                  >
-                    Search
-                  </Button>
-                )}
               </div>
               
-              {searchQuery && !showProductSearch && (
+              {searchQuery && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
-                  {isLoadingSuggestions && (
+                  {isLoading && (
                     <div className="p-4 text-center">
-                      <p className="text-sm text-muted-foreground">Loading suggestions...</p>
+                      <p className="text-sm text-muted-foreground">Searching...</p>
                     </div>
                   )}
                   
-                  {suggestionsError && (
+                  {error && (
                     <div className="p-4 text-center">
-                      <p className="text-sm text-destructive">{suggestionsError}</p>
+                      <p className="text-sm text-destructive">{error}</p>
                     </div>
                   )}
                   
-                  {!isLoadingSuggestions && !suggestionsError && suggestions.length === 0 && searchQuery.length >= 2 && (
+                  {!isLoading && !error && !hasResults && searchQuery.length >= 2 && (
                     <div className="p-4 text-center">
-                      <p className="text-sm text-muted-foreground">No local suggestions found. Press Enter to search online.</p>
+                      <p className="text-sm text-muted-foreground">No results found</p>
                     </div>
                   )}
                   
-                  {!isLoadingSuggestions && !suggestionsError && suggestions.length > 0 && (
+                  {!isLoading && !error && (
                     <>
-                      {productSuggestions.length > 0 && (
+                      {results.products && results.products.length > 0 && (
                         <div className="border-b last:border-b-0">
                           <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
                             Products
                           </div>
-                          {productSuggestions.map((suggestion) => (
+                          {results.products.map((product, index) => (
                             <ProductResultItem
-                              key={suggestion.id}
-                              product={{
-                                name: suggestion.name,
-                                venue: 'Product',
-                                description: suggestion.description || null,
-                                image_url: suggestion.image_url || '',
-                                api_source: 'local_cache',
-                                api_ref: suggestion.id,
-                                metadata: suggestion.metadata || {}
-                              }}
+                              key={`${product.api_source}-${product.api_ref || index}`}
+                              product={product}
                               onClick={handleResultClick}
                             />
                           ))}
                         </div>
                       )}
                       
-                      {suggestions.filter(s => s.type === 'entity').length > 0 && (
+                      {results.entities.length > 0 && (
                         <div className="border-b last:border-b-0">
                           <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
                             Places & Things
                           </div>
-                          {suggestions.filter(s => s.type === 'entity').map((suggestion) => (
+                          {results.entities.map((entity) => (
                             <EntityResultItem
-                              key={suggestion.id}
-                              entity={{
-                                id: suggestion.id,
-                                name: suggestion.name,
-                                type: 'place',
-                                venue: null,
-                                image_url: suggestion.image_url || null,
-                                description: suggestion.description || null,
-                                slug: null
-                              }}
+                              key={entity.id}
+                              entity={entity}
                               onClick={handleResultClick}
                             />
                           ))}
                         </div>
                       )}
                       
-                      {suggestions.filter(s => s.type === 'user').length > 0 && (
+                      {results.users.length > 0 && (
                         <div className="border-b last:border-b-0">
                           <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
                             People
                           </div>
-                          {suggestions.filter(s => s.type === 'user').map((suggestion) => (
+                          {results.users.map((user) => (
                             <UserResultItem
-                              key={suggestion.id}
-                              user={{
-                                id: suggestion.id,
-                                username: suggestion.name,
-                                avatar_url: suggestion.image_url || null,
-                                bio: suggestion.description || null
-                              }}
+                              key={user.id}
+                              user={user}
+                              onClick={handleResultClick}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
+                      {results.reviews.length > 0 && (
+                        <div className="border-b last:border-b-0">
+                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+                            Reviews
+                          </div>
+                          {results.reviews.map((review) => (
+                            <ReviewResultItem
+                              key={review.id}
+                              review={review}
+                              onClick={handleResultClick}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
+                      {results.recommendations.length > 0 && (
+                        <div className="border-b last:border-b-0">
+                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+                            Recommendations
+                          </div>
+                          {results.recommendations.map((recommendation) => (
+                            <RecommendationResultItem
+                              key={recommendation.id}
+                              recommendation={recommendation}
                               onClick={handleResultClick}
                             />
                           ))}
                         </div>
                       )}
                     </>
-                  )}
-                  
-                  {searchQuery.length >= 2 && (
-                    <div className="p-3 text-center border-t">
-                      <button 
-                        className="text-sm text-primary hover:underline flex items-center justify-center w-full"
-                        onClick={handleSearchSubmit}
-                      >
-                        <Search className="w-3 h-3 mr-1" />
-                        Search for "{searchQuery}"
-                      </button>
-                    </div>
                   )}
                 </div>
               )}
@@ -345,17 +304,7 @@ const Explore = () => {
               </TabsContent>
               <TabsContent value="products">
                 <div>
-                  {!showProductSearch && (
-                    <div className="mt-4 p-8 text-center">
-                      <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <h3 className="text-lg font-medium mb-2">Discover Products</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Search for products to compare prices and find the best deals
-                      </p>
-                    </div>
-                  )}
-                  
-                  {showProductSearch && isLoadingProducts && (
+                  {isLoadingProducts && (
                     <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                       {[1, 2, 3, 4, 5, 6].map((i) => (
                         <div key={i} className="h-[300px] bg-muted rounded-lg animate-pulse" />
@@ -363,7 +312,7 @@ const Explore = () => {
                     </div>
                   )}
                   
-                  {showProductSearch && !isLoadingProducts && productResults.length === 0 && searchQuery.length >= 2 && (
+                  {!isLoadingProducts && productResults.length === 0 && searchQuery.length >= 2 && (
                     <div className="mt-4 p-8 text-center">
                       <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                       <h3 className="text-lg font-medium mb-2">No products found</h3>
@@ -373,7 +322,17 @@ const Explore = () => {
                     </div>
                   )}
                   
-                  {showProductSearch && !isLoadingProducts && productResults.length > 0 && (
+                  {!isLoadingProducts && productResults.length === 0 && searchQuery.length < 2 && (
+                    <div className="mt-4 p-8 text-center">
+                      <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <h3 className="text-lg font-medium mb-2">Discover Products</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Search for products to compare prices and find the best deals
+                      </p>
+                    </div>
+                  )}
+                  
+                  {!isLoadingProducts && productResults.length > 0 && (
                     <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                       {productResults.map((product, index) => (
                         <ProductCard 

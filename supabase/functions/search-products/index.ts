@@ -30,20 +30,11 @@ serve(async (req) => {
   }
   
   try {
-    const { query, bypassCache = false } = await req.json();
+    const { query, bypassCache } = await req.json();
     if (!query) {
       return new Response(
         JSON.stringify({ error: "Query parameter is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Minimum query length check
-    if (query.trim().length < 2) {
-      console.log("Query too short, returning empty results");
-      return new Response(
-        JSON.stringify({ results: [], source: "validation" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -64,62 +55,45 @@ serve(async (req) => {
     if (!bypassCache) {
       console.log(`Checking cache for query: "${query}"`);
       
-      try {
-        // Check if we have a fresh cache for this query
-        const { data: isFreshData, error: isFreshError } = await supabaseAnonClient.rpc(
-          "is_query_fresh", 
-          { query_text: query }
-        );
+      // Check if we have a fresh cache for this query
+      const { data: isFreshData, error: isFreshError } = await supabaseAnonClient.rpc(
+        "is_query_fresh", 
+        { query_text: query }
+      );
+      
+      if (isFreshError) {
+        console.error("Error checking cache freshness:", isFreshError);
+      } else if (isFreshData === true) {
+        // Cache is fresh, get products from cache
+        console.log(`Found fresh cache for query: "${query}"`);
         
-        if (isFreshError) {
-          console.error("Error checking cache freshness:", isFreshError);
-        } else if (isFreshData === true) {
-          // Cache is fresh, get products from cache
-          console.log(`Found fresh cache for query: "${query}"`);
+        const { data: cachedProducts, error: cacheError } = await supabaseAnonClient
+          .from("cached_products")
+          .select("*")
+          .eq("query_id", 
+            supabaseAnonClient.rpc("get_cached_products", { query_text: query })
+          );
           
-          // First get the query ID
-          const { data: queryData, error: queryError } = await supabaseAnonClient
-            .from("cached_queries")
-            .select("id")
-            .eq("query", query)
-            .single();
+        if (cacheError) {
+          console.error("Error getting products from cache:", cacheError);
+        } else if (cachedProducts && cachedProducts.length > 0) {
+          // Transform cached products to expected format
+          results = cachedProducts.map(product => ({
+            name: product.name,
+            venue: product.venue || "Unknown Retailer",
+            description: product.description,
+            image_url: product.image_url || "",
+            api_source: product.api_source,
+            api_ref: product.api_ref || "",
+            metadata: product.metadata
+          }));
           
-          if (queryError) {
-            console.error("Error getting query ID:", queryError);
-          } else if (queryData && queryData.id) {
-            // Then get the cached products for this query
-            const { data: cachedProducts, error: cacheError } = await supabaseAnonClient
-              .from("cached_products")
-              .select("*")
-              .eq("query_id", queryData.id);
-              
-            if (cacheError) {
-              console.error("Error getting products from cache:", cacheError);
-            } else if (cachedProducts && cachedProducts.length > 0) {
-              // Transform cached products to expected format
-              results = cachedProducts.map(product => ({
-                name: product.name,
-                venue: product.venue || "Unknown Retailer",
-                description: product.description,
-                image_url: product.image_url || "",
-                api_source: product.api_source,
-                api_ref: product.api_ref || "",
-                metadata: product.metadata
-              }));
-              
-              console.log(`Returning ${results.length} cached products for query "${query}"`);
-              
-              // Return cached results
-              return new Response(
-                JSON.stringify({ results, source: "cache" }),
-                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
-            }
-          }
+          // Return cached results
+          return new Response(
+            JSON.stringify({ results, source: "cache" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
-      } catch (cacheError) {
-        console.error("Error in cache checking process:", cacheError);
-        // Continue to API search on cache error
       }
     }
 
@@ -144,7 +118,7 @@ serve(async (req) => {
     searchUrl.searchParams.append("gl", "in"); // India results
     searchUrl.searchParams.append("hl", "en"); // English language
 
-    console.log(`Fetching fresh results from SerpAPI for query: "${query}"`);
+    console.log(`Fetching fresh results for query: "${query}"`);
     
     const response = await fetch(searchUrl.toString());
     if (!response.ok) {
@@ -209,7 +183,6 @@ serve(async (req) => {
       console.error("Error updating cache:", cacheError);
     }
 
-    console.log(`Returning ${results.length} fresh API results for query "${query}"`);
     return new Response(
       JSON.stringify({ results, source: "api" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
