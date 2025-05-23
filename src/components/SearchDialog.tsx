@@ -1,18 +1,17 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Search, X } from 'lucide-react';
-import { useUnifiedSearch } from '@/hooks/use-unified-search';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
-import { ReviewResultItem } from './search/ReviewResultItem';
-import { RecommendationResultItem } from './search/RecommendationResultItem';
 import { ProductResultItem } from './search/ProductResultItem';
+import { useLocalSuggestions } from '@/hooks/use-local-suggestions';
 
 interface SearchDialogProps {
   open: boolean;
@@ -21,18 +20,23 @@ interface SearchDialogProps {
 
 export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState('');
+  const navigate = useNavigate();
   const { 
-    results, 
+    suggestions, 
     isLoading, 
-    error, 
-    defaultUsers, 
-    loadingDefaultUsers,
-    hasResults
-  } = useUnifiedSearch(query);
+    error
+  } = useLocalSuggestions(query);
 
   const handleResultClick = () => {
     onOpenChange(false);
     setQuery('');
+  };
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && query.trim().length >= 2) {
+      navigate(`/search?q=${encodeURIComponent(query)}`);
+      onOpenChange(false);
+    }
   };
 
   const renderSectionHeader = (title: string) => (
@@ -57,18 +61,20 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
   const renderEmptyState = () => (
     <div className="p-6 text-center">
-      <p className="text-sm text-muted-foreground">No results found. Try another name or topic.</p>
+      <p className="text-sm text-muted-foreground">No suggestions found. Press Enter to search.</p>
     </div>
   );
 
-  // Show default users when not searching
-  const shouldShowDefaultUsers = !query && defaultUsers.length > 0;
+  // Organize suggestions by type
+  const userSuggestions = suggestions.filter(s => s.type === 'user');
+  const entitySuggestions = suggestions.filter(s => s.type === 'entity');
+  const productSuggestions = suggestions.filter(s => s.type === 'product');
   
   // Determine if we should show an empty state
   const showEmptyState = query && 
                           query.length >= 2 && 
                           !isLoading && 
-                          !hasResults;
+                          suggestions.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,6 +86,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             placeholder="Search for people, places, food, products..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleSearch}
             className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70 text-sm h-8 px-0"
             autoFocus
           />
@@ -102,101 +109,90 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
           {isLoading && (
             <>
-              {renderSectionHeader('People')}
-              {renderLoadingSkeletons(2)}
-              {renderSectionHeader('Places')}
-              {renderLoadingSkeletons(2)}
-              {renderSectionHeader('Reviews')}
-              {renderLoadingSkeletons(1)}
+              {renderSectionHeader('Suggestions')}
+              {renderLoadingSkeletons(3)}
             </>
           )}
 
           {showEmptyState && renderEmptyState()}
 
-          {shouldShowDefaultUsers && (
-            <div className="flex flex-col">
-              {renderSectionHeader('People You May Know')}
-              <div className="flex flex-col">
-                {defaultUsers.map((user) => (
-                  <UserResultItem
-                    key={user.id}
-                    user={user}
-                    onClick={handleResultClick}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!isLoading && hasResults && (
+          {!isLoading && suggestions.length > 0 && (
             <>
-              {results.products && results.products.length > 0 && (
+              {productSuggestions.length > 0 && (
                 <div className="flex flex-col">
                   {renderSectionHeader('Products')}
-                  {results.products.map((product, index) => (
+                  {productSuggestions.map((suggestion) => (
                     <ProductResultItem
-                      key={`${product.api_source}-${product.api_ref || index}`}
-                      product={product}
+                      key={suggestion.id}
+                      product={{
+                        name: suggestion.name,
+                        venue: 'Product',
+                        description: suggestion.description || null,
+                        image_url: suggestion.image_url || '',
+                        api_source: 'local_cache',
+                        api_ref: suggestion.id,
+                        metadata: suggestion.metadata || {}
+                      }}
                       onClick={handleResultClick}
                     />
                   ))}
                 </div>
               )}
 
-              {results.entities.length > 0 && (
+              {entitySuggestions.length > 0 && (
                 <div className="flex flex-col">
                   {renderSectionHeader('Places & Things')}
-                  {results.entities.map((entity) => (
+                  {entitySuggestions.map((suggestion) => (
                     <EntityResultItem
-                      key={entity.id}
-                      entity={entity}
+                      key={suggestion.id}
+                      entity={{
+                        id: suggestion.id,
+                        name: suggestion.name,
+                        type: 'place',
+                        venue: null,
+                        image_url: suggestion.image_url || null,
+                        description: suggestion.description || null,
+                        slug: null
+                      }}
                       onClick={handleResultClick}
                     />
                   ))}
                 </div>
               )}
 
-              {results.reviews.length > 0 && (
-                <div className="flex flex-col">
-                  {renderSectionHeader('Reviews')}
-                  {results.reviews.map((review) => (
-                    <ReviewResultItem
-                      key={review.id}
-                      review={review}
-                      onClick={handleResultClick}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {results.recommendations.length > 0 && (
-                <div className="flex flex-col">
-                  {renderSectionHeader('Recommendations')}
-                  {results.recommendations.map((recommendation) => (
-                    <RecommendationResultItem
-                      key={recommendation.id}
-                      recommendation={recommendation}
-                      onClick={handleResultClick}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {results.users.length > 0 && (
+              {userSuggestions.length > 0 && (
                 <div className="flex flex-col">
                   {renderSectionHeader('People')}
-                  <div className="flex flex-col">
-                    {results.users.map((user) => (
-                      <UserResultItem
-                        key={user.id}
-                        user={user}
-                        onClick={handleResultClick}
-                      />
-                    ))}
-                  </div>
+                  {userSuggestions.map((suggestion) => (
+                    <UserResultItem
+                      key={suggestion.id}
+                      user={{
+                        id: suggestion.id,
+                        username: suggestion.name,
+                        avatar_url: suggestion.image_url || null,
+                        bio: suggestion.description || null
+                      }}
+                      onClick={handleResultClick}
+                    />
+                  ))}
                 </div>
               )}
             </>
+          )}
+
+          {query.length >= 2 && (
+            <div className="p-3 text-center border-t">
+              <button 
+                className="text-sm text-primary hover:underline flex items-center justify-center w-full"
+                onClick={() => {
+                  navigate(`/search?q=${encodeURIComponent(query)}`);
+                  onOpenChange(false);
+                }}
+              >
+                <Search className="w-3 h-3 mr-1" />
+                Search for "{query}"
+              </button>
+            </div>
           )}
         </div>
       </DialogContent>

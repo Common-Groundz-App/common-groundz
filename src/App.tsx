@@ -1,124 +1,88 @@
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { supabase } from '@/integrations/supabase/client';
+import Index from '@/pages/Index';
+import Auth from '@/pages/Auth';
+import Feed from '@/pages/Feed';
+import Explore from '@/pages/Explore';
+import Profile from '@/pages/Profile';
+import PostView from '@/pages/PostView';
+import Settings from '@/pages/Settings';
+import NotFound from '@/pages/NotFound';
+import RecommendationView from '@/pages/RecommendationView';
+import EntityDetail from '@/pages/EntityDetail';
+import Search from '@/pages/Search';
 
-import * as React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import ProtectedRoute from './components/ProtectedRoute';
-import Index from './pages/Index';
-import Auth from './pages/Auth';
-import Feed from './pages/Feed';
-import Profile from './pages/Profile';
-import Settings from './pages/Settings';
-import Explore from './pages/Explore';
-import NotFound from './pages/NotFound';
-import PostView from './pages/PostView';
-import RecommendationView from './pages/RecommendationView';
-import EntityDetail from './pages/EntityDetail';
-import './App.css';
-import { Toaster } from "./components/ui/toaster";
-import { TooltipProvider } from './components/ui/tooltip';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { ContentViewerProvider } from './contexts/ContentViewerContext';
-import ContentViewerModal from './components/content/ContentViewerModal';
-import { useEffect } from 'react';
-import { initializeStorageService } from './services/storageService';
-import PreferencesOnboardingModal from './components/preferences/PreferencesOnboardingModal';
+// Create a client
+const queryClient = new QueryClient();
 
 function App() {
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    // Initialize storage service on app start
-    initializeStorageService();
+    // Check if user is authenticated
+    const checkAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session) {
+          // User is authenticated
+          console.log('User is authenticated');
+        } else {
+          // User is not authenticated
+          console.log('User is not authenticated');
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <ThemeProvider>
-      <ContentViewerProvider>
-        <BrowserRouter>
-          <TooltipProvider>
+    <AuthProvider>
+      <Router>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route
+                path="/search"
+                element={
+                  <ProtectedRoute>
+                    <Search />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/auth" element={<Auth />} />
-              <Route 
-                path="/feed" 
-                element={
-                  <ProtectedRoute>
-                    <Feed />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/home" 
-                element={
-                  <ProtectedRoute>
-                    <Feed />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/profile" 
-                element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/profile/:userId" 
-                element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/settings" 
-                element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/explore" 
-                element={
-                  <ProtectedRoute>
-                    <Explore />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/post/:postId" 
-                element={
-                  <ProtectedRoute>
-                    <PostView />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/recommendation/:recommendationId" 
-                element={
-                  <ProtectedRoute>
-                    <RecommendationView />
-                  </ProtectedRoute>
-                } 
-              />
-              {/* New route for entity details */}
-              <Route 
-                path="/entity/:slug" 
-                element={
-                  <EntityDetail />
-                } 
-              />
-              {/* Redirect old edit routes to profile */}
-              <Route path="/recommendations/edit/:id" element={<Navigate to="/profile" />} />
-              <Route path="/posts/edit/:id" element={<Navigate to="/profile" />} />
+              <Route path="/home" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
+              <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
+              <Route path="/profile/:id" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/post/:id" element={<ProtectedRoute><PostView /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/recommendations/:id" element={<ProtectedRoute><RecommendationView /></ProtectedRoute>} />
+              <Route path="/places/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
+              <Route path="/movies/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
+              <Route path="/books/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
+              <Route path="/food/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <Toaster />
-            <ContentViewerModal />
-            <PreferencesOnboardingModal />
-          </TooltipProvider>
-        </BrowserRouter>
-      </ContentViewerProvider>
-    </ThemeProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </Router>
+    </AuthProvider>
   );
 }
 

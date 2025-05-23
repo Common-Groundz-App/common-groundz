@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,12 +30,71 @@ serve(async (req) => {
   }
   
   try {
-    const { query } = await req.json();
+    const { query, bypassCache } = await req.json();
     if (!query) {
       return new Response(
         JSON.stringify({ error: "Query parameter is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    
+    // Create a client with anonymous key for reading
+    const supabaseAnonClient = createClient(supabaseUrl, supabaseAnonKey);
+    
+    // Create a client with service role key for writing to the cache
+    const supabaseServiceClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    let results: ProductResult[] = [];
+
+    // Check cache first if not explicitly bypassing
+    if (!bypassCache) {
+      console.log(`Checking cache for query: "${query}"`);
+      
+      // Check if we have a fresh cache for this query
+      const { data: isFreshData, error: isFreshError } = await supabaseAnonClient.rpc(
+        "is_query_fresh", 
+        { query_text: query }
+      );
+      
+      if (isFreshError) {
+        console.error("Error checking cache freshness:", isFreshError);
+      } else if (isFreshData === true) {
+        // Cache is fresh, get products from cache
+        console.log(`Found fresh cache for query: "${query}"`);
+        
+        const { data: cachedProducts, error: cacheError } = await supabaseAnonClient
+          .from("cached_products")
+          .select("*")
+          .eq("query_id", 
+            supabaseAnonClient.rpc("get_cached_products", { query_text: query })
+          );
+          
+        if (cacheError) {
+          console.error("Error getting products from cache:", cacheError);
+        } else if (cachedProducts && cachedProducts.length > 0) {
+          // Transform cached products to expected format
+          results = cachedProducts.map(product => ({
+            name: product.name,
+            venue: product.venue || "Unknown Retailer",
+            description: product.description,
+            image_url: product.image_url || "",
+            api_source: product.api_source,
+            api_ref: product.api_ref || "",
+            metadata: product.metadata
+          }));
+          
+          // Return cached results
+          return new Response(
+            JSON.stringify({ results, source: "cache" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
     }
 
     // Get the SerpApi key from environment
@@ -58,7 +118,7 @@ serve(async (req) => {
     searchUrl.searchParams.append("gl", "in"); // India results
     searchUrl.searchParams.append("hl", "en"); // English language
 
-    console.log(`Searching for products with query: "${query}"`);
+    console.log(`Fetching fresh results for query: "${query}"`);
     
     const response = await fetch(searchUrl.toString());
     if (!response.ok) {
@@ -66,10 +126,65 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const results = parseProductResults(data);
+    results = parseProductResults(data);
+
+    // Update cache with new results
+    try {
+      // First, add/update the query in cached_queries
+      const { data: queryData, error: queryError } = await supabaseServiceClient
+        .from("cached_queries")
+        .upsert(
+          { 
+            query: query, 
+            last_fetched: new Date().toISOString() 
+          },
+          { 
+            onConflict: "query", 
+            returning: "id" 
+          }
+        );
+      
+      if (queryError) {
+        console.error("Error updating query cache:", queryError);
+      } else if (queryData && queryData.length > 0) {
+        const queryId = queryData[0].id;
+        
+        // Delete existing cached products for this query
+        await supabaseServiceClient
+          .from("cached_products")
+          .delete()
+          .eq("query_id", queryId);
+        
+        // Insert new cached products
+        if (results.length > 0) {
+          const productsToCache = results.map(product => ({
+            query_id: queryId,
+            name: product.name,
+            venue: product.venue,
+            description: product.description,
+            image_url: product.image_url,
+            api_source: product.api_source,
+            api_ref: product.api_ref,
+            metadata: product.metadata
+          }));
+          
+          const { error: insertError } = await supabaseServiceClient
+            .from("cached_products")
+            .insert(productsToCache);
+          
+          if (insertError) {
+            console.error("Error inserting product cache:", insertError);
+          } else {
+            console.log(`Successfully cached ${productsToCache.length} products for query "${query}"`);
+          }
+        }
+      }
+    } catch (cacheError) {
+      console.error("Error updating cache:", cacheError);
+    }
 
     return new Response(
-      JSON.stringify({ results }),
+      JSON.stringify({ results, source: "api" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

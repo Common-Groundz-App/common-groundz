@@ -22,8 +22,10 @@ serve(async (req) => {
     const requestData = await req.json();
     const query = requestData.query;
     const limit = requestData.limit || 5;
+    const type = requestData.type || "all"; // Can be "all", "products", "users", "entities", etc.
+    const fetchProducts = type === "all" || type === "products";
     
-    console.log(`Search query received: "${query}", limit: ${limit}`);
+    console.log(`Search query received: "${query}", limit: ${limit}, type: ${type}`);
     
     if (!query || query.trim().length < 2) {
       console.log("Search query too short, returning empty results");
@@ -43,111 +45,214 @@ serve(async (req) => {
 
     // Determine if query might be product-related
     const productRelatedTerms = ['buy', 'product', 'price', 'best', 'cheap', 'expensive', 'review', 'compare'];
-    const isLikelyProductQuery = productRelatedTerms.some(term => query.toLowerCase().includes(term));
+    const isLikelyProductQuery = productRelatedTerms.some(term => query.toLowerCase().includes(term)) || fetchProducts;
 
-    // Perform parallel searches across all data types
-    const [usersResponse, entitiesResponse, reviewsResponse, recommendationsResponse, productsResponse] = await Promise.all([
-      // Search users
-      supabase
-        .from('profiles')
-        .select('id, username, avatar_url, bio')
-        .ilike('username', `%${query}%`)
-        .limit(limit),
-      
-      // Search entities
-      supabase
-        .from('entities')
-        .select('id, name, type, venue, image_url, description, slug')
-        .or(`name.ilike.%${query}%, venue.ilike.%${query}%, slug.ilike.%${query}%`)
-        .eq('is_deleted', false)
-        .limit(limit),
-      
-      // Search reviews
-      supabase
-        .from('reviews')
-        .select(`
-          id, 
-          title, 
-          subtitle, 
-          category, 
-          description, 
-          rating, 
-          entity_id,
-          entities(id, name, slug, type, venue)
-        `)
-        .or(`title.ilike.%${query}%, description.ilike.%${query}%, subtitle.ilike.%${query}%`)
-        .eq('status', 'published')
-        .eq('visibility', 'public')
-        .limit(limit),
-      
-      // Search recommendations
-      supabase
-        .from('recommendations')
-        .select(`
-          id, 
-          title, 
-          description, 
-          category, 
-          rating, 
-          entity_id,
-          entities(id, name, slug, type, venue)
-        `)
-        .or(`title.ilike.%${query}%, description.ilike.%${query}%`)
-        .eq('visibility', 'public')
-        .limit(limit),
-      
-      // Search external products using the search-products function
-      // Only call if query seems product-related or we have few local results
-      isLikelyProductQuery ? 
-        supabase.functions.invoke('search-products', {
-          body: { query }
-        }) : 
-        Promise.resolve({ data: { results: [] }, error: null })
-    ]);
+    // Set up parallel search promises
+    const searchPromises = [];
+    const results = {
+      users: [],
+      entities: [],
+      reviews: [],
+      recommendations: [],
+      products: [],
+      errors: null
+    };
 
-    // Log search results
-    console.log(`Users search: ${usersResponse.data?.length ?? 0} results`);
-    console.log(`Entities search: ${entitiesResponse.data?.length ?? 0} results`);
-    console.log(`Reviews search: ${reviewsResponse.data?.length ?? 0} results`);
-    console.log(`Recommendations search: ${recommendationsResponse.data?.length ?? 0} results`);
-    console.log(`Products search: ${productsResponse.data?.results?.length ?? 0} results`);
-
-    // Handle any errors
-    const errors = [];
-    if (usersResponse.error) {
-      console.error("Users search error:", usersResponse.error);
-      errors.push(`Users: ${usersResponse.error.message}`);
-    }
-    if (entitiesResponse.error) {
-      console.error("Entities search error:", entitiesResponse.error);
-      errors.push(`Entities: ${entitiesResponse.error.message}`);
-    }
-    if (reviewsResponse.error) {
-      console.error("Reviews search error:", reviewsResponse.error);
-      errors.push(`Reviews: ${reviewsResponse.error.message}`);
-    }
-    if (recommendationsResponse.error) {
-      console.error("Recommendations search error:", recommendationsResponse.error);
-      errors.push(`Recommendations: ${recommendationsResponse.error.message}`);
-    }
-    if (productsResponse.error) {
-      console.error("Products search error:", productsResponse.error);
-      errors.push(`Products: ${productsResponse.error.message}`);
+    // Search users
+    if (type === "all" || type === "users") {
+      searchPromises.push(
+        supabase
+          .from('profiles')
+          .select('id, username, avatar_url, bio')
+          .ilike('username', `%${query}%`)
+          .limit(limit)
+          .then(response => {
+            if (response.error) {
+              console.error("Users search error:", response.error);
+              if (!results.errors) results.errors = [];
+              results.errors.push(`Users: ${response.error.message}`);
+            } else {
+              results.users = response.data || [];
+              console.log(`Users search: ${results.users.length} results`);
+            }
+          })
+      );
     }
     
-    if (errors.length > 0) {
-      console.error("Search errors:", errors);
+    // Search entities
+    if (type === "all" || type === "entities") {
+      searchPromises.push(
+        supabase
+          .from('entities')
+          .select('id, name, type, venue, image_url, description, slug')
+          .or(`name.ilike.%${query}%, venue.ilike.%${query}%, slug.ilike.%${query}%`)
+          .eq('is_deleted', false)
+          .limit(limit)
+          .then(response => {
+            if (response.error) {
+              console.error("Entities search error:", response.error);
+              if (!results.errors) results.errors = [];
+              results.errors.push(`Entities: ${response.error.message}`);
+            } else {
+              results.entities = response.data || [];
+              console.log(`Entities search: ${results.entities.length} results`);
+            }
+          })
+      );
+    }
+    
+    // Search reviews
+    if (type === "all" || type === "reviews") {
+      searchPromises.push(
+        supabase
+          .from('reviews')
+          .select(`
+            id, 
+            title, 
+            subtitle, 
+            category, 
+            description, 
+            rating, 
+            entity_id,
+            entities(id, name, slug, type, venue)
+          `)
+          .or(`title.ilike.%${query}%, description.ilike.%${query}%, subtitle.ilike.%${query}%`)
+          .eq('status', 'published')
+          .eq('visibility', 'public')
+          .limit(limit)
+          .then(response => {
+            if (response.error) {
+              console.error("Reviews search error:", response.error);
+              if (!results.errors) results.errors = [];
+              results.errors.push(`Reviews: ${response.error.message}`);
+            } else {
+              results.reviews = response.data || [];
+              console.log(`Reviews search: ${results.reviews.length} results`);
+            }
+          })
+      );
+    }
+    
+    // Search recommendations
+    if (type === "all" || type === "recommendations") {
+      searchPromises.push(
+        supabase
+          .from('recommendations')
+          .select(`
+            id, 
+            title, 
+            description, 
+            category, 
+            rating, 
+            entity_id,
+            entities(id, name, slug, type, venue)
+          `)
+          .or(`title.ilike.%${query}%, description.ilike.%${query}%`)
+          .eq('visibility', 'public')
+          .limit(limit)
+          .then(response => {
+            if (response.error) {
+              console.error("Recommendations search error:", response.error);
+              if (!results.errors) results.errors = [];
+              results.errors.push(`Recommendations: ${response.error.message}`);
+            } else {
+              results.recommendations = response.data || [];
+              console.log(`Recommendations search: ${results.recommendations.length} results`);
+            }
+          })
+      );
     }
 
-    // Compile results
-    const results = {
-      users: usersResponse.data || [],
-      entities: entitiesResponse.data || [],
-      reviews: reviewsResponse.data || [],
-      recommendations: recommendationsResponse.data || [],
-      products: productsResponse.data?.results || [],
-      errors: errors.length > 0 ? errors : null
-    };
+    // Check for products in local cache first before calling the external API
+    if (isLikelyProductQuery) {
+      searchPromises.push(
+        supabase.rpc('is_query_fresh', { query_text: query })
+          .then(async (freshResponse) => {
+            if (freshResponse.error) {
+              console.error("Error checking cache freshness:", freshResponse.error);
+              return null;
+            }
+            
+            if (freshResponse.data === true) {
+              // Cache is fresh, get products from cache
+              console.log(`Found fresh cache for query: "${query}"`);
+              
+              const { data: cachedProductsQuery, error: cacheQueryError } = await supabase
+                .from('cached_queries')
+                .select('id')
+                .eq('query', query)
+                .single();
+              
+              if (cacheQueryError) {
+                console.error("Error getting query ID:", cacheQueryError);
+                return null;
+              }
+              
+              const queryId = cachedProductsQuery?.id;
+              
+              if (queryId) {
+                const { data: cachedProducts, error: cacheError } = await supabase
+                  .from('cached_products')
+                  .select('*')
+                  .eq('query_id', queryId)
+                  .limit(limit);
+                
+                if (cacheError) {
+                  console.error("Error getting products from cache:", cacheError);
+                  return null;
+                }
+                
+                if (cachedProducts && cachedProducts.length > 0) {
+                  // Transform cached products to expected format
+                  results.products = cachedProducts.map(product => ({
+                    name: product.name,
+                    venue: product.venue || "Unknown Retailer",
+                    description: product.description,
+                    image_url: product.image_url || "",
+                    api_source: product.api_source,
+                    api_ref: product.api_ref || "",
+                    metadata: product.metadata
+                  }));
+                  
+                  console.log(`Products from cache: ${results.products.length} results`);
+                  return "cached";
+                }
+              }
+            }
+            
+            // If we're here, either cache isn't fresh or we didn't find cached results
+            // Only make an API call if we're specifically searching for products or if we have few local results
+            if (fetchProducts) {
+              // Call search-products edge function for fresh data
+              return supabase.functions
+                .invoke('search-products', { body: { query } })
+                .then((productsResponse) => {
+                  if (productsResponse.error) {
+                    console.error("Products search error:", productsResponse.error);
+                    if (!results.errors) results.errors = [];
+                    results.errors.push(`Products: ${productsResponse.error.message}`);
+                  } else {
+                    results.products = productsResponse.data?.results || [];
+                    console.log(`Products search: ${results.products.length} results`);
+                  }
+                  return "api";
+                });
+            }
+            
+            return "skipped";
+          })
+      );
+    }
+    
+    // Wait for all searches to complete
+    await Promise.all(searchPromises);
+    
+    // If errors array is empty, set it to null
+    if (results.errors && results.errors.length === 0) {
+      results.errors = null;
+    } else if (results.errors) {
+      console.error("Search errors:", results.errors);
+    }
 
     console.log("Search completed successfully");
 

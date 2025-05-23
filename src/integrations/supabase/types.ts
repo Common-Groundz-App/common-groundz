@@ -9,6 +9,77 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      cached_products: {
+        Row: {
+          api_ref: string | null
+          api_source: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          metadata: Json
+          name: string
+          query_id: string
+          updated_at: string
+          venue: string | null
+        }
+        Insert: {
+          api_ref?: string | null
+          api_source: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          metadata?: Json
+          name: string
+          query_id: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Update: {
+          api_ref?: string | null
+          api_source?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          metadata?: Json
+          name?: string
+          query_id?: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cached_products_query_id_fkey"
+            columns: ["query_id"]
+            isOneToOne: false
+            referencedRelation: "cached_queries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cached_queries: {
+        Row: {
+          created_at: string
+          id: string
+          last_fetched: string
+          query: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_fetched?: string
+          query: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_fetched?: string
+          query?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -1078,6 +1149,22 @@ export type Database = {
         Args: { name: string }
         Returns: string
       }
+      get_cached_products: {
+        Args: { query_text: string }
+        Returns: {
+          api_ref: string | null
+          api_source: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          metadata: Json
+          name: string
+          query_id: string
+          updated_at: string
+          venue: string | null
+        }[]
+      }
       get_comments_with_profiles: {
         Args: { p_table_name: string; p_id_field: string; p_item_id: string }
         Returns: {
@@ -1185,6 +1272,10 @@ export type Database = {
       insert_post_save: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
+      }
+      is_query_fresh: {
+        Args: { query_text: string; ttl_hours?: number }
+        Returns: boolean
       }
       mark_notifications_as_read: {
         Args: { notification_ids: string[] }
