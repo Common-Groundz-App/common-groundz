@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { supabase } from '@/integrations/supabase/client';
 import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
