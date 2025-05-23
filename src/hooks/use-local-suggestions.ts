@@ -27,6 +27,8 @@ export function useLocalSuggestions(query: string) {
       setError(null);
 
       try {
+        console.log(`Fetching local suggestions for query: "${query}"`);
+        
         // Fetch top users (limit 3)
         const { data: users, error: usersError } = await supabase
           .from('profiles')
@@ -53,7 +55,7 @@ export function useLocalSuggestions(query: string) {
         // Fetch cached products (limit 3)
         const { data: cachedQueries, error: queriesError } = await supabase
           .from('cached_queries')
-          .select('id')
+          .select('id, query')
           .ilike('query', `%${query}%`)
           .order('last_fetched', { ascending: false })
           .limit(3);
@@ -65,6 +67,8 @@ export function useLocalSuggestions(query: string) {
         let products: any[] = [];
 
         if (cachedQueries && cachedQueries.length > 0) {
+          console.log(`Found ${cachedQueries.length} cached queries matching "${query}"`);
+          
           const queryIds = cachedQueries.map(q => q.id);
           const { data: cachedProducts, error: productsError } = await supabase
             .from('cached_products')
@@ -72,9 +76,14 @@ export function useLocalSuggestions(query: string) {
             .in('query_id', queryIds)
             .limit(3);
 
-          if (!productsError && cachedProducts) {
+          if (productsError) {
+            console.error("Error fetching cached products:", productsError);
+          } else if (cachedProducts) {
             products = cachedProducts;
+            console.log(`Found ${products.length} cached products for query "${query}"`);
           }
+        } else {
+          console.log(`No cached queries found for "${query}"`);
         }
 
         // Combine all results
@@ -103,6 +112,7 @@ export function useLocalSuggestions(query: string) {
           }))
         ];
 
+        console.log(`Returning ${combinedResults.length} total local suggestions`);
         setSuggestions(combinedResults);
       } catch (err) {
         console.error('Error fetching local suggestions:', err);
