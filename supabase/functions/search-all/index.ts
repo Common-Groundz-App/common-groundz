@@ -24,8 +24,9 @@ serve(async (req) => {
     const limit = requestData.limit || 5;
     const type = requestData.type || "all"; // Can be "all", "products", "users", "entities", etc.
     const fetchProducts = type === "all" || type === "products";
+    const bypassCache = requestData.bypassCache === true; // Explicit true required to bypass cache
     
-    console.log(`Search query received: "${query}", limit: ${limit}, type: ${type}`);
+    console.log(`Search query received: "${query}", limit: ${limit}, type: ${type}, bypassCache: ${bypassCache}`);
     
     if (!query || query.trim().length < 2) {
       console.log("Search query too short, returning empty results");
@@ -166,81 +167,86 @@ serve(async (req) => {
     // Check for products in local cache first before calling the external API
     if (isLikelyProductQuery) {
       searchPromises.push(
-        supabase.rpc('is_query_fresh', { query_text: query })
-          .then(async (freshResponse) => {
-            if (freshResponse.error) {
-              console.error("Error checking cache freshness:", freshResponse.error);
-              return null;
-            }
-            
-            if (freshResponse.data === true) {
-              // Cache is fresh, get products from cache
-              console.log(`Found fresh cache for query: "${query}"`);
-              
-              const { data: cachedProductsQuery, error: cacheQueryError } = await supabase
+        (async () => {
+          if (!bypassCache) {
+            try {
+              // First check if we have a cached query
+              const { data: queryData, error: queryError } = await supabase
                 .from('cached_queries')
                 .select('id')
                 .eq('query', query)
                 .single();
-              
-              if (cacheQueryError) {
-                console.error("Error getting query ID:", cacheQueryError);
-                return null;
-              }
-              
-              const queryId = cachedProductsQuery?.id;
-              
-              if (queryId) {
-                const { data: cachedProducts, error: cacheError } = await supabase
-                  .from('cached_products')
-                  .select('*')
-                  .eq('query_id', queryId)
-                  .limit(limit);
                 
-                if (cacheError) {
-                  console.error("Error getting products from cache:", cacheError);
-                  return null;
+              if (queryError) {
+                if (queryError.code !== 'PGRST116') { // PGRST116 is "not found" which is expected if no cache exists
+                  console.error("Error getting query ID:", queryError);
                 }
+              } else if (queryData?.id) {
+                // Now check if cache is fresh
+                const { data: isFreshData, error: isFreshError } = await supabase.rpc(
+                  'is_query_fresh', 
+                  { query_text: query }
+                );
                 
-                if (cachedProducts && cachedProducts.length > 0) {
-                  // Transform cached products to expected format
-                  results.products = cachedProducts.map(product => ({
-                    name: product.name,
-                    venue: product.venue || "Unknown Retailer",
-                    description: product.description,
-                    image_url: product.image_url || "",
-                    api_source: product.api_source,
-                    api_ref: product.api_ref || "",
-                    metadata: product.metadata
-                  }));
+                if (isFreshError) {
+                  console.error("Error checking cache freshness:", isFreshError);
+                } else if (isFreshData === true) {
+                  // Cache is fresh, get products from cache
+                  console.log(`Found fresh cache for query: "${query}"`);
                   
-                  console.log(`Products from cache: ${results.products.length} results`);
-                  return "cached";
+                  const { data: cachedProducts, error: cacheError } = await supabase
+                    .from('cached_products')
+                    .select('*')
+                    .eq('query_id', queryData.id)
+                    .limit(limit);
+                  
+                  if (cacheError) {
+                    console.error("Error getting products from cache:", cacheError);
+                  } else if (cachedProducts && cachedProducts.length > 0) {
+                    // Transform cached products to expected format
+                    results.products = cachedProducts.map(product => ({
+                      name: product.name,
+                      venue: product.venue || "Unknown Retailer",
+                      description: product.description,
+                      image_url: product.image_url || "",
+                      api_source: product.api_source,
+                      api_ref: product.api_ref || "",
+                      metadata: product.metadata
+                    }));
+                    
+                    console.log(`Products from cache: ${results.products.length} results`);
+                    return "cached";
+                  }
                 }
               }
+            } catch (error) {
+              console.error("Error checking product cache:", error);
             }
+          }
             
-            // If we're here, either cache isn't fresh or we didn't find cached results
-            // Only make an API call if we're specifically searching for products or if we have few local results
-            if (fetchProducts) {
-              // Call search-products edge function for fresh data
-              return supabase.functions
-                .invoke('search-products', { body: { query } })
-                .then((productsResponse) => {
-                  if (productsResponse.error) {
-                    console.error("Products search error:", productsResponse.error);
-                    if (!results.errors) results.errors = [];
-                    results.errors.push(`Products: ${productsResponse.error.message}`);
-                  } else {
-                    results.products = productsResponse.data?.results || [];
-                    console.log(`Products search: ${results.products.length} results`);
-                  }
-                  return "api";
-                });
-            }
-            
-            return "skipped";
-          })
+          // If we're here, either cache isn't fresh, we didn't find cached results, or bypassCache is true
+          // Only make an API call if we're specifically searching for products or if we have few local results
+          if (fetchProducts) {
+            // Call search-products edge function for fresh data
+            return supabase.functions
+              .invoke('search-products', { 
+                body: { query, bypassCache } 
+              })
+              .then((productsResponse) => {
+                if (productsResponse.error) {
+                  console.error("Products search error:", productsResponse.error);
+                  if (!results.errors) results.errors = [];
+                  results.errors.push(`Products: ${productsResponse.error.message}`);
+                } else {
+                  results.products = productsResponse.data?.results || [];
+                  console.log(`Products search (${productsResponse.data?.source || 'unknown'}): ${results.products.length} results`);
+                }
+                return productsResponse.data?.source || "api";
+              });
+          }
+          
+          return "skipped";
+        })()
       );
     }
     
