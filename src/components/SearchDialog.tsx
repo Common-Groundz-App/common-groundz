@@ -12,6 +12,7 @@ import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
 import { ReviewResultItem } from './search/ReviewResultItem';
 import { RecommendationResultItem } from './search/RecommendationResultItem';
+import { ProductResultItem } from './search/ProductResultItem';
 
 interface SearchDialogProps {
   open: boolean;
@@ -129,6 +130,19 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
           {!isLoading && hasResults && (
             <>
+              {results.products && results.products.length > 0 && (
+                <div className="flex flex-col">
+                  {renderSectionHeader('Products')}
+                  {results.products.map((product, index) => (
+                    <ProductResultItem
+                      key={`${product.api_source}-${product.api_ref || index}`}
+                      product={product}
+                      onClick={handleResultClick}
+                    />
+                  ))}
+                </div>
+              )}
+
               {results.entities.length > 0 && (
                 <div className="flex flex-col">
                   {renderSectionHeader('Places & Things')}

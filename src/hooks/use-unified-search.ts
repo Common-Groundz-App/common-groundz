@@ -53,11 +53,28 @@ export type RecommendationSearchResult = {
   } | null;
 }
 
+export type ProductSearchResult = {
+  name: string;
+  venue: string;
+  description: string | null;
+  image_url: string;
+  api_source: string;
+  api_ref: string;
+  metadata: {
+    price?: string;
+    rating?: number;
+    seller?: string;
+    purchase_url: string;
+    [key: string]: any;
+  }
+}
+
 export interface UnifiedSearchResults {
   users: SearchResult[];
   entities: EntitySearchResult[];
   reviews: ReviewSearchResult[];
   recommendations: RecommendationSearchResult[];
+  products: ProductSearchResult[];
   errors?: string[] | null;
 }
 
@@ -66,7 +83,8 @@ export function useUnifiedSearch(query: string) {
     users: [],
     entities: [],
     reviews: [],
-    recommendations: []
+    recommendations: [],
+    products: []
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +124,8 @@ export function useUnifiedSearch(query: string) {
           users: [],
           entities: [],
           reviews: [],
-          recommendations: []
+          recommendations: [],
+          products: []
         });
         return;
       }
@@ -115,7 +134,6 @@ export function useUnifiedSearch(query: string) {
       setError(null);
 
       try {
-        // Fix: Use body property instead of params for FunctionInvokeOptions
         const { data, error } = await supabase.functions.invoke('search-all', {
           body: { query: query, limit: 5 }
         });
@@ -132,7 +150,8 @@ export function useUnifiedSearch(query: string) {
           users: [],
           entities: [],
           reviews: [],
-          recommendations: []
+          recommendations: [],
+          products: []
         });
       } finally {
         setIsLoading(false);
@@ -155,6 +174,7 @@ export function useUnifiedSearch(query: string) {
     hasResults: results.users.length > 0 || 
                 results.entities.length > 0 || 
                 results.reviews.length > 0 || 
-                results.recommendations.length > 0
+                results.recommendations.length > 0 ||
+                results.products.length > 0
   };
 }

@@ -24,21 +24,56 @@ import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
+import { ProductResultItem } from '@/components/search/ProductResultItem';
 import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
 import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
+import { ProductCard } from '@/components/explore/ProductCard';
 import { EntityTypeString } from '@/hooks/feed/api/types';
+import { supabase } from '@/integrations/supabase/client';
 
 const Explore = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
+  const [productResults, setProductResults] = useState<any[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+
   const { 
     results, 
     isLoading, 
     error, 
     hasResults 
   } = useUnifiedSearch(searchQuery);
+
+  // Function to search products directly for the Products tab
+  const searchProducts = async (query: string) => {
+    if (!query || query.length < 2) {
+      setProductResults([]);
+      return;
+    }
+    setIsLoadingProducts(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('search-products', {
+        body: { query }
+      });
+      
+      if (error) throw error;
+      
+      setProductResults(data.results || []);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  // Effect to search products when in the Products tab
+  useEffect(() => {
+    if (searchQuery.length >= 2) {
+      searchProducts(searchQuery);
+    }
+  }, [searchQuery]);
   
   const getInitialActiveTab = () => {
     return 'Explore';
@@ -168,6 +203,21 @@ const Explore = () => {
                   
                   {!isLoading && !error && (
                     <>
+                      {results.products && results.products.length > 0 && (
+                        <div className="border-b last:border-b-0">
+                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
+                            Products
+                          </div>
+                          {results.products.map((product, index) => (
+                            <ProductResultItem
+                              key={`${product.api_source}-${product.api_ref || index}`}
+                              product={product}
+                              onClick={handleResultClick}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
                       {results.entities.length > 0 && (
                         <div className="border-b last:border-b-0">
                           <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
@@ -253,7 +303,46 @@ const Explore = () => {
                 <CategoryHighlights entityType="food" />
               </TabsContent>
               <TabsContent value="products">
-                <CategoryHighlights entityType="product" />
+                <div>
+                  {isLoadingProducts && (
+                    <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+                      {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <div key={i} className="h-[300px] bg-muted rounded-lg animate-pulse" />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {!isLoadingProducts && productResults.length === 0 && searchQuery.length >= 2 && (
+                    <div className="mt-4 p-8 text-center">
+                      <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <h3 className="text-lg font-medium mb-2">No products found</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Try searching for specific product names, categories, or brands
+                      </p>
+                    </div>
+                  )}
+                  
+                  {!isLoadingProducts && productResults.length === 0 && searchQuery.length < 2 && (
+                    <div className="mt-4 p-8 text-center">
+                      <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <h3 className="text-lg font-medium mb-2">Discover Products</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Search for products to compare prices and find the best deals
+                      </p>
+                    </div>
+                  )}
+                  
+                  {!isLoadingProducts && productResults.length > 0 && (
+                    <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+                      {productResults.map((product, index) => (
+                        <ProductCard 
+                          key={`${product.api_source}-${product.api_ref || index}`}
+                          product={product} 
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
               <TabsContent value="people">
                 <UserDirectoryList sortOption={sortOption} />

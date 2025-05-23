@@ -32,7 +32,8 @@ serve(async (req) => {
           users: [], 
           entities: [], 
           reviews: [], 
-          recommendations: [] 
+          recommendations: [],
+          products: [] 
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -40,8 +41,12 @@ serve(async (req) => {
 
     console.log("Starting parallel search across all data types...");
 
+    // Determine if query might be product-related
+    const productRelatedTerms = ['buy', 'product', 'price', 'best', 'cheap', 'expensive', 'review', 'compare'];
+    const isLikelyProductQuery = productRelatedTerms.some(term => query.toLowerCase().includes(term));
+
     // Perform parallel searches across all data types
-    const [usersResponse, entitiesResponse, reviewsResponse, recommendationsResponse] = await Promise.all([
+    const [usersResponse, entitiesResponse, reviewsResponse, recommendationsResponse, productsResponse] = await Promise.all([
       // Search users
       supabase
         .from('profiles')
@@ -90,6 +95,14 @@ serve(async (req) => {
         .or(`title.ilike.%${query}%, description.ilike.%${query}%`)
         .eq('visibility', 'public')
         .limit(limit),
+      
+      // Search external products using the search-products function
+      // Only call if query seems product-related or we have few local results
+      isLikelyProductQuery ? 
+        supabase.functions.invoke('search-products', {
+          body: { query }
+        }) : 
+        Promise.resolve({ data: { results: [] }, error: null })
     ]);
 
     // Log search results
@@ -97,6 +110,7 @@ serve(async (req) => {
     console.log(`Entities search: ${entitiesResponse.data?.length ?? 0} results`);
     console.log(`Reviews search: ${reviewsResponse.data?.length ?? 0} results`);
     console.log(`Recommendations search: ${recommendationsResponse.data?.length ?? 0} results`);
+    console.log(`Products search: ${productsResponse.data?.results?.length ?? 0} results`);
 
     // Handle any errors
     const errors = [];
@@ -116,6 +130,10 @@ serve(async (req) => {
       console.error("Recommendations search error:", recommendationsResponse.error);
       errors.push(`Recommendations: ${recommendationsResponse.error.message}`);
     }
+    if (productsResponse.error) {
+      console.error("Products search error:", productsResponse.error);
+      errors.push(`Products: ${productsResponse.error.message}`);
+    }
     
     if (errors.length > 0) {
       console.error("Search errors:", errors);
@@ -127,6 +145,7 @@ serve(async (req) => {
       entities: entitiesResponse.data || [],
       reviews: reviewsResponse.data || [],
       recommendations: recommendationsResponse.data || [],
+      products: productsResponse.data?.results || [],
       errors: errors.length > 0 ? errors : null
     };
 
