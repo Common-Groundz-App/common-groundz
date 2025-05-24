@@ -30,7 +30,10 @@ serve(async (req) => {
   }
   
   try {
-    const { query, bypassCache = false } = await req.json();
+    const requestData = await req.json();
+    const query = requestData.query;
+    const bypassCache = requestData.bypassCache === true;
+    
     if (!query) {
       return new Response(
         JSON.stringify({ error: "Query parameter is required" }),
@@ -59,6 +62,7 @@ serve(async (req) => {
     const supabaseServiceClient = createClient(supabaseUrl, supabaseServiceKey);
 
     let results: ProductResult[] = [];
+    let sourceOfResults = "api"; // default source
 
     // Check cache first if not explicitly bypassing
     if (!bypassCache) {
@@ -107,7 +111,8 @@ serve(async (req) => {
                 metadata: product.metadata
               }));
               
-              console.log(`Returning ${results.length} cached products for query "${query}"`);
+              console.log(`SUCCESS: Returning ${results.length} cached products for query "${query}"`);
+              sourceOfResults = "cache";
               
               // Return cached results
               return new Response(
@@ -144,7 +149,7 @@ serve(async (req) => {
     searchUrl.searchParams.append("gl", "in"); // India results
     searchUrl.searchParams.append("hl", "en"); // English language
 
-    console.log(`Fetching fresh results from SerpAPI for query: "${query}"`);
+    console.log(`⚠️ MAKING EXTERNAL API CALL: Fetching fresh results from SerpAPI for query: "${query}"`);
     
     const response = await fetch(searchUrl.toString());
     if (!response.ok) {
@@ -209,7 +214,7 @@ serve(async (req) => {
       console.error("Error updating cache:", cacheError);
     }
 
-    console.log(`Returning ${results.length} fresh API results for query "${query}"`);
+    console.log(`SUCCESS: Returning ${results.length} fresh API results for query "${query}"`);
     return new Response(
       JSON.stringify({ results, source: "api" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

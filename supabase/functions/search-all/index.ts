@@ -22,11 +22,13 @@ serve(async (req) => {
     const requestData = await req.json();
     const query = requestData.query;
     const limit = requestData.limit || 5;
-    const type = requestData.type || "all"; // Can be "all", "products", "users", "entities", etc.
-    const fetchProducts = type === "all" || type === "products";
+    const type = requestData.type || "all"; // Can be "all", "products", "users", "entities", "local_only", etc.
+    
+    // Skip products API call during typing if type is local_only
+    const fetchProducts = (type === "all" || type === "products") && type !== "local_only";
     const bypassCache = requestData.bypassCache === true; // Explicit true required to bypass cache
     
-    console.log(`Search query received: "${query}", limit: ${limit}, type: ${type}, bypassCache: ${bypassCache}`);
+    console.log(`Search query received: "${query}", limit: ${limit}, type: ${type}, bypassCache: ${bypassCache}, fetchProducts: ${fetchProducts}`);
     
     if (!query || query.trim().length < 2) {
       console.log("Search query too short, returning empty results");
@@ -46,7 +48,7 @@ serve(async (req) => {
 
     // Determine if query might be product-related
     const productRelatedTerms = ['buy', 'product', 'price', 'best', 'cheap', 'expensive', 'review', 'compare'];
-    const isLikelyProductQuery = productRelatedTerms.some(term => query.toLowerCase().includes(term)) || fetchProducts;
+    const isLikelyProductQuery = (productRelatedTerms.some(term => query.toLowerCase().includes(term)) || fetchProducts) && type !== "local_only";
 
     // Set up parallel search promises
     const searchPromises = [];
@@ -60,7 +62,7 @@ serve(async (req) => {
     };
 
     // Search users
-    if (type === "all" || type === "users") {
+    if (type === "all" || type === "users" || type === "local_only") {
       searchPromises.push(
         supabase
           .from('profiles')
@@ -81,7 +83,7 @@ serve(async (req) => {
     }
     
     // Search entities
-    if (type === "all" || type === "entities") {
+    if (type === "all" || type === "entities" || type === "local_only") {
       searchPromises.push(
         supabase
           .from('entities')
@@ -103,7 +105,7 @@ serve(async (req) => {
     }
     
     // Search reviews
-    if (type === "all" || type === "reviews") {
+    if (type === "all" || type === "reviews" || type === "local_only") {
       searchPromises.push(
         supabase
           .from('reviews')
@@ -135,7 +137,7 @@ serve(async (req) => {
     }
     
     // Search recommendations
-    if (type === "all" || type === "recommendations") {
+    if (type === "all" || type === "recommendations" || type === "local_only") {
       searchPromises.push(
         supabase
           .from('recommendations')
@@ -165,7 +167,8 @@ serve(async (req) => {
     }
 
     // Check for products in local cache first before calling the external API
-    if (isLikelyProductQuery) {
+    // Only do this if type is not local_only
+    if (isLikelyProductQuery && fetchProducts) {
       searchPromises.push(
         (async () => {
           if (!bypassCache) {
@@ -227,6 +230,8 @@ serve(async (req) => {
           // If we're here, either cache isn't fresh, we didn't find cached results, or bypassCache is true
           // Only make an API call if we're specifically searching for products or if we have few local results
           if (fetchProducts) {
+            console.log(`Making API call to search-products with query: "${query}"`);
+            
             // Call search-products edge function for fresh data
             return supabase.functions
               .invoke('search-products', { 
@@ -243,11 +248,15 @@ serve(async (req) => {
                 }
                 return productsResponse.data?.source || "api";
               });
+          } else {
+            console.log("Skipping products search as requested (local_only mode)");
           }
           
           return "skipped";
         })()
       );
+    } else {
+      console.log("Skipping products search as it's not a product-related query or local_only mode is enabled");
     }
     
     // Wait for all searches to complete

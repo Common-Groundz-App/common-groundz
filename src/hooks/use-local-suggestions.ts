@@ -123,9 +123,10 @@ export function useLocalSuggestions(query: string) {
       }
     };
 
+    // Increase debounce time from 300ms to 500ms to reduce frequency of requests
     const timer = setTimeout(() => {
       fetchSuggestions();
-    }, 300);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [query]);

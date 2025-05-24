@@ -9,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag } from 'lucide-react';
+import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -31,6 +31,7 @@ import { ProductCard } from '@/components/explore/ProductCard';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useLocalSuggestions } from '@/hooks/use-local-suggestions';
+import { toast } from '@/components/ui/use-toast';
 
 const Explore = () => {
   const { user } = useAuth();
@@ -40,30 +41,33 @@ const Explore = () => {
   const [productResults, setProductResults] = useState<any[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [showProductSearch, setShowProductSearch] = useState(false);
+  const [searchSource, setSearchSource] = useState<'cache' | 'api' | null>(null);
 
-  // Use local suggestions for search dropdown
+  // Use local suggestions for search dropdown - no API calls during typing
   const { 
     suggestions, 
     isLoading: isLoadingSuggestions, 
     error: suggestionsError 
   } = useLocalSuggestions(searchQuery);
 
-  // Unified search for comprehensive search results
+  // Local search only during typing - no external API calls
   const { 
-    results, 
-    isLoading, 
-    error, 
-    hasResults 
-  } = useUnifiedSearch(searchQuery);
+    results: localResults, 
+    isLoading: isLoadingLocalResults,
+    error: localResultsError
+  } = useUnifiedSearch(searchQuery, { skipProductSearch: true });
 
   // Function to search products directly for the Products tab
   const searchProducts = async (query: string) => {
     if (!query || query.length < 2) {
       setProductResults([]);
+      setSearchSource(null);
       return;
     }
+    
     setIsLoadingProducts(true);
     try {
+      console.log(`Searching products for query: "${query}"`);
       const { data, error } = await supabase.functions.invoke('search-products', {
         body: { query, bypassCache: false }
       });
@@ -71,14 +75,38 @@ const Explore = () => {
       if (error) throw error;
       
       setProductResults(data.results || []);
+      setSearchSource(data.source || 'api');
+      
+      // Show toast notification based on source
+      if (data.source === 'cache') {
+        toast({
+          title: "Results from cache",
+          description: `Found ${data.results.length} products from cached results`,
+          duration: 3000
+        });
+      } else {
+        toast({
+          title: "Fresh search results",
+          description: `Found ${data.results.length} products from SerpAPI`,
+          duration: 3000
+        });
+      }
+      
+      console.log(`Got ${data.results.length} product results from ${data.source}`);
     } catch (err) {
       console.error('Error fetching products:', err);
+      toast({
+        title: "Search error",
+        description: "Failed to fetch product results",
+        variant: "destructive",
+        duration: 3000
+      });
     } finally {
       setIsLoadingProducts(false);
     }
   };
 
-  // Handle explicit search submission
+  // Handle explicit search submission - this is the ONLY place that calls searchProducts!
   const handleSearchSubmit = () => {
     if (searchQuery.trim().length >= 2) {
       setShowProductSearch(true);
@@ -235,7 +263,7 @@ const Explore = () => {
                   
                   {!isLoadingSuggestions && !suggestionsError && suggestions.length === 0 && searchQuery.length >= 2 && (
                     <div className="p-4 text-center">
-                      <p className="text-sm text-muted-foreground">No local suggestions found. Press Enter to search online.</p>
+                      <p className="text-sm text-muted-foreground">No local suggestions found. Press Enter or Search to search online.</p>
                     </div>
                   )}
                   
@@ -352,14 +380,44 @@ const Explore = () => {
                       <p className="text-sm text-muted-foreground">
                         Search for products to compare prices and find the best deals
                       </p>
+                      <div className="flex items-center justify-center mt-4">
+                        <div className="relative flex-1 max-w-md">
+                          <Input
+                            type="text"
+                            placeholder="Search for products..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            className="pr-20"
+                          />
+                          <Button 
+                            className="absolute right-0 top-0 rounded-l-none"
+                            onClick={handleSearchSubmit}
+                          >
+                            Search
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   )}
                   
                   {showProductSearch && isLoadingProducts && (
-                    <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-                      {[1, 2, 3, 4, 5, 6].map((i) => (
-                        <div key={i} className="h-[300px] bg-muted rounded-lg animate-pulse" />
-                      ))}
+                    <div className="mt-4 text-center py-8">
+                      <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary mb-2" />
+                      <p className="text-sm text-muted-foreground">Searching for products...</p>
+                    </div>
+                  )}
+                  
+                  {showProductSearch && !isLoadingProducts && (
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-medium">
+                        Results for "{searchQuery}"
+                      </h3>
+                      {searchSource && (
+                        <div className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-full">
+                          Source: {searchSource === 'cache' ? 'Cache' : 'SerpAPI'}
+                        </div>
+                      )}
                     </div>
                   )}
                   
@@ -370,18 +428,36 @@ const Explore = () => {
                       <p className="text-sm text-muted-foreground">
                         Try searching for specific product names, categories, or brands
                       </p>
+                      <Button
+                        onClick={() => setShowProductSearch(false)}
+                        variant="outline"
+                        className="mt-4"
+                      >
+                        Try another search
+                      </Button>
                     </div>
                   )}
                   
                   {showProductSearch && !isLoadingProducts && productResults.length > 0 && (
-                    <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-                      {productResults.map((product, index) => (
-                        <ProductCard 
-                          key={`${product.api_source}-${product.api_ref || index}`}
-                          product={product} 
-                        />
-                      ))}
-                    </div>
+                    <>
+                      <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+                        {productResults.map((product, index) => (
+                          <ProductCard 
+                            key={`${product.api_source}-${product.api_ref || index}`}
+                            product={product} 
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-4 text-center">
+                        <Button 
+                          variant="outline"
+                          onClick={() => setShowProductSearch(false)}
+                          className="mx-auto"
+                        >
+                          New search
+                        </Button>
+                      </div>
+                    </>
                   )}
                 </div>
               </TabsContent>

@@ -78,7 +78,7 @@ export interface UnifiedSearchResults {
   errors?: string[] | null;
 }
 
-export function useUnifiedSearch(query: string) {
+export function useUnifiedSearch(query: string, options: { skipProductSearch?: boolean } = {}) {
   const [results, setResults] = useState<UnifiedSearchResults>({
     users: [],
     entities: [],
@@ -134,8 +134,14 @@ export function useUnifiedSearch(query: string) {
       setError(null);
 
       try {
+        // If skipProductSearch is true, we'll add "skipProducts=true" to the request
+        // This way we only search for local entities during typing
         const { data, error } = await supabase.functions.invoke('search-all', {
-          body: { query: query, limit: 5 }
+          body: { 
+            query: query, 
+            limit: 5,
+            type: options.skipProductSearch ? "local_only" : "all"
+          }
         });
 
         if (error) {
@@ -163,7 +169,7 @@ export function useUnifiedSearch(query: string) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, options.skipProductSearch]);
 
   return { 
     results, 
