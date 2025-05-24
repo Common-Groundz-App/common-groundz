@@ -1,8 +1,4 @@
-
 import React from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, Star } from 'lucide-react';
 
 interface ProductResultItemProps {
   product: {
@@ -24,50 +20,35 @@ interface ProductResultItemProps {
 }
 
 export function ProductResultItem({ product, onClick }: ProductResultItemProps) {
-  const handleBuyClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    window.open(product.metadata.purchase_url, '_blank', 'noopener,noreferrer');
-  };
-
   return (
     <a
       href={product.metadata.purchase_url}
-      className="flex items-center gap-3 px-4 py-2 hover:bg-muted/30 transition-colors"
-      onClick={(e) => {
-        e.preventDefault();
-        onClick();
-        window.open(product.metadata.purchase_url, '_blank', 'noopener,noreferrer');
-      }}
       target="_blank"
       rel="noopener noreferrer"
+      className="flex items-center gap-2 px-4 py-1.5 hover:bg-muted/30 transition-colors"
+      onClick={onClick}
     >
-      <Avatar className="h-10 w-10 rounded-md">
-        <AvatarImage src={product.image_url} alt={product.name} className="object-cover" />
-        <AvatarFallback className="rounded-md">
-          <ShoppingBag className="h-4 w-4" />
-        </AvatarFallback>
-      </Avatar>
-      
+      <img
+        src={product.image_url}
+        alt={product.name}
+        className="h-8 w-8 rounded-full object-cover"
+        onError={(e: any) => {
+          e.target.onerror = null; // prevent infinite loop
+          e.target.src = "https://via.placeholder.com/50"; // Placeholder image URL
+        }}
+      />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
           <p className="text-sm font-medium truncate">{product.name}</p>
-          <Badge variant="outline" className="text-xs py-0 px-1.5 h-5 bg-muted/50">
-            Product
-          </Badge>
         </div>
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="truncate">{product.venue || product.metadata.seller}</span>
-          <div className="flex items-center gap-2">
-            {product.metadata.rating && (
-              <span className="flex items-center">
-                <Star className="w-3 h-3 mr-0.5 fill-yellow-500 text-yellow-500" /> 
-                {product.metadata.rating}
-              </span>
-            )}
-            <span className="font-semibold">{product.metadata.price}</span>
+        <div className="flex items-center text-xs text-muted-foreground">
+          <span className="truncate">{product.venue}</span>
+        </div>
+        {product.metadata.price && (
+          <div className="text-xs text-muted-foreground">
+            Price: {product.metadata.price}
           </div>
-        </div>
+        )}
       </div>
     </a>
   );

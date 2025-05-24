@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { ensureHttps } from "./utils.ts";
+import { ensureHttps, isValidUrl } from "./utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -161,6 +161,10 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    
+    // Debug: Log available keys in response to help troubleshoot
+    console.log(`SerpAPI response keys for query "${query}":`, Object.keys(data));
+    
     results = parseProductResults(data);
 
     // Update cache with new results
@@ -236,27 +240,82 @@ serve(async (req) => {
 });
 
 function parseProductResults(data: any): ProductResult[] {
-  if (!data.shopping_results || !Array.isArray(data.shopping_results)) {
-    return [];
+  // Debug log to see what data we're working with
+  console.log("Parsing product results from response with keys:", Object.keys(data));
+  
+  // Try multiple potential result arrays from SerpAPI response
+  const possibleResultArrays = [
+    data.shopping_results,
+    data.organic_results,
+    data.product_results,
+    data.inline_shopping_results
+  ];
+  
+  // Find first valid array of results
+  let resultsArray = null;
+  for (const arr of possibleResultArrays) {
+    if (Array.isArray(arr) && arr.length > 0) {
+      console.log(`Found valid results array with ${arr.length} items at key:`, 
+                 possibleResultArrays.indexOf(arr) === 0 ? "shopping_results" :
+                 possibleResultArrays.indexOf(arr) === 1 ? "organic_results" :
+                 possibleResultArrays.indexOf(arr) === 2 ? "product_results" : 
+                 "inline_shopping_results");
+      resultsArray = arr;
+      break;
+    }
+  }
+  
+  if (!resultsArray) {
+    console.warn("No product arrays found in SerpAPI response! Available keys:", Object.keys(data));
+    console.log("Response data structure:", JSON.stringify(data).substring(0, 1000) + "...");
+    
+    // Try to extract useful information from other response parts if possible
+    if (data.search_information?.organic_results_state === "Fully empty") {
+      console.log("SerpAPI explicitly reported no results for this query");
+    }
+    
+    return []; // Return empty array instead of undefined to avoid mapping errors
   }
 
-  return data.shopping_results.slice(0, 10).map((item: any) => ({
-    name: item.title || "Unknown Product",
-    venue: item.source || item.seller || "Unknown Retailer",
-    description: item.snippet || null,
-    image_url: ensureHttps(item.thumbnail) || "",
-    api_source: "serpapi_shopping",
-    api_ref: item.product_id || item.position?.toString() || "",
-    metadata: {
-      price: item.price || "Price not available",
-      rating: item.rating ? parseFloat(item.rating) : null,
-      seller: item.source || item.seller || "Unknown Retailer",
-      purchase_url: ensureHttps(item.link) || "",
-      extracted_price: item.extracted_price || null,
-      shipping: item.shipping || null,
-      sale_price: item.price_when_on_sale || null
+  return resultsArray.slice(0, 10).map((item: any) => {
+    // Ensure we have a valid item
+    if (!item) return null;
+    
+    // For debugging
+    console.log(`Processing item with keys: ${Object.keys(item).join(", ")}`);
+    
+    // Extract and format the data
+    const productResult: ProductResult = {
+      name: item.title || item.name || "Unknown Product",
+      venue: item.source || item.seller || item.shop || "Unknown Retailer",
+      description: item.snippet || item.description || null,
+      image_url: ensureHttps(item.thumbnail || item.image || "") || "",
+      api_source: "serpapi_shopping",
+      api_ref: item.product_id || item.position?.toString() || "",
+      metadata: {
+        price: item.price || "Price not available",
+        rating: item.rating ? parseFloat(item.rating) : null,
+        seller: item.source || item.seller || item.shop || "Unknown Retailer",
+        purchase_url: ensureHttps(item.link || "") || "",
+        extracted_price: item.extracted_price || null,
+        shipping: item.shipping || null,
+        sale_price: item.price_when_on_sale || null
+      }
+    };
+    
+    // Extra validation to ensure all URLs are HTTPS and valid
+    if (productResult.image_url && !isValidUrl(productResult.image_url)) {
+      console.warn(`Invalid image URL detected: ${productResult.image_url}`);
+      productResult.image_url = ""; // Reset to empty if invalid
     }
-  }));
+    
+    if (productResult.metadata.purchase_url && !isValidUrl(productResult.metadata.purchase_url)) {
+      console.warn(`Invalid purchase URL detected: ${productResult.metadata.purchase_url}`);
+      productResult.metadata.purchase_url = ""; // Reset to empty if invalid
+    }
+    
+    return productResult;
+  }).filter(Boolean); // Remove any null items
 }
 
 // Fallback function for mock results when API key isn't available

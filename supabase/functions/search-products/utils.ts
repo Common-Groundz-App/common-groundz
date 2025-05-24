@@ -29,3 +29,17 @@ export const ensureHttps = (url: string): string => {
   
   return url;
 };
+
+/**
+ * Validates if the provided value is a proper URL
+ */
+export const isValidUrl = (url: string): boolean => {
+  if (!url) return false;
+  
+  try {
+    new URL(url);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
