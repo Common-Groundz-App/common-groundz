@@ -67,34 +67,64 @@ const Explore = () => {
     
     setIsLoadingProducts(true);
     try {
-      console.log(`Searching products for query: "${query}"`);
+      console.log(`🔍 Frontend: Starting product search for query: "${query}"`);
+      
       const { data, error } = await supabase.functions.invoke('search-products', {
         body: { query, bypassCache: false }
       });
       
-      if (error) throw error;
-      
-      setProductResults(data.results || []);
-      setSearchSource(data.source || 'api');
-      
-      // Show toast notification based on source
-      if (data.source === 'cache') {
-        toast({
-          title: "Results from cache",
-          description: `Found ${data.results.length} products from cached results`,
-          duration: 3000
-        });
-      } else {
-        toast({
-          title: "Fresh search results",
-          description: `Found ${data.results.length} products from SerpAPI`,
-          duration: 3000
-        });
+      if (error) {
+        console.error('❌ Frontend: Search error:', error);
+        throw error;
       }
       
-      console.log(`Got ${data.results.length} product results from ${data.source}`);
+      console.log('📦 Frontend: Raw API response:', {
+        data: data,
+        hasResults: data?.results ? 'yes' : 'no',
+        resultsType: data?.results ? typeof data.results : 'undefined',
+        resultsIsArray: Array.isArray(data?.results),
+        resultsLength: data?.results?.length || 0,
+        source: data?.source
+      });
+      
+      // Validate and set results with enhanced error checking
+      if (data && typeof data === 'object') {
+        const results = data.results;
+        
+        if (Array.isArray(results)) {
+          console.log(`✅ Frontend: Setting ${results.length} valid product results`);
+          setProductResults(results);
+          setSearchSource(data.source || 'api');
+          
+          // Show toast notification based on source
+          if (data.source === 'cache') {
+            toast({
+              title: "Results from cache",
+              description: `Found ${results.length} products from cached results`,
+              duration: 3000
+            });
+          } else {
+            toast({
+              title: "Fresh search results",
+              description: `Found ${results.length} products from SerpAPI`,
+              duration: 3000
+            });
+          }
+        } else {
+          console.warn('⚠️ Frontend: Results is not an array:', results);
+          setProductResults([]);
+          setSearchSource(data.source || null);
+        }
+      } else {
+        console.warn('⚠️ Frontend: Invalid response format:', data);
+        setProductResults([]);
+        setSearchSource(null);
+      }
+      
     } catch (err) {
-      console.error('Error fetching products:', err);
+      console.error('❌ Frontend: Error fetching products:', err);
+      setProductResults([]);
+      setSearchSource(null);
       toast({
         title: "Search error",
         description: "Failed to fetch product results",
@@ -109,6 +139,7 @@ const Explore = () => {
   // Handle explicit search submission - this is the ONLY place that calls searchProducts!
   const handleSearchSubmit = () => {
     if (searchQuery.trim().length >= 2) {
+      console.log(`🎯 Frontend: User submitted search for: "${searchQuery}"`);
       setShowProductSearch(true);
       searchProducts(searchQuery);
     }
@@ -421,7 +452,8 @@ const Explore = () => {
                     </div>
                   )}
                   
-                  {showProductSearch && !isLoadingProducts && productResults.length === 0 && searchQuery.length >= 2 && (
+                  {/* Fixed condition: Only show "No products found" when we've actually searched and got no results */}
+                  {showProductSearch && !isLoadingProducts && Array.isArray(productResults) && productResults.length === 0 && searchQuery.length >= 2 && (
                     <div className="mt-4 p-8 text-center">
                       <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                       <h3 className="text-lg font-medium mb-2">No products found</h3>
@@ -438,7 +470,8 @@ const Explore = () => {
                     </div>
                   )}
                   
-                  {showProductSearch && !isLoadingProducts && productResults.length > 0 && (
+                  {/* Fixed condition: Only show results when we have actual products */}
+                  {showProductSearch && !isLoadingProducts && Array.isArray(productResults) && productResults.length > 0 && (
                     <>
                       <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                         {productResults.map((product, index) => (

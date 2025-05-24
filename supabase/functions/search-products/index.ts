@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { ensureHttps, isValidUrl } from "./utils.ts";
@@ -118,9 +117,14 @@ serve(async (req) => {
               console.log(`SUCCESS: Returning ${results.length} cached products for query "${query}"`);
               sourceOfResults = "cache";
               
-              // Return cached results
+              // Return cached results with proper structure
               return new Response(
-                JSON.stringify({ results, source: "cache" }),
+                JSON.stringify({ 
+                  results: results,
+                  source: "cache",
+                  query: query,
+                  count: results.length 
+                }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } }
               );
             }
@@ -139,7 +143,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: "SERP API key not configured",
-          results: getMockResults(query) // Fallback to mock data if no API key
+          results: getMockResults(query),
+          source: "mock",
+          query: query,
+          count: 0
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -153,7 +160,7 @@ serve(async (req) => {
     searchUrl.searchParams.append("gl", "in"); // India results
     searchUrl.searchParams.append("hl", "en"); // English language
 
-    console.log(`⚠️ MAKING EXTERNAL API CALL: Fetching fresh results from SerpAPI for query: "${query}"`);
+    console.log(`🔍 EXTERNAL API CALL: Fetching fresh results from SerpAPI for query: "${query}"`);
     
     const response = await fetch(searchUrl.toString());
     if (!response.ok) {
@@ -162,10 +169,24 @@ serve(async (req) => {
 
     const data = await response.json();
     
-    // Debug: Log available keys in response to help troubleshoot
-    console.log(`SerpAPI response keys for query "${query}":`, Object.keys(data));
+    // Enhanced debugging for response structure
+    console.log(`📊 SerpAPI response structure for query "${query}":`, {
+      keys: Object.keys(data),
+      hasShoppingResults: Array.isArray(data.shopping_results),
+      shoppingResultsCount: data.shopping_results?.length || 0,
+      hasOrganicResults: Array.isArray(data.organic_results),
+      organicResultsCount: data.organic_results?.length || 0,
+      searchInformation: data.search_information
+    });
     
     results = parseProductResults(data);
+    console.log(`🎯 Parsed ${results.length} products from API response`);
+
+    // Validate results array before proceeding
+    if (!Array.isArray(results)) {
+      console.error("⚠️ parseProductResults did not return an array:", typeof results);
+      results = [];
+    }
 
     // Update cache with new results
     try {
@@ -214,7 +235,7 @@ serve(async (req) => {
           if (insertError) {
             console.error("Error inserting product cache:", insertError);
           } else {
-            console.log(`Successfully cached ${productsToCache.length} products for query "${query}"`);
+            console.log(`💾 Successfully cached ${productsToCache.length} products for query "${query}"`);
           }
         }
       }
@@ -222,17 +243,38 @@ serve(async (req) => {
       console.error("Error updating cache:", cacheError);
     }
 
-    console.log(`SUCCESS: Returning ${results.length} fresh API results for query "${query}"`);
+    // Return results with enhanced structure for debugging
+    const finalResponse = {
+      results: results,
+      source: "api",
+      query: query,
+      count: results.length,
+      debug: {
+        apiResponseKeys: Object.keys(data),
+        shoppingResultsFound: data.shopping_results?.length || 0,
+        organicResultsFound: data.organic_results?.length || 0
+      }
+    };
+
+    console.log(`✅ SUCCESS: Returning ${results.length} fresh API results for query "${query}"`);
+    console.log(`📤 Final response structure:`, {
+      resultsIsArray: Array.isArray(finalResponse.results),
+      resultsLength: finalResponse.results.length,
+      source: finalResponse.source
+    });
+
     return new Response(
-      JSON.stringify({ results, source: "api" }),
+      JSON.stringify(finalResponse),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error in search-products:", error);
+    console.error("❌ Error in search-products:", error);
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        results: [] // Return empty array on error
+        results: [],
+        source: "error",
+        count: 0
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -240,82 +282,91 @@ serve(async (req) => {
 });
 
 function parseProductResults(data: any): ProductResult[] {
-  // Debug log to see what data we're working with
-  console.log("Parsing product results from response with keys:", Object.keys(data));
+  // Enhanced debugging to see what data we're working with
+  console.log("🔄 Parsing product results from response with keys:", Object.keys(data));
   
   // Try multiple potential result arrays from SerpAPI response
   const possibleResultArrays = [
-    data.shopping_results,
-    data.organic_results,
-    data.product_results,
-    data.inline_shopping_results
+    { key: 'shopping_results', data: data.shopping_results },
+    { key: 'organic_results', data: data.organic_results },
+    { key: 'product_results', data: data.product_results },
+    { key: 'inline_shopping_results', data: data.inline_shopping_results }
   ];
   
   // Find first valid array of results
   let resultsArray = null;
-  for (const arr of possibleResultArrays) {
-    if (Array.isArray(arr) && arr.length > 0) {
-      console.log(`Found valid results array with ${arr.length} items at key:`, 
-                 possibleResultArrays.indexOf(arr) === 0 ? "shopping_results" :
-                 possibleResultArrays.indexOf(arr) === 1 ? "organic_results" :
-                 possibleResultArrays.indexOf(arr) === 2 ? "product_results" : 
-                 "inline_shopping_results");
-      resultsArray = arr;
+  let sourceKey = null;
+  
+  for (const arrayOption of possibleResultArrays) {
+    if (Array.isArray(arrayOption.data) && arrayOption.data.length > 0) {
+      console.log(`✅ Found valid results array '${arrayOption.key}' with ${arrayOption.data.length} items`);
+      resultsArray = arrayOption.data;
+      sourceKey = arrayOption.key;
       break;
+    } else if (arrayOption.data) {
+      console.log(`⚠️ Found '${arrayOption.key}' but it's not a valid array:`, typeof arrayOption.data);
     }
   }
   
   if (!resultsArray) {
-    console.warn("No product arrays found in SerpAPI response! Available keys:", Object.keys(data));
-    console.log("Response data structure:", JSON.stringify(data).substring(0, 1000) + "...");
+    console.warn("❌ No valid product arrays found in SerpAPI response!");
+    console.log("Available response structure:", {
+      keys: Object.keys(data),
+      searchInfo: data.search_information,
+      responseSnippet: JSON.stringify(data).substring(0, 500) + "..."
+    });
     
-    // Try to extract useful information from other response parts if possible
-    if (data.search_information?.organic_results_state === "Fully empty") {
-      console.log("SerpAPI explicitly reported no results for this query");
-    }
-    
-    return []; // Return empty array instead of undefined to avoid mapping errors
+    return []; // Return empty array instead of undefined
   }
 
-  return resultsArray.slice(0, 10).map((item: any) => {
+  console.log(`🔄 Processing ${resultsArray.length} items from '${sourceKey}'`);
+
+  const processedResults = resultsArray.slice(0, 10).map((item: any, index: number) => {
     // Ensure we have a valid item
-    if (!item) return null;
+    if (!item) {
+      console.warn(`⚠️ Skipping null/undefined item at index ${index}`);
+      return null;
+    }
     
-    // For debugging
-    console.log(`Processing item with keys: ${Object.keys(item).join(", ")}`);
+    // For debugging - log each item's structure
+    console.log(`Processing item ${index + 1} with keys: ${Object.keys(item).join(", ")}`);
     
-    // Extract and format the data
+    // Extract and format the data with fallbacks
     const productResult: ProductResult = {
-      name: item.title || item.name || "Unknown Product",
+      name: item.title || item.name || `Product ${index + 1}`,
       venue: item.source || item.seller || item.shop || "Unknown Retailer",
       description: item.snippet || item.description || null,
       image_url: ensureHttps(item.thumbnail || item.image || "") || "",
       api_source: "serpapi_shopping",
-      api_ref: item.product_id || item.position?.toString() || "",
+      api_ref: item.product_id || item.position?.toString() || `item_${index}`,
       metadata: {
         price: item.price || "Price not available",
         rating: item.rating ? parseFloat(item.rating) : null,
         seller: item.source || item.seller || item.shop || "Unknown Retailer",
-        purchase_url: ensureHttps(item.link || "") || "",
+        purchase_url: ensureHttps(item.link || item.product_link || "") || "",
         extracted_price: item.extracted_price || null,
         shipping: item.shipping || null,
-        sale_price: item.price_when_on_sale || null
+        sale_price: item.price_when_on_sale || null,
+        old_price: item.old_price || null
       }
     };
     
     // Extra validation to ensure all URLs are HTTPS and valid
     if (productResult.image_url && !isValidUrl(productResult.image_url)) {
-      console.warn(`Invalid image URL detected: ${productResult.image_url}`);
+      console.warn(`⚠️ Invalid image URL detected: ${productResult.image_url}`);
       productResult.image_url = ""; // Reset to empty if invalid
     }
     
     if (productResult.metadata.purchase_url && !isValidUrl(productResult.metadata.purchase_url)) {
-      console.warn(`Invalid purchase URL detected: ${productResult.metadata.purchase_url}`);
+      console.warn(`⚠️ Invalid purchase URL detected: ${productResult.metadata.purchase_url}`);
       productResult.metadata.purchase_url = ""; // Reset to empty if invalid
     }
     
     return productResult;
   }).filter(Boolean); // Remove any null items
+
+  console.log(`✅ Successfully processed ${processedResults.length} valid products`);
+  return processedResults;
 }
 
 // Fallback function for mock results when API key isn't available
