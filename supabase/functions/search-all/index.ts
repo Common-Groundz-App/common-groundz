@@ -25,7 +25,7 @@ serve(async (req) => {
     const type = requestData.type || "all"; // Can be "all", "products", "users", "entities", "local_only", etc.
     
     // Skip products API call during typing if type is local_only
-    const fetchProducts = (type === "all" || type === "products") && type !== "local_only";
+    const fetchProducts = type === "products" || (type === "all" && type !== "local_only");
     const bypassCache = requestData.bypassCache === true; // Explicit true required to bypass cache
     
     console.log(`Search query received: "${query}", limit: ${limit}, type: ${type}, bypassCache: ${bypassCache}, fetchProducts: ${fetchProducts}`);
@@ -48,7 +48,7 @@ serve(async (req) => {
 
     // Determine if query might be product-related
     const productRelatedTerms = ['buy', 'product', 'price', 'best', 'cheap', 'expensive', 'review', 'compare'];
-    const isLikelyProductQuery = (productRelatedTerms.some(term => query.toLowerCase().includes(term)) || fetchProducts) && type !== "local_only";
+    const isLikelyProductQuery = productRelatedTerms.some(term => query.toLowerCase().includes(term)) && fetchProducts;
 
     // Set up parallel search promises
     const searchPromises = [];
@@ -167,8 +167,8 @@ serve(async (req) => {
     }
 
     // Check for products in local cache first before calling the external API
-    // Only do this if type is not local_only
-    if (isLikelyProductQuery && fetchProducts) {
+    // Only do this if explicitly searching for products or explicitly requested
+    if (isLikelyProductQuery && fetchProducts && type !== "local_only") {
       searchPromises.push(
         (async () => {
           if (!bypassCache) {
@@ -229,7 +229,7 @@ serve(async (req) => {
             
           // If we're here, either cache isn't fresh, we didn't find cached results, or bypassCache is true
           // Only make an API call if we're specifically searching for products or if we have few local results
-          if (fetchProducts) {
+          if (fetchProducts && type !== "local_only") {
             console.log(`Making API call to search-products with query: "${query}"`);
             
             // Call search-products edge function for fresh data

@@ -134,12 +134,13 @@ export function useUnifiedSearch(query: string, options: { skipProductSearch?: b
       setError(null);
 
       try {
-        // If skipProductSearch is true, we'll add "skipProducts=true" to the request
-        // This way we only search for local entities during typing
+        // If skipProductSearch is true, we'll add "local_only" to the request type
+        // This ensures we only get results from the database, not from external APIs
         const { data, error } = await supabase.functions.invoke('search-all', {
           body: { 
             query: query, 
             limit: 5,
+            // Only set type to local_only if skipProductSearch is true
             type: options.skipProductSearch ? "local_only" : "all"
           }
         });

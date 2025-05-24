@@ -12,9 +12,20 @@ interface EntityResultItemProps {
 }
 
 export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
+  // Generate the correct path based on entity type and slug
+  const getEntityPath = () => {
+    if (!entity.type) return '/404'; // Fallback for missing type
+    
+    const entityType = entity.type.toLowerCase();
+    // Use slug if available, otherwise fall back to ID
+    const identifier = entity.slug || entity.id;
+    
+    return `/${entityType}/${identifier}`;
+  };
+
   return (
     <Link
-      to={`/entity/${entity.slug || entity.id}`}
+      to={getEntityPath()}
       className="flex items-center gap-2 px-4 py-1.5 hover:bg-muted/30 transition-colors"
       onClick={onClick}
     >

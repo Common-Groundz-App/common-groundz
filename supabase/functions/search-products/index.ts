@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { ensureHttps } from "./utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,15 +101,18 @@ serve(async (req) => {
             if (cacheError) {
               console.error("Error getting products from cache:", cacheError);
             } else if (cachedProducts && cachedProducts.length > 0) {
-              // Transform cached products to expected format
+              // Transform cached products to expected format and ensure HTTPS URLs
               results = cachedProducts.map(product => ({
                 name: product.name,
                 venue: product.venue || "Unknown Retailer",
                 description: product.description,
-                image_url: product.image_url || "",
+                image_url: ensureHttps(product.image_url) || "",
                 api_source: product.api_source,
                 api_ref: product.api_ref || "",
-                metadata: product.metadata
+                metadata: {
+                  ...product.metadata,
+                  purchase_url: ensureHttps(product.metadata.purchase_url)
+                }
               }));
               
               console.log(`SUCCESS: Returning ${results.length} cached products for query "${query}"`);
@@ -141,7 +145,7 @@ serve(async (req) => {
       );
     }
 
-    // Call SerpApi Google Shopping search
+    // Call SerpApi Google Shopping search - ENSURE WE USE HTTPS!
     const searchUrl = new URL("https://serpapi.com/search");
     searchUrl.searchParams.append("api_key", serpApiKey);
     searchUrl.searchParams.append("engine", "google_shopping");
@@ -240,14 +244,14 @@ function parseProductResults(data: any): ProductResult[] {
     name: item.title || "Unknown Product",
     venue: item.source || item.seller || "Unknown Retailer",
     description: item.snippet || null,
-    image_url: item.thumbnail || "",
+    image_url: ensureHttps(item.thumbnail) || "",
     api_source: "serpapi_shopping",
     api_ref: item.product_id || item.position?.toString() || "",
     metadata: {
       price: item.price || "Price not available",
       rating: item.rating ? parseFloat(item.rating) : null,
       seller: item.source || item.seller || "Unknown Retailer",
-      purchase_url: item.link || "",
+      purchase_url: ensureHttps(item.link) || "",
       extracted_price: item.extracted_price || null,
       shipping: item.shipping || null,
       sale_price: item.price_when_on_sale || null
