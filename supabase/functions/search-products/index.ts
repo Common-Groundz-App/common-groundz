@@ -28,6 +28,171 @@ interface ProductResult {
   api_ref: string;
 }
 
+// Gemini API integration
+async function processWithGemini(query: string, sources: any[], geminiApiKey: string): Promise<any> {
+  const prompt = `
+You are an expert product analyst. Analyze the following search results for "${query}" and provide a comprehensive product analysis.
+
+Search Results:
+${sources.map((source, i) => `
+${i + 1}. Title: ${source.title}
+   URL: ${source.url}
+   Snippet: ${source.snippet}
+   Source Type: ${source.type}
+`).join('\n')}
+
+Please provide a JSON response with the following structure:
+{
+  "name": "Main product name",
+  "summary": "2-3 sentence overview of the product",
+  "insights": {
+    "pros": ["positive point 1", "positive point 2", "positive point 3"],
+    "cons": ["negative point 1", "negative point 2"],
+    "price_range": "estimated price range in INR",
+    "overall_rating": "overall rating or sentiment",
+    "key_features": ["feature 1", "feature 2", "feature 3"]
+  }
+}
+
+Focus on extracting actual insights from the provided sources. Be factual and concise.`;
+
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': geminiApiKey,
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: prompt
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.3,
+        topK: 1,
+        topP: 1,
+        maxOutputTokens: 2048,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini API request failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates[0].content.parts[0].text;
+  
+  // Clean up the response to extract JSON
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('No valid JSON found in Gemini response');
+  }
+  
+  return JSON.parse(jsonMatch[0]);
+}
+
+// OpenAI API integration (fallback)
+async function processWithOpenAI(query: string, sources: any[], openaiApiKey: string): Promise<any> {
+  const llmPrompt = `
+You are an expert product analyst. Analyze the following search results for "${query}" and provide a comprehensive product analysis.
+
+Search Results:
+${sources.map((source, i) => `
+${i + 1}. Title: ${source.title}
+   URL: ${source.url}
+   Snippet: ${source.snippet}
+   Source Type: ${source.type}
+`).join('\n')}
+
+Please provide a JSON response with the following structure:
+{
+  "name": "Main product name",
+  "summary": "2-3 sentence overview of the product",
+  "insights": {
+    "pros": ["positive point 1", "positive point 2", "positive point 3"],
+    "cons": ["negative point 1", "negative point 2"],
+    "price_range": "estimated price range in INR",
+    "overall_rating": "overall rating or sentiment",
+    "key_features": ["feature 1", "feature 2", "feature 3"]
+  }
+}
+
+Focus on extracting actual insights from the provided sources. Be factual and concise.`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openaiApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are a helpful product analysis assistant. Always respond with valid JSON.' },
+        { role: 'user', content: llmPrompt }
+      ],
+      temperature: 0.3,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI API request failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices[0].message.content;
+  
+  return JSON.parse(content);
+}
+
+// Enhanced LLM processing with fallback chain
+async function processWithLLMs(query: string, sources: any[]): Promise<{ analysis: any, llmUsed: string }> {
+  const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+  const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+  
+  // Try Gemini first (primary)
+  if (geminiApiKey) {
+    try {
+      console.log(`🤖 Trying Gemini API for query: "${query}"`);
+      const analysis = await processWithGemini(query, sources, geminiApiKey);
+      console.log(`✅ Gemini processing completed successfully`);
+      return { analysis, llmUsed: 'gemini' };
+    } catch (geminiError) {
+      console.error("❌ Gemini processing failed:", geminiError);
+    }
+  }
+  
+  // Fallback to OpenAI
+  if (openaiApiKey) {
+    try {
+      console.log(`🤖 Falling back to OpenAI API for query: "${query}"`);
+      const analysis = await processWithOpenAI(query, sources, openaiApiKey);
+      console.log(`✅ OpenAI processing completed successfully`);
+      return { analysis, llmUsed: 'openai' };
+    } catch (openaiError) {
+      console.error("❌ OpenAI processing failed:", openaiError);
+    }
+  }
+  
+  // Final fallback - basic processing without LLM
+  console.log(`⚠️ Both LLMs failed, using basic fallback processing`);
+  const fallbackAnalysis = {
+    name: query,
+    summary: `Search results for ${query} from multiple sources including reviews, forums, and e-commerce sites.`,
+    insights: {
+      pros: ["Multiple sources found"],
+      cons: ["Detailed analysis unavailable"],
+      price_range: "Check individual sources",
+      overall_rating: "Varied reviews",
+      key_features: ["See individual sources for details"]
+    }
+  };
+  
+  return { analysis: fallbackAnalysis, llmUsed: 'fallback' };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -126,7 +291,6 @@ serve(async (req) => {
 
     // Get API keys
     const serpApiKey = Deno.env.get("SERP_API_KEY");
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     
     if (!serpApiKey) {
       console.error("SERP_API_KEY is not set");
@@ -159,11 +323,11 @@ serve(async (req) => {
     // Call SerpApi Google Search (not Google Shopping)
     const searchUrl = new URL("https://serpapi.com/search");
     searchUrl.searchParams.append("api_key", serpApiKey);
-    searchUrl.searchParams.append("engine", "google"); // Changed from google_shopping
-    searchUrl.searchParams.append("q", query + " review price buy"); // Enhanced query
+    searchUrl.searchParams.append("engine", "google");
+    searchUrl.searchParams.append("q", query + " review price buy");
     searchUrl.searchParams.append("gl", "in");
     searchUrl.searchParams.append("hl", "en");
-    searchUrl.searchParams.append("num", "20"); // Get more results
+    searchUrl.searchParams.append("num", "20");
 
     console.log(`🔍 EXTERNAL API CALL: Fetching fresh results from SerpAPI for query: "${query}"`);
     
@@ -180,7 +344,6 @@ serve(async (req) => {
       organicResultsCount: data.organic_results?.length || 0,
     });
     
-    // Extract and organize search results
     const organicResults = data.organic_results || [];
     if (organicResults.length === 0) {
       console.log("No organic results found");
@@ -218,79 +381,13 @@ serve(async (req) => {
       };
     }).filter(source => source.url && source.title);
 
-    // Use OpenAI to process and organize the search results
-    console.log(`🤖 Processing ${processedSources.length} sources with OpenAI`);
+    // Use enhanced LLM processing with fallback chain
+    console.log(`🤖 Processing ${processedSources.length} sources with LLM chain`);
     
-    const llmPrompt = `
-You are an expert product analyst. Analyze the following search results for "${query}" and provide a comprehensive product analysis.
-
-Search Results:
-${processedSources.map((source, i) => `
-${i + 1}. Title: ${source.title}
-   URL: ${source.url}
-   Snippet: ${source.snippet}
-   Source Type: ${source.type}
-`).join('\n')}
-
-Please provide a JSON response with the following structure:
-{
-  "name": "Main product name",
-  "summary": "2-3 sentence overview of the product",
-  "insights": {
-    "pros": ["positive point 1", "positive point 2", "positive point 3"],
-    "cons": ["negative point 1", "negative point 2"],
-    "price_range": "estimated price range in INR",
-    "overall_rating": "overall rating or sentiment",
-    "key_features": ["feature 1", "feature 2", "feature 3"]
-  }
-}
-
-Focus on extracting actual insights from the provided sources. Be factual and concise.`;
-
     try {
-      const llmResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'You are a helpful product analysis assistant. Always respond with valid JSON.' },
-            { role: 'user', content: llmPrompt }
-          ],
-          temperature: 0.3,
-        }),
-      });
+      const { analysis: productAnalysis, llmUsed } = await processWithLLMs(query, processedSources);
 
-      if (!llmResponse.ok) {
-        throw new Error(`OpenAI API request failed: ${llmResponse.status}`);
-      }
-
-      const llmData = await llmResponse.json();
-      const llmContent = llmData.choices[0].message.content;
-      
-      let productAnalysis;
-      try {
-        productAnalysis = JSON.parse(llmContent);
-      } catch (parseError) {
-        console.error("Failed to parse LLM response as JSON:", parseError);
-        // Fallback analysis
-        productAnalysis = {
-          name: query,
-          summary: "Product information extracted from multiple sources.",
-          insights: {
-            pros: ["Multiple sources available"],
-            cons: ["Analysis in progress"],
-            price_range: "Price information being analyzed",
-            overall_rating: "Mixed reviews",
-            key_features: ["Various features mentioned"]
-          }
-        };
-      }
-
-      // Create the final result
+      // Create the final result with LLM source tracking
       const productResult: ProductResult = {
         name: productAnalysis.name || query,
         summary: productAnalysis.summary || "Product information extracted from search results.",
@@ -302,18 +399,17 @@ Focus on extracting actual insights from the provided sources. Be factual and co
           overall_rating: "Not available",
           key_features: []
         },
-        api_source: "google_search_llm",
+        api_source: `google_search_${llmUsed}`,
         api_ref: `search_${Date.now()}`
       };
 
       results = [productResult];
+      console.log(`✅ LLM processing completed using: ${llmUsed}`);
 
-      console.log(`✅ LLM processing completed successfully`);
-
-    } catch (llmError) {
-      console.error("Error processing with LLM:", llmError);
+    } catch (processingError) {
+      console.error("Error in LLM processing chain:", processingError);
       
-      // Fallback: return basic processed results without LLM analysis
+      // Final fallback: return basic processed results
       const fallbackResult: ProductResult = {
         name: query,
         summary: `Search results for ${query} from multiple sources including reviews, forums, and e-commerce sites.`,
