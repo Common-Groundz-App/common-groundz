@@ -306,20 +306,6 @@ serve(async (req) => {
       );
     }
 
-    if (!openaiApiKey) {
-      console.error("OPENAI_API_KEY is not set");
-      return new Response(
-        JSON.stringify({ 
-          error: "OpenAI API key not configured",
-          results: [],
-          source: "error",
-          query: query,
-          count: 0
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Call SerpApi Google Search (not Google Shopping)
     const searchUrl = new URL("https://serpapi.com/search");
     searchUrl.searchParams.append("api_key", serpApiKey);
