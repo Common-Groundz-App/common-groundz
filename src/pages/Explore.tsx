@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -9,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag, Loader2 } from 'lucide-react';
+import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -38,10 +38,7 @@ const Explore = () => {
   const isMobile = useIsMobile();
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
-  const [productResults, setProductResults] = useState<any[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  const [showProductSearch, setShowProductSearch] = useState(false);
-  const [searchSource, setSearchSource] = useState<'cache' | 'api' | null>(null);
+  const navigate = useNavigate();
 
   // Use local suggestions for search dropdown - no API calls during typing
   const { 
@@ -57,91 +54,12 @@ const Explore = () => {
     error: localResultsError
   } = useUnifiedSearch(searchQuery, { skipProductSearch: true });
 
-  // Function to search products directly for the Products tab
-  const searchProducts = async (query: string) => {
-    if (!query || query.length < 2) {
-      setProductResults([]);
-      setSearchSource(null);
-      return;
-    }
-    
-    setIsLoadingProducts(true);
-    try {
-      console.log(`🔍 Frontend: Starting product search for query: "${query}"`);
-      
-      const { data, error } = await supabase.functions.invoke('search-products', {
-        body: { query, bypassCache: false }
-      });
-      
-      if (error) {
-        console.error('❌ Frontend: Search error:', error);
-        throw error;
-      }
-      
-      console.log('📦 Frontend: Raw API response:', {
-        data: data,
-        hasResults: data?.results ? 'yes' : 'no',
-        resultsType: data?.results ? typeof data.results : 'undefined',
-        resultsIsArray: Array.isArray(data?.results),
-        resultsLength: data?.results?.length || 0,
-        source: data?.source
-      });
-      
-      // Validate and set results with enhanced error checking
-      if (data && typeof data === 'object') {
-        const results = data.results;
-        
-        if (Array.isArray(results)) {
-          console.log(`✅ Frontend: Setting ${results.length} valid product results`);
-          setProductResults(results);
-          setSearchSource(data.source || 'api');
-          
-          // Show toast notification based on source
-          if (data.source === 'cache') {
-            toast({
-              title: "Results from cache",
-              description: `Found ${results.length} products from cached results`,
-              duration: 3000
-            });
-          } else {
-            toast({
-              title: "Fresh search results",
-              description: `Found ${results.length} products from SerpAPI`,
-              duration: 3000
-            });
-          }
-        } else {
-          console.warn('⚠️ Frontend: Results is not an array:', results);
-          setProductResults([]);
-          setSearchSource(data.source || null);
-        }
-      } else {
-        console.warn('⚠️ Frontend: Invalid response format:', data);
-        setProductResults([]);
-        setSearchSource(null);
-      }
-      
-    } catch (err) {
-      console.error('❌ Frontend: Error fetching products:', err);
-      setProductResults([]);
-      setSearchSource(null);
-      toast({
-        title: "Search error",
-        description: "Failed to fetch product results",
-        variant: "destructive",
-        duration: 3000
-      });
-    } finally {
-      setIsLoadingProducts(false);
-    }
-  };
-
-  // Handle explicit search submission - this is the ONLY place that calls searchProducts!
+  // Handle explicit search submission - redirect to product search page
   const handleSearchSubmit = () => {
     if (searchQuery.trim().length >= 2) {
-      console.log(`🎯 Frontend: User submitted search for: "${searchQuery}"`);
-      setShowProductSearch(true);
-      searchProducts(searchQuery);
+      console.log(`🎯 Frontend: Redirecting to product search for: "${searchQuery}"`);
+      const encodedQuery = encodeURIComponent(searchQuery.trim());
+      navigate(`/search/products/${encodedQuery}`);
     }
   };
 
@@ -155,13 +73,6 @@ const Explore = () => {
   const getInitialActiveTab = () => {
     return 'Explore';
   };
-
-  // Reset product search when query is cleared
-  useEffect(() => {
-    if (!searchQuery) {
-      setShowProductSearch(false);
-    }
-  }, [searchQuery]);
 
   if (!user) {
     return <div>Loading...</div>;
@@ -278,7 +189,7 @@ const Explore = () => {
                 )}
               </div>
               
-              {searchQuery && !showProductSearch && (
+              {searchQuery && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
                   {isLoadingSuggestions && (
                     <div className="p-4 text-center">
@@ -402,98 +313,35 @@ const Explore = () => {
               <TabsContent value="food">
                 <CategoryHighlights entityType="food" />
               </TabsContent>
+              
               <TabsContent value="products">
-                <div>
-                  {!showProductSearch && (
-                    <div className="mt-4 p-8 text-center">
-                      <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <h3 className="text-lg font-medium mb-2">Discover Products</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Search for products to compare prices and find the best deals
-                      </p>
-                      <div className="flex items-center justify-center mt-4">
-                        <div className="relative flex-1 max-w-md">
-                          <Input
-                            type="text"
-                            placeholder="Search for products..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            className="pr-20"
-                          />
-                          <Button 
-                            className="absolute right-0 top-0 rounded-l-none"
-                            onClick={handleSearchSubmit}
-                          >
-                            Search
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {showProductSearch && isLoadingProducts && (
-                    <div className="mt-4 text-center py-8">
-                      <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary mb-2" />
-                      <p className="text-sm text-muted-foreground">Searching for products...</p>
-                    </div>
-                  )}
-                  
-                  {showProductSearch && !isLoadingProducts && (
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-medium">
-                        Results for "{searchQuery}"
-                      </h3>
-                      {searchSource && (
-                        <div className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-full">
-                          Source: {searchSource === 'cache' ? 'Cache' : 'SerpAPI'}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Fixed condition: Only show "No products found" when we've actually searched and got no results */}
-                  {showProductSearch && !isLoadingProducts && Array.isArray(productResults) && productResults.length === 0 && searchQuery.length >= 2 && (
-                    <div className="mt-4 p-8 text-center">
-                      <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <h3 className="text-lg font-medium mb-2">No products found</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Try searching for specific product names, categories, or brands
-                      </p>
-                      <Button
-                        onClick={() => setShowProductSearch(false)}
-                        variant="outline"
-                        className="mt-4"
+                <div className="mt-4 p-8 text-center">
+                  <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="text-lg font-medium mb-2">Discover Products</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Search for products to get comprehensive analysis from reviews, forums, and multiple sources
+                  </p>
+                  <div className="flex items-center justify-center">
+                    <div className="relative flex-1 max-w-md">
+                      <Input
+                        type="text"
+                        placeholder="Search for products..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        className="pr-20"
+                      />
+                      <Button 
+                        className="absolute right-0 top-0 rounded-l-none"
+                        onClick={handleSearchSubmit}
                       >
-                        Try another search
+                        Search
                       </Button>
                     </div>
-                  )}
-                  
-                  {/* Fixed condition: Only show results when we have actual products */}
-                  {showProductSearch && !isLoadingProducts && Array.isArray(productResults) && productResults.length > 0 && (
-                    <>
-                      <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-                        {productResults.map((product, index) => (
-                          <ProductCard 
-                            key={`${product.api_source}-${product.api_ref || index}`}
-                            product={product} 
-                          />
-                        ))}
-                      </div>
-                      <div className="mt-4 text-center">
-                        <Button 
-                          variant="outline"
-                          onClick={() => setShowProductSearch(false)}
-                          className="mx-auto"
-                        >
-                          New search
-                        </Button>
-                      </div>
-                    </>
-                  )}
+                  </div>
                 </div>
               </TabsContent>
+              
               <TabsContent value="people">
                 <UserDirectoryList sortOption={sortOption} />
               </TabsContent>

@@ -18,6 +18,7 @@ import NotFound from '@/pages/NotFound';
 import RecommendationView from '@/pages/RecommendationView';
 import EntityDetail from '@/pages/EntityDetail';
 import Search from '@/pages/Search';
+import ProductSearch from '@/pages/ProductSearch';
 import ContentViewerModal from '@/components/content/ContentViewerModal';
 
 // Create a client
@@ -64,6 +65,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Search />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/search/products/:query"
+                element={
+                  <ProtectedRoute>
+                    <ProductSearch />
                   </ProtectedRoute>
                 }
               />

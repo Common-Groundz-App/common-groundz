@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { ensureHttps, isValidUrl } from "./utils.ts";
@@ -9,22 +10,25 @@ const corsHeaders = {
 
 interface ProductResult {
   name: string;
-  venue: string;
-  description: string | null;
-  image_url: string;
+  summary: string;
+  sources: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    type: 'review' | 'official' | 'forum' | 'blog' | 'ecommerce';
+  }>;
+  insights: {
+    pros: string[];
+    cons: string[];
+    price_range: string;
+    overall_rating: string;
+    key_features: string[];
+  };
   api_source: string;
   api_ref: string;
-  metadata: {
-    price?: string;
-    rating?: number;
-    seller?: string;
-    purchase_url: string;
-    [key: string]: any;
-  }
 }
 
 serve(async (req) => {
-  // Handle CORS preflight request
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -41,7 +45,6 @@ serve(async (req) => {
       );
     }
 
-    // Minimum query length check
     if (query.trim().length < 2) {
       console.log("Query too short, returning empty results");
       return new Response(
@@ -50,26 +53,21 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     
-    // Create a client with anonymous key for reading
     const supabaseAnonClient = createClient(supabaseUrl, supabaseAnonKey);
-    
-    // Create a client with service role key for writing to the cache
     const supabaseServiceClient = createClient(supabaseUrl, supabaseServiceKey);
 
     let results: ProductResult[] = [];
-    let sourceOfResults = "api"; // default source
+    let sourceOfResults = "api";
 
     // Check cache first if not explicitly bypassing
     if (!bypassCache) {
       console.log(`Checking cache for query: "${query}"`);
       
       try {
-        // Check if we have a fresh cache for this query
         const { data: isFreshData, error: isFreshError } = await supabaseAnonClient.rpc(
           "is_query_fresh", 
           { query_text: query }
@@ -78,10 +76,8 @@ serve(async (req) => {
         if (isFreshError) {
           console.error("Error checking cache freshness:", isFreshError);
         } else if (isFreshData === true) {
-          // Cache is fresh, get products from cache
           console.log(`Found fresh cache for query: "${query}"`);
           
-          // First get the query ID
           const { data: queryData, error: queryError } = await supabaseAnonClient
             .from("cached_queries")
             .select("id")
@@ -91,7 +87,6 @@ serve(async (req) => {
           if (queryError) {
             console.error("Error getting query ID:", queryError);
           } else if (queryData && queryData.id) {
-            // Then get the cached products for this query
             const { data: cachedProducts, error: cacheError } = await supabaseAnonClient
               .from("cached_products")
               .select("*")
@@ -100,24 +95,18 @@ serve(async (req) => {
             if (cacheError) {
               console.error("Error getting products from cache:", cacheError);
             } else if (cachedProducts && cachedProducts.length > 0) {
-              // Transform cached products to expected format and ensure HTTPS URLs
               results = cachedProducts.map(product => ({
                 name: product.name,
-                venue: product.venue || "Unknown Retailer",
-                description: product.description,
-                image_url: ensureHttps(product.image_url) || "",
+                summary: product.description || "",
+                sources: product.metadata.sources || [],
+                insights: product.metadata.insights || {},
                 api_source: product.api_source,
                 api_ref: product.api_ref || "",
-                metadata: {
-                  ...product.metadata,
-                  purchase_url: ensureHttps(product.metadata.purchase_url)
-                }
               }));
               
               console.log(`SUCCESS: Returning ${results.length} cached products for query "${query}"`);
               sourceOfResults = "cache";
               
-              // Return cached results with proper structure
               return new Response(
                 JSON.stringify({ 
                   results: results,
@@ -132,19 +121,20 @@ serve(async (req) => {
         }
       } catch (cacheError) {
         console.error("Error in cache checking process:", cacheError);
-        // Continue to API search on cache error
       }
     }
 
-    // Get the SerpApi key from environment
+    // Get API keys
     const serpApiKey = Deno.env.get("SERP_API_KEY");
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    
     if (!serpApiKey) {
       console.error("SERP_API_KEY is not set");
       return new Response(
         JSON.stringify({ 
           error: "SERP API key not configured",
-          results: getMockResults(query),
-          source: "mock",
+          results: [],
+          source: "error",
           query: query,
           count: 0
         }),
@@ -152,13 +142,28 @@ serve(async (req) => {
       );
     }
 
-    // Call SerpApi Google Shopping search - ENSURE WE USE HTTPS!
+    if (!openaiApiKey) {
+      console.error("OPENAI_API_KEY is not set");
+      return new Response(
+        JSON.stringify({ 
+          error: "OpenAI API key not configured",
+          results: [],
+          source: "error",
+          query: query,
+          count: 0
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Call SerpApi Google Search (not Google Shopping)
     const searchUrl = new URL("https://serpapi.com/search");
     searchUrl.searchParams.append("api_key", serpApiKey);
-    searchUrl.searchParams.append("engine", "google_shopping");
-    searchUrl.searchParams.append("q", query);
-    searchUrl.searchParams.append("gl", "in"); // India results
-    searchUrl.searchParams.append("hl", "en"); // English language
+    searchUrl.searchParams.append("engine", "google"); // Changed from google_shopping
+    searchUrl.searchParams.append("q", query + " review price buy"); // Enhanced query
+    searchUrl.searchParams.append("gl", "in");
+    searchUrl.searchParams.append("hl", "en");
+    searchUrl.searchParams.append("num", "20"); // Get more results
 
     console.log(`🔍 EXTERNAL API CALL: Fetching fresh results from SerpAPI for query: "${query}"`);
     
@@ -169,28 +174,166 @@ serve(async (req) => {
 
     const data = await response.json();
     
-    // Enhanced debugging for response structure
     console.log(`📊 SerpAPI response structure for query "${query}":`, {
       keys: Object.keys(data),
-      hasShoppingResults: Array.isArray(data.shopping_results),
-      shoppingResultsCount: data.shopping_results?.length || 0,
       hasOrganicResults: Array.isArray(data.organic_results),
       organicResultsCount: data.organic_results?.length || 0,
-      searchInformation: data.search_information
     });
     
-    results = parseProductResults(data);
-    console.log(`🎯 Parsed ${results.length} products from API response`);
+    // Extract and organize search results
+    const organicResults = data.organic_results || [];
+    if (organicResults.length === 0) {
+      console.log("No organic results found");
+      return new Response(
+        JSON.stringify({ 
+          results: [],
+          source: "api",
+          query: query,
+          count: 0
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    // Validate results array before proceeding
-    if (!Array.isArray(results)) {
-      console.error("⚠️ parseProductResults did not return an array:", typeof results);
-      results = [];
+    // Process organic results and categorize them
+    const processedSources = organicResults.slice(0, 15).map((result: any, index: number) => {
+      const domain = new URL(result.link || '').hostname;
+      let type: 'review' | 'official' | 'forum' | 'blog' | 'ecommerce' = 'blog';
+      
+      if (domain.includes('reddit.com') || domain.includes('quora.com')) {
+        type = 'forum';
+      } else if (domain.includes('amazon.') || domain.includes('flipkart.') || domain.includes('myntra.') || domain.includes('shop')) {
+        type = 'ecommerce';
+      } else if (domain.includes('review') || result.title?.toLowerCase().includes('review')) {
+        type = 'review';
+      } else if (result.snippet?.toLowerCase().includes('official') || domain.includes('official')) {
+        type = 'official';
+      }
+
+      return {
+        title: result.title || `Result ${index + 1}`,
+        url: ensureHttps(result.link || "") || "",
+        snippet: result.snippet || "",
+        type: type
+      };
+    }).filter(source => source.url && source.title);
+
+    // Use OpenAI to process and organize the search results
+    console.log(`🤖 Processing ${processedSources.length} sources with OpenAI`);
+    
+    const llmPrompt = `
+You are an expert product analyst. Analyze the following search results for "${query}" and provide a comprehensive product analysis.
+
+Search Results:
+${processedSources.map((source, i) => `
+${i + 1}. Title: ${source.title}
+   URL: ${source.url}
+   Snippet: ${source.snippet}
+   Source Type: ${source.type}
+`).join('\n')}
+
+Please provide a JSON response with the following structure:
+{
+  "name": "Main product name",
+  "summary": "2-3 sentence overview of the product",
+  "insights": {
+    "pros": ["positive point 1", "positive point 2", "positive point 3"],
+    "cons": ["negative point 1", "negative point 2"],
+    "price_range": "estimated price range in INR",
+    "overall_rating": "overall rating or sentiment",
+    "key_features": ["feature 1", "feature 2", "feature 3"]
+  }
+}
+
+Focus on extracting actual insights from the provided sources. Be factual and concise.`;
+
+    try {
+      const llmResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a helpful product analysis assistant. Always respond with valid JSON.' },
+            { role: 'user', content: llmPrompt }
+          ],
+          temperature: 0.3,
+        }),
+      });
+
+      if (!llmResponse.ok) {
+        throw new Error(`OpenAI API request failed: ${llmResponse.status}`);
+      }
+
+      const llmData = await llmResponse.json();
+      const llmContent = llmData.choices[0].message.content;
+      
+      let productAnalysis;
+      try {
+        productAnalysis = JSON.parse(llmContent);
+      } catch (parseError) {
+        console.error("Failed to parse LLM response as JSON:", parseError);
+        // Fallback analysis
+        productAnalysis = {
+          name: query,
+          summary: "Product information extracted from multiple sources.",
+          insights: {
+            pros: ["Multiple sources available"],
+            cons: ["Analysis in progress"],
+            price_range: "Price information being analyzed",
+            overall_rating: "Mixed reviews",
+            key_features: ["Various features mentioned"]
+          }
+        };
+      }
+
+      // Create the final result
+      const productResult: ProductResult = {
+        name: productAnalysis.name || query,
+        summary: productAnalysis.summary || "Product information extracted from search results.",
+        sources: processedSources,
+        insights: productAnalysis.insights || {
+          pros: [],
+          cons: [],
+          price_range: "Not available",
+          overall_rating: "Not available",
+          key_features: []
+        },
+        api_source: "google_search_llm",
+        api_ref: `search_${Date.now()}`
+      };
+
+      results = [productResult];
+
+      console.log(`✅ LLM processing completed successfully`);
+
+    } catch (llmError) {
+      console.error("Error processing with LLM:", llmError);
+      
+      // Fallback: return basic processed results without LLM analysis
+      const fallbackResult: ProductResult = {
+        name: query,
+        summary: `Search results for ${query} from multiple sources including reviews, forums, and e-commerce sites.`,
+        sources: processedSources,
+        insights: {
+          pros: ["Multiple sources found"],
+          cons: ["Detailed analysis unavailable"],
+          price_range: "Check individual sources",
+          overall_rating: "Varied reviews",
+          key_features: ["See individual sources for details"]
+        },
+        api_source: "google_search_basic",
+        api_ref: `search_${Date.now()}`
+      };
+      
+      results = [fallbackResult];
     }
 
     // Update cache with new results
     try {
-      // First, add/update the query in cached_queries
       const { data: queryData, error: queryError } = await supabaseServiceClient
         .from("cached_queries")
         .upsert(
@@ -209,23 +352,24 @@ serve(async (req) => {
       } else if (queryData && queryData.length > 0) {
         const queryId = queryData[0].id;
         
-        // Delete existing cached products for this query
         await supabaseServiceClient
           .from("cached_products")
           .delete()
           .eq("query_id", queryId);
         
-        // Insert new cached products
         if (results.length > 0) {
           const productsToCache = results.map(product => ({
             query_id: queryId,
             name: product.name,
-            venue: product.venue,
-            description: product.description,
-            image_url: product.image_url,
+            venue: "Multiple Sources",
+            description: product.summary,
+            image_url: "",
             api_source: product.api_source,
             api_ref: product.api_ref,
-            metadata: product.metadata
+            metadata: {
+              sources: product.sources,
+              insights: product.insights
+            }
           }));
           
           const { error: insertError } = await supabaseServiceClient
@@ -243,25 +387,14 @@ serve(async (req) => {
       console.error("Error updating cache:", cacheError);
     }
 
-    // Return results with enhanced structure for debugging
     const finalResponse = {
       results: results,
       source: "api",
       query: query,
-      count: results.length,
-      debug: {
-        apiResponseKeys: Object.keys(data),
-        shoppingResultsFound: data.shopping_results?.length || 0,
-        organicResultsFound: data.organic_results?.length || 0
-      }
+      count: results.length
     };
 
-    console.log(`✅ SUCCESS: Returning ${results.length} fresh API results for query "${query}"`);
-    console.log(`📤 Final response structure:`, {
-      resultsIsArray: Array.isArray(finalResponse.results),
-      resultsLength: finalResponse.results.length,
-      source: finalResponse.source
-    });
+    console.log(`✅ SUCCESS: Returning ${results.length} processed results for query "${query}"`);
 
     return new Response(
       JSON.stringify(finalResponse),
@@ -280,128 +413,3 @@ serve(async (req) => {
     );
   }
 });
-
-function parseProductResults(data: any): ProductResult[] {
-  // Enhanced debugging to see what data we're working with
-  console.log("🔄 Parsing product results from response with keys:", Object.keys(data));
-  
-  // Try multiple potential result arrays from SerpAPI response
-  const possibleResultArrays = [
-    { key: 'shopping_results', data: data.shopping_results },
-    { key: 'organic_results', data: data.organic_results },
-    { key: 'product_results', data: data.product_results },
-    { key: 'inline_shopping_results', data: data.inline_shopping_results }
-  ];
-  
-  // Find first valid array of results
-  let resultsArray = null;
-  let sourceKey = null;
-  
-  for (const arrayOption of possibleResultArrays) {
-    if (Array.isArray(arrayOption.data) && arrayOption.data.length > 0) {
-      console.log(`✅ Found valid results array '${arrayOption.key}' with ${arrayOption.data.length} items`);
-      resultsArray = arrayOption.data;
-      sourceKey = arrayOption.key;
-      break;
-    } else if (arrayOption.data) {
-      console.log(`⚠️ Found '${arrayOption.key}' but it's not a valid array:`, typeof arrayOption.data);
-    }
-  }
-  
-  if (!resultsArray) {
-    console.warn("❌ No valid product arrays found in SerpAPI response!");
-    console.log("Available response structure:", {
-      keys: Object.keys(data),
-      searchInfo: data.search_information,
-      responseSnippet: JSON.stringify(data).substring(0, 500) + "..."
-    });
-    
-    return []; // Return empty array instead of undefined
-  }
-
-  console.log(`🔄 Processing ${resultsArray.length} items from '${sourceKey}'`);
-
-  const processedResults = resultsArray.slice(0, 10).map((item: any, index: number) => {
-    // Ensure we have a valid item
-    if (!item) {
-      console.warn(`⚠️ Skipping null/undefined item at index ${index}`);
-      return null;
-    }
-    
-    // For debugging - log each item's structure
-    console.log(`Processing item ${index + 1} with keys: ${Object.keys(item).join(", ")}`);
-    
-    // Extract and format the data with fallbacks
-    const productResult: ProductResult = {
-      name: item.title || item.name || `Product ${index + 1}`,
-      venue: item.source || item.seller || item.shop || "Unknown Retailer",
-      description: item.snippet || item.description || null,
-      image_url: ensureHttps(item.thumbnail || item.image || "") || "",
-      api_source: "serpapi_shopping",
-      api_ref: item.product_id || item.position?.toString() || `item_${index}`,
-      metadata: {
-        price: item.price || "Price not available",
-        rating: item.rating ? parseFloat(item.rating) : null,
-        seller: item.source || item.seller || item.shop || "Unknown Retailer",
-        purchase_url: ensureHttps(item.link || item.product_link || "") || "",
-        extracted_price: item.extracted_price || null,
-        shipping: item.shipping || null,
-        sale_price: item.price_when_on_sale || null,
-        old_price: item.old_price || null
-      }
-    };
-    
-    // Extra validation to ensure all URLs are HTTPS and valid
-    if (productResult.image_url && !isValidUrl(productResult.image_url)) {
-      console.warn(`⚠️ Invalid image URL detected: ${productResult.image_url}`);
-      productResult.image_url = ""; // Reset to empty if invalid
-    }
-    
-    if (productResult.metadata.purchase_url && !isValidUrl(productResult.metadata.purchase_url)) {
-      console.warn(`⚠️ Invalid purchase URL detected: ${productResult.metadata.purchase_url}`);
-      productResult.metadata.purchase_url = ""; // Reset to empty if invalid
-    }
-    
-    return productResult;
-  }).filter(Boolean); // Remove any null items
-
-  console.log(`✅ Successfully processed ${processedResults.length} valid products`);
-  return processedResults;
-}
-
-// Fallback function for mock results when API key isn't available
-function getMockResults(query: string): ProductResult[] {
-  // Simple mock product results
-  const mockProducts = [
-    {
-      name: "Apple iPhone 15",
-      venue: "Apple Store",
-      description: "The latest Apple iPhone with advanced camera and display.",
-      image_url: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=400&q=80",
-      api_source: "mock_products",
-      api_ref: "apple-iphone-15",
-      metadata: { 
-        price: "₹79,900",
-        rating: 4.7,
-        seller: "Apple Store",
-        purchase_url: "https://www.apple.com/in/iphone-15/" 
-      }
-    },
-    {
-      name: "Sony WH-1000XM5 Headphones",
-      venue: "Best Buy",
-      description: "Industry leading noise-cancelling wireless headphones.",
-      image_url: "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=400&q=80",
-      api_source: "mock_products",
-      api_ref: "sony-wh1000xm5",
-      metadata: { 
-        price: "₹26,990",
-        rating: 4.8,
-        seller: "Best Buy",
-        purchase_url: "https://www.bestbuy.com/sony-wh1000xm5" 
-      }
-    }
-  ].filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
-
-  return mockProducts;
-}
