@@ -1,3 +1,4 @@
+
 interface ProductMention {
   name: string;
   brand?: string;
@@ -28,40 +29,71 @@ export interface ProductExtractionResult {
   extraction_method: string;
 }
 
-// Common product patterns and brand recognition
+// Enhanced brand patterns with more comprehensive coverage
 const BRAND_PATTERNS = [
-  'CeraVe', 'Neutrogena', 'The Ordinary', 'Skinceuticals', 'Olay', 'L\'Oreal', 'Minimalist',
-  'Cetaphil', 'Vanicream', 'La Roche-Posay', 'Eucerin', 'Aveeno', 'Dove', 'Garnier',
+  // Skincare Brands
+  'CeraVe', 'Cetaphil', 'Neutrogena', 'The Ordinary', 'Skinceuticals', 'Olay', 'L\'Oreal',
+  'Minimalist', 'Vanicream', 'La Roche-Posay', 'Eucerin', 'Aveeno', 'Dove', 'Garnier',
+  'Paula\'s Choice', 'Mad Hippie', 'Timeless', 'Drunk Elephant', 'Glossier', 
+  'Hyram', 'First Aid Beauty', 'Youth to the People', 'Tatcha', 'Sunday Riley',
+  'Kiehl\'s', 'Clinique', 'Estee Lauder', 'Lancome', 'Shiseido', 'Dermalogica',
+  'Pixi', 'Bioderma', 'Vichy', 'Avene', 'COSRX', 'Some By Mi', 'Innisfree',
+  
+  // Indian Brands
+  'Himalaya', 'Lakme', 'Lotus', 'Biotique', 'Forest Essentials', 'Kama Ayurveda',
+  'Plum', 'MCaffeine', 'Mamaearth', 'The Body Shop', 'Nykaa', 'Sugar Cosmetics',
+  'Colorbar', 'Faces Canada', 'Blue Heaven', 'Revlon', 'WOW Skin Science',
+  
+  // Makeup Brands
   'Maybelline', 'MAC', 'Urban Decay', 'Fenty Beauty', 'NARS', 'Too Faced', 'Tarte',
-  'Clinique', 'Estee Lauder', 'Lancome', 'Shiseido', 'Drunk Elephant', 'Paula\'s Choice',
-  'Mad Hippie', 'Timeless', 'Hyram', 'Glossier', 'Fenty', 'Rare Beauty', 'Kylie Cosmetics'
+  'Rare Beauty', 'Kylie Cosmetics', 'Charlotte Tilotte', 'Huda Beauty'
 ];
 
+// Enhanced product type patterns with more specific terms
 const PRODUCT_TYPE_PATTERNS = [
-  'serum', 'moisturizer', 'cleanser', 'cream', 'lotion', 'oil', 'toner', 'essence',
-  'foundation', 'concealer', 'mascara', 'lipstick', 'eyeshadow', 'blush', 'bronzer',
-  'primer', 'setting spray', 'powder', 'highlighter', 'contour', 'eyeliner', 'lip gloss',
-  'sunscreen', 'face wash', 'exfoliant', 'mask', 'treatment', 'spot treatment'
+  // Skincare
+  'cleanser', 'face wash', 'facial cleanser', 'foaming cleanser', 'gel cleanser', 'cream cleanser',
+  'moisturizer', 'moisturiser', 'face cream', 'day cream', 'night cream', 'face lotion',
+  'serum', 'face serum', 'vitamin c serum', 'niacinamide serum', 'hyaluronic acid serum',
+  'toner', 'astringent', 'essence', 'face mist', 'micellar water',
+  'sunscreen', 'sunblock', 'spf', 'facial sunscreen',
+  'exfoliant', 'scrub', 'face scrub', 'chemical exfoliant', 'aha', 'bha',
+  'face mask', 'sheet mask', 'clay mask', 'overnight mask',
+  'face oil', 'facial oil', 'treatment oil',
+  'spot treatment', 'acne treatment', 'blemish treatment',
+  
+  // Makeup
+  'foundation', 'concealer', 'primer', 'bb cream', 'cc cream', 'tinted moisturizer',
+  'powder', 'setting powder', 'compact powder', 'loose powder',
+  'blush', 'bronzer', 'highlighter', 'contour', 'contouring',
+  'eyeshadow', 'eye shadow', 'eyeshadow palette', 'eyeliner', 'mascara',
+  'lipstick', 'lip gloss', 'lip balm', 'lip tint', 'liquid lipstick',
+  'setting spray', 'makeup spray', 'fixing spray'
 ];
 
-// Extract product mentions from HTML content
+// Enhanced product extraction with stricter brand requirements
 export async function extractProductMentions(
-  sources: Array<{ url: string; title: string; snippet: string; type: string }>
+  sources: Array<{ url: string; title: string; snippet: string; type: string; qualityScore?: number }>
 ): Promise<ProductMention[]> {
   const mentions: ProductMention[] = [];
   
   for (const source of sources) {
     try {
-      console.log(`🔍 Extracting products from: ${source.title}`);
+      console.log(`🔍 Extracting products from: ${source.title} (Quality: ${source.qualityScore?.toFixed(2) || 'N/A'})`);
       
-      // First, try to fetch full HTML content
+      // Prioritize high-quality sources
+      if (source.qualityScore && source.qualityScore < 0.4) {
+        console.log(`⚠️ Skipping low-quality source: ${source.title}`);
+        continue;
+      }
+      
       let fullContent = source.snippet;
       try {
         const response = await fetch(source.url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (compatible; ProductBot/1.0)',
           },
-          signal: AbortSignal.timeout(5000), // 5 second timeout
+          signal: AbortSignal.timeout(5000),
         });
         
         if (response.ok) {
@@ -70,11 +102,11 @@ export async function extractProductMentions(
           console.log(`✅ Fetched full content from ${source.url} (${fullContent.length} chars)`);
         }
       } catch (fetchError) {
-        console.log(`⚠️ Could not fetch ${source.url}, using snippet only:`, fetchError);
+        console.log(`⚠️ Using snippet for ${source.url}:`, fetchError);
       }
       
-      // Extract product mentions from content
-      const productMentions = findProductMentions(fullContent, source);
+      // Enhanced product extraction with stricter criteria
+      const productMentions = findEnhancedProductMentions(fullContent, source);
       mentions.push(...productMentions);
       
     } catch (error) {
@@ -82,11 +114,10 @@ export async function extractProductMentions(
     }
   }
   
-  console.log(`🎯 Total product mentions extracted: ${mentions.length}`);
+  console.log(`🎯 Total enhanced product mentions extracted: ${mentions.length}`);
   return mentions;
 }
 
-// Extract clean text from HTML
 function extractTextFromHTML(html: string): string {
   // Remove script and style tags
   let cleanHtml = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
@@ -98,90 +129,130 @@ function extractTextFromHTML(html: string): string {
   // Clean up whitespace
   cleanHtml = cleanHtml.replace(/\s+/g, ' ').trim();
   
-  // Limit to reasonable length (first 10k characters)
-  return cleanHtml.substring(0, 10000);
+  // Limit to reasonable length
+  return cleanHtml.substring(0, 8000);
 }
 
-// Find product mentions in text content
-function findProductMentions(
+// Enhanced product mention finding with stricter brand requirements
+function findEnhancedProductMentions(
   content: string, 
-  source: { url: string; title: string; type: string }
+  source: { url: string; title: string; type: string; qualityScore?: number }
 ): ProductMention[] {
   const mentions: ProductMention[] = [];
   const lowerContent = content.toLowerCase();
   
-  // Strategy 1: Brand + Product Type combinations
+  // Strategy 1: Strict Brand + Complete Product Name combinations
   for (const brand of BRAND_PATTERNS) {
-    for (const productType of PRODUCT_TYPE_PATTERNS) {
-      const patterns = [
-        new RegExp(`\\b${brand}\\s+[\\w\\s]*${productType}[\\w\\s]*`, 'gi'),
-        new RegExp(`\\b${brand}\\s+[\\w\\s]{0,30}${productType}`, 'gi'),
-        new RegExp(`${productType}[\\w\\s]{0,10}by\\s+${brand}`, 'gi'),
-        new RegExp(`${productType}[\\w\\s]{0,10}from\\s+${brand}`, 'gi')
-      ];
-      
-      for (const pattern of patterns) {
-        const matches = content.match(pattern);
-        if (matches) {
-          for (const match of matches) {
-            const cleanMatch = match.trim();
-            if (cleanMatch.length > 5 && cleanMatch.length < 100) {
-              mentions.push({
-                name: cleanMatch,
-                brand: brand,
-                context: extractContext(content, match, 100),
-                source_url: source.url,
-                source_title: source.title,
-                source_type: source.type as any,
-                confidence_score: calculateConfidenceScore(match, content, source)
-              });
-            }
+    const brandLower = brand.toLowerCase();
+    
+    // Look for complete product names with brand
+    const completeProductPattern = new RegExp(
+      `\\b${escapeRegex(brand)}\\s+([A-Za-z0-9\\s]{5,50}?)\\b(?=\\s|\\.|,|!|\\?|$)`,
+      'gi'
+    );
+    
+    const matches = content.match(completeProductPattern);
+    if (matches) {
+      for (const match of matches) {
+        const cleanMatch = match.trim();
+        
+        // Enhanced validation: must contain product type and brand
+        if (cleanMatch.length > 10 && cleanMatch.length < 80 && 
+            containsProductType(cleanMatch) &&
+            !isGenericDescription(cleanMatch)) {
+          
+          const confidence = calculateEnhancedConfidenceScore(cleanMatch, content, source);
+          
+          if (confidence > 0.6) { // Higher threshold for quality
+            mentions.push({
+              name: cleanMatch,
+              brand: brand,
+              context: extractContext(content, match, 150),
+              source_url: source.url,
+              source_title: source.title,
+              source_type: source.type as any,
+              confidence_score: confidence
+            });
           }
         }
       }
     }
   }
   
-  // Strategy 2: Quoted product names (often in reviews)
-  const quotedProducts = content.match(/"([^"]{10,80})"/g);
+  // Strategy 2: Quoted specific product names (often exact product names)
+  const quotedProducts = content.match(/"([^"]{15,80})"/g);
   if (quotedProducts) {
     for (const quoted of quotedProducts) {
       const productName = quoted.replace(/"/g, '');
-      if (containsProductIndicators(productName)) {
-        mentions.push({
-          name: productName,
-          brand: extractBrandFromName(productName),
-          context: extractContext(content, quoted, 100),
-          source_url: source.url,
-          source_title: source.title,
-          source_type: source.type as any,
-          confidence_score: calculateConfidenceScore(quoted, content, source) * 1.2 // Boost quoted items
-        });
+      const brand = extractBrandFromName(productName);
+      
+      if (brand && containsProductType(productName) && !isGenericDescription(productName)) {
+        const confidence = calculateEnhancedConfidenceScore(quoted, content, source) * 1.3; // Boost quoted items
+        
+        if (confidence > 0.7) {
+          mentions.push({
+            name: productName,
+            brand: brand,
+            context: extractContext(content, quoted, 150),
+            source_url: source.url,
+            source_title: source.title,
+            source_type: source.type as any,
+            confidence_score: confidence
+          });
+        }
       }
     }
   }
   
-  // Strategy 3: Title case product names
-  const titleCasePattern = /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Serum|Moisturizer|Cleanser|Cream|Foundation|Mascara|Lipstick)\b/g;
-  const titleCaseMatches = content.match(titleCasePattern);
-  if (titleCaseMatches) {
-    for (const match of titleCaseMatches) {
-      mentions.push({
-        name: match,
-        brand: extractBrandFromName(match),
-        context: extractContext(content, match, 100),
-        source_url: source.url,
-        source_title: source.title,
-        source_type: source.type as any,
-        confidence_score: calculateConfidenceScore(match, content, source)
-      });
+  // Strategy 3: Structured product mentions (lists, recommendations)
+  const structuredPattern = /(?:best|top|recommended|favorite)\s+([A-Z][a-zA-Z\s]+(?:serum|moisturizer|cleanser|cream|foundation|mascara))/gi;
+  const structuredMatches = content.match(structuredPattern);
+  if (structuredMatches) {
+    for (const match of structuredMatches) {
+      const productPart = match.replace(/^(?:best|top|recommended|favorite)\s+/i, '');
+      const brand = extractBrandFromName(productPart);
+      
+      if (brand && productPart.length > 10) {
+        const confidence = calculateEnhancedConfidenceScore(match, content, source) * 1.1;
+        
+        if (confidence > 0.6) {
+          mentions.push({
+            name: productPart,
+            brand: brand,
+            context: extractContext(content, match, 150),
+            source_url: source.url,
+            source_title: source.title,
+            source_type: source.type as any,
+            confidence_score: confidence
+          });
+        }
+      }
     }
   }
   
   return mentions;
 }
 
-// Extract surrounding context for a match
+function escapeRegex(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsProductType(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  return PRODUCT_TYPE_PATTERNS.some(type => lowerText.includes(type.toLowerCase()));
+}
+
+function isGenericDescription(text: string): boolean {
+  const genericTerms = [
+    'best moisturizer', 'good cleanser', 'great serum', 'perfect cream',
+    'buy online', 'shop now', 'add to cart', 'price range', 'available at',
+    'collection', 'category', 'browse', 'filter', 'sort by'
+  ];
+  
+  const lowerText = text.toLowerCase();
+  return genericTerms.some(term => lowerText.includes(term));
+}
+
 function extractContext(content: string, match: string, contextLength: number): string {
   const index = content.indexOf(match);
   if (index === -1) return match;
@@ -192,14 +263,6 @@ function extractContext(content: string, match: string, contextLength: number): 
   return content.substring(start, end).trim();
 }
 
-// Check if a string contains product indicators
-function containsProductIndicators(text: string): boolean {
-  const lowerText = text.toLowerCase();
-  return PRODUCT_TYPE_PATTERNS.some(type => lowerText.includes(type)) ||
-         BRAND_PATTERNS.some(brand => lowerText.toLowerCase().includes(brand.toLowerCase()));
-}
-
-// Extract brand from product name
 function extractBrandFromName(productName: string): string {
   for (const brand of BRAND_PATTERNS) {
     if (productName.toLowerCase().includes(brand.toLowerCase())) {
@@ -209,41 +272,55 @@ function extractBrandFromName(productName: string): string {
   return '';
 }
 
-// Calculate confidence score for a product mention
-function calculateConfidenceScore(
+function calculateEnhancedConfidenceScore(
   match: string, 
   content: string, 
-  source: { title: string; type: string }
+  source: { title: string; type: string; qualityScore?: number }
 ): number {
-  let score = 0.5; // Base score
+  let score = 0.4; // Lower base score, require evidence
   
-  // Boost if in title
-  if (source.title.toLowerCase().includes(match.toLowerCase())) {
-    score += 0.3;
+  // Boost for source quality
+  if (source.qualityScore) {
+    score += source.qualityScore * 0.3;
   }
   
-  // Boost for review sites
+  // Boost if mentioned in title
+  if (source.title.toLowerCase().includes(match.toLowerCase())) {
+    score += 0.25;
+  }
+  
+  // Boost for review sites and expert content
   if (source.type === 'review') {
     score += 0.2;
   }
   
-  // Boost if mentioned multiple times
-  const mentionCount = (content.toLowerCase().match(new RegExp(match.toLowerCase(), 'g')) || []).length;
-  score += Math.min(mentionCount * 0.1, 0.3);
+  // Check context quality
+  const context = extractContext(content, match, 100).toLowerCase();
   
-  // Boost for specific product words
-  const specificWords = ['best', 'recommend', 'favorite', 'love', 'amazing', 'perfect'];
-  const context = extractContext(content, match, 50).toLowerCase();
-  for (const word of specificWords) {
-    if (context.includes(word)) {
-      score += 0.1;
-    }
+  // Boost for recommendation context
+  const recommendationWords = ['recommend', 'best', 'favorite', 'love', 'holy grail', 'must-have', 'amazing'];
+  const recommendationBoost = recommendationWords.filter(word => context.includes(word)).length * 0.1;
+  score += Math.min(recommendationBoost, 0.3);
+  
+  // Boost for dermatologist/expert mentions
+  if (context.includes('dermatologist') || context.includes('expert') || context.includes('professional')) {
+    score += 0.15;
   }
   
-  return Math.min(score, 1.0);
+  // Penalize for commercial language
+  const commercialTerms = ['buy', 'shop', 'cart', 'discount', 'sale', 'offer'];
+  const commercialPenalty = commercialTerms.filter(term => context.includes(term)).length * 0.05;
+  score -= commercialPenalty;
+  
+  // Boost for specific ingredient mentions
+  const ingredients = ['niacinamide', 'hyaluronic acid', 'vitamin c', 'retinol', 'salicylic acid', 'aha', 'bha'];
+  if (ingredients.some(ingredient => match.toLowerCase().includes(ingredient))) {
+    score += 0.1;
+  }
+  
+  return Math.max(0.1, Math.min(score, 1.0));
 }
 
-// Analyze frequency and rank products
 export function analyzeProductFrequency(mentions: ProductMention[]): RankedProduct[] {
   const productMap = new Map<string, RankedProduct>();
   
@@ -277,25 +354,26 @@ export function analyzeProductFrequency(mentions: ProductMention[]): RankedProdu
     }
   }
   
-  // Convert to array and sort by weighted score
+  // Convert to array and sort by enhanced scoring
   const rankedProducts = Array.from(productMap.values())
+    .filter(product => product.mention_count >= 2 || product.quality_score > 0.8) // Filter low-quality products
     .map(product => ({
       ...product,
       quality_score: product.quality_score / product.mention_count // Average quality
     }))
     .sort((a, b) => {
-      const scoreA = a.mention_count * a.quality_score;
-      const scoreB = b.mention_count * b.quality_score;
+      // Enhanced scoring: frequency * quality * brand recognition
+      const scoreA = a.mention_count * a.quality_score * (a.brand ? 1.2 : 1.0);
+      const scoreB = b.mention_count * b.quality_score * (b.brand ? 1.2 : 1.0);
       return scoreB - scoreA;
     });
   
-  console.log(`📊 Product frequency analysis complete:`, 
+  console.log(`📊 Enhanced product frequency analysis complete:`, 
     rankedProducts.slice(0, 5).map(p => `${p.product_name} (${p.mention_count} mentions, score: ${p.quality_score.toFixed(2)})`));
   
   return rankedProducts.slice(0, 5); // Return top 5 products
 }
 
-// Normalize product names for comparison
 function normalizeProductName(name: string): string {
   return name
     .toLowerCase()
