@@ -15,8 +15,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 
 interface ProductSearchResult {
-  name: string;
+  product_name: string;
+  brand: string;
   summary: string;
+  image_url?: string;
   sources: Array<{
     title: string;
     url: string;
@@ -29,7 +31,10 @@ interface ProductSearchResult {
     price_range: string;
     overall_rating: string;
     key_features: string[];
+    recommended_by: string[];
   };
+  mention_frequency: number;
+  quality_score: number;
   api_source: string;
   api_ref: string;
 }
@@ -42,6 +47,8 @@ const ProductSearch = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchSource, setSearchSource] = useState<'cache' | 'api' | null>(null);
+  const [totalSourcesAnalyzed, setTotalSourcesAnalyzed] = useState(0);
+  const [processingMethod, setProcessingMethod] = useState<string>('');
 
   const decodedQuery = query ? decodeURIComponent(query) : '';
 
@@ -72,15 +79,19 @@ const ProductSearch = () => {
       if (data && Array.isArray(data.results)) {
         setResults(data.results);
         setSearchSource(data.source || 'api');
+        setTotalSourcesAnalyzed(data.total_sources_analyzed || 0);
+        setProcessingMethod(data.processing_method || '');
         
         toast({
-          title: data.source === 'cache' ? "Results from cache" : "Fresh search results",
-          description: `Found comprehensive analysis for "${searchQuery}"`,
+          title: data.source === 'cache' ? "Results from cache" : "Fresh product analysis",
+          description: `Found ${data.results.length} products from ${data.total_sources_analyzed || 0} sources`,
           duration: 3000
         });
       } else {
         setResults([]);
         setSearchSource(data?.source || null);
+        setTotalSourcesAnalyzed(0);
+        setProcessingMethod('');
       }
       
     } catch (err) {
@@ -88,6 +99,8 @@ const ProductSearch = () => {
       setError(err instanceof Error ? err.message : 'Failed to fetch product information');
       setResults([]);
       setSearchSource(null);
+      setTotalSourcesAnalyzed(0);
+      setProcessingMethod('');
       
       toast({
         title: "Search error",
@@ -159,12 +172,22 @@ const ProductSearch = () => {
                 </Button>
               )}
               <div className="flex-1">
-                <h1 className="text-2xl md:text-3xl font-bold">Product Search Results</h1>
+                <h1 className="text-2xl md:text-3xl font-bold">Product Recommendations</h1>
                 <p className="text-muted-foreground">
-                  Search results for "{decodedQuery}"
+                  Product analysis for "{decodedQuery}"
                   {searchSource && (
                     <Badge variant="secondary" className="ml-2 text-xs">
                       {searchSource === 'cache' ? 'Cached' : 'Fresh'}
+                    </Badge>
+                  )}
+                  {totalSourcesAnalyzed > 0 && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      {totalSourcesAnalyzed} sources analyzed
+                    </Badge>
+                  )}
+                  {processingMethod && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      {processingMethod}
                     </Badge>
                   )}
                 </p>
@@ -174,8 +197,8 @@ const ProductSearch = () => {
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-                <p className="text-muted-foreground">Analyzing product information...</p>
-                <p className="text-sm text-muted-foreground">This may take a moment while we process multiple sources</p>
+                <p className="text-muted-foreground">Analyzing products across multiple sources...</p>
+                <p className="text-sm text-muted-foreground">Extracting product mentions and ranking by frequency</p>
               </div>
             )}
             
@@ -195,7 +218,7 @@ const ProductSearch = () => {
             
             {!isLoading && !error && results.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-muted-foreground">No product information found for "{decodedQuery}"</p>
+                <p className="text-muted-foreground">No products found for "{decodedQuery}"</p>
                 <Button
                   onClick={() => navigate('/explore')}
                   variant="outline"
@@ -210,17 +233,39 @@ const ProductSearch = () => {
               <div className="space-y-8">
                 {results.map((result, index) => (
                   <div key={index} className="space-y-6">
-                    {/* Product Overview */}
+                    {/* Product Header */}
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-xl">{result.name}</CardTitle>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-xl">{result.product_name}</CardTitle>
+                            {result.brand && (
+                              <p className="text-muted-foreground mt-1">by {result.brand}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge variant="secondary" className="text-xs">
+                                Mentioned {result.mention_frequency} times
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                Quality Score: {result.quality_score.toFixed(1)}
+                              </Badge>
+                            </div>
+                          </div>
+                          {result.image_url && (
+                            <img 
+                              src={result.image_url} 
+                              alt={result.product_name}
+                              className="w-24 h-24 object-cover rounded-lg"
+                            />
+                          )}
+                        </div>
                       </CardHeader>
                       <CardContent>
                         <p className="text-muted-foreground leading-relaxed">{result.summary}</p>
                       </CardContent>
                     </Card>
                     
-                    {/* Insights Grid */}
+                    {/* Product Details Grid */}
                     <div className="grid md:grid-cols-2 gap-6">
                       {/* Pros & Cons */}
                       <Card>
@@ -261,10 +306,10 @@ const ProductSearch = () => {
                         </CardContent>
                       </Card>
                       
-                      {/* Key Info */}
+                      {/* Product Details */}
                       <Card>
                         <CardHeader>
-                          <CardTitle className="text-lg">Key Information</CardTitle>
+                          <CardTitle className="text-lg">Product Details</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                           <div>
@@ -276,6 +321,21 @@ const ProductSearch = () => {
                             <h4 className="font-medium text-sm text-muted-foreground">Overall Rating</h4>
                             <p className="text-sm">{result.insights.overall_rating}</p>
                           </div>
+                          {result.insights.recommended_by.length > 0 && (
+                            <>
+                              <Separator />
+                              <div>
+                                <h4 className="font-medium text-sm text-muted-foreground mb-2">Recommended By</h4>
+                                <div className="flex flex-wrap gap-1">
+                                  {result.insights.recommended_by.map((recommender, i) => (
+                                    <Badge key={i} variant="secondary" className="text-xs">
+                                      {recommender}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </>
+                          )}
                           {result.insights.key_features.length > 0 && (
                             <>
                               <Separator />
@@ -283,7 +343,7 @@ const ProductSearch = () => {
                                 <h4 className="font-medium text-sm text-muted-foreground mb-2">Key Features</h4>
                                 <div className="flex flex-wrap gap-1">
                                   {result.insights.key_features.map((feature, i) => (
-                                    <Badge key={i} variant="secondary" className="text-xs">
+                                    <Badge key={i} variant="outline" className="text-xs">
                                       {feature}
                                     </Badge>
                                   ))}
@@ -300,7 +360,7 @@ const ProductSearch = () => {
                       <CardHeader>
                         <CardTitle className="text-lg">Sources ({result.sources.length})</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          Information gathered from multiple sources including reviews, forums, and official sites
+                          Sources where {result.product_name} was mentioned and analyzed
                         </p>
                       </CardHeader>
                       <CardContent>

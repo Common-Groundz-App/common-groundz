@@ -1,7 +1,7 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { ensureHttps, isValidUrl } from "./utils.ts";
+import { extractProductMentions, analyzeProductFrequency, ProductExtractionResult } from "./product-extractor.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,8 +9,10 @@ const corsHeaders = {
 };
 
 interface ProductResult {
-  name: string;
+  product_name: string;
+  brand: string;
   summary: string;
+  image_url?: string;
   sources: Array<{
     title: string;
     url: string;
@@ -23,9 +25,21 @@ interface ProductResult {
     price_range: string;
     overall_rating: string;
     key_features: string[];
+    recommended_by: string[];
   };
+  mention_frequency: number;
+  quality_score: number;
   api_source: string;
   api_ref: string;
+}
+
+interface SearchResponse {
+  results: ProductResult[];
+  query: string;
+  total_sources_analyzed: number;
+  processing_method: string;
+  source: string;
+  count: number;
 }
 
 // Gemini API integration
@@ -193,6 +207,135 @@ async function processWithLLMs(query: string, sources: any[]): Promise<{ analysi
   return { analysis: fallbackAnalysis, llmUsed: 'fallback' };
 }
 
+// Enhanced LLM processing for individual products
+async function processProductWithLLMs(
+  productName: string,
+  brand: string,
+  contexts: Array<{ text: string; source_title: string; source_url: string }>,
+  mentionFrequency: number,
+  qualityScore: number
+): Promise<{ analysis: any, llmUsed: string }> {
+  const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+  const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+  
+  const contextText = contexts.map((ctx, i) => `
+${i + 1}. Source: ${ctx.source_title}
+   URL: ${ctx.source_url}
+   Context: ${ctx.text}
+`).join('\n');
+
+  const prompt = `
+You are an expert product analyst. Analyze the following mentions of "${productName}" by ${brand} and provide a comprehensive product analysis.
+
+Product: ${productName}
+Brand: ${brand}
+Mention Frequency: ${mentionFrequency} times across sources
+Quality Score: ${qualityScore.toFixed(2)}
+
+Contexts and Sources:
+${contextText}
+
+Please provide a JSON response with the following structure:
+{
+  "summary": "2-3 sentence overview of this specific product based on the sources",
+  "insights": {
+    "pros": ["specific positive point 1", "specific positive point 2", "specific positive point 3"],
+    "cons": ["specific negative point 1", "specific negative point 2"],
+    "price_range": "estimated price range in INR if mentioned, otherwise 'Price varies'",
+    "overall_rating": "overall sentiment from sources",
+    "key_features": ["key feature 1", "key feature 2", "key feature 3"],
+    "recommended_by": ["who specifically recommends this product based on sources"]
+  }
+}
+
+Focus on extracting actual insights about THIS SPECIFIC PRODUCT from the provided sources. Be factual and concise.`;
+
+  // Try Gemini first
+  if (geminiApiKey) {
+    try {
+      console.log(`🤖 Processing ${productName} with Gemini API`);
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': geminiApiKey,
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            topK: 1,
+            topP: 1,
+            maxOutputTokens: 2048,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.candidates[0].content.parts[0].text;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return { analysis: JSON.parse(jsonMatch[0]), llmUsed: 'gemini' };
+        }
+      }
+    } catch (error) {
+      console.error(`❌ Gemini processing failed for ${productName}:`, error);
+    }
+  }
+  
+  // Fallback to OpenAI
+  if (openaiApiKey) {
+    try {
+      console.log(`🤖 Processing ${productName} with OpenAI API`);
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a helpful product analysis assistant. Always respond with valid JSON.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.3,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+        return { analysis: JSON.parse(content), llmUsed: 'openai' };
+      }
+    } catch (error) {
+      console.error(`❌ OpenAI processing failed for ${productName}:`, error);
+    }
+  }
+  
+  // Final fallback
+  console.log(`⚠️ Using fallback processing for ${productName}`);
+  return {
+    analysis: {
+      summary: `${productName} by ${brand} mentioned ${mentionFrequency} times across sources.`,
+      insights: {
+        pros: ["Found in multiple sources"],
+        cons: ["Detailed analysis unavailable"],
+        price_range: "Price varies",
+        overall_rating: "Mixed reviews",
+        key_features: ["See individual sources for details"],
+        recommended_by: ["Various sources"]
+      }
+    },
+    llmUsed: 'fallback'
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -261,10 +404,21 @@ serve(async (req) => {
               console.error("Error getting products from cache:", cacheError);
             } else if (cachedProducts && cachedProducts.length > 0) {
               results = cachedProducts.map(product => ({
-                name: product.name,
+                product_name: product.name,
+                brand: product.metadata.brand || "",
                 summary: product.description || "",
+                image_url: product.image_url || undefined,
                 sources: product.metadata.sources || [],
-                insights: product.metadata.insights || {},
+                insights: product.metadata.insights || {
+                  pros: [],
+                  cons: [],
+                  price_range: "Not available",
+                  overall_rating: "Not available",
+                  key_features: [],
+                  recommended_by: []
+                },
+                mention_frequency: product.metadata.mention_frequency || 0,
+                quality_score: product.metadata.quality_score || 0,
                 api_source: product.api_source,
                 api_ref: product.api_ref || "",
               }));
@@ -277,7 +431,9 @@ serve(async (req) => {
                   results: results,
                   source: "cache",
                   query: query,
-                  count: results.length 
+                  count: results.length,
+                  total_sources_analyzed: 0,
+                  processing_method: "cached"
                 }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } }
               );
@@ -338,14 +494,16 @@ serve(async (req) => {
           results: [],
           source: "api",
           query: query,
-          count: 0
+          count: 0,
+          total_sources_analyzed: 0,
+          processing_method: "no_results"
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Process organic results and categorize them
-    const processedSources = organicResults.slice(0, 15).map((result: any, index: number) => {
+    const processedSources = organicResults.slice(0, 10).map((result: any, index: number) => {
       const domain = new URL(result.link || '').hostname;
       let type: 'review' | 'official' | 'forum' | 'blog' | 'ecommerce' = 'blog';
       
@@ -367,52 +525,81 @@ serve(async (req) => {
       };
     }).filter(source => source.url && source.title);
 
-    // Use enhanced LLM processing with fallback chain
-    console.log(`🤖 Processing ${processedSources.length} sources with LLM chain`);
+    console.log(`🔍 Phase 1: Starting product extraction from ${processedSources.length} sources`);
     
-    try {
-      const { analysis: productAnalysis, llmUsed } = await processWithLLMs(query, processedSources);
-
-      // Create the final result with LLM source tracking
-      const productResult: ProductResult = {
-        name: productAnalysis.name || query,
-        summary: productAnalysis.summary || "Product information extracted from search results.",
-        sources: processedSources,
-        insights: productAnalysis.insights || {
-          pros: [],
-          cons: [],
-          price_range: "Not available",
-          overall_rating: "Not available",
-          key_features: []
-        },
-        api_source: `google_search_${llmUsed}`,
-        api_ref: `search_${Date.now()}`
-      };
-
-      results = [productResult];
-      console.log(`✅ LLM processing completed using: ${llmUsed}`);
-
-    } catch (processingError) {
-      console.error("Error in LLM processing chain:", processingError);
-      
-      // Final fallback: return basic processed results
-      const fallbackResult: ProductResult = {
-        name: query,
-        summary: `Search results for ${query} from multiple sources including reviews, forums, and e-commerce sites.`,
-        sources: processedSources,
-        insights: {
-          pros: ["Multiple sources found"],
-          cons: ["Detailed analysis unavailable"],
-          price_range: "Check individual sources",
-          overall_rating: "Varied reviews",
-          key_features: ["See individual sources for details"]
-        },
-        api_source: "google_search_basic",
-        api_ref: `search_${Date.now()}`
-      };
-      
-      results = [fallbackResult];
+    // PHASE 1: Extract product mentions and analyze frequency
+    const productMentions = await extractProductMentions(processedSources);
+    const rankedProducts = analyzeProductFrequency(productMentions);
+    
+    console.log(`📊 Found ${rankedProducts.length} top products:`, rankedProducts.map(p => p.product_name));
+    
+    if (rankedProducts.length === 0) {
+      console.log("No products found after extraction");
+      return new Response(
+        JSON.stringify({ 
+          results: [],
+          source: "api",
+          query: query,
+          count: 0,
+          total_sources_analyzed: processedSources.length,
+          processing_method: "no_products_found"
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    // Process each ranked product with LLM
+    const productResults: ProductResult[] = [];
+    let processingMethod = 'fallback';
+    
+    for (const rankedProduct of rankedProducts) {
+      try {
+        console.log(`🤖 Processing product: ${rankedProduct.product_name}`);
+        
+        const { analysis, llmUsed } = await processProductWithLLMs(
+          rankedProduct.product_name,
+          rankedProduct.brand,
+          rankedProduct.contexts,
+          rankedProduct.mention_count,
+          rankedProduct.quality_score
+        );
+        
+        processingMethod = llmUsed;
+        
+        const productResult: ProductResult = {
+          product_name: rankedProduct.product_name,
+          brand: rankedProduct.brand,
+          summary: analysis.summary || `${rankedProduct.product_name} mentioned ${rankedProduct.mention_count} times across sources.`,
+          image_url: undefined, // Will be handled in Phase 3
+          sources: rankedProduct.contexts.map(ctx => ({
+            title: ctx.source_title,
+            url: ctx.source_url,
+            snippet: ctx.text,
+            type: 'review' as any // Default type, will be refined
+          })),
+          insights: {
+            pros: analysis.insights?.pros || [],
+            cons: analysis.insights?.cons || [],
+            price_range: analysis.insights?.price_range || "Price varies",
+            overall_rating: analysis.insights?.overall_rating || "Mixed reviews",
+            key_features: analysis.insights?.key_features || [],
+            recommended_by: analysis.insights?.recommended_by || []
+          },
+          mention_frequency: rankedProduct.mention_count,
+          quality_score: rankedProduct.quality_score,
+          api_source: `google_search_frequency_${llmUsed}`,
+          api_ref: `search_${Date.now()}_${rankedProduct.normalized_name}`
+        };
+        
+        productResults.push(productResult);
+        
+      } catch (error) {
+        console.error(`❌ Error processing product ${rankedProduct.product_name}:`, error);
+      }
+    }
+
+    results = productResults;
+    console.log(`✅ Successfully processed ${results.length} products using method: ${processingMethod}`);
 
     // Update cache with new results
     try {
@@ -442,15 +629,18 @@ serve(async (req) => {
         if (results.length > 0) {
           const productsToCache = results.map(product => ({
             query_id: queryId,
-            name: product.name,
-            venue: "Multiple Sources",
+            name: product.product_name,
+            venue: product.brand,
             description: product.summary,
-            image_url: "",
+            image_url: product.image_url || "",
             api_source: product.api_source,
             api_ref: product.api_ref,
             metadata: {
+              brand: product.brand,
               sources: product.sources,
-              insights: product.insights
+              insights: product.insights,
+              mention_frequency: product.mention_frequency,
+              quality_score: product.quality_score
             }
           }));
           
@@ -469,14 +659,16 @@ serve(async (req) => {
       console.error("Error updating cache:", cacheError);
     }
 
-    const finalResponse = {
+    const finalResponse: SearchResponse = {
       results: results,
       source: "api",
       query: query,
-      count: results.length
+      count: results.length,
+      total_sources_analyzed: processedSources.length,
+      processing_method: processingMethod
     };
 
-    console.log(`✅ SUCCESS: Returning ${results.length} processed results for query "${query}"`);
+    console.log(`✅ SUCCESS: Returning ${results.length} product-specific results for query "${query}"`);
 
     return new Response(
       JSON.stringify(finalResponse),
@@ -489,7 +681,9 @@ serve(async (req) => {
         error: error.message,
         results: [],
         source: "error",
-        count: 0
+        count: 0,
+        total_sources_analyzed: 0,
+        processing_method: "error"
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
