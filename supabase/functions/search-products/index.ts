@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { ensureHttps, isValidUrl } from "./utils.ts";
 import { extractProductMentions, analyzeProductFrequency, ProductExtractionResult } from "./product-extractor.ts";
 import { analyzeQueryIntent } from "./query-analyzer.ts";
+import { identifyProductsWithLLM, processProductWithEnhancedLLMs } from "./llm-analyzer.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -462,7 +463,9 @@ serve(async (req) => {
           rankedProduct.product_name,
           rankedProduct.contexts,
           rankedProduct.mention_count,
-          rankedProduct.quality_score
+          rankedProduct.quality_score,
+          geminiApiKey,
+          openaiApiKey
         );
         
         processingMethod = llmUsed;
