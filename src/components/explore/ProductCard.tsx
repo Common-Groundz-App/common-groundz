@@ -87,15 +87,18 @@ export function ProductCard({ product, enableEntityCreation = false, onEntityCre
             Buy Now
           </Button>
         ) : (
-          <SearchResultHandler 
-            result={product} 
-            query="" 
+          <div 
+            className="w-full cursor-pointer"
+            onClick={() => {
+              // Handle entity creation click
+              console.log('Creating entity for product:', product);
+            }}
           >
             <Button className="w-full" variant="outline">
               <Plus className="w-4 h-4 mr-2" />
               Create Entity
             </Button>
-          </SearchResultHandler>
+          </div>
         )}
       </CardFooter>
     </Card>

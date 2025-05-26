@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -30,20 +29,29 @@ export interface EntitySearchResult {
 
 export interface ReviewSearchResult {
   id: string;
+  title: string;
   content: string;
   rating: number;
   entity_name: string;
   username: string;
   avatar_url: string | null;
+  entities?: {
+    name: string;
+  };
 }
 
 export interface RecommendationSearchResult {
   id: string;
+  title: string;
   content: string;
   rating: number;
   entity_name: string;
   username: string;
   avatar_url: string | null;
+  category: string;
+  entities?: {
+    name: string;
+  };
 }
 
 export interface SearchResult {
