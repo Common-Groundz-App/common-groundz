@@ -1,3 +1,4 @@
+import { analyzeQueryIntent, QueryIntent } from "./query-analyzer.ts";
 
 interface EnhancedQueryIntent extends QueryIntent {
   categoryHints: string[];
