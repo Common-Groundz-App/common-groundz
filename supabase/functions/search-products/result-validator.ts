@@ -256,6 +256,8 @@ function generateImprovementSuggestions(
   
   if (resultCount === 0) {
     suggestions.push('No results found - try alternative spellings or related terms');
+    suggestions.push('For books, try searching with author name or alternate title');
+    suggestions.push('Consider searching for similar products in the same category');
   }
   
   return suggestions;
@@ -311,7 +313,13 @@ export function generateSpellCorrections(query: string): string[] {
     'neutrogina': 'neutrogena',
     'moistrizer': 'moisturizer',
     'cleanser': 'cleanser',
-    'sunscren': 'sunscreen'
+    'sunscren': 'sunscreen',
+    // Book-specific corrections
+    'atomic habbit': 'atomic habits',
+    'atomic habit': 'atomic habits',
+    'james claire': 'james clear',
+    'james cleer': 'james clear',
+    'habbit': 'habits'
   };
   
   let corrected = query.toLowerCase();

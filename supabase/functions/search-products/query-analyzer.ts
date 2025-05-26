@@ -36,7 +36,23 @@ const ENHANCED_BRAND_PATTERNS = [
 
 const SPECIFIC_PRODUCT_PATTERNS = [
   'Eclipse Solaire', 'Hyaluronic Acid', 'Niacinamide', 'Vitamin C Serum',
-  'Retinol', 'Salicylic Acid', 'AHA BHA', 'Sunscreen SPF'
+  'Retinol', 'Salicylic Acid', 'AHA BHA', 'Sunscreen SPF',
+  // Book-specific patterns
+  'Atomic Habits', 'Think and Grow Rich', 'Rich Dad Poor Dad', 'The Power of Now',
+  'Sapiens', 'Educated', 'Becoming', 'The Alchemist', 'Harry Potter'
+];
+
+// Book-specific patterns for better recognition
+const BOOK_TITLE_PATTERNS = [
+  'Atomic Habits', 'Think and Grow Rich', 'Rich Dad Poor Dad', 'The 7 Habits',
+  'How to Win Friends', 'The Power of Positive Thinking', 'The Lean Startup',
+  'Good to Great', 'The 4-Hour Work Week', 'Mindset', 'Grit', 'Outliers'
+];
+
+const AUTHOR_PATTERNS = [
+  'James Clear', 'Napoleon Hill', 'Robert Kiyosaki', 'Stephen Covey',
+  'Dale Carnegie', 'Timothy Ferriss', 'Malcolm Gladwell', 'Carol Dweck',
+  'Angela Duckworth', 'Simon Sinek', 'Brené Brown', 'Cal Newport'
 ];
 
 export { analyzeQueryIntent };
@@ -69,6 +85,51 @@ async function analyzeQueryIntent(
 
 function performQuickAnalysis(query: string): QueryIntent {
   const lowerQuery = query.toLowerCase().trim();
+  
+  // Check for specific book titles
+  for (const bookTitle of BOOK_TITLE_PATTERNS) {
+    if (lowerQuery.includes(bookTitle.toLowerCase())) {
+      return {
+        type: 'specific_product',
+        confidence: 0.95,
+        originalQuery: query,
+        optimizedQuery: generateOptimizedQuery(query, 'specific_product'),
+        searchStrategy: {
+          exactMatch: true,
+          includeReviews: true,
+          excludeListings: true,
+          focusOnComparisons: false
+        },
+        extractedEntities: {
+          productName: bookTitle,
+          category: 'books'
+        }
+      };
+    }
+  }
+  
+  // Check for author names
+  for (const author of AUTHOR_PATTERNS) {
+    if (lowerQuery.includes(author.toLowerCase())) {
+      return {
+        type: 'specific_product',
+        confidence: 0.9,
+        originalQuery: query,
+        optimizedQuery: generateOptimizedQuery(query, 'specific_product'),
+        searchStrategy: {
+          exactMatch: true,
+          includeReviews: true,
+          excludeListings: true,
+          focusOnComparisons: false
+        },
+        extractedEntities: {
+          productName: query,
+          brandName: author,
+          category: 'books'
+        }
+      };
+    }
+  }
   
   // Check for specific product mentions
   for (const product of SPECIFIC_PRODUCT_PATTERNS) {
@@ -160,15 +221,20 @@ async function performLLMAnalysis(
   openaiApiKey?: string
 ): Promise<Partial<QueryIntent>> {
   const prompt = `
-Analyze this beauty/skincare search query and classify its intent:
+Analyze this search query and classify its intent:
 
 Query: "${query}"
 
 Classify as one of:
-1. specific_product - User wants info about ONE specific product (e.g., "Eclipse Solaire", "CeraVe Hydrating Cleanser")
-2. category - User wants recommendations in a category (e.g., "best vitamin C serum", "moisturizer for dry skin")
-3. comparison - User wants to compare products (e.g., "CeraVe vs Cetaphil", "compare retinol serums")
-4. brand_exploration - User wants to explore a brand's products (e.g., "Yuderma products", "The Ordinary range")
+1. specific_product - User wants info about ONE specific product (e.g., "Atomic Habits", "CeraVe Hydrating Cleanser", "iPhone 13")
+2. category - User wants recommendations in a category (e.g., "best vitamin C serum", "self-help books", "productivity apps")
+3. comparison - User wants to compare products (e.g., "CeraVe vs Cetaphil", "Atomic Habits vs The 7 Habits")
+4. brand_exploration - User wants to explore a brand's products (e.g., "James Clear books", "Apple products")
+
+Special considerations:
+- Book titles like "Atomic Habits" should be classified as specific_product
+- Author names with books should be specific_product or brand_exploration
+- "Best [category]" should be category
 
 Return JSON:
 {
@@ -177,7 +243,7 @@ Return JSON:
   "reasoning": "brief explanation",
   "extractedEntities": {
     "productName": "exact product name if specific_product",
-    "brandName": "brand name if mentioned",
+    "brandName": "brand/author name if mentioned",
     "category": "product category if category search",
     "comparisonTerms": ["term1", "term2"] if comparison
   }
@@ -285,7 +351,7 @@ function generateOptimizedQuery(originalQuery: string, intentType: string): stri
   switch (intentType) {
     case 'specific_product':
       // For specific products, use exact match with review focus
-      return `"${baseQuery}" review dermatologist recommended -"buy online" -"shop now" -"add to cart" -"collection" -"range"`;
+      return `"${baseQuery}" review summary analysis -"buy online" -"shop now" -"add to cart" -"collection" -"range"`;
     
     case 'comparison':
       // For comparisons, focus on comparison content
@@ -298,7 +364,7 @@ function generateOptimizedQuery(originalQuery: string, intentType: string): stri
     case 'category':
     default:
       // For category searches, use current approach
-      return `${baseQuery} dermatologist recommended review "best" -"buy online" -"shop now" -"add to cart"`;
+      return `${baseQuery} recommended review "best" -"buy online" -"shop now" -"add to cart"`;
   }
 }
 

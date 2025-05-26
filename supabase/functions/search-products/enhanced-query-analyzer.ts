@@ -1,3 +1,4 @@
+
 import { analyzeQueryIntent, QueryIntent } from "./query-analyzer.ts";
 
 interface EnhancedQueryIntent extends QueryIntent {
@@ -49,7 +50,8 @@ const CATEGORY_DOMAINS: CategoryDomains = {
   books: {
     highQuality: [
       'goodreads.com', 'bookish.com', 'npr.org', 'nytimes.com',
-      'theguardian.com', 'reddit.com', 'kirkusreviews.com'
+      'theguardian.com', 'reddit.com', 'kirkusreviews.com',
+      'publishersweekly.com', 'booklist.ala.org', 'libraryjournal.com'
     ],
     moderate: [
       'youtube.com', 'medium.com', 'quora.com', 'booklist.in'
@@ -130,8 +132,8 @@ function extractCategoryHints(query: string): string[] {
     hints.push('food');
   }
   
-  // Book keywords
-  if (lowerQuery.match(/(book|novel|author|read|story|fiction|biography)/)) {
+  // Book keywords - enhanced detection
+  if (lowerQuery.match(/(book|novel|author|read|story|fiction|biography|habits|atomic habits|james clear)/)) {
     hints.push('books');
   }
   
@@ -173,6 +175,13 @@ function generateFallbackQueries(query: string, categoryHints: string[]): string
   if (categoryHints.length > 0) {
     fallbacks.push(`${query} ${categoryHints[0]} recommendation`);
     fallbacks.push(`best ${query} ${categoryHints[0]}`);
+    
+    // Book-specific fallbacks
+    if (categoryHints.includes('books')) {
+      fallbacks.push(`"${query}" book review`);
+      fallbacks.push(`${query} summary analysis`);
+      fallbacks.push(`${query} author recommendations`);
+    }
   }
   
   // Simplified version
@@ -203,6 +212,18 @@ function generateEnhancedOptimizedQuery(
         break;
       case 'comparison':
         optimized = `${optimized} comparison expert review dermatologist opinion -"buy online"`;
+        break;
+    }
+  } else if (categoryHints.includes('books')) {
+    switch (intentType) {
+      case 'specific_product':
+        optimized = `"${optimized}" book review summary analysis -"buy online" -"shop now" -"add to cart"`;
+        break;
+      case 'category':
+        optimized = `${optimized} book review recommendation "best books" -"buy online" -"collection"`;
+        break;
+      case 'comparison':
+        optimized = `${optimized} book comparison review analysis -"buy online"`;
         break;
     }
   }
