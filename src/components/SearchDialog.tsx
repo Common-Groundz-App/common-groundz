@@ -133,6 +133,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                         api_ref: suggestion.id,
                         metadata: suggestion.metadata || {}
                       }}
+                      query={query}
                       onClick={handleResultClick}
                     />
                   ))}

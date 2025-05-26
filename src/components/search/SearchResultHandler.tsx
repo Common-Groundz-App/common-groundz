@@ -44,7 +44,9 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
       
       if (entity) {
         // Navigate to the entity page using the proper URL structure
-        const entityPath = `/${entityType}/${entity.slug || entity.id}`;
+        // Use slug if available, otherwise fall back to id
+        const identifier = entity.slug || entity.id;
+        const entityPath = `/${entityType}/${identifier}`;
         navigate(entityPath);
         
         if (onClose) {

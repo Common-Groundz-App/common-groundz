@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -228,6 +229,7 @@ const Explore = () => {
                                 api_ref: suggestion.id,
                                 metadata: suggestion.metadata || {}
                               }}
+                              query={searchQuery}
                               onClick={handleResultClick}
                             />
                           ))}

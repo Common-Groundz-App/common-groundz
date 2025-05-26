@@ -5,11 +5,11 @@ import { SearchResultHandler } from './SearchResultHandler';
 
 interface ProductResultItemProps {
   product: ProductSearchResult;
-  query: string;
+  query?: string;
   onClick: () => void;
 }
 
-export function ProductResultItem({ product, query, onClick }: ProductResultItemProps) {
+export function ProductResultItem({ product, query = '', onClick }: ProductResultItemProps) {
   return (
     <SearchResultHandler 
       result={product} 
