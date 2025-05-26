@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
@@ -114,8 +113,27 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
   // Ensure we have a valid image URL or use fallback based on type
   const imageUrl = entity.image_url || getEntityTypeFallbackImage(typeAsString);
   
-  // Generate slug if not provided
-  const slug = entity.slug || generateSlug(entity.name);
+  // Generate a unique slug
+  let baseSlug = entity.slug || generateSlug(entity.name);
+  let finalSlug = baseSlug;
+  let counter = 0;
+  
+  // Check for slug uniqueness and generate a unique one if needed
+  while (true) {
+    const { data: existingEntity } = await supabase
+      .from('entities')
+      .select('id')
+      .eq('slug', finalSlug)
+      .eq('is_deleted', false)
+      .maybeSingle();
+    
+    if (!existingEntity) {
+      break; // Slug is unique
+    }
+    
+    counter++;
+    finalSlug = `${baseSlug}-${counter}`;
+  }
   
   // For database insertion, prepare the entity data with only the fields that exist in the database
   const entityForDb = {
@@ -128,10 +146,10 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     api_ref: entity.api_ref || null,
     metadata: entity.metadata || null,
     website_url: entity.website_url || null,
-    slug: slug
+    slug: finalSlug
   };
   
-  console.log(`🏗️ Creating entity in database:`, entityForDb);
+  console.log(`🏗️ Creating entity in database with slug: ${finalSlug}`, entityForDb);
   
   const { data, error } = await supabase
     .from('entities')
@@ -145,7 +163,7 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     return null;
   }
 
-  console.log(`✅ Entity created successfully:`, data);
+  console.log(`✅ Entity created successfully with slug: ${data?.slug}`, data);
   return data as Entity;
 };
 

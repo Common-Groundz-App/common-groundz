@@ -50,10 +50,9 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
       if (entity) {
         console.log(`✅ Entity created successfully:`, entity);
         
-        // Navigate to the entity page using the proper URL structure
-        // Use slug if available, otherwise fall back to id
+        // Always navigate to the standardized entity URL using slug
         const identifier = entity.slug || entity.id;
-        const entityPath = `/${entityType}/${identifier}`;
+        const entityPath = `/entity/${identifier}`;
         
         console.log(`🔗 Navigating to entity page: ${entityPath}`);
         navigate(entityPath);

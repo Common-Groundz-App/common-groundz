@@ -12,15 +12,11 @@ interface EntityResultItemProps {
 }
 
 export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
-  // Generate the correct path based on entity type and slug
+  // Always use the standardized entity URL format
   const getEntityPath = () => {
-    if (!entity.type) return '/404'; // Fallback for missing type
-    
-    const entityType = entity.type.toLowerCase();
     // Use slug if available, otherwise fall back to ID
     const identifier = entity.slug || entity.id;
-    
-    return `/${entityType}/${identifier}`;
+    return `/entity/${identifier}`;
   };
 
   return (

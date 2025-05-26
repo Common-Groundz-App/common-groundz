@@ -9,7 +9,7 @@ import {
 } from '@/services/entityService';
 import { Entity } from '@/services/recommendation/types';
 
-export const useEntityDetail = (slug: string) => {
+export const useEntityDetail = (slugOrId: string) => {
   const { user } = useAuth();
   const [entity, setEntity] = useState<Entity | null>(null);
   const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -28,20 +28,21 @@ export const useEntityDetail = (slug: string) => {
 
   useEffect(() => {
     const fetchEntityData = async () => {
-      console.log('Fetching entity data for slug:', slug);
+      console.log('🔍 Fetching entity data for slugOrId:', slugOrId);
       setIsLoading(true);
       setError(null);
 
       try {
-        // Fetch entity data
-        const entityData = await fetchEntityBySlug(slug);
+        // Fetch entity data using the updated fetchEntityBySlug function
+        const entityData = await fetchEntityBySlug(slugOrId);
         if (!entityData) {
+          console.log('❌ Entity not found for:', slugOrId);
           setError('Entity not found');
           setIsLoading(false);
           return;
         }
 
-        console.log('Found entity data:', entityData);
+        console.log('✅ Found entity data:', entityData);
         setEntity(entityData);
 
         // Fetch related content
@@ -72,10 +73,10 @@ export const useEntityDetail = (slug: string) => {
       }
     };
 
-    if (slug) {
+    if (slugOrId) {
       fetchEntityData();
     }
-  }, [slug, user?.id]);
+  }, [slugOrId, user?.id]);
 
   // Function to refresh data
   const refreshData = async () => {
