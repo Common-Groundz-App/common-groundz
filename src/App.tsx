@@ -83,10 +83,12 @@ function App() {
               <Route path="/post/:id" element={<ProtectedRoute><PostView /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/recommendations/:id" element={<ProtectedRoute><RecommendationView /></ProtectedRoute>} />
-              <Route path="/places/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
-              <Route path="/movies/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
-              <Route path="/books/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
+              {/* Fixed entity routes - support all entity types */}
+              <Route path="/place/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
+              <Route path="/movie/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
+              <Route path="/book/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
               <Route path="/food/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
+              <Route path="/product/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <ContentViewerModal />
