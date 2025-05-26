@@ -1,3 +1,4 @@
+
 import { getEnhancedSourceQualityScore } from "./enhanced-query-analyzer.ts";
 
 interface ProductMention {
@@ -15,7 +16,31 @@ interface SourceQuality {
   freshnessFactor: number;
 }
 
+// Curated list of popular books that should always be found
+const CURATED_BOOKS = {
+  'atomic habits': {
+    name: 'Atomic Habits',
+    brand: 'James Clear',
+    description: 'An Easy & Proven Way to Build Good Habits & Break Bad Ones',
+    category: 'books'
+  },
+  'think and grow rich': {
+    name: 'Think and Grow Rich',
+    brand: 'Napoleon Hill',
+    description: 'The landmark bestseller on motivation and personal success',
+    category: 'books'
+  },
+  'rich dad poor dad': {
+    name: 'Rich Dad Poor Dad',
+    brand: 'Robert Kiyosaki',
+    description: 'What the Rich Teach Their Kids About Money',
+    category: 'books'
+  }
+};
+
 async function extractWithLLM(prompt: string, geminiApiKey?: string, openaiApiKey?: string): Promise<ProductMention[]> {
+  console.log(`🤖 LLM Extraction prompt preview: ${prompt.substring(0, 200)}...`);
+  
   // Try Gemini first
   if (geminiApiKey) {
     try {
@@ -43,9 +68,19 @@ async function extractWithLLM(prompt: string, geminiApiKey?: string, openaiApiKe
       if (response.ok) {
         const data = await response.json();
         const content = data.candidates[0].content.parts[0].text;
+        console.log(`🤖 Gemini raw response: ${content}`);
+        
         try {
-          const products = JSON.parse(content) as ProductMention[];
-          return products;
+          // Try to extract JSON from the response
+          const jsonMatch = content.match(/\[[\s\S]*?\]/);
+          if (jsonMatch) {
+            const products = JSON.parse(jsonMatch[0]) as ProductMention[];
+            console.log(`✅ Gemini parsed ${products.length} products successfully`);
+            return products;
+          } else {
+            console.log(`⚠️ No JSON array found in Gemini response`);
+            return [];
+          }
         } catch (jsonError) {
           console.error('❌ Invalid JSON from Gemini:', content, jsonError);
           return [];
@@ -72,7 +107,7 @@ async function extractWithLLM(prompt: string, geminiApiKey?: string, openaiApiKe
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'You are a product extraction expert. Always respond with valid JSON.' },
+            { role: 'system', content: 'You are a product extraction expert. Always respond with valid JSON arrays only. No explanations.' },
             { role: 'user', content: prompt }
           ],
           temperature: 0.1,
@@ -82,9 +117,18 @@ async function extractWithLLM(prompt: string, geminiApiKey?: string, openaiApiKe
       if (response.ok) {
         const data = await response.json();
         const content = data.choices[0].message.content;
+        console.log(`🤖 OpenAI raw response: ${content}`);
+        
         try {
-          const products = JSON.parse(content) as ProductMention[];
-          return products;
+          const jsonMatch = content.match(/\[[\s\S]*?\]/);
+          if (jsonMatch) {
+            const products = JSON.parse(jsonMatch[0]) as ProductMention[];
+            console.log(`✅ OpenAI parsed ${products.length} products successfully`);
+            return products;
+          } else {
+            console.log(`⚠️ No JSON array found in OpenAI response`);
+            return [];
+          }
         } catch (jsonError) {
           console.error('❌ Invalid JSON from OpenAI:', content, jsonError);
           return [];
@@ -125,12 +169,19 @@ export async function enhancedExtractProducts(
     return [];
   }
   
+  // Check for curated books first
+  const curatedProducts = checkCuratedBooks(title, snippet, categoryHints);
+  if (curatedProducts.length > 0) {
+    console.log(`📚 Found ${curatedProducts.length} curated books from ${title}`);
+    return curatedProducts;
+  }
+  
   // Use enhanced prompts based on category hints
   const extractionPrompt = generateCategorySpecificPrompt(title, snippet, categoryHints, intentType);
   
   const products = await extractWithLLM(extractionPrompt, geminiApiKey, openaiApiKey);
   
-  console.log(`🤖 Gemini identified ${products.length} products from ${title}`);
+  console.log(`🤖 LLM identified ${products.length} products from ${title}`);
   
   // Enhanced post-processing based on category
   const enhancedProducts = enhanceCategorySpecificExtraction(products, categoryHints, title, snippet);
@@ -140,33 +191,61 @@ export async function enhancedExtractProducts(
   return enhancedProducts;
 }
 
+function checkCuratedBooks(title: string, snippet: string, categoryHints: string[]): ProductMention[] {
+  if (!categoryHints.includes('books')) {
+    return [];
+  }
+  
+  const combinedText = `${title} ${snippet}`.toLowerCase();
+  const foundBooks: ProductMention[] = [];
+  
+  for (const [searchTerm, bookData] of Object.entries(CURATED_BOOKS)) {
+    if (combinedText.includes(searchTerm) || 
+        combinedText.includes(bookData.name.toLowerCase()) ||
+        combinedText.includes(bookData.brand.toLowerCase())) {
+      foundBooks.push({
+        ...bookData,
+        confidence: 0.95,
+        sourceType: 'curated'
+      });
+    }
+  }
+  
+  return foundBooks;
+}
+
 function generateCategorySpecificPrompt(
   title: string,
   snippet: string,
   categoryHints: string[],
   intentType: string
 ): string {
-  const basePrompt = `Extract product mentions from this content:
+  const basePrompt = `Extract products from this content:
 Title: "${title}"
 Content: "${snippet}"`;
 
   if (categoryHints.includes('books')) {
     return `${basePrompt}
 
-Focus on extracting BOOKS, AUTHORS, and LITERARY WORKS mentioned. Look for:
-- Book titles (e.g., "Atomic Habits", "Think and Grow Rich")
-- Author names (e.g., "James Clear", "Napoleon Hill") 
-- Series or collections
-- Educational materials, guides, workbooks
+I need you to extract BOOKS mentioned in this content. Look for:
+- Book titles (like "Atomic Habits", "Think and Grow Rich")
+- Author names (like "James Clear", "Napoleon Hill")
+- Any literary works or publications
 
-For each book found, extract:
-- Title (exact name)
-- Author (if mentioned)
-- Description/summary
-- Genre/category if mentioned
+IMPORTANT: Return ONLY a JSON array like this example:
+[
+  {
+    "name": "Atomic Habits",
+    "brand": "James Clear", 
+    "description": "Book about building good habits",
+    "category": "books",
+    "confidence": 0.9,
+    "sourceType": "extracted"
+  }
+]
 
-Return as JSON array of objects with: name, brand (author), description, category.
-Only include actual books/publications, not general topics or concepts.`;
+If you find books, extract them. If no books are mentioned, return: []
+NO explanations, just the JSON array.`;
   } else if (categoryHints.includes('beauty')) {
     return `${basePrompt}
 
@@ -176,7 +255,8 @@ Focus on extracting SKINCARE and BEAUTY PRODUCTS mentioned. Look for:
 - Makeup products
 - Beauty tools
 
-Return as JSON array of objects with: name, brand, description, category.`;
+Return ONLY a JSON array of objects with: name, brand, description, category.
+If no products found, return: []`;
   }
   
   // Default prompt for other categories
@@ -187,7 +267,8 @@ Extract any specific products mentioned. Look for:
 - Specific models or versions
 - Recommended items
 
-Return as JSON array of objects with: name, brand, description, category.`;
+Return ONLY a JSON array of objects with: name, brand, description, category.
+If no products found, return: []`;
 }
 
 function enhanceCategorySpecificExtraction(
@@ -210,37 +291,45 @@ function enhanceBookExtraction(
 ): ProductMention[] {
   const enhanced: ProductMention[] = [...products];
   
-  // Look for common book patterns in title and snippet
+  // Enhanced book patterns with more variations
   const bookPatterns = [
-    /atomic habits/i,
-    /([\w\s]+) by ([\w\s]+)/i, // "Book Title by Author"
-    /"([^"]+)" book/i, // "Book Title" book
-    /book[:\s]+["']?([^"']+)["']?/i // book: "Title"
+    /atomic habits/gi,
+    /([\w\s]{3,50})\s+by\s+([\w\s]{3,30})/gi, // "Book Title by Author"
+    /"([^"]{3,50})"\s*book/gi, // "Book Title" book
+    /book[:\s]+["']?([^"']{3,50})["']?/gi, // book: "Title"
+    /(think and grow rich)/gi,
+    /(rich dad poor dad)/gi,
+    /(james clear)/gi,
+    /(napoleon hill)/gi
   ];
   
-  const combinedText = `${title} ${snippet}`.toLowerCase();
+  const combinedText = `${title} ${snippet}`;
+  console.log(`📖 Analyzing text for books: ${combinedText.substring(0, 200)}...`);
   
   for (const pattern of bookPatterns) {
-    const matches = combinedText.match(pattern);
-    if (matches) {
-      const bookTitle = matches[1] || matches[0];
-      const author = matches[2] || null;
+    let match;
+    while ((match = pattern.exec(combinedText)) !== null) {
+      const bookTitle = match[1] || match[0];
+      const author = match[2] || null;
       
-      // Avoid duplicates
-      const exists = enhanced.some(p => 
-        p.name.toLowerCase().includes(bookTitle.toLowerCase()) ||
-        bookTitle.toLowerCase().includes(p.name.toLowerCase())
-      );
-      
-      if (!exists && bookTitle.length > 3) {
-        enhanced.push({
-          name: bookTitle.trim(),
-          brand: author?.trim() || 'Unknown Author',
-          description: `Book mentioned in ${title}`,
-          category: 'books',
-          confidence: 0.8,
-          sourceType: 'extracted'
-        });
+      if (bookTitle && bookTitle.length > 2) {
+        // Check if we already have this book
+        const exists = enhanced.some(p => 
+          normalizeString(p.name).includes(normalizeString(bookTitle)) ||
+          normalizeString(bookTitle).includes(normalizeString(p.name))
+        );
+        
+        if (!exists) {
+          console.log(`📚 Pattern match found: "${bookTitle}" by ${author || 'Unknown'}`);
+          enhanced.push({
+            name: bookTitle.trim(),
+            brand: author?.trim() || 'Unknown Author',
+            description: `Book mentioned in ${title}`,
+            category: 'books',
+            confidence: 0.8,
+            sourceType: 'extracted'
+          });
+        }
       }
     }
   }

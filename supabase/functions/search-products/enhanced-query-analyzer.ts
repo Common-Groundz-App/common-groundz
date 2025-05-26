@@ -51,13 +51,15 @@ const CATEGORY_DOMAINS: CategoryDomains = {
     highQuality: [
       'goodreads.com', 'bookish.com', 'npr.org', 'nytimes.com',
       'theguardian.com', 'reddit.com', 'kirkusreviews.com',
-      'publishersweekly.com', 'booklist.ala.org', 'libraryjournal.com'
+      'publishersweekly.com', 'booklist.ala.org', 'libraryjournal.com',
+      'bookreviews.org', 'shelfawareness.com'
     ],
     moderate: [
-      'youtube.com', 'medium.com', 'quora.com', 'booklist.in'
+      'youtube.com', 'medium.com', 'quora.com', 'booklist.in',
+      'blog', 'wordpress.com', 'blogspot.com'
     ],
     blocklist: [
-      'amazon.', 'flipkart.', 'buy', 'purchase'
+      'amazon.', 'flipkart.', 'buy', 'purchase', 'shop', 'cart'
     ]
   }
 };
@@ -132,8 +134,8 @@ function extractCategoryHints(query: string): string[] {
     hints.push('food');
   }
   
-  // Book keywords - enhanced detection
-  if (lowerQuery.match(/(book|novel|author|read|story|fiction|biography|habits|atomic habits|james clear)/)) {
+  // Enhanced book keywords - be more aggressive about detecting books
+  if (lowerQuery.match(/(book|novel|author|read|story|fiction|biography|habits|atomic habits|james clear|think and grow rich|napoleon hill|rich dad poor dad|robert kiyosaki|self.?help|personal development|bestseller|paperback|hardcover|kindle|audiobook|literature|memoir|non.?fiction)/)) {
     hints.push('books');
   }
   
@@ -149,12 +151,12 @@ function analyzeConfidenceFactors(query: string): { patternMatch: number; contex
   const lowerQuery = query.toLowerCase();
   
   // Pattern matching confidence
-  const hasSpecificBrand = /\b(cerave|cetaphil|neutrogena|eclipse solaire)\b/i.test(query);
-  const hasProductType = /\b(serum|cream|cleanser|moisturizer)\b/i.test(query);
+  const hasSpecificBrand = /\b(cerave|cetaphil|neutrogena|eclipse solaire|atomic habits|james clear|napoleon hill)\b/i.test(query);
+  const hasProductType = /\b(serum|cream|cleanser|moisturizer|book|novel|habits)\b/i.test(query);
   const patternMatch = hasSpecificBrand ? 0.9 : hasProductType ? 0.7 : 0.5;
   
   // Contextual clues confidence
-  const hasIntent = /\b(best|recommend|review|compare)\b/i.test(query);
+  const hasIntent = /\b(best|recommend|review|compare|summary|analysis)\b/i.test(query);
   const contextualClues = hasIntent ? 0.8 : 0.6;
   
   // Entity recognition confidence
@@ -181,6 +183,8 @@ function generateFallbackQueries(query: string, categoryHints: string[]): string
       fallbacks.push(`"${query}" book review`);
       fallbacks.push(`${query} summary analysis`);
       fallbacks.push(`${query} author recommendations`);
+      fallbacks.push(`${query} book summary`);
+      fallbacks.push(`${query} james clear`); // For atomic habits specifically
     }
   }
   
@@ -217,13 +221,13 @@ function generateEnhancedOptimizedQuery(
   } else if (categoryHints.includes('books')) {
     switch (intentType) {
       case 'specific_product':
-        optimized = `"${optimized}" book review summary analysis -"buy online" -"shop now" -"add to cart"`;
+        optimized = `"${optimized}" book review summary analysis -"buy online" -"shop now" -"add to cart" -"price" -"purchase"`;
         break;
       case 'category':
-        optimized = `${optimized} book review recommendation "best books" -"buy online" -"collection"`;
+        optimized = `${optimized} book review recommendation "best books" -"buy online" -"collection" -"shop"`;
         break;
       case 'comparison':
-        optimized = `${optimized} book comparison review analysis -"buy online"`;
+        optimized = `${optimized} book comparison review analysis -"buy online" -"price"`;
         break;
     }
   }
@@ -256,6 +260,14 @@ export function getEnhancedSourceQualityScore(
       } else if (categoryDomains.blocklist.some(d => domain.includes(d) || url.includes(d) || title.toLowerCase().includes(d))) {
         score -= 0.4;
       }
+    }
+  }
+  
+  // Special boost for book-related content
+  if (categoryHints.includes('books')) {
+    if (title.toLowerCase().includes('review') || title.toLowerCase().includes('summary') || 
+        title.toLowerCase().includes('analysis') || title.toLowerCase().includes('book')) {
+      score += 0.1;
     }
   }
   

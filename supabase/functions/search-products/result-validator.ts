@@ -52,7 +52,8 @@ export async function validateSearchResults(
     diversityScore, 
     freshnessScore, 
     credibilityScore,
-    results.length
+    results.length,
+    queryIntent
   );
   
   // Generate explanation
@@ -230,7 +231,8 @@ function generateImprovementSuggestions(
   diversity: number,
   freshness: number,
   credibility: number,
-  resultCount: number
+  resultCount: number,
+  queryIntent: any
 ): string[] {
   const suggestions: string[] = [];
   
@@ -256,8 +258,18 @@ function generateImprovementSuggestions(
   
   if (resultCount === 0) {
     suggestions.push('No results found - try alternative spellings or related terms');
-    suggestions.push('For books, try searching with author name or alternate title');
-    suggestions.push('Consider searching for similar products in the same category');
+    
+    // Category-specific suggestions
+    if (queryIntent.categoryHints?.includes('books')) {
+      suggestions.push('For books, try searching with author name or full title');
+      suggestions.push('Try searching for "book review [title]" or "[author] books"');
+      suggestions.push('Consider searching for similar books in the same genre');
+    }
+    
+    if (queryIntent.categoryHints?.includes('beauty')) {
+      suggestions.push('For beauty products, try including brand name');
+      suggestions.push('Consider searching for similar products in the same category');
+    }
   }
   
   return suggestions;
@@ -314,12 +326,18 @@ export function generateSpellCorrections(query: string): string[] {
     'moistrizer': 'moisturizer',
     'cleanser': 'cleanser',
     'sunscren': 'sunscreen',
-    // Book-specific corrections
+    // Enhanced book-specific corrections
     'atomic habbit': 'atomic habits',
     'atomic habit': 'atomic habits',
+    'atommic habits': 'atomic habits',
+    'atomic habbits': 'atomic habits',
     'james claire': 'james clear',
     'james cleer': 'james clear',
-    'habbit': 'habits'
+    'james clear': 'james clear',
+    'habbit': 'habits',
+    'habbits': 'habits',
+    'think grow rich': 'think and grow rich',
+    'rich dad poor dad': 'rich dad poor dad'
   };
   
   let corrected = query.toLowerCase();
