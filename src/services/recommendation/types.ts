@@ -12,7 +12,7 @@ export interface Entity {
   slug?: string;
   category_id?: string;
   popularity_score?: number;
-  photo_reference?: string; // Added this missing property
+  photo_reference?: string;
 }
 
 export enum EntityType {
