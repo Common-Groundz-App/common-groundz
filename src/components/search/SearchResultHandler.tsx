@@ -1,10 +1,10 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { useToast } from '@/hooks/use-toast';
+import { Entity } from '@/services/recommendation/types';
 
 interface SearchResultHandlerProps {
   result: ProductSearchResult;
@@ -40,12 +40,12 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
       };
 
       // Create entity from the search result
-      const entity = await createEntityFromExternal(externalData);
+      const entity = await createEntityFromExternal(externalData) as Entity;
       
       if (entity) {
         // Navigate to the entity page using the proper URL structure
         // Use slug if available, otherwise fall back to id
-        const identifier = entity.slug || entity.id;
+        const identifier = (entity as any).slug || entity.id;
         const entityPath = `/${entityType}/${identifier}`;
         navigate(entityPath);
         
