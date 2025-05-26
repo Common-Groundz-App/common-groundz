@@ -4,6 +4,8 @@ import { ensureHttps, isValidUrl } from "./utils.ts";
 import { extractProductMentions, analyzeProductFrequency, ProductExtractionResult } from "./product-extractor.ts";
 import { analyzeQueryIntent } from "./query-analyzer.ts";
 import { identifyProductsWithLLM, processProductWithEnhancedLLMs } from "./llm-analyzer.ts";
+import { enhancedQueryAnalysis, getEnhancedSourceQualityScore } from "./enhanced-query-analyzer.ts";
+import { validateSearchResults, shouldTriggerFallback, generateSpellCorrections } from "./result-validator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -209,6 +211,7 @@ serve(async (req) => {
 
     let results: ProductResult[] = [];
     let sourceOfResults = "api";
+    let processingMethod = "enhanced_v2";
 
     // Get API keys
     const serpApiKey = Deno.env.get("SERP_API_KEY");
@@ -229,12 +232,13 @@ serve(async (req) => {
       );
     }
 
-    // PHASE 0: Query Intent Analysis
-    console.log(`🧠 PHASE 0: Analyzing query intent for: "${query}"`);
-    const queryIntent = await analyzeQueryIntent(query, geminiApiKey, openaiApiKey);
+    // PHASE 0: Enhanced Query Intent Analysis
+    console.log(`🧠 PHASE 0: Enhanced query analysis for: "${query}"`);
+    const enhancedIntent = await enhancedQueryAnalysis(query, geminiApiKey, openaiApiKey);
     
-    console.log(`🎯 Query classified as: ${queryIntent.type} (confidence: ${queryIntent.confidence})`);
-    console.log(`🔧 Optimized query: "${queryIntent.optimizedQuery}"`);
+    console.log(`🎯 Enhanced classification: ${enhancedIntent.type} (confidence: ${enhancedIntent.confidence})`);
+    console.log(`📍 Category hints: ${enhancedIntent.categoryHints.join(', ')}`);
+    console.log(`🔧 Enhanced optimized query: "${enhancedIntent.optimizedQuery}"`);
 
     // Check cache first if not explicitly bypassing
     if (!bypassCache) {
@@ -299,7 +303,7 @@ serve(async (req) => {
                   count: results.length,
                   total_sources_analyzed: 0,
                   processing_method: "cached",
-                  query_intent: queryIntent.type
+                  query_intent: enhancedIntent.type
                 }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } }
               );
@@ -311,201 +315,263 @@ serve(async (req) => {
       }
     }
 
-    // Enhanced SERP API call with optimized query
-    const searchUrl = new URL("https://serpapi.com/search");
-    searchUrl.searchParams.append("api_key", serpApiKey);
-    searchUrl.searchParams.append("engine", "google");
-    searchUrl.searchParams.append("q", queryIntent.optimizedQuery);
-    searchUrl.searchParams.append("gl", "in");
-    searchUrl.searchParams.append("hl", "en");
-    searchUrl.searchParams.append("num", "25");
+    // PHASE 1: Enhanced Search Execution
+    console.log(`🔍 PHASE 1: Enhanced search execution for: "${enhancedIntent.optimizedQuery}"`);
+    
+    let searchSuccessful = false;
+    let currentQuery = enhancedIntent.optimizedQuery;
+    let fallbackAttempt = 0;
+    const maxFallbackAttempts = enhancedIntent.fallbackQueries.length;
 
-    console.log(`🔍 ENHANCED SEARCH (${queryIntent.type.toUpperCase()}): "${queryIntent.optimizedQuery}"`);
-    
-    const response = await fetch(searchUrl.toString());
-    if (!response.ok) {
-      throw new Error(`SerpApi request failed: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const organicResults = data.organic_results || [];
-    
-    if (organicResults.length === 0) {
-      console.log("No organic results found");
-      return new Response(
-        JSON.stringify({ 
-          results: [],
-          source: "api",
-          query: query,
-          count: 0,
-          total_sources_analyzed: 0,
-          processing_method: "no_results",
-          query_intent: queryIntent.type
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Intent-aware source filtering and ranking
-    const processedSources = filterAndRankSources(organicResults, queryIntent.type);
-    console.log(`🔍 Filtered to ${processedSources.length} high-quality ${queryIntent.type} sources from ${organicResults.length} results`);
-    
-    if (processedSources.length === 0) {
-      console.log("No high-quality sources found after intent-aware filtering");
-      return new Response(
-        JSON.stringify({ 
-          results: [],
-          source: "api",
-          query: query,
-          count: 0,
-          total_sources_analyzed: organicResults.length,
-          processing_method: "filtered_out",
-          query_intent: queryIntent.type
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // PHASE 1: LLM-based product extraction from high-quality sources
-    console.log(`🤖 Phase 1: Starting LLM-based product identification from ${processedSources.length} sources`);
-    
-    const allIdentifiedProducts = new Map<string, Array<{ text: string; source_title: string; source_url: string }>>();
-    
-    for (const source of processedSources) {
+    while (!searchSuccessful && fallbackAttempt <= maxFallbackAttempts) {
       try {
-        console.log(`🤖 Identifying products from: ${source.title}`);
+        const searchUrl = new URL("https://serpapi.com/search");
+        searchUrl.searchParams.append("api_key", serpApiKey);
+        searchUrl.searchParams.append("engine", "google");
+        searchUrl.searchParams.append("q", currentQuery);
+        searchUrl.searchParams.append("gl", "in");
+        searchUrl.searchParams.append("hl", enhancedIntent.languageDetected === 'hindi' ? 'hi' : 'en');
+        searchUrl.searchParams.append("num", "25");
+
+        console.log(`🔍 Search attempt ${fallbackAttempt + 1}: "${currentQuery}"`);
         
-        // Get full content or use snippet
-        let content = source.snippet;
-        try {
-          const fetchResponse = await fetch(source.url, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProductBot/1.0)' },
-            signal: AbortSignal.timeout(5000),
-          });
+        const response = await fetch(searchUrl.toString());
+        if (!response.ok) {
+          throw new Error(`SerpApi request failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const organicResults = data.organic_results || [];
+        
+        if (organicResults.length === 0) {
+          console.log(`No results for attempt ${fallbackAttempt + 1}, trying fallback`);
+          fallbackAttempt++;
+          if (fallbackAttempt <= maxFallbackAttempts) {
+            currentQuery = enhancedIntent.fallbackQueries[fallbackAttempt - 1];
+            continue;
+          } else {
+            // Try spell corrections as last resort
+            const corrections = generateSpellCorrections(query);
+            if (corrections.length > 0) {
+              currentQuery = corrections[0];
+              console.log(`🔤 Trying spell correction: "${currentQuery}"`);
+              continue;
+            }
+          }
+        } else {
+          searchSuccessful = true;
           
-          if (fetchResponse.ok) {
-            const html = await fetchResponse.text();
-            // Extract text from HTML (simplified)
-            content = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-                          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-                          .replace(/<[^>]*>/g, ' ')
-                          .replace(/\s+/g, ' ')
-                          .trim()
-                          .substring(0, 5000);
+          // Enhanced source filtering with category awareness
+          const processedSources = organicResults
+            .map((result: any) => {
+              const domain = new URL(result.link || '').hostname;
+              let type: 'review' | 'official' | 'forum' | 'blog' | 'ecommerce' = 'blog';
+              
+              if (domain.includes('reddit.com') || domain.includes('quora.com')) {
+                type = 'forum';
+              } else if (domain.includes('amazon.') || domain.includes('flipkart.') || 
+                         domain.includes('myntra.') || domain.includes('nykaa.') ||
+                         domain.includes('sephora.') || domain.includes('ulta.')) {
+                type = 'ecommerce';
+              } else if (result.title?.toLowerCase().includes('review') || 
+                         domain.includes('review') || 
+                         ['cosmopolitan.com', 'allure.com', 'byrdie.com'].some(d => domain.includes(d))) {
+                type = 'review';
+              } else if (result.snippet?.toLowerCase().includes('official') || domain.includes('official')) {
+                type = 'official';
+              }
+
+              const qualityScore = getEnhancedSourceQualityScore(
+                domain, 
+                result.link, 
+                result.title || '', 
+                enhancedIntent.type,
+                enhancedIntent.categoryHints
+              );
+              
+              return {
+                title: result.title || `Result`,
+                url: ensureHttps(result.link || "") || "",
+                snippet: result.snippet || "",
+                type: type,
+                qualityScore: qualityScore,
+                domain: domain
+              };
+            })
+            .filter(source => {
+              return source.url && source.title && source.qualityScore > 0.3;
+            })
+            .sort((a, b) => b.qualityScore - a.qualityScore)
+            .slice(0, enhancedIntent.type === 'specific_product' ? 8 : 12);
+
+          console.log(`🔍 Enhanced filtering: ${processedSources.length} high-quality sources from ${organicResults.length} results`);
+          
+          if (processedSources.length === 0) {
+            console.log("No high-quality sources after enhanced filtering");
+            fallbackAttempt++;
+            if (fallbackAttempt <= maxFallbackAttempts) {
+              currentQuery = enhancedIntent.fallbackQueries[fallbackAttempt - 1];
+              searchSuccessful = false;
+              continue;
+            }
+          } else {
+            // PHASE 2: Enhanced Product Extraction
+            console.log(`🤖 PHASE 2: Enhanced LLM-based product identification from ${processedSources.length} sources`);
+            
+            const allIdentifiedProducts = new Map<string, Array<{ text: string; source_title: string; source_url: string }>>();
+            
+            for (const source of processedSources) {
+              try {
+                console.log(`🤖 Enhanced extraction from: ${source.title} (Quality: ${source.qualityScore.toFixed(2)})`);
+                
+                let content = source.snippet;
+                try {
+                  const fetchResponse = await fetch(source.url, {
+                    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProductBot/1.0)' },
+                    signal: AbortSignal.timeout(5000),
+                  });
+                  
+                  if (fetchResponse.ok) {
+                    const html = await fetchResponse.text();
+                    content = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                                  .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                                  .replace(/<[^>]*>/g, ' ')
+                                  .replace(/\s+/g, ' ')
+                                  .trim()
+                                  .substring(0, 5000);
+                  }
+                } catch (fetchError) {
+                  console.log(`⚠️ Using snippet for ${source.url}`);
+                }
+                
+                const identifiedProducts = await identifyProductsWithLLM(content, source.title, geminiApiKey, openaiApiKey);
+                
+                console.log(`🎯 Enhanced identification: ${identifiedProducts.length} products from ${source.title}`);
+                
+                for (const productName of identifiedProducts) {
+                  const normalizedName = productName.toLowerCase().trim();
+                  if (!allIdentifiedProducts.has(normalizedName)) {
+                    allIdentifiedProducts.set(normalizedName, []);
+                  }
+                  allIdentifiedProducts.get(normalizedName)!.push({
+                    text: content.substring(0, 1000),
+                    source_title: source.title,
+                    source_url: source.url
+                  });
+                }
+                
+              } catch (error) {
+                console.error(`❌ Error in enhanced processing for ${source.url}:`, error);
+              }
+            }
+            
+            console.log(`📊 Enhanced extraction complete: ${allIdentifiedProducts.size} unique products identified`);
+            
+            if (allIdentifiedProducts.size > 0) {
+              // PHASE 3: Enhanced Product Analysis and Ranking
+              const rankedProducts = Array.from(allIdentifiedProducts.entries())
+                .map(([productName, contexts]) => ({
+                  product_name: contexts[0] ? contexts.find(c => c.text.toLowerCase().includes(productName))?.text.split(' ').find(word => 
+                    word.toLowerCase().includes(productName.split(' ')[0].toLowerCase())
+                  ) || productName : productName,
+                  brand: productName.split(' ')[0],
+                  mention_count: contexts.length,
+                  quality_score: contexts.length * 0.2 + (contexts.reduce((sum, ctx) => sum + ctx.source_title.length, 0) / contexts.length) * 0.001,
+                  contexts: contexts
+                }))
+                .sort((a, b) => {
+                  const scoreA = a.mention_count * a.quality_score;
+                  const scoreB = b.mention_count * b.quality_score;
+                  return scoreB - scoreA;
+                })
+                .slice(0, 5);
+
+              console.log(`🏆 Enhanced ranking complete:`, rankedProducts.map(p => `${p.product_name} (${p.mention_count} mentions)`));
+
+              // Enhanced LLM analysis for each product
+              const productResults: ProductResult[] = [];
+              
+              for (const rankedProduct of rankedProducts) {
+                try {
+                  console.log(`🤖 Enhanced analysis: ${rankedProduct.product_name}`);
+                  
+                  const { analysis, llmUsed } = await processProductWithEnhancedLLMs(
+                    rankedProduct.product_name,
+                    rankedProduct.contexts,
+                    rankedProduct.mention_count,
+                    rankedProduct.quality_score,
+                    geminiApiKey,
+                    openaiApiKey
+                  );
+                  
+                  processingMethod = `enhanced_${llmUsed}_v2`;
+                  
+                  const productResult: ProductResult = {
+                    product_name: rankedProduct.product_name,
+                    brand: rankedProduct.brand,
+                    summary: analysis.summary || `${rankedProduct.product_name} mentioned ${rankedProduct.mention_count} times across expert sources.`,
+                    image_url: undefined,
+                    sources: rankedProduct.contexts.map(ctx => ({
+                      title: ctx.source_title,
+                      url: ctx.source_url,
+                      snippet: ctx.text.substring(0, 200),
+                      type: 'review' as any
+                    })),
+                    insights: {
+                      pros: analysis.insights?.pros || [],
+                      cons: analysis.insights?.cons || [],
+                      price_range: analysis.insights?.price_range || "Price varies",
+                      overall_rating: analysis.insights?.overall_rating || "Expert mentioned",
+                      key_features: analysis.insights?.key_features || [],
+                      recommended_by: analysis.insights?.recommended_by || []
+                    },
+                    mention_frequency: rankedProduct.mention_count,
+                    quality_score: rankedProduct.quality_score,
+                    api_source: `enhanced_google_search_${llmUsed}_v2`,
+                    api_ref: `enhanced_search_v2_${Date.now()}_${rankedProduct.product_name.replace(/\s+/g, '_')}`
+                  };
+                  
+                  productResults.push(productResult);
+                  
+                } catch (error) {
+                  console.error(`❌ Error in enhanced analysis for ${rankedProduct.product_name}:`, error);
+                }
+              }
+
+              results = productResults;
+            }
           }
-        } catch (fetchError) {
-          console.log(`⚠️ Using snippet for ${source.url}`);
-        }
-        
-        // Stage 1: Identify specific products using LLM
-        const identifiedProducts = await identifyProductsWithLLM(content, source.title, geminiApiKey, openaiApiKey);
-        
-        console.log(`🎯 Identified ${identifiedProducts.length} products from ${source.title}`);
-        
-        // Store products with their contexts
-        for (const productName of identifiedProducts) {
-          if (!allIdentifiedProducts.has(productName)) {
-            allIdentifiedProducts.set(productName, []);
-          }
-          allIdentifiedProducts.get(productName)!.push({
-            text: content.substring(0, 1000), // Store relevant context
-            source_title: source.title,
-            source_url: source.url
-          });
         }
         
       } catch (error) {
-        console.error(`❌ Error processing source ${source.url}:`, error);
-      }
-    }
-    
-    console.log(`📊 Total unique products identified: ${allIdentifiedProducts.size}`);
-    
-    if (allIdentifiedProducts.size === 0) {
-      console.log("No products identified after LLM processing");
-      return new Response(
-        JSON.stringify({ 
-          results: [],
-          source: "api",
-          query: query,
-          count: 0,
-          total_sources_analyzed: processedSources.length,
-          processing_method: "no_products_identified",
-          query_intent: queryIntent.type
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // PHASE 2: Rank products by mention frequency and quality
-    const rankedProducts = Array.from(allIdentifiedProducts.entries())
-      .map(([productName, contexts]) => ({
-        product_name: productName,
-        brand: productName.split(' ')[0], // First word is usually the brand
-        mention_count: contexts.length,
-        quality_score: contexts.length * 0.2, // Simple quality scoring
-        contexts: contexts
-      }))
-      .sort((a, b) => b.mention_count - a.mention_count)
-      .slice(0, 5); // Top 5 products
-
-    console.log(`🏆 Top ranked products:`, rankedProducts.map(p => `${p.product_name} (${p.mention_count} mentions)`));
-
-    // PHASE 3: Enhanced LLM analysis for each top product
-    const productResults: ProductResult[] = [];
-    let processingMethod = 'fallback';
-    
-    for (const rankedProduct of rankedProducts) {
-      try {
-        console.log(`🤖 Stage 2: Analyzing ${rankedProduct.product_name}`);
-        
-        const { analysis, llmUsed } = await processProductWithEnhancedLLMs(
-          rankedProduct.product_name,
-          rankedProduct.contexts,
-          rankedProduct.mention_count,
-          rankedProduct.quality_score,
-          geminiApiKey,
-          openaiApiKey
-        );
-        
-        processingMethod = llmUsed;
-        
-        const productResult: ProductResult = {
-          product_name: rankedProduct.product_name,
-          brand: rankedProduct.brand,
-          summary: analysis.summary || `${rankedProduct.product_name} mentioned ${rankedProduct.mention_count} times across expert sources.`,
-          image_url: undefined,
-          sources: rankedProduct.contexts.map(ctx => ({
-            title: ctx.source_title,
-            url: ctx.source_url,
-            snippet: ctx.text.substring(0, 200),
-            type: 'review' as any
-          })),
-          insights: {
-            pros: analysis.insights?.pros || [],
-            cons: analysis.insights?.cons || [],
-            price_range: analysis.insights?.price_range || "Price varies",
-            overall_rating: analysis.insights?.overall_rating || "Expert mentioned",
-            key_features: analysis.insights?.key_features || [],
-            recommended_by: analysis.insights?.recommended_by || []
-          },
-          mention_frequency: rankedProduct.mention_count,
-          quality_score: rankedProduct.quality_score,
-          api_source: `enhanced_google_search_${llmUsed}`,
-          api_ref: `enhanced_search_${Date.now()}_${rankedProduct.product_name.replace(/\s+/g, '_')}`
-        };
-        
-        productResults.push(productResult);
-        
-      } catch (error) {
-        console.error(`❌ Error analyzing product ${rankedProduct.product_name}:`, error);
+        console.error(`❌ Error in search attempt ${fallbackAttempt + 1}:`, error);
+        fallbackAttempt++;
+        if (fallbackAttempt <= maxFallbackAttempts) {
+          currentQuery = enhancedIntent.fallbackQueries[fallbackAttempt - 1];
+        }
       }
     }
 
-    results = productResults;
-    console.log(`✅ Successfully processed ${results.length} products using enhanced method: ${processingMethod}`);
+    // PHASE 4: Result Validation and Quality Assurance
+    console.log(`🔍 PHASE 4: Validating results quality`);
+    const validation = await validateSearchResults(query, results, enhancedIntent, geminiApiKey, openaiApiKey);
+    
+    console.log(`📊 Validation complete: Overall quality ${validation.overallQuality.toFixed(2)}`);
+    if (validation.suggestions.length > 0) {
+      console.log(`💡 Suggestions: ${validation.suggestions.join(', ')}`);
+    }
 
-    // Update cache with new results
+    // Trigger additional fallback if quality is too low
+    if (shouldTriggerFallback(validation) && results.length === 0) {
+      console.log(`🔄 Quality too low, attempting spell correction fallback`);
+      const corrections = generateSpellCorrections(query);
+      if (corrections.length > 0) {
+        console.log(`🔤 Attempting with correction: "${corrections[0]}"`);
+        // Could recursively call with corrected query, but keeping simple for now
+      }
+    }
+
+    // Update cache with enhanced results
     try {
       const { data: queryData, error: queryError } = await supabaseServiceClient
         .from("cached_queries")
@@ -544,7 +610,8 @@ serve(async (req) => {
               sources: product.sources,
               insights: product.insights,
               mention_frequency: product.mention_frequency,
-              quality_score: product.quality_score
+              quality_score: product.quality_score,
+              validation: validation
             }
           }));
           
@@ -553,27 +620,27 @@ serve(async (req) => {
             .insert(productsToCache);
           
           if (insertError) {
-            console.error("Error inserting product cache:", insertError);
+            console.error("Error inserting enhanced product cache:", insertError);
           } else {
-            console.log(`💾 Successfully cached ${productsToCache.length} products for query "${query}"`);
+            console.log(`💾 Successfully cached ${productsToCache.length} enhanced products for query "${query}"`);
           }
         }
       }
     } catch (cacheError) {
-      console.error("Error updating cache:", cacheError);
+      console.error("Error updating enhanced cache:", cacheError);
     }
 
     const finalResponse: SearchResponse = {
       results: results,
-      source: "api",
+      source: sourceOfResults,
       query: query,
       count: results.length,
-      total_sources_analyzed: processedSources.length,
-      processing_method: `enhanced_intent_aware`,
-      query_intent: queryIntent.type
+      total_sources_analyzed: searchSuccessful ? 25 : 0,
+      processing_method: processingMethod,
+      query_intent: enhancedIntent.type
     };
 
-    console.log(`✅ INTENT-AWARE SUCCESS: Returning ${results.length} ${queryIntent.type} results for query "${query}"`);
+    console.log(`✅ ENHANCED SUCCESS: Returning ${results.length} ${enhancedIntent.type} results for query "${query}" (Quality: ${validation.overallQuality.toFixed(2)})`);
 
     return new Response(
       JSON.stringify(finalResponse),

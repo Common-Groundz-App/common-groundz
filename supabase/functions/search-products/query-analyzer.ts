@@ -39,7 +39,9 @@ const SPECIFIC_PRODUCT_PATTERNS = [
   'Retinol', 'Salicylic Acid', 'AHA BHA', 'Sunscreen SPF'
 ];
 
-export async function analyzeQueryIntent(
+export { analyzeQueryIntent };
+
+async function analyzeQueryIntent(
   query: string,
   geminiApiKey?: string,
   openaiApiKey?: string
