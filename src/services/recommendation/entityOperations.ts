@@ -5,6 +5,17 @@ import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '
 import { getEntityTypeFallbackImage } from '@/utils/imageUtils';
 import { deferEntityImageRefresh } from '@/utils/imageRefresh';
 
+// Generate a slug from a name
+const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .trim()
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+};
+
 // Fetch an entity by its ID
 export const fetchEntityById = async (entityId: string): Promise<Entity | null> => {
   const { data, error } = await supabase
@@ -103,6 +114,9 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
   // Ensure we have a valid image URL or use fallback based on type
   const imageUrl = entity.image_url || getEntityTypeFallbackImage(typeAsString);
   
+  // Generate slug if not provided
+  const slug = entity.slug || generateSlug(entity.name);
+  
   // For database insertion, prepare the entity data with only the fields that exist in the database
   const entityForDb = {
     name: entity.name,
@@ -113,8 +127,11 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     api_source: entity.api_source || null,
     api_ref: entity.api_ref || null,
     metadata: entity.metadata || null,
-    website_url: entity.website_url || null
+    website_url: entity.website_url || null,
+    slug: slug
   };
+  
+  console.log(`🏗️ Creating entity in database:`, entityForDb);
   
   const { data, error } = await supabase
     .from('entities')
@@ -124,10 +141,11 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     .maybeSingle();
 
   if (error) {
-    console.error('Error creating entity:', error);
+    console.error('❌ Error creating entity:', error);
     return null;
   }
 
+  console.log(`✅ Entity created successfully:`, data);
   return data as Entity;
 };
 
@@ -148,13 +166,13 @@ export const findOrCreateEntity = async (
   if (apiSource && apiRef) {
     const existingEntity = await findEntityByApiRef(apiSource, apiRef);
     if (existingEntity) {
-      console.log(`Found existing entity: ${existingEntity.id} (${existingEntity.name}) with api_ref: ${apiRef}`);
+      console.log(`🔍 Found existing entity: ${existingEntity.id} (${existingEntity.name}) with api_ref: ${apiRef}`);
       
       // If it's a Google Places entity and we want to ensure image is up to date
       if (apiSource === 'google_places' && metadata?.photo_reference) {
         // Store photo reference in metadata if it's not there already
         if (!existingEntity.metadata?.photo_reference) {
-          console.log(`Updating entity ${existingEntity.id} with photo reference: ${metadata.photo_reference}`);
+          console.log(`📝 Updating entity ${existingEntity.id} with photo reference: ${metadata.photo_reference}`);
           
           const { error: updateError } = await supabase
             .from('entities')
@@ -178,7 +196,7 @@ export const findOrCreateEntity = async (
   // Ensure we have a valid image URL or use fallback based on type
   const finalImageUrl = imageUrl || getEntityTypeFallbackImage(typeAsString);
 
-  console.log(`Creating new entity: ${name} (${typeAsString}) with api_ref: ${apiRef}`);
+  console.log(`🆕 Creating new entity: ${name} (${typeAsString}) with api_ref: ${apiRef}`);
   
   // Create a new entity if not found or if we don't have API reference info
   const entity = await createEntity({
@@ -190,13 +208,14 @@ export const findOrCreateEntity = async (
     api_source: apiSource,
     api_ref: apiRef,
     metadata,
-    website_url: websiteUrl
+    website_url: websiteUrl,
+    slug: generateSlug(name)
   });
   
   // If entity creation was successful and it's a Google Places entity,
   // schedule a background image refresh after a delay
   if (entity && apiSource === 'google_places' && apiRef) {
-    console.log(`Scheduling deferred image refresh for newly created entity: ${entity.id}`);
+    console.log(`⏰ Scheduling deferred image refresh for newly created entity: ${entity.id}`);
     deferEntityImageRefresh(entity.id);
   }
   

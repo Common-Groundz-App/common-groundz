@@ -83,7 +83,9 @@ function App() {
               <Route path="/post/:id" element={<ProtectedRoute><PostView /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/recommendations/:id" element={<ProtectedRoute><RecommendationView /></ProtectedRoute>} />
-              {/* Fixed entity routes - support all entity types */}
+              
+              {/* Entity routes - support all entity types with both old and new formats */}
+              <Route path="/entity/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
               <Route path="/place/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
               <Route path="/movie/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />
               <Route path="/book/:slug" element={<ProtectedRoute><EntityDetail /></ProtectedRoute>} />

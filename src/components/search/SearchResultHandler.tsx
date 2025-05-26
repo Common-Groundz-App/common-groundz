@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -22,6 +23,8 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
 
   const handleResultClick = async () => {
     try {
+      console.log(`🔍 Creating entity from search result:`, result);
+      
       // Convert search result to external data format for entity creation
       const externalData = {
         name: result.name,
@@ -39,20 +42,27 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         }
       };
 
+      console.log(`🏗️ Creating ${entityType} entity with data:`, externalData);
+
       // Create entity from the search result
       const entity = await createEntityFromExternal(externalData) as Entity;
       
       if (entity) {
+        console.log(`✅ Entity created successfully:`, entity);
+        
         // Navigate to the entity page using the proper URL structure
         // Use slug if available, otherwise fall back to id
-        const identifier = (entity as any).slug || entity.id;
+        const identifier = entity.slug || entity.id;
         const entityPath = `/${entityType}/${identifier}`;
+        
+        console.log(`🔗 Navigating to entity page: ${entityPath}`);
         navigate(entityPath);
         
         if (onClose) {
           onClose();
         }
       } else {
+        console.error('❌ Entity creation failed - no entity returned');
         toast({
           title: 'Error',
           description: 'Could not create entity from this result',
@@ -60,7 +70,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         });
       }
     } catch (error) {
-      console.error('Error handling search result:', error);
+      console.error('❌ Error handling search result:', error);
       toast({
         title: 'Error',
         description: 'Failed to process search result',
@@ -100,6 +110,11 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
             {result.metadata.price}
           </p>
         )}
+        <div className="mt-1">
+          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+            {entityType}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -127,6 +142,12 @@ function determineEntityType(result: ProductSearchResult): EntityTypeString {
     result.venue.toLowerCase().includes('food')
   )) {
     return 'food';
+  }
+  
+  // Check for book-related keywords in the name or description
+  const text = `${result.name} ${result.description || ''}`.toLowerCase();
+  if (text.includes('book') || text.includes('author') || text.includes('novel') || text.includes('paperback') || text.includes('hardcover')) {
+    return 'book';
   }
   
   // Default to product for shopping/commercial results
