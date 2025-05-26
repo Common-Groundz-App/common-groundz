@@ -2,7 +2,8 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, ShoppingBag } from 'lucide-react';
+import { Star, ShoppingBag, Plus } from 'lucide-react';
+import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 
 interface ProductCardProps {
   product: {
@@ -16,13 +17,25 @@ interface ProductCardProps {
       price?: string;
       rating?: number;
       seller?: string;
-      purchase_url: string;
+      purchase_url?: string;
       [key: string]: any;
     }
   };
+  enableEntityCreation?: boolean;
+  onEntityCreated?: () => void;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, enableEntityCreation = false, onEntityCreated }: ProductCardProps) {
+  if (enableEntityCreation) {
+    return (
+      <SearchResultHandler 
+        result={product} 
+        query="" 
+        onClose={onEntityCreated}
+      />
+    );
+  }
+
   return (
     <Card className="overflow-hidden h-full flex flex-col">
       <div className="h-48 overflow-hidden relative">
@@ -66,12 +79,24 @@ export function ProductCard({ product }: ProductCardProps) {
       )}
       
       <CardFooter className="p-4 pt-2 flex justify-end">
-        <Button 
-          onClick={() => window.open(product.metadata.purchase_url, '_blank', 'noopener,noreferrer')}
-          className="w-full"
-        >
-          Buy Now
-        </Button>
+        {product.metadata.purchase_url ? (
+          <Button 
+            onClick={() => window.open(product.metadata.purchase_url, '_blank', 'noopener,noreferrer')}
+            className="w-full"
+          >
+            Buy Now
+          </Button>
+        ) : (
+          <SearchResultHandler 
+            result={product} 
+            query="" 
+          >
+            <Button className="w-full" variant="outline">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Entity
+            </Button>
+          </SearchResultHandler>
+        )}
       </CardFooter>
     </Card>
   );

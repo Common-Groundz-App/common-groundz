@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -13,10 +12,10 @@ import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { ProductCard } from '@/components/explore/ProductCard';
+import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
 import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { ProductSearchResult, EntitySearchResult, RecommendationSearchResult, ReviewSearchResult, SearchResult as UserSearchResult } from '@/hooks/use-unified-search';
+import { useUnifiedSearch } from '@/hooks/use-unified-search';
 
 const Search = () => {
   const isMobile = useIsMobile();
@@ -24,65 +23,10 @@ const Search = () => {
   const navigate = useNavigate();
   const query = searchParams.get('q') || '';
   const [searchQuery, setSearchQuery] = useState(query);
-  const [searchResults, setSearchResults] = useState<{
-    products: ProductSearchResult[];
-    entities: EntitySearchResult[];
-    reviews: ReviewSearchResult[];
-    recommendations: RecommendationSearchResult[];
-    users: UserSearchResult[];
-  }>({
-    products: [],
-    entities: [],
-    reviews: [],
-    recommendations: [],
-    users: []
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
 
-  // Function to perform the search
-  const performSearch = async (q: string) => {
-    if (!q || q.trim().length < 2) return;
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('search-all', {
-        body: { 
-          query: q,
-          limit: 20,
-          type: activeTab === 'all' ? 'all' : activeTab
-        }
-      });
-      
-      if (error) {
-        throw new Error(`Search failed: ${error.message}`);
-      }
-      
-      setSearchResults({
-        products: data?.products || [],
-        entities: data?.entities || [],
-        reviews: data?.reviews || [],
-        recommendations: data?.recommendations || [],
-        users: data?.users || []
-      });
-      
-    } catch (err) {
-      console.error('Error performing search:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      setSearchResults({
-        products: [],
-        entities: [],
-        reviews: [],
-        recommendations: [],
-        users: []
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Use the updated unified search hook
+  const { results, isLoading, error } = useUnifiedSearch(query);
 
   // Update the URL when search query changes
   const handleSearch = (e: React.FormEvent) => {
@@ -90,19 +34,6 @@ const Search = () => {
     if (searchQuery.trim().length >= 2) {
       setSearchParams({ q: searchQuery });
     }
-  };
-
-  // Perform search when the query parameter changes
-  useEffect(() => {
-    if (query && query.trim().length >= 2) {
-      performSearch(query);
-    }
-  }, [query, activeTab]);
-
-  // Handle tab change
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    performSearch(query);
   };
 
   return (
@@ -152,7 +83,7 @@ const Search = () => {
                 <Tabs 
                   defaultValue="all" 
                   value={activeTab}
-                  onValueChange={handleTabChange}
+                  onValueChange={setActiveTab}
                   className="mb-6"
                 >
                   <TabsList>
@@ -178,26 +109,30 @@ const Search = () => {
                       <>
                         <TabsContent value="all">
                           {/* Products section */}
-                          {searchResults.products.length > 0 && (
+                          {results.products.length > 0 && (
                             <div className="mb-8">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                <ShoppingBag className="h-5 w-5" /> Products
+                                <ShoppingBag className="h-5 w-5" /> Products & Items
                               </h2>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {searchResults.products.slice(0, 3).map((product, index) => (
-                                  <ProductCard 
+                              <p className="text-sm text-muted-foreground mb-4">
+                                Click any result to create an entity and start reviewing!
+                              </p>
+                              <div className="space-y-2">
+                                {results.products.slice(0, 5).map((product, index) => (
+                                  <SearchResultHandler
                                     key={`${product.api_source}-${product.api_ref || index}`}
-                                    product={product} 
+                                    result={product}
+                                    query={query}
                                   />
                                 ))}
                               </div>
-                              {searchResults.products.length > 3 && (
+                              {results.products.length > 5 && (
                                 <div className="mt-4 text-center">
                                   <Button 
                                     variant="outline"
                                     onClick={() => setActiveTab('products')}
                                   >
-                                    View all {searchResults.products.length} products
+                                    View all {results.products.length} items
                                   </Button>
                                 </div>
                               )}
@@ -205,13 +140,13 @@ const Search = () => {
                           )}
                           
                           {/* Places section */}
-                          {searchResults.entities.length > 0 && (
+                          {results.entities.length > 0 && (
                             <div className="mb-8">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                 <MapPin className="h-5 w-5" /> Places & Things
                               </h2>
                               <div className="border rounded-md overflow-hidden">
-                                {searchResults.entities.slice(0, 5).map((entity) => (
+                                {results.entities.slice(0, 5).map((entity) => (
                                   <EntityResultItem
                                     key={entity.id}
                                     entity={entity}
@@ -219,13 +154,13 @@ const Search = () => {
                                   />
                                 ))}
                               </div>
-                              {searchResults.entities.length > 5 && (
+                              {results.entities.length > 5 && (
                                 <div className="mt-4 text-center">
                                   <Button 
                                     variant="outline"
                                     onClick={() => setActiveTab('entities')}
                                   >
-                                    View all {searchResults.entities.length} places & things
+                                    View all {results.entities.length} places & things
                                   </Button>
                                 </div>
                               )}
@@ -233,13 +168,13 @@ const Search = () => {
                           )}
                           
                           {/* People section */}
-                          {searchResults.users.length > 0 && (
+                          {results.users.length > 0 && (
                             <div className="mb-8">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                 <Users className="h-5 w-5" /> People
                               </h2>
                               <div className="border rounded-md overflow-hidden">
-                                {searchResults.users.slice(0, 5).map((user) => (
+                                {results.users.slice(0, 5).map((user) => (
                                   <UserResultItem
                                     key={user.id}
                                     user={user}
@@ -247,13 +182,13 @@ const Search = () => {
                                   />
                                 ))}
                               </div>
-                              {searchResults.users.length > 5 && (
+                              {results.users.length > 5 && (
                                 <div className="mt-4 text-center">
                                   <Button 
                                     variant="outline"
                                     onClick={() => setActiveTab('users')}
                                   >
-                                    View all {searchResults.users.length} people
+                                    View all {results.users.length} people
                                   </Button>
                                 </div>
                               )}
@@ -261,11 +196,11 @@ const Search = () => {
                           )}
                           
                           {/* Reviews section */}
-                          {searchResults.reviews.length > 0 && (
+                          {results.reviews.length > 0 && (
                             <div className="mb-8">
                               <h2 className="text-xl font-semibold mb-4">Reviews</h2>
                               <div className="border rounded-md overflow-hidden">
-                                {searchResults.reviews.slice(0, 3).map((review) => (
+                                {results.reviews.slice(0, 3).map((review) => (
                                   <ReviewResultItem
                                     key={review.id}
                                     review={review}
@@ -273,13 +208,13 @@ const Search = () => {
                                   />
                                 ))}
                               </div>
-                              {searchResults.reviews.length > 3 && (
+                              {results.reviews.length > 3 && (
                                 <div className="mt-4 text-center">
                                   <Button 
                                     variant="outline"
                                     onClick={() => setActiveTab('reviews')}
                                   >
-                                    View all {searchResults.reviews.length} reviews
+                                    View all {results.reviews.length} reviews
                                   </Button>
                                 </div>
                               )}
@@ -287,11 +222,11 @@ const Search = () => {
                           )}
                           
                           {/* No results message */}
-                          {!searchResults.products.length && 
-                           !searchResults.entities.length && 
-                           !searchResults.users.length && 
-                           !searchResults.reviews.length && 
-                           !searchResults.recommendations.length && (
+                          {!results.products.length && 
+                           !results.entities.length && 
+                           !results.users.length && 
+                           !results.reviews.length && 
+                           !results.recommendations.length && (
                             <div className="py-12 text-center">
                               <p className="text-muted-foreground">No results found for "{query}"</p>
                             </div>
@@ -300,14 +235,18 @@ const Search = () => {
                         
                         <TabsContent value="products">
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                            <ShoppingBag className="h-5 w-5" /> Products
+                            <ShoppingBag className="h-5 w-5" /> Products & Items
                           </h2>
-                          {searchResults.products.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                              {searchResults.products.map((product, index) => (
-                                <ProductCard 
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Click any result to create an entity and start reviewing!
+                          </p>
+                          {results.products.length > 0 ? (
+                            <div className="space-y-2">
+                              {results.products.map((product, index) => (
+                                <SearchResultHandler
                                   key={`${product.api_source}-${product.api_ref || index}`}
-                                  product={product} 
+                                  result={product}
+                                  query={query}
                                 />
                               ))}
                             </div>
@@ -322,9 +261,9 @@ const Search = () => {
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <MapPin className="h-5 w-5" /> Places & Things
                           </h2>
-                          {searchResults.entities.length > 0 ? (
+                          {results.entities.length > 0 ? (
                             <div className="border rounded-md overflow-hidden">
-                              {searchResults.entities.map((entity) => (
+                              {results.entities.map((entity) => (
                                 <EntityResultItem
                                   key={entity.id}
                                   entity={entity}
@@ -343,9 +282,9 @@ const Search = () => {
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <Users className="h-5 w-5" /> People
                           </h2>
-                          {searchResults.users.length > 0 ? (
+                          {results.users.length > 0 ? (
                             <div className="border rounded-md overflow-hidden">
-                              {searchResults.users.map((user) => (
+                              {results.users.map((user) => (
                                 <UserResultItem
                                   key={user.id}
                                   user={user}
@@ -362,9 +301,9 @@ const Search = () => {
                         
                         <TabsContent value="reviews">
                           <h2 className="text-xl font-semibold mb-4">Reviews</h2>
-                          {searchResults.reviews.length > 0 ? (
+                          {results.reviews.length > 0 ? (
                             <div className="border rounded-md overflow-hidden">
-                              {searchResults.reviews.map((review) => (
+                              {results.reviews.map((review) => (
                                 <ReviewResultItem
                                   key={review.id}
                                   review={review}
