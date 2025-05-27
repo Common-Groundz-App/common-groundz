@@ -14,6 +14,8 @@ export interface Entity {
   category_id?: string;
   popularity_score?: number;
   photo_reference?: string;
+  created_at?: string;
+  updated_at?: string;
   
   // Enhanced metadata fields
   authors?: string[];
