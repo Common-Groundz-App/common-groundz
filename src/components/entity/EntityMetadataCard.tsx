@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Entity } from '@/services/recommendation/types';
-import { Book, Film, MapPin, Package, Star, Calendar, User, Globe, Phone, Clock } from 'lucide-react';
+import { Book, Film, MapPin, Package, Star, Calendar, User, Globe, Phone, Clock, DollarSign, Hash, Building } from 'lucide-react';
 
 interface EntityMetadataCardProps {
   entity: Entity;
@@ -30,6 +31,9 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
     const languages = entity.languages || 
                      (entity.metadata?.languages && Array.isArray(entity.metadata.languages) ? entity.metadata.languages : []);
 
+    const subjects = entity.specifications?.subjects || entity.metadata?.subjects || [];
+    const editionCount = entity.specifications?.edition_count || entity.metadata?.edition_count;
+
     return (
       <div className="space-y-3">
         {authors && authors.length > 0 && (
@@ -56,10 +60,10 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
         
         {isbn && (
           <div className="flex items-start gap-2">
-            <Book className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <Hash className="h-4 w-4 mt-0.5 text-muted-foreground" />
             <div>
               <div className="text-sm font-medium">ISBN</div>
-              <div className="text-sm text-muted-foreground">{isbn}</div>
+              <div className="text-sm text-muted-foreground font-mono text-xs">{isbn}</div>
             </div>
           </div>
         )}
@@ -76,10 +80,20 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
         
         {publisher && (
           <div className="flex items-start gap-2">
-            <Package className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <Building className="h-4 w-4 mt-0.5 text-muted-foreground" />
             <div>
               <div className="text-sm font-medium">Publisher</div>
               <div className="text-sm text-muted-foreground">{publisher}</div>
+            </div>
+          </div>
+        )}
+
+        {editionCount && (
+          <div className="flex items-start gap-2">
+            <Package className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">Editions</div>
+              <div className="text-sm text-muted-foreground">{editionCount} editions</div>
             </div>
           </div>
         )}
@@ -90,11 +104,37 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
             <div>
               <div className="text-sm font-medium">Languages</div>
               <div className="flex flex-wrap gap-1 mt-1">
-                {languages.map((lang, index) => (
+                {languages.slice(0, 3).map((lang, index) => (
                   <Badge key={index} variant="outline" className="text-xs">
                     {lang}
                   </Badge>
                 ))}
+                {languages.length > 3 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{languages.length - 3} more
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {subjects && subjects.length > 0 && (
+          <div className="flex items-start gap-2">
+            <Star className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">Subjects</div>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {subjects.slice(0, 4).map((subject: string, index: number) => (
+                  <Badge key={index} variant="secondary" className="text-xs">
+                    {subject}
+                  </Badge>
+                ))}
+                {subjects.length > 4 && (
+                  <Badge variant="secondary" className="text-xs">
+                    +{subjects.length - 4} more
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -147,6 +187,34 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
           </div>
         </div>
       )}
+
+      {entity.specifications?.budget && (
+        <div className="flex items-start gap-2">
+          <DollarSign className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <div>
+            <div className="text-sm font-medium">Budget</div>
+            <div className="text-sm text-muted-foreground">
+              ${typeof entity.specifications.budget === 'number' 
+                ? (entity.specifications.budget / 1000000).toFixed(1) + 'M'
+                : entity.specifications.budget}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {entity.specifications?.revenue && (
+        <div className="flex items-start gap-2">
+          <DollarSign className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <div>
+            <div className="text-sm font-medium">Box Office</div>
+            <div className="text-sm text-muted-foreground">
+              ${typeof entity.specifications.revenue === 'number' 
+                ? (entity.specifications.revenue / 1000000).toFixed(1) + 'M'
+                : entity.specifications.revenue}
+            </div>
+          </div>
+        </div>
+      )}
       
       {entity.specifications?.genres && entity.specifications.genres.length > 0 && (
         <div className="flex items-start gap-2">
@@ -159,6 +227,18 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
                   {genre}
                 </Badge>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {entity.specifications?.countries && entity.specifications.countries.length > 0 && (
+        <div className="flex items-start gap-2">
+          <Globe className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <div>
+            <div className="text-sm font-medium">Countries</div>
+            <div className="text-sm text-muted-foreground">
+              {entity.specifications.countries.join(', ')}
             </div>
           </div>
         </div>
@@ -204,6 +284,20 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
           </div>
         </div>
       )}
+
+      {entity.specifications?.hours && (
+        <div className="flex items-start gap-2">
+          <Clock className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <div>
+            <div className="text-sm font-medium">Hours</div>
+            <div className="text-sm text-muted-foreground">
+              {typeof entity.specifications.hours === 'object' 
+                ? 'See full hours online'
+                : entity.specifications.hours}
+            </div>
+          </div>
+        </div>
+      )}
       
       {entity.specifications?.types && entity.specifications.types.length > 0 && (
         <div className="flex items-start gap-2">
@@ -216,6 +310,11 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
                   {type.replace(/_/g, ' ')}
                 </Badge>
               ))}
+              {entity.specifications.types.length > 3 && (
+                <Badge variant="outline" className="text-xs">
+                  +{entity.specifications.types.length - 3} more
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -227,11 +326,16 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
     <div className="space-y-3">
       {entity.price_info?.price && (
         <div className="flex items-start gap-2">
-          <Package className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <DollarSign className="h-4 w-4 mt-0.5 text-muted-foreground" />
           <div>
             <div className="text-sm font-medium">Price</div>
             <div className="text-sm text-muted-foreground">
               {entity.price_info.currency || '$'}{entity.price_info.price}
+              {entity.price_info.original_price && entity.price_info.original_price !== entity.price_info.price && (
+                <span className="ml-2 line-through text-xs">
+                  {entity.price_info.currency || '$'}{entity.price_info.original_price}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -266,11 +370,34 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
           </div>
         </div>
       )}
+
+      {entity.price_info?.availability && (
+        <div className="flex items-start gap-2">
+          <Package className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <div>
+            <div className="text-sm font-medium">Availability</div>
+            <Badge 
+              variant={entity.price_info.availability === 'in_stock' ? 'default' : 'secondary'}
+              className="text-xs"
+            >
+              {entity.price_info.availability.replace(/_/g, ' ')}
+            </Badge>
+          </div>
+        </div>
+      )}
     </div>
   );
 
   const renderExternalRatings = () => {
     if (!entity.external_ratings || Object.keys(entity.external_ratings).length === 0) {
+      return null;
+    }
+
+    const ratingsToShow = Object.entries(entity.external_ratings).filter(([source, rating]) => 
+      rating && rating !== null && rating !== undefined
+    );
+
+    if (ratingsToShow.length === 0) {
       return null;
     }
 
@@ -282,17 +409,30 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
             External Ratings
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {Object.entries(entity.external_ratings).map(([source, rating]) => {
-            if (!rating || rating === null) return null;
+        <CardContent className="space-y-3">
+          {ratingsToShow.map(([source, rating]) => {
+            const displayName = source.replace(/_/g, ' ').split(' ').map(word => 
+              word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
             
+            const formatRating = (rating: any) => {
+              if (typeof rating === 'number') {
+                return rating.toFixed(1);
+              }
+              if (typeof rating === 'string' && rating.includes('/')) {
+                return rating;
+              }
+              return String(rating);
+            };
+
             return (
               <div key={source} className="flex items-center justify-between">
-                <span className="text-sm font-medium capitalize">
-                  {source.replace(/_/g, ' ')}
-                </span>
-                <Badge variant="outline">
-                  {typeof rating === 'number' ? rating.toFixed(1) : rating}
+                <div className="flex items-center gap-2">
+                  <Star className="h-3 w-3 text-yellow-500" />
+                  <span className="text-sm font-medium">{displayName}</span>
+                </div>
+                <Badge variant="outline" className="font-mono">
+                  {formatRating(rating)}
                 </Badge>
               </div>
             );

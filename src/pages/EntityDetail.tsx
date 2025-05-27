@@ -25,6 +25,7 @@ import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refres
 import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
 import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
 import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
+import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -550,6 +551,9 @@ const EntityDetail = () => {
               {/* Entity Specifications Card */}
               {entity && <EntitySpecsCard entity={entity} />}
               
+              {/* Related Entities Card */}
+              {entity && <EntityRelatedCard entity={entity} />}
+              
               {/* Entity Basic Info Card */}
               {entity && (
                 <Card>
@@ -569,25 +573,41 @@ const EntityDetail = () => {
                       </div>
                     )}
                     
+                    {entity.api_source && (
+                      <div className="text-sm">
+                        <div className="font-medium">Source</div>
+                        <div className="text-muted-foreground capitalize">
+                          {entity.api_source.replace(/_/g, ' ')}
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="text-sm">
                       <div className="font-medium">Added</div>
                       <div className="text-muted-foreground">
-                        Recently added
+                        {entity.created_at ? formatRelativeDate(entity.created_at) : 'Recently added'}
                       </div>
                     </div>
+
+                    {entity.data_quality_score && (
+                      <div className="text-sm">
+                        <div className="font-medium">Data Quality</div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-muted rounded-full h-2">
+                            <div 
+                              className="bg-primary h-2 rounded-full transition-all"
+                              style={{ width: `${entity.data_quality_score}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {entity.data_quality_score}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
-              
-              {/* Placeholder for Related Entities */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Related Entities</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">Coming soon...</p>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </div>
