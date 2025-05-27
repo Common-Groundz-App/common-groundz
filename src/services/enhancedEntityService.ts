@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
@@ -128,25 +127,39 @@ const extractEnhancedMetadata = async (rawData: any, entityType: string): Promis
 const extractBookMetadata = (rawData: any, baseData: EnhancedEntityData): EnhancedEntityData => {
   const metadata = rawData.metadata || {};
   
+  // Extract authors from multiple possible locations
+  const authors = extractAuthors(rawData);
+  
+  // Extract publication year
+  const publicationYear = extractPublicationYear(rawData);
+  
+  // Extract ISBN
+  const isbn = extractISBN(rawData);
+  
+  // Extract languages
+  const languages = extractLanguages(rawData);
+  
   return {
     ...baseData,
-    authors: extractAuthors(rawData),
-    publication_year: extractPublicationYear(rawData),
-    isbn: extractISBN(rawData),
-    languages: extractLanguages(rawData),
+    authors: authors,
+    publication_year: publicationYear,
+    isbn: isbn,
+    languages: languages,
     external_ratings: {
       goodreads: metadata.goodreads_rating,
       amazon: metadata.amazon_rating,
-      openlibrary: metadata.rating_average,
-      rating_count: metadata.rating_count
+      openlibrary: metadata.ratings_average || metadata.rating_average,
+      rating_count: metadata.ratings_count || metadata.rating_count
     },
     specifications: {
-      page_count: metadata.page_count || metadata.number_of_pages,
+      page_count: metadata.page_count || metadata.number_of_pages_median,
       publisher: metadata.publisher,
       publish_date: metadata.publish_date,
       format: metadata.format,
       series: metadata.series,
-      volume: metadata.volume
+      volume: metadata.volume,
+      edition_count: metadata.edition_count,
+      subjects: metadata.subjects
     }
   };
 };
@@ -162,14 +175,15 @@ const extractMovieMetadata = (rawData: any, baseData: EnhancedEntityData): Enhan
     publication_year: extractReleaseYear(rawData),
     languages: extractLanguages(rawData),
     external_ratings: {
-      imdb: metadata.imdb_rating,
+      imdb: metadata.imdb_rating || metadata.imdbRating,
       tmdb: metadata.vote_average,
       rotten_tomatoes: metadata.rotten_tomatoes,
-      metacritic: metadata.metacritic_score
+      metacritic: metadata.metascore || metadata.metacritic_score,
+      imdb_votes: metadata.imdb_votes || metadata.imdbVotes
     },
     cast_crew: {
       director: metadata.director,
-      cast: metadata.cast,
+      cast: metadata.cast || (metadata.actors ? metadata.actors.split(', ') : []),
       crew: metadata.crew,
       producer: metadata.producer,
       writer: metadata.writer
@@ -178,9 +192,12 @@ const extractMovieMetadata = (rawData: any, baseData: EnhancedEntityData): Enhan
       runtime: metadata.runtime,
       budget: metadata.budget,
       revenue: metadata.revenue,
-      genres: metadata.genres,
+      genres: metadata.genres || (metadata.genre ? metadata.genre.split(', ') : []),
       production_companies: metadata.production_companies,
-      countries: metadata.production_countries
+      countries: metadata.countries || (metadata.country ? metadata.country.split(', ') : []),
+      rated: metadata.rated,
+      box_office: metadata.box_office,
+      awards: metadata.awards
     }
   };
 };
@@ -274,29 +291,74 @@ const extractProductMetadata = (rawData: any, baseData: EnhancedEntityData): Enh
 
 // Helper functions for metadata extraction
 const extractAuthors = (rawData: any): string[] => {
-  const authors = rawData.authors || rawData.metadata?.authors || [];
-  if (typeof authors === 'string') return [authors];
-  if (Array.isArray(authors)) return authors.map((a: any) => typeof a === 'string' ? a : a.name || a.author);
+  // Try multiple possible locations for authors
+  if (rawData.authors && Array.isArray(rawData.authors)) {
+    return rawData.authors.map((a: any) => typeof a === 'string' ? a : a.name || a.author);
+  }
+  
+  if (rawData.metadata?.authors && Array.isArray(rawData.metadata.authors)) {
+    return rawData.metadata.authors.map((a: any) => typeof a === 'string' ? a : a.name || a.author);
+  }
+  
+  if (rawData.venue && rawData.api_source === 'openlibrary') {
+    // For books, venue often contains author names
+    return [rawData.venue];
+  }
+  
+  if (typeof rawData.authors === 'string') return [rawData.authors];
+  if (typeof rawData.metadata?.authors === 'string') return [rawData.metadata.authors];
+  
   return [];
 };
 
 const extractPublicationYear = (rawData: any): number | undefined => {
-  const year = rawData.publication_year || rawData.metadata?.publication_year || 
-               rawData.metadata?.publish_date || rawData.year;
-  if (typeof year === 'string') {
-    const match = year.match(/\d{4}/);
-    return match ? parseInt(match[0]) : undefined;
+  // Try multiple fields for publication year
+  const sources = [
+    rawData.publication_year,
+    rawData.metadata?.publication_year,
+    rawData.metadata?.publish_year,
+    rawData.metadata?.first_publish_year,
+    rawData.year,
+    rawData.metadata?.year
+  ];
+  
+  for (const source of sources) {
+    if (typeof source === 'number' && source > 0) {
+      return source;
+    }
+    if (typeof source === 'string') {
+      const match = source.match(/\d{4}/);
+      if (match) {
+        return parseInt(match[0]);
+      }
+    }
   }
-  return typeof year === 'number' ? year : undefined;
+  
+  return undefined;
 };
 
 const extractReleaseYear = (rawData: any): number | undefined => {
-  const year = rawData.release_date || rawData.metadata?.release_date || rawData.year;
-  if (typeof year === 'string') {
-    const match = year.match(/\d{4}/);
-    return match ? parseInt(match[0]) : undefined;
+  const sources = [
+    rawData.release_date,
+    rawData.metadata?.release_date,
+    rawData.metadata?.year,
+    rawData.year,
+    rawData.publication_year
+  ];
+  
+  for (const source of sources) {
+    if (typeof source === 'number' && source > 0) {
+      return source;
+    }
+    if (typeof source === 'string') {
+      const match = source.match(/\d{4}/);
+      if (match) {
+        return parseInt(match[0]);
+      }
+    }
   }
-  return typeof year === 'number' ? year : undefined;
+  
+  return undefined;
 };
 
 const extractISBN = (rawData: any): string | undefined => {
@@ -304,9 +366,22 @@ const extractISBN = (rawData: any): string | undefined => {
 };
 
 const extractLanguages = (rawData: any): string[] => {
-  const languages = rawData.languages || rawData.metadata?.languages || [];
-  if (typeof languages === 'string') return [languages];
-  return Array.isArray(languages) ? languages : [];
+  const sources = [
+    rawData.languages,
+    rawData.metadata?.languages,
+    rawData.metadata?.language
+  ];
+  
+  for (const source of sources) {
+    if (Array.isArray(source)) {
+      return source.map(lang => typeof lang === 'string' ? lang : lang.name || lang.english_name || String(lang));
+    }
+    if (typeof source === 'string') {
+      return [source];
+    }
+  }
+  
+  return [];
 };
 
 const extractIngredients = (rawData: any): string[] => {

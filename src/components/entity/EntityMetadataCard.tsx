@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,77 +9,99 @@ interface EntityMetadataCardProps {
 }
 
 export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }) => {
-  const renderBookMetadata = () => (
-    <div className="space-y-3">
-      {entity.authors && entity.authors.length > 0 && (
-        <div className="flex items-start gap-2">
-          <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
-          <div>
-            <div className="text-sm font-medium">Authors</div>
-            <div className="text-sm text-muted-foreground">
-              {entity.authors.join(', ')}
+  const renderBookMetadata = () => {
+    // Enhanced fallback logic for book metadata
+    const authors = entity.authors || 
+                   (entity.metadata?.authors && Array.isArray(entity.metadata.authors) ? entity.metadata.authors : []) ||
+                   (entity.venue && entity.api_source === 'openlibrary' ? [entity.venue] : []);
+    
+    const publicationYear = entity.publication_year || 
+                           entity.metadata?.publication_year || 
+                           entity.metadata?.first_publish_year;
+    
+    const isbn = entity.isbn || entity.metadata?.isbn || entity.metadata?.isbn_13 || entity.metadata?.isbn_10;
+    
+    const pageCount = entity.specifications?.page_count || 
+                     entity.metadata?.page_count || 
+                     entity.metadata?.number_of_pages_median;
+    
+    const publisher = entity.specifications?.publisher || entity.metadata?.publisher;
+    
+    const languages = entity.languages || 
+                     (entity.metadata?.languages && Array.isArray(entity.metadata.languages) ? entity.metadata.languages : []);
+
+    return (
+      <div className="space-y-3">
+        {authors && authors.length > 0 && (
+          <div className="flex items-start gap-2">
+            <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">Authors</div>
+              <div className="text-sm text-muted-foreground">
+                {authors.join(', ')}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      
-      {entity.publication_year && (
-        <div className="flex items-start gap-2">
-          <Calendar className="h-4 w-4 mt-0.5 text-muted-foreground" />
-          <div>
-            <div className="text-sm font-medium">Published</div>
-            <div className="text-sm text-muted-foreground">{entity.publication_year}</div>
-          </div>
-        </div>
-      )}
-      
-      {entity.isbn && (
-        <div className="flex items-start gap-2">
-          <Book className="h-4 w-4 mt-0.5 text-muted-foreground" />
-          <div>
-            <div className="text-sm font-medium">ISBN</div>
-            <div className="text-sm text-muted-foreground">{entity.isbn}</div>
-          </div>
-        </div>
-      )}
-      
-      {entity.specifications?.page_count && (
-        <div className="flex items-start gap-2">
-          <Book className="h-4 w-4 mt-0.5 text-muted-foreground" />
-          <div>
-            <div className="text-sm font-medium">Pages</div>
-            <div className="text-sm text-muted-foreground">{entity.specifications.page_count}</div>
-          </div>
-        </div>
-      )}
-      
-      {entity.specifications?.publisher && (
-        <div className="flex items-start gap-2">
-          <Package className="h-4 w-4 mt-0.5 text-muted-foreground" />
-          <div>
-            <div className="text-sm font-medium">Publisher</div>
-            <div className="text-sm text-muted-foreground">{entity.specifications.publisher}</div>
-          </div>
-        </div>
-      )}
-      
-      {entity.languages && entity.languages.length > 0 && (
-        <div className="flex items-start gap-2">
-          <Globe className="h-4 w-4 mt-0.5 text-muted-foreground" />
-          <div>
-            <div className="text-sm font-medium">Languages</div>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {entity.languages.map((lang, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
-                  {lang}
-                </Badge>
-              ))}
+        )}
+        
+        {publicationYear && (
+          <div className="flex items-start gap-2">
+            <Calendar className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">Published</div>
+              <div className="text-sm text-muted-foreground">{publicationYear}</div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        )}
+        
+        {isbn && (
+          <div className="flex items-start gap-2">
+            <Book className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">ISBN</div>
+              <div className="text-sm text-muted-foreground">{isbn}</div>
+            </div>
+          </div>
+        )}
+        
+        {pageCount && (
+          <div className="flex items-start gap-2">
+            <Book className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">Pages</div>
+              <div className="text-sm text-muted-foreground">{pageCount}</div>
+            </div>
+          </div>
+        )}
+        
+        {publisher && (
+          <div className="flex items-start gap-2">
+            <Package className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">Publisher</div>
+              <div className="text-sm text-muted-foreground">{publisher}</div>
+            </div>
+          </div>
+        )}
+        
+        {languages && languages.length > 0 && (
+          <div className="flex items-start gap-2">
+            <Globe className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">Languages</div>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {languages.map((lang, index) => (
+                  <Badge key={index} variant="outline" className="text-xs">
+                    {lang}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderMovieMetadata = () => (
     <div className="space-y-3">

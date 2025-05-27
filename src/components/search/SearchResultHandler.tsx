@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -31,8 +30,37 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
       setIsCreatingEntity(true);
       console.log(`🔍 Creating enhanced entity from search result:`, result);
       
+      // Prepare enhanced data for entity creation
+      const enhancedResultData = {
+        ...result,
+        // Ensure metadata is properly structured
+        metadata: {
+          ...result.metadata,
+          // For books, ensure we capture all the enhanced metadata from Open Library
+          ...(result.api_source === 'openlibrary' && {
+            authors: result.metadata?.authors,
+            publication_year: result.metadata?.publication_year || result.metadata?.first_publish_year,
+            isbn: result.metadata?.isbn,
+            publisher: result.metadata?.publisher,
+            page_count: result.metadata?.page_count || result.metadata?.number_of_pages_median,
+            languages: result.metadata?.languages,
+            subjects: result.metadata?.subjects,
+            edition_count: result.metadata?.edition_count
+          }),
+          // For movies, ensure we capture OMDB enhanced metadata
+          ...(result.api_source === 'omdb' && {
+            director: result.metadata?.director,
+            cast: result.metadata?.cast,
+            runtime: result.metadata?.runtime,
+            genres: result.metadata?.genres,
+            imdb_rating: result.metadata?.imdb_rating,
+            year: result.metadata?.year
+          })
+        }
+      };
+      
       // Use enhanced entity service to create entity with rich metadata
-      const entity = await createEnhancedEntity(result, entityType);
+      const entity = await createEnhancedEntity(enhancedResultData, entityType);
       
       if (entity) {
         console.log(`✅ Enhanced entity created successfully:`, entity);
@@ -185,4 +213,3 @@ function determineEntityType(result: ProductSearchResult): EntityTypeString {
   // Default to product for shopping/commercial results
   return 'product';
 }
-
