@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -8,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 import { createEnhancedEntity } from '@/services/enhancedEntityService';
 import { LoadingSpinner, EntityCreationLoader } from '@/components/ui/loading-spinner';
+import { EntityCategory } from '@/utils/loadingMessages';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 interface SearchResultHandlerProps {
@@ -65,6 +67,25 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
     }
   };
 
+  // Convert entity type to category for loading messages
+  const getEntityCategory = (type: EntityTypeString): EntityCategory => {
+    const categoryMap: Record<EntityTypeString, EntityCategory> = {
+      'book': 'book',
+      'movie': 'movie',
+      'place': 'place',
+      'food': 'food',
+      'product': 'product',
+      'music': 'music',
+      'tv': 'tv',
+      'art': 'art',
+      'activity': 'activity',
+      'drink': 'drink',
+      'travel': 'travel'
+    };
+    
+    return categoryMap[type] || 'product';
+  };
+
   return (
     <>
       <div 
@@ -106,7 +127,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
           )}
           <div className="mt-1">
             <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-              {entityType} • Enhanced
+              {entityType}
             </span>
           </div>
         </div>
@@ -120,7 +141,10 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
       {/* Loading Modal */}
       <Dialog open={isCreatingEntity} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md">
-          <EntityCreationLoader entityName={result.name} />
+          <EntityCreationLoader 
+            entityName={result.name} 
+            category={getEntityCategory(entityType)}
+          />
         </DialogContent>
       </Dialog>
     </>
@@ -160,3 +184,4 @@ function determineEntityType(result: ProductSearchResult): EntityTypeString {
   // Default to product for shopping/commercial results
   return 'product';
 }
+

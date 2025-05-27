@@ -1,8 +1,10 @@
 
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { getRandomLoadingMessage } from '@/utils/loadingMessages';
 
 export const EntityDetailSkeleton = () => {
   return (
@@ -129,12 +131,32 @@ export const EntityDetailSkeleton = () => {
 };
 
 export const EntityDetailLoadingProgress = ({ step, total }: { step: number; total: number }) => {
-  const steps = [
-    'Loading entity data...',
-    'Fetching recommendations...',
-    'Loading reviews...',
-    'Calculating statistics...'
-  ];
+  const [currentMessage, setCurrentMessage] = useState('');
+
+  useEffect(() => {
+    // Set engaging messages that rotate
+    const updateMessage = () => {
+      const generalMessages = [
+        '🎯 Curating the perfect experience for you...',
+        '✨ Gathering insights and recommendations...',
+        '🌟 Building your personalized content feed...',
+        '🔍 Discovering hidden gems and details...',
+        '💫 Creating connections and finding patterns...',
+        '🎨 Crafting a beautiful experience just for you...',
+        '🚀 Almost ready to show you something amazing...',
+        '🎪 Putting the finishing touches on everything...'
+      ];
+      
+      setCurrentMessage(generalMessages[Math.floor(Math.random() * generalMessages.length)]);
+    };
+
+    updateMessage();
+    
+    // Change message every 2.5 seconds
+    const interval = setInterval(updateMessage, 2500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -142,24 +164,27 @@ export const EntityDetailLoadingProgress = ({ step, total }: { step: number; tot
         <CardContent className="p-6">
           <div className="space-y-4">
             <div className="text-center">
-              <h3 className="font-semibold">Loading Entity Details</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {steps[step - 1] || 'Processing...'}
+              <h3 className="font-semibold">Loading Experience</h3>
+              <p className="text-sm text-muted-foreground mt-2 animate-fade-in">
+                {currentMessage}
               </p>
             </div>
             
-            {/* Progress Bar */}
-            <div className="w-full bg-muted rounded-full h-2">
+            {/* Progress Bar with brand colors */}
+            <div className="w-full bg-muted rounded-full h-3">
               <div 
-                className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
+                className="bg-primary h-3 rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${(step / total) * 100}%` }}
               />
             </div>
             
-            {/* Step Indicators */}
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Step {step}</span>
-              <span>{total} steps</span>
+            {/* Simplified progress indicator */}
+            <div className="flex justify-center">
+              <div className="flex gap-1">
+                <div className="h-2 w-2 bg-primary rounded-full animate-bounce" />
+                <div className="h-2 w-2 bg-primary rounded-full animate-bounce animation-delay-75" />
+                <div className="h-2 w-2 bg-primary rounded-full animate-bounce animation-delay-150" />
+              </div>
             </div>
           </div>
         </CardContent>
@@ -167,3 +192,4 @@ export const EntityDetailLoadingProgress = ({ step, total }: { step: number; tot
     </div>
   );
 };
+

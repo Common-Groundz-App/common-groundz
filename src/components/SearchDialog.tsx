@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -154,10 +155,10 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
           {(hasResults || hasCategorizedResults) && (
             <>
-              {/* Local Entities - Show first with priority */}
+              {/* Local Entities - Changed from "Your Database" to "Saved Items" */}
               {results.entities.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('Your Database', results.entities.length, 'entities')}
+                  {renderSectionHeader('Saved Items', results.entities.length, 'entities')}
                   {(showAllResults.entities ? results.entities : results.entities.slice(0, 3)).map((entity) => (
                     <EntityResultItem
                       key={entity.id}
@@ -186,7 +187,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               {/* Movies */}
               {results.categorized.movies.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('Movies', results.categorized.movies.length, 'movies')}
+                  {renderSectionHeader('Movies & TV', results.categorized.movies.length, 'movies')}
                   {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
                     <SearchResultHandler
                       key={`${movie.api_source}-${movie.api_ref || index}`}
@@ -263,3 +264,4 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     </Dialog>
   );
 }
+
