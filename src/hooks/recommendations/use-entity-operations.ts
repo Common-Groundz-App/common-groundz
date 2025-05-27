@@ -182,11 +182,11 @@ export const useEntityOperations = () => {
 // Helper function to ensure correct entity type based on API source
 const getCorrectEntityType = (apiSource: string, originalType: EntityType): EntityType => {
   const apiSourceMapping: Record<string, EntityType> = {
-    'openlibrary': 'book',
-    'google_books': 'book',
-    'omdb': 'movie',
-    'tmdb': 'movie',
-    'google_places': 'place'
+    'openlibrary': EntityType.Book,
+    'google_books': EntityType.Book,
+    'omdb': EntityType.Movie,
+    'tmdb': EntityType.Movie,
+    'google_places': EntityType.Place
   };
   
   const correctedType = apiSourceMapping[apiSource];
