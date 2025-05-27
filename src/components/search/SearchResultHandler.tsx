@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -33,6 +34,8 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
       // Prepare enhanced data for entity creation
       const enhancedResultData = {
         ...result,
+        // Ensure the type is correctly set based on API source
+        type: entityType,
         // Ensure metadata is properly structured
         metadata: {
           ...result.metadata,
@@ -55,6 +58,15 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
             genres: result.metadata?.genres,
             imdb_rating: result.metadata?.imdb_rating,
             year: result.metadata?.year
+          }),
+          // For Google Books API
+          ...(result.api_source === 'google_books' && {
+            authors: result.metadata?.authors,
+            publication_year: result.metadata?.publication_year,
+            isbn: result.metadata?.isbn,
+            publisher: result.metadata?.publisher,
+            page_count: result.metadata?.page_count,
+            languages: result.metadata?.languages
           })
         }
       };
@@ -182,20 +194,33 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
 
 // Helper function to determine entity type from search result
 function determineEntityType(result: ProductSearchResult): EntityTypeString {
-  // Check if api_source gives us a hint about the type
-  if (result.api_source === 'openlibrary') {
+  // PRIORITY 1: Check API source for definitive type mapping
+  if (result.api_source === 'openlibrary' || result.api_source === 'google_books') {
     return 'book';
+  }
+  
+  if (result.api_source === 'omdb' || result.api_source === 'tmdb') {
+    return 'movie';
   }
   
   if (result.api_source === 'google_places') {
     return 'place';
   }
   
-  if (result.api_source === 'tmdb') {
+  // PRIORITY 2: Check metadata for specific type indicators
+  if (result.metadata?.authors || result.metadata?.isbn || result.metadata?.publication_year) {
+    return 'book';
+  }
+  
+  if (result.metadata?.director || result.metadata?.cast || result.metadata?.runtime || result.metadata?.imdb_rating) {
     return 'movie';
   }
   
-  // Check venue or metadata for clues
+  if (result.metadata?.formatted_address || result.metadata?.place_id) {
+    return 'place';
+  }
+  
+  // PRIORITY 3: Check venue or description for clues
   if (result.venue && (
     result.venue.toLowerCase().includes('restaurant') ||
     result.venue.toLowerCase().includes('cafe') ||
@@ -204,10 +229,22 @@ function determineEntityType(result: ProductSearchResult): EntityTypeString {
     return 'food';
   }
   
-  // Check for book-related keywords in the name or description
+  // PRIORITY 4: Check for content-related keywords in the name or description
   const text = `${result.name} ${result.description || ''}`.toLowerCase();
-  if (text.includes('book') || text.includes('author') || text.includes('novel') || text.includes('paperback') || text.includes('hardcover')) {
+  
+  if (text.includes('book') || text.includes('author') || text.includes('novel') || 
+      text.includes('paperback') || text.includes('hardcover') || text.includes('isbn')) {
     return 'book';
+  }
+  
+  if (text.includes('movie') || text.includes('film') || text.includes('cinema') ||
+      text.includes('director') || text.includes('actor')) {
+    return 'movie';
+  }
+  
+  if (text.includes('restaurant') || text.includes('cafe') || text.includes('food') ||
+      text.includes('cuisine') || text.includes('dining')) {
+    return 'food';
   }
   
   // Default to product for shopping/commercial results

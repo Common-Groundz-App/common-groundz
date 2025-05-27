@@ -67,6 +67,15 @@ export const useEntityOperations = () => {
     try {
       setIsLoading(true);
 
+      // Validate and correct entity type based on API source
+      let correctedType = type;
+      if (apiSource) {
+        correctedType = getCorrectEntityType(apiSource, type);
+        if (correctedType !== type) {
+          console.log(`🔧 Corrected entity type from ${type} to ${correctedType} based on API source: ${apiSource}`);
+        }
+      }
+
       if (websiteUrl) {
         const urlMetadata = await fetchUrlMetadata(websiteUrl);
         if (urlMetadata) {
@@ -82,7 +91,7 @@ export const useEntityOperations = () => {
 
       const entity = await findOrCreateEntity(
         name,
-        type,
+        correctedType,
         apiSource,
         apiRef,
         venue,
@@ -168,4 +177,23 @@ export const useEntityOperations = () => {
     searchEntities,
     searchGoogleBooks
   };
+};
+
+// Helper function to ensure correct entity type based on API source
+const getCorrectEntityType = (apiSource: string, originalType: EntityType): EntityType => {
+  const apiSourceMapping: Record<string, EntityType> = {
+    'openlibrary': 'book',
+    'google_books': 'book',
+    'omdb': 'movie',
+    'tmdb': 'movie',
+    'google_places': 'place'
+  };
+  
+  const correctedType = apiSourceMapping[apiSource];
+  if (correctedType && correctedType !== originalType) {
+    console.warn(`⚠️ API source ${apiSource} should map to ${correctedType}, but got ${originalType}. Correcting automatically.`);
+    return correctedType;
+  }
+  
+  return originalType;
 };
