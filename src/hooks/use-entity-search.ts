@@ -8,6 +8,7 @@ import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { saveExternalImageToStorage, isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
 import { ensureBucketPolicies } from '@/services/storageService';
+import { createEntityFast } from '@/services/fastEntityService';
 
 // Define a simplified entity structure for the component's internal use
 interface Entity {
@@ -182,119 +183,43 @@ export function useEntitySearch(type: EntityTypeString) {
         
         if (existingEntity) {
           console.log(`Found existing entity: ${existingEntity.id} (${existingEntity.name})`);
-          // Return the existing entity instead of trying to create a new one
           return existingEntity;
         }
       }
 
-      // Generate a new entity ID
-      const entityId = uuidv4();
-      
-      // Ensure the entity-images bucket exists with proper policies
-      await ensureBucketPolicies('entity-images');
-      
-      // Set initial image URL from external data or use fallback
-      let imageUrl = externalData.image_url || getEntityTypeFallbackImage(type);
-      let storedImageUrl = null;
-      
-      console.log(`Processing image for entity: ${externalData.name}`, { originalUrl: imageUrl });
-      
-      // Handle Google Places images special case - these require the refresh-entity-image function
-      if (isGooglePlacesImage(imageUrl)) {
-        console.log(`Google Places image detected for ${externalData.name}, will be stored via refresh later`);
-        // Keep the original URL for now, but store the photo reference for later refresh
-      } 
-      // For non-Google Places images with a valid URL, try to save to storage immediately
-      else if (imageUrl && isValidImageUrl(imageUrl) && !isGooglePlacesImage(imageUrl)) {
-        try {
-          // Download and store the external image
-          storedImageUrl = await saveExternalImageToStorage(imageUrl, entityId);
-          
-          if (storedImageUrl) {
-            console.log(`Successfully saved image to storage: ${storedImageUrl}`);
-            imageUrl = storedImageUrl;
-          } else {
-            console.warn(`Failed to save image to storage for ${externalData.name}, using original URL`);
-          }
-        } catch (imageError) {
-          console.error('Error saving image to storage:', imageError);
-          // Keep the original URL if storage fails
-        }
-      }
-      
-      // Prepare entity data for insertion
-      const entityData = {
+      console.log('🚀 Creating entity with fast service:', externalData.name);
+
+      // Use fast entity creation service
+      const result = await createEntityFast({
         name: externalData.name,
-        type: type as any, // Cast to any to handle extended entity types
+        type: type,
         venue: externalData.venue,
-        description: externalData.description || null,
-        image_url: imageUrl,
+        description: externalData.description,
         api_source: externalData.api_source,
         api_ref: externalData.api_ref,
-        photo_reference: externalData.metadata?.photos?.[0]?.photo_reference,
-        metadata: externalData.metadata,
-        is_deleted: false
-      };
+        metadata: externalData.metadata
+      });
+
+      if (!result) {
+        throw new Error('Fast entity creation failed');
+      }
+
+      console.log('✅ Entity created fast:', result.entity.id);
       
-      // Insert the entity into the database
-      const { data, error } = await supabase
-        .from('entities')
-        .insert(entityData)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Error inserting entity:', error);
-        throw error;
+      if (result.backgroundTaskId) {
+        console.log('🔄 Background processing queued:', result.backgroundTaskId);
+        toast({
+          title: 'Entity created!',
+          description: 'Processing additional details in the background...',
+        });
+      } else {
+        toast({
+          title: 'Entity created!',
+          description: `Successfully added ${result.entity.name}`,
+        });
       }
       
-      // For Google Places entities, if we have a photo reference, refresh the image immediately
-      if (isGooglePlacesImage(imageUrl) && entityData.photo_reference) {
-        try {
-          console.log(`Refreshing Google Places image for new entity ${data.id}`);
-          
-          // Get current session for authentication
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (session) {
-            // Call the refresh-entity-image edge function to store the image properly
-            const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-              },
-              body: JSON.stringify({
-                photoReference: entityData.photo_reference,
-                placeId: entityData.api_ref,
-                entityId: data.id
-              })
-            });
-            
-            if (response.ok) {
-              const result = await response.json();
-              console.log('Successfully refreshed Google Places image for new entity:', result);
-              
-              // Update the entity with the new image URL if one was returned
-              if (result.imageUrl) {
-                await supabase
-                  .from('entities')
-                  .update({ image_url: result.imageUrl })
-                  .eq('id', data.id);
-              }
-            } else {
-              console.error('Failed to refresh Google Places image for new entity:', await response.text());
-            }
-          } else {
-            console.warn('No active session to refresh Google Places image for new entity');
-          }
-        } catch (refreshError) {
-          console.error('Error refreshing Google Places image for new entity:', refreshError);
-          // Continue with original URL if refresh fails
-        }
-      }
-      
-      return data as Entity;
+      return result.entity;
     } catch (error) {
       console.error('Error creating entity:', error);
       toast({
@@ -319,55 +244,33 @@ export function useEntitySearch(type: EntityTypeString) {
         throw new Error('Could not fetch metadata from URL');
       }
 
-      // Generate a new entity ID
-      const entityId = uuidv4();
-      
-      // Get appropriate image or fallback
-      let imageUrl = data.metadata.og_image || data.metadata.image || getEntityTypeFallbackImage(type);
-      let storedImageUrl = null;
-      
-      // If we have a valid image URL, try to save it to our storage
-      if (imageUrl && isValidImageUrl(imageUrl)) {
-        try {
-          // Download and store the external image
-          storedImageUrl = await saveExternalImageToStorage(imageUrl, entityId);
-          
-          if (storedImageUrl) {
-            console.log(`Successfully saved image from URL metadata to storage: ${storedImageUrl}`);
-            imageUrl = storedImageUrl;
-          } else {
-            console.warn(`Failed to save image from URL metadata to storage, using original URL`);
-          }
-        } catch (imageError) {
-          console.error('Error saving image from URL metadata to storage:', imageError);
-          // Keep the original URL if storage fails
-        }
-      }
-      
-      // Create entity from the metadata
-      const entityData = {
+      console.log('🚀 Creating entity from URL with fast service');
+
+      // Use fast entity creation service
+      const result = await createEntityFast({
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
-        type: type as any, // Cast to any to handle extended entity types
+        type: type,
         venue: data.metadata.site_name || new URL(url).hostname,
-        description: data.metadata.description || data.metadata.og_description || null,
-        image_url: imageUrl,
+        description: data.metadata.description || data.metadata.og_description,
         api_source: 'url_metadata',
         api_ref: url,
         metadata: data.metadata
-      };
+      });
+
+      if (!result) {
+        throw new Error('Fast entity creation failed');
+      }
+
+      console.log('✅ Entity created fast from URL:', result.entity.id);
       
-      // Insert the entity into our database
-      const { data: insertData, error: insertError } = await supabase
-        .from('entities')
-        .insert(entityData)
-        .select()
-        .single();
-      
-      if (insertError) {
-        throw insertError;
+      if (result.backgroundTaskId) {
+        toast({
+          title: 'Entity created!',
+          description: 'Processing additional details in the background...',
+        });
       }
       
-      return insertData as Entity;
+      return result.entity;
     } catch (error) {
       console.error('Error creating entity from URL:', error);
       toast({

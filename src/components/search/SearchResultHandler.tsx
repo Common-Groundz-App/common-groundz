@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -7,7 +5,7 @@ import { EntityTypeString } from '@/hooks/feed/api/types';
 import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
-import { createEnhancedEntity } from '@/services/enhancedEntityService';
+import { createEnhancedEntity, createEntityFast } from '@/services/enhancedEntityService';
 import { LoadingSpinner, EntityCreationLoader } from '@/components/ui/loading-spinner';
 import { EntityCategory } from '@/utils/loadingMessages';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -29,26 +27,41 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
   const handleResultClick = async () => {
     try {
       setIsCreatingEntity(true);
-      console.log(`🔍 Creating enhanced entity from search result:`, result);
+      console.log(`🔍 Creating entity from search result (fast):`, result);
       
-      // Use enhanced entity service to create entity with rich metadata
-      const entity = await createEnhancedEntity(result, entityType);
+      // Use fast entity creation instead of enhanced service
+      const entityResult = await createEntityFast({
+        name: result.name,
+        type: entityType,
+        venue: result.venue,
+        description: result.description,
+        api_source: result.api_source,
+        api_ref: result.api_ref,
+        metadata: result.metadata || {}
+      });
       
-      if (entity) {
-        console.log(`✅ Enhanced entity created successfully:`, entity);
+      if (entityResult) {
+        console.log(`✅ Entity created successfully (fast):`, entityResult.entity);
         
         // Always navigate to the standardized entity URL using slug
-        const identifier = entity.slug || entity.id;
+        const identifier = entityResult.entity.slug || entityResult.entity.id;
         const entityPath = `/entity/${identifier}`;
         
         console.log(`🔗 Navigating to entity page: ${entityPath}`);
         navigate(entityPath);
         
+        if (entityResult.backgroundTaskId) {
+          toast({
+            title: 'Entity created!',
+            description: 'Processing additional details in the background...',
+          });
+        }
+        
         if (onClose) {
           onClose();
         }
       } else {
-        console.error('❌ Enhanced entity creation failed - no entity returned');
+        console.error('❌ Entity creation failed - no entity returned');
         toast({
           title: 'Error',
           description: 'Could not create entity from this result',
@@ -184,4 +197,3 @@ function determineEntityType(result: ProductSearchResult): EntityTypeString {
   // Default to product for shopping/commercial results
   return 'product';
 }
-
