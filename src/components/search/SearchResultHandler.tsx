@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -5,7 +6,7 @@ import { EntityTypeString } from '@/hooks/feed/api/types';
 import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
-import { createEnhancedEntity, createEntityFast } from '@/services/enhancedEntityService';
+import { createEntityFast } from '@/services/fastEntityService';
 import { LoadingSpinner, EntityCreationLoader } from '@/components/ui/loading-spinner';
 import { EntityCategory } from '@/utils/loadingMessages';
 import { Dialog, DialogContent } from '@/components/ui/dialog';

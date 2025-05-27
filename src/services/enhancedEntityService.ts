@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
 import { createEntityFast } from '@/services/fastEntityService';
+import { EntityTypeString } from '@/hooks/feed/api/types';
 
 export interface EnhancedEntityData {
   name: string;
