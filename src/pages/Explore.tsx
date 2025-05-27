@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -113,9 +112,12 @@ const Explore = () => {
 
   const hasResults = results.products.length > 0 || 
                    results.entities.length > 0 || 
-                   results.users.length > 0 || 
-                   results.reviews.length > 0 || 
-                   results.recommendations.length > 0;
+                   results.users.length > 0;
+
+  const hasCategorizedResults = results.categorized.books.length > 0 ||
+                               results.categorized.movies.length > 0 ||
+                               results.categorized.places.length > 0 ||
+                               results.categorized.food.length > 0;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -190,6 +192,11 @@ const Explore = () => {
                   <Badge variant="secondary" className="text-xs">
                     {classification.classification} ({Math.round(classification.confidence * 100)}% confidence)
                   </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {classification.api_used === 'gemini' ? '🤖 Gemini' : 
+                     classification.api_used === 'openai' ? '🧠 OpenAI' : 
+                     '🔧 Local'}
+                  </Badge>
                   {isLoading && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -200,7 +207,7 @@ const Explore = () => {
               )}
               
               {/* Real-time Search Results */}
-              {searchQuery && hasResults && (
+              {searchQuery && (hasResults || hasCategorizedResults) && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
                   
                   {/* Loading States */}
@@ -210,7 +217,8 @@ const Explore = () => {
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span>Searching across all sources...</span>
                       </div>
-                      <div className="flex gap-1 mt-2 justify-center">
+                      <div className="flex gap-1 mt-2 justify-center flex-wrap">
+                        {loadingStates.classification && <Badge variant="outline" className="text-xs">Classifying</Badge>}
                         {loadingStates.local && <Badge variant="outline" className="text-xs">Local</Badge>}
                         {loadingStates.books && <Badge variant="outline" className="text-xs">Books</Badge>}
                         {loadingStates.movies && <Badge variant="outline" className="text-xs">Movies</Badge>}
@@ -226,17 +234,71 @@ const Explore = () => {
                     </div>
                   )}
                   
-                  {/* Products from External APIs */}
-                  {results.products.length > 0 && (
+                  {/* Books from External APIs */}
+                  {results.categorized.books.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
+                        <Book className="w-3 h-3" />
+                        Books ({results.categorized.books.length})
+                      </div>
+                      {results.categorized.books.slice(0, 3).map((book, index) => (
+                        <SearchResultHandler
+                          key={`${book.api_source}-${book.api_ref || index}`}
+                          result={book}
+                          query={searchQuery}
+                          onClose={handleResultClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Movies from External APIs */}
+                  {results.categorized.movies.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
+                        <Film className="w-3 h-3" />
+                        Movies ({results.categorized.movies.length})
+                      </div>
+                      {results.categorized.movies.slice(0, 3).map((movie, index) => (
+                        <SearchResultHandler
+                          key={`${movie.api_source}-${movie.api_ref || index}`}
+                          result={movie}
+                          query={searchQuery}
+                          onClose={handleResultClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Places from External APIs */}
+                  {results.categorized.places.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
+                        <MapPin className="w-3 h-3" />
+                        Places ({results.categorized.places.length})
+                      </div>
+                      {results.categorized.places.slice(0, 3).map((place, index) => (
+                        <SearchResultHandler
+                          key={`${place.api_source}-${place.api_ref || index}`}
+                          result={place}
+                          query={searchQuery}
+                          onClose={handleResultClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Food from External APIs */}
+                  {results.categorized.food.length > 0 && (
                     <div className="border-b last:border-b-0">
                       <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
                         <ShoppingBag className="w-3 h-3" />
-                        External Results ({results.products.length})
+                        Food & Recipes ({results.categorized.food.length})
                       </div>
-                      {results.products.slice(0, 5).map((product, index) => (
+                      {results.categorized.food.slice(0, 3).map((food, index) => (
                         <SearchResultHandler
-                          key={`${product.api_source}-${product.api_ref || index}`}
-                          result={product}
+                          key={`${food.api_source}-${food.api_ref || index}`}
+                          result={food}
                           query={searchQuery}
                           onClose={handleResultClick}
                         />
@@ -294,7 +356,7 @@ const Explore = () => {
               )}
 
               {/* No Results */}
-              {searchQuery && !hasResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
+              {searchQuery && !hasResults && !hasCategorizedResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 p-4 text-center">
                   <p className="text-sm text-muted-foreground">No results found locally. Try searching for more products.</p>
                   <button 

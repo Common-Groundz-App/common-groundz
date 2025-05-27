@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -83,6 +82,11 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                    results.entities.length > 0 || 
                    results.users.length > 0;
 
+  const hasCategorizedResults = results.categorized.books.length > 0 ||
+                               results.categorized.movies.length > 0 ||
+                               results.categorized.places.length > 0 ||
+                               results.categorized.food.length > 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden shadow-lg border-0">
@@ -116,7 +120,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
           {(isLoading || Object.values(loadingStates).some(Boolean)) && renderLoadingState()}
 
-          {query && !hasResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
+          {query && !hasResults && !hasCategorizedResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
             <div className="p-6 text-center">
               <p className="text-sm text-muted-foreground">No suggestions found. Press Enter to search more sources.</p>
               {classification && (
@@ -128,15 +132,61 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             </div>
           )}
 
-          {hasResults && (
+          {(hasResults || hasCategorizedResults) && (
             <>
-              {results.products.length > 0 && (
+              {/* Books */}
+              {results.categorized.books.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('External Products', results.products.length)}
-                  {results.products.slice(0, 3).map((product, index) => (
+                  {renderSectionHeader('Books', results.categorized.books.length)}
+                  {results.categorized.books.slice(0, 2).map((book, index) => (
                     <SearchResultHandler
-                      key={`${product.api_source}-${product.api_ref || index}`}
-                      result={product}
+                      key={`${book.api_source}-${book.api_ref || index}`}
+                      result={book}
+                      query={query}
+                      onClose={handleResultClick}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Movies */}
+              {results.categorized.movies.length > 0 && (
+                <div className="flex flex-col">
+                  {renderSectionHeader('Movies', results.categorized.movies.length)}
+                  {results.categorized.movies.slice(0, 2).map((movie, index) => (
+                    <SearchResultHandler
+                      key={`${movie.api_source}-${movie.api_ref || index}`}
+                      result={movie}
+                      query={query}
+                      onClose={handleResultClick}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Places */}
+              {results.categorized.places.length > 0 && (
+                <div className="flex flex-col">
+                  {renderSectionHeader('Places', results.categorized.places.length)}
+                  {results.categorized.places.slice(0, 2).map((place, index) => (
+                    <SearchResultHandler
+                      key={`${place.api_source}-${place.api_ref || index}`}
+                      result={place}
+                      query={query}
+                      onClose={handleResultClick}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Food & Recipes */}
+              {results.categorized.food.length > 0 && (
+                <div className="flex flex-col">
+                  {renderSectionHeader('Food & Recipes', results.categorized.food.length)}
+                  {results.categorized.food.slice(0, 2).map((food, index) => (
+                    <SearchResultHandler
+                      key={`${food.api_source}-${food.api_ref || index}`}
+                      result={food}
                       query={query}
                       onClose={handleResultClick}
                     />
