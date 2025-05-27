@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -73,10 +74,17 @@ export interface UnifiedSearchResults {
 const classifyQuery = (query: string): 'book' | 'movie' | 'place' | 'food' | 'product' | 'general' => {
   const lowerQuery = query.toLowerCase();
   
-  // Book indicators
+  // Book indicators - improved detection
   if (lowerQuery.includes('book') || lowerQuery.includes('novel') || lowerQuery.includes('author') || 
       lowerQuery.includes('paperback') || lowerQuery.includes('hardcover') || lowerQuery.includes('ebook') ||
-      lowerQuery.includes('read') || lowerQuery.includes('chapter') || lowerQuery.includes('library')) {
+      lowerQuery.includes('read') || lowerQuery.includes('chapter') || lowerQuery.includes('library') ||
+      // Common book titles and patterns
+      lowerQuery.includes('rich dad poor dad') || lowerQuery.includes('harry potter') ||
+      lowerQuery.includes('lord of the rings') || lowerQuery.includes('game of thrones') ||
+      // Check for title-like patterns (words with capital letters or common book words)
+      /\b(the|a|an)\s+[a-z]+\s+(of|and|in|to|for|with)\b/.test(lowerQuery) ||
+      // Check if it looks like a title (multiple capitalized words)
+      /^[a-z]+(\s+[a-z]+){1,4}$/.test(lowerQuery)) {
     return 'book';
   }
   
@@ -153,11 +161,20 @@ export const useUnifiedSearch = (query: string, options?: { skipProductSearch?: 
         if (searchType === 'book') {
           console.log('📚 Searching books specifically...');
           try {
-            const { data: bookData } = await supabase.functions.invoke('search-books', {
+            console.log('📚 Invoking search-books function...');
+            const { data: bookData, error: bookError } = await supabase.functions.invoke('search-books', {
               body: { query }
             });
+            
+            if (bookError) {
+              console.error('📚 Book search error:', bookError);
+              throw bookError;
+            }
+            
+            console.log('📚 Book search response:', bookData);
             if (bookData?.results) {
               searchResults.products = bookData.results;
+              console.log(`📚 Found ${bookData.results.length} books`);
             }
           } catch (bookError) {
             console.error('Book search failed, falling back to general search:', bookError);
@@ -165,9 +182,10 @@ export const useUnifiedSearch = (query: string, options?: { skipProductSearch?: 
         } else if (searchType === 'movie') {
           console.log('🎬 Searching movies specifically...');
           try {
-            const { data: movieData } = await supabase.functions.invoke('search-movies', {
+            const { data: movieData, error: movieError } = await supabase.functions.invoke('search-movies', {
               body: { query }
             });
+            if (movieError) throw movieError;
             if (movieData?.results) {
               searchResults.products = movieData.results;
             }
@@ -177,9 +195,10 @@ export const useUnifiedSearch = (query: string, options?: { skipProductSearch?: 
         } else if (searchType === 'place') {
           console.log('📍 Searching places specifically...');
           try {
-            const { data: placeData } = await supabase.functions.invoke('search-places', {
+            const { data: placeData, error: placeError } = await supabase.functions.invoke('search-places', {
               body: { query }
             });
+            if (placeError) throw placeError;
             if (placeData?.results) {
               searchResults.products = placeData.results;
             }
@@ -189,9 +208,10 @@ export const useUnifiedSearch = (query: string, options?: { skipProductSearch?: 
         } else if (searchType === 'food') {
           console.log('🍳 Searching food/recipes specifically...');
           try {
-            const { data: foodData } = await supabase.functions.invoke('search-food', {
+            const { data: foodData, error: foodError } = await supabase.functions.invoke('search-food', {
               body: { query }
             });
+            if (foodError) throw foodError;
             if (foodData?.results) {
               searchResults.products = foodData.results;
             }

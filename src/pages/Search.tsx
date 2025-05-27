@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -11,7 +12,6 @@ import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
-import { ProductCard } from '@/components/explore/ProductCard';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
 import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2 } from 'lucide-react';
@@ -98,7 +98,8 @@ const Search = () => {
                     {isLoading ? (
                       <div className="flex flex-col items-center justify-center py-12">
                         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-                        <p className="text-muted-foreground">Searching...</p>
+                        <p className="text-muted-foreground">Searching for "{query}"...</p>
+                        <p className="text-sm text-muted-foreground mt-2">Finding the best results across books, movies, places and more</p>
                       </div>
                     ) : error ? (
                       <div className="flex flex-col items-center justify-center py-12">
@@ -229,6 +230,7 @@ const Search = () => {
                            !results.recommendations.length && (
                             <div className="py-12 text-center">
                               <p className="text-muted-foreground">No results found for "{query}"</p>
+                              <p className="text-sm text-muted-foreground mt-2">Try searching for books, movies, places, or products</p>
                             </div>
                           )}
                         </TabsContent>

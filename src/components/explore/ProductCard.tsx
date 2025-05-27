@@ -3,7 +3,9 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Star, ShoppingBag, Plus } from 'lucide-react';
-import { SearchResultHandler } from '@/components/search/SearchResultHandler';
+import { useNavigate } from 'react-router-dom';
+import { useEntityOperations } from '@/hooks/recommendations/use-entity-operations';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProductCardProps {
   product: {
@@ -26,15 +28,65 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, enableEntityCreation = false, onEntityCreated }: ProductCardProps) {
-  if (enableEntityCreation) {
-    return (
-      <SearchResultHandler 
-        result={product} 
-        query="" 
-        onClose={onEntityCreated}
-      />
-    );
-  }
+  const navigate = useNavigate();
+  const { handleEntityCreation } = useEntityOperations();
+  const { toast } = useToast();
+
+  const handleCreateEntity = async () => {
+    try {
+      console.log('🔍 Creating entity from product:', product);
+      
+      // Determine entity type based on API source
+      let entityType = 'product';
+      if (product.api_source === 'openlibrary') {
+        entityType = 'book';
+      } else if (product.api_source === 'tmdb') {
+        entityType = 'movie';
+      } else if (product.api_source === 'google_places') {
+        entityType = 'place';
+      }
+
+      const entity = await handleEntityCreation(
+        product.name,
+        entityType as any,
+        product.api_source,
+        product.api_ref,
+        product.venue,
+        product.description,
+        product.image_url,
+        product.metadata
+      );
+
+      if (entity) {
+        console.log('✅ Entity created successfully:', entity);
+        
+        // Navigate to the entity page using slug
+        const identifier = entity.slug || entity.id;
+        const entityPath = `/entity/${identifier}`;
+        
+        console.log(`🔗 Navigating to entity page: ${entityPath}`);
+        navigate(entityPath);
+        
+        if (onEntityCreated) {
+          onEntityCreated();
+        }
+      } else {
+        console.error('❌ Entity creation failed - no entity returned');
+        toast({
+          title: 'Error',
+          description: 'Could not create entity from this result',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error creating entity:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create entity. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
 
   return (
     <Card className="overflow-hidden h-full flex flex-col">
@@ -87,18 +139,14 @@ export function ProductCard({ product, enableEntityCreation = false, onEntityCre
             Buy Now
           </Button>
         ) : (
-          <div 
-            className="w-full cursor-pointer"
-            onClick={() => {
-              // Handle entity creation click
-              console.log('Creating entity for product:', product);
-            }}
+          <Button 
+            className="w-full" 
+            variant="outline"
+            onClick={handleCreateEntity}
           >
-            <Button className="w-full" variant="outline">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Entity
-            </Button>
-          </div>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Entity
+          </Button>
         )}
       </CardFooter>
     </Card>
