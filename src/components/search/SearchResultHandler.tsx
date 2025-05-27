@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -77,16 +76,22 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
       if (entity) {
         console.log(`✅ Enhanced entity created successfully:`, entity);
         
-        // Always navigate to the standardized entity URL using slug
-        const identifier = entity.slug || entity.id;
-        const entityPath = `/entity/${identifier}`;
+        // Keep the loading state active for a moment to ensure smooth transition
+        setTimeout(() => {
+          // Always navigate to the standardized entity URL using slug
+          const identifier = entity.slug || entity.id;
+          const entityPath = `/entity/${identifier}`;
+          
+          console.log(`🔗 Navigating to entity page: ${entityPath}`);
+          navigate(entityPath);
+          
+          if (onClose) {
+            onClose();
+          }
+          
+          setIsCreatingEntity(false);
+        }, 800); // Small delay for smoother transition
         
-        console.log(`🔗 Navigating to entity page: ${entityPath}`);
-        navigate(entityPath);
-        
-        if (onClose) {
-          onClose();
-        }
       } else {
         console.error('❌ Enhanced entity creation failed - no entity returned');
         toast({
@@ -94,6 +99,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
           description: 'Could not create entity from this result',
           variant: 'destructive'
         });
+        setIsCreatingEntity(false);
       }
     } catch (error) {
       console.error('❌ Error handling search result:', error);
@@ -102,7 +108,6 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         description: 'Failed to process search result',
         variant: 'destructive'
       });
-    } finally {
       setIsCreatingEntity(false);
     }
   };
@@ -179,7 +184,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         )}
       </div>
 
-      {/* Loading Modal */}
+      {/* Enhanced Loading Modal - Stays active throughout entire process */}
       <Dialog open={isCreatingEntity} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md">
           <EntityCreationLoader 
