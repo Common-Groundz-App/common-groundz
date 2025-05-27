@@ -5,6 +5,7 @@ import App from './App.tsx';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import './index.css';
 
 // Make sure we have a root element before trying to render
@@ -15,12 +16,14 @@ const root = createRoot(rootElement);
 
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      <PreferencesProvider>
-        <LocationProvider>
-          <App />
-        </LocationProvider>
-      </PreferencesProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <PreferencesProvider>
+          <LocationProvider>
+            <App />
+          </LocationProvider>
+        </PreferencesProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
