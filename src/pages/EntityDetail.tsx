@@ -118,15 +118,55 @@ const EntityDetail = () => {
     return fallbacks[type] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
   };
 
-  const getLocationDisplay = () => {
+  const getContextualFieldInfo = () => {
     if (!entity) return null;
     
-    if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
-      return entity.metadata.formatted_address;
+    switch (entity.type) {
+      case 'book':
+        return {
+          label: 'Author',
+          value: entity.authors && entity.authors.length > 0 
+            ? entity.authors[0] 
+            : entity.venue || null
+        };
+      case 'movie':
+      case 'tv':
+        return {
+          label: 'Studio',
+          value: entity.cast_crew?.studio || entity.venue || null
+        };
+      case 'place':
+        return {
+          label: 'Location',
+          value: entity.api_source === 'google_places' && entity.metadata?.formatted_address
+            ? entity.metadata.formatted_address
+            : entity.venue || null
+        };
+      case 'product':
+        return {
+          label: 'Brand',
+          value: entity.specifications?.brand || entity.venue || null
+        };
+      case 'music':
+        return {
+          label: 'Artist',
+          value: entity.venue || null
+        };
+      case 'food':
+      case 'drink':
+        return {
+          label: 'Venue',
+          value: entity.venue || null
+        };
+      default:
+        return {
+          label: 'Source',
+          value: entity.venue || null
+        };
     }
-    
-    return entity.venue;
   };
+
+  const contextualField = getContextualFieldInfo();
 
   const handleAddRecommendation = () => {
     if (!user) {
@@ -310,10 +350,10 @@ const EntityDetail = () => {
                       </Badge>
                     )}
                   </div>
-                  {getLocationDisplay() && (
+                  {contextualField?.value && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <MapPin className="h-4 w-4" />
-                      <span>{getLocationDisplay()}</span>
+                      <span>{contextualField.value}</span>
                     </div>
                   )}
                   
@@ -554,7 +594,7 @@ const EntityDetail = () => {
               {/* Related Entities Card */}
               {entity && <EntityRelatedCard entity={entity} />}
               
-              {/* Entity Basic Info Card */}
+              {/* Simplified Basic Info Card - only essential fields */}
               {entity && (
                 <Card>
                   <CardHeader className="pb-3">
@@ -563,46 +603,13 @@ const EntityDetail = () => {
                   <CardContent className="space-y-3">
                     <div className="text-sm">
                       <div className="font-medium">Type</div>
-                      <div className="text-muted-foreground">{entity.type}</div>
+                      <div className="text-muted-foreground capitalize">{entity.type}</div>
                     </div>
                     
-                    {getLocationDisplay() && (
+                    {contextualField?.value && (
                       <div className="text-sm">
-                        <div className="font-medium">Location</div>
-                        <div className="text-muted-foreground">{getLocationDisplay()}</div>
-                      </div>
-                    )}
-                    
-                    {entity.api_source && (
-                      <div className="text-sm">
-                        <div className="font-medium">Source</div>
-                        <div className="text-muted-foreground capitalize">
-                          {entity.api_source.replace(/_/g, ' ')}
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="text-sm">
-                      <div className="font-medium">Added</div>
-                      <div className="text-muted-foreground">
-                        {entity.created_at ? formatRelativeDate(entity.created_at) : 'Recently added'}
-                      </div>
-                    </div>
-
-                    {entity.data_quality_score && (
-                      <div className="text-sm">
-                        <div className="font-medium">Data Quality</div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-muted rounded-full h-2">
-                            <div 
-                              className="bg-primary h-2 rounded-full transition-all"
-                              style={{ width: `${entity.data_quality_score}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {entity.data_quality_score}%
-                          </span>
-                        </div>
+                        <div className="font-medium">{contextualField.label}</div>
+                        <div className="text-muted-foreground">{contextualField.value}</div>
                       </div>
                     )}
                   </CardContent>

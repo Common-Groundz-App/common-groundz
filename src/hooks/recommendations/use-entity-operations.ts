@@ -30,6 +30,20 @@ export const useEntityOperations = () => {
     }
   };
 
+  const searchGoogleBooks = async (query: string): Promise<any[]> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('search-google-books', {
+        body: { query, maxResults: 20 }
+      });
+
+      if (error) throw error;
+      return data?.results || [];
+    } catch (error) {
+      console.error('Error searching Google Books:', error);
+      return [];
+    }
+  };
+
   const handleEntityCreation = async (
     name: string,
     type: EntityType,
@@ -105,9 +119,35 @@ export const useEntityOperations = () => {
   const searchEntities = async (type: EntityType, searchTerm: string = ''): Promise<Entity[]> => {
     try {
       setIsLoading(true);
-      const searchResults = await getEntitiesByType(type, searchTerm);
-      setEntities(searchResults);
-      return searchResults;
+      let allResults: Entity[] = [];
+      
+      // Get existing entities from database
+      const existingResults = await getEntitiesByType(type, searchTerm);
+      allResults = [...existingResults];
+      
+      // For books, also search Google Books API
+      if (type === 'book' && searchTerm.trim()) {
+        try {
+          const googleBooksResults = await searchGoogleBooks(searchTerm);
+          
+          // Filter out any that already exist in our database by comparing names and authors
+          const filteredGoogleResults = googleBooksResults.filter(googleBook => {
+            return !existingResults.some(existing => {
+              const nameMatch = existing.name.toLowerCase() === googleBook.name.toLowerCase();
+              const authorMatch = existing.authors?.[0]?.toLowerCase() === googleBook.authors?.[0]?.toLowerCase();
+              return nameMatch && authorMatch;
+            });
+          });
+          
+          allResults = [...allResults, ...filteredGoogleResults];
+        } catch (error) {
+          console.error('Error searching Google Books:', error);
+          // Continue with just database results if Google Books fails
+        }
+      }
+      
+      setEntities(allResults);
+      return allResults;
     } catch (error) {
       console.error('Error searching entities:', error);
       toast({
@@ -125,6 +165,7 @@ export const useEntityOperations = () => {
     entities,
     isLoading,
     handleEntityCreation,
-    searchEntities
+    searchEntities,
+    searchGoogleBooks
   };
 };
