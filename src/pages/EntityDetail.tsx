@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,7 +23,7 @@ import Footer from '@/components/Footer';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
-import { EntityDetailSkeleton, EntityDetailLoadingProgress } from '@/components/entity/EntityDetailSkeleton';
+import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -74,7 +75,21 @@ const EntityDetail = () => {
 
   // Show loading progress when still loading
   if (isLoading && loadingStep > 0) {
-    return <EntityDetailLoadingProgress step={loadingStep} total={4} />;
+    return (
+      <div className="min-h-screen flex flex-col animate-fade-in">
+        <NavBarComponent />
+        <div className="flex-1 pt-16">
+          <div className="container max-w-6xl mx-auto py-8 px-4">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-4">Loading Entity Details...</h2>
+              <p className="text-muted-foreground">Step {loadingStep} of 4</p>
+            </div>
+          </div>
+        </div>
+        <Footer />
+        <BottomNavigation />
+      </div>
+    );
   }
 
   // Show skeleton when initially loading
