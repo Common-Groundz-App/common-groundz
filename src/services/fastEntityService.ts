@@ -58,8 +58,11 @@ export const createEntityFast = async (data: FastEntityData): Promise<EntityCrea
 
     // Queue background processing if there's external data to process
     let backgroundTaskId: string | undefined;
-    if (data.api_source && data.api_ref) {
+    if (data.api_source && (data.api_ref || data.metadata)) {
       backgroundTaskId = await queueBackgroundProcessing(entity.id, data);
+      
+      // Immediately trigger background processing
+      await triggerBackgroundProcessing();
     }
 
     return {
@@ -103,6 +106,27 @@ const queueBackgroundProcessing = async (entityId: string, data: FastEntityData)
   } catch (error) {
     console.error('❌ Error queuing background processing:', error);
     return undefined;
+  }
+};
+
+/**
+ * Trigger background processing immediately
+ */
+const triggerBackgroundProcessing = async (): Promise<void> => {
+  try {
+    console.log('🔄 Triggering background processing...');
+    
+    const { error } = await supabase.functions.invoke('process-entity-background', {
+      body: { trigger: 'immediate' }
+    });
+
+    if (error) {
+      console.error('❌ Error triggering background processing:', error);
+    } else {
+      console.log('✅ Background processing triggered successfully');
+    }
+  } catch (error) {
+    console.error('❌ Error in triggerBackgroundProcessing:', error);
   }
 };
 

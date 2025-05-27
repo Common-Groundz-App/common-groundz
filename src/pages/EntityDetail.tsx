@@ -22,7 +22,7 @@ import Footer from '@/components/Footer';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
-import { EntityDetailSkeleton, EntityDetailLoadingProgress } from '@/components/entity/EntityDetailSkeleton';
+import { EntityDetailSkeleton, EntityDetailLoadingProgress, EntityProcessingStatus } from '@/components/entity/EntityDetailSkeleton';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -196,14 +196,14 @@ const EntityDetail = () => {
     }
   };
 
-  // New function to handle image refresh
+  // Enhanced function to handle image refresh
   const handleImageRefresh = async () => {
     if (!entity) return;
     
     setIsRefreshingImage(true);
     
     try {
-      // Call the refresh function from the hook
+      // First try the refresh hook
       const newImageUrl = await refreshEntityImage(
         entity.id, 
         entity.api_source === 'google_places' ? entity.api_ref : undefined, 
@@ -219,10 +219,21 @@ const EntityDetail = () => {
         // Refresh the entity data to show the new image
         refreshData();
       } else {
+        // If refresh hook fails, try triggering background processing
+        console.log('🔄 Triggering background processing for entity:', entity.id);
+        
+        // Trigger background processing
+        await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/process-entity-background`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ entityId: entity.id })
+        });
+        
         toast({
-          title: 'Image refresh failed',
-          description: 'Unable to refresh the image. Please try again later.',
-          variant: 'destructive',
+          title: 'Processing started',
+          description: 'Image processing has been queued. Please wait a moment and refresh.',
         });
       }
     } catch (error) {
@@ -237,10 +248,24 @@ const EntityDetail = () => {
     }
   };
 
+  // Handle processing completion to refresh data
+  const handleProcessingComplete = () => {
+    console.log('🔄 Background processing completed, refreshing entity data...');
+    refreshData();
+  };
+
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
       <NavBarComponent />
       <div className="flex-1 pt-16">
+        {/* Processing Status */}
+        {entity && (
+          <EntityProcessingStatus 
+            entityId={entity.id} 
+            onProcessingComplete={handleProcessingComplete}
+          />
+        )}
+        
         {/* Hero Entity Header Section */}
         <div className="relative bg-gradient-to-b from-violet-100/30 to-transparent dark:from-violet-900/10">
           <div className="container max-w-6xl mx-auto py-8 px-4">
@@ -253,6 +278,7 @@ const EntityDetail = () => {
                     alt={entity?.name || 'Entity image'}
                     className="w-full h-full object-cover"
                     fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
+                    entityType={entity?.type}
                   />
                   
                   {/* Image source indicator and refresh button */}

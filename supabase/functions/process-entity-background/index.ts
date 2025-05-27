@@ -37,7 +37,7 @@ serve(async (req) => {
       .eq('status', 'pending')
       .order('priority', { ascending: true })
       .order('created_at', { ascending: true })
-      .limit(5);
+      .limit(10); // Increased limit for better throughput
 
     if (tasksError) {
       throw new Error(`Failed to fetch tasks: ${tasksError.message}`);
@@ -152,12 +152,13 @@ async function processEntityTask(supabase: any, task: BackgroundTask): Promise<b
 
     let updateData: any = {};
 
-    // Process image if needed
+    // Process image if needed and entity has API data
     if (taskList.includes('image_processing') && original_data.api_source) {
-      console.log(`Processing image for entity ${entity_id}`);
-      const imageUrl = await processEntityImage(original_data, entity_id);
-      if (imageUrl) {
+      console.log(`Processing image for entity ${entity_id} from ${original_data.api_source}`);
+      const imageUrl = await processEntityImage(supabase, original_data, entity_id);
+      if (imageUrl && imageUrl !== entity.image_url) {
         updateData.image_url = imageUrl;
+        console.log(`✅ New image URL for entity ${entity_id}: ${imageUrl}`);
       }
     }
 
@@ -182,7 +183,9 @@ async function processEntityTask(supabase: any, task: BackgroundTask): Promise<b
         throw new Error(`Failed to update entity: ${updateError.message}`);
       }
 
-      console.log(`✅ Entity ${entity_id} enhanced successfully`);
+      console.log(`✅ Entity ${entity_id} enhanced successfully with updates:`, Object.keys(updateData));
+    } else {
+      console.log(`ℹ️ No updates needed for entity ${entity_id}`);
     }
 
     return true;
@@ -193,13 +196,23 @@ async function processEntityTask(supabase: any, task: BackgroundTask): Promise<b
 }
 
 /**
- * Process entity image (simplified version for background)
+ * Process entity image with improved handling for different sources
  */
-async function processEntityImage(originalData: any, entityId: string): Promise<string | null> {
+async function processEntityImage(supabase: any, originalData: any, entityId: string): Promise<string | null> {
   try {
-    // For Google Places entities, trigger image refresh
+    console.log(`🖼️ Processing image for entity ${entityId}, source: ${originalData.api_source}`);
+    
+    // Handle Google Places images
     if (originalData.api_source === 'google_places' && originalData.api_ref) {
-      // Call the existing refresh-entity-image function
+      console.log(`📍 Processing Google Places image for place: ${originalData.api_ref}`);
+      
+      const photoReference = originalData.metadata?.photo_reference;
+      if (!photoReference) {
+        console.log(`⚠️ No photo reference found for Google Places entity ${entityId}`);
+        return null;
+      }
+
+      // Call the refresh-entity-image function for Google Places
       const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/refresh-entity-image`, {
         method: 'POST',
         headers: {
@@ -209,57 +222,108 @@ async function processEntityImage(originalData: any, entityId: string): Promise<
         body: JSON.stringify({
           entityId,
           placeId: originalData.api_ref,
-          photoReference: originalData.metadata?.photo_reference
+          photoReference: photoReference
         })
       });
 
       if (response.ok) {
         const result = await response.json();
+        console.log(`✅ Google Places image processed successfully: ${result.imageUrl}`);
         return result.imageUrl;
+      } else {
+        const errorText = await response.text();
+        console.error(`❌ Google Places image processing failed: ${errorText}`);
       }
     }
 
-    // For other sources, attempt to save external image
+    // Handle OpenLibrary book covers
+    if (originalData.api_source === 'openlibrary') {
+      console.log(`📚 Processing OpenLibrary image for book: ${originalData.name}`);
+      
+      // OpenLibrary images are already in the metadata, just use them directly
+      const coverUrl = originalData.metadata?.image_url;
+      if (coverUrl && coverUrl.includes('covers.openlibrary.org')) {
+        console.log(`✅ Using OpenLibrary cover: ${coverUrl}`);
+        return coverUrl;
+      }
+    }
+
+    // Handle TMDB movie posters
+    if (originalData.api_source === 'tmdb') {
+      console.log(`🎬 Processing TMDB image for movie: ${originalData.name}`);
+      
+      const posterPath = originalData.metadata?.poster_path;
+      if (posterPath) {
+        const fullImageUrl = `https://image.tmdb.org/t/p/w500${posterPath}`;
+        console.log(`✅ Using TMDB poster: ${fullImageUrl}`);
+        return fullImageUrl;
+      }
+    }
+
+    // Handle other external images
     if (originalData.metadata?.image_url) {
-      // This would call image saving logic
-      // For now, return the original URL
+      console.log(`🌐 Processing external image: ${originalData.metadata.image_url}`);
+      // For now, return the original URL - could implement saving to storage here
       return originalData.metadata.image_url;
     }
 
+    console.log(`ℹ️ No suitable image found for entity ${entityId}`);
     return null;
   } catch (error) {
-    console.error('Error processing entity image:', error);
+    console.error('❌ Error processing entity image:', error);
     return null;
   }
 }
 
 /**
- * Enrich entity metadata (simplified version for background)
+ * Enrich entity metadata with better data extraction
  */
 async function enrichEntityMetadata(originalData: any): Promise<any> {
   const enrichedData: any = {};
 
   try {
-    // Add enhanced metadata based on type
+    // Add enhanced metadata based on type and source
     if (originalData.type === 'book' && originalData.metadata) {
       enrichedData.authors = originalData.metadata.authors || [];
-      enrichedData.publication_year = originalData.metadata.publish_year;
+      enrichedData.publication_year = originalData.metadata.publish_year || originalData.metadata.first_publish_year;
       enrichedData.isbn = originalData.metadata.isbn;
+      
+      if (originalData.metadata.subjects) {
+        enrichedData.subjects = originalData.metadata.subjects.slice(0, 10); // Limit subjects
+      }
     }
 
     if (originalData.type === 'place' && originalData.metadata) {
       enrichedData.external_ratings = {
         google_rating: originalData.metadata.rating,
-        user_ratings_total: originalData.metadata.user_ratings_total
+        user_ratings_total: originalData.metadata.user_ratings_total,
+        price_level: originalData.metadata.price_level
       };
+      
+      if (originalData.metadata.formatted_address) {
+        enrichedData.formatted_address = originalData.metadata.formatted_address;
+      }
     }
 
-    // Add enrichment source
-    enrichedData.enrichment_source = originalData.api_source;
+    if (originalData.type === 'movie' && originalData.metadata) {
+      enrichedData.external_ratings = {
+        tmdb_rating: originalData.metadata.vote_average,
+        vote_count: originalData.metadata.vote_count
+      };
+      
+      if (originalData.metadata.release_date) {
+        enrichedData.publication_year = new Date(originalData.metadata.release_date).getFullYear();
+      }
+    }
 
+    // Add enrichment source and timestamp
+    enrichedData.enrichment_source = originalData.api_source;
+    enrichedData.enriched_at = new Date().toISOString();
+
+    console.log(`🔧 Enhanced metadata for ${originalData.type}:`, Object.keys(enrichedData));
     return enrichedData;
   } catch (error) {
-    console.error('Error enriching metadata:', error);
+    console.error('❌ Error enriching metadata:', error);
     return {};
   }
 }
