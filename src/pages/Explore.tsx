@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -132,9 +131,9 @@ const Explore = () => {
             onClick={() => toggleShowAll(categoryKey)}
           >
             {showAllResults[categoryKey] ? (
-              <>Less <ChevronUp className="w-3 h-3 ml-1" /></>
+              <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
             ) : (
-              <>All <ChevronDown className="w-3 h-3 ml-1" /></>
+              <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
             )}
           </Button>
         )}
@@ -199,9 +198,9 @@ const Explore = () => {
                 />
                 {searchQuery && (
                   <Button 
-                    variant="ghost" 
+                    variant="default" 
                     size="sm"
-                    className="mr-1"
+                    className="mr-1 bg-brand-orange hover:bg-brand-orange/90"
                     onClick={handleComplexProductSearch}
                   >
                     Search More
@@ -209,16 +208,11 @@ const Explore = () => {
                 )}
               </div>
               
-              {/* Search Classification Info */}
+              {/* Search Classification Info - Only show confidence percentage */}
               {classification && searchQuery && (
                 <div className="mt-2 flex items-center gap-2">
                   <Badge variant="secondary" className="text-xs">
                     {classification.classification} ({Math.round(classification.confidence * 100)}% confidence)
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {classification.api_used === 'gemini' ? '🤖 Gemini' : 
-                     classification.api_used === 'openai' ? '🧠 OpenAI' : 
-                     '🔧 Local'}
                   </Badge>
                   {isLoading && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -257,10 +251,10 @@ const Explore = () => {
                     </div>
                   )}
                   
-                  {/* Your Database - Priority Section */}
+                  {/* Already on Groundz - Priority Section */}
                   {results.entities.length > 0 && (
                     <div className="border-b last:border-b-0">
-                      {renderSectionHeader('✨ Your Database', results.entities.length, 'entities')}
+                      {renderSectionHeader('✨ Already on Groundz', results.entities.length, 'entities')}
                       {(showAllResults.entities ? results.entities : results.entities.slice(0, 3)).map((entity) => (
                         <EntityResultItem
                           key={entity.id}
@@ -353,7 +347,7 @@ const Explore = () => {
                         onClick={handleComplexProductSearch}
                       >
                         <Search className="w-3 h-3 mr-1" />
-                        Search more products for "{searchQuery}"
+                        Search More
                       </button>
                     </div>
                   )}
@@ -368,7 +362,7 @@ const Explore = () => {
                     className="text-sm text-primary hover:underline mt-2"
                     onClick={handleComplexProductSearch}
                   >
-                    Search external sources for "{searchQuery}"
+                    Search More
                   </button>
                 </div>
               )}
@@ -412,7 +406,7 @@ const Explore = () => {
                         className="pr-20"
                       />
                       <Button 
-                        className="absolute right-0 top-0 rounded-l-none"
+                        className="absolute right-0 top-0 rounded-l-none bg-brand-orange hover:bg-brand-orange/90"
                         onClick={handleComplexProductSearch}
                       >
                         Search

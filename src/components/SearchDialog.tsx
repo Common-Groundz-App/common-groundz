@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,7 +6,7 @@ import {
   DialogContent,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, X, Loader2, Sparkles, Zap, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
 import { SearchResultHandler } from './search/SearchResultHandler';
@@ -59,28 +58,15 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             onClick={() => toggleShowAll(categoryKey)}
           >
             {showAllResults[categoryKey] ? (
-              <>Show Less <ChevronUp className="w-3 h-3 ml-1" /></>
+              <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
             ) : (
-              <>Show All <ChevronDown className="w-3 h-3 ml-1" /></>
+              <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
             )}
           </Button>
         )}
       </div>
     </div>
   );
-
-  const getAPIIcon = (apiUsed?: string) => {
-    switch (apiUsed) {
-      case 'gemini':
-        return <Sparkles className="w-3 h-3 text-blue-500" />;
-      case 'openai':
-        return <Zap className="w-3 h-3 text-green-500" />;
-      case 'fallback':
-        return <AlertCircle className="w-3 h-3 text-orange-500" />;
-      default:
-        return null;
-    }
-  };
 
   const renderLoadingState = () => (
     <div className="p-4 text-center">
@@ -90,8 +76,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       </div>
       {classification && (
         <div className="flex items-center justify-center gap-2">
-          <Badge variant="secondary" className="text-xs flex items-center gap-1">
-            {getAPIIcon(classification.api_used)}
+          <Badge variant="secondary" className="text-xs">
             {classification.classification} ({Math.round(classification.confidence * 100)}%)
           </Badge>
         </div>
@@ -146,8 +131,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               <p className="text-sm text-muted-foreground">No suggestions found. Press Enter to search more sources.</p>
               {classification && (
                 <Badge variant="outline" className="text-xs mt-2 flex items-center gap-1 justify-center">
-                  {getAPIIcon(classification.api_used)}
-                  Classified as: {classification.classification}
+                  Classified as: {classification.classification} ({Math.round(classification.confidence * 100)}%)
                 </Badge>
               )}
             </div>
@@ -155,10 +139,10 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
           {(hasResults || hasCategorizedResults) && (
             <>
-              {/* Local Entities - Changed from "Your Database" to "Saved Items" */}
+              {/* Already on Groundz - Changed from "Saved Items" */}
               {results.entities.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('Saved Items', results.entities.length, 'entities')}
+                  {renderSectionHeader('✨ Already on Groundz', results.entities.length, 'entities')}
                   {(showAllResults.entities ? results.entities : results.entities.slice(0, 3)).map((entity) => (
                     <EntityResultItem
                       key={entity.id}
@@ -255,7 +239,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 }}
               >
                 <Search className="w-3 h-3 mr-1" />
-                Search for "{query}"
+                Search More
               </button>
             </div>
           )}
@@ -264,4 +248,3 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     </Dialog>
   );
 }
-
