@@ -4,7 +4,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
@@ -23,6 +22,7 @@ import Footer from '@/components/Footer';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
+import { EntityDetailSkeleton, EntityDetailLoadingProgress } from '@/components/entity/EntityDetailSkeleton';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -48,6 +48,7 @@ const EntityDetail = () => {
     reviews,
     stats,
     isLoading,
+    loadingStep,
     error,
     refreshData
   } = useEntityDetail(slug || '');
@@ -69,6 +70,25 @@ const EntityDetail = () => {
   // Handle entity not found or deleted
   if (!isLoading && (error || !entity)) {
     return <NotFound />;
+  }
+
+  // Show loading progress when still loading
+  if (isLoading && loadingStep > 0) {
+    return <EntityDetailLoadingProgress step={loadingStep} total={4} />;
+  }
+
+  // Show skeleton when initially loading
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col animate-fade-in">
+        <NavBarComponent />
+        <div className="flex-1 pt-16">
+          <EntityDetailSkeleton />
+        </div>
+        <Footer />
+        <BottomNavigation />
+      </div>
+    );
   }
 
   // Get category-based fallback image for entities
@@ -218,164 +238,147 @@ const EntityDetail = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col animate-fade-in">
       <NavBarComponent />
       <div className="flex-1 pt-16">
         {/* Hero Entity Header Section */}
         <div className="relative bg-gradient-to-b from-violet-100/30 to-transparent dark:from-violet-900/10">
-          {isLoading ? (
-            <div className="container max-w-6xl mx-auto py-8 px-4">
-              <div className="space-y-4">
-                <Skeleton className="h-8 w-3/4" />
-                <Skeleton className="h-6 w-1/2" />
-                <Skeleton className="h-40 w-full" />
-              </div>
-            </div>
-          ) : (
-            <div className="container max-w-6xl mx-auto py-8 px-4">
-              <div className="flex flex-col md:flex-row gap-8">
-                {/* Entity Image */}
-                <div className="w-full md:w-1/3 lg:w-1/4">
-                  <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
-                    <ImageWithFallback
-                      src={entity?.image_url || ''}
-                      alt={entity?.name || 'Entity image'}
-                      className="w-full h-full object-cover"
-                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
-                    />
-                    
-                    {/* Image source indicator and refresh button */}
-                    {entity?.image_url && (
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        {/* Image source indicator */}
-                        <Badge 
-                          variant="outline" 
-                          className={`${
-                            isEntityImageMigrated(entity.image_url) 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' 
-                              : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
-                          } opacity-80 group-hover:opacity-100`}
-                        >
-                          <Image className="h-3 w-3 mr-1" />
-                          {isEntityImageMigrated(entity.image_url) ? 'Local' : 'External'}
-                        </Badge>
-                        
-                        {/* Refresh button - only show for users */}
-                        {user && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 px-2 bg-white/80 dark:bg-black/50 opacity-80 group-hover:opacity-100"
-                            onClick={handleImageRefresh}
-                            disabled={isRefreshing || isRefreshingImage}
-                          >
-                            <RefreshCw className={`h-3 w-3 ${(isRefreshing || isRefreshingImage) ? 'animate-spin' : ''}`} />
-                            <span className="sr-only">Refresh image</span>
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </AspectRatio>
-                </div>
-                
-                {/* Entity Details */}
-                <div className="flex-1 space-y-4">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-3xl font-bold">{entity?.name}</h1>
-                      {entity?.metadata?.verified && (
-                        <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 gap-1">
-                          <Flag className="h-3 w-3" /> Verified
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
-                        {entity?.type}
+          <div className="container max-w-6xl mx-auto py-8 px-4">
+            <div className="flex flex-col md:flex-row gap-8">
+              {/* Entity Image */}
+              <div className="w-full md:w-1/3 lg:w-1/4">
+                <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
+                  <ImageWithFallback
+                    src={entity?.image_url || ''}
+                    alt={entity?.name || 'Entity image'}
+                    className="w-full h-full object-cover"
+                    fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
+                  />
+                  
+                  {/* Image source indicator and refresh button */}
+                  {entity?.image_url && (
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      {/* Image source indicator */}
+                      <Badge 
+                        variant="outline" 
+                        className={`${
+                          isEntityImageMigrated(entity.image_url) 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' 
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
+                        } opacity-80 group-hover:opacity-100`}
+                      >
+                        <Image className="h-3 w-3 mr-1" />
+                        {isEntityImageMigrated(entity.image_url) ? 'Local' : 'External'}
                       </Badge>
-                      {entity?.category_id && (
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                          {/* Category name would be fetched here */}
-                          Category
-                        </Badge>
+                      
+                      {/* Refresh button - only show for users */}
+                      {user && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 bg-white/80 dark:bg-black/50 opacity-80 group-hover:opacity-100"
+                          onClick={handleImageRefresh}
+                          disabled={isRefreshing || isRefreshingImage}
+                        >
+                          <RefreshCw className={`h-3 w-3 ${(isRefreshing || isRefreshingImage) ? 'animate-spin' : ''}`} />
+                          <span className="sr-only">Refresh image</span>
+                        </Button>
                       )}
                     </div>
-                    {getLocationDisplay() && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span>{getLocationDisplay()}</span>
-                      </div>
-                    )}
-                    
-                    {/* Description */}
-                    {entity?.description && (
-                      <p className="text-muted-foreground mt-2">{entity.description}</p>
+                  )}
+                </AspectRatio>
+              </div>
+              
+              {/* Entity Details */}
+              <div className="flex-1 space-y-4">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-3xl font-bold">{entity?.name}</h1>
+                    {entity?.metadata?.verified && (
+                      <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 gap-1">
+                        <Flag className="h-3 w-3" /> Verified
+                      </Badge>
                     )}
                   </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
+                      {entity?.type}
+                    </Badge>
+                    {entity?.category_id && (
+                      <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        {/* Category name would be fetched here */}
+                        Category
+                      </Badge>
+                    )}
+                  </div>
+                  {getLocationDisplay() && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span>{getLocationDisplay()}</span>
+                    </div>
+                  )}
+                  
+                  {/* Description */}
+                  {entity?.description && (
+                    <p className="text-muted-foreground mt-2">{entity.description}</p>
+                  )}
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
         
         {/* Rating Summary Bar */}
         <div className="bg-card border-y dark:bg-card/50 py-4">
           <div className="container max-w-6xl mx-auto px-4">
-            {isLoading ? (
-              <div className="flex justify-between">
-                <Skeleton className="h-10 w-32" />
-                <Skeleton className="h-10 w-40" />
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-6 justify-between">
-                {/* Rating Display */}
-                <div className="flex items-center gap-4">
-                  {stats.averageRating !== null ? (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center bg-violet-50 dark:bg-violet-900/20 rounded-full p-2 h-16 w-16">
-                        <ConnectedRingsRating
-                          value={stats.averageRating}
-                          variant="badge"
-                          showValue={true}
-                          size="md"
-                        />
-                      </div>
-                      <div>
-                        <div className="font-semibold">Overall Rating</div>
-                        <div className="text-sm text-muted-foreground">
-                          Based on {stats.recommendationCount + stats.reviewCount} ratings
-                        </div>
+            <div className="flex flex-wrap items-center gap-6 justify-between">
+              {/* Rating Display */}
+              <div className="flex items-center gap-4">
+                {stats.averageRating !== null ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center bg-violet-50 dark:bg-violet-900/20 rounded-full p-2 h-16 w-16">
+                      <ConnectedRingsRating
+                        value={stats.averageRating}
+                        variant="badge"
+                        showValue={true}
+                        size="md"
+                      />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Overall Rating</div>
+                      <div className="text-sm text-muted-foreground">
+                        Based on {stats.recommendationCount + stats.reviewCount} ratings
                       </div>
                     </div>
-                  ) : (
-                    <div className="text-muted-foreground">No ratings yet</div>
-                  )}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground">No ratings yet</div>
+                )}
+              </div>
+              
+              {/* Stats */}
+              <div className="flex flex-wrap gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/20">
+                    <MessageSquareHeart className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <div className="font-medium">{stats.recommendationCount}</div>
+                    <div className="text-sm text-muted-foreground">Recommendations</div>
+                  </div>
                 </div>
                 
-                {/* Stats */}
-                <div className="flex flex-wrap gap-6">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/20">
-                      <MessageSquareHeart className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <div className="font-medium">{stats.recommendationCount}</div>
-                      <div className="text-sm text-muted-foreground">Recommendations</div>
-                    </div>
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-full bg-amber-50 dark:bg-amber-900/20">
+                    <MessageSquare className="h-5 w-5 text-amber-500 dark:text-amber-400" />
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-full bg-amber-50 dark:bg-amber-900/20">
-                      <MessageSquare className="h-5 w-5 text-amber-500 dark:text-amber-400" />
-                    </div>
-                    <div>
-                      <div className="font-medium">{stats.reviewCount}</div>
-                      <div className="text-sm text-muted-foreground">Reviews</div>
-                    </div>
+                  <div>
+                    <div className="font-medium">{stats.reviewCount}</div>
+                    <div className="text-sm text-muted-foreground">Reviews</div>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
         
@@ -422,12 +425,7 @@ const EntityDetail = () => {
                 
                 {/* Recommendations Tab */}
                 <TabsContent value="recommendations" className="space-y-4 mt-2">
-                  {isLoading ? (
-                    <div className="space-y-4">
-                      <Skeleton className="h-48 w-full" />
-                      <Skeleton className="h-48 w-full" />
-                    </div>
-                  ) : !recommendations || recommendations.length === 0 ? (
+                  {!recommendations || recommendations.length === 0 ? (
                     <div className="py-12 text-center border rounded-lg bg-violet-50/30 dark:bg-violet-900/5">
                       <MessageSquareHeart className="h-12 w-12 mx-auto text-violet-300 dark:text-violet-700" />
                       <h3 className="font-medium text-lg mt-4">No recommendations yet</h3>
@@ -471,12 +469,7 @@ const EntityDetail = () => {
                 
                 {/* Reviews Tab */}
                 <TabsContent value="reviews" className="space-y-4 mt-2">
-                  {isLoading ? (
-                    <div className="space-y-4">
-                      <Skeleton className="h-48 w-full" />
-                      <Skeleton className="h-48 w-full" />
-                    </div>
-                  ) : !reviews || reviews.length === 0 ? (
+                  {!reviews || reviews.length === 0 ? (
                     <div className="py-12 text-center border rounded-lg bg-amber-50/30 dark:bg-amber-900/5">
                       <MessageSquare className="h-12 w-12 mx-auto text-amber-300 dark:text-amber-700" />
                       <h3 className="font-medium text-lg mt-4">No reviews yet</h3>
@@ -524,39 +517,37 @@ const EntityDetail = () => {
             {/* Right Sidebar */}
             <div className="w-full md:w-72 lg:w-80 space-y-5 order-first md:order-last">
               {/* Share Your Experience Card */}
-              {!isLoading && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-medium">Share Your Experience</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button 
-                      onClick={handleAddRecommendation}
-                      className="w-full gap-2"
-                    >
-                      <MessageSquareHeart className="h-4 w-4" />
-                      Recommend
-                    </Button>
-                    
-                    <Button 
-                      onClick={handleAddReview}
-                      variant="outline" 
-                      className="w-full gap-2"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                      Write Review
-                    </Button>
-                    
-                    <Button variant="outline" className="w-full gap-2">
-                      <Share2 className="h-4 w-4" />
-                      Share
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg font-medium">Share Your Experience</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button 
+                    onClick={handleAddRecommendation}
+                    className="w-full gap-2"
+                  >
+                    <MessageSquareHeart className="h-4 w-4" />
+                    Recommend
+                  </Button>
+                  
+                  <Button 
+                    onClick={handleAddReview}
+                    variant="outline" 
+                    className="w-full gap-2"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Write Review
+                  </Button>
+                  
+                  <Button variant="outline" className="w-full gap-2">
+                    <Share2 className="h-4 w-4" />
+                    Share
+                  </Button>
+                </CardContent>
+              </Card>
               
               {/* Entity Info Card */}
-              {!isLoading && entity && (
+              {entity && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg font-medium">Entity Information</CardTitle>
@@ -585,16 +576,14 @@ const EntityDetail = () => {
               )}
               
               {/* Placeholder for Related Entities */}
-              {!isLoading && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-medium">Related Entities</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">Coming soon...</p>
-                  </CardContent>
-                </Card>
-              )}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg font-medium">Related Entities</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Coming soon...</p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>

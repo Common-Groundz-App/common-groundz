@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
 import { EntityTypeString } from '@/hooks/feed/api/types';
@@ -7,6 +7,8 @@ import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 import { createEnhancedEntity } from '@/services/enhancedEntityService';
+import { LoadingSpinner, EntityCreationLoader } from '@/components/ui/loading-spinner';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 interface SearchResultHandlerProps {
   result: ProductSearchResult;
@@ -17,12 +19,14 @@ interface SearchResultHandlerProps {
 export function SearchResultHandler({ result, query, onClose }: SearchResultHandlerProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isCreatingEntity, setIsCreatingEntity] = useState(false);
   
   // Determine entity type based on result data or use 'product' as default
   const entityType: EntityTypeString = determineEntityType(result);
 
   const handleResultClick = async () => {
     try {
+      setIsCreatingEntity(true);
       console.log(`🔍 Creating enhanced entity from search result:`, result);
       
       // Use enhanced entity service to create entity with rich metadata
@@ -56,47 +60,70 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         description: 'Failed to process search result',
         variant: 'destructive'
       });
+    } finally {
+      setIsCreatingEntity(false);
     }
   };
 
   return (
-    <div 
-      className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer rounded-lg transition-colors"
-      onClick={handleResultClick}
-    >
-      <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-        {result.image_url ? (
-          <img 
-            src={result.image_url} 
-            alt={result.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-            No Image
+    <>
+      <div 
+        className={`flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer rounded-lg transition-all duration-200 ${
+          isCreatingEntity ? 'opacity-50 pointer-events-none' : 'hover:scale-[1.02]'
+        }`}
+        onClick={handleResultClick}
+      >
+        <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+          {result.image_url ? (
+            <img 
+              src={result.image_url} 
+              alt={result.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+              No Image
+            </div>
+          )}
+          {isCreatingEntity && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <LoadingSpinner size="sm" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-sm truncate">{result.name}</h3>
+          <p className="text-xs text-muted-foreground truncate">{result.venue}</p>
+          {result.description && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+              {result.description}
+            </p>
+          )}
+          {result.metadata?.price && (
+            <p className="text-xs font-medium text-green-600 mt-1">
+              {result.metadata.price}
+            </p>
+          )}
+          <div className="mt-1">
+            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+              {entityType} • Enhanced
+            </span>
+          </div>
+        </div>
+        {isCreatingEntity && (
+          <div className="flex-shrink-0">
+            <LoadingSpinner size="sm" />
           </div>
         )}
       </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="font-medium text-sm truncate">{result.name}</h3>
-        <p className="text-xs text-muted-foreground truncate">{result.venue}</p>
-        {result.description && (
-          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-            {result.description}
-          </p>
-        )}
-        {result.metadata?.price && (
-          <p className="text-xs font-medium text-green-600 mt-1">
-            {result.metadata.price}
-          </p>
-        )}
-        <div className="mt-1">
-          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-            {entityType} • Enhanced
-          </span>
-        </div>
-      </div>
-    </div>
+
+      {/* Loading Modal */}
+      <Dialog open={isCreatingEntity} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md">
+          <EntityCreationLoader entityName={result.name} />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

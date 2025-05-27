@@ -24,16 +24,19 @@ export const useEntityDetail = (slugOrId: string) => {
     averageRating: null
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchEntityData = async () => {
       console.log('🔍 Fetching entity data for slugOrId:', slugOrId);
       setIsLoading(true);
+      setLoadingStep(0);
       setError(null);
 
       try {
-        // Fetch entity data using the updated fetchEntityBySlug function
+        // Step 1: Fetch entity data
+        setLoadingStep(1);
         const entityData = await fetchEntityBySlug(slugOrId);
         if (!entityData) {
           console.log('❌ Entity not found for:', slugOrId);
@@ -45,19 +48,23 @@ export const useEntityDetail = (slugOrId: string) => {
         console.log('✅ Found entity data:', entityData);
         setEntity(entityData);
 
-        // Fetch related content
+        // Step 2: Fetch recommendations
+        setLoadingStep(2);
         const entityRecommendations = await fetchEntityRecommendations(entityData.id, user?.id || null);
         console.log('Entity recommendations fetched:', entityRecommendations);
         setRecommendations(entityRecommendations);
         
+        // Step 3: Fetch reviews
+        setLoadingStep(3);
         const entityReviews = await fetchEntityReviews(entityData.id, user?.id || null);
         console.log('Entity reviews fetched:', entityReviews);
-        // Log a sample review to verify the structure
         if (entityReviews && entityReviews.length > 0) {
           console.log('Sample review structure:', JSON.stringify(entityReviews[0], null, 2));
         }
         setReviews(entityReviews);
         
+        // Step 4: Fetch statistics
+        setLoadingStep(4);
         const entityStats = await getEntityStats(entityData.id);
         console.log('Entity stats fetched:', entityStats);
         setStats(entityStats);
@@ -70,6 +77,7 @@ export const useEntityDetail = (slugOrId: string) => {
         setError('Failed to load entity data');
       } finally {
         setIsLoading(false);
+        setLoadingStep(0);
       }
     };
 
@@ -84,16 +92,21 @@ export const useEntityDetail = (slugOrId: string) => {
     
     console.log('Refreshing entity data for:', entity.name);
     setIsLoading(true);
+    setLoadingStep(1);
     
     try {
+      setLoadingStep(2);
       const refreshedRecommendations = await fetchEntityRecommendations(entity.id, user?.id || null);
+      
+      setLoadingStep(3);
       const refreshedReviews = await fetchEntityReviews(entity.id, user?.id || null);
+      
+      setLoadingStep(4);
       const refreshedStats = await getEntityStats(entity.id);
 
       console.log('Refresh received recommendations:', refreshedRecommendations.length);
       console.log('Refresh received reviews:', refreshedReviews.length);
       
-      // Log a sample review after refresh to verify the structure
       if (refreshedReviews && refreshedReviews.length > 0) {
         console.log('Sample refreshed review structure:', JSON.stringify(refreshedReviews[0], null, 2));
       }
@@ -105,6 +118,7 @@ export const useEntityDetail = (slugOrId: string) => {
       console.error('Error refreshing entity data:', err);
     } finally {
       setIsLoading(false);
+      setLoadingStep(0);
     }
   };
 
@@ -114,6 +128,7 @@ export const useEntityDetail = (slugOrId: string) => {
     reviews,
     stats,
     isLoading,
+    loadingStep,
     error,
     refreshData
   };
