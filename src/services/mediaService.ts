@@ -2,6 +2,7 @@
 import { generateUUID } from '@/lib/uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';
+import { ensureBucketPolicies } from '@/services/storageService';
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm'];
@@ -37,6 +38,9 @@ export const uploadMedia = async (
     if (!valid) {
       throw new Error(error);
     }
+
+    // Ensure bucket policies are set up
+    await ensureBucketPolicies('post_media');
 
     // Create a unique file name
     const fileExt = file.name.split('.').pop();

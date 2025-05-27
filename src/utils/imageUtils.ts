@@ -1,14 +1,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { ensureBucketPolicies } from '@/services/storageService';
 
 /**
  * Ensures a URL is using HTTPS protocol.
- * If the URL is already HTTPS, it returns the original URL.
- * If the URL is HTTP, it replaces the protocol with HTTPS.
- * If the URL is relative or doesn't start with HTTP/HTTPS, it returns null.
- *
- * @param url The URL to check and convert.
- * @returns The HTTPS URL, or null if the input is invalid.
  */
 export const ensureHttps = (url: string): string | null => {
   if (!url) {
@@ -34,9 +29,6 @@ export const ensureHttps = (url: string): string | null => {
 
 /**
  * Checks if a URL is a valid image URL.
- *
- * @param url The URL to check.
- * @returns True if the URL is valid, false otherwise.
  */
 export const isValidImageUrl = (url: string): boolean => {
   if (!url) {
@@ -60,9 +52,6 @@ export const isValidImageUrl = (url: string): boolean => {
 
 /**
  * Checks if a URL is a Google Places image URL.
- *
- * @param url The URL to check.
- * @returns True if the URL is a Google Places image URL, false otherwise.
  */
 export const isGooglePlacesImage = (url: string): boolean => {
   return url?.includes('maps.googleapis.com/maps/api/place/photo');
@@ -70,29 +59,27 @@ export const isGooglePlacesImage = (url: string): boolean => {
 
 /**
  * Returns a fallback image URL based on the entity type.
- *
- * @param entityType The type of entity.
- * @returns The fallback image URL.
  */
 export const getEntityTypeFallbackImage = (entityType: string): string => {
-  switch (entityType) {
-    case 'movie':
-      return '/movie_fallback.jpg';
-    case 'book':
-      return '/book_fallback.jpg';
-    case 'food':
-      return '/food_fallback.jpg';
-    case 'product':
-      return '/product_fallback.jpg';
-    case 'place':
-      return '/place_fallback.jpg';
-    default:
-      return '/placeholder.svg';
-  }
+  const fallbacks: Record<string, string> = {
+    'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
+    'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
+    'food': 'https://images.unsplash.com/photo-1555939594-58d7698950b',
+    'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
+    'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
+    'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
+    'music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
+    'art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
+    'tv': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
+    'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
+    'travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
+  };
+  
+  return fallbacks[entityType] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
 };
 
 /**
- * Save an external image to Supabase storage
+ * Save an external image to Supabase storage with improved error handling and retries
  * @param imageUrl URL of the external image
  * @param entityId ID of the entity to associate with the image
  * @returns Public URL of the stored image or null if failed
@@ -115,130 +102,146 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       return secureUrl;
     }
     
-    // Check if it's a Google Places image
+    // Check if it's a Google Places image and handle specially
     if (isGooglePlacesImage(secureUrl)) {
-      console.log('Google Places image detected. These should be handled by the refresh-entity-image function:', secureUrl);
-      
-      try {
-        // Get current session
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          console.error('No active session found to process Google Places image');
-          return secureUrl; // Return original URL as fallback
-        }
-        
-        // Extract the photo reference from the URL
-        const url = new URL(secureUrl);
-        const photoReference = url.searchParams.get('photoreference');
-        const placeId = url.searchParams.get('placeid'); // Some URLs might include this
-        
-        if (!photoReference) {
-          console.warn('No photo reference found in Google Places URL');
-          return secureUrl; // Return original URL as fallback
-        }
-        
-        // Call the refresh-entity-image edge function with the photo reference
-        console.log('Calling refresh-entity-image with photo reference:', photoReference);
-        
-        const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            photoReference,
-            placeId, // This might be null, but that's okay
-            entityId
-          })
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error('Error response from refresh-entity-image:', errorData);
-          return secureUrl; // Return original URL as fallback
-        }
-        
-        const responseData = await response.json();
-        console.log('Successfully processed Google Places image:', responseData);
-        
-        return responseData.imageUrl || secureUrl;
-      } catch (googlePlacesError) {
-        console.error('Error processing Google Places image:', googlePlacesError);
-        return secureUrl; // Return original URL as fallback
-      }
+      console.log('Google Places image detected, using specialized handling:', secureUrl);
+      return await handleGooglePlacesImage(secureUrl, entityId);
     }
     
     console.log('Fetching external image for storage:', secureUrl);
     
-    // Check if the entity-images bucket exists and ensure bucket policies
+    // Ensure bucket exists and has proper policies
     await ensureBucketForImage();
     
-    // Fetch the image with retries
-    let response;
-    let retryCount = 0;
-    const maxRetries = 2;
+    // Fetch the image with improved error handling
+    const imageBlob = await fetchImageWithRetries(secureUrl);
+    if (!imageBlob) {
+      return null;
+    }
     
-    while (retryCount <= maxRetries) {
-      try {
-        // Using AbortController to set a timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    // Upload to storage
+    return await uploadImageToStorage(imageBlob, entityId, secureUrl);
+    
+  } catch (error) {
+    console.error('Error saving image to storage:', error);
+    return null;
+  }
+};
+
+/**
+ * Handle Google Places images with specialized processing
+ */
+async function handleGooglePlacesImage(imageUrl: string, entityId: string): Promise<string | null> {
+  try {
+    // Get current session
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      console.error('No active session found to process Google Places image');
+      return imageUrl; // Return original URL as fallback
+    }
+    
+    // Extract the photo reference from the URL
+    const url = new URL(imageUrl);
+    const photoReference = url.searchParams.get('photoreference');
+    
+    if (!photoReference) {
+      console.warn('No photo reference found in Google Places URL');
+      return imageUrl; // Return original URL as fallback
+    }
+    
+    // Call the refresh-entity-image edge function
+    console.log('Processing Google Places image with photo reference:', photoReference);
+    
+    const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
+      body: {
+        photoReference,
+        entityId
+      }
+    });
+    
+    if (error) {
+      console.error('Error processing Google Places image:', error);
+      return imageUrl; // Return original URL as fallback
+    }
+    
+    console.log('Successfully processed Google Places image:', data);
+    return data?.imageUrl || imageUrl;
+    
+  } catch (error) {
+    console.error('Error processing Google Places image:', error);
+    return imageUrl; // Return original URL as fallback
+  }
+}
+
+/**
+ * Fetch image with retry logic and proper error handling
+ */
+async function fetchImageWithRetries(imageUrl: string, maxRetries: number = 2): Promise<Blob | null> {
+  let retryCount = 0;
+  
+  while (retryCount <= maxRetries) {
+    try {
+      // Using AbortController to set a timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(imageUrl, { 
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const blob = await response.blob();
         
-        response = await fetch(secureUrl, { 
-          signal: controller.signal,
-          headers: {
-            // Add a cache-busting query parameter to the URL
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          break; // Successful response, exit retry loop
+        // Validate blob size
+        if (blob.size <= 0) {
+          console.error('Received empty image blob from', imageUrl);
+          return null;
         }
         
-        console.warn(`Fetch attempt ${retryCount + 1} failed with status: ${response.status}`);
-        
-        // If status is 429 (Too Many Requests) wait longer
-        if (response.status === 429) {
-          await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
-        }
-      } catch (fetchError) {
-        console.warn(`Fetch attempt ${retryCount + 1} failed:`, fetchError);
-        
-        // If it's the last retry, re-throw the error
-        if (retryCount >= maxRetries) {
-          throw fetchError;
-        }
+        console.log(`Successfully fetched image: ${blob.size} bytes`);
+        return blob;
       }
       
-      retryCount++;
-      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+      console.warn(`Fetch attempt ${retryCount + 1} failed with status: ${response.status}`);
+      
+      // If status is 429 (Too Many Requests) wait longer
+      if (response.status === 429) {
+        await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
+      }
+    } catch (fetchError) {
+      console.warn(`Fetch attempt ${retryCount + 1} failed:`, fetchError);
+      
+      // If it's the last retry, return null
+      if (retryCount >= maxRetries) {
+        return null;
+      }
     }
     
-    if (!response || !response.ok) {
-      console.error('Failed to fetch image for storage migration:', response?.status, response?.statusText);
-      throw new Error(`Failed to fetch image: ${response?.status} ${response?.statusText}`);
-    }
-    
-    // Get image data
-    const blob = await response.blob();
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    retryCount++;
+    await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+  }
+  
+  return null;
+}
+
+/**
+ * Upload image blob to Supabase storage
+ */
+async function uploadImageToStorage(blob: Blob, entityId: string, originalUrl: string): Promise<string | null> {
+  try {
+    const contentType = blob.type || 'image/jpeg';
     const fileExt = contentType.split('/')[1] || 'jpg';
     const fileName = `${entityId}_${Date.now()}.${fileExt}`;
     const filePath = `${entityId}/${fileName}`;
     
     console.log(`Uploading image to storage: ${filePath} (${contentType}, size: ${blob.size} bytes)`);
-    
-    // Validate blob size
-    if (blob.size <= 0) {
-      console.error('Received empty image blob from', secureUrl);
-      return null;
-    }
     
     // Upload to Supabase storage
     const { data, error } = await supabase.storage
@@ -249,37 +252,10 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       });
       
     if (error) {
-      // Log detailed error information
       console.error('Failed to upload image to storage:', error);
       
       if (error.message.includes('storage/duplicate_file')) {
-        console.log('Duplicate file detected, attempting to get public URL anyway');
-        const { data: { publicUrl } } = supabase.storage
-          .from('entity-images')
-          .getPublicUrl(filePath);
-        return publicUrl;
-      }
-      
-      // Check if it's a permission error
-      if (error.message.includes('storage/permission_denied')) {
-        console.error('Permission denied error. Check RLS policies for entity-images bucket');
-        
-        // Try to ensure bucket policies as a recovery step
-        await ensureBucketPolicies();
-        
-        // Try the upload one more time
-        const { data: retryData, error: retryError } = await supabase.storage
-          .from('entity-images')
-          .upload(filePath, blob, {
-            contentType,
-            upsert: false
-          });
-          
-        if (retryError) {
-          console.error('Retry upload still failed:', retryError);
-          return null;
-        }
-        
+        console.log('Duplicate file detected, getting public URL');
         const { data: { publicUrl } } = supabase.storage
           .from('entity-images')
           .getPublicUrl(filePath);
@@ -297,25 +273,14 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
     console.log('Image saved to storage successfully:', publicUrl);
     return publicUrl;
   } catch (error) {
-    console.error('Error saving image to storage:', error);
+    console.error('Error uploading image to storage:', error);
     return null;
   }
-};
+}
 
 // Helper function to ensure the entity-images bucket exists with proper policies
 async function ensureBucketForImage() {
   try {
-    // Import the needed functions
-    const { ensureBucketExists, ensureBucketPolicies } = await import('@/services/storageService');
-    
-    // Ensure the bucket exists
-    const bucketExists = await ensureBucketExists('entity-images', true);
-    
-    if (!bucketExists) {
-      console.error('Failed to ensure entity-images bucket exists');
-      return false;
-    }
-    
     // Ensure the bucket has proper policies
     const policiesSet = await ensureBucketPolicies('entity-images');
     
@@ -326,17 +291,6 @@ async function ensureBucketForImage() {
     return true;
   } catch (error) {
     console.error('Error ensuring bucket for image:', error);
-    return false;
-  }
-}
-
-// Helper function to ensure bucket policies
-async function ensureBucketPolicies() {
-  try {
-    const { ensureBucketPolicies } = await import('@/services/storageService');
-    return await ensureBucketPolicies('entity-images');
-  } catch (error) {
-    console.error('Error ensuring bucket policies:', error);
     return false;
   }
 }
