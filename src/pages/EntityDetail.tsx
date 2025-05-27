@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,6 +23,8 @@ import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
+import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
+import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -33,14 +34,10 @@ const EntityDetail = () => {
   const [activeTab, setActiveTab] = useState('recommendations');
   const { handleImageUpload } = useRecommendationUploads();
   
-  // New state variables to control the visibility of forms
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
-  
-  // Add state for image refresh
   const [isRefreshingImage, setIsRefreshingImage] = useState(false);
   
-  // Import the entity image refresh hook
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
   
   const {
@@ -54,7 +51,6 @@ const EntityDetail = () => {
     refreshData
   } = useEntityDetail(slug || '');
   
-  // Debug logging for recommendations and reviews
   useEffect(() => {
     if (!isLoading) {
       console.log('EntityDetail component received recommendations:', recommendations?.length);
@@ -68,12 +64,10 @@ const EntityDetail = () => {
     }
   }, [isLoading, recommendations, reviews]);
 
-  // Handle entity not found or deleted
   if (!isLoading && (error || !entity)) {
     return <NotFound />;
   }
 
-  // Show loading progress when still loading
   if (isLoading && loadingStep > 0) {
     return (
       <div className="min-h-screen flex flex-col animate-fade-in">
@@ -92,7 +86,6 @@ const EntityDetail = () => {
     );
   }
 
-  // Show skeleton when initially loading
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col animate-fade-in">
@@ -106,7 +99,6 @@ const EntityDetail = () => {
     );
   }
 
-  // Get category-based fallback image for entities
   const getEntityTypeFallbackImage = (type: string): string => {
     const fallbacks: Record<string, string> = {
       'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
@@ -125,16 +117,13 @@ const EntityDetail = () => {
     return fallbacks[type] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
   };
 
-  // Helper function to get the proper location display
   const getLocationDisplay = () => {
     if (!entity) return null;
     
-    // If this entity is from Google Places API and has formatted address in metadata
     if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
       return entity.metadata.formatted_address;
     }
     
-    // Otherwise, fall back to venue field
     return entity.venue;
   };
 
@@ -174,7 +163,6 @@ const EntityDetail = () => {
     refreshData();
   };
   
-  // Handle recommendation form submission
   const handleRecommendationSubmit = async (values: any) => {
     try {
       toast({
@@ -198,7 +186,6 @@ const EntityDetail = () => {
     }
   };
   
-  // Handle review form submission
   const handleReviewSubmit = async () => {
     try {
       setIsReviewFormOpen(false);
@@ -211,14 +198,12 @@ const EntityDetail = () => {
     }
   };
 
-  // New function to handle image refresh
   const handleImageRefresh = async () => {
     if (!entity) return;
     
     setIsRefreshingImage(true);
     
     try {
-      // Call the refresh function from the hook
       const newImageUrl = await refreshEntityImage(
         entity.id, 
         entity.api_source === 'google_places' ? entity.api_ref : undefined, 
@@ -231,7 +216,6 @@ const EntityDetail = () => {
           description: 'The image has been successfully updated.',
         });
         
-        // Refresh the entity data to show the new image
         refreshData();
       } else {
         toast({
@@ -321,7 +305,6 @@ const EntityDetail = () => {
                     </Badge>
                     {entity?.category_id && (
                       <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        {/* Category name would be fetched here */}
                         Category
                       </Badge>
                     )}
@@ -529,7 +512,7 @@ const EntityDetail = () => {
               </Tabs>
             </div>
             
-            {/* Right Sidebar */}
+            {/* Enhanced Right Sidebar with new metadata components */}
             <div className="w-full md:w-72 lg:w-80 space-y-5 order-first md:order-last">
               {/* Share Your Experience Card */}
               <Card>
@@ -561,11 +544,17 @@ const EntityDetail = () => {
                 </CardContent>
               </Card>
               
-              {/* Entity Info Card */}
+              {/* Enhanced Entity Metadata Card */}
+              {entity && <EntityMetadataCard entity={entity} />}
+              
+              {/* Entity Specifications Card */}
+              {entity && <EntitySpecsCard entity={entity} />}
+              
+              {/* Entity Basic Info Card */}
               {entity && (
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-medium">Entity Information</CardTitle>
+                    <CardTitle className="text-lg font-medium">Basic Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="text-sm">
