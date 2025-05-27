@@ -62,11 +62,11 @@ export function useEntitySearch(type: EntityTypeString) {
     setIsLoading(true);
     
     try {
-      // Search in our local database first - use the string type directly for the query
+      // Search in our local database first - cast the type to avoid TypeScript issues
       const { data: localData, error: localError } = await supabase
         .from('entities')
         .select()
-        .eq('type', type) // String type is compatible with database
+        .eq('type', type as any) // Cast to any to handle extended entity types
         .ilike('name', `%${query}%`)
         .order('name')
         .limit(5);
@@ -224,9 +224,8 @@ export function useEntitySearch(type: EntityTypeString) {
       
       // Prepare entity data for insertion
       const entityData = {
-        id: entityId,
         name: externalData.name,
-        type,
+        type: type as any, // Cast to any to handle extended entity types
         venue: externalData.venue,
         description: externalData.description || null,
         image_url: imageUrl,
@@ -240,18 +239,7 @@ export function useEntitySearch(type: EntityTypeString) {
       // Insert the entity into the database
       const { data, error } = await supabase
         .from('entities')
-        .insert({
-          id: entityData.id, // Include the ID in the insert
-          name: entityData.name,
-          type: entityData.type,
-          venue: entityData.venue,
-          description: entityData.description,
-          image_url: entityData.image_url,
-          api_source: entityData.api_source,
-          api_ref: entityData.api_ref,
-          photo_reference: entityData.photo_reference,
-          metadata: entityData.metadata
-        })
+        .insert(entityData)
         .select()
         .single();
       
@@ -263,7 +251,7 @@ export function useEntitySearch(type: EntityTypeString) {
       // For Google Places entities, if we have a photo reference, refresh the image immediately
       if (isGooglePlacesImage(imageUrl) && entityData.photo_reference) {
         try {
-          console.log(`Refreshing Google Places image for new entity ${entityData.id}`);
+          console.log(`Refreshing Google Places image for new entity ${data.id}`);
           
           // Get current session for authentication
           const { data: { session } } = await supabase.auth.getSession();
@@ -279,7 +267,7 @@ export function useEntitySearch(type: EntityTypeString) {
               body: JSON.stringify({
                 photoReference: entityData.photo_reference,
                 placeId: entityData.api_ref,
-                entityId: entityData.id
+                entityId: data.id
               })
             });
             
@@ -292,7 +280,7 @@ export function useEntitySearch(type: EntityTypeString) {
                 await supabase
                   .from('entities')
                   .update({ image_url: result.imageUrl })
-                  .eq('id', entityData.id);
+                  .eq('id', data.id);
               }
             } else {
               console.error('Failed to refresh Google Places image for new entity:', await response.text());
@@ -356,11 +344,10 @@ export function useEntitySearch(type: EntityTypeString) {
         }
       }
       
-      // Create entity from the metadata - use string type
+      // Create entity from the metadata
       const entityData = {
-        id: entityId,
         name: data.metadata.title || data.metadata.og_title || url.split('/').pop() || 'Untitled',
-        type,
+        type: type as any, // Cast to any to handle extended entity types
         venue: data.metadata.site_name || new URL(url).hostname,
         description: data.metadata.description || data.metadata.og_description || null,
         image_url: imageUrl,
@@ -372,17 +359,7 @@ export function useEntitySearch(type: EntityTypeString) {
       // Insert the entity into our database
       const { data: insertData, error: insertError } = await supabase
         .from('entities')
-        .insert({
-          id: entityData.id,
-          name: entityData.name,
-          type: entityData.type,
-          venue: entityData.venue,
-          description: entityData.description,
-          image_url: entityData.image_url,
-          api_source: entityData.api_source,
-          api_ref: entityData.api_ref,
-          metadata: entityData.metadata
-        })
+        .insert(entityData)
         .select()
         .single();
       

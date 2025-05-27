@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,8 +40,9 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
           .limit(6);
         
         // If a specific entity type is provided, filter by that type
+        // Cast to the allowed Supabase type to avoid TypeScript errors
         if (entityType) {
-          query.eq('type', entityType);
+          query.eq('type', entityType as any);
         }
         
         const { data, error } = await query;
