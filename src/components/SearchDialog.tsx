@@ -6,7 +6,7 @@ import {
   DialogContent,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, X, Loader2 } from 'lucide-react';
+import { Search, X, Loader2, Sparkles, Zap, AlertCircle } from 'lucide-react';
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
 import { SearchResultHandler } from './search/SearchResultHandler';
@@ -49,6 +49,19 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     </div>
   );
 
+  const getAPIIcon = (apiUsed?: string) => {
+    switch (apiUsed) {
+      case 'gemini':
+        return <Sparkles className="w-3 h-3 text-blue-500" />;
+      case 'openai':
+        return <Zap className="w-3 h-3 text-green-500" />;
+      case 'fallback':
+        return <AlertCircle className="w-3 h-3 text-orange-500" />;
+      default:
+        return null;
+    }
+  };
+
   const renderLoadingState = () => (
     <div className="p-4 text-center">
       <div className="flex items-center justify-center gap-2 mb-2">
@@ -56,9 +69,12 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
         <span className="text-sm text-muted-foreground">Searching...</span>
       </div>
       {classification && (
-        <Badge variant="secondary" className="text-xs">
-          {classification.classification} ({Math.round(classification.confidence * 100)}%)
-        </Badge>
+        <div className="flex items-center justify-center gap-2">
+          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+            {getAPIIcon(classification.api_used)}
+            {classification.classification} ({Math.round(classification.confidence * 100)}%)
+          </Badge>
+        </div>
       )}
     </div>
   );
@@ -103,6 +119,12 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
           {query && !hasResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
             <div className="p-6 text-center">
               <p className="text-sm text-muted-foreground">No suggestions found. Press Enter to search more sources.</p>
+              {classification && (
+                <Badge variant="outline" className="text-xs mt-2 flex items-center gap-1 justify-center">
+                  {getAPIIcon(classification.api_used)}
+                  Classified as: {classification.classification}
+                </Badge>
+              )}
             </div>
           )}
 

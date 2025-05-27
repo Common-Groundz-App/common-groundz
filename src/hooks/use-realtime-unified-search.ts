@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { 
@@ -14,6 +13,7 @@ interface SearchClassification {
   classification: 'book' | 'movie' | 'place' | 'food' | 'product' | 'person' | 'general';
   confidence: number;
   reasoning?: string;
+  api_used?: 'gemini' | 'openai' | 'fallback';
 }
 
 interface RealtimeSearchState {
@@ -92,7 +92,7 @@ export const useRealtimeUnifiedSearch = (query: string) => {
     }));
   }, []);
 
-  // Classify search query using LLM
+  // Classify search query using LLM (Gemini primary, OpenAI fallback)
   const classifyQuery = useCallback(async (searchQuery: string): Promise<SearchClassification> => {
     setLoadingState('classification', true);
     try {
@@ -103,10 +103,22 @@ export const useRealtimeUnifiedSearch = (query: string) => {
       if (error) throw error;
       
       console.log('🤖 Query classification:', data);
-      return data;
+      
+      // Handle the updated response format
+      return {
+        classification: data.classification,
+        confidence: data.confidence,
+        reasoning: data.reasoning,
+        api_used: data.api_used
+      };
     } catch (error) {
       console.error('Classification failed:', error);
-      return { classification: 'general', confidence: 0.5 };
+      return { 
+        classification: 'general', 
+        confidence: 0.5,
+        reasoning: 'Classification service error',
+        api_used: 'fallback'
+      };
     } finally {
       setLoadingState('classification', false);
     }
