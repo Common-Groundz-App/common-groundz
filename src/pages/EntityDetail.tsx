@@ -26,6 +26,7 @@ import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
 import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
 import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
+import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -75,10 +76,10 @@ const EntityDetail = () => {
         <NavBarComponent />
         <div className="flex-1 pt-16">
           <div className="container max-w-6xl mx-auto py-8 px-4">
-            <div className="text-center">
-              <h2 className="text-xl font-semibold mb-4">Loading Entity Details...</h2>
-              <p className="text-muted-foreground">Step {loadingStep} of 4</p>
-            </div>
+            <EntityDetailLoadingProgress 
+              entityName={slug || 'Entity'}
+              entityType="product"
+            />
           </div>
         </div>
         <Footer />
