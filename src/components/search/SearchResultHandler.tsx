@@ -6,6 +6,7 @@ import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 import { createEnhancedEntity } from '@/services/enhancedEntityService';
+import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { LoadingSpinner, EntityCreationLoader } from '@/components/ui/loading-spinner';
 import { EntityCategory } from '@/utils/loadingMessages';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -20,25 +21,63 @@ interface SearchResultHandlerProps {
 export function SearchResultHandler({ result, query, onClose }: SearchResultHandlerProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isCreatingEntity, setIsCreatingEntity] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   
   // Determine entity type based on result data or use 'product' as default
   const entityType: EntityTypeString = determineEntityType(result);
 
   const handleResultClick = async () => {
     try {
-      setIsCreatingEntity(true);
-      console.log(`🔍 Creating enhanced entity from search result:`, result);
+      setIsProcessing(true);
+      
+      // Set engaging loading message based on entity type
+      const initialMessage = getEngagingLoadingMessage(entityType, result.name);
+      setLoadingMessage(initialMessage);
+      
+      console.log(`🔍 Processing search result:`, result);
+      
+      // First, check if entity already exists
+      let existingEntity: Entity | null = null;
+      if (result.api_source && result.api_ref) {
+        existingEntity = await findEntityByApiRef(result.api_source, result.api_ref);
+      }
+      
+      if (existingEntity) {
+        console.log(`✅ Found existing entity: ${existingEntity.name} (${existingEntity.id})`);
+        
+        // Update loading message for existing entity
+        setLoadingMessage(getNavigationMessage(entityType, result.name));
+        
+        // Keep the loading state active for smooth transition
+        setTimeout(() => {
+          const identifier = existingEntity.slug || existingEntity.id;
+          const entityPath = `/entity/${identifier}`;
+          
+          console.log(`🔗 Navigating to existing entity: ${entityPath}`);
+          navigate(entityPath);
+          
+          if (onClose) {
+            onClose();
+          }
+          
+          setIsProcessing(false);
+        }, 1200); // Slightly longer delay for better UX
+        
+        return;
+      }
+      
+      // If no existing entity, create new one
+      console.log(`🆕 Creating new entity from search result`);
+      setLoadingMessage(getCreationMessage(entityType, result.name));
       
       // Prepare enhanced data for entity creation
       const enhancedResultData = {
         ...result,
-        // Ensure the type is correctly set based on API source
         type: entityType,
-        // Ensure metadata is properly structured
         metadata: {
           ...result.metadata,
-          // For books, ensure we capture all the enhanced metadata from Open Library
+          // ... keep existing code (enhanced metadata handling)
           ...(result.api_source === 'openlibrary' && {
             authors: result.metadata?.authors,
             publication_year: result.metadata?.publication_year || result.metadata?.first_publish_year,
@@ -49,7 +88,6 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
             subjects: result.metadata?.subjects,
             edition_count: result.metadata?.edition_count
           }),
-          // For movies, ensure we capture OMDB enhanced metadata
           ...(result.api_source === 'omdb' && {
             director: result.metadata?.director,
             cast: result.metadata?.cast,
@@ -58,7 +96,6 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
             imdb_rating: result.metadata?.imdb_rating,
             year: result.metadata?.year
           }),
-          // For Google Books API
           ...(result.api_source === 'google_books' && {
             authors: result.metadata?.authors,
             publication_year: result.metadata?.publication_year,
@@ -78,37 +115,36 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         
         // Keep the loading state active for a moment to ensure smooth transition
         setTimeout(() => {
-          // Always navigate to the standardized entity URL using slug
           const identifier = entity.slug || entity.id;
           const entityPath = `/entity/${identifier}`;
           
-          console.log(`🔗 Navigating to entity page: ${entityPath}`);
+          console.log(`🔗 Navigating to new entity page: ${entityPath}`);
           navigate(entityPath);
           
           if (onClose) {
             onClose();
           }
           
-          setIsCreatingEntity(false);
-        }, 800); // Small delay for smoother transition
+          setIsProcessing(false);
+        }, 800);
         
       } else {
         console.error('❌ Enhanced entity creation failed - no entity returned');
         toast({
           title: 'Error',
-          description: 'Could not create entity from this result',
+          description: 'Could not process this item. Please try again.',
           variant: 'destructive'
         });
-        setIsCreatingEntity(false);
+        setIsProcessing(false);
       }
     } catch (error) {
       console.error('❌ Error handling search result:', error);
       toast({
         title: 'Error',
-        description: 'Failed to process search result',
+        description: 'Something went wrong. Please try again.',
         variant: 'destructive'
       });
-      setIsCreatingEntity(false);
+      setIsProcessing(false);
     }
   };
 
@@ -135,7 +171,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
     <>
       <div 
         className={`flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer rounded-lg transition-all duration-200 ${
-          isCreatingEntity ? 'opacity-50 pointer-events-none' : 'hover:scale-[1.02]'
+          isProcessing ? 'opacity-50 pointer-events-none' : 'hover:scale-[1.02]'
         }`}
         onClick={handleResultClick}
       >
@@ -152,7 +188,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
               No Image
             </div>
           )}
-          {isCreatingEntity && (
+          {isProcessing && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
               <LoadingSpinner size="sm" />
             </div>
@@ -177,24 +213,107 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
             </span>
           </div>
         </div>
-        {isCreatingEntity && (
+        {isProcessing && (
           <div className="flex-shrink-0">
             <LoadingSpinner size="sm" />
           </div>
         )}
       </div>
 
-      {/* Enhanced Loading Modal - Stays active throughout entire process */}
-      <Dialog open={isCreatingEntity} onOpenChange={() => {}}>
+      {/* Enhanced Loading Modal with Custom Messages */}
+      <Dialog open={isProcessing} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md">
-          <EntityCreationLoader 
+          <CustomEntityLoader 
             entityName={result.name} 
             category={getEntityCategory(entityType)}
+            customMessage={loadingMessage}
           />
         </DialogContent>
       </Dialog>
     </>
   );
+}
+
+// Custom loader component with custom messages
+const CustomEntityLoader = ({ entityName, category, customMessage }: { 
+  entityName: string; 
+  category?: EntityCategory;
+  customMessage?: string;
+}) => {
+  return (
+    <div className="flex flex-col items-center gap-6 p-6">
+      <div className="relative">
+        <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+        <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
+      </div>
+      <div className="text-center space-y-3">
+        <h3 className="font-medium text-lg">{entityName}</h3>
+        <div className="flex items-center justify-center">
+          <span className="max-w-xs text-center leading-relaxed animate-fade-in text-sm text-muted-foreground px-4">
+            {customMessage || '✨ Processing your selection...'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Helper functions for engaging messages
+function getEngagingLoadingMessage(type: EntityTypeString, name: string): string {
+  const messages = {
+    movie: [
+      `🎬 Exploring this incredible film...`,
+      `🍿 Getting ready for movie night...`,
+      `🎭 Discovering cinematic magic...`
+    ],
+    book: [
+      `📚 Diving into this amazing story...`,
+      `✨ Exploring literary excellence...`,
+      `📖 Preparing your next great read...`
+    ],
+    place: [
+      `🗺️ Exploring this amazing destination...`,
+      `🌟 Discovering what makes this place special...`,
+      `📍 Preparing your next adventure...`
+    ],
+    food: [
+      `🍽️ Exploring this delicious experience...`,
+      `👨‍🍳 Discovering culinary excellence...`,
+      `🌟 Preparing a feast for your senses...`
+    ],
+    product: [
+      `🛍️ Exploring this amazing item...`,
+      `✨ Discovering product details...`,
+      `🌟 Preparing something special...`
+    ]
+  };
+  
+  const typeMessages = messages[type as keyof typeof messages] || messages.product;
+  return typeMessages[Math.floor(Math.random() * typeMessages.length)];
+}
+
+function getNavigationMessage(type: EntityTypeString, name: string): string {
+  const messages = {
+    movie: `🎬 Taking you to this amazing film...`,
+    book: `📚 Opening this incredible book...`,
+    place: `🗺️ Taking you to this wonderful place...`,
+    food: `🍽️ Taking you to this delicious experience...`,
+    product: `🛍️ Exploring this amazing item...`
+  };
+  
+  return messages[type as keyof typeof messages] || `✨ Taking you there...`;
+}
+
+function getCreationMessage(type: EntityTypeString, name: string): string {
+  const messages = {
+    movie: `🎬 Adding this film to your collection...`,
+    book: `📚 Adding this book to your library...`,
+    place: `🗺️ Adding this place to your map...`,
+    food: `🍽️ Adding this spot to your favorites...`,
+    product: `🛍️ Adding this to your collection...`
+  };
+  
+  return messages[type as keyof typeof messages] || `✨ Creating your personalized experience...`;
 }
 
 // Helper function to determine entity type from search result
