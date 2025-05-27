@@ -1,3 +1,4 @@
+
 export interface Entity {
   id: string;
   name: string;
@@ -13,6 +14,21 @@ export interface Entity {
   category_id?: string;
   popularity_score?: number;
   photo_reference?: string;
+  
+  // Enhanced metadata fields
+  authors?: string[];
+  publication_year?: number;
+  isbn?: string;
+  languages?: string[];
+  external_ratings?: Record<string, any>;
+  price_info?: Record<string, any>;
+  specifications?: Record<string, any>;
+  cast_crew?: Record<string, any>;
+  ingredients?: string[];
+  nutritional_info?: Record<string, any>;
+  last_enriched_at?: string;
+  enrichment_source?: string;
+  data_quality_score?: number;
 }
 
 export enum EntityType {
