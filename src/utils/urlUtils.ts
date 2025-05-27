@@ -1,4 +1,3 @@
-
 /**
  * Ensures a URL uses HTTPS instead of HTTP
  */
@@ -19,9 +18,8 @@ export const ensureHttps = (url: string): string => {
   }
   
   // Handle Google Maps photo URLs properly
-  // These are valid and should be processed normally, not rejected
   if (url.includes('maps.googleapis.com/maps/api/place/photo')) {
-    return url; // Keep Google Maps photo URLs as they are
+    return url;
   }
   
   // If it's already HTTPS, return as is
@@ -68,6 +66,31 @@ export const isValidUrl = (url: string): boolean => {
     }
     return false;
   }
+};
+
+/**
+ * Create a CORS proxy URL for problematic external images
+ */
+export const createCorsProxyUrl = (originalUrl: string): string => {
+  // Use allorigins.win as a CORS proxy
+  return `https://api.allorigins.win/raw?url=${encodeURIComponent(originalUrl)}`;
+};
+
+/**
+ * Check if a URL needs CORS proxying
+ */
+export const needsCorsProxy = (url: string): boolean => {
+  if (!url) return false;
+  
+  const corsProblematicDomains = [
+    'covers.openlibrary.org',
+    'books.google.com',
+    'images-amazon.com',
+    'm.media-amazon.com',
+    'images-static.nykaa.com'
+  ];
+  
+  return corsProblematicDomains.some(domain => url.includes(domain));
 };
 
 /**

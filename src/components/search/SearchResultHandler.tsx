@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -11,6 +10,7 @@ import { createEnhancedEntity } from '@/services/enhancedEntityService';
 import { LoadingSpinner, EntityCreationLoader } from '@/components/ui/loading-spinner';
 import { EntityCategory } from '@/utils/loadingMessages';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface SearchResultHandlerProps {
   result: ProductSearchResult;
@@ -94,11 +94,12 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         }`}
         onClick={handleResultClick}
       >
-        <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+        <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative group">
           {result.image_url ? (
-            <img 
+            <ImageWithFallback
               src={result.image_url} 
               alt={result.name}
+              entityType={entityType}
               className="w-full h-full object-cover"
             />
           ) : (

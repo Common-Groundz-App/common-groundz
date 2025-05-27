@@ -25,7 +25,28 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 1; // One retry attempt for transient failures
+  const maxRetries = 1;
+
+  // Check if URL has CORS issues and needs proxying
+  const needsProxy = (url: string): boolean => {
+    if (!url) return false;
+    
+    // Known problematic domains that need CORS proxy
+    const corsProblematicDomains = [
+      'covers.openlibrary.org',
+      'books.google.com',
+      'images-amazon.com',
+      'm.media-amazon.com'
+    ];
+    
+    return corsProblematicDomains.some(domain => url.includes(domain));
+  };
+
+  // Create proxy URL for CORS-problematic images
+  const createProxyUrl = (originalUrl: string): string => {
+    // Use a simple CORS proxy service
+    return `https://api.allorigins.win/raw?url=${encodeURIComponent(originalUrl)}`;
+  };
 
   useEffect(() => {
     // Reset error state when src changes
@@ -34,7 +55,6 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       setRetryCount(0);
       
       if (!isValidImageUrl(src)) {
-        // If URL is invalid after processing, use fallback
         console.log("ImageWithFallback: Invalid image URL, using fallback for entity type:", entityType);
         setImgSrc(actualFallback);
         setHasError(true);
@@ -44,50 +64,65 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       const secureUrl = ensureHttps(src);
       
       if (!secureUrl) {
-        // If URL is empty after processing, use fallback
         console.log("ImageWithFallback: Using fallback image for entity type:", entityType);
         setImgSrc(actualFallback);
         setHasError(true);
       } else {
-        setImgSrc(secureUrl);
+        // Check if URL needs CORS proxy
+        if (needsProxy(secureUrl)) {
+          console.log("ImageWithFallback: Using CORS proxy for:", secureUrl);
+          const proxiedUrl = createProxyUrl(secureUrl);
+          setImgSrc(proxiedUrl);
+        } else {
+          setImgSrc(secureUrl);
+        }
       }
     } else {
-      // No source provided, use fallback
       console.log("ImageWithFallback: No source URL provided, using fallback for type:", entityType);
       setImgSrc(actualFallback);
     }
   }, [src, actualFallback, entityType]);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    // For Google Places URLs, which can be problematic, try one retry
-    const isGooglePlaces = imgSrc && isGooglePlacesImage(imgSrc);
+    const currentUrl = imgSrc;
     
-    if (!hasError && retryCount < maxRetries && imgSrc && !imgSrc.startsWith('data:')) {
-      // Try once more (network issues)
+    if (!hasError && retryCount < maxRetries && currentUrl) {
       setRetryCount(prev => prev + 1);
       
-      if (isGooglePlaces) {
-        console.log("Google Places image failed to load, trying with cache buster:", imgSrc);
-        // For Google Places URLs, add a cache buster
+      // If the original URL was proxied and failed, try the original
+      if (currentUrl.includes('allorigins.win') && src) {
+        console.log("Proxy failed, trying original URL:", src);
+        const secureUrl = ensureHttps(src);
+        setImgSrc(secureUrl);
+        return;
+      }
+      
+      // If original URL failed and it needs proxy, try proxy
+      if (!currentUrl.includes('allorigins.win') && src && needsProxy(src)) {
+        console.log("Original URL failed, trying proxy:", src);
+        const proxiedUrl = createProxyUrl(ensureHttps(src) || src);
+        setImgSrc(proxiedUrl);
+        return;
+      }
+      
+      // For Google Places URLs, add cache buster
+      if (isGooglePlacesImage(currentUrl)) {
+        console.log("Google Places image failed, trying with cache buster:", currentUrl);
         setTimeout(() => {
           const cacheBuster = `cb=${Date.now()}`;
-          setImgSrc(`${imgSrc}${imgSrc?.includes('?') ? '&' : '?'}${cacheBuster}`);
+          setImgSrc(`${currentUrl}${currentUrl?.includes('?') ? '&' : '?'}${cacheBuster}`);
         }, 500);
-      } else {
-        // For other URLs, just retry once after a short delay
-        setTimeout(() => {
-          console.log(`Retrying image load (${retryCount + 1}/${maxRetries}):`, imgSrc);
-          setImgSrc(`${imgSrc}`);
-        }, 500);
+        return;
       }
-    } else {
-      console.log("Image load error, using fallback for type:", entityType);
-      setImgSrc(actualFallback);
-      setHasError(true);
-      
-      if (onError) {
-        onError(e);
-      }
+    }
+    
+    // All retries failed, use fallback
+    console.log("Image load error, using fallback for type:", entityType);
+    setImgSrc(actualFallback);
+    setHasError(true);
+    
+    if (onError) {
+      onError(e);
     }
   };
 
@@ -96,6 +131,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       src={imgSrc || actualFallback}
       alt={alt}
       onError={handleError}
+      crossOrigin="anonymous"
       {...props}
     />
   );

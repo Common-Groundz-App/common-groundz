@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ensureBucketPolicies } from '@/services/storageService';
 
@@ -58,24 +57,41 @@ export const isGooglePlacesImage = (url: string): boolean => {
 };
 
 /**
+ * Checks if a URL is from a CORS-problematic domain
+ */
+export const isCorsProblematic = (url: string): boolean => {
+  if (!url) return false;
+  
+  const problematicDomains = [
+    'covers.openlibrary.org',
+    'books.google.com',
+    'images-amazon.com',
+    'm.media-amazon.com',
+    'images-static.nykaa.com'
+  ];
+  
+  return problematicDomains.some(domain => url.includes(domain));
+};
+
+/**
  * Returns a fallback image URL based on the entity type.
  */
 export const getEntityTypeFallbackImage = (entityType: string): string => {
   const fallbacks: Record<string, string> = {
-    'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
-    'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
-    'food': 'https://images.unsplash.com/photo-1555939594-58d7698950b',
-    'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
-    'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
-    'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-    'music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
-    'art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
-    'tv': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
-    'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
-    'travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
+    'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&q=80&w=1000',
+    'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=1000',
+    'food': 'https://images.unsplash.com/photo-1555939594-58d7698950b?auto=format&fit=crop&q=80&w=1000',
+    'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&q=80&w=1000',
+    'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&q=80&w=1000',
+    'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51?auto=format&fit=crop&q=80&w=1000',
+    'music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80&w=1000',
+    'art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&q=80&w=1000',
+    'tv': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&q=80&w=1000',
+    'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&q=80&w=1000',
+    'travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7?auto=format&fit=crop&q=80&w=1000'
   };
   
-  return fallbacks[entityType] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
+  return fallbacks[entityType] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&q=80&w=1000';
 };
 
 /**
