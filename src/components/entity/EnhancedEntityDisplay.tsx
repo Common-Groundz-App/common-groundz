@@ -257,9 +257,14 @@ export const EnhancedEntityDisplay = ({ entity }: EnhancedEntityDisplayProps) =>
             <CardTitle>Additional Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="text-sm bg-muted p-3 rounded overflow-auto">
-              {JSON.stringify(entity.metadata, null, 2)}
-            </pre>
+            <div className="text-sm bg-muted p-3 rounded overflow-auto max-h-60">
+              {Object.entries(entity.metadata).map(([key, value]) => (
+                <div key={key} className="mb-2">
+                  <span className="font-medium">{key}: </span>
+                  <span>{typeof value === 'string' ? value : JSON.stringify(value)}</span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
