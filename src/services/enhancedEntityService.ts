@@ -1,8 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
-import { createEntityFast } from '@/services/fastEntityService';
-import { EntityTypeString } from '@/hooks/feed/api/types';
 
 export interface EnhancedEntityData {
   name: string;
@@ -29,30 +28,62 @@ export interface EnhancedEntityData {
 }
 
 /**
- * Enhanced entity creation with fast initial creation and background processing
+ * Enhanced entity creation with comprehensive metadata extraction
  */
 export const createEnhancedEntity = async (rawData: any, entityType: string): Promise<Entity | null> => {
   try {
-    console.log('🔧 Creating enhanced entity (fast approach):', rawData);
+    console.log('🔧 Creating enhanced entity from raw data:', rawData);
     
-    // Use fast entity creation for immediate response
-    const result = await createEntityFast({
-      name: rawData.name || rawData.title || '',
-      type: entityType as EntityTypeString,
-      venue: rawData.venue,
-      description: rawData.description,
-      api_source: rawData.api_source,
-      api_ref: rawData.api_ref,
-      metadata: rawData.metadata || {}
-    });
-
-    if (!result) {
-      console.error('❌ Enhanced entity creation failed');
+    // Extract enhanced metadata based on entity type
+    const enhancedData = await extractEnhancedMetadata(rawData, entityType);
+    
+    // Save image locally if available
+    let localImageUrl = enhancedData.image_url;
+    if (enhancedData.image_url) {
+      const savedImageUrl = await saveExternalImageToStorage(enhancedData.image_url, 'temp-id');
+      if (savedImageUrl) {
+        localImageUrl = savedImageUrl;
+      }
+    }
+    
+    // Create entity with enhanced data
+    const { data: entity, error } = await supabase
+      .from('entities')
+      .insert({
+        name: enhancedData.name,
+        type: entityType as any,
+        venue: enhancedData.venue,
+        description: enhancedData.description,
+        image_url: localImageUrl,
+        api_source: enhancedData.api_source,
+        api_ref: enhancedData.api_ref,
+        website_url: enhancedData.website_url,
+        metadata: enhancedData.metadata,
+        authors: enhancedData.authors,
+        publication_year: enhancedData.publication_year,
+        isbn: enhancedData.isbn,
+        languages: enhancedData.languages,
+        external_ratings: enhancedData.external_ratings,
+        price_info: enhancedData.price_info,
+        specifications: enhancedData.specifications,
+        cast_crew: enhancedData.cast_crew,
+        ingredients: enhancedData.ingredients,
+        nutritional_info: enhancedData.nutritional_info,
+        last_enriched_at: new Date().toISOString(),
+        enrichment_source: enhancedData.api_source,
+        data_quality_score: calculateDataQualityScore(enhancedData),
+        slug: generateSlug(enhancedData.name)
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error creating enhanced entity:', error);
       return null;
     }
-
-    console.log('✅ Enhanced entity created fast:', result.entity);
-    return result.entity as Entity;
+    
+    console.log('✅ Enhanced entity created successfully:', entity);
+    return entity as Entity;
   } catch (error) {
     console.error('❌ Error in createEnhancedEntity:', error);
     return null;
