@@ -1,18 +1,19 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import Home from './pages/Index';
+import Login from './pages/Auth';
+import Signup from './pages/Auth';
 import Profile from './pages/Profile';
-import EditProfile from './pages/EditProfile';
+import EditProfile from './pages/Settings';
 import Explore from './pages/Explore';
-import SearchResultsPage from './pages/SearchResultsPage';
+import SearchResultsPage from './pages/Search';
 import NotFound from './pages/NotFound';
-import RecommendationDetail from './pages/RecommendationDetail';
-import CreateRecommendation from './pages/CreateRecommendation';
-import EditRecommendation from './pages/EditRecommendation';
+import RecommendationDetail from './pages/RecommendationView';
+import CreateRecommendation from './pages/Settings';
+import EditRecommendation from './pages/Settings';
 import { Toaster } from '@/components/ui/toaster';
 import EntityDetail from './pages/EntityDetail';
 import OptimizedEntityDetail from '@/pages/OptimizedEntityDetail';

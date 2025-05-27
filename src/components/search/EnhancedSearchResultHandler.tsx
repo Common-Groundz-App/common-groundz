@@ -25,6 +25,18 @@ export function EnhancedSearchResultHandler({
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Determine entity type based on API source
+  const getEntityType = (apiSource: string) => {
+    switch (apiSource) {
+      case 'omdb': return 'movie';
+      case 'google_books': return 'book';
+      case 'google_places': return 'place';
+      default: return 'product';
+    }
+  };
+
+  const entityType = getEntityType(result.api_source);
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'book': return <Book className="h-4 w-4" />;
@@ -112,7 +124,7 @@ export function EnhancedSearchResultHandler({
       // Create the entity with enhanced metadata
       const entity = await findOrCreateEntity(
         result.name,
-        result.type as any,
+        entityType as any,
         result.api_source,
         result.api_ref,
         result.venue,
@@ -219,11 +231,11 @@ export function EnhancedSearchResultHandler({
           src={result.image_url || ''}
           alt={result.name}
           className="w-12 h-12 object-cover rounded-md"
-          entityType={result.type}
+          entityType={entityType}
         />
         <div className="absolute -top-1 -right-1">
           <Badge variant="secondary" className="h-5 px-1 text-xs flex items-center gap-1">
-            {getTypeIcon(result.type)}
+            {getTypeIcon(entityType)}
           </Badge>
         </div>
       </div>

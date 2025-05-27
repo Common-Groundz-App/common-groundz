@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -9,6 +10,7 @@ import { Search, X, Loader2, Sparkles, Zap, AlertCircle, ChevronDown, ChevronUp 
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
 import { SearchResultHandler } from './search/SearchResultHandler';
+import { EnhancedSearchResultHandler } from './search/EnhancedSearchResultHandler';
 import { useEnhancedSearch } from '@/hooks/use-enhanced-search';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
