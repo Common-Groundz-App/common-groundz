@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -173,7 +172,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 <div className="flex flex-col">
                   {renderSectionHeader('Books', results.categorized.books.length, 'books')}
                   {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
-                    <SearchResultHandler
+                    <EnhancedSearchResultHandler
                       key={`${book.api_source}-${book.api_ref || index}`}
                       result={book}
                       query={query}
@@ -188,7 +187,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 <div className="flex flex-col">
                   {renderSectionHeader('Movies', results.categorized.movies.length, 'movies')}
                   {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
-                    <SearchResultHandler
+                    <EnhancedSearchResultHandler
                       key={`${movie.api_source}-${movie.api_ref || index}`}
                       result={movie}
                       query={query}
@@ -203,7 +202,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 <div className="flex flex-col">
                   {renderSectionHeader('Places', results.categorized.places.length, 'places')}
                   {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
-                    <SearchResultHandler
+                    <EnhancedSearchResultHandler
                       key={`${place.api_source}-${place.api_ref || index}`}
                       result={place}
                       query={query}
@@ -218,7 +217,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 <div className="flex flex-col">
                   {renderSectionHeader('Food & Recipes', results.categorized.food.length, 'food')}
                   {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
-                    <SearchResultHandler
+                    <EnhancedSearchResultHandler
                       key={`${food.api_source}-${food.api_ref || index}`}
                       result={food}
                       query={query}
