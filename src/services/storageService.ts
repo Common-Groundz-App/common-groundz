@@ -1,19 +1,19 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 // Initialize storage service on application load
 export const initializeStorageService = async (): Promise<void> => {
   try {
-    console.log('Initializing storage service...');
+    console.log('Initializing enhanced storage service...');
     
     // Ensure required buckets exist and have proper policies
     await Promise.all([
       ensureBucketPolicies('entity-images'),
       ensureBucketPolicies('post_media'),
-      ensureBucketPolicies('recommendation_images')
+      ensureBucketPolicies('recommendation_images'),
+      ensureBucketPolicies('enhanced-entity-data') // New bucket for enhanced data
     ]);
 
-    console.log('Storage service initialized successfully');
+    console.log('Enhanced storage service initialized successfully');
   } catch (error) {
     console.error('Error initializing storage service:', error);
   }
@@ -132,5 +132,62 @@ export const updateBucketPublicAccess = async (
   } catch (error) {
     console.error('Error updating bucket:', error);
     return false;
+  }
+};
+
+/**
+ * Store enhanced entity metadata as a backup
+ */
+export const storeEnhancedMetadata = async (
+  entityId: string, 
+  metadata: any
+): Promise<boolean> => {
+  try {
+    const fileName = `${entityId}/enhanced-metadata.json`;
+    const metadataBlob = new Blob([JSON.stringify(metadata, null, 2)], { 
+      type: 'application/json' 
+    });
+    
+    const { error } = await supabase.storage
+      .from('enhanced-entity-data')
+      .upload(fileName, metadataBlob, {
+        cacheControl: '3600',
+        upsert: true
+      });
+    
+    if (error) {
+      console.error('Error storing enhanced metadata:', error);
+      return false;
+    }
+    
+    console.log(`Enhanced metadata stored for entity: ${entityId}`);
+    return true;
+  } catch (error) {
+    console.error('Error in storeEnhancedMetadata:', error);
+    return false;
+  }
+};
+
+/**
+ * Retrieve enhanced entity metadata backup
+ */
+export const retrieveEnhancedMetadata = async (entityId: string): Promise<any | null> => {
+  try {
+    const fileName = `${entityId}/enhanced-metadata.json`;
+    
+    const { data, error } = await supabase.storage
+      .from('enhanced-entity-data')
+      .download(fileName);
+    
+    if (error || !data) {
+      console.log(`No enhanced metadata found for entity: ${entityId}`);
+      return null;
+    }
+    
+    const text = await data.text();
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('Error retrieving enhanced metadata:', error);
+    return null;
   }
 };

@@ -158,20 +158,33 @@ export type Database = {
         Row: {
           api_ref: string | null
           api_source: string | null
+          authors: string[] | null
+          cast_crew: Json | null
           category_id: string | null
           created_at: string
           created_by: string | null
+          data_quality_score: number | null
           description: string | null
+          enrichment_source: string | null
+          external_ratings: Json | null
           id: string
           image_url: string | null
+          ingredients: string[] | null
           is_deleted: boolean
           is_verified: boolean | null
+          isbn: string | null
+          languages: string[] | null
+          last_enriched_at: string | null
           metadata: Json | null
           name: string
+          nutritional_info: Json | null
           open_graph_data: Json | null
           photo_reference: string | null
           popularity_score: number | null
+          price_info: Json | null
+          publication_year: number | null
           slug: string | null
+          specifications: Json | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at: string
           venue: string | null
@@ -181,20 +194,33 @@ export type Database = {
         Insert: {
           api_ref?: string | null
           api_source?: string | null
+          authors?: string[] | null
+          cast_crew?: Json | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          data_quality_score?: number | null
           description?: string | null
+          enrichment_source?: string | null
+          external_ratings?: Json | null
           id?: string
           image_url?: string | null
+          ingredients?: string[] | null
           is_deleted?: boolean
           is_verified?: boolean | null
+          isbn?: string | null
+          languages?: string[] | null
+          last_enriched_at?: string | null
           metadata?: Json | null
           name: string
+          nutritional_info?: Json | null
           open_graph_data?: Json | null
           photo_reference?: string | null
           popularity_score?: number | null
+          price_info?: Json | null
+          publication_year?: number | null
           slug?: string | null
+          specifications?: Json | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
           venue?: string | null
@@ -204,20 +230,33 @@ export type Database = {
         Update: {
           api_ref?: string | null
           api_source?: string | null
+          authors?: string[] | null
+          cast_crew?: Json | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          data_quality_score?: number | null
           description?: string | null
+          enrichment_source?: string | null
+          external_ratings?: Json | null
           id?: string
           image_url?: string | null
+          ingredients?: string[] | null
           is_deleted?: boolean
           is_verified?: boolean | null
+          isbn?: string | null
+          languages?: string[] | null
+          last_enriched_at?: string | null
           metadata?: Json | null
           name?: string
+          nutritional_info?: Json | null
           open_graph_data?: Json | null
           photo_reference?: string | null
           popularity_score?: number | null
+          price_info?: Json | null
+          publication_year?: number | null
           slug?: string | null
+          specifications?: Json | null
           type?: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
           venue?: string | null
@@ -309,6 +348,50 @@ export type Database = {
           website_url?: string | null
         }
         Relationships: []
+      }
+      entity_enrichment_queue: {
+        Row: {
+          created_at: string | null
+          entity_id: string | null
+          error_message: string | null
+          id: string
+          priority: number | null
+          processed_at: string | null
+          retry_count: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_id?: string | null
+          error_message?: string | null
+          id?: string
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_id?: string | null
+          error_message?: string | null
+          id?: string
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_enrichment_queue_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: true
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       follows: {
         Row: {

@@ -6,6 +6,7 @@ import { EntityTypeString } from '@/hooks/feed/api/types';
 import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
+import { createEnhancedEntity } from '@/services/enhancedEntityService';
 
 interface SearchResultHandlerProps {
   result: ProductSearchResult;
@@ -19,36 +20,16 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
   
   // Determine entity type based on result data or use 'product' as default
   const entityType: EntityTypeString = determineEntityType(result);
-  const { createEntityFromExternal } = useEntitySearch(entityType);
 
   const handleResultClick = async () => {
     try {
-      console.log(`🔍 Creating entity from search result:`, result);
+      console.log(`🔍 Creating enhanced entity from search result:`, result);
       
-      // Convert search result to external data format for entity creation
-      const externalData = {
-        name: result.name,
-        venue: result.venue,
-        description: result.description,
-        image_url: result.image_url,
-        api_source: result.api_source,
-        api_ref: result.api_ref,
-        metadata: {
-          ...result.metadata,
-          purchase_url: result.metadata?.purchase_url,
-          price: result.metadata?.price,
-          rating: result.metadata?.rating,
-          seller: result.metadata?.seller
-        }
-      };
-
-      console.log(`🏗️ Creating ${entityType} entity with data:`, externalData);
-
-      // Create entity from the search result
-      const entity = await createEntityFromExternal(externalData) as Entity;
+      // Use enhanced entity service to create entity with rich metadata
+      const entity = await createEnhancedEntity(result, entityType);
       
       if (entity) {
-        console.log(`✅ Entity created successfully:`, entity);
+        console.log(`✅ Enhanced entity created successfully:`, entity);
         
         // Always navigate to the standardized entity URL using slug
         const identifier = entity.slug || entity.id;
@@ -61,7 +42,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
           onClose();
         }
       } else {
-        console.error('❌ Entity creation failed - no entity returned');
+        console.error('❌ Enhanced entity creation failed - no entity returned');
         toast({
           title: 'Error',
           description: 'Could not create entity from this result',
@@ -111,7 +92,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         )}
         <div className="mt-1">
           <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-            {entityType}
+            {entityType} • Enhanced
           </span>
         </div>
       </div>

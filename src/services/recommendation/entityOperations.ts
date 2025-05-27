@@ -3,6 +3,7 @@ import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
 import { getEntityTypeFallbackImage } from '@/utils/imageUtils';
 import { deferEntityImageRefresh } from '@/utils/imageRefresh';
+import { createEnhancedEntity, queueEntityForEnrichment } from '@/services/enhancedEntityService';
 
 // Generate a slug from a name
 const generateSlug = (name: string): string => {
@@ -99,7 +100,7 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
   }
 };
 
-// Create a new entity
+// Create a new entity - now using enhanced service
 export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>): Promise<Entity | null> => {
   // Convert EntityType enum to string for database compatibility
   let typeAsString: string;
@@ -109,6 +110,29 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
   } else {
     typeAsString = mapEntityTypeToString(entity.type as EntityType);
   }
+  
+  console.log(`🏗️ Creating entity using enhanced service: ${entity.name}`);
+  
+  // Use enhanced entity service for rich metadata extraction
+  const enhancedEntity = await createEnhancedEntity({
+    name: entity.name,
+    type: typeAsString,
+    venue: entity.venue,
+    description: entity.description,
+    image_url: entity.image_url,
+    api_source: entity.api_source,
+    api_ref: entity.api_ref,
+    website_url: entity.website_url,
+    metadata: entity.metadata || {}
+  }, typeAsString);
+  
+  if (enhancedEntity) {
+    console.log(`✅ Enhanced entity created successfully: ${enhancedEntity.name}`);
+    return enhancedEntity;
+  }
+  
+  // Fallback to basic entity creation if enhanced service fails
+  console.log(`⚠️ Enhanced service failed, falling back to basic entity creation`);
   
   // Ensure we have a valid image URL or use fallback based on type
   const imageUrl = entity.image_url || getEntityTypeFallbackImage(typeAsString);
@@ -149,7 +173,7 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     slug: finalSlug
   };
   
-  console.log(`🏗️ Creating entity in database with slug: ${finalSlug}`, entityForDb);
+  console.log(`🏗️ Creating basic entity in database with slug: ${finalSlug}`, entityForDb);
   
   const { data, error } = await supabase
     .from('entities')
@@ -163,11 +187,11 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     return null;
   }
 
-  console.log(`✅ Entity created successfully with slug: ${data?.slug}`, data);
+  console.log(`✅ Basic entity created successfully with slug: ${data?.slug}`, data);
   return data as Entity;
 };
 
-// Find or create an entity based on external API data
+// Find or create an entity based on external API data - now with enhanced processing
 export const findOrCreateEntity = async (
   name: string,
   type: EntityType | EntityTypeString,
@@ -186,24 +210,16 @@ export const findOrCreateEntity = async (
     if (existingEntity) {
       console.log(`🔍 Found existing entity: ${existingEntity.id} (${existingEntity.name}) with api_ref: ${apiRef}`);
       
-      // If it's a Google Places entity and we want to ensure image is up to date
-      if (apiSource === 'google_places' && metadata?.photo_reference) {
-        // Store photo reference in metadata if it's not there already
-        if (!existingEntity.metadata?.photo_reference) {
-          console.log(`📝 Updating entity ${existingEntity.id} with photo reference: ${metadata.photo_reference}`);
-          
-          const { error: updateError } = await supabase
-            .from('entities')
-            .update({ 
-              metadata: { ...existingEntity.metadata, photo_reference: metadata.photo_reference }
-            })
-            .eq('id', existingEntity.id);
-            
-          if (updateError) {
-            console.error('Error updating entity metadata with photo reference:', updateError);
-          }
-        }
+      // Check if entity needs enrichment (older than 7 days or low quality score)
+      const needsEnrichment = !existingEntity.last_enriched_at || 
+                             new Date(existingEntity.last_enriched_at) < new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) ||
+                             (existingEntity.data_quality_score || 0) < 50;
+      
+      if (needsEnrichment) {
+        console.log(`⏰ Queuing existing entity for enrichment: ${existingEntity.id}`);
+        await queueEntityForEnrichment(existingEntity.id, 3); // Higher priority for existing entities
       }
+      
       return existingEntity;
     }
   }
@@ -211,30 +227,42 @@ export const findOrCreateEntity = async (
   // Convert type to string if it's an enum
   const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
 
-  // Ensure we have a valid image URL or use fallback based on type
-  const finalImageUrl = imageUrl || getEntityTypeFallbackImage(typeAsString);
-
-  console.log(`🆕 Creating new entity: ${name} (${typeAsString}) with api_ref: ${apiRef}`);
+  console.log(`🆕 Creating new enhanced entity: ${name} (${typeAsString}) with api_ref: ${apiRef}`);
   
-  // Create a new entity if not found or if we don't have API reference info
-  const entity = await createEntity({
+  // Create a new entity using enhanced service
+  const entity = await createEnhancedEntity({
     name,
-    type: typeAsString as any, // Cast to any to bypass type checking
+    type: typeAsString,
     venue,
     description,
-    image_url: finalImageUrl,
+    image_url: imageUrl,
     api_source: apiSource,
     api_ref: apiRef,
-    metadata,
-    website_url: websiteUrl,
-    slug: generateSlug(name)
-  });
+    metadata: metadata || {},
+    website_url: websiteUrl
+  }, typeAsString);
   
-  // If entity creation was successful and it's a Google Places entity,
-  // schedule a background image refresh after a delay
-  if (entity && apiSource === 'google_places' && apiRef) {
-    console.log(`⏰ Scheduling deferred image refresh for newly created entity: ${entity.id}`);
-    deferEntityImageRefresh(entity.id);
+  if (!entity) {
+    // Fallback to basic entity creation
+    console.log(`⚠️ Enhanced entity creation failed, using basic creation`);
+    return await createEntity({
+      name,
+      type: typeAsString as any,
+      venue,
+      description,
+      image_url: imageUrl,
+      api_source: apiSource,
+      api_ref: apiRef,
+      metadata,
+      website_url: websiteUrl,
+      slug: generateSlug(name)
+    });
+  }
+  
+  // Queue for additional background enrichment if it's from an API source
+  if (apiSource && apiRef) {
+    console.log(`⏰ Queuing newly created entity for background enrichment: ${entity.id}`);
+    await queueEntityForEnrichment(entity.id, 2); // High priority for new entities
   }
   
   return entity;
