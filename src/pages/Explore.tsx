@@ -120,14 +120,13 @@ const Explore = () => {
 
   const renderSectionHeader = (title: string, count: number, categoryKey?: keyof typeof showAllResults) => (
     <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
-      <span>{title}</span>
+      <span>{title} ({count})</span>
       <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-xs">{count}</Badge>
         {categoryKey && count > 3 && (
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-xs"
+            className="h-6 px-2 text-xs text-brand-orange font-semibold hover:text-brand-orange/80"
             onClick={() => toggleShowAll(categoryKey)}
           >
             {showAllResults[categoryKey] ? (
