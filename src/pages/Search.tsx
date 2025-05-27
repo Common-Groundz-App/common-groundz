@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -15,7 +14,8 @@ import { RecommendationResultItem } from '@/components/search/RecommendationResu
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
 import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2 } from 'lucide-react';
-import { useUnifiedSearch } from '@/hooks/use-unified-search';
+import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
+import { Badge } from '@/components/ui/badge';
 
 const Search = () => {
   const isMobile = useIsMobile();
@@ -25,14 +25,27 @@ const Search = () => {
   const [searchQuery, setSearchQuery] = useState(query);
   const [activeTab, setActiveTab] = useState('all');
 
-  // Use the updated unified search hook
-  const { results, isLoading, error } = useUnifiedSearch(query);
+  // Use the new realtime unified search hook
+  const { 
+    results, 
+    isLoading, 
+    loadingStates, 
+    error, 
+    classification 
+  } = useRealtimeUnifiedSearch(query);
 
   // Update the URL when search query changes
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim().length >= 2) {
       setSearchParams({ q: searchQuery });
+    }
+  };
+
+  const handleComplexProductSearch = () => {
+    if (query.trim().length >= 2) {
+      const encodedQuery = encodeURIComponent(query.trim());
+      navigate(`/search/products/${encodedQuery}`);
     }
   };
 
@@ -77,6 +90,20 @@ const Search = () => {
                 <Button type="submit">Search</Button>
               </div>
             </form>
+
+            {/* Search Classification Info */}
+            {classification && query && (
+              <div className="mb-4 flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs">
+                  Classified as: {classification.classification} ({Math.round(classification.confidence * 100)}% confidence)
+                </Badge>
+                {classification.reasoning && (
+                  <span className="text-xs text-muted-foreground">
+                    {classification.reasoning}
+                  </span>
+                )}
+              </div>
+            )}
             
             {query ? (
               <>
@@ -95,11 +122,19 @@ const Search = () => {
                   </TabsList>
                   
                   <div className="mt-6">
-                    {isLoading ? (
+                    {isLoading || Object.values(loadingStates).some(Boolean) ? (
                       <div className="flex flex-col items-center justify-center py-12">
                         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                         <p className="text-muted-foreground">Searching for "{query}"...</p>
-                        <p className="text-sm text-muted-foreground mt-2">Finding the best results across books, movies, places and more</p>
+                        <p className="text-sm text-muted-foreground mt-2">Finding the best results across all sources</p>
+                        
+                        <div className="flex gap-2 mt-4">
+                          {loadingStates.local && <Badge variant="outline" className="text-xs">Local Database</Badge>}
+                          {loadingStates.books && <Badge variant="outline" className="text-xs">Books</Badge>}
+                          {loadingStates.movies && <Badge variant="outline" className="text-xs">Movies</Badge>}
+                          {loadingStates.places && <Badge variant="outline" className="text-xs">Places</Badge>}
+                          {loadingStates.food && <Badge variant="outline" className="text-xs">Food</Badge>}
+                        </div>
                       </div>
                     ) : error ? (
                       <div className="flex flex-col items-center justify-center py-12">
@@ -113,7 +148,7 @@ const Search = () => {
                           {results.products.length > 0 && (
                             <div className="mb-8">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                <ShoppingBag className="h-5 w-5" /> Products & Items
+                                <ShoppingBag className="h-5 w-5" /> External Products & Items
                               </h2>
                               <p className="text-sm text-muted-foreground mb-4">
                                 Click any result to create an entity and start reviewing!
@@ -144,7 +179,7 @@ const Search = () => {
                           {results.entities.length > 0 && (
                             <div className="mb-8">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                <MapPin className="h-5 w-5" /> Places & Things
+                                <MapPin className="h-5 w-5" /> Local Places & Things
                               </h2>
                               <div className="border rounded-md overflow-hidden">
                                 {results.entities.slice(0, 5).map((entity) => (
@@ -222,6 +257,18 @@ const Search = () => {
                             </div>
                           )}
                           
+                          {/* Complex Product Search Option */}
+                          <div className="mb-8 p-4 border border-dashed rounded-lg text-center">
+                            <h3 className="text-lg font-medium mb-2">Need more comprehensive product results?</h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Use our advanced product search for deeper analysis from multiple sources
+                            </p>
+                            <Button onClick={handleComplexProductSearch} variant="outline">
+                              <SearchIcon className="w-4 h-4 mr-2" />
+                              Advanced Product Search for "{query}"
+                            </Button>
+                          </div>
+                          
                           {/* No results message */}
                           {!results.products.length && 
                            !results.entities.length && 
@@ -230,7 +277,14 @@ const Search = () => {
                            !results.recommendations.length && (
                             <div className="py-12 text-center">
                               <p className="text-muted-foreground">No results found for "{query}"</p>
-                              <p className="text-sm text-muted-foreground mt-2">Try searching for books, movies, places, or products</p>
+                              <p className="text-sm text-muted-foreground mt-2">Try the advanced product search for more comprehensive results</p>
+                              <Button 
+                                onClick={handleComplexProductSearch} 
+                                variant="outline" 
+                                className="mt-4"
+                              >
+                                Advanced Product Search
+                              </Button>
                             </div>
                           )}
                         </TabsContent>
@@ -254,11 +308,19 @@ const Search = () => {
                             </div>
                           ) : (
                             <div className="py-12 text-center">
-                              <p className="text-muted-foreground">No products found for "{query}"</p>
+                              <p className="text-muted-foreground">No external products found for "{query}"</p>
+                              <Button 
+                                onClick={handleComplexProductSearch} 
+                                variant="outline" 
+                                className="mt-4"
+                              >
+                                Try Advanced Product Search
+                              </Button>
                             </div>
                           )}
                         </TabsContent>
                         
+                        {/* ... keep existing code for other tabs ... */}
                         <TabsContent value="entities">
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <MapPin className="h-5 w-5" /> Places & Things

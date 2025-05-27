@@ -10,7 +10,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag } from 'lucide-react';
+import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -20,19 +20,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { useUnifiedSearch } from '@/hooks/use-unified-search';
+import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
 import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
-import { ProductResultItem } from '@/components/search/ProductResultItem';
+import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
 import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
-import { ProductCard } from '@/components/explore/ProductCard';
-import { EntityTypeString } from '@/hooks/feed/api/types';
-import { supabase } from '@/integrations/supabase/client';
-import { useLocalSuggestions } from '@/hooks/use-local-suggestions';
-import { toast } from '@/components/ui/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 const Explore = () => {
   const { user } = useAuth();
@@ -41,33 +37,31 @@ const Explore = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
-  // Use local suggestions for search dropdown - no API calls during typing
+  // Use the new realtime search hook
   const { 
-    suggestions, 
-    isLoading: isLoadingSuggestions, 
-    error: suggestionsError 
-  } = useLocalSuggestions(searchQuery);
+    results, 
+    isLoading, 
+    loadingStates, 
+    error, 
+    classification 
+  } = useRealtimeUnifiedSearch(searchQuery);
 
-  // Local search only during typing - no external API calls
-  const { 
-    results: localResults, 
-    isLoading: isLoadingLocalResults,
-    error: localResultsError
-  } = useUnifiedSearch(searchQuery, { skipProductSearch: true });
+  const handleResultClick = () => {
+    setSearchQuery('');
+  };
 
-  // Handle explicit search submission - redirect to product search page
-  const handleSearchSubmit = () => {
+  // Handle explicit search submission for complex product search
+  const handleComplexProductSearch = () => {
     if (searchQuery.trim().length >= 2) {
-      console.log(`🎯 Frontend: Redirecting to product search for: "${searchQuery}"`);
+      console.log(`🎯 Redirecting to complex product search for: "${searchQuery}"`);
       const encodedQuery = encodeURIComponent(searchQuery.trim());
       navigate(`/search/products/${encodedQuery}`);
     }
   };
 
-  // Handle Enter key press
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      handleSearchSubmit();
+      handleComplexProductSearch();
     }
   };
   
@@ -77,9 +71,7 @@ const Explore = () => {
 
   if (!user) {
     return <div>Loading...</div>;
-  }
-
-  const productSuggestions = suggestions.filter(s => s.type === 'product');
+  };
   
   const tabItems = [
     {
@@ -119,9 +111,11 @@ const Explore = () => {
     }
   ];
 
-  const handleResultClick = () => {
-    setSearchQuery('');
-  };
+  const hasResults = results.products.length > 0 || 
+                   results.entities.length > 0 || 
+                   results.users.length > 0 || 
+                   results.reviews.length > 0 || 
+                   results.recommendations.length > 0;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -183,115 +177,132 @@ const Explore = () => {
                     variant="ghost" 
                     size="sm"
                     className="mr-1"
-                    onClick={handleSearchSubmit}
+                    onClick={handleComplexProductSearch}
                   >
-                    Search
+                    Search More
                   </Button>
                 )}
               </div>
               
-              {searchQuery && (
+              {/* Search Classification Info */}
+              {classification && searchQuery && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {classification.classification} ({Math.round(classification.confidence * 100)}% confidence)
+                  </Badge>
+                  {isLoading && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Searching...
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Real-time Search Results */}
+              {searchQuery && hasResults && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
-                  {isLoadingSuggestions && (
-                    <div className="p-4 text-center">
-                      <p className="text-sm text-muted-foreground">Loading suggestions...</p>
+                  
+                  {/* Loading States */}
+                  {(isLoading || Object.values(loadingStates).some(Boolean)) && (
+                    <div className="p-3 text-center border-b">
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Searching across all sources...</span>
+                      </div>
+                      <div className="flex gap-1 mt-2 justify-center">
+                        {loadingStates.local && <Badge variant="outline" className="text-xs">Local</Badge>}
+                        {loadingStates.books && <Badge variant="outline" className="text-xs">Books</Badge>}
+                        {loadingStates.movies && <Badge variant="outline" className="text-xs">Movies</Badge>}
+                        {loadingStates.places && <Badge variant="outline" className="text-xs">Places</Badge>}
+                        {loadingStates.food && <Badge variant="outline" className="text-xs">Food</Badge>}
+                      </div>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="p-4 text-center text-destructive text-sm">
+                      {error}
                     </div>
                   )}
                   
-                  {suggestionsError && (
-                    <div className="p-4 text-center">
-                      <p className="text-sm text-destructive">{suggestionsError}</p>
+                  {/* Products from External APIs */}
+                  {results.products.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
+                        <ShoppingBag className="w-3 h-3" />
+                        External Results ({results.products.length})
+                      </div>
+                      {results.products.slice(0, 5).map((product, index) => (
+                        <SearchResultHandler
+                          key={`${product.api_source}-${product.api_ref || index}`}
+                          result={product}
+                          query={searchQuery}
+                          onClose={handleResultClick}
+                        />
+                      ))}
                     </div>
                   )}
                   
-                  {!isLoadingSuggestions && !suggestionsError && suggestions.length === 0 && searchQuery.length >= 2 && (
-                    <div className="p-4 text-center">
-                      <p className="text-sm text-muted-foreground">No local suggestions found. Press Enter or Search to search online.</p>
+                  {/* Local Entities */}
+                  {results.entities.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
+                        <MapPin className="w-3 h-3" />
+                        Local Places & Things ({results.entities.length})
+                      </div>
+                      {results.entities.slice(0, 5).map((entity) => (
+                        <EntityResultItem
+                          key={entity.id}
+                          entity={entity}
+                          onClick={handleResultClick}
+                        />
+                      ))}
                     </div>
                   )}
                   
-                  {!isLoadingSuggestions && !suggestionsError && suggestions.length > 0 && (
-                    <>
-                      {productSuggestions.length > 0 && (
-                        <div className="border-b last:border-b-0">
-                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
-                            Products
-                          </div>
-                          {productSuggestions.map((suggestion) => (
-                            <ProductResultItem
-                              key={suggestion.id}
-                              product={{
-                                name: suggestion.name,
-                                venue: 'Product',
-                                description: suggestion.description || null,
-                                image_url: suggestion.image_url || '',
-                                api_source: 'local_cache',
-                                api_ref: suggestion.id,
-                                metadata: suggestion.metadata || {}
-                              }}
-                              query={searchQuery}
-                              onClick={handleResultClick}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      
-                      {suggestions.filter(s => s.type === 'entity').length > 0 && (
-                        <div className="border-b last:border-b-0">
-                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
-                            Places & Things
-                          </div>
-                          {suggestions.filter(s => s.type === 'entity').map((suggestion) => (
-                            <EntityResultItem
-                              key={suggestion.id}
-                              entity={{
-                                id: suggestion.id,
-                                name: suggestion.name,
-                                type: 'place',
-                                venue: null,
-                                image_url: suggestion.image_url || null,
-                                description: suggestion.description || null,
-                                slug: null
-                              }}
-                              onClick={handleResultClick}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      
-                      {suggestions.filter(s => s.type === 'user').length > 0 && (
-                        <div className="border-b last:border-b-0">
-                          <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
-                            People
-                          </div>
-                          {suggestions.filter(s => s.type === 'user').map((suggestion) => (
-                            <UserResultItem
-                              key={suggestion.id}
-                              user={{
-                                id: suggestion.id,
-                                username: suggestion.name,
-                                avatar_url: suggestion.image_url || null,
-                                bio: suggestion.description || null
-                              }}
-                              onClick={handleResultClick}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </>
+                  {/* Local Users */}
+                  {results.users.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
+                        <Users className="w-3 h-3" />
+                        People ({results.users.length})
+                      </div>
+                      {results.users.slice(0, 5).map((user) => (
+                        <UserResultItem
+                          key={user.id}
+                          user={user}
+                          onClick={handleResultClick}
+                        />
+                      ))}
+                    </div>
                   )}
-                  
+
+                  {/* Complex Product Search Option */}
                   {searchQuery.length >= 2 && (
                     <div className="p-3 text-center border-t">
                       <button 
                         className="text-sm text-primary hover:underline flex items-center justify-center w-full"
-                        onClick={handleSearchSubmit}
+                        onClick={handleComplexProductSearch}
                       >
                         <Search className="w-3 h-3 mr-1" />
-                        Search for "{searchQuery}"
+                        Search more products for "{searchQuery}"
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* No Results */}
+              {searchQuery && !hasResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">No results found locally. Try searching for more products.</p>
+                  <button 
+                    className="text-sm text-primary hover:underline mt-2"
+                    onClick={handleComplexProductSearch}
+                  >
+                    Search external sources for "{searchQuery}"
+                  </button>
                 </div>
               )}
             </div>
@@ -335,7 +346,7 @@ const Explore = () => {
                       />
                       <Button 
                         className="absolute right-0 top-0 rounded-l-none"
-                        onClick={handleSearchSubmit}
+                        onClick={handleComplexProductSearch}
                       >
                         Search
                       </Button>

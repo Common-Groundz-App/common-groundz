@@ -6,12 +6,12 @@ import {
   DialogContent,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, X } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Search, X, Loader2 } from 'lucide-react';
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
-import { ProductResultItem } from './search/ProductResultItem';
-import { useLocalSuggestions } from '@/hooks/use-local-suggestions';
+import { SearchResultHandler } from './search/SearchResultHandler';
+import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
+import { Badge } from '@/components/ui/badge';
 
 interface SearchDialogProps {
   open: boolean;
@@ -21,11 +21,14 @@ interface SearchDialogProps {
 export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
+  
   const { 
-    suggestions, 
+    results, 
     isLoading, 
-    error
-  } = useLocalSuggestions(query);
+    loadingStates, 
+    error, 
+    classification 
+  } = useRealtimeUnifiedSearch(query);
 
   const handleResultClick = () => {
     onOpenChange(false);
@@ -39,42 +42,30 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     }
   };
 
-  const renderSectionHeader = (title: string) => (
-    <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
-      {title}
+  const renderSectionHeader = (title: string, count: number) => (
+    <div className="px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
+      <span>{title}</span>
+      <Badge variant="outline" className="text-xs">{count}</Badge>
     </div>
   );
 
-  const renderLoadingSkeletons = (count: number = 3) => (
-    <div className="px-2">
-      {Array(count).fill(0).map((_, index) => (
-        <div key={index} className="flex items-center gap-2 px-2 py-1.5">
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <div className="flex-1">
-            <Skeleton className="h-3 w-20 mb-1" />
-            <Skeleton className="h-2 w-32" />
-          </div>
-        </div>
-      ))}
+  const renderLoadingState = () => (
+    <div className="p-4 text-center">
+      <div className="flex items-center justify-center gap-2 mb-2">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        <span className="text-sm text-muted-foreground">Searching...</span>
+      </div>
+      {classification && (
+        <Badge variant="secondary" className="text-xs">
+          {classification.classification} ({Math.round(classification.confidence * 100)}%)
+        </Badge>
+      )}
     </div>
   );
 
-  const renderEmptyState = () => (
-    <div className="p-6 text-center">
-      <p className="text-sm text-muted-foreground">No suggestions found. Press Enter to search.</p>
-    </div>
-  );
-
-  // Organize suggestions by type
-  const userSuggestions = suggestions.filter(s => s.type === 'user');
-  const entitySuggestions = suggestions.filter(s => s.type === 'entity');
-  const productSuggestions = suggestions.filter(s => s.type === 'product');
-  
-  // Determine if we should show an empty state
-  const showEmptyState = query && 
-                          query.length >= 2 && 
-                          !isLoading && 
-                          suggestions.length === 0;
+  const hasResults = results.products.length > 0 || 
+                   results.entities.length > 0 || 
+                   results.users.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -102,77 +93,55 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
         <div className="max-h-[60vh] overflow-y-auto">
           {error && (
-            <div className="px-4 py-2 text-center text-xs text-muted-foreground">
+            <div className="px-4 py-2 text-center text-xs text-destructive">
               {error}
             </div>
           )}
 
-          {isLoading && (
-            <>
-              {renderSectionHeader('Suggestions')}
-              {renderLoadingSkeletons(3)}
-            </>
+          {(isLoading || Object.values(loadingStates).some(Boolean)) && renderLoadingState()}
+
+          {query && !hasResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
+            <div className="p-6 text-center">
+              <p className="text-sm text-muted-foreground">No suggestions found. Press Enter to search more sources.</p>
+            </div>
           )}
 
-          {showEmptyState && renderEmptyState()}
-
-          {!isLoading && suggestions.length > 0 && (
+          {hasResults && (
             <>
-              {productSuggestions.length > 0 && (
+              {results.products.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('Products')}
-                  {productSuggestions.map((suggestion) => (
-                    <ProductResultItem
-                      key={suggestion.id}
-                      product={{
-                        name: suggestion.name,
-                        venue: 'Product',
-                        description: suggestion.description || null,
-                        image_url: suggestion.image_url || '',
-                        api_source: 'local_cache',
-                        api_ref: suggestion.id,
-                        metadata: suggestion.metadata || {}
-                      }}
+                  {renderSectionHeader('External Products', results.products.length)}
+                  {results.products.slice(0, 3).map((product, index) => (
+                    <SearchResultHandler
+                      key={`${product.api_source}-${product.api_ref || index}`}
+                      result={product}
                       query={query}
-                      onClick={handleResultClick}
+                      onClose={handleResultClick}
                     />
                   ))}
                 </div>
               )}
 
-              {entitySuggestions.length > 0 && (
+              {results.entities.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('Places & Things')}
-                  {entitySuggestions.map((suggestion) => (
+                  {renderSectionHeader('Places & Things', results.entities.length)}
+                  {results.entities.slice(0, 3).map((entity) => (
                     <EntityResultItem
-                      key={suggestion.id}
-                      entity={{
-                        id: suggestion.id,
-                        name: suggestion.name,
-                        type: 'place',
-                        venue: null,
-                        image_url: suggestion.image_url || null,
-                        description: suggestion.description || null,
-                        slug: null
-                      }}
+                      key={entity.id}
+                      entity={entity}
                       onClick={handleResultClick}
                     />
                   ))}
                 </div>
               )}
 
-              {userSuggestions.length > 0 && (
+              {results.users.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('People')}
-                  {userSuggestions.map((suggestion) => (
+                  {renderSectionHeader('People', results.users.length)}
+                  {results.users.slice(0, 3).map((user) => (
                     <UserResultItem
-                      key={suggestion.id}
-                      user={{
-                        id: suggestion.id,
-                        username: suggestion.name,
-                        avatar_url: suggestion.image_url || null,
-                        bio: suggestion.description || null
-                      }}
+                      key={user.id}
+                      user={user}
                       onClick={handleResultClick}
                     />
                   ))}
