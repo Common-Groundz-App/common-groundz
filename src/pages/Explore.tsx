@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -26,7 +27,6 @@ import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
 import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
 import { Badge } from '@/components/ui/badge';
-import { EnhancedSearchResultHandler } from '@/components/search/EnhancedSearchResultHandler';
 
 const Explore = () => {
   const { user } = useAuth();
@@ -276,7 +276,7 @@ const Explore = () => {
                     <div className="border-b last:border-b-0">
                       {renderSectionHeader('📚 Books', results.categorized.books.length, 'books')}
                       {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
-                        <EnhancedSearchResultHandler
+                        <SearchResultHandler
                           key={`${book.api_source}-${book.api_ref || index}`}
                           result={book}
                           query={searchQuery}
@@ -291,7 +291,7 @@ const Explore = () => {
                     <div className="border-b last:border-b-0">
                       {renderSectionHeader('🎬 Movies', results.categorized.movies.length, 'movies')}
                       {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
-                        <EnhancedSearchResultHandler
+                        <SearchResultHandler
                           key={`${movie.api_source}-${movie.api_ref || index}`}
                           result={movie}
                           query={searchQuery}
@@ -306,7 +306,7 @@ const Explore = () => {
                     <div className="border-b last:border-b-0">
                       {renderSectionHeader('📍 Places', results.categorized.places.length, 'places')}
                       {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
-                        <EnhancedSearchResultHandler
+                        <SearchResultHandler
                           key={`${place.api_source}-${place.api_ref || index}`}
                           result={place}
                           query={searchQuery}
@@ -321,7 +321,7 @@ const Explore = () => {
                     <div className="border-b last:border-b-0">
                       {renderSectionHeader('🍽️ Food & Recipes', results.categorized.food.length, 'food')}
                       {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
-                        <EnhancedSearchResultHandler
+                        <SearchResultHandler
                           key={`${food.api_source}-${food.api_ref || index}`}
                           result={food}
                           query={searchQuery}

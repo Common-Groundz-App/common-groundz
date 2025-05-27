@@ -10,7 +10,6 @@ import { Search, X, Loader2, Sparkles, Zap, AlertCircle, ChevronDown, ChevronUp 
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
 import { SearchResultHandler } from './search/SearchResultHandler';
-import { EnhancedSearchResultHandler } from './search/EnhancedSearchResultHandler';
 import { useEnhancedSearch } from '@/hooks/use-enhanced-search';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -174,7 +173,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 <div className="flex flex-col">
                   {renderSectionHeader('Books', results.categorized.books.length, 'books')}
                   {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
-                    <EnhancedSearchResultHandler
+                    <SearchResultHandler
                       key={`${book.api_source}-${book.api_ref || index}`}
                       result={book}
                       query={query}
@@ -189,7 +188,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 <div className="flex flex-col">
                   {renderSectionHeader('Movies', results.categorized.movies.length, 'movies')}
                   {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
-                    <EnhancedSearchResultHandler
+                    <SearchResultHandler
                       key={`${movie.api_source}-${movie.api_ref || index}`}
                       result={movie}
                       query={query}
@@ -204,7 +203,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 <div className="flex flex-col">
                   {renderSectionHeader('Places', results.categorized.places.length, 'places')}
                   {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
-                    <EnhancedSearchResultHandler
+                    <SearchResultHandler
                       key={`${place.api_source}-${place.api_ref || index}`}
                       result={place}
                       query={query}
@@ -219,7 +218,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 <div className="flex flex-col">
                   {renderSectionHeader('Food & Recipes', results.categorized.food.length, 'food')}
                   {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
-                    <EnhancedSearchResultHandler
+                    <SearchResultHandler
                       key={`${food.api_source}-${food.api_ref || index}`}
                       result={food}
                       query={query}
