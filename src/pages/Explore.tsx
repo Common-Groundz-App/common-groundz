@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -9,7 +10,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag, Loader2 } from 'lucide-react';
+import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -19,11 +20,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
+import { useEnhancedSearch } from '@/hooks/use-enhanced-search';
 import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
-import { ReviewResultItem } from '@/components/search/ReviewResultItem';
-import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
 import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
@@ -36,20 +35,21 @@ const Explore = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
-  // Use the new realtime search hook
+  // Use the enhanced search hook
   const { 
     results, 
     isLoading, 
     loadingStates, 
     error, 
-    classification 
-  } = useRealtimeUnifiedSearch(searchQuery);
+    classification,
+    showAllResults,
+    toggleShowAll
+  } = useEnhancedSearch(searchQuery);
 
   const handleResultClick = () => {
     setSearchQuery('');
   };
 
-  // Handle explicit search submission for complex product search
   const handleComplexProductSearch = () => {
     if (searchQuery.trim().length >= 2) {
       console.log(`🎯 Redirecting to complex product search for: "${searchQuery}"`);
@@ -118,6 +118,29 @@ const Explore = () => {
                                results.categorized.movies.length > 0 ||
                                results.categorized.places.length > 0 ||
                                results.categorized.food.length > 0;
+
+  const renderSectionHeader = (title: string, count: number, categoryKey?: keyof typeof showAllResults) => (
+    <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
+      <span>{title}</span>
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="text-xs">{count}</Badge>
+        {categoryKey && count > 3 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => toggleShowAll(categoryKey)}
+          >
+            {showAllResults[categoryKey] ? (
+              <>Less <ChevronUp className="w-3 h-3 ml-1" /></>
+            ) : (
+              <>All <ChevronDown className="w-3 h-3 ml-1" /></>
+            )}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -206,7 +229,7 @@ const Explore = () => {
                 </div>
               )}
               
-              {/* Real-time Search Results */}
+              {/* Enhanced Real-time Search Results */}
               {searchQuery && (hasResults || hasCategorizedResults) && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
                   
@@ -234,14 +257,25 @@ const Explore = () => {
                     </div>
                   )}
                   
+                  {/* Your Database - Priority Section */}
+                  {results.entities.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      {renderSectionHeader('✨ Your Database', results.entities.length, 'entities')}
+                      {(showAllResults.entities ? results.entities : results.entities.slice(0, 3)).map((entity) => (
+                        <EntityResultItem
+                          key={entity.id}
+                          entity={entity}
+                          onClick={handleResultClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+
                   {/* Books from External APIs */}
                   {results.categorized.books.length > 0 && (
                     <div className="border-b last:border-b-0">
-                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
-                        <Book className="w-3 h-3" />
-                        Books ({results.categorized.books.length})
-                      </div>
-                      {results.categorized.books.slice(0, 3).map((book, index) => (
+                      {renderSectionHeader('📚 Books', results.categorized.books.length, 'books')}
+                      {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
                         <SearchResultHandler
                           key={`${book.api_source}-${book.api_ref || index}`}
                           result={book}
@@ -255,11 +289,8 @@ const Explore = () => {
                   {/* Movies from External APIs */}
                   {results.categorized.movies.length > 0 && (
                     <div className="border-b last:border-b-0">
-                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
-                        <Film className="w-3 h-3" />
-                        Movies ({results.categorized.movies.length})
-                      </div>
-                      {results.categorized.movies.slice(0, 3).map((movie, index) => (
+                      {renderSectionHeader('🎬 Movies', results.categorized.movies.length, 'movies')}
+                      {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
                         <SearchResultHandler
                           key={`${movie.api_source}-${movie.api_ref || index}`}
                           result={movie}
@@ -273,11 +304,8 @@ const Explore = () => {
                   {/* Places from External APIs */}
                   {results.categorized.places.length > 0 && (
                     <div className="border-b last:border-b-0">
-                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
-                        <MapPin className="w-3 h-3" />
-                        Places ({results.categorized.places.length})
-                      </div>
-                      {results.categorized.places.slice(0, 3).map((place, index) => (
+                      {renderSectionHeader('📍 Places', results.categorized.places.length, 'places')}
+                      {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
                         <SearchResultHandler
                           key={`${place.api_source}-${place.api_ref || index}`}
                           result={place}
@@ -291,11 +319,8 @@ const Explore = () => {
                   {/* Food from External APIs */}
                   {results.categorized.food.length > 0 && (
                     <div className="border-b last:border-b-0">
-                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
-                        <ShoppingBag className="w-3 h-3" />
-                        Food & Recipes ({results.categorized.food.length})
-                      </div>
-                      {results.categorized.food.slice(0, 3).map((food, index) => (
+                      {renderSectionHeader('🍽️ Food & Recipes', results.categorized.food.length, 'food')}
+                      {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
                         <SearchResultHandler
                           key={`${food.api_source}-${food.api_ref || index}`}
                           result={food}
@@ -306,31 +331,11 @@ const Explore = () => {
                     </div>
                   )}
                   
-                  {/* Local Entities */}
-                  {results.entities.length > 0 && (
-                    <div className="border-b last:border-b-0">
-                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
-                        <MapPin className="w-3 h-3" />
-                        Local Places & Things ({results.entities.length})
-                      </div>
-                      {results.entities.slice(0, 5).map((entity) => (
-                        <EntityResultItem
-                          key={entity.id}
-                          entity={entity}
-                          onClick={handleResultClick}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Local Users */}
+                  {/* People */}
                   {results.users.length > 0 && (
                     <div className="border-b last:border-b-0">
-                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center gap-2">
-                        <Users className="w-3 h-3" />
-                        People ({results.users.length})
-                      </div>
-                      {results.users.slice(0, 5).map((user) => (
+                      {renderSectionHeader('👥 People', results.users.length, 'users')}
+                      {(showAllResults.users ? results.users : results.users.slice(0, 3)).map((user) => (
                         <UserResultItem
                           key={user.id}
                           user={user}
