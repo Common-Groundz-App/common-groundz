@@ -123,7 +123,7 @@ const ConnectedRingsRating = ({
       svgHeight: 20,
       ringSize: 9,
       strokeWidth: 2,
-      textClass: 'text-[10px]',
+      textClass: 'text-sm',
       textOffset: 12,
       overlapOffset: 6
     }
