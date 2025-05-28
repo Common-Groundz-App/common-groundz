@@ -87,12 +87,16 @@ const Search = () => {
       movies: results.categorized?.movies || [],
       books: results.categorized?.books || [],
       places: results.categorized?.places || [],
-      // General products that don't fall into specific categories
-      products: results.products.filter(p => 
-        !results.categorized?.movies?.includes(p) &&
-        !results.categorized?.books?.includes(p) &&
-        !results.categorized?.places?.includes(p)
-      )
+      // General products that don't fall into specific categories - fixed filtering logic
+      products: results.products.filter(p => {
+        const movieRefs = (results.categorized?.movies || []).map(item => item.api_ref);
+        const bookRefs = (results.categorized?.books || []).map(item => item.api_ref);
+        const placeRefs = (results.categorized?.places || []).map(item => item.api_ref);
+        
+        return !movieRefs.includes(p.api_ref) &&
+               !bookRefs.includes(p.api_ref) &&
+               !placeRefs.includes(p.api_ref);
+      })
     };
 
     switch (activeTab) {
@@ -461,7 +465,7 @@ const Search = () => {
                               {filteredResults.externalResults.length > 0 && (
                                 <div>
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
-                                    <Globe className="h-4 w-4" /> External Movies
+                                    <Globe className="h-4 w-4" /> All Movies
                                   </h3>
                                   <div className="space-y-2">
                                     {filteredResults.externalResults.map((movie, index) => (
@@ -501,7 +505,7 @@ const Search = () => {
                               {filteredResults.externalResults.length > 0 && (
                                 <div>
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
-                                    <Globe className="h-4 w-4" /> External Books
+                                    <Globe className="h-4 w-4" /> All Books
                                   </h3>
                                   <div className="space-y-2">
                                     {filteredResults.externalResults.map((book, index) => (
@@ -541,7 +545,7 @@ const Search = () => {
                               {filteredResults.externalResults.length > 0 && (
                                 <div>
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
-                                    <Globe className="h-4 w-4" /> External Places
+                                    <Globe className="h-4 w-4" /> All Places
                                   </h3>
                                   <div className="space-y-2">
                                     {filteredResults.externalResults.map((place, index) => (
@@ -612,7 +616,7 @@ const Search = () => {
                               {filteredResults.externalResults.length > 0 && (
                                 <div>
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
-                                    <Globe className="h-4 w-4" /> External Products
+                                    <Globe className="h-4 w-4" /> All Products
                                   </h3>
                                   <p className="text-sm text-muted-foreground mb-4">
                                     Click any result to create an entity and start reviewing!
