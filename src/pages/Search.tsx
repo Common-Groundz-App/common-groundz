@@ -63,17 +63,16 @@ const Search = () => {
       ...results.recommendations
     ];
 
+    // Categorize external products properly
     const categorizedProducts = {
       movies: results.categorized?.movies || [],
       books: results.categorized?.books || [],
       places: results.categorized?.places || [],
+      // General products that don't fall into specific categories
       products: results.products.filter(p => 
-        !['book', 'movie', 'place'].includes(p.type) &&
-        p.api_source !== 'openlibrary' &&
-        p.api_source !== 'google_books' &&
-        p.api_source !== 'omdb' &&
-        p.api_source !== 'tmdb' &&
-        p.api_source !== 'google_places'
+        !results.categorized?.movies?.includes(p) &&
+        !results.categorized?.books?.includes(p) &&
+        !results.categorized?.places?.includes(p)
       )
     };
 
@@ -138,7 +137,7 @@ const Search = () => {
         
         <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
           <SearchIcon className="w-5 h-5" />
-          Searching for "{capitalizedQuery}"
+          🔍 Searching for "{capitalizedQuery}"
         </h2>
         
         <div className="text-center max-w-md">
@@ -263,31 +262,32 @@ const Search = () => {
                                         onClick={() => {}}
                                       />
                                     );
-                                  } else if ('entity_id' in item && 'rating' in item) {
+                                  } else if ('entity_id' in item && 'rating' in item && 'title' in item && 'description' in item) {
                                     return (
                                       <ReviewResultItem
                                         key={item.id}
-                                        review={item}
+                                        review={item as any}
                                         onClick={() => {}}
                                       />
                                     );
-                                  } else if ('entity_id' in item && 'title' in item) {
+                                  } else if ('entity_id' in item && 'title' in item && !('rating' in item)) {
                                     return (
                                       <RecommendationResultItem
                                         key={item.id}
-                                        recommendation={item}
+                                        recommendation={item as any}
                                         onClick={() => {}}
                                       />
                                     );
-                                  } else {
+                                  } else if ('name' in item && 'type' in item) {
                                     return (
                                       <EntityResultItem
                                         key={item.id}
-                                        entity={item}
+                                        entity={item as any}
                                         onClick={() => {}}
                                       />
                                     );
                                   }
+                                  return null;
                                 })}
                               </div>
                               {filteredResults.localResults.length > 5 && (
@@ -431,7 +431,7 @@ const Search = () => {
                                     {filteredResults.localResults.map((item) => (
                                       <EntityResultItem
                                         key={item.id}
-                                        entity={item}
+                                        entity={item as any}
                                         onClick={() => {}}
                                       />
                                     ))}
@@ -477,7 +477,7 @@ const Search = () => {
                                     {filteredResults.localResults.map((item) => (
                                       <EntityResultItem
                                         key={item.id}
-                                        entity={item}
+                                        entity={item as any}
                                         onClick={() => {}}
                                       />
                                     ))}
@@ -523,7 +523,7 @@ const Search = () => {
                                     {filteredResults.localResults.map((item) => (
                                       <EntityResultItem
                                         key={item.id}
-                                        entity={item}
+                                        entity={item as any}
                                         onClick={() => {}}
                                       />
                                     ))}
@@ -600,7 +600,7 @@ const Search = () => {
                                     {filteredResults.localResults.map((item) => (
                                       <EntityResultItem
                                         key={item.id}
-                                        entity={item}
+                                        entity={item as any}
                                         onClick={() => {}}
                                       />
                                     ))}
