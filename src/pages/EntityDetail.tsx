@@ -27,6 +27,8 @@ import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
 import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
+import { LightboxPreview } from '@/components/media/LightboxPreview';
+import { MediaItem } from '@/types/media';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -39,6 +41,7 @@ const EntityDetail = () => {
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isRefreshingImage, setIsRefreshingImage] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
   
@@ -278,6 +281,32 @@ const EntityDetail = () => {
     }
   };
 
+  const handleImageClick = (e: React.MouseEvent) => {
+    // Prevent lightbox from opening if clicking on overlay buttons
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
+    setIsLightboxOpen(true);
+  };
+
+  const handleLightboxClose = () => {
+    setIsLightboxOpen(false);
+  };
+
+  // Create media item for lightbox
+  const createMediaItem = (): MediaItem => {
+    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entity?.type || 'place');
+    return {
+      url: imageUrl,
+      type: 'image',
+      alt: entity?.name || 'Entity image',
+      caption: entity?.name,
+      order: 0,
+      id: entity?.id || 'entity-image'
+    };
+  };
+
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
       <NavBarComponent />
@@ -289,12 +318,18 @@ const EntityDetail = () => {
               {/* Entity Image */}
               <div className="w-full md:w-1/3 lg:w-1/4">
                 <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
-                  <ImageWithFallback
-                    src={entity?.image_url || ''}
-                    alt={entity?.name || 'Entity image'}
-                    className="w-full h-full object-cover"
-                    fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
-                  />
+                  {/* Clickable image container */}
+                  <div 
+                    className="w-full h-full cursor-pointer transition-transform hover:scale-105"
+                    onClick={handleImageClick}
+                  >
+                    <ImageWithFallback
+                      src={entity?.image_url || ''}
+                      alt={entity?.name || 'Entity image'}
+                      className="w-full h-full object-cover"
+                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
+                    />
+                  </div>
                   
                   {/* Image source indicator and refresh button */}
                   {entity?.image_url && (
@@ -688,6 +723,15 @@ const EntityDetail = () => {
             description: entity.description || '',
             metadata: entity.metadata
           }}
+        />
+      )}
+
+      {/* Lightbox Preview */}
+      {isLightboxOpen && entity && (
+        <LightboxPreview
+          media={[createMediaItem()]}
+          initialIndex={0}
+          onClose={handleLightboxClose}
         />
       )}
       
