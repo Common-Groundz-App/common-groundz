@@ -119,7 +119,7 @@ const ConnectedRingsRating = ({
       overlapOffset: 25
     },
     badge: {
-      svgWidth: 86,
+      svgWidth: 72,
       svgHeight: 20,
       ringSize: 9,
       strokeWidth: 2,
