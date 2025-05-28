@@ -401,7 +401,31 @@ const EntityDetail = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-muted-foreground">No ratings yet</div>
+                  <div className="flex items-center gap-4">
+                    {/* Rings and rating number together */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-fit">
+                        <ConnectedRingsRating
+                          value={0}
+                          variant="badge"
+                          showValue={false}
+                          size="md"
+                          minimal={true}
+                        />
+                      </div>
+                      <span className="text-lg font-bold text-muted-foreground">
+                        0
+                      </span>
+                    </div>
+                    
+                    {/* Text labels */}
+                    <div className="leading-tight min-w-[140px]">
+                      <div className="font-semibold text-sm whitespace-nowrap">Not yet rated</div>
+                      <div className="text-xs text-muted-foreground">
+                        Be the first to rate this
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
               
