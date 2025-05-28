@@ -83,28 +83,87 @@ serve(async (req) => {
     let products = [];
     let errors = null;
 
-    // Only search external products if mode is "deep" (not "quick")
+    // In quick mode, search lightweight external APIs in parallel
+    if (mode === "quick") {
+      console.log(`🏎️ Quick search mode: Searching lightweight external APIs for: "${query}"`);
+      
+      try {
+        // Call external APIs in parallel for quick results
+        const [moviesResponse, booksResponse, placesResponse] = await Promise.allSettled([
+          supabase.functions.invoke('search-movies', { body: { query } }),
+          supabase.functions.invoke('search-books', { body: { query } }),
+          supabase.functions.invoke('search-places', { body: { query } })
+        ]);
+
+        // Process movie results
+        if (moviesResponse.status === 'fulfilled' && moviesResponse.value?.data?.results) {
+          const movieResults = moviesResponse.value.data.results.slice(0, limit).map((movie: any) => ({
+            ...movie,
+            type: 'movie'
+          }));
+          products.push(...movieResults);
+          console.log(`🎬 Found ${movieResults.length} movie results`);
+        } else if (moviesResponse.status === 'rejected') {
+          console.error('Movies search failed:', moviesResponse.reason);
+        }
+
+        // Process book results
+        if (booksResponse.status === 'fulfilled' && booksResponse.value?.data?.results) {
+          const bookResults = booksResponse.value.data.results.slice(0, limit).map((book: any) => ({
+            ...book,
+            type: 'book'
+          }));
+          products.push(...bookResults);
+          console.log(`📚 Found ${bookResults.length} book results`);
+        } else if (booksResponse.status === 'rejected') {
+          console.error('Books search failed:', booksResponse.reason);
+        }
+
+        // Process place results
+        if (placesResponse.status === 'fulfilled' && placesResponse.value?.data?.results) {
+          const placeResults = placesResponse.value.data.results.slice(0, limit).map((place: any) => ({
+            ...place,
+            type: 'place'
+          }));
+          products.push(...placeResults);
+          console.log(`📍 Found ${placeResults.length} place results`);
+        } else if (placesResponse.status === 'rejected') {
+          console.error('Places search failed:', placesResponse.reason);
+        }
+
+        // Limit total external results
+        products = products.slice(0, limit * 2);
+        console.log(`✅ Quick search found ${products.length} total external results`);
+
+      } catch (error) {
+        console.error('Error calling external APIs in quick mode:', error);
+        errors = [`External API search failed: ${error.message}`];
+      }
+    }
+
+    // Only search comprehensive products if mode is "deep"
     if (mode === "deep") {
       try {
-        console.log(`🔍 Deep search mode: Searching external products for: "${query}"`);
+        console.log(`🔍 Deep search mode: Searching comprehensive products for: "${query}"`);
         
-        // Call the search-products function to get external results
+        // Call the search-products function to get comprehensive results
         const { data: productData, error: productError } = await supabase.functions.invoke('search-products', {
           body: { query }
         });
 
         if (productError) {
-          console.error('Product search error:', productError);
-          errors = [`Product search failed: ${productError.message}`];
+          console.error('Comprehensive product search error:', productError);
+          errors = [`Comprehensive product search failed: ${productError.message}`];
         } else if (productData?.results) {
           // Transform product results to match expected format
-          products = productData.results.map((product: any) => ({
+          const comprehensiveProducts = productData.results.map((product: any) => ({
             name: product.product_name,
             venue: product.brand || 'Unknown Brand',
             description: product.summary,
             image_url: product.image_url,
             api_source: product.api_source,
             api_ref: product.api_ref,
+            type: 'product',
             metadata: {
               price: product.insights?.price_range,
               rating: product.insights?.overall_rating,
@@ -115,14 +174,13 @@ serve(async (req) => {
             }
           })).slice(0, limit);
           
-          console.log(`✅ Found ${products.length} external products from deep search`);
+          products.push(...comprehensiveProducts);
+          console.log(`✅ Found ${comprehensiveProducts.length} comprehensive products from deep search`);
         }
       } catch (error) {
         console.error('Error calling search-products:', error);
-        errors = [`External product search failed: ${error.message}`];
+        errors = [`Comprehensive product search failed: ${error.message}`];
       }
-    } else {
-      console.log(`🏎️ Quick search mode: Skipping external products search`);
     }
 
     const results = {
