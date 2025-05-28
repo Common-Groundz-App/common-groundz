@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -390,11 +391,11 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Enhanced Deep Search CTA - Reverted text */}
+                          {/* Enhanced Deep Search CTA */}
                           {searchMode === 'quick' && (
                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10">
                               <h3 className="text-lg font-semibold mb-2">🔍 Didn't find what you're looking for?</h3>
-                              <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                              <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
                                 Try Deep Search to find comprehensive results from across the web
                                 <br />
                                 <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
@@ -566,11 +567,11 @@ const Search = () => {
                             <ShoppingBag className="h-5 w-5" /> Products
                           </h2>
                           
-                          {/* Deep Search CTA for products tab - Reverted text */}
+                          {/* Deep Search CTA for products tab */}
                           {searchMode === 'quick' && filteredResults.externalResults.length === 0 && (
                             <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20">
                               <h3 className="text-lg font-semibold mb-2">🔍 Didn't find what you're looking for?</h3>
-                              <p className="text-sm text-muted-foreground mb-4">
+                              <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
                                 Try Deep Search to find comprehensive results from across the web
                                 <br />
                                 <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
