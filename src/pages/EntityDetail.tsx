@@ -376,14 +376,13 @@ const EntityDetail = () => {
               <div className="flex items-center gap-4">
                 {stats.averageRating !== null ? (
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center bg-violet-50 dark:bg-violet-900/20 rounded-full p-2 h-16 w-16">
-                      <ConnectedRingsRating
-                        value={stats.averageRating}
-                        variant="badge"
-                        showValue={true}
-                        size="md"
-                      />
-                    </div>
+                    <ConnectedRingsRating
+                      value={stats.averageRating}
+                      variant="badge"
+                      showValue={true}
+                      size="md"
+                      minimal={true}
+                    />
                     <div>
                       <div className="font-semibold">Overall Rating</div>
                       <div className="text-sm text-muted-foreground">
