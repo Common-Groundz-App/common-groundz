@@ -13,7 +13,7 @@ import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
-import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2 } from 'lucide-react';
+import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock } from 'lucide-react';
 import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
 import { Badge } from '@/components/ui/badge';
 
@@ -22,30 +22,34 @@ const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const query = searchParams.get('q') || '';
+  const mode = searchParams.get('mode') || 'quick';
   const [searchQuery, setSearchQuery] = useState(query);
   const [activeTab, setActiveTab] = useState('all');
+  const [isDeepSearching, setIsDeepSearching] = useState(mode === 'deep');
 
-  // Use the new realtime unified search hook
+  // Use the new realtime unified search hook with mode parameter
   const { 
     results, 
     isLoading, 
     loadingStates, 
     error, 
-    classification 
-  } = useRealtimeUnifiedSearch(query);
+    classification,
+    searchMode
+  } = useRealtimeUnifiedSearch(query, { mode: mode as 'quick' | 'deep' });
 
   // Update the URL when search query changes
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim().length >= 2) {
-      setSearchParams({ q: searchQuery });
+      setSearchParams({ q: searchQuery, mode: 'quick' });
     }
   };
 
-  const handleComplexProductSearch = () => {
+  // Handle deep search request
+  const handleDeepSearch = () => {
     if (query.trim().length >= 2) {
-      const encodedQuery = encodeURIComponent(query.trim());
-      navigate(`/search/products/${encodedQuery}`);
+      setIsDeepSearching(true);
+      setSearchParams({ q: query, mode: 'deep' });
     }
   };
 
@@ -91,16 +95,16 @@ const Search = () => {
               </div>
             </form>
 
-            {/* Search Classification Info */}
-            {classification && query && (
+            {/* Search Mode Indicator */}
+            {query && (
               <div className="mb-4 flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">
-                  Classified as: {classification.classification} ({Math.round(classification.confidence * 100)}% confidence)
+                <Badge variant={searchMode === 'quick' ? 'outline' : 'default'} className="text-xs">
+                  {searchMode === 'quick' ? 'Quick Search' : 'Deep Search'}
                 </Badge>
-                {classification.reasoning && (
-                  <span className="text-xs text-muted-foreground">
-                    {classification.reasoning}
-                  </span>
+                {classification && (
+                  <Badge variant="secondary" className="text-xs">
+                    {classification.classification} ({Math.round(classification.confidence * 100)}%)
+                  </Badge>
                 )}
               </div>
             )}
@@ -257,17 +261,35 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Complex Product Search Option */}
-                          <div className="mb-8 p-4 border border-dashed rounded-lg text-center">
-                            <h3 className="text-lg font-medium mb-2">Need more comprehensive product results?</h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                              Use our advanced product search for deeper analysis from multiple sources
-                            </p>
-                            <Button onClick={handleComplexProductSearch} variant="outline">
-                              <SearchIcon className="w-4 h-4 mr-2" />
-                              Advanced Product Search for "{query}"
-                            </Button>
-                          </div>
+                          {/* Deep Search CTA - Only show if we're in quick mode */}
+                          {searchMode === 'quick' && (
+                            <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20">
+                              <h3 className="text-lg font-medium mb-2">🔍 Didn't find what you're looking for?</h3>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                Try Deep Search to find comprehensive results from across the web
+                                <br />
+                                <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
+                              </p>
+                              <Button 
+                                onClick={handleDeepSearch}
+                                variant="default"
+                                className="bg-brand-orange hover:bg-brand-orange/90"
+                                disabled={isDeepSearching}
+                              >
+                                {isDeepSearching ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Searching deeply...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Run Deep Search
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
                           
                           {/* No results message */}
                           {!results.products.length && 
@@ -277,14 +299,16 @@ const Search = () => {
                            !results.recommendations.length && (
                             <div className="py-12 text-center">
                               <p className="text-muted-foreground">No results found for "{query}"</p>
-                              <p className="text-sm text-muted-foreground mt-2">Try the advanced product search for more comprehensive results</p>
-                              <Button 
-                                onClick={handleComplexProductSearch} 
-                                variant="outline" 
-                                className="mt-4"
-                              >
-                                Advanced Product Search
-                              </Button>
+                              {searchMode === 'quick' && (
+                                <Button 
+                                  onClick={handleDeepSearch} 
+                                  variant="outline" 
+                                  className="mt-4"
+                                  disabled={isDeepSearching}
+                                >
+                                  {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
+                                </Button>
+                              )}
                             </div>
                           )}
                         </TabsContent>
@@ -293,6 +317,37 @@ const Search = () => {
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <ShoppingBag className="h-5 w-5" /> Products & Items
                           </h2>
+                          
+                          {/* Deep Search CTA - Only show if we're in quick mode */}
+                          {searchMode === 'quick' && !results.products.length && (
+                            <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20">
+                              <h3 className="text-lg font-medium mb-2">🔍 Try Deep Search for Products</h3>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                Deep Search finds comprehensive results from across the web
+                                <br />
+                                <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
+                              </p>
+                              <Button 
+                                onClick={handleDeepSearch}
+                                variant="default"
+                                className="bg-brand-orange hover:bg-brand-orange/90"
+                                disabled={isDeepSearching}
+                              >
+                                {isDeepSearching ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Searching deeply...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Run Deep Search
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                          
                           <p className="text-sm text-muted-foreground mb-4">
                             Click any result to create an entity and start reviewing!
                           </p>
@@ -309,18 +364,20 @@ const Search = () => {
                           ) : (
                             <div className="py-12 text-center">
                               <p className="text-muted-foreground">No external products found for "{query}"</p>
-                              <Button 
-                                onClick={handleComplexProductSearch} 
-                                variant="outline" 
-                                className="mt-4"
-                              >
-                                Try Advanced Product Search
-                              </Button>
+                              {searchMode === 'quick' && (
+                                <Button 
+                                  onClick={handleDeepSearch} 
+                                  variant="outline" 
+                                  className="mt-4"
+                                  disabled={isDeepSearching}
+                                >
+                                  {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
+                                </Button>
+                              )}
                             </div>
                           )}
                         </TabsContent>
                         
-                        {/* ... keep existing code for other tabs ... */}
                         <TabsContent value="entities">
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <MapPin className="h-5 w-5" /> Places & Things

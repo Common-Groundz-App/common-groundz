@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -41,7 +39,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && query.trim().length >= 2) {
-      navigate(`/search?q=${encodeURIComponent(query)}`);
+      navigate(`/search?q=${encodeURIComponent(query)}&mode=quick`);
       onOpenChange(false);
     }
   };
@@ -234,7 +232,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               <button 
                 className="text-sm text-primary hover:underline flex items-center justify-center w-full"
                 onClick={() => {
-                  navigate(`/search?q=${encodeURIComponent(query)}`);
+                  navigate(`/search?q=${encodeURIComponent(query)}&mode=quick`);
                   onOpenChange(false);
                 }}
               >
@@ -248,4 +246,3 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     </Dialog>
   );
 }
-

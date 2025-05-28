@@ -51,9 +51,9 @@ const Explore = () => {
 
   const handleComplexProductSearch = () => {
     if (searchQuery.trim().length >= 2) {
-      console.log(`🎯 Redirecting to complex product search for: "${searchQuery}"`);
+      console.log(`🎯 Redirecting to quick product search for: "${searchQuery}"`);
       const encodedQuery = encodeURIComponent(searchQuery.trim());
-      navigate(`/search/products/${encodedQuery}`);
+      navigate(`/search?q=${encodedQuery}&mode=quick`);
     }
   };
 

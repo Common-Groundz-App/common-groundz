@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { query, limit = 5, type = "all" } = await req.json();
+    const { query, limit = 5, type = "all", mode = "quick" } = await req.json();
 
     if (!query || query.trim().length < 2) {
       return new Response(
@@ -22,7 +22,8 @@ serve(async (req) => {
           entities: [],
           reviews: [],
           recommendations: [],
-          products: []
+          products: [],
+          mode: mode
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -32,7 +33,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log(`🔍 Unified search for: "${query}" (type: ${type})`);
+    console.log(`🔍 Unified search for: "${query}" (type: ${type}, mode: ${mode})`);
 
     // Search users
     const { data: users, error: usersError } = await supabase
@@ -82,10 +83,10 @@ serve(async (req) => {
     let products = [];
     let errors = null;
 
-    // Only search external products if type is "all" (not "local_only")
-    if (type === "all") {
+    // Only search external products if mode is "deep" (not "quick")
+    if (mode === "deep") {
       try {
-        console.log(`🔍 Searching external products for: "${query}"`);
+        console.log(`🔍 Deep search mode: Searching external products for: "${query}"`);
         
         // Call the search-products function to get external results
         const { data: productData, error: productError } = await supabase.functions.invoke('search-products', {
@@ -114,12 +115,14 @@ serve(async (req) => {
             }
           })).slice(0, limit);
           
-          console.log(`✅ Found ${products.length} external products`);
+          console.log(`✅ Found ${products.length} external products from deep search`);
         }
       } catch (error) {
         console.error('Error calling search-products:', error);
         errors = [`External product search failed: ${error.message}`];
       }
+    } else {
+      console.log(`🏎️ Quick search mode: Skipping external products search`);
     }
 
     const results = {
@@ -128,10 +131,11 @@ serve(async (req) => {
       reviews: reviews || [],
       recommendations: recommendations || [],
       products: products,
-      errors: errors
+      errors: errors,
+      mode: mode
     };
 
-    console.log(`✅ Unified search results:`, {
+    console.log(`✅ Unified search results (${mode} mode):`, {
       users: results.users.length,
       entities: results.entities.length,
       reviews: results.reviews.length,
