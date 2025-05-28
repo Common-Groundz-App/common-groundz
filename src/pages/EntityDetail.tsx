@@ -373,7 +373,7 @@ const EntityDetail = () => {
           <div className="container max-w-6xl mx-auto px-4">
             <div className="flex flex-wrap items-center gap-6 justify-between">
               {/* Rating Display */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 ml-4">
                 {stats.averageRating !== null ? (
                   <div className="flex items-center gap-4">
                     {/* Rings and rating number together */}
