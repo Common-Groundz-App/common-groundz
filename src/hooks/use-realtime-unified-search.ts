@@ -122,31 +122,15 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
 
         console.log(`🔍 Search results (${searchMode} mode):`, data);
         
-        // Organize results into categories
-        const categorizedResults = {
+        // Use categorized results from the backend
+        const categorizedResults = data?.categorized || {
           books: [],
           movies: [],
           places: [],
           food: []
         };
 
-        // Categorize external products based on their types
-        if (data?.products) {
-          data.products.forEach((product: any) => {
-            const productType = product.type || 'product';
-            if (productType === 'book' || product.api_source === 'openlibrary' || product.api_source === 'google_books') {
-              categorizedResults.books.push(product);
-            } else if (productType === 'movie' || product.api_source === 'omdb' || product.api_source === 'tmdb') {
-              categorizedResults.movies.push(product);
-            } else if (productType === 'place' || product.api_source === 'google_places') {
-              categorizedResults.places.push(product);
-            } else if (productType === 'food') {
-              categorizedResults.food.push(product);
-            }
-          });
-        }
-
-        // Update results with categorized data
+        // Update results with properly categorized data
         setResults({
           users: data?.users || [],
           entities: data?.entities || [],

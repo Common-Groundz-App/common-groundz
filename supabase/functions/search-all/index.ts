@@ -23,6 +23,12 @@ serve(async (req) => {
           reviews: [],
           recommendations: [],
           products: [],
+          categorized: {
+            books: [],
+            movies: [],
+            places: [],
+            food: []
+          },
           mode: mode
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -81,6 +87,12 @@ serve(async (req) => {
     if (recommendationsError) console.error('Recommendations search error:', recommendationsError);
 
     let products = [];
+    let categorizedResults = {
+      books: [],
+      movies: [],
+      places: [],
+      food: []
+    };
     let errors = null;
 
     // In quick mode, search lightweight external APIs in parallel
@@ -95,44 +107,47 @@ serve(async (req) => {
           supabase.functions.invoke('search-places', { body: { query } })
         ]);
 
-        // Process movie results
+        // Process movie results with proper categorization
         if (moviesResponse.status === 'fulfilled' && moviesResponse.value?.data?.results) {
           const movieResults = moviesResponse.value.data.results.slice(0, limit).map((movie: any) => ({
             ...movie,
             type: 'movie'
           }));
           products.push(...movieResults);
+          categorizedResults.movies = movieResults;
           console.log(`🎬 Found ${movieResults.length} movie results`);
         } else if (moviesResponse.status === 'rejected') {
           console.error('Movies search failed:', moviesResponse.reason);
         }
 
-        // Process book results
+        // Process book results with proper categorization
         if (booksResponse.status === 'fulfilled' && booksResponse.value?.data?.results) {
           const bookResults = booksResponse.value.data.results.slice(0, limit).map((book: any) => ({
             ...book,
             type: 'book'
           }));
           products.push(...bookResults);
+          categorizedResults.books = bookResults;
           console.log(`📚 Found ${bookResults.length} book results`);
         } else if (booksResponse.status === 'rejected') {
           console.error('Books search failed:', booksResponse.reason);
         }
 
-        // Process place results
+        // Process place results with proper categorization
         if (placesResponse.status === 'fulfilled' && placesResponse.value?.data?.results) {
           const placeResults = placesResponse.value.data.results.slice(0, limit).map((place: any) => ({
             ...place,
             type: 'place'
           }));
           products.push(...placeResults);
+          categorizedResults.places = placeResults;
           console.log(`📍 Found ${placeResults.length} place results`);
         } else if (placesResponse.status === 'rejected') {
           console.error('Places search failed:', placesResponse.reason);
         }
 
         // Limit total external results
-        products = products.slice(0, limit * 2);
+        products = products.slice(0, limit * 3);
         console.log(`✅ Quick search found ${products.length} total external results`);
 
       } catch (error) {
@@ -189,6 +204,7 @@ serve(async (req) => {
       reviews: reviews || [],
       recommendations: recommendations || [],
       products: products,
+      categorized: categorizedResults,
       errors: errors,
       mode: mode
     };
@@ -198,7 +214,13 @@ serve(async (req) => {
       entities: results.entities.length,
       reviews: results.reviews.length,
       recommendations: results.recommendations.length,
-      products: results.products.length
+      products: results.products.length,
+      categorized: {
+        books: results.categorized.books.length,
+        movies: results.categorized.movies.length,
+        places: results.categorized.places.length,
+        food: results.categorized.food.length
+      }
     });
 
     return new Response(
@@ -215,7 +237,13 @@ serve(async (req) => {
         entities: [],
         reviews: [],
         recommendations: [],
-        products: []
+        products: [],
+        categorized: {
+          books: [],
+          movies: [],
+          places: [],
+          food: []
+        }
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

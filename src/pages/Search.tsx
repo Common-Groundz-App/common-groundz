@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -13,9 +14,10 @@ import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
-import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock } from 'lucide-react';
+import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe } from 'lucide-react';
 import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
 import { Badge } from '@/components/ui/badge';
+import { getRandomLoadingMessage } from '@/utils/loadingMessages';
 
 const Search = () => {
   const isMobile = useIsMobile();
@@ -51,6 +53,114 @@ const Search = () => {
       setIsDeepSearching(true);
       setSearchParams({ q: query, mode: 'deep' });
     }
+  };
+
+  // Filter results based on active tab
+  const getFilteredResults = () => {
+    const allLocalResults = [
+      ...results.entities,
+      ...results.reviews,
+      ...results.recommendations
+    ];
+
+    const categorizedProducts = {
+      movies: results.categorized?.movies || [],
+      books: results.categorized?.books || [],
+      places: results.categorized?.places || [],
+      products: results.products.filter(p => 
+        !['book', 'movie', 'place'].includes(p.type) &&
+        p.api_source !== 'openlibrary' &&
+        p.api_source !== 'google_books' &&
+        p.api_source !== 'omdb' &&
+        p.api_source !== 'tmdb' &&
+        p.api_source !== 'google_places'
+      )
+    };
+
+    switch (activeTab) {
+      case 'movies':
+        return {
+          localResults: allLocalResults.filter(item => 
+            'type' in item && item.type === 'movie'
+          ),
+          externalResults: categorizedProducts.movies
+        };
+      case 'books':
+        return {
+          localResults: allLocalResults.filter(item => 
+            'type' in item && item.type === 'book'
+          ),
+          externalResults: categorizedProducts.books
+        };
+      case 'places':
+        return {
+          localResults: allLocalResults.filter(item => 
+            'type' in item && item.type === 'place'
+          ),
+          externalResults: categorizedProducts.places
+        };
+      case 'products':
+        return {
+          localResults: allLocalResults.filter(item => 
+            'type' in item && item.type === 'product'
+          ),
+          externalResults: categorizedProducts.products
+        };
+      case 'users':
+        return {
+          localResults: [],
+          externalResults: [],
+          users: results.users
+        };
+      default: // 'all'
+        return {
+          localResults: allLocalResults,
+          externalResults: results.products,
+          users: results.users
+        };
+    }
+  };
+
+  const filteredResults = getFilteredResults();
+
+  // Enhanced loading screen with dynamic messages
+  const renderEnhancedLoadingState = () => {
+    const capitalizedQuery = query.charAt(0).toUpperCase() + query.slice(1);
+    const category = classification?.classification || 'general';
+    const loadingMessage = getRandomLoadingMessage(category as any);
+
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <div className="relative mb-6">
+          <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+          <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
+        </div>
+        
+        <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+          <SearchIcon className="w-5 h-5" />
+          Searching for "{capitalizedQuery}"
+        </h2>
+        
+        <div className="text-center max-w-md">
+          <p className="text-muted-foreground mb-4">{loadingMessage}</p>
+          
+          {classification && (
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Badge variant="secondary" className="text-xs">
+                {classification.classification} ({Math.round(classification.confidence * 100)}% confidence)
+              </Badge>
+            </div>
+          )}
+          
+          <div className="flex gap-2 justify-center flex-wrap">
+            {loadingStates.books && <Badge variant="outline" className="text-xs">📚 Books</Badge>}
+            {loadingStates.movies && <Badge variant="outline" className="text-xs">🎬 Movies</Badge>}
+            {loadingStates.places && <Badge variant="outline" className="text-xs">📍 Places</Badge>}
+            {loadingStates.food && <Badge variant="outline" className="text-xs">🍽️ Food</Badge>}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -119,27 +229,16 @@ const Search = () => {
                 >
                   <TabsList>
                     <TabsTrigger value="all">All</TabsTrigger>
+                    <TabsTrigger value="movies">Movies</TabsTrigger>
+                    <TabsTrigger value="books">Books</TabsTrigger>
+                    <TabsTrigger value="places">Places</TabsTrigger>
                     <TabsTrigger value="products">Products</TabsTrigger>
-                    <TabsTrigger value="entities">Places</TabsTrigger>
-                    <TabsTrigger value="reviews">Reviews</TabsTrigger>
                     <TabsTrigger value="users">People</TabsTrigger>
                   </TabsList>
                   
                   <div className="mt-6">
                     {isLoading || Object.values(loadingStates).some(Boolean) ? (
-                      <div className="flex flex-col items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-                        <p className="text-muted-foreground">Searching for "{query}"...</p>
-                        <p className="text-sm text-muted-foreground mt-2">Finding the best results across all sources</p>
-                        
-                        <div className="flex gap-2 mt-4">
-                          {loadingStates.local && <Badge variant="outline" className="text-xs">Local Database</Badge>}
-                          {loadingStates.books && <Badge variant="outline" className="text-xs">Books</Badge>}
-                          {loadingStates.movies && <Badge variant="outline" className="text-xs">Movies</Badge>}
-                          {loadingStates.places && <Badge variant="outline" className="text-xs">Places</Badge>}
-                          {loadingStates.food && <Badge variant="outline" className="text-xs">Food</Badge>}
-                        </div>
-                      </div>
+                      renderEnhancedLoadingState()
                     ) : error ? (
                       <div className="flex flex-col items-center justify-center py-12">
                         <AlertCircle className="h-8 w-8 text-destructive mb-4" />
@@ -148,17 +247,73 @@ const Search = () => {
                     ) : (
                       <>
                         <TabsContent value="all">
-                          {/* Products section */}
-                          {results.products.length > 0 && (
+                          {/* Already on Groundz section - Priority 1 */}
+                          {filteredResults.localResults.length > 0 && (
                             <div className="mb-8">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                <ShoppingBag className="h-5 w-5" /> External Products & Items
+                                <Star className="h-5 w-5 text-yellow-500" /> Already on Groundz
+                              </h2>
+                              <div className="border rounded-md overflow-hidden">
+                                {filteredResults.localResults.slice(0, 5).map((item) => {
+                                  if ('username' in item) {
+                                    return (
+                                      <UserResultItem
+                                        key={item.id}
+                                        user={item}
+                                        onClick={() => {}}
+                                      />
+                                    );
+                                  } else if ('entity_id' in item && 'rating' in item) {
+                                    return (
+                                      <ReviewResultItem
+                                        key={item.id}
+                                        review={item}
+                                        onClick={() => {}}
+                                      />
+                                    );
+                                  } else if ('entity_id' in item && 'title' in item) {
+                                    return (
+                                      <RecommendationResultItem
+                                        key={item.id}
+                                        recommendation={item}
+                                        onClick={() => {}}
+                                      />
+                                    );
+                                  } else {
+                                    return (
+                                      <EntityResultItem
+                                        key={item.id}
+                                        entity={item}
+                                        onClick={() => {}}
+                                      />
+                                    );
+                                  }
+                                })}
+                              </div>
+                              {filteredResults.localResults.length > 5 && (
+                                <div className="mt-4 text-center">
+                                  <Button 
+                                    variant="outline"
+                                    onClick={() => {/* Show all local results */}}
+                                  >
+                                    View all {filteredResults.localResults.length} items
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* All Items section */}
+                          {filteredResults.externalResults.length > 0 && (
+                            <div className="mb-8">
+                              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                <Globe className="h-5 w-5" /> All Items
                               </h2>
                               <p className="text-sm text-muted-foreground mb-4">
-                                Click any result to create an entity and start reviewing!
+                                Everything we found related to your search.
                               </p>
                               <div className="space-y-2">
-                                {results.products.slice(0, 5).map((product, index) => (
+                                {filteredResults.externalResults.slice(0, 8).map((product, index) => (
                                   <SearchResultHandler
                                     key={`${product.api_source}-${product.api_ref || index}`}
                                     result={product}
@@ -166,41 +321,13 @@ const Search = () => {
                                   />
                                 ))}
                               </div>
-                              {results.products.length > 5 && (
+                              {filteredResults.externalResults.length > 8 && (
                                 <div className="mt-4 text-center">
                                   <Button 
                                     variant="outline"
-                                    onClick={() => setActiveTab('products')}
+                                    onClick={() => {/* Show filtered results in current context */}}
                                   >
-                                    View all {results.products.length} items
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Places section */}
-                          {results.entities.length > 0 && (
-                            <div className="mb-8">
-                              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                <MapPin className="h-5 w-5" /> Local Places & Things
-                              </h2>
-                              <div className="border rounded-md overflow-hidden">
-                                {results.entities.slice(0, 5).map((entity) => (
-                                  <EntityResultItem
-                                    key={entity.id}
-                                    entity={entity}
-                                    onClick={() => {}}
-                                  />
-                                ))}
-                              </div>
-                              {results.entities.length > 5 && (
-                                <div className="mt-4 text-center">
-                                  <Button 
-                                    variant="outline"
-                                    onClick={() => setActiveTab('entities')}
-                                  >
-                                    View all {results.entities.length} places & things
+                                    View all {filteredResults.externalResults.length} items
                                   </Button>
                                 </div>
                               )}
@@ -235,40 +362,17 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Reviews section */}
-                          {results.reviews.length > 0 && (
-                            <div className="mb-8">
-                              <h2 className="text-xl font-semibold mb-4">Reviews</h2>
-                              <div className="border rounded-md overflow-hidden">
-                                {results.reviews.slice(0, 3).map((review) => (
-                                  <ReviewResultItem
-                                    key={review.id}
-                                    review={review}
-                                    onClick={() => {}}
-                                  />
-                                ))}
-                              </div>
-                              {results.reviews.length > 3 && (
-                                <div className="mt-4 text-center">
-                                  <Button 
-                                    variant="outline"
-                                    onClick={() => setActiveTab('reviews')}
-                                  >
-                                    View all {results.reviews.length} reviews
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Deep Search CTA - Only show if we're in quick mode */}
+                          {/* Enhanced Deep Search CTA */}
                           {searchMode === 'quick' && (
-                            <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20">
-                              <h3 className="text-lg font-medium mb-2">🔍 Didn't find what you're looking for?</h3>
-                              <p className="text-sm text-muted-foreground mb-4">
-                                Try Deep Search to find comprehensive results from across the web
+                            <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10">
+                              <div className="flex items-center justify-center mb-3">
+                                <SearchIcon className="w-8 h-8 text-primary mr-2" />
+                                <h3 className="text-lg font-medium">Want deeper results?</h3>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                                Try Deep Search to explore comprehensive results from across the web with detailed analysis
                                 <br />
-                                <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
+                                <span className="text-xs italic">(Takes up to 2 minutes for thorough results)</span>
                               </p>
                               <Button 
                                 onClick={handleDeepSearch}
@@ -292,11 +396,9 @@ const Search = () => {
                           )}
                           
                           {/* No results message */}
-                          {!results.products.length && 
-                           !results.entities.length && 
-                           !results.users.length && 
-                           !results.reviews.length && 
-                           !results.recommendations.length && (
+                          {!filteredResults.localResults.length && 
+                           !filteredResults.externalResults.length && 
+                           !results.users.length && (
                             <div className="py-12 text-center">
                               <p className="text-muted-foreground">No results found for "{query}"</p>
                               {searchMode === 'quick' && (
@@ -313,13 +415,152 @@ const Search = () => {
                           )}
                         </TabsContent>
                         
+                        {/* Category-specific tabs */}
+                        <TabsContent value="movies">
+                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <Film className="h-5 w-5" /> Movies
+                          </h2>
+                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
+                            <div className="space-y-6">
+                              {filteredResults.localResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
+                                  </h3>
+                                  <div className="border rounded-md overflow-hidden">
+                                    {filteredResults.localResults.map((item) => (
+                                      <EntityResultItem
+                                        key={item.id}
+                                        entity={item}
+                                        onClick={() => {}}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {filteredResults.externalResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Globe className="h-4 w-4" /> External Movies
+                                  </h3>
+                                  <div className="space-y-2">
+                                    {filteredResults.externalResults.map((movie, index) => (
+                                      <SearchResultHandler
+                                        key={`${movie.api_source}-${movie.api_ref || index}`}
+                                        result={movie}
+                                        query={query}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No movies found for "{query}"</p>
+                            </div>
+                          )}
+                        </TabsContent>
+                        
+                        <TabsContent value="books">
+                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <Book className="h-5 w-5" /> Books
+                          </h2>
+                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
+                            <div className="space-y-6">
+                              {filteredResults.localResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
+                                  </h3>
+                                  <div className="border rounded-md overflow-hidden">
+                                    {filteredResults.localResults.map((item) => (
+                                      <EntityResultItem
+                                        key={item.id}
+                                        entity={item}
+                                        onClick={() => {}}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {filteredResults.externalResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Globe className="h-4 w-4" /> External Books
+                                  </h3>
+                                  <div className="space-y-2">
+                                    {filteredResults.externalResults.map((book, index) => (
+                                      <SearchResultHandler
+                                        key={`${book.api_source}-${book.api_ref || index}`}
+                                        result={book}
+                                        query={query}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No books found for "{query}"</p>
+                            </div>
+                          )}
+                        </TabsContent>
+                        
+                        <TabsContent value="places">
+                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <MapPin className="h-5 w-5" /> Places
+                          </h2>
+                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
+                            <div className="space-y-6">
+                              {filteredResults.localResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
+                                  </h3>
+                                  <div className="border rounded-md overflow-hidden">
+                                    {filteredResults.localResults.map((item) => (
+                                      <EntityResultItem
+                                        key={item.id}
+                                        entity={item}
+                                        onClick={() => {}}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {filteredResults.externalResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Globe className="h-4 w-4" /> External Places
+                                  </h3>
+                                  <div className="space-y-2">
+                                    {filteredResults.externalResults.map((place, index) => (
+                                      <SearchResultHandler
+                                        key={`${place.api_source}-${place.api_ref || index}`}
+                                        result={place}
+                                        query={query}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No places found for "{query}"</p>
+                            </div>
+                          )}
+                        </TabsContent>
+                        
                         <TabsContent value="products">
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                            <ShoppingBag className="h-5 w-5" /> Products & Items
+                            <ShoppingBag className="h-5 w-5" /> Products
                           </h2>
                           
-                          {/* Deep Search CTA - Only show if we're in quick mode */}
-                          {searchMode === 'quick' && !results.products.length && (
+                          {/* Deep Search CTA for products tab */}
+                          {searchMode === 'quick' && filteredResults.externalResults.length === 0 && (
                             <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20">
                               <h3 className="text-lg font-medium mb-2">🔍 Try Deep Search for Products</h3>
                               <p className="text-sm text-muted-foreground mb-4">
@@ -348,22 +589,47 @@ const Search = () => {
                             </div>
                           )}
                           
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Click any result to create an entity and start reviewing!
-                          </p>
-                          {results.products.length > 0 ? (
-                            <div className="space-y-2">
-                              {results.products.map((product, index) => (
-                                <SearchResultHandler
-                                  key={`${product.api_source}-${product.api_ref || index}`}
-                                  result={product}
-                                  query={query}
-                                />
-                              ))}
+                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
+                            <div className="space-y-6">
+                              {filteredResults.localResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
+                                  </h3>
+                                  <div className="border rounded-md overflow-hidden">
+                                    {filteredResults.localResults.map((item) => (
+                                      <EntityResultItem
+                                        key={item.id}
+                                        entity={item}
+                                        onClick={() => {}}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {filteredResults.externalResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Globe className="h-4 w-4" /> External Products
+                                  </h3>
+                                  <p className="text-sm text-muted-foreground mb-4">
+                                    Click any result to create an entity and start reviewing!
+                                  </p>
+                                  <div className="space-y-2">
+                                    {filteredResults.externalResults.map((product, index) => (
+                                      <SearchResultHandler
+                                        key={`${product.api_source}-${product.api_ref || index}`}
+                                        result={product}
+                                        query={query}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="py-12 text-center">
-                              <p className="text-muted-foreground">No external products found for "{query}"</p>
+                              <p className="text-muted-foreground">No products found for "{query}"</p>
                               {searchMode === 'quick' && (
                                 <Button 
                                   onClick={handleDeepSearch} 
@@ -374,27 +640,6 @@ const Search = () => {
                                   {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
                                 </Button>
                               )}
-                            </div>
-                          )}
-                        </TabsContent>
-                        
-                        <TabsContent value="entities">
-                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                            <MapPin className="h-5 w-5" /> Places & Things
-                          </h2>
-                          {results.entities.length > 0 ? (
-                            <div className="border rounded-md overflow-hidden">
-                              {results.entities.map((entity) => (
-                                <EntityResultItem
-                                  key={entity.id}
-                                  entity={entity}
-                                  onClick={() => {}}
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="py-12 text-center">
-                              <p className="text-muted-foreground">No places or things found for "{query}"</p>
                             </div>
                           )}
                         </TabsContent>
@@ -416,25 +661,6 @@ const Search = () => {
                           ) : (
                             <div className="py-12 text-center">
                               <p className="text-muted-foreground">No people found for "{query}"</p>
-                            </div>
-                          )}
-                        </TabsContent>
-                        
-                        <TabsContent value="reviews">
-                          <h2 className="text-xl font-semibold mb-4">Reviews</h2>
-                          {results.reviews.length > 0 ? (
-                            <div className="border rounded-md overflow-hidden">
-                              {results.reviews.map((review) => (
-                                <ReviewResultItem
-                                  key={review.id}
-                                  review={review}
-                                  onClick={() => {}}
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="py-12 text-center">
-                              <p className="text-muted-foreground">No reviews found for "{query}"</p>
                             </div>
                           )}
                         </TabsContent>
