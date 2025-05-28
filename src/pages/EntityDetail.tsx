@@ -375,7 +375,7 @@ const EntityDetail = () => {
               {/* Rating Display */}
               <div className="flex items-center gap-4">
                 {stats.averageRating !== null ? (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <ConnectedRingsRating
                       value={stats.averageRating}
                       variant="badge"
@@ -383,9 +383,9 @@ const EntityDetail = () => {
                       size="md"
                       minimal={true}
                     />
-                    <div>
-                      <div className="font-semibold">Overall Rating</div>
-                      <div className="text-sm text-muted-foreground">
+                    <div className="flex flex-col justify-center">
+                      <div className="font-semibold leading-tight">Overall Rating</div>
+                      <div className="text-sm text-muted-foreground leading-tight">
                         Based on {stats.recommendationCount + stats.reviewCount} ratings
                       </div>
                     </div>
