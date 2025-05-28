@@ -55,7 +55,7 @@ const Search = () => {
     }
   };
 
-  // Filter results based on active tab
+  // Filter results based on active tab using backend categorization
   const getFilteredResults = () => {
     const allLocalResults = [
       ...results.entities,
@@ -63,7 +63,7 @@ const Search = () => {
       ...results.recommendations
     ];
 
-    // Categorize external products properly
+    // Use categorized results from backend
     const categorizedProducts = {
       movies: results.categorized?.movies || [],
       books: results.categorized?.books || [],
@@ -79,30 +79,38 @@ const Search = () => {
     switch (activeTab) {
       case 'movies':
         return {
-          localResults: allLocalResults.filter(item => 
-            'type' in item && item.type === 'movie'
-          ),
+          localResults: allLocalResults.filter(item => {
+            if ('type' in item && item.type === 'movie') return true;
+            if ('category' in item && item.category === 'movie') return true;
+            return false;
+          }),
           externalResults: categorizedProducts.movies
         };
       case 'books':
         return {
-          localResults: allLocalResults.filter(item => 
-            'type' in item && item.type === 'book'
-          ),
+          localResults: allLocalResults.filter(item => {
+            if ('type' in item && item.type === 'book') return true;
+            if ('category' in item && item.category === 'book') return true;
+            return false;
+          }),
           externalResults: categorizedProducts.books
         };
       case 'places':
         return {
-          localResults: allLocalResults.filter(item => 
-            'type' in item && item.type === 'place'
-          ),
+          localResults: allLocalResults.filter(item => {
+            if ('type' in item && item.type === 'place') return true;
+            if ('category' in item && item.category === 'place') return true;
+            return false;
+          }),
           externalResults: categorizedProducts.places
         };
       case 'products':
         return {
-          localResults: allLocalResults.filter(item => 
-            'type' in item && item.type === 'product'
-          ),
+          localResults: allLocalResults.filter(item => {
+            if ('type' in item && item.type === 'product') return true;
+            if ('category' in item && item.category === 'product') return true;
+            return false;
+          }),
           externalResults: categorizedProducts.products
         };
       case 'users':
@@ -160,6 +168,44 @@ const Search = () => {
         </div>
       </div>
     );
+  };
+
+  // Helper function to render mixed local results with proper type handling
+  const renderLocalResultItem = (item: any) => {
+    if ('username' in item) {
+      return (
+        <UserResultItem
+          key={item.id}
+          user={item}
+          onClick={() => {}}
+        />
+      );
+    } else if ('entity_id' in item && 'rating' in item && 'title' in item && 'description' in item) {
+      return (
+        <ReviewResultItem
+          key={item.id}
+          review={item}
+          onClick={() => {}}
+        />
+      );
+    } else if ('entity_id' in item && 'title' in item && !('rating' in item)) {
+      return (
+        <RecommendationResultItem
+          key={item.id}
+          recommendation={item}
+          onClick={() => {}}
+        />
+      );
+    } else if ('name' in item && 'type' in item) {
+      return (
+        <EntityResultItem
+          key={item.id}
+          entity={item}
+          onClick={() => {}}
+        />
+      );
+    }
+    return null;
   };
 
   return (
@@ -253,42 +299,7 @@ const Search = () => {
                                 <Star className="h-5 w-5 text-yellow-500" /> Already on Groundz
                               </h2>
                               <div className="border rounded-md overflow-hidden">
-                                {filteredResults.localResults.slice(0, 5).map((item) => {
-                                  if ('username' in item) {
-                                    return (
-                                      <UserResultItem
-                                        key={item.id}
-                                        user={item}
-                                        onClick={() => {}}
-                                      />
-                                    );
-                                  } else if ('entity_id' in item && 'rating' in item && 'title' in item && 'description' in item) {
-                                    return (
-                                      <ReviewResultItem
-                                        key={item.id}
-                                        review={item as any}
-                                        onClick={() => {}}
-                                      />
-                                    );
-                                  } else if ('entity_id' in item && 'title' in item && !('rating' in item)) {
-                                    return (
-                                      <RecommendationResultItem
-                                        key={item.id}
-                                        recommendation={item as any}
-                                        onClick={() => {}}
-                                      />
-                                    );
-                                  } else if ('name' in item && 'type' in item) {
-                                    return (
-                                      <EntityResultItem
-                                        key={item.id}
-                                        entity={item as any}
-                                        onClick={() => {}}
-                                      />
-                                    );
-                                  }
-                                  return null;
-                                })}
+                                {filteredResults.localResults.slice(0, 5).map((item) => renderLocalResultItem(item))}
                               </div>
                               {filteredResults.localResults.length > 5 && (
                                 <div className="mt-4 text-center">
@@ -428,13 +439,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden">
-                                    {filteredResults.localResults.map((item) => (
-                                      <EntityResultItem
-                                        key={item.id}
-                                        entity={item as any}
-                                        onClick={() => {}}
-                                      />
-                                    ))}
+                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
                                   </div>
                                 </div>
                               )}
@@ -474,13 +479,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden">
-                                    {filteredResults.localResults.map((item) => (
-                                      <EntityResultItem
-                                        key={item.id}
-                                        entity={item as any}
-                                        onClick={() => {}}
-                                      />
-                                    ))}
+                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
                                   </div>
                                 </div>
                               )}
@@ -520,13 +519,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden">
-                                    {filteredResults.localResults.map((item) => (
-                                      <EntityResultItem
-                                        key={item.id}
-                                        entity={item as any}
-                                        onClick={() => {}}
-                                      />
-                                    ))}
+                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
                                   </div>
                                 </div>
                               )}
@@ -597,13 +590,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden">
-                                    {filteredResults.localResults.map((item) => (
-                                      <EntityResultItem
-                                        key={item.id}
-                                        entity={item as any}
-                                        onClick={() => {}}
-                                      />
-                                    ))}
+                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
                                   </div>
                                 </div>
                               )}
