@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { classifyQuery } from '@/utils/searchClassifier';
 import { UnifiedSearchResults } from '@/hooks/use-unified-search';
 
 export interface SearchLoading {
