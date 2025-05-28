@@ -375,16 +375,18 @@ const EntityDetail = () => {
               {/* Rating Display */}
               <div className="flex items-center gap-4">
                 {stats.averageRating !== null ? (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-4">
                     {/* Rings and rating number together */}
                     <div className="flex items-center gap-2">
-                      <ConnectedRingsRating
-                        value={stats.averageRating}
-                        variant="badge"
-                        showValue={false}
-                        size="md"
-                        minimal={true}
-                      />
+                      <div className="w-fit">
+                        <ConnectedRingsRating
+                          value={stats.averageRating}
+                          variant="badge"
+                          showValue={false}
+                          size="md"
+                          minimal={true}
+                        />
+                      </div>
                       <span className="text-lg font-bold" style={{ color: stats.averageRating < 2 ? "#ea384c" : stats.averageRating < 3 ? "#F97316" : stats.averageRating < 4 ? "#FEC006" : stats.averageRating < 4.5 ? "#84cc16" : "#22c55e" }}>
                         {stats.averageRating.toFixed(1)}
                       </span>

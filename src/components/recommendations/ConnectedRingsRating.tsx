@@ -119,7 +119,7 @@ const ConnectedRingsRating = ({
       overlapOffset: 25
     },
     badge: {
-      svgWidth: 108,
+      svgWidth: 86,
       svgHeight: 20,
       ringSize: 9,
       strokeWidth: 2,
@@ -370,7 +370,7 @@ const ConnectedRingsRating = ({
           <div
             className={cn(
               "relative flex",
-              variant === 'badge' ? "items-center" : "justify-center",
+              variant === 'badge' ? "items-center w-fit" : "justify-center",
               isInteractive && !minimal && "cursor-pointer"
             )}
             onMouseLeave={() => isInteractive && !minimal && setHoverRating(0)}
