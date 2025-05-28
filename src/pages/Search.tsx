@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -153,7 +152,7 @@ const Search = () => {
 
   const filteredResults = getFilteredResults();
 
-  // Enhanced loading screen with dynamic messages
+  // Enhanced loading screen with dynamic messages for all categories
   const renderEnhancedLoadingState = () => {
     const capitalizedQuery = query.charAt(0).toUpperCase() + query.slice(1);
     const category = classification?.classification || 'general';
@@ -167,11 +166,16 @@ const Search = () => {
         </div>
         
         <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
-          🔍 Searching for "{capitalizedQuery}"
+          🔍 {searchMode === 'deep' ? 'Deep searching' : 'Searching'} for "{capitalizedQuery}"
         </h2>
         
         <div className="text-center max-w-md">
-          <p className="text-muted-foreground mb-4">{loadingMessage}</p>
+          <p className="text-muted-foreground mb-4">
+            {searchMode === 'deep' ? 
+              'Searching comprehensive sources across multiple APIs...' : 
+              loadingMessage
+            }
+          </p>
           
           {classification && (
             <div className="flex items-center justify-center gap-2 mb-4">
@@ -182,10 +186,29 @@ const Search = () => {
           )}
           
           <div className="flex gap-2 justify-center flex-wrap">
-            {loadingStates.books && <Badge variant="outline" className="text-xs">📚 Books</Badge>}
-            {loadingStates.movies && <Badge variant="outline" className="text-xs">🎬 Movies</Badge>}
-            {loadingStates.places && <Badge variant="outline" className="text-xs">📍 Places</Badge>}
-            {loadingStates.food && <Badge variant="outline" className="text-xs">🍽️ Food</Badge>}
+            {searchMode === 'deep' ? (
+              <>
+                <Badge variant={loadingStates.books ? "default" : "outline"} className="text-xs">
+                  📚 Books {loadingStates.books && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+                </Badge>
+                <Badge variant={loadingStates.movies ? "default" : "outline"} className="text-xs">
+                  🎬 Movies {loadingStates.movies && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+                </Badge>
+                <Badge variant={loadingStates.places ? "default" : "outline"} className="text-xs">
+                  📍 Places {loadingStates.places && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+                </Badge>
+                <Badge variant="default" className="text-xs">
+                  🛍️ Products <Loader2 className="w-3 h-3 ml-1 animate-spin" />
+                </Badge>
+              </>
+            ) : (
+              <>
+                {loadingStates.books && <Badge variant="outline" className="text-xs">📚 Books</Badge>}
+                {loadingStates.movies && <Badge variant="outline" className="text-xs">🎬 Movies</Badge>}
+                {loadingStates.places && <Badge variant="outline" className="text-xs">📍 Places</Badge>}
+                {loadingStates.food && <Badge variant="outline" className="text-xs">🍽️ Food</Badge>}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -395,14 +418,14 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Enhanced Deep Search CTA */}
+                          {/* Enhanced Deep Search CTA for all tabs when no results */}
                           {searchMode === 'quick' && (
                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10">
-                              <h3 className="text-lg font-semibold mb-2">🔍 Didn't find what you're looking for?</h3>
+                              <h3 className="text-lg font-semibold mb-2">🔍 Want more comprehensive results?</h3>
                               <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
-                                Try Deep Search to find comprehensive results from across the web
+                                Deep Search analyzes multiple sources including specialized APIs for movies, books, places, and products
                                 <br />
-                                <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
+                                <span className="text-xs italic">(Enhanced search across all categories - may take up to 2 minutes)</span>
                               </p>
                               <Button 
                                 onClick={handleDeepSearch}
@@ -413,7 +436,7 @@ const Search = () => {
                                 {isDeepSearching ? (
                                   <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Searching deeply...
+                                    Deep searching all categories...
                                   </>
                                 ) : (
                                   <>

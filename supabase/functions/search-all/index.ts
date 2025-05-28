@@ -41,7 +41,7 @@ serve(async (req) => {
 
     console.log(`🔍 Unified search for: "${query}" (type: ${type}, mode: ${mode})`);
 
-    // Search users
+    // Search users (same for both modes)
     const { data: users, error: usersError } = await supabase
       .from('profiles')
       .select('id, username, avatar_url, bio')
@@ -50,7 +50,7 @@ serve(async (req) => {
 
     if (usersError) console.error('Users search error:', usersError);
 
-    // Search entities
+    // Search entities (same for both modes)
     const { data: entities, error: entitiesError } = await supabase
       .from('entities')
       .select('id, name, type, venue, image_url, description, slug')
@@ -60,7 +60,7 @@ serve(async (req) => {
 
     if (entitiesError) console.error('Entities search error:', entitiesError);
 
-    // Search reviews
+    // Search reviews (same for both modes)
     const { data: reviews, error: reviewsError } = await supabase
       .from('reviews')
       .select(`
@@ -73,7 +73,7 @@ serve(async (req) => {
 
     if (reviewsError) console.error('Reviews search error:', reviewsError);
 
-    // Search recommendations
+    // Search recommendations (same for both modes)
     const { data: recommendations, error: recommendationsError } = await supabase
       .from('recommendations')
       .select(`
@@ -95,7 +95,6 @@ serve(async (req) => {
     };
     let errors = null;
 
-    // In quick mode, search lightweight external APIs in parallel
     if (mode === "quick") {
       console.log(`🏎️ Quick search mode: Searching lightweight external APIs for: "${query}"`);
       
@@ -156,22 +155,52 @@ serve(async (req) => {
       }
     }
 
-    // Only search comprehensive products if mode is "deep"
+    // Enhanced deep search mode with category-specific deep search
     if (mode === "deep") {
+      console.log(`🔍 Deep search mode: Searching comprehensive sources for: "${query}"`);
+      
       try {
-        console.log(`🔍 Deep search mode: Searching comprehensive products for: "${query}"`);
-        
-        // Call the search-products function to get comprehensive results
-        const { data: productData, error: productError } = await supabase.functions.invoke('search-products', {
-          body: { query }
-        });
+        // Call all deep search functions in parallel
+        const [moviesDeepResponse, booksDeepResponse, placesDeepResponse, productsDeepResponse] = await Promise.allSettled([
+          supabase.functions.invoke('search-movies-deep', { body: { query } }),
+          supabase.functions.invoke('search-books-deep', { body: { query } }),
+          supabase.functions.invoke('search-places-deep', { body: { query } }),
+          supabase.functions.invoke('search-products', { body: { query } })
+        ]);
 
-        if (productError) {
-          console.error('Comprehensive product search error:', productError);
-          errors = [`Comprehensive product search failed: ${productError.message}`];
-        } else if (productData?.results) {
-          // Transform product results to match expected format
-          const comprehensiveProducts = productData.results.map((product: any) => ({
+        // Process deep movie results
+        if (moviesDeepResponse.status === 'fulfilled' && moviesDeepResponse.value?.data?.results) {
+          const movieResults = moviesDeepResponse.value.data.results.slice(0, 8);
+          products.push(...movieResults);
+          categorizedResults.movies = movieResults;
+          console.log(`🎬 Found ${movieResults.length} movies from deep search`);
+        } else if (moviesDeepResponse.status === 'rejected') {
+          console.error('Deep movies search failed:', moviesDeepResponse.reason);
+        }
+
+        // Process deep book results
+        if (booksDeepResponse.status === 'fulfilled' && booksDeepResponse.value?.data?.results) {
+          const bookResults = booksDeepResponse.value.data.results.slice(0, 8);
+          products.push(...bookResults);
+          categorizedResults.books = bookResults;
+          console.log(`📚 Found ${bookResults.length} books from deep search`);
+        } else if (booksDeepResponse.status === 'rejected') {
+          console.error('Deep books search failed:', booksDeepResponse.reason);
+        }
+
+        // Process deep place results
+        if (placesDeepResponse.status === 'fulfilled' && placesDeepResponse.value?.data?.results) {
+          const placeResults = placesDeepResponse.value.data.results.slice(0, 8);
+          products.push(...placeResults);
+          categorizedResults.places = placeResults;
+          console.log(`📍 Found ${placeResults.length} places from deep search`);
+        } else if (placesDeepResponse.status === 'rejected') {
+          console.error('Deep places search failed:', placesDeepResponse.reason);
+        }
+
+        // Process comprehensive product results
+        if (productsDeepResponse.status === 'fulfilled' && productsDeepResponse.value?.data?.results) {
+          const comprehensiveProducts = productsDeepResponse.value.data.results.map((product: any) => ({
             name: product.product_name,
             venue: product.brand || 'Unknown Brand',
             description: product.summary,
@@ -187,14 +216,19 @@ serve(async (req) => {
               quality_score: product.quality_score,
               ...product.insights
             }
-          })).slice(0, limit);
+          })).slice(0, 8);
           
           products.push(...comprehensiveProducts);
-          console.log(`✅ Found ${comprehensiveProducts.length} comprehensive products from deep search`);
+          console.log(`🛍️ Found ${comprehensiveProducts.length} comprehensive products from deep search`);
+        } else if (productsDeepResponse.status === 'rejected') {
+          console.error('Deep products search failed:', productsDeepResponse.reason);
         }
+
+        console.log(`✅ Deep search found ${products.length} total results across all categories`);
+
       } catch (error) {
-        console.error('Error calling search-products:', error);
-        errors = [`Comprehensive product search failed: ${error.message}`];
+        console.error('Error calling deep search APIs:', error);
+        errors = [`Deep search failed: ${error.message}`];
       }
     }
 
