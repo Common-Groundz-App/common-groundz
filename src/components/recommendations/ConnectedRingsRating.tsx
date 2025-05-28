@@ -362,11 +362,12 @@ const ConnectedRingsRating = ({
           </style>
         )}
 
-        {/* Center the SVG container horizontally with proper alignment */}
+        {/* Main container with proper flex layout for horizontal alignment */}
         <div className={cn(
           "w-full flex",
-          variant === 'badge' ? "items-center" : "justify-center"
+          variant === 'badge' ? "items-center gap-2" : "flex-col items-center"
         )}>
+          {/* SVG Container */}
           <div
             className={cn(
               "relative flex",
@@ -723,44 +724,40 @@ const ConnectedRingsRating = ({
               )}
             </svg>
           </div>
+          
+          {/* Rating value - positioned next to rings for badge variant, below for others */}
+          {showValue && (
+            <span 
+              className={cn(
+                textClass, 
+                "font-semibold flex-shrink-0",
+                textAnimating && !minimal && "animate-pulse"
+              )}
+              style={{
+                color: sentimentColor,
+                animation: textAnimating && !minimal ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none'
+              }}
+            >
+              {effectiveRating.toFixed(1)}
+            </span>
+          )}
         </div>
         
-        {/* Rating value and text - only show if not in badge variant or if explicitly enabled */}
-        {(variant !== 'badge' || (variant === 'badge' && showValue)) && (
-          <div className={cn(
-            "flex",
-            variant === 'badge' ? "ml-2 items-center" : "mt-2 flex-col items-center"
-          )}>
-            {showValue && (
-              <span 
-                className={cn(
-                  textClass, 
-                  "font-semibold",
-                  textAnimating && !minimal && "animate-pulse"
-                )}
-                style={{
-                  color: sentimentColor,
-                  animation: textAnimating && !minimal ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none'
-                }}
-              >
-                {effectiveRating.toFixed(1)}
-              </span>
-            )}
-            
-            {showLabel && variant !== 'badge' && (
-              <span 
-                className={cn(
-                  textClass, 
-                  "text-muted-foreground text-center",
-                  textAnimating && !minimal && "animate-pulse"
-                )}
-                style={{
-                  animation: textAnimating && !minimal ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s' : 'none'
-                }}
-              >
-                {getRatingText(effectiveRating)}
-              </span>
-            )}
+        {/* Label - only show for non-badge variant when enabled */}
+        {showLabel && variant !== 'badge' && (
+          <div className="mt-2 flex flex-col items-center">
+            <span 
+              className={cn(
+                textClass, 
+                "text-muted-foreground text-center",
+                textAnimating && !minimal && "animate-pulse"
+              )}
+              style={{
+                animation: textAnimating && !minimal ? 'ratingTextChange 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s' : 'none'
+              }}
+            >
+              {getRatingText(effectiveRating)}
+            </span>
           </div>
         )}
       </>
@@ -769,12 +766,12 @@ const ConnectedRingsRating = ({
 
   // Wrap with TooltipProvider only if not in minimal mode
   return minimal ? (
-    <div className={cn("flex flex-col items-center w-full", className)}>
+    <div className={cn("w-full", className)}>
       {renderRating()}
     </div>
   ) : (
     <TooltipProvider>
-      <div className={cn("flex flex-col items-center w-full", className)}>
+      <div className={cn("w-full", className)}>
         {renderRating()}
       </div>
     </TooltipProvider>
