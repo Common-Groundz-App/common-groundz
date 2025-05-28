@@ -376,25 +376,25 @@ const EntityDetail = () => {
               <div className="flex items-center gap-4">
                 {stats.averageRating !== null ? (
                   <div className="flex items-center gap-3">
-                    {/* Rings without built-in value display */}
-                    <ConnectedRingsRating
-                      value={stats.averageRating}
-                      variant="badge"
-                      showValue={false}
-                      size="md"
-                      minimal={true}
-                    />
-                    
-                    {/* Custom rating number aligned with rings */}
+                    {/* Rings and rating number together */}
                     <div className="flex items-center gap-2">
+                      <ConnectedRingsRating
+                        value={stats.averageRating}
+                        variant="badge"
+                        showValue={false}
+                        size="md"
+                        minimal={true}
+                      />
                       <span className="text-lg font-bold" style={{ color: stats.averageRating < 2 ? "#ea384c" : stats.averageRating < 3 ? "#F97316" : stats.averageRating < 4 ? "#FEC006" : stats.averageRating < 4.5 ? "#84cc16" : "#22c55e" }}>
                         {stats.averageRating.toFixed(1)}
                       </span>
-                      <div className="leading-tight min-w-[140px]">
-                        <div className="font-semibold text-sm whitespace-nowrap">Overall Rating</div>
-                        <div className="text-xs text-muted-foreground">
-                          Based on {stats.recommendationCount + stats.reviewCount} ratings
-                        </div>
+                    </div>
+                    
+                    {/* Text labels */}
+                    <div className="leading-tight min-w-[140px]">
+                      <div className="font-semibold text-sm whitespace-nowrap">Overall Rating</div>
+                      <div className="text-xs text-muted-foreground">
+                        Based on {stats.recommendationCount + stats.reviewCount} ratings
                       </div>
                     </div>
                   </div>
