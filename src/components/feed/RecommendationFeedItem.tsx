@@ -283,7 +283,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             variant="badge"
             minimal={true}
             showValue={true}
-            size="sm"
+            size="md"
             className="flex-shrink-0"
           />
         </div>
