@@ -8,7 +8,7 @@ import Footer from '@/components/Footer';
 
 const Profile = () => {
   const { user } = useAuth();
-  const { userId } = useParams();
+  const { id } = useParams();
   const [searchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'posts';
   
@@ -20,7 +20,7 @@ const Profile = () => {
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
       <div className="flex-1">
-        <ProfileContent defaultActiveTab={activeTab} />
+        <ProfileContent profileUserId={id} defaultActiveTab={activeTab} />
       </div>
       <Footer />
     </div>

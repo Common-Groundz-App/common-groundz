@@ -20,6 +20,7 @@ import EntityDetail from '@/pages/EntityDetail';
 import Search from '@/pages/Search';
 import ProductSearch from '@/pages/ProductSearch';
 import ContentViewerModal from '@/components/content/ContentViewerModal';
+import ProfileRedirect from '@/components/ProfileRedirect';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -79,6 +80,7 @@ function App() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/home" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
               <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><ProfileRedirect /></ProtectedRoute>} />
               <Route path="/profile/:id" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/post/:id" element={<ProtectedRoute><PostView /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
