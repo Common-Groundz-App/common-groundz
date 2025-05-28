@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -28,6 +27,13 @@ const Search = () => {
   const [searchQuery, setSearchQuery] = useState(query);
   const [activeTab, setActiveTab] = useState('all');
   const [isDeepSearching, setIsDeepSearching] = useState(mode === 'deep');
+  
+  // State for "show all" functionality
+  const [showAllStates, setShowAllStates] = useState({
+    localResults: false,
+    externalResults: false,
+    users: false
+  });
 
   // Use the new realtime unified search hook with mode parameter
   const { 
@@ -52,6 +58,18 @@ const Search = () => {
     if (query.trim().length >= 2) {
       setIsDeepSearching(true);
       setSearchParams({ q: query, mode: 'deep' });
+    }
+  };
+
+  // Handle "View All" button clicks
+  const handleViewAll = (section: keyof typeof showAllStates) => {
+    if (section === 'users') {
+      setActiveTab('users');
+    } else {
+      setShowAllStates(prev => ({
+        ...prev,
+        [section]: !prev[section]
+      }));
     }
   };
 
@@ -144,7 +162,6 @@ const Search = () => {
         </div>
         
         <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
-          <SearchIcon className="w-5 h-5" />
           🔍 Searching for "{capitalizedQuery}"
         </h2>
         
@@ -299,15 +316,15 @@ const Search = () => {
                                 <Star className="h-5 w-5 text-yellow-500" /> Already on Groundz
                               </h2>
                               <div className="border rounded-md overflow-hidden">
-                                {filteredResults.localResults.slice(0, 5).map((item) => renderLocalResultItem(item))}
+                                {(showAllStates.localResults ? filteredResults.localResults : filteredResults.localResults.slice(0, 5)).map((item) => renderLocalResultItem(item))}
                               </div>
                               {filteredResults.localResults.length > 5 && (
                                 <div className="mt-4 text-center">
                                   <Button 
                                     variant="outline"
-                                    onClick={() => {/* Show all local results */}}
+                                    onClick={() => handleViewAll('localResults')}
                                   >
-                                    View all {filteredResults.localResults.length} items
+                                    {showAllStates.localResults ? 'Show less' : `View all ${filteredResults.localResults.length} items`}
                                   </Button>
                                 </div>
                               )}
@@ -324,7 +341,7 @@ const Search = () => {
                                 Everything we found related to your search.
                               </p>
                               <div className="space-y-2">
-                                {filteredResults.externalResults.slice(0, 8).map((product, index) => (
+                                {(showAllStates.externalResults ? filteredResults.externalResults : filteredResults.externalResults.slice(0, 8)).map((product, index) => (
                                   <SearchResultHandler
                                     key={`${product.api_source}-${product.api_ref || index}`}
                                     result={product}
@@ -336,9 +353,9 @@ const Search = () => {
                                 <div className="mt-4 text-center">
                                   <Button 
                                     variant="outline"
-                                    onClick={() => {/* Show filtered results in current context */}}
+                                    onClick={() => handleViewAll('externalResults')}
                                   >
-                                    View all {filteredResults.externalResults.length} items
+                                    {showAllStates.externalResults ? 'Show less' : `View all ${filteredResults.externalResults.length} items`}
                                   </Button>
                                 </div>
                               )}
@@ -364,7 +381,7 @@ const Search = () => {
                                 <div className="mt-4 text-center">
                                   <Button 
                                     variant="outline"
-                                    onClick={() => setActiveTab('users')}
+                                    onClick={() => handleViewAll('users')}
                                   >
                                     View all {results.users.length} people
                                   </Button>
@@ -373,17 +390,14 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Enhanced Deep Search CTA */}
+                          {/* Enhanced Deep Search CTA - Reverted text */}
                           {searchMode === 'quick' && (
                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10">
-                              <div className="flex items-center justify-center mb-3">
-                                <SearchIcon className="w-8 h-8 text-primary mr-2" />
-                                <h3 className="text-lg font-medium">Want deeper results?</h3>
-                              </div>
+                              <h3 className="text-lg font-semibold mb-2">🔍 Didn't find what you're looking for?</h3>
                               <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-                                Try Deep Search to explore comprehensive results from across the web with detailed analysis
+                                Try Deep Search to find comprehensive results from across the web
                                 <br />
-                                <span className="text-xs italic">(Takes up to 2 minutes for thorough results)</span>
+                                <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
                               </p>
                               <Button 
                                 onClick={handleDeepSearch}
@@ -552,12 +566,12 @@ const Search = () => {
                             <ShoppingBag className="h-5 w-5" /> Products
                           </h2>
                           
-                          {/* Deep Search CTA for products tab */}
+                          {/* Deep Search CTA for products tab - Reverted text */}
                           {searchMode === 'quick' && filteredResults.externalResults.length === 0 && (
                             <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20">
-                              <h3 className="text-lg font-medium mb-2">🔍 Try Deep Search for Products</h3>
+                              <h3 className="text-lg font-semibold mb-2">🔍 Didn't find what you're looking for?</h3>
                               <p className="text-sm text-muted-foreground mb-4">
-                                Deep Search finds comprehensive results from across the web
+                                Try Deep Search to find comprehensive results from across the web
                                 <br />
                                 <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
                               </p>
