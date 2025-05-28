@@ -375,18 +375,26 @@ const EntityDetail = () => {
               {/* Rating Display */}
               <div className="flex items-center gap-4">
                 {stats.averageRating !== null ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    {/* Rings without built-in value display */}
                     <ConnectedRingsRating
                       value={stats.averageRating}
                       variant="badge"
-                      showValue={true}
+                      showValue={false}
                       size="md"
                       minimal={true}
                     />
-                    <div className="flex flex-col justify-center">
-                      <div className="font-semibold leading-tight">Overall Rating</div>
-                      <div className="text-sm text-muted-foreground leading-tight">
-                        Based on {stats.recommendationCount + stats.reviewCount} ratings
+                    
+                    {/* Custom rating number aligned with rings */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold" style={{ color: stats.averageRating < 2 ? "#ea384c" : stats.averageRating < 3 ? "#F97316" : stats.averageRating < 4 ? "#FEC006" : stats.averageRating < 4.5 ? "#84cc16" : "#22c55e" }}>
+                        {stats.averageRating.toFixed(1)}
+                      </span>
+                      <div className="leading-tight">
+                        <div className="font-semibold text-sm">Overall Rating</div>
+                        <div className="text-xs text-muted-foreground">
+                          Based on {stats.recommendationCount + stats.reviewCount} ratings
+                        </div>
                       </div>
                     </div>
                   </div>
