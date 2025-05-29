@@ -10,6 +10,14 @@ interface UseCirclePicksFetchProps {
   sortBy: 'recent' | 'most_liked' | 'highest_rated';
 }
 
+// Define valid categories to match the database enum
+const VALID_CATEGORIES = ['Food', 'Drink', 'Movie', 'Book', 'Product', 'Place', 'Activity', 'Music', 'Art', 'TV', 'Travel'] as const;
+type ValidCategory = typeof VALID_CATEGORIES[number];
+
+function isValidCategory(category: string): category is ValidCategory {
+  return VALID_CATEGORIES.includes(category as ValidCategory);
+}
+
 export const useCirclePicksFetch = ({ 
   userId, 
   category, 
@@ -27,7 +35,7 @@ export const useCirclePicksFetch = ({
     queryFn: async () => {
       if (!userId) return { recommendations: [], reviews: [] };
 
-      // Get followed user IDs
+      // Get followed user IDs first
       const { data: follows, error: followsError } = await supabase
         .from('follows')
         .select('following_id')
@@ -41,54 +49,53 @@ export const useCirclePicksFetch = ({
         return { recommendations: [], reviews: [] };
       }
 
-      // Fetch recommendations from followed users
-      const recQuery = supabase
+      // Build recommendations query
+      let recQuery = supabase
         .from('recommendations')
         .select('*')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
-      // Apply category filter only if it's not 'all' and is a valid category
-      const validCategories = ['Food', 'Drink', 'Movie', 'Book', 'Product', 'Place', 'Activity', 'Music', 'Art', 'TV', 'Travel'];
-      if (category && category !== 'all' && validCategories.includes(category)) {
-        recQuery.eq('category', category);
+      // Apply category filter only if it's valid
+      if (category && category !== 'all' && isValidCategory(category)) {
+        recQuery = recQuery.eq('category', category);
       }
 
       // Apply sorting
       if (sortBy === 'recent') {
-        recQuery.order('created_at', { ascending: false });
+        recQuery = recQuery.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        recQuery.order('rating', { ascending: false });
+        recQuery = recQuery.order('rating', { ascending: false });
       }
 
       const { data: recommendations, error: recError } = await recQuery.limit(20);
       
       if (recError) throw recError;
 
-      // Fetch reviews from followed users
-      const reviewQuery = supabase
+      // Build reviews query
+      let reviewQuery = supabase
         .from('reviews')
         .select('*')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
-      // Apply category filter
+      // Apply category filter for reviews
       if (category && category !== 'all') {
-        reviewQuery.eq('category', category);
+        reviewQuery = reviewQuery.eq('category', category);
       }
 
       // Apply sorting
       if (sortBy === 'recent') {
-        reviewQuery.order('created_at', { ascending: false });
+        reviewQuery = reviewQuery.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        reviewQuery.order('rating', { ascending: false });
+        reviewQuery = reviewQuery.order('rating', { ascending: false });
       }
 
       const { data: reviews, error: reviewError } = await reviewQuery.limit(20);
       
       if (reviewError) throw reviewError;
 
-      // Get user profiles for the content
+      // Get user profiles separately to avoid complex joins
       const allUserIds = [
         ...new Set([
           ...(recommendations || []).map(r => r.user_id),
@@ -134,44 +141,43 @@ export const useCirclePicksFetch = ({
     queryFn: async () => {
       if (!userId) return { recommendations: [], reviews: [] };
 
-      // Fetch user's recommendations
-      const myRecQuery = supabase
+      // Build user's recommendations query
+      let myRecQuery = supabase
         .from('recommendations')
         .select('*')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
-      // Apply category filter
-      const validCategories = ['Food', 'Drink', 'Movie', 'Book', 'Product', 'Place', 'Activity', 'Music', 'Art', 'TV', 'Travel'];
-      if (category && category !== 'all' && validCategories.includes(category)) {
-        myRecQuery.eq('category', category);
+      // Apply category filter only if it's valid
+      if (category && category !== 'all' && isValidCategory(category)) {
+        myRecQuery = myRecQuery.eq('category', category);
       }
 
       if (sortBy === 'recent') {
-        myRecQuery.order('created_at', { ascending: false });
+        myRecQuery = myRecQuery.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        myRecQuery.order('rating', { ascending: false });
+        myRecQuery = myRecQuery.order('rating', { ascending: false });
       }
 
       const { data: myRecommendations, error: myRecError } = await myRecQuery.limit(10);
       
       if (myRecError) throw myRecError;
 
-      // Fetch user's reviews
-      const myReviewQuery = supabase
+      // Build user's reviews query
+      let myReviewQuery = supabase
         .from('reviews')
         .select('*')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
       if (category && category !== 'all') {
-        myReviewQuery.eq('category', category);
+        myReviewQuery = myReviewQuery.eq('category', category);
       }
 
       if (sortBy === 'recent') {
-        myReviewQuery.order('created_at', { ascending: false });
+        myReviewQuery = myReviewQuery.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        myReviewQuery.order('rating', { ascending: false });
+        myReviewQuery = myReviewQuery.order('rating', { ascending: false });
       }
 
       const { data: myReviews, error: myReviewError } = await myReviewQuery.limit(10);
