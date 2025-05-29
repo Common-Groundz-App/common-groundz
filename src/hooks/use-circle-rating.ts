@@ -2,11 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { CircleContributor, CircleRatingData } from './use-circle-rating-types';
 
-export const useCircleRating = (entityId: string) => {
+export const useCircleRating = (entityId: string): CircleRatingData => {
   const { user } = useAuth();
   const [circleRating, setCircleRating] = useState<number | null>(null);
   const [circleRatingCount, setCircleRatingCount] = useState<number>(0);
+  const [circleContributors, setCircleContributors] = useState<CircleContributor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export const useCircleRating = (entityId: string) => {
           console.log('🔵 User follows no one, circle rating is 0');
           setCircleRating(null);
           setCircleRatingCount(0);
+          setCircleContributors([]);
           setIsLoading(false);
           return;
         }
@@ -65,13 +68,20 @@ export const useCircleRating = (entityId: string) => {
           console.error('Error fetching circle reviews:', reviewError);
         }
 
-        // Combine all ratings from followed users
+        // Combine all ratings and contributors from followed users
         const allRatings: number[] = [];
+        const contributors: CircleContributor[] = [];
         
         if (recommendations) {
           recommendations.forEach(rec => {
             if (rec.rating && typeof rec.rating === 'number') {
-              allRatings.push(Number(rec.rating));
+              const rating = Number(rec.rating);
+              allRatings.push(rating);
+              contributors.push({
+                userId: rec.user_id,
+                rating: rating,
+                type: 'recommendation'
+              });
             }
           });
         }
@@ -80,25 +90,40 @@ export const useCircleRating = (entityId: string) => {
           reviews.forEach(review => {
             if (review.rating && typeof review.rating === 'number') {
               allRatings.push(review.rating);
+              contributors.push({
+                userId: review.user_id,
+                rating: review.rating,
+                type: 'review'
+              });
             }
           });
         }
 
         console.log('🔵 Circle ratings found:', allRatings);
+        console.log('🔵 Circle contributors found:', contributors.length);
+
+        // Sort contributors by rating (highest first) and limit to top contributors
+        const sortedContributors = contributors
+          .sort((a, b) => b.rating - a.rating)
+          .slice(0, 5); // Limit to top 5 contributors for performance
 
         if (allRatings.length === 0) {
           setCircleRating(null);
           setCircleRatingCount(0);
+          setCircleContributors([]);
         } else {
           const averageRating = allRatings.reduce((sum, rating) => sum + rating, 0) / allRatings.length;
           setCircleRating(averageRating);
           setCircleRatingCount(allRatings.length);
+          setCircleContributors(sortedContributors);
           console.log('🔵 Circle rating calculated:', averageRating, 'from', allRatings.length, 'ratings');
+          console.log('🔵 Top contributors:', sortedContributors);
         }
       } catch (error) {
         console.error('Error calculating circle rating:', error);
         setCircleRating(null);
         setCircleRatingCount(0);
+        setCircleContributors([]);
       } finally {
         setIsLoading(false);
       }
@@ -110,6 +135,7 @@ export const useCircleRating = (entityId: string) => {
   return {
     circleRating,
     circleRatingCount,
+    circleContributors,
     isLoading
   };
 };
