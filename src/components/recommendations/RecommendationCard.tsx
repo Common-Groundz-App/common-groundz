@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +29,7 @@ interface RecommendationCardProps {
   onSave?: (id: string) => void;
   highlightCommentId?: string | null;
   onDeleted?: () => void;
+  hideEntityFallbacks?: boolean;
 }
 
 const RecommendationCard = ({ 
@@ -37,7 +37,8 @@ const RecommendationCard = ({
   onLike, 
   onSave, 
   highlightCommentId,
-  onDeleted 
+  onDeleted,
+  hideEntityFallbacks = false
 }: RecommendationCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -127,6 +128,29 @@ const RecommendationCard = ({
     console.log(`No media found for recommendation ${recommendation.id}, using empty array`);
     return [] as MediaItem[];
   }, [recommendation, entityImageUrl]);
+
+  // Check if we should hide media based on hideEntityFallbacks prop
+  const shouldShowMedia = React.useMemo(() => {
+    if (!hideEntityFallbacks) {
+      return mediaItems.length > 0;
+    }
+    
+    // If hideEntityFallbacks is true, only show media if it contains user-uploaded content
+    // (not just entity fallback images)
+    const hasUserUploadedMedia = mediaItems.some(item => 
+      item.source !== 'entity' && 
+      !item.url.includes(entityImageUrl || '')
+    );
+    
+    console.log(`Should show media for recommendation ${recommendation.id}:`, {
+      hideEntityFallbacks,
+      mediaItemsLength: mediaItems.length,
+      hasUserUploadedMedia,
+      result: hasUserUploadedMedia
+    });
+    
+    return hasUserUploadedMedia;
+  }, [mediaItems, hideEntityFallbacks, entityImageUrl, recommendation.id]);
 
   // Get a category-specific fallback image URL
   const getCategoryFallbackImage = (category: string): string => {
@@ -320,28 +344,30 @@ const RecommendationCard = ({
           </div>
         </div>
         
-        {/* Media - Using enhanced PostMediaDisplay with improved fallback */}
-        <div className="mt-3">
-          {mediaItems.length > 0 ? (
-            <PostMediaDisplay 
-              media={mediaItems} 
-              className="mt-2 mb-3"
-              aspectRatio="maintain"
-              objectFit="contain"
-              enableBackground={true}
-              thumbnailDisplay="none"
-            />
-          ) : (
-            <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
-              <ImageWithFallback
-                src={getFallbackImage()}
-                alt={`${recommendation.title} - ${recommendation.category || 'Recommendation'}`}
-                className="w-full h-full object-cover"
-                fallbackSrc={recommendation.category ? getCategoryFallbackImage(recommendation.category) : undefined}
+        {/* Media - Only show if shouldShowMedia is true */}
+        {shouldShowMedia && (
+          <div className="mt-3">
+            {mediaItems.length > 0 ? (
+              <PostMediaDisplay 
+                media={mediaItems} 
+                className="mt-2 mb-3"
+                aspectRatio="maintain"
+                objectFit="contain"
+                enableBackground={true}
+                thumbnailDisplay="none"
               />
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
+                <ImageWithFallback
+                  src={getFallbackImage()}
+                  alt={`${recommendation.title} - ${recommendation.category || 'Recommendation'}`}
+                  className="w-full h-full object-cover"
+                  fallbackSrc={recommendation.category ? getCategoryFallbackImage(recommendation.category) : undefined}
+                />
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Description */}
         {recommendation.description && (
