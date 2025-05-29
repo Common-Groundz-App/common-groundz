@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { MediaItem } from '@/types/media';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -23,6 +22,25 @@ export function LightboxPreview({
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const mediaRef = useRef<MediaItem[]>([]);
   const isMobile = useIsMobile();
+  
+  // Prevent body scrolling when lightbox is open
+  useEffect(() => {
+    // Save the current overflow value
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    
+    // Prevent scrolling
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    
+    // Cleanup function to restore original styles
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.width = '';
+    };
+  }, []);
   
   // Track if the media array has changed
   useEffect(() => {
