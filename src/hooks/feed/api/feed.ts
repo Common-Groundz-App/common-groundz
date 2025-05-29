@@ -8,11 +8,8 @@ import { sortItemsByDate } from './utils';
 // Fetch for you feed (combines recommendations and posts)
 export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryParams) => {
   try {
-    // Fetch recommendations
-    const { recommendations: recsData } = await fetchRecommendations({ userId, page, itemsPerPage });
-    
-    // Process recommendations with user profiles and metadata
-    const processedRecs = await processRecommendations(recsData, userId);
+    // Fetch recommendations data
+    const recsData = await fetchRecommendations({ userId, page, itemsPerPage });
     
     // Fetch posts
     const { posts: postsData } = await fetchPosts({ userId, page, itemsPerPage });
@@ -21,7 +18,7 @@ export const fetchForYouFeed = async ({ userId, page, itemsPerPage }: FeedQueryP
     const processedPosts = await processPosts(postsData, userId);
     
     // Combine and sort all feed items
-    const allItems: CombinedFeedItem[] = [...processedRecs, ...processedPosts];
+    const allItems: CombinedFeedItem[] = [...recsData, ...processedPosts];
     const sortedItems = sortItemsByDate(allItems);
     
     // Pagination calculation
@@ -56,25 +53,16 @@ export const fetchFollowingFeed = async ({ userId, page, itemsPerPage }: FeedQue
     const followingIds = followingData.map(f => f.following_id);
     
     // Fetch recommendations from followed users
-    const { recommendations: recsData } = await fetchRecommendations(
-      { userId, page, itemsPerPage },
-      followingIds
-    );
-    
-    // Process recommendations with user profiles and metadata
-    const processedRecs = await processRecommendations(recsData, userId);
+    const recsData = await fetchRecommendations({ userId, page, itemsPerPage });
     
     // Fetch posts from followed users
-    const { posts: postsData } = await fetchPosts(
-      { userId, page, itemsPerPage },
-      followingIds
-    );
+    const { posts: postsData } = await fetchPosts({ userId, page, itemsPerPage });
     
     // Process posts with metadata
     const processedPosts = await processPosts(postsData, userId);
     
     // Combine and sort all feed items
-    const allItems: CombinedFeedItem[] = [...processedRecs, ...processedPosts];
+    const allItems: CombinedFeedItem[] = [...recsData, ...processedPosts];
     const sortedItems = sortItemsByDate(allItems);
     
     // Pagination calculation
