@@ -47,13 +47,12 @@ export const useCirclePicksFetch = ({
         .select(`
           *,
           entity:entities(*),
-          media:recommendation_media(*),
           profiles!recommendations_user_id_fkey(username, avatar_url)
         `)
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
-      if (category) {
+      if (category && category !== 'all') {
         recQuery = recQuery.eq('category', category);
       }
 
@@ -73,13 +72,12 @@ export const useCirclePicksFetch = ({
         .from('reviews')
         .select(`
           *,
-          media:review_media(*),
           profiles!reviews_user_id_fkey(username, avatar_url)
         `)
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
-      if (category) {
+      if (category && category !== 'all') {
         reviewQuery = reviewQuery.eq('category', category);
       }
 
@@ -95,16 +93,16 @@ export const useCirclePicksFetch = ({
       if (reviewError) throw reviewError;
 
       // Format the data
-      const formattedRecommendations = recommendations.map(rec => ({
+      const formattedRecommendations = (recommendations || []).map(rec => ({
         ...rec,
-        username: rec.profiles?.username,
-        avatar_url: rec.profiles?.avatar_url
+        username: rec.profiles?.username || 'Unknown',
+        avatar_url: rec.profiles?.avatar_url || null
       }));
 
-      const formattedReviews = reviews.map(review => ({
+      const formattedReviews = (reviews || []).map(review => ({
         ...review,
-        username: review.profiles?.username,
-        avatar_url: review.profiles?.avatar_url
+        username: review.profiles?.username || 'Unknown',
+        avatar_url: review.profiles?.avatar_url || null
       }));
 
       return {
@@ -131,13 +129,12 @@ export const useCirclePicksFetch = ({
         .select(`
           *,
           entity:entities(*),
-          media:recommendation_media(*),
           profiles!recommendations_user_id_fkey(username, avatar_url)
         `)
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
-      if (category) {
+      if (category && category !== 'all') {
         myRecQuery = myRecQuery.eq('category', category);
       }
 
@@ -156,13 +153,12 @@ export const useCirclePicksFetch = ({
         .from('reviews')
         .select(`
           *,
-          media:review_media(*),
           profiles!reviews_user_id_fkey(username, avatar_url)
         `)
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
-      if (category) {
+      if (category && category !== 'all') {
         myReviewQuery = myReviewQuery.eq('category', category);
       }
 
@@ -177,16 +173,16 @@ export const useCirclePicksFetch = ({
       if (myReviewError) throw myReviewError;
 
       // Format the data
-      const formattedMyRecommendations = myRecommendations.map(rec => ({
+      const formattedMyRecommendations = (myRecommendations || []).map(rec => ({
         ...rec,
-        username: rec.profiles?.username,
-        avatar_url: rec.profiles?.avatar_url
+        username: rec.profiles?.username || 'Unknown',
+        avatar_url: rec.profiles?.avatar_url || null
       }));
 
-      const formattedMyReviews = myReviews.map(review => ({
+      const formattedMyReviews = (myReviews || []).map(review => ({
         ...review,
-        username: review.profiles?.username,
-        avatar_url: review.profiles?.avatar_url
+        username: review.profiles?.username || 'Unknown',
+        avatar_url: review.profiles?.avatar_url || null
       }));
 
       return {
