@@ -60,81 +60,49 @@ export const useCirclePicksFetch = ({
 
       const dbCategory = category && category !== 'all' ? mapCategoryToDb(category) : null;
       
-      // Fetch recommendations with simple select
-      let recQuery = supabase
+      // Fetch recommendations with explicit type assertion
+      const recQueryBuilder = supabase
         .from('recommendations')
-        .select(`
-          id,
-          title,
-          description,
-          rating,
-          category,
-          image_url,
-          created_at,
-          user_id,
-          entity_id,
-          venue,
-          visibility,
-          is_certified,
-          view_count,
-          comment_count
-        `)
+        .select('*')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
       // Apply category filter only if it's a valid database category
       if (dbCategory) {
-        recQuery = recQuery.eq('category', dbCategory);
+        recQueryBuilder.eq('category', dbCategory);
       }
 
       // Apply sorting
       if (sortBy === 'recent') {
-        recQuery = recQuery.order('created_at', { ascending: false });
+        recQueryBuilder.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        recQuery = recQuery.order('rating', { ascending: false });
+        recQueryBuilder.order('rating', { ascending: false });
       }
 
-      const { data: recommendations, error: recError } = await recQuery.limit(20);
+      const { data: recommendations, error: recError } = await recQueryBuilder.limit(20);
       
       if (recError) throw recError;
 
-      // Fetch reviews with simple select
-      let reviewQuery = supabase
+      // Fetch reviews with explicit type assertion
+      const reviewQueryBuilder = supabase
         .from('reviews')
-        .select(`
-          id,
-          title,
-          description,
-          rating,
-          category,
-          image_url,
-          created_at,
-          user_id,
-          entity_id,
-          venue,
-          visibility,
-          status,
-          subtitle,
-          experience_date,
-          media,
-          metadata
-        `)
+        .select('*')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
       // For reviews, we can filter by any category since reviews table might support more categories
       if (category && category !== 'all') {
-        reviewQuery = reviewQuery.eq('category', category);
+        reviewQueryBuilder.eq('category', category);
       }
 
       // Apply sorting
       if (sortBy === 'recent') {
-        reviewQuery = reviewQuery.order('created_at', { ascending: false });
+        reviewQueryBuilder.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        reviewQuery = reviewQuery.order('rating', { ascending: false });
+        reviewQueryBuilder.order('rating', { ascending: false });
       }
 
-      const { data: reviews, error: reviewError } = await reviewQuery.limit(20);
+      const { data: reviews, error: reviewError } = await reviewQueryBuilder.limit(20);
       
       if (reviewError) throw reviewError;
 
@@ -186,78 +154,46 @@ export const useCirclePicksFetch = ({
 
       const dbCategory = category && category !== 'all' ? mapCategoryToDb(category) : null;
       
-      // Fetch user's recommendations with simple select
-      let myRecQuery = supabase
+      // Fetch user's recommendations with explicit type assertion
+      const myRecQueryBuilder = supabase
         .from('recommendations')
-        .select(`
-          id,
-          title,
-          description,
-          rating,
-          category,
-          image_url,
-          created_at,
-          user_id,
-          entity_id,
-          venue,
-          visibility,
-          is_certified,
-          view_count,
-          comment_count
-        `)
+        .select('*')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
       // Apply category filter only if it's a valid database category
       if (dbCategory) {
-        myRecQuery = myRecQuery.eq('category', dbCategory);
+        myRecQueryBuilder.eq('category', dbCategory);
       }
 
       if (sortBy === 'recent') {
-        myRecQuery = myRecQuery.order('created_at', { ascending: false });
+        myRecQueryBuilder.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        myRecQuery = myRecQuery.order('rating', { ascending: false });
+        myRecQueryBuilder.order('rating', { ascending: false });
       }
 
-      const { data: myRecommendations, error: myRecError } = await myRecQuery.limit(10);
+      const { data: myRecommendations, error: myRecError } = await myRecQueryBuilder.limit(10);
       
       if (myRecError) throw myRecError;
 
-      // Fetch user's reviews with simple select
-      let myReviewQuery = supabase
+      // Fetch user's reviews with explicit type assertion
+      const myReviewQueryBuilder = supabase
         .from('reviews')
-        .select(`
-          id,
-          title,
-          description,
-          rating,
-          category,
-          image_url,
-          created_at,
-          user_id,
-          entity_id,
-          venue,
-          visibility,
-          status,
-          subtitle,
-          experience_date,
-          media,
-          metadata
-        `)
+        .select('*')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
       if (category && category !== 'all') {
-        myReviewQuery = myReviewQuery.eq('category', category);
+        myReviewQueryBuilder.eq('category', category);
       }
 
       if (sortBy === 'recent') {
-        myReviewQuery = myReviewQuery.order('created_at', { ascending: false });
+        myReviewQueryBuilder.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        myReviewQuery = myReviewQuery.order('rating', { ascending: false });
+        myReviewQueryBuilder.order('rating', { ascending: false });
       }
 
-      const { data: myReviews, error: myReviewError } = await myReviewQuery.limit(10);
+      const { data: myReviews, error: myReviewError } = await myReviewQueryBuilder.limit(10);
       
       if (myReviewError) throw myReviewError;
 
