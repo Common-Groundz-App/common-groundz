@@ -30,6 +30,7 @@ import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loadi
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { useCircleRating } from '@/hooks/use-circle-rating';
+import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -505,13 +506,17 @@ const EntityDetail = () => {
                         </span>
                       </div>
                       
-                      {/* Text labels */}
+                      {/* Text labels and contributors */}
                       <div className="leading-tight min-w-[140px]">
                         <div className="font-semibold text-sm whitespace-nowrap">Circle Rating</div>
                         <div className="text-xs text-muted-foreground">
                           Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
-                          {/* Contributors will be displayed here in Phase 2 */}
                         </div>
+                        <CircleContributorsPreview 
+                          contributors={circleContributors}
+                          totalCount={circleRatingCount}
+                          maxDisplay={4}
+                        />
                       </div>
                     </div>
                   ) : (
