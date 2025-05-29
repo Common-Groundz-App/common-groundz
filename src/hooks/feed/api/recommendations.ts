@@ -1,8 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { FeedQueryParams, RecommendationFeedItem } from '../types';
 import { fetchMultipleProfiles } from '@/services/enhancedProfileService';
-import { RecommendationCategory } from '@/services/recommendation/types';
+import { RecommendationCategory, RecommendationVisibility } from '@/services/recommendation/types';
 
 // Helper function to map database category strings to RecommendationCategory enum
 const mapDatabaseCategoryToEnum = (dbCategory: string): RecommendationCategory => {
@@ -19,6 +18,17 @@ const mapDatabaseCategoryToEnum = (dbCategory: string): RecommendationCategory =
     case 'tv': return RecommendationCategory.TV;
     case 'travel': return RecommendationCategory.Travel;
     default: return RecommendationCategory.Place; // fallback
+  }
+};
+
+// Helper function to map database visibility strings to RecommendationVisibility enum
+const mapDatabaseVisibilityToEnum = (dbVisibility: string): RecommendationVisibility => {
+  switch (dbVisibility.toLowerCase()) {
+    case 'public': return RecommendationVisibility.Public;
+    case 'private': return RecommendationVisibility.Private;
+    case 'friends_only':
+    case 'circle_only': return RecommendationVisibility.FriendsOnly;
+    default: return RecommendationVisibility.Public; // fallback
   }
 };
 
@@ -124,6 +134,7 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
       return {
         ...rec,
         category: mapDatabaseCategoryToEnum(rec.category), // Convert database category to enum
+        visibility: mapDatabaseVisibilityToEnum(rec.visibility), // Convert database visibility to enum
         is_post: false,
         username: profile?.displayName || profile?.username || null,
         avatar_url: profile?.avatar_url || null,
@@ -224,6 +235,7 @@ export const processRecommendations = async (
       return {
         ...rec, // This spreads all original recommendation properties including category, is_certified, view_count
         category: mapDatabaseCategoryToEnum(rec.category), // Convert database category to enum
+        visibility: mapDatabaseVisibilityToEnum(rec.visibility), // Convert database visibility to enum
         is_post: false,
         username: profile?.displayName || profile?.username || null,
         avatar_url: profile?.avatar_url || null,
