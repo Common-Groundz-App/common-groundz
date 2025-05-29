@@ -45,12 +45,11 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
             return (
               <Tooltip key={contributor.userId}>
                 <TooltipTrigger asChild>
-                  <div className="cursor-pointer">
+                  <div className="cursor-pointer relative" style={{ zIndex: maxDisplay - index }}>
                     <ProfileAvatar 
                       userId={contributor.userId}
                       size="xs"
                       className="ring-2 ring-background hover:ring-primary/20 transition-all duration-200 hover:scale-110"
-                      style={{ zIndex: maxDisplay - index }}
                     />
                   </div>
                 </TooltipTrigger>
