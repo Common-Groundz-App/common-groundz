@@ -1,14 +1,13 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share2 } from 'lucide-react';
+import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, Share2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns'; // Add the missing import
+import { format } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,15 +17,12 @@ import {
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { deleteReview, updateReviewStatus } from '@/services/reviewService';
 import ReviewForm from './ReviewForm';
-import { formatRelativeDate } from '@/utils/dateUtils';
-import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ensureHttps } from '@/utils/urlUtils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import UsernameLink from '@/components/common/UsernameLink';
-import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import { Separator } from "@/components/ui/separator";
+import { CompactRatingDisplay } from '@/components/ui/compact-rating-display';
+import { EntityContextBar } from '@/components/entity/EntityContextBar';
+import { MinimalAuthorInfo } from '@/components/common/MinimalAuthorInfo';
+import { ContentMediaThumbnail } from '@/components/media/ContentMediaThumbnail';
 
 interface ReviewCardProps {
   review: Review;
@@ -50,7 +46,7 @@ const ReviewCard = ({
   const [isDeleting, setIsDeleting] = useState(false);
   
   const isOwner = user?.id === review.user_id;
-  const isAdmin = user?.email?.includes('@lovable.dev') || false; // Simple admin check
+  const isAdmin = user?.email?.includes('@lovable.dev') || false;
   
   // Get entity image URL if available, ensuring it uses HTTPS
   const entityImageUrl = review.entity?.image_url ? ensureHttps(review.entity.image_url) : null;
@@ -70,62 +66,8 @@ const ReviewCard = ({
       }] as MediaItem[];
     }
     
-    if (entityImageUrl) {
-      return [{
-        url: entityImageUrl,
-        type: 'image' as const,
-        order: 0,
-        id: `entity-${review.entity?.id}`,
-        source: 'entity'
-      }] as MediaItem[];
-    }
-    
     return [] as MediaItem[];
-  }, [review, entityImageUrl]);
-  
-  // Get a category-specific fallback image URL for when no image is available
-  const getCategoryFallbackImage = (category: string): string => {
-    const fallbacks: Record<string, string> = {
-      'food': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1',
-      'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
-      'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
-      'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
-      'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
-      'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
-      'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-      'music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
-      'Art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
-      'TV': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
-      'Travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
-    };
-    
-    return fallbacks[category.toLowerCase()] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
-  };
-  
-  // Get a fallback image with the proper priority
-  const getFallbackImage = (): string => {
-    if (entityImageUrl) {
-      return entityImageUrl;
-    }
-    return getCategoryFallbackImage(review.category);
-  };
-  
-  const getCategoryLabel = (category: string): string => {
-    const labels: Record<string, string> = {
-      'food': 'Food',
-      'drink': 'Drink',
-      'activity': 'Activity',
-      'movie': 'Movie',
-      'book': 'Book',
-      'place': 'Place', 
-      'product': 'Product',
-      'music': 'Music',
-      'art': 'Art',
-      'tv': 'TV',
-      'travel': 'Travel'
-    };
-    return labels[category.toLowerCase()] || category;
-  };
+  }, [review]);
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -185,215 +127,134 @@ const ReviewCard = ({
     }
   };
 
-  const getStatusBadge = () => {
-    if (review.status === 'flagged') {
-      return (
-        <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-300">
-          <AlertTriangle className="h-3 w-3 mr-1" />
-          Flagged
-        </Badge>
-      );
-    }
-    if (review.status === 'deleted') {
-      return (
-        <Badge variant="outline" className="bg-red-50 text-red-800 border-red-300">
-          <Trash2 className="h-3 w-3 mr-1" />
-          Deleted
-        </Badge>
-      );
-    }
-    return null;
-  };
-
-  const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
-  
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      'Food': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-      'Drink': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-      'Activity': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-      'Product': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-      'Book': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-      'Movie': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-      'TV': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
-      'Music': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
-      'Art': 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-300',
-      'Place': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
-      'Travel': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300',
-    };
-    return colors[getCategoryLabel(category)] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
-  };
-
   return (
     <>
       <Card 
         className="overflow-hidden hover:shadow-md transition-shadow duration-200"
       >
-        <CardContent className="p-6">
-          {/* Card Header with User Info */}
-          <div className="flex justify-between items-start">
-            <div className="flex items-start gap-3">
-              <UsernameLink 
-                userId={review.user_id}
-                className="hover:opacity-80 transition-opacity"
-              >
-                <Avatar className="h-10 w-10 border">
-                  <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
-                  <AvatarFallback>{getInitials(review.user?.username)}</AvatarFallback>
-                </Avatar>
-              </UsernameLink>
-              <div>
-                <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
-                <div className="text-muted-foreground text-xs mt-0.5">
-                  <span>{formatRelativeDate(review.created_at)}</span>
-                </div>
-                <div className="mt-1">
-                  <RatingDisplay rating={review.rating} />
-                </div>
+        <CardContent className="p-5">
+          {/* Header: Rating + Title + Options */}
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <CompactRatingDisplay rating={review.rating} size="md" />
+                {(isOwner || isAdmin) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full h-6 w-6 p-0 ml-auto"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreVertical className="h-3 w-3" />
+                        <span className="sr-only">Menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isOwner && (
+                        <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
+                          <Pencil className="h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                      )}
+                      
+                      {!review.is_converted && isOwner && onConvert && (
+                        <DropdownMenuItem onClick={handleConvertClick} className="flex items-center gap-2">
+                          <UploadCloud className="h-4 w-4" /> Convert to Recommendation
+                        </DropdownMenuItem>
+                      )}
+                      
+                      {isAdmin && review.status !== 'flagged' && (
+                        <DropdownMenuItem 
+                          onClick={() => handleStatusChange('flagged')}
+                          className="flex items-center gap-2"
+                        >
+                          <Flag className="h-4 w-4" /> Flag for Review
+                        </DropdownMenuItem>
+                      )}
+                      
+                      {isAdmin && review.status === 'flagged' && (
+                        <DropdownMenuItem 
+                          onClick={() => handleStatusChange('published')}
+                          className="flex items-center gap-2"
+                        >
+                          <Flag className="h-4 w-4" /> Remove Flag
+                        </DropdownMenuItem>
+                      )}
+                      
+                      {(isOwner || isAdmin) && (
+                        <DropdownMenuItem 
+                          onClick={handleDeleteClick} 
+                          className="text-destructive focus:text-destructive flex items-center gap-2"
+                        >
+                          <Trash2 className="h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
-            </div>
-            
-            {/* Options Menu for own content */}
-            {(isOwner || isAdmin) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full h-8 w-8 p-0"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">Menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {isOwner && (
-                    <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
-                      <Pencil className="h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {!review.is_converted && isOwner && onConvert && (
-                    <DropdownMenuItem onClick={handleConvertClick} className="flex items-center gap-2">
-                      <UploadCloud className="h-4 w-4" /> Convert to Recommendation
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {isAdmin && review.status !== 'flagged' && (
-                    <DropdownMenuItem 
-                      onClick={() => handleStatusChange('flagged')}
-                      className="flex items-center gap-2"
-                    >
-                      <Flag className="h-4 w-4" /> Flag for Review
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {isAdmin && review.status === 'flagged' && (
-                    <DropdownMenuItem 
-                      onClick={() => handleStatusChange('published')}
-                      className="flex items-center gap-2"
-                    >
-                      <Flag className="h-4 w-4" /> Remove Flag
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {(isOwner || isAdmin) && (
-                    <DropdownMenuItem 
-                      onClick={handleDeleteClick} 
-                      className="text-destructive focus:text-destructive flex items-center gap-2"
-                    >
-                      <Trash2 className="h-4 w-4" /> Delete
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-          
-          {/* Title and Category */}
-          <div className="mt-4">
-            {/* Display Review Headline/Title (subtitle) if available */}
-            {review.subtitle && (
-              <h3 className="font-semibold text-lg">{review.subtitle}</h3>
-            )}
-            
-            {/* Always display the content name (title) */}
-            <h3 className={`${review.subtitle ? "text-base mt-1" : "font-semibold text-lg"}`}>
-              {review.title}
-            </h3>
-            
-            <div className="flex flex-wrap gap-2 mt-1">
-              {review.category && (
-                <Badge className={cn("font-normal", getCategoryColor(review.category))} variant="outline">
-                  {getCategoryLabel(review.category)}
-                </Badge>
-              )}
               
-              {review.entity && (
-                <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
-                  {review.entity.name}
-                </Badge>
+              {/* Title hierarchy: subtitle (review headline) then title (content name) */}
+              {review.subtitle && (
+                <h3 className="font-semibold text-lg leading-tight line-clamp-2 mb-1">{review.subtitle}</h3>
+              )}
+              <h4 className={`${review.subtitle ? "text-base text-muted-foreground" : "font-semibold text-lg"} leading-tight line-clamp-1`}>
+                {review.title}
+              </h4>
+            </div>
+          </div>
+          
+          {/* Entity Context */}
+          <EntityContextBar 
+            entity={review.entity}
+            category={review.category}
+            venue={review.venue}
+            className="mb-3"
+          />
+          
+          {/* Content Section */}
+          <div className="flex gap-3 mb-4">
+            {/* Media Thumbnail */}
+            <ContentMediaThumbnail
+              media={mediaItems}
+              entityImageUrl={entityImageUrl}
+              category={review.category}
+              title={review.title}
+              size="md"
+            />
+            
+            {/* Description */}
+            <div className="flex-1 min-w-0">
+              {review.description && (
+                <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+                  {review.description}
+                </p>
               )}
             </div>
           </div>
           
-          {/* Media */}
-          <div className="mt-3">
-            {mediaItems.length > 0 ? (
-              <PostMediaDisplay 
-                media={mediaItems} 
-                className="mt-2 mb-3"
-                aspectRatio="maintain"
-                objectFit="contain"
-                enableBackground={true}
-                thumbnailDisplay="none"
-              />
-            ) : (
-              <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
-                <ImageWithFallback
-                  src={getFallbackImage()}
-                  alt={`${review.title} - ${review.category || 'Review'}`}
-                  className="w-full h-full object-cover"
-                  fallbackSrc={review.category ? getCategoryFallbackImage(review.category) : undefined}
-                />
-              </div>
-            )}
-          </div>
-          
-          {/* Description */}
-          {review.description && (
-            <div className="mt-3 text-sm text-muted-foreground">
-              <p className="line-clamp-3">{review.description}</p>
-            </div>
-          )}
-          
-          {/* Venue */}
-          {review.venue && (
-            <div className="mt-3 text-sm">
-              <span className="font-medium">Location: </span>
-              <span>{review.venue}</span>
-            </div>
-          )}
-          
-          {/* Experience date */}
+          {/* Experience Date */}
           {review.experience_date && (
-            <div className="text-xs text-gray-500 flex items-center mt-3">
+            <div className="text-xs text-muted-foreground flex items-center mb-3">
               <Calendar className="h-3 w-3 mr-1" />
               <span>Experienced: {format(new Date(review.experience_date), 'MMM d, yyyy')}</span>
             </div>
           )}
           
-          {/* Social Actions */}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t">
-            <div className="flex items-center gap-3 sm:gap-6">
+          {/* Footer: Author + Social Actions */}
+          <div className="flex items-center justify-between pt-3 border-t">
+            <MinimalAuthorInfo 
+              userId={review.user_id}
+              createdAt={review.created_at}
+            />
+            
+            <div className="flex items-center gap-1">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className={cn(
-                  "flex items-center gap-1 py-0 px-2 sm:px-4", 
+                  "h-8 px-2 text-xs", 
                   review.isLiked && "text-red-500 hover:text-red-600"
                 )}
                 onClick={(e) => {
@@ -402,24 +263,24 @@ const ReviewCard = ({
                   onLike(review.id);
                 }}
               >
-                <Heart className={cn("h-5 w-5", review.isLiked && "fill-current")} />
-                <span>{review.likes}</span>
+                <Heart className={cn("h-4 w-4 mr-1", review.isLiked && "fill-current")} />
+                {review.likes}
               </Button>
               
               <Button
                 variant="ghost"
                 size="sm" 
-                className="flex items-center gap-1 py-0 px-2 sm:px-4"
+                className="h-8 px-2 text-xs"
               >
-                <MessageCircle className="h-5 w-5" />
-                <span>{review.comment_count || 0}</span>
+                <MessageCircle className="h-4 w-4 mr-1" />
+                {review.comment_count || 0}
               </Button>
               
               <Button
                 variant="ghost"
                 size="sm" 
                 className={cn(
-                  "flex items-center gap-1 py-0 px-2 sm:px-4",
+                  "h-8 px-2",
                   review.isSaved && "text-primary"
                 )}
                 onClick={(e) => {
@@ -428,18 +289,17 @@ const ReviewCard = ({
                   onSave(review.id);
                 }}
               >
-                <Bookmark className={cn("h-5 w-5", review.isSaved && "fill-current")} />
+                <Bookmark className={cn("h-4 w-4", review.isSaved && "fill-current")} />
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm" 
+                className="h-8 px-2"
+              >
+                <Share2 className="h-4 w-4" />
               </Button>
             </div>
-            
-            {/* Share button */}
-            <Button
-              variant="ghost"
-              size="sm" 
-              className="flex items-center gap-1 py-0 px-2 sm:px-4"
-            >
-              <Share2 className="h-5 w-5" />
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -465,21 +325,6 @@ const ReviewCard = ({
         />
       )}
     </>
-  );
-};
-
-// Updated RatingDisplay component - now on its own row below the date
-const RatingDisplay = ({ rating }: { rating: number }) => {
-  return (
-    <ConnectedRingsRating
-      value={rating}
-      size="badge"
-      variant="badge"
-      showValue={false}
-      isInteractive={false}
-      showLabel={false}
-      minimal={true}
-    />
   );
 };
 
