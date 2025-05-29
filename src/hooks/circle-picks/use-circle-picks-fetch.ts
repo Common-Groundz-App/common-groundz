@@ -58,12 +58,27 @@ export const useCirclePicksFetch = ({
         return { recommendations: [], reviews: [] };
       }
 
-      // Build recommendations query - simplified select to avoid deep types
       const dbCategory = category && category !== 'all' ? mapCategoryToDb(category) : null;
       
+      // Fetch recommendations with simple select
       let recQuery = supabase
         .from('recommendations')
-        .select('id, title, description, rating, category, image_url, created_at, user_id, entity_id, venue, visibility, is_certified, view_count, comment_count')
+        .select(`
+          id,
+          title,
+          description,
+          rating,
+          category,
+          image_url,
+          created_at,
+          user_id,
+          entity_id,
+          venue,
+          visibility,
+          is_certified,
+          view_count,
+          comment_count
+        `)
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
@@ -83,10 +98,27 @@ export const useCirclePicksFetch = ({
       
       if (recError) throw recError;
 
-      // Build reviews query - simplified select
+      // Fetch reviews with simple select
       let reviewQuery = supabase
         .from('reviews')
-        .select('id, title, description, rating, category, image_url, created_at, user_id, entity_id, venue, visibility, status, subtitle, experience_date, media, metadata')
+        .select(`
+          id,
+          title,
+          description,
+          rating,
+          category,
+          image_url,
+          created_at,
+          user_id,
+          entity_id,
+          venue,
+          visibility,
+          status,
+          subtitle,
+          experience_date,
+          media,
+          metadata
+        `)
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
@@ -152,12 +184,27 @@ export const useCirclePicksFetch = ({
     queryFn: async () => {
       if (!userId) return { recommendations: [], reviews: [] };
 
-      // Build user's recommendations query - simplified select
       const dbCategory = category && category !== 'all' ? mapCategoryToDb(category) : null;
       
+      // Fetch user's recommendations with simple select
       let myRecQuery = supabase
         .from('recommendations')
-        .select('id, title, description, rating, category, image_url, created_at, user_id, entity_id, venue, visibility, is_certified, view_count, comment_count')
+        .select(`
+          id,
+          title,
+          description,
+          rating,
+          category,
+          image_url,
+          created_at,
+          user_id,
+          entity_id,
+          venue,
+          visibility,
+          is_certified,
+          view_count,
+          comment_count
+        `)
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
@@ -176,10 +223,27 @@ export const useCirclePicksFetch = ({
       
       if (myRecError) throw myRecError;
 
-      // Build user's reviews query - simplified select
+      // Fetch user's reviews with simple select
       let myReviewQuery = supabase
         .from('reviews')
-        .select('id, title, description, rating, category, image_url, created_at, user_id, entity_id, venue, visibility, status, subtitle, experience_date, media, metadata')
+        .select(`
+          id,
+          title,
+          description,
+          rating,
+          category,
+          image_url,
+          created_at,
+          user_id,
+          entity_id,
+          venue,
+          visibility,
+          status,
+          subtitle,
+          experience_date,
+          media,
+          metadata
+        `)
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
