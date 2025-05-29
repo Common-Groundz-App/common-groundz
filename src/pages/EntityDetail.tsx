@@ -654,7 +654,6 @@ const EntityDetail = () => {
                             recommendation={recommendation}
                             onLike={() => handleRecommendationAction('like', recommendation.id)}
                             onSave={() => handleRecommendationAction('save', recommendation.id)}
-                            hideEntityFallbacks={true}
                           />
                         ))}
                       </div>
@@ -700,7 +699,6 @@ const EntityDetail = () => {
                             onLike={() => handleReviewAction('like', review.id)}
                             onSave={() => handleReviewAction('save', review.id)}
                             refreshReviews={refreshData}
-                            hideEntityFallbacks={true}
                           />
                         ))}
                       </div>

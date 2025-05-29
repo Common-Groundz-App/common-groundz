@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +34,6 @@ interface ReviewCardProps {
   onSave: (id: string) => void;
   onConvert?: (id: string) => void;
   refreshReviews: () => Promise<void>;
-  hideEntityFallbacks?: boolean;
 }
 
 const ReviewCard = ({ 
@@ -41,8 +41,7 @@ const ReviewCard = ({
   onLike, 
   onSave,
   onConvert,
-  refreshReviews,
-  hideEntityFallbacks = false
+  refreshReviews 
 }: ReviewCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -58,12 +57,10 @@ const ReviewCard = ({
   
   // Process media items for display with improved fallback handling
   const mediaItems = React.useMemo(() => {
-    // If media array is already provided - these are user uploads
     if (review.media && Array.isArray(review.media) && review.media.length > 0) {
       return review.media as MediaItem[];
     }
     
-    // If we have a legacy image_url - this is user uploaded content
     if (review.image_url) {
       return [{
         url: review.image_url,
@@ -73,7 +70,6 @@ const ReviewCard = ({
       }] as MediaItem[];
     }
     
-    // If we have an entity with an image, use it as fallback - mark as entity source
     if (entityImageUrl) {
       return [{
         url: entityImageUrl,
@@ -86,25 +82,6 @@ const ReviewCard = ({
     
     return [] as MediaItem[];
   }, [review, entityImageUrl]);
-  
-  // Check if we should hide media based on hideEntityFallbacks prop
-  const shouldShowMedia = React.useMemo(() => {
-    if (!hideEntityFallbacks) {
-      return mediaItems.length > 0;
-    }
-    
-    // If hideEntityFallbacks is true, only hide media if ALL items are entity fallbacks
-    const allItemsAreEntityFallbacks = mediaItems.every(item => item.source === 'entity');
-    
-    console.log(`Should show media for review ${review.id}:`, {
-      hideEntityFallbacks,
-      mediaItemsLength: mediaItems.length,
-      allItemsAreEntityFallbacks,
-      result: !allItemsAreEntityFallbacks && mediaItems.length > 0
-    });
-    
-    return !allItemsAreEntityFallbacks && mediaItems.length > 0;
-  }, [mediaItems, hideEntityFallbacks, review.id]);
   
   // Get a category-specific fallback image URL for when no image is available
   const getCategoryFallbackImage = (category: string): string => {
@@ -363,30 +340,28 @@ const ReviewCard = ({
             </div>
           </div>
           
-          {/* Media - Only show if shouldShowMedia is true */}
-          {shouldShowMedia && (
-            <div className="mt-3">
-              {mediaItems.length > 0 ? (
-                <PostMediaDisplay 
-                  media={mediaItems} 
-                  className="mt-2 mb-3"
-                  aspectRatio="maintain"
-                  objectFit="contain"
-                  enableBackground={true}
-                  thumbnailDisplay="none"
+          {/* Media */}
+          <div className="mt-3">
+            {mediaItems.length > 0 ? (
+              <PostMediaDisplay 
+                media={mediaItems} 
+                className="mt-2 mb-3"
+                aspectRatio="maintain"
+                objectFit="contain"
+                enableBackground={true}
+                thumbnailDisplay="none"
+              />
+            ) : (
+              <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
+                <ImageWithFallback
+                  src={getFallbackImage()}
+                  alt={`${review.title} - ${review.category || 'Review'}`}
+                  className="w-full h-full object-cover"
+                  fallbackSrc={review.category ? getCategoryFallbackImage(review.category) : undefined}
                 />
-              ) : (
-                <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
-                  <ImageWithFallback
-                    src={getFallbackImage()}
-                    alt={`${review.title} - ${review.category || 'Review'}`}
-                    className="w-full h-full object-cover"
-                    fallbackSrc={review.category ? getCategoryFallbackImage(review.category) : undefined}
-                  />
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
           
           {/* Description */}
           {review.description && (
