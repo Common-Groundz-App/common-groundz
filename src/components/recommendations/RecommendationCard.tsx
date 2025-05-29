@@ -218,7 +218,7 @@ const RecommendationCard = ({
       return;
     }
     
-    navigate(`/recommendation/${recommendation.id}`);
+    navigate(`/recommendations/${recommendation.id}`);
   };
 
   return (
@@ -355,7 +355,7 @@ const RecommendationCard = ({
               className="flex items-center gap-1 py-0 px-2 sm:px-4"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/recommendation/${recommendation.id}?commentId=new`);
+                navigate(`/recommendations/${recommendation.id}?commentId=new`);
               }}
             >
               <MessageCircle className="h-5 w-5" />
