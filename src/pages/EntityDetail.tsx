@@ -78,6 +78,13 @@ const EntityDetail = () => {
     }
   }, [isLoading, recommendations, reviews]);
 
+  // Log contributors when available for debugging
+  useEffect(() => {
+    if (circleContributors.length > 0) {
+      console.log('Contributors ready for display:', circleContributors);
+    }
+  }, [circleContributors]);
+
   if (!isLoading && (error || !entity)) {
     return <NotFound />;
   }
@@ -503,8 +510,7 @@ const EntityDetail = () => {
                         <div className="font-semibold text-sm whitespace-nowrap">Circle Rating</div>
                         <div className="text-xs text-muted-foreground">
                           Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
-                          {/* Log contributors for now - will be replaced with visual component in Phase 2 */}
-                          {circleContributors.length > 0 && console.log('Contributors ready for display:', circleContributors)}
+                          {/* Contributors will be displayed here in Phase 2 */}
                         </div>
                       </div>
                     </div>
