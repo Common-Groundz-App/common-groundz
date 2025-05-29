@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -26,6 +25,8 @@ import TagBadge from '@/components/feed/TagBadge';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
+import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
+import { LightboxPreview } from '@/components/media/LightboxPreview';
 
 // Helper function to reset pointer-events on body if they're set to none
 const resetBodyPointerEvents = () => {
@@ -67,6 +68,8 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   const [localIsLiked, setLocalIsLiked] = useState(false);
   const [localIsSaved, setLocalIsSaved] = useState(false);
   const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   
   const isOwner = user?.id === post.user_id;
   const CONTENT_LIMIT = 280;
@@ -316,6 +319,37 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
     );
   };
 
+  const handleImageClick = (index: number) => {
+    setActiveImageIndex(index);
+    setLightboxOpen(true);
+  };
+
+  // Filter and prepare media for display
+  const getValidMedia = () => {
+    if (!post.media || post.media.length === 0) return [];
+    
+    return post.media
+      .filter(item => !item.is_deleted)
+      .sort((a, b) => a.order - b.order)
+      .map(item => {
+        if (!item.orientation && item.width && item.height) {
+          const ratio = item.width / item.height;
+          let orientation: 'portrait' | 'landscape' | 'square';
+          
+          if (ratio > 1.05) orientation = 'landscape';
+          else if (ratio < 0.95) orientation = 'portrait';
+          else orientation = 'square';
+          
+          return { ...item, orientation };
+        } else if (!item.orientation) {
+          return { ...item, orientation: 'landscape' as const };
+        }
+        
+        return item;
+      });
+  };
+
+  const validMedia = getValidMedia();
   const displayCommentCount = localCommentCount !== null ? localCommentCount : 0;
 
   return (
@@ -390,14 +424,20 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           )}
         </div>
 
-        {/* Media Content */}
-        {post.media && post.media.length > 0 && (
-          <PostMediaDisplay 
-            media={post.media} 
+        {/* Media Content - Using TwitterStyleMediaPreview directly to avoid buggy lightbox */}
+        {validMedia.length > 0 && (
+          <TwitterStyleMediaPreview
+            media={validMedia}
+            readOnly={true}
             className="mt-3 mb-4"
-            maxHeight="h-80"
+            maxHeight="h-auto max-h-[480px]"
             aspectRatio="maintain"
             objectFit="contain"
+            enableBackground={true}
+            thumbnailDisplay="always"
+            enableLazyLoading={true}
+            displayMode="linkedin"
+            onImageClick={handleImageClick}
           />
         )}
         
@@ -460,6 +500,15 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           </Button>
         </div>
       </CardContent>
+      
+      {/* Working Lightbox Preview */}
+      {lightboxOpen && validMedia.length > 0 && (
+        <LightboxPreview
+          media={validMedia}
+          initialIndex={activeImageIndex}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
       
       {/* Comments Dialog */}
       {isCommentDialogOpen && (
