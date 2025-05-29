@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { LucideIcon, MoreHorizontal, Settings, Home, Star, Search, User, Bell } from "lucide-react";
+import { LucideIcon, MoreHorizontal, Settings, Home, Star, Search, User, Bell, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/Logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -49,6 +50,7 @@ export function VerticalTubelightNavbar({
   const defaultNavItems: NavItem[] = [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
+    { name: 'Circle Picks', url: '/circle-picks', icon: Users },
     { name: 'Profile', url: '/profile', icon: User },
     { 
       name: 'Notifications', 
