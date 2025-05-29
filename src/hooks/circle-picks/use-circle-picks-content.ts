@@ -29,100 +29,112 @@ export const useCirclePicksContent = ({ followedUserIds, filters }: UseCirclePic
 
         const allItems: CirclePicksItem[] = [];
 
-        // Fetch recommendations
-        const { data: recommendations, error: recError } = await supabase
-          .from('recommendations')
-          .select('*')
-          .in('user_id', followedUserIds)
-          .eq('visibility', 'public');
+        // Fetch recommendations with better error handling
+        try {
+          const { data: recommendations, error: recError } = await supabase
+            .from('recommendations')
+            .select('*')
+            .in('user_id', followedUserIds)
+            .eq('visibility', 'public');
 
-        if (recError) throw recError;
+          if (recError) {
+            console.warn('Error fetching recommendations:', recError);
+          } else if (recommendations) {
+            // Get user profiles for recommendations
+            const recUserIds = recommendations.map(r => r.user_id);
+            const uniqueRecUserIds = [...new Set(recUserIds)];
 
-        // Fetch reviews
-        const { data: reviews, error: reviewError } = await supabase
-          .from('reviews')
-          .select('*')
-          .in('user_id', followedUserIds)
-          .eq('visibility', 'public');
+            const { data: recProfiles } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .in('id', uniqueRecUserIds);
 
-        if (reviewError) throw reviewError;
-
-        // Get user profiles for all content
-        const allUserIds = [
-          ...(recommendations?.map(r => r.user_id) || []),
-          ...(reviews?.map(r => r.user_id) || [])
-        ];
-        const uniqueUserIds = [...new Set(allUserIds)];
-
-        const { data: profiles, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url')
-          .in('id', uniqueUserIds);
-
-        if (profileError) throw profileError;
-
-        // Transform recommendations
-        if (recommendations) {
-          recommendations.forEach(rec => {
-            const profile = profiles?.find(p => p.id === rec.user_id);
-            if (!profile) return;
-
-            allItems.push({
-              id: rec.id,
-              type: 'recommendation',
-              title: rec.title,
-              content: rec.description,
-              rating: Number(rec.rating),
-              category: rec.category.toLowerCase(),
-              imageUrl: rec.image_url,
-              entityName: rec.title, // Using title as entity name for now
-              entityType: rec.category.toLowerCase(),
-              createdAt: rec.created_at,
-              updatedAt: rec.updated_at,
-              likesCount: 0, // We'll fetch this separately if needed
-              commentsCount: rec.comment_count || 0,
-              isLiked: false, // We'll fetch this separately if needed
-              isSaved: false, // We'll fetch this separately if needed
-              author: {
-                id: profile.id,
-                username: profile.username || 'Unknown User',
-                fullName: profile.username || 'Unknown User',
-                avatarUrl: profile.avatar_url
+            // Transform recommendations
+            recommendations.forEach(rec => {
+              const profile = recProfiles?.find(p => p.id === rec.user_id);
+              if (profile) {
+                allItems.push({
+                  id: rec.id,
+                  type: 'recommendation',
+                  title: rec.title,
+                  content: rec.description,
+                  rating: Number(rec.rating),
+                  category: rec.category.toLowerCase(),
+                  imageUrl: rec.image_url,
+                  entityName: rec.title,
+                  entityType: rec.category.toLowerCase(),
+                  createdAt: rec.created_at,
+                  updatedAt: rec.updated_at,
+                  likesCount: 0,
+                  commentsCount: rec.comment_count || 0,
+                  isLiked: false,
+                  isSaved: false,
+                  author: {
+                    id: profile.id,
+                    username: profile.username || 'Unknown User',
+                    fullName: profile.username || 'Unknown User',
+                    avatarUrl: profile.avatar_url
+                  }
+                });
               }
             });
-          });
+          }
+        } catch (recErr) {
+          console.warn('Failed to fetch recommendations:', recErr);
         }
 
-        // Transform reviews
-        if (reviews) {
-          reviews.forEach(review => {
-            const profile = profiles?.find(p => p.id === review.user_id);
-            if (!profile) return;
+        // Fetch reviews with better error handling
+        try {
+          const { data: reviews, error: reviewError } = await supabase
+            .from('reviews')
+            .select('*')
+            .in('user_id', followedUserIds)
+            .eq('visibility', 'public');
 
-            allItems.push({
-              id: review.id,
-              type: 'review',
-              title: review.title,
-              content: review.description,
-              rating: review.rating,
-              category: review.category.toLowerCase(),
-              imageUrl: review.image_url,
-              entityName: review.title, // Using title as entity name for now
-              entityType: review.category.toLowerCase(),
-              createdAt: review.created_at,
-              updatedAt: review.updated_at,
-              likesCount: 0, // We'll fetch this separately if needed
-              commentsCount: 0, // Reviews don't have comments in current schema
-              isLiked: false, // We'll fetch this separately if needed
-              isSaved: false, // We'll fetch this separately if needed
-              author: {
-                id: profile.id,
-                username: profile.username || 'Unknown User',
-                fullName: profile.username || 'Unknown User',
-                avatarUrl: profile.avatar_url
+          if (reviewError) {
+            console.warn('Error fetching reviews:', reviewError);
+          } else if (reviews) {
+            // Get user profiles for reviews
+            const reviewUserIds = reviews.map(r => r.user_id);
+            const uniqueReviewUserIds = [...new Set(reviewUserIds)];
+
+            const { data: reviewProfiles } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .in('id', uniqueReviewUserIds);
+
+            // Transform reviews
+            reviews.forEach(review => {
+              const profile = reviewProfiles?.find(p => p.id === review.user_id);
+              if (profile) {
+                allItems.push({
+                  id: review.id,
+                  type: 'review',
+                  title: review.title,
+                  content: review.description,
+                  rating: review.rating,
+                  category: review.category.toLowerCase(),
+                  imageUrl: review.image_url,
+                  entityName: review.title,
+                  entityType: review.category.toLowerCase(),
+                  createdAt: review.created_at,
+                  updatedAt: review.updated_at,
+                  likesCount: 0,
+                  commentsCount: 0,
+                  isLiked: false,
+                  isSaved: false,
+                  author: {
+                    id: profile.id,
+                    username: profile.username || 'Unknown User',
+                    fullName: profile.username || 'Unknown User',
+                    avatarUrl: profile.avatar_url
+                  }
+                });
               }
             });
-          });
+          }
+        } catch (reviewErr) {
+          console.warn('Failed to fetch reviews:', reviewErr);
         }
 
         // Apply filters
@@ -153,6 +165,7 @@ export const useCirclePicksContent = ({ followedUserIds, filters }: UseCirclePic
       } catch (err) {
         console.error('Error fetching circle picks content:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch content');
+        setItems([]); // Set empty array on error
       } finally {
         setLoading(false);
       }
@@ -169,6 +182,7 @@ export const useCirclePicksContent = ({ followedUserIds, filters }: UseCirclePic
       if (user && followedUserIds.length > 0) {
         setLoading(true);
         setError(null);
+        // The useEffect will handle the refetch
       }
     }
   };

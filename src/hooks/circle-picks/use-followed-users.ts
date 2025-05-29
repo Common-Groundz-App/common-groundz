@@ -27,7 +27,10 @@ export const useFollowedUsers = () => {
           .select('following_id, created_at')
           .eq('follower_id', user.id);
 
-        if (followsError) throw followsError;
+        if (followsError) {
+          console.error('Error fetching follows:', followsError);
+          throw followsError;
+        }
 
         if (!followsData || followsData.length === 0) {
           setFollowedUsers([]);
@@ -42,28 +45,32 @@ export const useFollowedUsers = () => {
           .select('id, username, avatar_url')
           .in('id', followedUserIds);
 
-        if (profilesError) throw profilesError;
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+          throw profilesError;
+        }
 
-        // Combine the data
-        const followedUsersWithProfiles = followsData
-          .map(follow => {
-            const profile = profilesData?.find(p => p.id === follow.following_id);
-            if (!profile) return null;
-
-            return {
+        // Combine the data with proper type handling
+        const followedUsersWithProfiles: FollowedUser[] = [];
+        
+        followsData.forEach(follow => {
+          const profile = profilesData?.find(p => p.id === follow.following_id);
+          if (profile) {
+            followedUsersWithProfiles.push({
               id: profile.id,
               username: profile.username || 'Unknown User',
               fullName: profile.username || 'Unknown User',
-              avatarUrl: profile.avatar_url,
+              avatarUrl: profile.avatar_url || undefined, // Handle optional avatarUrl properly
               followedAt: follow.created_at
-            };
-          })
-          .filter((user): user is FollowedUser => user !== null);
+            });
+          }
+        });
 
         setFollowedUsers(followedUsersWithProfiles);
       } catch (err) {
         console.error('Error fetching followed users:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch followed users');
+        setFollowedUsers([]); // Set empty array on error
       } finally {
         setLoading(false);
       }
@@ -80,6 +87,7 @@ export const useFollowedUsers = () => {
       if (user) {
         setLoading(true);
         setError(null);
+        // The useEffect will handle the refetch
       }
     }
   };
