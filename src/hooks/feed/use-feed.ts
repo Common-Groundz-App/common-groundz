@@ -1,5 +1,6 @@
+
 import { useState, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { FeedVisibility, FeedState } from './types';
@@ -12,6 +13,7 @@ const ITEMS_PER_PAGE = 10;
 export const useFeed = (feedType: FeedVisibility) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [state, setState] = useState<FeedState>({
     items: [],
     isLoading: true,
@@ -21,14 +23,14 @@ export const useFeed = (feedType: FeedVisibility) => {
     isLoadingMore: false
   });
 
-  // Use React Query to fetch the feed data
+  // Use React Query to fetch the feed data - removed page from query key
   const { 
     data: feedData,
     error: feedError,
     isLoading: isFeedLoading,
     refetch
   } = useQuery({
-    queryKey: ['feed', feedType, user?.id, state.page],
+    queryKey: ['feed', feedType, user?.id],
     queryFn: async () => {
       const fetchFunction = feedType === 'for_you' ? fetchForYouFeed : fetchFollowingFeed;
       return await fetchFunction({ 
@@ -84,15 +86,25 @@ export const useFeed = (feedType: FeedVisibility) => {
     }));
   }, [state.isLoadingMore, state.hasMore]);
 
-  // Refresh feed
+  // Refresh feed - fixed to properly reset state and invalidate cache
   const refreshFeed = useCallback(async () => {
+    // Reset state to initial values
     setState(prev => ({ 
       ...prev, 
       page: 0,
-      isLoading: true 
+      items: [],
+      isLoading: true,
+      error: null
     }));
+
+    // Invalidate the query cache to force fresh data
+    await queryClient.invalidateQueries({
+      queryKey: ['feed', feedType, user?.id]
+    });
+
+    // Refetch the data
     await refetch();
-  }, [refetch]);
+  }, [queryClient, feedType, user?.id, refetch]);
 
   const { handleLike: interactionLike, handleSave: interactionSave } = useInteractions();
 
