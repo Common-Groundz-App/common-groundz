@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/use-profile-cache';
 import { fetchFollowerCount, fetchFollowingCount } from '@/services/profileService';
 
 interface ViewedProfile {
@@ -19,7 +19,13 @@ interface ViewedProfile {
 
 export const useViewedProfile = (profileUserId?: string) => {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<ViewedProfile>({
+  const viewingUserId = profileUserId || user?.id;
+  const isOwnProfile = !profileUserId || (user && profileUserId === user.id);
+  
+  // Use enhanced profile service
+  const { data: profile, isLoading: profileLoading, error: profileError } = useProfile(viewingUserId);
+  
+  const [profile_state, setProfile] = useState<ViewedProfile>({
     username: '',
     bio: '',
     location: '',
@@ -30,15 +36,12 @@ export const useViewedProfile = (profileUserId?: string) => {
     followingCount: 0,
     isLoading: true,
     error: null,
-    isOwnProfile: false
+    isOwnProfile
   });
 
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const viewingUserId = profileUserId || user?.id;
-        const isOwnProfile = !profileUserId || (user && profileUserId === user.id);
-        
         if (!viewingUserId) {
           setProfile(prev => ({
             ...prev,
@@ -49,56 +52,50 @@ export const useViewedProfile = (profileUserId?: string) => {
           return;
         }
 
-        const { data: profileData, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', viewingUserId)
-          .single();
+        if (profile) {
+          const [followerCountData, followingCountData] = await Promise.all([
+            fetchFollowerCount(viewingUserId),
+            fetchFollowingCount(viewingUserId)
+          ]);
+          
+          console.log(`Fetched counts for ${viewingUserId}: followers=${followerCountData}, following=${followingCountData}`);
 
-        if (error) throw error;
-
-        const [followerCountData, followingCountData] = await Promise.all([
-          fetchFollowerCount(viewingUserId),
-          fetchFollowingCount(viewingUserId)
-        ]);
-        
-        console.log(`Fetched counts for ${viewingUserId}: followers=${followerCountData}, following=${followingCountData}`);
-
-        let displayName = profileData?.username || 'User';
-        if (isOwnProfile && user?.user_metadata) {
-          const { first_name, last_name } = user.user_metadata;
-          if (first_name || last_name) {
-            displayName = `${first_name || ''} ${last_name || ''}`.trim();
-          }
+          setProfile({
+            username: profile.username,
+            bio: profile.bio,
+            location: profile.location,
+            avatarUrl: profile.avatar_url,
+            createdAt: profile.created_at || new Date().toISOString(),
+            displayName: profile.displayName,
+            followerCount: followerCountData,
+            followingCount: followingCountData,
+            isLoading: false,
+            error: null,
+            isOwnProfile
+          });
         }
-
-        setProfile({
-          username: profileData?.username || null,
-          bio: profileData?.bio || null,
-          location: profileData?.location || null,
-          avatarUrl: profileData?.avatar_url || null,
-          createdAt: profileData?.created_at || new Date().toISOString(),
-          displayName,
-          followerCount: followerCountData,
-          followingCount: followingCountData,
-          isLoading: false,
-          error: null,
-          isOwnProfile
-        });
       } catch (error) {
         console.error('Error fetching profile:', error);
         setProfile(prev => ({
           ...prev,
           isLoading: false,
           error: error as Error,
-          isOwnProfile: !profileUserId || (user && profileUserId === user?.id) || false
+          isOwnProfile
         }));
       }
     };
 
     if (user) {
-      setProfile(prev => ({ ...prev, isLoading: true }));
-      fetchProfileData();
+      setProfile(prev => ({ ...prev, isLoading: profileLoading }));
+      if (!profileLoading && profile) {
+        fetchProfileData();
+      } else if (profileError) {
+        setProfile(prev => ({ 
+          ...prev, 
+          isLoading: false,
+          error: profileError as Error
+        }));
+      }
     } else {
       setProfile(prev => ({ 
         ...prev, 
@@ -106,7 +103,7 @@ export const useViewedProfile = (profileUserId?: string) => {
         error: new Error('User not authenticated')
       }));
     }
-  }, [profileUserId, user]);
+  }, [profileUserId, user, profile, profileLoading, profileError, viewingUserId, isOwnProfile]);
 
   useEffect(() => {
     const handleFollowStatusChange = async (event: CustomEvent) => {
@@ -116,8 +113,8 @@ export const useViewedProfile = (profileUserId?: string) => {
       
       if (profileUserId === following) {
         const updatedCount = action === 'follow' 
-          ? profile.followerCount + 1 
-          : Math.max(0, profile.followerCount - 1);
+          ? profile_state.followerCount + 1 
+          : Math.max(0, profile_state.followerCount - 1);
           
         console.log(`Follow status change: ${action} - updating follower count to ${updatedCount}`);
         
@@ -147,7 +144,7 @@ export const useViewedProfile = (profileUserId?: string) => {
           followerCount: event.detail.count
         }));
       } else if (event.detail && typeof event.detail.countChange === 'number') {
-        const newCount = profile.followerCount + event.detail.countChange;
+        const newCount = profile_state.followerCount + event.detail.countChange;
         console.log(`Follower count changed by ${event.detail.countChange} to: ${newCount}`);
         setProfile(prev => ({
           ...prev,
@@ -164,7 +161,7 @@ export const useViewedProfile = (profileUserId?: string) => {
           followingCount: event.detail.count
         }));
       } else if (event.detail && typeof event.detail.countChange === 'number') {
-        const newCount = profile.followingCount + event.detail.countChange;
+        const newCount = profile_state.followingCount + event.detail.countChange;
         console.log(`Following count changed by ${event.detail.countChange} to: ${newCount}`);
         setProfile(prev => ({
           ...prev,
@@ -182,9 +179,9 @@ export const useViewedProfile = (profileUserId?: string) => {
       window.removeEventListener('profile-follower-count-changed', handleFollowerCountChanged as EventListener);
       window.removeEventListener('profile-following-count-changed', handleFollowingCountChanged as EventListener);
     };
-  }, [profileUserId, profile.followerCount, profile.followingCount]);
+  }, [profileUserId, profile_state.followerCount, profile_state.followingCount]);
 
   return {
-    ...profile
+    ...profile_state
   };
 };

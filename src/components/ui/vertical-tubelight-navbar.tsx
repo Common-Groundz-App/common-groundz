@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -16,10 +17,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { SearchDialog } from "@/components/SearchDialog";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
+import { useProfile } from "@/hooks/use-profile-cache";
 
 interface NavItem {
   name: string;
@@ -65,48 +66,15 @@ export function VerticalTubelightNavbar({
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const { user, signOut } = useAuth();
   const { toast } = useToast();
-  const [profileData, setProfileData] = useState({
-    fullName: "",
-    username: "",
-    avatarUrl: null as string | null
-  });
+  
+  // Use enhanced profile service
+  const { data: profile, isLoading } = useProfile(user?.id);
 
   useEffect(() => {
     if (initialActiveTab) {
       setActiveTab(initialActiveTab);
     }
   }, [initialActiveTab]);
-
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      if (!user) return;
-      
-      try {
-        const userMetadata = user.user_metadata;
-        const firstName = userMetadata?.first_name || '';
-        const lastName = userMetadata?.last_name || '';
-        const fullName = `${firstName} ${lastName}`.trim();
-        
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('username, avatar_url')
-          .eq('id', user.id)
-          .single();
-        
-        if (error) throw error;
-        
-        setProfileData({
-          fullName: fullName || (data?.username || user.email?.split('@')[0] || 'User'),
-          username: data?.username || user.email?.split('@')[0] || 'user',
-          avatarUrl: data?.avatar_url
-        });
-      } catch (error) {
-        console.error("Error fetching profile data:", error);
-      }
-    };
-    
-    fetchProfileData();
-  }, [user]);
 
   const handleNavItemClick = (item: NavItem) => {
     setActiveTab(item.name);
@@ -116,12 +84,8 @@ export function VerticalTubelightNavbar({
   };
 
   const getInitials = () => {
-    if (profileData.fullName) {
-      const words = profileData.fullName.trim().split(' ');
-      if (words.length === 1) {
-        return words[0].substring(0, 2).toUpperCase();
-      }
-      return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    if (profile?.initials) {
+      return profile.initials;
     }
     
     if (user?.email) {
@@ -147,6 +111,10 @@ export function VerticalTubelightNavbar({
       });
     }
   };
+
+  // Use enhanced profile data with fallbacks
+  const displayName = profile?.displayName || user?.email?.split('@')[0] || 'User';
+  const username = profile?.username || user?.email?.split('@')[0] || 'user';
 
   return (
     <>
@@ -233,12 +201,12 @@ export function VerticalTubelightNavbar({
                 <button className="w-full flex items-center px-3 py-2 rounded-md hover:bg-accent transition-colors">
                   <div className="flex items-center w-full">
                     <Avatar className="h-9 w-9">
-                      <AvatarImage src={profileData.avatarUrl || ""} />
+                      <AvatarImage src={profile?.avatar_url || ""} />
                       <AvatarFallback>{getInitials()}</AvatarFallback>
                     </Avatar>
                     <div className="ml-3 flex-1 min-w-0 hidden md:block text-left">
-                      <p className="text-sm font-medium truncate">{profileData.fullName}</p>
-                      <p className="text-xs text-muted-foreground truncate">@{profileData.username}</p>
+                      <p className="text-sm font-medium truncate">{displayName}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{username}</p>
                     </div>
                     <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
                   </div>

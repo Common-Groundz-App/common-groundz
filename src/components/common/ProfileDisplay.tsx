@@ -4,6 +4,7 @@ import { ProfileAvatar } from './ProfileAvatar';
 import { useProfile } from '@/hooks/use-profile-cache';
 import UsernameLink from './UsernameLink';
 import { cn } from '@/lib/utils';
+import { ProfileErrorBoundary } from './ProfileErrorBoundary';
 
 interface ProfileDisplayProps {
   userId: string | null | undefined;
@@ -23,7 +24,7 @@ const spacingClasses = {
   loose: 'gap-3'
 };
 
-export const ProfileDisplay: React.FC<ProfileDisplayProps> = ({
+const ProfileDisplayContent: React.FC<ProfileDisplayProps> = ({
   userId,
   size = 'md',
   showUsername = true,
@@ -34,7 +35,7 @@ export const ProfileDisplay: React.FC<ProfileDisplayProps> = ({
   direction = 'horizontal',
   spacing = 'normal'
 }) => {
-  const { data: profile, isLoading } = useProfile(userId);
+  const { data: profile, isLoading, error } = useProfile(userId);
 
   const containerClasses = cn(
     'flex items-center',
@@ -42,6 +43,34 @@ export const ProfileDisplay: React.FC<ProfileDisplayProps> = ({
     spacingClasses[spacing],
     className
   );
+
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <div className={containerClasses}>
+        <ProfileAvatar userId={null} size={size} className={cn('animate-pulse', avatarClassName)} />
+        {showUsername && (
+          <span className={cn('text-muted-foreground animate-pulse', usernameClassName)}>
+            Loading...
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <div className={containerClasses}>
+        <ProfileAvatar userId={null} size={size} className={avatarClassName} />
+        {showUsername && (
+          <span className={cn('text-muted-foreground', usernameClassName)}>
+            Error loading user
+          </span>
+        )}
+      </div>
+    );
+  }
 
   if (!userId) {
     return (
@@ -66,15 +95,34 @@ export const ProfileDisplay: React.FC<ProfileDisplayProps> = ({
               username={profile?.displayName}
               userId={userId}
               className="truncate"
-              fallback={isLoading ? 'Loading...' : 'Unknown User'}
+              fallback="Unknown User"
             />
           ) : (
             <span className="text-sm font-medium truncate">
-              {isLoading ? 'Loading...' : profile?.displayName || 'Unknown User'}
+              {profile?.displayName || 'Unknown User'}
             </span>
           )}
         </div>
       )}
     </div>
+  );
+};
+
+export const ProfileDisplay: React.FC<ProfileDisplayProps> = (props) => {
+  return (
+    <ProfileErrorBoundary
+      fallback={
+        <div className={cn('flex items-center gap-2', props.className)}>
+          <ProfileAvatar userId={null} size={props.size} className={props.avatarClassName} />
+          {props.showUsername && (
+            <span className={cn('text-muted-foreground', props.usernameClassName)}>
+              Error
+            </span>
+          )}
+        </div>
+      }
+    >
+      <ProfileDisplayContent {...props} />
+    </ProfileErrorBoundary>
   );
 };

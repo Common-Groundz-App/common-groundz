@@ -44,22 +44,9 @@ export function UserMenu() {
     );
   }
 
-  // Generate display name with fallbacks
-  const getDisplayName = (): string => {
-    if (profile?.displayName) return profile.displayName;
-    
-    const userMetadata = user.user_metadata;
-    const firstName = userMetadata?.first_name || '';
-    const lastName = userMetadata?.last_name || '';
-    
-    if (firstName || lastName) {
-      return `${firstName} ${lastName}`.trim();
-    }
-    
-    return user.email?.split('@')[0] || 'User';
-  };
-
-  const displayName = getDisplayName();
+  // Use enhanced profile data with fallbacks
+  const displayName = profile?.displayName || user.email?.split('@')[0] || 'User';
+  const initials = profile?.initials || displayName.substring(0, 2).toUpperCase();
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -71,7 +58,7 @@ export function UserMenu() {
               alt={displayName} 
             />
             <AvatarFallback className="bg-brand-orange text-white">
-              {profile?.initials || displayName.substring(0, 2).toUpperCase()}
+              {initials}
             </AvatarFallback>
           </Avatar>
         </Button>

@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserProfile, getDisplayName, fetchFollowerCount, fetchFollowingCount } from '@/services/profileService'; 
+import { useProfile } from '@/hooks/use-profile-cache';
+import { fetchFollowerCount, fetchFollowingCount } from '@/services/profileService'; 
 import { useProfileFollows } from './profile/use-profile-follows';
 import { useProfileImages } from './profile/use-profile-images';
 import { useProfileMetadata } from './profile/use-profile-metadata';
@@ -12,8 +13,12 @@ const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5
 export const useProfileData = (userId?: string) => {
   const { user } = useAuth();
   const [error, setError] = useState<Error | null>(null);
-  const [profileData, setProfileData] = useState<any>(null);
   const [isOwnProfile, setIsOwnProfile] = useState<boolean>(false);
+
+  const viewingUserId = userId || user?.id;
+  
+  // Use the enhanced profile service instead of direct fetching
+  const { data: profile, isLoading } = useProfile(viewingUserId);
 
   const {
     followerCount,
@@ -43,16 +48,23 @@ export const useProfileData = (userId?: string) => {
     setProfileMetadata
   } = useProfileMetadata();
 
-  // Use React Query to fetch profile data
-  const viewingUserId = userId || user?.id;
-  
-  const { data: profile, isLoading } = useQuery({
-    queryKey: ['profile', viewingUserId],
-    queryFn: () => fetchUserProfile(viewingUserId as string),
-    enabled: !!viewingUserId && !!user,
+  // Use React Query to fetch follower and following counts
+  const { data: followerCountData } = useQuery({
+    queryKey: ['followerCount', viewingUserId],
+    queryFn: () => fetchFollowerCount(viewingUserId as string),
+    enabled: !!viewingUserId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
-    refetchOnWindowFocus: false, // Important: prevent refetch on window focus
+    refetchOnWindowFocus: false,
+  });
+  
+  const { data: followingCountData } = useQuery({
+    queryKey: ['followingCount', viewingUserId],
+    queryFn: () => fetchFollowingCount(viewingUserId as string),
+    enabled: !!viewingUserId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -63,40 +75,25 @@ export const useProfileData = (userId?: string) => {
       setIsOwnProfile(!userId || userId === user.id);
       
       if (profile) {
-        console.log("Profile data loaded:", profile);
-        setProfileData(profile);
+        console.log("Enhanced profile data loaded:", profile);
         
-        const displayName = getDisplayName(user, profile);
-        setUsername(displayName);
-        setProfileMetadata(user.user_metadata, profile);
+        setUsername(profile.displayName);
+        setProfileMetadata(user.user_metadata, { 
+          username: profile.username,
+          bio: profile.bio,
+          location: profile.location 
+        });
         
-        // This will now use cached images if available
-        setInitialImages(profile);
+        setInitialImages({ 
+          avatar_url: profile.avatar_url,
+          cover_url: null 
+        });
       }
     } catch (err) {
       console.error('Error:', err);
       setError(err instanceof Error ? err : new Error('Failed to load profile data'));
     }
   }, [user, userId, profile, setUsername, setProfileMetadata, setInitialImages]);
-
-  // Use React Query to fetch follower and following counts
-  const { data: followerCountData } = useQuery({
-    queryKey: ['followerCount', viewingUserId],
-    queryFn: () => fetchFollowerCount(viewingUserId as string),
-    enabled: !!viewingUserId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 10, // 10 minutes
-    refetchOnWindowFocus: false, // Important: prevent refetch on window focus
-  });
-  
-  const { data: followingCountData } = useQuery({
-    queryKey: ['followingCount', viewingUserId],
-    queryFn: () => fetchFollowingCount(viewingUserId as string),
-    enabled: !!viewingUserId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 10, // 10 minutes
-    refetchOnWindowFocus: false, // Important: prevent refetch on window focus
-  });
   
   // Update follower and following counts when data changes
   useEffect(() => {
@@ -114,7 +111,7 @@ export const useProfileData = (userId?: string) => {
   return {
     isLoading,
     error,
-    profileData,
+    profileData: profile,
     isOwnProfile,
     coverImage,
     profileImage,
