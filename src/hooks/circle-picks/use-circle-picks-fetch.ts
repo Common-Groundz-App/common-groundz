@@ -35,20 +35,16 @@ export const useCirclePicksFetch = ({
 
       if (followsError) throw followsError;
 
-      const followedIds = follows.map(f => f.following_id);
+      const followedIds = follows?.map(f => f.following_id) || [];
       
       if (followedIds.length === 0) {
         return { recommendations: [], reviews: [] };
       }
 
-      // Fetch recommendations from followed users
+      // Fetch recommendations from followed users with simplified query
       let recQuery = supabase
         .from('recommendations')
-        .select(`
-          *,
-          entity:entities(*),
-          profiles!recommendations_user_id_fkey(username, avatar_url)
-        `)
+        .select('*')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
@@ -67,13 +63,10 @@ export const useCirclePicksFetch = ({
       
       if (recError) throw recError;
 
-      // Fetch reviews from followed users
+      // Fetch reviews from followed users with simplified query
       let reviewQuery = supabase
         .from('reviews')
-        .select(`
-          *,
-          profiles!reviews_user_id_fkey(username, avatar_url)
-        `)
+        .select('*')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
@@ -92,17 +85,32 @@ export const useCirclePicksFetch = ({
       
       if (reviewError) throw reviewError;
 
-      // Format the data
+      // Get user profiles for the content
+      const allUserIds = [
+        ...new Set([
+          ...(recommendations || []).map(r => r.user_id),
+          ...(reviews || []).map(r => r.user_id)
+        ])
+      ];
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', allUserIds);
+
+      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      // Format the data with profile information
       const formattedRecommendations = (recommendations || []).map(rec => ({
         ...rec,
-        username: rec.profiles?.username || 'Unknown',
-        avatar_url: rec.profiles?.avatar_url || null
+        username: profilesMap.get(rec.user_id)?.username || 'Unknown',
+        avatar_url: profilesMap.get(rec.user_id)?.avatar_url || null
       }));
 
       const formattedReviews = (reviews || []).map(review => ({
         ...review,
-        username: review.profiles?.username || 'Unknown',
-        avatar_url: review.profiles?.avatar_url || null
+        username: profilesMap.get(review.user_id)?.username || 'Unknown',
+        avatar_url: profilesMap.get(review.user_id)?.avatar_url || null
       }));
 
       return {
@@ -126,11 +134,7 @@ export const useCirclePicksFetch = ({
       // Fetch user's recommendations
       let myRecQuery = supabase
         .from('recommendations')
-        .select(`
-          *,
-          entity:entities(*),
-          profiles!recommendations_user_id_fkey(username, avatar_url)
-        `)
+        .select('*')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
@@ -151,10 +155,7 @@ export const useCirclePicksFetch = ({
       // Fetch user's reviews
       let myReviewQuery = supabase
         .from('reviews')
-        .select(`
-          *,
-          profiles!reviews_user_id_fkey(username, avatar_url)
-        `)
+        .select('*')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
@@ -172,17 +173,24 @@ export const useCirclePicksFetch = ({
       
       if (myReviewError) throw myReviewError;
 
+      // Get user profile
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', userId)
+        .single();
+
       // Format the data
       const formattedMyRecommendations = (myRecommendations || []).map(rec => ({
         ...rec,
-        username: rec.profiles?.username || 'Unknown',
-        avatar_url: rec.profiles?.avatar_url || null
+        username: userProfile?.username || 'Unknown',
+        avatar_url: userProfile?.avatar_url || null
       }));
 
       const formattedMyReviews = (myReviews || []).map(review => ({
         ...review,
-        username: review.profiles?.username || 'Unknown',
-        avatar_url: review.profiles?.avatar_url || null
+        username: userProfile?.username || 'Unknown',
+        avatar_url: userProfile?.avatar_url || null
       }));
 
       return {
