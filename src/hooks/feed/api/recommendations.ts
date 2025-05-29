@@ -110,6 +110,17 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
     const processedRecommendations: RecommendationFeedItem[] = recommendations.map(rec => {
       const profile = profilesMap[rec.user_id];
       
+      // Process entity data to ensure metadata is properly typed
+      let processedEntity = null;
+      if (rec.entities) {
+        processedEntity = {
+          ...rec.entities,
+          metadata: rec.entities.metadata && typeof rec.entities.metadata === 'object' 
+            ? rec.entities.metadata as Record<string, any>
+            : {}
+        };
+      }
+      
       return {
         ...rec,
         category: mapDatabaseCategoryToEnum(rec.category), // Convert database category to enum
@@ -120,7 +131,7 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
         comment_count: commentsCount.get(rec.id) || 0,
         is_liked: userLikes.has(rec.id),
         is_saved: userSaves.has(rec.id),
-        entity: rec.entities || null
+        entity: processedEntity
       };
     });
 
@@ -199,6 +210,17 @@ export const processRecommendations = async (
     const processedRecommendations: RecommendationFeedItem[] = recsData.map(rec => {
       const profile = profilesMap[rec.user_id];
       
+      // Process entity data to ensure metadata is properly typed
+      let processedEntity = null;
+      if (rec.entities) {
+        processedEntity = {
+          ...rec.entities,
+          metadata: rec.entities.metadata && typeof rec.entities.metadata === 'object' 
+            ? rec.entities.metadata as Record<string, any>
+            : {}
+        };
+      }
+      
       return {
         ...rec, // This spreads all original recommendation properties including category, is_certified, view_count
         category: mapDatabaseCategoryToEnum(rec.category), // Convert database category to enum
@@ -209,7 +231,7 @@ export const processRecommendations = async (
         comment_count: commentsCount.get(rec.id) || 0,
         is_liked: userLikes.has(rec.id),
         is_saved: userSaves.has(rec.id),
-        entity: rec.entities || null
+        entity: processedEntity
       };
     });
 
