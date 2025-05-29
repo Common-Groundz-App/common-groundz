@@ -4,20 +4,23 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { useProfile, useProfileCacheActions } from '@/hooks/use-profile-cache';
 
 interface ProfileAvatarProps {
-  username: string;
-  profileImage: string;
-  isLoading: boolean;
+  userId?: string | null;
+  username?: string;
+  profileImage?: string;
+  isLoading?: boolean;
   onProfileImageChange?: (url: string) => void;
   onImageSelected?: (url: string | null) => void;
   isEditable?: boolean;
 }
 
 const ProfileAvatar = ({ 
-  username, 
-  profileImage, 
-  isLoading, 
+  userId,
+  username: propUsername, 
+  profileImage: propProfileImage, 
+  isLoading = false, 
   onProfileImageChange,
   onImageSelected,
   isEditable = true
@@ -25,6 +28,12 @@ const ProfileAvatar = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
+  const { data: profile } = useProfile(userId || user?.id);
+  const { updateProfileCache } = useProfileCacheActions();
+  
+  // Use cached profile data with prop fallbacks
+  const username = propUsername || profile?.displayName || profile?.username || 'User';
+  const profileImage = propProfileImage || profile?.avatar_url || '';
   
   console.log("ProfileAvatar rendering with profileImage:", profileImage);
 
@@ -81,6 +90,14 @@ const ProfileAvatar = ({
       
       // Update the visual display
       onProfileImageChange(urlWithTimestamp);
+      
+      // Update the profile cache
+      if (profile) {
+        updateProfileCache(user.id, {
+          ...profile,
+          avatar_url: publicUrl
+        });
+      }
       
     } catch (error) {
       console.error('Error uploading profile image:', error);

@@ -13,64 +13,20 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = React.useState(false);
-  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
-  const [displayName, setDisplayName] = React.useState<string>('');
-
-  // Function to fetch the avatar and user data
-  const fetchUserData = async () => {
-    if (!user) return;
-    
-    try {
-      // Get user metadata
-      const userMetadata = user.user_metadata;
-      const firstName = userMetadata?.first_name || '';
-      const lastName = userMetadata?.last_name || '';
-      
-      if (firstName || lastName) {
-        setDisplayName(`${firstName} ${lastName}`.trim());
-      } else {
-        setDisplayName(user.email?.split('@')[0] || 'User');
-      }
-      
-      // Get avatar
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('avatar_url')
-        .eq('id', user.id)
-        .single();
-      
-      if (error) {
-        console.error("Error fetching avatar:", error);
-        return;
-      }
-      
-      // Add timestamp to force image refresh
-      if (data?.avatar_url) {
-        setAvatarUrl(data.avatar_url + '?t=' + new Date().getTime());
-      } else {
-        setAvatarUrl(null);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
-  // Initial fetch when component mounts or user changes
-  React.useEffect(() => {
-    if (user) {
-      fetchUserData();
-    }
-  }, [user]);
+  const { data: profile, isLoading } = useProfile(user?.id);
+  const { invalidateProfile } = useProfileCacheActions();
 
   // Listen for profile update events
   React.useEffect(() => {
     const handleProfileUpdate = () => {
-      fetchUserData();
+      if (user?.id) {
+        invalidateProfile(user.id);
+      }
     };
 
     window.addEventListener('profile-updated', handleProfileUpdate);
@@ -78,7 +34,7 @@ export function UserMenu() {
     return () => {
       window.removeEventListener('profile-updated', handleProfileUpdate);
     };
-  }, []);
+  }, [user?.id, invalidateProfile]);
 
   if (!user) {
     return (
@@ -88,21 +44,22 @@ export function UserMenu() {
     );
   }
 
-  const getInitials = () => {
-    if (displayName) {
-      const words = displayName.trim().split(' ');
-      if (words.length === 1) {
-        return words[0].substring(0, 2).toUpperCase();
-      }
-      return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  // Generate display name with fallbacks
+  const getDisplayName = (): string => {
+    if (profile?.displayName) return profile.displayName;
+    
+    const userMetadata = user.user_metadata;
+    const firstName = userMetadata?.first_name || '';
+    const lastName = userMetadata?.last_name || '';
+    
+    if (firstName || lastName) {
+      return `${firstName} ${lastName}`.trim();
     }
     
-    if (user.email) {
-      return user.email.substring(0, 2).toUpperCase();
-    }
-    
-    return "U";
+    return user.email?.split('@')[0] || 'User';
   };
+
+  const displayName = getDisplayName();
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -110,12 +67,11 @@ export function UserMenu() {
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
             <AvatarImage 
-              src={avatarUrl || ""} 
-              alt={displayName || user.email || "User"} 
-              key={avatarUrl} // Add key to force re-render when image changes
+              src={profile?.avatar_url || ""} 
+              alt={displayName} 
             />
             <AvatarFallback className="bg-brand-orange text-white">
-              {getInitials()}
+              {profile?.initials || displayName.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </Button>
