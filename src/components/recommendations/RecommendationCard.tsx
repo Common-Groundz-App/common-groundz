@@ -96,13 +96,13 @@ const RecommendationCard = ({
       entityId: recommendation.entity?.id,
     });
     
-    // If media array is already provided
+    // If media array is already provided - these are user uploads
     if (recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0) {
       console.log(`Using ${recommendation.media.length} media items from recommendation.media`);
       return recommendation.media as MediaItem[];
     }
     
-    // If we have a legacy image_url, convert it to a media item
+    // If we have a legacy image_url - this is user uploaded content
     if (recommendation.image_url) {
       console.log(`Using legacy image_url: ${recommendation.image_url}`);
       return [{
@@ -113,7 +113,7 @@ const RecommendationCard = ({
       }] as MediaItem[];
     }
     
-    // If we have an entity with an image, use it as fallback
+    // If we have an entity with an image, use it as fallback - mark as entity source
     if (entityImageUrl) {
       console.log(`Using entity image as fallback: ${entityImageUrl}`);
       return [{
@@ -121,7 +121,7 @@ const RecommendationCard = ({
         type: 'image' as const,
         order: 0,
         id: `entity-${recommendation.entity?.id}`,
-        source: 'entity' // This is now defined in the MediaItem interface
+        source: 'entity'
       }] as MediaItem[];
     }
     
@@ -135,22 +135,18 @@ const RecommendationCard = ({
       return mediaItems.length > 0;
     }
     
-    // If hideEntityFallbacks is true, only show media if it contains user-uploaded content
-    // (not just entity fallback images)
-    const hasUserUploadedMedia = mediaItems.some(item => 
-      item.source !== 'entity' && 
-      !item.url.includes(entityImageUrl || '')
-    );
+    // If hideEntityFallbacks is true, only hide media if ALL items are entity fallbacks
+    const allItemsAreEntityFallbacks = mediaItems.every(item => item.source === 'entity');
     
     console.log(`Should show media for recommendation ${recommendation.id}:`, {
       hideEntityFallbacks,
       mediaItemsLength: mediaItems.length,
-      hasUserUploadedMedia,
-      result: hasUserUploadedMedia
+      allItemsAreEntityFallbacks,
+      result: !allItemsAreEntityFallbacks && mediaItems.length > 0
     });
     
-    return hasUserUploadedMedia;
-  }, [mediaItems, hideEntityFallbacks, entityImageUrl, recommendation.id]);
+    return !allItemsAreEntityFallbacks && mediaItems.length > 0;
+  }, [mediaItems, hideEntityFallbacks, recommendation.id]);
 
   // Get a category-specific fallback image URL
   const getCategoryFallbackImage = (category: string): string => {

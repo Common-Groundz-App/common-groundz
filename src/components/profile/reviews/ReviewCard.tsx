@@ -58,10 +58,12 @@ const ReviewCard = ({
   
   // Process media items for display with improved fallback handling
   const mediaItems = React.useMemo(() => {
+    // If media array is already provided - these are user uploads
     if (review.media && Array.isArray(review.media) && review.media.length > 0) {
       return review.media as MediaItem[];
     }
     
+    // If we have a legacy image_url - this is user uploaded content
     if (review.image_url) {
       return [{
         url: review.image_url,
@@ -71,6 +73,7 @@ const ReviewCard = ({
       }] as MediaItem[];
     }
     
+    // If we have an entity with an image, use it as fallback - mark as entity source
     if (entityImageUrl) {
       return [{
         url: entityImageUrl,
@@ -90,22 +93,18 @@ const ReviewCard = ({
       return mediaItems.length > 0;
     }
     
-    // If hideEntityFallbacks is true, only show media if it contains user-uploaded content
-    // (not just entity fallback images)
-    const hasUserUploadedMedia = mediaItems.some(item => 
-      item.source !== 'entity' && 
-      !item.url.includes(entityImageUrl || '')
-    );
+    // If hideEntityFallbacks is true, only hide media if ALL items are entity fallbacks
+    const allItemsAreEntityFallbacks = mediaItems.every(item => item.source === 'entity');
     
     console.log(`Should show media for review ${review.id}:`, {
       hideEntityFallbacks,
       mediaItemsLength: mediaItems.length,
-      hasUserUploadedMedia,
-      result: hasUserUploadedMedia
+      allItemsAreEntityFallbacks,
+      result: !allItemsAreEntityFallbacks && mediaItems.length > 0
     });
     
-    return hasUserUploadedMedia;
-  }, [mediaItems, hideEntityFallbacks, entityImageUrl, review.id]);
+    return !allItemsAreEntityFallbacks && mediaItems.length > 0;
+  }, [mediaItems, hideEntityFallbacks, review.id]);
   
   // Get a category-specific fallback image URL for when no image is available
   const getCategoryFallbackImage = (category: string): string => {
