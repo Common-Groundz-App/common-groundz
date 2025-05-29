@@ -1,15 +1,22 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Star, Filter, SortAsc } from 'lucide-react';
+import { useCirclePicks } from '@/hooks/circle-picks/use-circle-picks';
 
 const CirclePicks = () => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('newest');
+  const { 
+    items, 
+    filters, 
+    loading, 
+    error, 
+    updateFilters, 
+    followedCount 
+  } = useCirclePicks();
 
   const categories = [
     { value: 'all', label: 'All Categories' },
@@ -26,6 +33,31 @@ const CirclePicks = () => {
     { value: 'highest-rated', label: 'Highest Rated' },
     { value: 'most-liked', label: 'Most Liked' }
   ];
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex w-full">
+        <div className="hidden md:block">
+          <VerticalTubelightNavbar />
+        </div>
+        
+        <main className="flex-1 bg-background p-6">
+          <div className="text-center py-12">
+            <Star className="h-16 w-16 mx-auto mb-4 opacity-30 text-red-500" />
+            <h3 className="text-lg font-medium mb-2 text-red-600">Error Loading Circle Picks</h3>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+          </div>
+        </main>
+
+        <div className="md:hidden">
+          <BottomNavigation />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex w-full">
@@ -49,7 +81,7 @@ const CirclePicks = () => {
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <Select value={filters.category} onValueChange={(value) => updateFilters({ category: value })}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -65,7 +97,7 @@ const CirclePicks = () => {
               
               <div className="flex items-center gap-2">
                 <SortAsc className="h-4 w-4 text-muted-foreground" />
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <Select value={filters.sortBy} onValueChange={(value: any) => updateFilters({ sortBy: value })}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
@@ -80,7 +112,7 @@ const CirclePicks = () => {
               </div>
               
               <Badge variant="secondary" className="ml-auto">
-                Following: 24 people
+                Following: {followedCount} people
               </Badge>
             </div>
           </div>
@@ -112,39 +144,94 @@ const CirclePicks = () => {
             </div>
           </div>
 
-          {/* Circle Content Grid */}
+          {/* Circle Content */}
           <div className="mb-6">
             <h2 className="text-xl font-semibold mb-4">From Your Circle</h2>
             
-            {/* Placeholder Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Placeholder cards */}
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="border rounded-lg p-4 bg-card">
-                  <div className="aspect-video bg-muted rounded-md mb-4" />
-                  <div className="space-y-2">
-                    <div className="h-4 bg-muted rounded w-3/4" />
-                    <div className="h-3 bg-muted rounded w-1/2" />
-                    <div className="flex items-center gap-2 mt-3">
-                      <div className="w-6 h-6 bg-muted rounded-full" />
-                      <div className="h-3 bg-muted rounded w-20" />
+            {loading ? (
+              // Loading State
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="border rounded-lg p-4 bg-card animate-pulse">
+                    <div className="aspect-video bg-muted rounded-md mb-4" />
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted rounded w-3/4" />
+                      <div className="h-3 bg-muted rounded w-1/2" />
+                      <div className="flex items-center gap-2 mt-3">
+                        <div className="w-6 h-6 bg-muted rounded-full" />
+                        <div className="h-3 bg-muted rounded w-20" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Empty State */}
-          <div className="text-center py-12 text-muted-foreground">
-            <Star className="h-16 w-16 mx-auto mb-4 opacity-30" />
-            <h3 className="text-lg font-medium mb-2">No picks yet</h3>
-            <p className="mb-4">
-              Start following people to see their recommendations and reviews here
-            </p>
-            <Button variant="outline">
-              Discover People to Follow
-            </Button>
+                ))}
+              </div>
+            ) : items.length > 0 ? (
+              // Content Grid
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {items.map((item) => (
+                  <div key={item.id} className="border rounded-lg p-4 bg-card hover:shadow-md transition-shadow">
+                    {item.imageUrl && (
+                      <div className="aspect-video bg-muted rounded-md mb-4 overflow-hidden">
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="outline" className="text-xs">
+                          {item.type}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {item.category}
+                        </Badge>
+                      </div>
+                      <h3 className="font-medium line-clamp-2">{item.title}</h3>
+                      {item.content && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{item.content}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-3">
+                        <div className="w-6 h-6 bg-muted rounded-full overflow-hidden">
+                          {item.author.avatarUrl && (
+                            <img 
+                              src={item.author.avatarUrl} 
+                              alt={item.author.username}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {item.author.username}
+                        </span>
+                        {item.rating && (
+                          <div className="flex items-center gap-1 ml-auto">
+                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                            <span className="text-xs">{item.rating}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              // Empty State
+              <div className="text-center py-12 text-muted-foreground">
+                <Star className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                <h3 className="text-lg font-medium mb-2">No picks yet</h3>
+                <p className="mb-4">
+                  Start following people to see their recommendations and reviews here
+                </p>
+                <Button variant="outline">
+                  Discover People to Follow
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </main>
