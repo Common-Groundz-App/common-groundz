@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Clock, Tag, MoreVertical, Pencil, Trash2, MapPin } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Heart, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share2, Globe, Lock, Users, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
@@ -15,13 +17,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CreatePostForm } from '@/components/feed/CreatePostForm';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import TagBadge from '@/components/feed/TagBadge';
+import CommentDialog from '@/components/comments/CommentDialog';
+import { fetchCommentCount } from '@/services/commentsService';
+import UsernameLink from '@/components/common/UsernameLink';
 
 // Helper function to reset pointer-events on body if they're set to none
 const resetBodyPointerEvents = () => {
@@ -42,6 +46,8 @@ interface Post {
   media?: MediaItem[];
   user_id?: string;
   tags?: string[];
+  username?: string;
+  avatar_url?: string;
 }
 
 interface ProfilePostItemProps {
@@ -55,36 +61,150 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+  const [localLikes, setLocalLikes] = useState(0);
+  const [localIsLiked, setLocalIsLiked] = useState(false);
+  const [localIsSaved, setLocalIsSaved] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
   
   const isOwner = user?.id === post.user_id;
+  const CONTENT_LIMIT = 280;
 
-  const getPostTypeLabel = (type: string) => {
-    switch(type) {
-      case 'story': return 'Story';
-      case 'routine': return 'Routine';
-      case 'project': return 'Project';
-      case 'note': return 'Note';
-      default: return type;
+  // Load initial data
+  useEffect(() => {
+    const loadInitialData = async () => {
+      if (!user) return;
+
+      try {
+        // Get like count
+        const { count: likeCount } = await supabase
+          .from('post_likes')
+          .select('*', { count: 'exact', head: true })
+          .eq('post_id', post.id);
+
+        setLocalLikes(likeCount || 0);
+
+        // Check if user liked this post
+        const { data: likeData } = await supabase
+          .from('post_likes')
+          .select('*')
+          .eq('post_id', post.id)
+          .eq('user_id', user.id)
+          .single();
+
+        setLocalIsLiked(!!likeData);
+
+        // Check if user saved this post
+        const { data: saveData } = await supabase
+          .from('post_saves')
+          .select('*')
+          .eq('post_id', post.id)
+          .eq('user_id', user.id)
+          .single();
+
+        setLocalIsSaved(!!saveData);
+
+        // Get comment count
+        const count = await fetchCommentCount(post.id, 'post');
+        setLocalCommentCount(count);
+      } catch (error) {
+        console.error('Error loading post data:', error);
+      }
+    };
+
+    loadInitialData();
+  }, [post.id, user?.id]);
+
+  const getVisibilityIcon = () => {
+    switch(post.visibility) {
+      case 'private': return <Lock className="h-4 w-4" />;
+      case 'circle_only': return <Users className="h-4 w-4" />;
+      default: return <Globe className="h-4 w-4" />;
     }
   };
 
-  const getVisibilityLabel = (visibility: string) => {
-    switch(visibility) {
-      case 'public': return 'Public';
+  const getVisibilityLabel = () => {
+    switch(post.visibility) {
+      case 'private': return 'Only Me';
       case 'circle_only': return 'Circle Only';
-      case 'private': return 'Private';
-      default: return visibility;
+      default: return 'Public';
+    }
+  };
+
+  const handleLikeClick = async () => {
+    if (!user || !post) return;
+    
+    try {
+      if (localIsLiked) {
+        await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', post.id)
+          .eq('user_id', user.id);
+        
+        setLocalIsLiked(false);
+        setLocalLikes(prev => prev > 0 ? prev - 1 : 0);
+      } else {
+        await supabase
+          .from('post_likes')
+          .insert({ post_id: post.id, user_id: user.id });
+        
+        setLocalIsLiked(true);
+        setLocalLikes(prev => prev + 1);
+      }
+    } catch (err) {
+      console.error('Error toggling like:', err);
     }
   };
   
-  const getEntityTypeColor = (type: string): string => {
-    switch(type) {
-      case 'book': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'movie': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-      case 'place': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'product': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-      case 'food': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      default: return '';
+  const handleSaveClick = async () => {
+    if (!user || !post) return;
+    
+    try {
+      if (localIsSaved) {
+        await supabase
+          .from('post_saves')
+          .delete()
+          .eq('post_id', post.id)
+          .eq('user_id', user.id);
+        
+        setLocalIsSaved(false);
+      } else {
+        await supabase
+          .from('post_saves')
+          .insert({ post_id: post.id, user_id: user.id });
+        
+        setLocalIsSaved(true);
+      }
+    } catch (err) {
+      console.error('Error toggling save:', err);
+    }
+  };
+
+  const handleCommentClick = () => {
+    setIsCommentDialogOpen(true);
+  };
+  
+  const handleCommentAdded = () => {
+    setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
+  };
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: post.title || 'Check out this post!',
+        text: post.content ? post.content.substring(0, 50) + (post.content.length > 50 ? '...' : '') : 'Read more...',
+        url: `${window.location.origin}/post/${post.id}`,
+      }).then(() => {
+        console.log('Successful share');
+      })
+      .catch((error) => console.error('Error sharing:', error));
+    } else {
+      toast({
+        title: 'Web Share API not supported',
+        description: 'Please copy the link manually.',
+      });
     }
   };
 
@@ -159,97 +279,198 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
     }
   };
 
+  const renderTaggedEntities = (entities: Entity[]) => {
+    if (!entities || entities.length === 0) return null;
+    
+    return (
+      <div className="mt-4">
+        <div className="flex flex-wrap gap-2">
+          {entities.map(entity => (
+            <TagBadge
+              key={entity.id}
+              type="entity"
+              label={entity.name}
+              entityType={entity.type as any}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderLocationTags = (tags: string[] | null) => {
+    if (!tags || tags.length === 0) return null;
+    
+    return (
+      <div className="mt-4">
+        <div className="flex flex-wrap gap-2">
+          {tags.map((tag, index) => (
+            <TagBadge
+              key={index}
+              type="location"
+              label={tag}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const displayCommentCount = localCommentCount !== null ? localCommentCount : 0;
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-6">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-lg font-semibold">{post.title}</h3>
-            <div className="flex gap-2 mt-1">
-              <Badge variant="outline">{getPostTypeLabel(post.post_type)}</Badge>
-              <Badge variant="outline" className={post.visibility !== 'public' ? 'bg-muted' : ''}>
-                {getVisibilityLabel(post.visibility)}
-              </Badge>
+        {/* User Info and Post Meta */}
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10 border">
+              <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
+              <AvatarFallback>{(post.username || 'U')[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div>
+              <UsernameLink 
+                userId={post.user_id || ''} 
+                username={post.username || 'User'}
+                className="hover:underline"
+              />
+              <div className="flex items-center text-muted-foreground text-xs gap-1">
+                <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
+                <span>·</span>
+                <div className="flex items-center gap-1">
+                  {getVisibilityIcon()}
+                  <span>{getVisibilityLabel()}</span>
+                </div>
+              </div>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <div className="flex items-center text-muted-foreground text-sm">
-              <Clock size={14} className="mr-1" />
-              <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
-            </div>
-            
-            {isOwner && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">More options</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
-                    <Pencil className="h-4 w-4" /> Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={handleDeleteClick} 
-                    className="text-destructive focus:text-destructive flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+
+          {isOwner && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                  <span className="sr-only">More options</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                  <Pencil className="h-4 w-4" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={handleDeleteClick} 
+                  className="text-destructive focus:text-destructive flex items-center gap-2"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+        
+        {/* Post Content */}
+        <div className="mt-4">
+          <div className={cn("text-sm relative", isExpanded ? "" : "max-h-[120px] overflow-hidden")}>
+            <RichTextDisplay content={post.content} />
+            {(!isExpanded && post.content && post.content.length > CONTENT_LIMIT) && (
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background to-transparent h-8" />
             )}
           </div>
+          
+          {post.content && post.content.length > CONTENT_LIMIT && (
+            <Button
+              variant="link"
+              size="sm"
+              className="p-0 h-auto font-normal text-muted-foreground"
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? "Show less" : "Show more"}
+              <ChevronDown className={cn("h-4 w-4 ml-1 transition-transform", isExpanded && "rotate-180")} />
+            </Button>
+          )}
         </div>
-        
-        <div className="text-muted-foreground">
-          <RichTextDisplay content={post.content} />
-        </div>
-        
-        {/* Update to use our standardized media display component */}
+
+        {/* Media Content */}
         {post.media && post.media.length > 0 && (
-          <div className="mt-4">
-            <PostMediaDisplay 
-              media={post.media}
-              maxHeight="h-80"
-              aspectRatio="maintain"
-              objectFit="contain" 
-            />
-          </div>
+          <PostMediaDisplay 
+            media={post.media} 
+            className="mt-3 mb-4"
+            maxHeight="h-80"
+            aspectRatio="maintain"
+            objectFit="contain"
+          />
         )}
         
-        {/* Location Tags - Updated with simplified display */}
-        {post.tags && post.tags.length > 0 && (
-          <div className="mt-4">
-            <div className="flex flex-wrap gap-2">
-              {post.tags.map((tag, index) => (
-                <TagBadge
-                  key={index}
-                  type="location"
-                  label={tag}
-                />
-              ))}
-            </div>
+        {/* Tag Groups */}
+        <div className="space-y-3 mt-4">
+          {/* Render location tags */}
+          {post.tags && renderLocationTags(post.tags)}
+          
+          {/* Render entity tags */}
+          {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
+        </div>
+
+        {/* Social Actions */}
+        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+          <div className="flex items-center gap-3 sm:gap-6">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={cn(
+                "flex items-center gap-1 py-0 px-2 sm:px-4", 
+                localIsLiked && "text-red-500 hover:text-red-600"
+              )}
+              onClick={handleLikeClick}
+            >
+              <Heart className={cn("h-5 w-5", localIsLiked && "fill-current")} />
+              <span>{localLikes || 0}</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm" 
+              className="flex items-center gap-1 py-0 px-2 sm:px-4"
+              onClick={handleCommentClick}
+            >
+              <MessageCircle className="h-5 w-5" />
+              <span>{displayCommentCount || 0}</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm" 
+              className={cn(
+                "flex items-center gap-1 py-0 px-2 sm:px-4",
+                localIsSaved && "text-primary"
+              )}
+              onClick={handleSaveClick}
+            >
+              <Bookmark className={cn("h-5 w-5", localIsSaved && "fill-current")} />
+            </Button>
           </div>
-        )}
-        
-        {/* Tagged Entities - Updated with simplified display */}
-        {post.tagged_entities && post.tagged_entities.length > 0 && (
-          <div className="mt-4">
-            <div className="flex flex-wrap gap-2">
-              {post.tagged_entities.map(entity => (
-                <TagBadge
-                  key={entity.id}
-                  type="entity"
-                  label={entity.name}
-                  entityType={entity.type as any}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          
+          {/* Share button */}
+          <Button
+            variant="ghost"
+            size="sm" 
+            className="flex items-center gap-1 py-0 px-2 sm:px-4"
+            onClick={handleShare}
+          >
+            <Share2 className="h-5 w-5" />
+          </Button>
+        </div>
       </CardContent>
+      
+      {/* Comments Dialog */}
+      {isCommentDialogOpen && (
+        <CommentDialog
+          isOpen={isCommentDialogOpen}
+          onClose={() => setIsCommentDialogOpen(false)}
+          itemId={post.id}
+          itemType="post"
+          onCommentAdded={handleCommentAdded}
+        />
+      )}
       
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
