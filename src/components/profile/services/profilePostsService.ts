@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
+import { fetchProfiles } from '@/hooks/feed/api/profiles';
 
 export interface Post {
   id: string;
@@ -22,10 +23,7 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
   try {
     let query = supabase
       .from('posts')
-      .select(`
-        *,
-        profiles!posts_user_id_fkey(username, avatar_url)
-      `)
+      .select('*')
       .eq('user_id', profileUserId)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
@@ -38,6 +36,10 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
     const { data: postsData, error } = await query;
 
     if (error) throw error;
+    
+    // Fetch profile data for the user
+    const { data: profilesData } = await fetchProfiles([profileUserId]);
+    const profile = profilesData?.[0];
     
     // Fetch entities for all posts using direct query instead of RPC function
     const postIds = (postsData || []).map(post => post.id);
@@ -65,7 +67,7 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
         });
       }
       
-      // Add entities and flatten profile data to posts
+      // Add entities and profile data to posts
       const enrichedPosts = (postsData || []).map(post => {
         // Process media properly with type safety
         let mediaItems: MediaItem[] | undefined;
@@ -85,16 +87,12 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
           }));
         }
 
-        // Flatten the profiles data
-        const profile = (post as any).profiles;
-
         return {
           ...post,
           username: profile?.username || null,
           avatar_url: profile?.avatar_url || null,
           tagged_entities: entitiesByPostId[post.id] || [],
-          media: mediaItems,
-          profiles: undefined // Remove the nested profiles object
+          media: mediaItems
         };
       });
       
@@ -119,15 +117,11 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
           }));
         }
 
-        // Flatten the profiles data
-        const profile = (post as any).profiles;
-
         return {
           ...post,
           username: profile?.username || null,
           avatar_url: profile?.avatar_url || null,
-          media: mediaItems,
-          profiles: undefined // Remove the nested profiles object
+          media: mediaItems
         };
       }) as Post[];
     }
