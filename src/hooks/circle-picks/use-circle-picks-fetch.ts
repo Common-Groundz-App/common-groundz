@@ -41,44 +41,47 @@ export const useCirclePicksFetch = ({
         return { recommendations: [], reviews: [] };
       }
 
-      // Fetch recommendations from followed users with simplified query
-      let recQuery = supabase
+      // Fetch recommendations from followed users
+      const recQuery = supabase
         .from('recommendations')
         .select('*')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
-      if (category && category !== 'all') {
-        recQuery = recQuery.eq('category', category);
+      // Apply category filter only if it's not 'all' and is a valid category
+      const validCategories = ['Food', 'Drink', 'Movie', 'Book', 'Product', 'Place', 'Activity', 'Music', 'Art', 'TV', 'Travel'];
+      if (category && category !== 'all' && validCategories.includes(category)) {
+        recQuery.eq('category', category);
       }
 
       // Apply sorting
       if (sortBy === 'recent') {
-        recQuery = recQuery.order('created_at', { ascending: false });
+        recQuery.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        recQuery = recQuery.order('rating', { ascending: false });
+        recQuery.order('rating', { ascending: false });
       }
 
       const { data: recommendations, error: recError } = await recQuery.limit(20);
       
       if (recError) throw recError;
 
-      // Fetch reviews from followed users with simplified query
-      let reviewQuery = supabase
+      // Fetch reviews from followed users
+      const reviewQuery = supabase
         .from('reviews')
         .select('*')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
+      // Apply category filter
       if (category && category !== 'all') {
-        reviewQuery = reviewQuery.eq('category', category);
+        reviewQuery.eq('category', category);
       }
 
       // Apply sorting
       if (sortBy === 'recent') {
-        reviewQuery = reviewQuery.order('created_at', { ascending: false });
+        reviewQuery.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        reviewQuery = reviewQuery.order('rating', { ascending: false });
+        reviewQuery.order('rating', { ascending: false });
       }
 
       const { data: reviews, error: reviewError } = await reviewQuery.limit(20);
@@ -132,20 +135,22 @@ export const useCirclePicksFetch = ({
       if (!userId) return { recommendations: [], reviews: [] };
 
       // Fetch user's recommendations
-      let myRecQuery = supabase
+      const myRecQuery = supabase
         .from('recommendations')
         .select('*')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
-      if (category && category !== 'all') {
-        myRecQuery = myRecQuery.eq('category', category);
+      // Apply category filter
+      const validCategories = ['Food', 'Drink', 'Movie', 'Book', 'Product', 'Place', 'Activity', 'Music', 'Art', 'TV', 'Travel'];
+      if (category && category !== 'all' && validCategories.includes(category)) {
+        myRecQuery.eq('category', category);
       }
 
       if (sortBy === 'recent') {
-        myRecQuery = myRecQuery.order('created_at', { ascending: false });
+        myRecQuery.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        myRecQuery = myRecQuery.order('rating', { ascending: false });
+        myRecQuery.order('rating', { ascending: false });
       }
 
       const { data: myRecommendations, error: myRecError } = await myRecQuery.limit(10);
@@ -153,20 +158,20 @@ export const useCirclePicksFetch = ({
       if (myRecError) throw myRecError;
 
       // Fetch user's reviews
-      let myReviewQuery = supabase
+      const myReviewQuery = supabase
         .from('reviews')
         .select('*')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
       if (category && category !== 'all') {
-        myReviewQuery = myReviewQuery.eq('category', category);
+        myReviewQuery.eq('category', category);
       }
 
       if (sortBy === 'recent') {
-        myReviewQuery = myReviewQuery.order('created_at', { ascending: false });
+        myReviewQuery.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        myReviewQuery = myReviewQuery.order('rating', { ascending: false });
+        myReviewQuery.order('rating', { ascending: false });
       }
 
       const { data: myReviews, error: myReviewError } = await myReviewQuery.limit(10);
