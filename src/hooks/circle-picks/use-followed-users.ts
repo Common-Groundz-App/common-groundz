@@ -45,7 +45,7 @@ export const useFollowedUsers = () => {
         if (profilesError) throw profilesError;
 
         // Combine the data
-        const followedUsersWithProfiles: FollowedUser[] = followsData
+        const followedUsersWithProfiles = followsData
           .map(follow => {
             const profile = profilesData?.find(p => p.id === follow.following_id);
             if (!profile) return null;
@@ -53,7 +53,7 @@ export const useFollowedUsers = () => {
             return {
               id: profile.id,
               username: profile.username || 'Unknown User',
-              fullName: profile.username || 'Unknown User', // We'll use username as display name for now
+              fullName: profile.username || 'Unknown User',
               avatarUrl: profile.avatar_url,
               followedAt: follow.created_at
             };
