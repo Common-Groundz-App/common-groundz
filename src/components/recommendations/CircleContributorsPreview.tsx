@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useNavigate } from 'react-router-dom';
 import { ContributorModal } from './ContributorModal';
 import { RatingDistribution } from './RatingDistribution';
-import { Star, Clock } from 'lucide-react';
+import { Star, ArrowUpRight } from 'lucide-react';
 
 interface CircleContributorsPreviewProps {
   contributors: CircleContributor[];
@@ -34,7 +34,6 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
   }
 
   const visibleContributors = contributors.slice(0, maxDisplay);
-  const remainingCount = Math.max(0, totalCount - maxDisplay);
 
   const getRatingColor = (rating: number) => {
     if (rating < 2) return "#ea384c";
@@ -116,17 +115,6 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
               </Tooltip>
             );
           })}
-          
-          {remainingCount > 0 && (
-            <div className="flex items-center gap-2 ml-2">
-              <button
-                onClick={handleViewAllClick}
-                className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer hover:underline"
-              >
-                +{remainingCount} more
-              </button>
-            </div>
-          )}
         </div>
         
         {/* Rating Distribution */}
@@ -139,6 +127,25 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
             />
           </div>
         )}
+
+        {/* Always-visible Arrow Icon for accessing contributors modal */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleViewAllClick}
+              className="ml-2 p-1 rounded hover:bg-muted/50 transition-all duration-200 group"
+            >
+              <ArrowUpRight 
+                className="h-3 w-3 text-muted-foreground opacity-40 group-hover:opacity-80 group-hover:text-foreground transition-all duration-200 group-hover:scale-110" 
+              />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <div className="text-xs">
+              View all contributors ({totalCount})
+            </div>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Contributors Modal */}
