@@ -24,7 +24,7 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
       .from('posts')
       .select(`
         *,
-        profiles:user_id(username, avatar_url)
+        profiles!posts_user_id_fkey(username, avatar_url)
       `)
       .eq('user_id', profileUserId)
       .eq('is_deleted', false)
@@ -86,7 +86,7 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
         }
 
         // Flatten the profiles data
-        const profile = post.profiles;
+        const profile = (post as any).profiles;
 
         return {
           ...post,
@@ -120,7 +120,7 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
         }
 
         // Flatten the profiles data
-        const profile = post.profiles;
+        const profile = (post as any).profiles;
 
         return {
           ...post,
