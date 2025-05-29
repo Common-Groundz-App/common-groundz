@@ -31,7 +31,7 @@ export const useRecommendationsFetch = ({
   // Improved debugging with the profile user ID
   console.log('useRecommendationsFetch called with profileUserId:', profileUserId);
   
-  // Fetch recommendations using React Query
+  // Fetch recommendations using React Query with enhanced profile integration
   const { 
     data,
     isLoading,
@@ -58,6 +58,7 @@ export const useRecommendationsFetch = ({
   useEffect(() => {
     if (data) {
       console.log('Recommendations fetched:', data.recommendations.length);
+      // The enhanced profile data should already be included from the service
       setRecommendations(data.recommendations);
       setError(null);
     }

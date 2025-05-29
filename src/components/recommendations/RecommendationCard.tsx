@@ -2,14 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, Bookmark, MoreVertical, Star, Share2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { Heart, MessageCircle, Bookmark, MoreVertical, Share2 } from 'lucide-react';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
-import UsernameLink from '@/components/common/UsernameLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   DropdownMenu,
@@ -25,6 +22,7 @@ import { MediaItem } from '@/types/media';
 import { ensureHttps } from '@/utils/urlUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { formatRelativeDate } from '@/utils/dateUtils';
+import { ProfileDisplay } from '@/components/common/ProfileDisplay';
 
 interface RecommendationCardProps {
   recommendation: any;
@@ -260,20 +258,17 @@ const RecommendationCard = ({
       onClick={handleCardClick}
     >
       <CardContent className="p-6">
-        {/* Card Header with User Info */}
+        {/* Card Header with User Info using ProfileDisplay */}
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
-            <UsernameLink 
+            <ProfileDisplay
               userId={recommendation.user_id}
+              size="md"
+              showUsername={true}
+              showLink={true}
               className="hover:opacity-80 transition-opacity"
-            >
-              <Avatar className="h-10 w-10 border">
-                <AvatarImage src={recommendation.avatar_url} alt={recommendation.username || 'User'} />
-                <AvatarFallback>{(recommendation.username || 'U')[0].toUpperCase()}</AvatarFallback>
-              </Avatar>
-            </UsernameLink>
+            />
             <div>
-              <UsernameLink userId={recommendation.user_id} username={recommendation.username} className="font-medium hover:underline" />
               <div className="flex items-center gap-1 text-muted-foreground text-xs">
                 <span>{formatRelativeDate(recommendation.created_at)}</span>
                 <span>·</span>

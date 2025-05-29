@@ -35,7 +35,7 @@ export const useRecommendations = ({
   
   console.log('useRecommendations called with profileUserId:', profileUserId);
   
-  // Fetch recommendations data
+  // Fetch recommendations data using enhanced service
   const { 
     recommendations,
     isLoading,
