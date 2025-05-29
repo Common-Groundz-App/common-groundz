@@ -516,6 +516,7 @@ const EntityDetail = () => {
                           contributors={circleContributors}
                           totalCount={circleRatingCount}
                           maxDisplay={4}
+                          entityName={entity?.name}
                         />
                       </div>
                     </div>
