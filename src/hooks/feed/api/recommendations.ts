@@ -2,6 +2,25 @@
 import { supabase } from '@/integrations/supabase/client';
 import { FeedQueryParams, RecommendationFeedItem } from '../types';
 import { fetchMultipleProfiles } from '@/services/enhancedProfileService';
+import { RecommendationCategory } from '@/services/recommendation/types';
+
+// Helper function to map database category strings to RecommendationCategory enum
+const mapDatabaseCategoryToEnum = (dbCategory: string): RecommendationCategory => {
+  switch (dbCategory.toLowerCase()) {
+    case 'food': return RecommendationCategory.Food;
+    case 'drink': return RecommendationCategory.Drink;
+    case 'movie': return RecommendationCategory.Movie;
+    case 'book': return RecommendationCategory.Book;
+    case 'place': return RecommendationCategory.Place;
+    case 'product': return RecommendationCategory.Product;
+    case 'activity': return RecommendationCategory.Activity;
+    case 'music': return RecommendationCategory.Music;
+    case 'art': return RecommendationCategory.Art;
+    case 'tv': return RecommendationCategory.TV;
+    case 'travel': return RecommendationCategory.Travel;
+    default: return RecommendationCategory.Place; // fallback
+  }
+};
 
 export const fetchRecommendations = async (params: FeedQueryParams): Promise<RecommendationFeedItem[]> => {
   try {
@@ -93,6 +112,7 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
       
       return {
         ...rec,
+        category: mapDatabaseCategoryToEnum(rec.category), // Convert database category to enum
         is_post: false,
         username: profile?.displayName || profile?.username || null,
         avatar_url: profile?.avatar_url || null,
@@ -181,6 +201,7 @@ export const processRecommendations = async (
       
       return {
         ...rec, // This spreads all original recommendation properties including category, is_certified, view_count
+        category: mapDatabaseCategoryToEnum(rec.category), // Convert database category to enum
         is_post: false,
         username: profile?.displayName || profile?.username || null,
         avatar_url: profile?.avatar_url || null,
