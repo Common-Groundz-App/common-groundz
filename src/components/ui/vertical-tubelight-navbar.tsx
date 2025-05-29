@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -49,6 +50,7 @@ export function VerticalTubelightNavbar({
   const defaultNavItems: NavItem[] = [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
+    { name: 'Circle Picks', url: '/circle-picks', icon: Star },
     { name: 'Profile', url: '/profile', icon: User },
     { 
       name: 'Notifications', 

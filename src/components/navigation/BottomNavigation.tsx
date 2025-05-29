@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, User, PlusCircle, Bell } from 'lucide-react';
+import { Home, Search, User, PlusCircle, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,16 +36,7 @@ export const BottomNavigation = () => {
         window.dispatchEvent(event);
       }
     },
-    { 
-      name: 'Notifications', 
-      path: '#notifications', 
-      icon: Bell, 
-      badge: unreadCount > 0 ? unreadCount : undefined,
-      onClick: () => {
-        const event = new CustomEvent('open-notifications');
-        window.dispatchEvent(event);
-      }
-    },
+    { name: 'Circle Picks', path: '/circle-picks', icon: Star },
     { name: 'Profile', path: '/profile', icon: User }
   ];
   
@@ -56,6 +47,7 @@ export const BottomNavigation = () => {
           const isActive = location.pathname === item.path || 
                           (item.path === '/profile' && location.pathname.startsWith('/profile')) ||
                           (item.path === '/explore' && location.pathname.startsWith('/explore')) ||
+                          (item.path === '/circle-picks' && location.pathname === '/circle-picks') ||
                           (item.path === '/home' && (location.pathname === '/home' || location.pathname === '/feed'));
           
           if (item.path.startsWith('#')) {
