@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { MediaItem } from '@/types/media';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -143,8 +144,8 @@ export function LightboxPreview({
   
   const orientation = getOrientationClass(currentItem);
   const isLandscape = orientation === 'landscape';
-  
-  return (
+
+  const lightboxContent = (
     <div className={cn("fixed inset-0 z-[9999] flex items-center justify-center bg-black/95", className)}>
       {/* Close button - smaller on mobile */}
       <Button 
@@ -298,4 +299,13 @@ export function LightboxPreview({
       </div>
     </div>
   );
+
+  // Use portal to render outside the normal component hierarchy
+  const modalRoot = document.getElementById('modal-root');
+  if (!modalRoot) {
+    console.error('Modal root element not found');
+    return null;
+  }
+
+  return createPortal(lightboxContent, modalRoot);
 }
