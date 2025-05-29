@@ -54,18 +54,6 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
     setIsModalOpen(true);
   };
 
-  const handleRatingDistributionClick = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    setIsModalOpen(true);
-  };
-
-  // Generate smart text based on contributor count
-  const getViewAllText = () => {
-    if (totalCount === 1) return "View details";
-    if (totalCount <= maxDisplay) return `View all (${totalCount})`;
-    return `+${remainingCount} more`;
-  };
-
   return (
     <TooltipProvider>
       <div className="flex items-center mt-1">
@@ -129,39 +117,26 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
             );
           })}
           
-          {/* Always show view details link when there are contributors */}
-          <div className="flex items-center gap-2 ml-2">
-            <button
-              onClick={handleViewAllClick}
-              className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer hover:underline"
-            >
-              {getViewAllText()}
-            </button>
-          </div>
+          {remainingCount > 0 && (
+            <div className="flex items-center gap-2 ml-2">
+              <button
+                onClick={handleViewAllClick}
+                className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer hover:underline"
+              >
+                +{remainingCount} more
+              </button>
+            </div>
+          )}
         </div>
         
-        {/* Rating Distribution - Now clickable */}
+        {/* Rating Distribution */}
         {contributors.length > 1 && (
           <div className="ml-3 flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div 
-                  className="cursor-pointer transition-all duration-200 hover:scale-105"
-                  onClick={handleRatingDistributionClick}
-                >
-                  <RatingDistribution 
-                    contributors={contributors} 
-                    size="sm" 
-                    className="w-16"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <div className="text-xs">
-                  Click to view detailed rating breakdown
-                </div>
-              </TooltipContent>
-            </Tooltip>
+            <RatingDistribution 
+              contributors={contributors} 
+              size="sm" 
+              className="w-16"
+            />
           </div>
         )}
       </div>
