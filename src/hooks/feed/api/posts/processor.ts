@@ -1,6 +1,6 @@
 
 import { PostFeedItem } from '../../types';
-import { fetchProfiles } from '../profiles';
+import { fetchMultipleProfiles } from '@/services/enhancedProfileService';
 import { createMap, processMediaItems } from '../../api/utils';
 import { fetchPostEntities } from './entities';
 import { getPostLikeCounts, getUserPostLikes, getUserPostSaves } from './interactions';
@@ -16,12 +16,9 @@ export const processPosts = async (
     // Get post IDs for fetching related data
     const postIds = postsData.map(post => post.id);
     
-    // Fetch user profiles
-    const userIds = postsData.map(post => post.user_id);
-    const { data: profilesData } = await fetchProfiles(userIds);
-    
-    // Create lookup map for profiles
-    const profilesMap = createMap(profilesData, 'id');
+    // Fetch user profiles using enhanced service
+    const userIds = [...new Set(postsData.map(post => post.user_id))];
+    const profilesMap = await fetchMultipleProfiles(userIds);
     
     // Get entities for posts
     const entitiesByPostId = await fetchPostEntities(postIds);
@@ -35,9 +32,9 @@ export const processPosts = async (
     
     // Format the posts as feed items
     const processedPosts = postsData.map(post => {
-      // Get profile data
-      const profile = profilesMap.get(post.user_id);
-      const username = profile?.username || null;
+      // Get profile data from enhanced service
+      const profile = profilesMap[post.user_id];
+      const username = profile?.displayName || profile?.username || null;
       const avatar_url = profile?.avatar_url || null;
       
       // Process media properly with type safety

@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,8 +6,8 @@ import RecommendationCard from '@/components/recommendations/RecommendationCard'
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { Shell } from 'lucide-react';
-import { fetchComments } from '@/services/commentsService';
 import { useSearchParams } from 'react-router-dom';
+import { useProfile } from '@/hooks/use-profile-cache';
 
 interface RecommendationContentViewerProps {
   recommendationId: string;
@@ -27,8 +26,10 @@ const RecommendationContentViewer = ({
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [showComments, setShowComments] = React.useState(false);
-  const [topComment, setTopComment] = React.useState<any>(null);
   const [searchParams] = useSearchParams();
+
+  // Use the profile cache for the recommendation author
+  const { data: authorProfile } = useProfile(recommendation?.user_id);
 
   // Determine if we should auto-open comments based on URL params or highlightCommentId
   React.useEffect(() => {
@@ -53,14 +54,6 @@ const RecommendationContentViewer = ({
           setError('Recommendation not found or has been deleted');
           return;
         }
-        
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('username, avatar_url')
-          .eq('id', data.user_id)
-          .single();
-          
-        if (profileError) throw profileError;
         
         const { count: likeCount } = await supabase
           .from('recommendation_likes')
@@ -113,8 +106,6 @@ const RecommendationContentViewer = ({
         
         const processedRecommendation = {
           ...data,
-          username: profileData?.username || 'User',
-          avatar_url: profileData?.avatar_url || null,
           likes: likeCount || 0,
           comment_count: commentCount || 0,
           isLiked: isLiked,
@@ -141,29 +132,16 @@ const RecommendationContentViewer = ({
     }
   }, [recommendationId, user?.id]);
 
-  const fetchTopComment = async () => {
-    try {
-      const comments = await fetchComments(recommendationId, 'recommendation');
-      if (comments && comments.length > 0) {
-        const firstComment = comments[0];
-        setTopComment({
-          username: firstComment.username || 'User',
-          content: firstComment.content,
-        });
-      } else {
-        setTopComment(null);
-      }
-    } catch (err) {
-      console.error('Error fetching top comment:', err);
-      setTopComment(null);
-    }
-  };
-
+  // Update recommendation with profile data when available
   React.useEffect(() => {
-    if (recommendationId) {
-      fetchTopComment();
+    if (recommendation && authorProfile) {
+      setRecommendation(prevRec => ({
+        ...prevRec,
+        username: authorProfile.displayName || authorProfile.username,
+        avatar_url: authorProfile.avatar_url
+      }));
     }
-  }, [recommendationId]);
+  }, [recommendation, authorProfile]);
 
   const handleRecommendationLike = async () => {
     if (!user || !recommendation) return;

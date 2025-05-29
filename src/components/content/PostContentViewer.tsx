@@ -6,8 +6,8 @@ import PostFeedItem from '@/components/feed/PostFeedItem';
 import { Shell } from 'lucide-react';
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
-import { fetchComments } from '@/services/commentsService';
 import { useSearchParams } from 'react-router-dom';
+import { useProfile } from '@/hooks/use-profile-cache';
 
 interface PostContentViewerProps {
   postId: string;
@@ -22,8 +22,10 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [showComments, setShowComments] = React.useState(false);
-  const [topComment, setTopComment] = React.useState<any>(null);
   const [searchParams] = useSearchParams();
+  
+  // Use the profile cache for the post author
+  const { data: authorProfile } = useProfile(post?.user_id);
   
   React.useEffect(() => {
     if (highlightCommentId || searchParams.has('commentId')) {
@@ -61,14 +63,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
           setError('Post not found or has been deleted');
           return;
         }
-        
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('username, avatar_url')
-          .eq('id', data.user_id)
-          .single();
-          
-        if (profileError) throw profileError;
         
         const { count: likeCount } = await supabase
           .from('post_likes')
@@ -120,8 +114,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
         
         const processedPost = {
           ...data,
-          username: profileData?.username || 'User',
-          avatar_url: profileData?.avatar_url || null,
           likes: likeCount || 0,
           comment_count: commentCount || 0,
           is_liked: isLiked,
@@ -147,6 +139,17 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
       fetchPost();
     }
   }, [postId, user?.id]);
+
+  // Update post with profile data when available
+  React.useEffect(() => {
+    if (post && authorProfile) {
+      setPost(prevPost => ({
+        ...prevPost,
+        username: authorProfile.displayName || authorProfile.username,
+        avatar_url: authorProfile.avatar_url
+      }));
+    }
+  }, [post, authorProfile]);
 
   const handlePostLike = async () => {
     if (!user || !post) return;
