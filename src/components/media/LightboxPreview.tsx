@@ -145,7 +145,7 @@ export function LightboxPreview({
   const isLandscape = orientation === 'landscape';
   
   return (
-    <div className={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/95", className)}>
+    <div className={cn("fixed inset-0 z-[9999] flex items-center justify-center bg-black/95", className)}>
       {/* Close button - smaller on mobile */}
       <Button 
         className={cn(
