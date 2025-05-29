@@ -10,29 +10,18 @@ interface UseCirclePicksFetchProps {
   sortBy: 'recent' | 'most_liked' | 'highest_rated';
 }
 
-// Define valid categories to match the database enum (lowercase)
-const VALID_CATEGORIES = ['food', 'drink', 'movie', 'book', 'product', 'place', 'activity', 'music', 'art', 'tv', 'travel'] as const;
-type ValidCategory = typeof VALID_CATEGORIES[number];
+// Define valid categories that exist in the database
+const DB_CATEGORIES = ['food', 'book', 'movie', 'place', 'product'] as const;
+type DbCategory = typeof DB_CATEGORIES[number];
 
-function isValidCategory(category: string): category is ValidCategory {
-  // Convert to lowercase and check
-  return VALID_CATEGORIES.includes(category.toLowerCase() as ValidCategory);
-}
-
-// Map frontend categories to database categories
-function mapCategoryToDb(category: string): ValidCategory | null {
-  const categoryMap: Record<string, ValidCategory> = {
+// Map frontend categories to database categories (only for supported ones)
+function mapCategoryToDb(category: string): DbCategory | null {
+  const categoryMap: Record<string, DbCategory> = {
     'Food': 'food',
-    'Drink': 'drink', 
-    'Movie': 'movie',
     'Book': 'book',
-    'Product': 'product',
+    'Movie': 'movie',
     'Place': 'place',
-    'Activity': 'activity',
-    'Music': 'music',
-    'Art': 'art',
-    'TV': 'tv',
-    'Travel': 'travel'
+    'Product': 'product'
   };
   
   return categoryMap[category] || null;
@@ -69,31 +58,16 @@ export const useCirclePicksFetch = ({
         return { recommendations: [], reviews: [] };
       }
 
-      // Build recommendations query with explicit typing
+      // Build recommendations query - simplified select to avoid deep types
       const dbCategory = category && category !== 'all' ? mapCategoryToDb(category) : null;
       
       let recQuery = supabase
         .from('recommendations')
-        .select(`
-          id,
-          title,
-          description,
-          rating,
-          category,
-          image_url,
-          created_at,
-          user_id,
-          entity_id,
-          venue,
-          visibility,
-          is_certified,
-          view_count,
-          comment_count
-        `)
+        .select('id, title, description, rating, category, image_url, created_at, user_id, entity_id, venue, visibility, is_certified, view_count, comment_count')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
-      // Apply category filter only if it's valid
+      // Apply category filter only if it's a valid database category
       if (dbCategory) {
         recQuery = recQuery.eq('category', dbCategory);
       }
@@ -109,31 +83,14 @@ export const useCirclePicksFetch = ({
       
       if (recError) throw recError;
 
-      // Build reviews query with explicit typing
+      // Build reviews query - simplified select
       let reviewQuery = supabase
         .from('reviews')
-        .select(`
-          id,
-          title,
-          description,
-          rating,
-          category,
-          image_url,
-          created_at,
-          user_id,
-          entity_id,
-          venue,
-          visibility,
-          status,
-          subtitle,
-          experience_date,
-          media,
-          metadata
-        `)
+        .select('id, title, description, rating, category, image_url, created_at, user_id, entity_id, venue, visibility, status, subtitle, experience_date, media, metadata')
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
-      // Apply category filter for reviews
+      // For reviews, we can filter by any category since reviews table might support more categories
       if (category && category !== 'all') {
         reviewQuery = reviewQuery.eq('category', category);
       }
@@ -195,31 +152,16 @@ export const useCirclePicksFetch = ({
     queryFn: async () => {
       if (!userId) return { recommendations: [], reviews: [] };
 
-      // Build user's recommendations query with explicit typing
+      // Build user's recommendations query - simplified select
       const dbCategory = category && category !== 'all' ? mapCategoryToDb(category) : null;
       
       let myRecQuery = supabase
         .from('recommendations')
-        .select(`
-          id,
-          title,
-          description,
-          rating,
-          category,
-          image_url,
-          created_at,
-          user_id,
-          entity_id,
-          venue,
-          visibility,
-          is_certified,
-          view_count,
-          comment_count
-        `)
+        .select('id, title, description, rating, category, image_url, created_at, user_id, entity_id, venue, visibility, is_certified, view_count, comment_count')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
-      // Apply category filter only if it's valid
+      // Apply category filter only if it's a valid database category
       if (dbCategory) {
         myRecQuery = myRecQuery.eq('category', dbCategory);
       }
@@ -234,27 +176,10 @@ export const useCirclePicksFetch = ({
       
       if (myRecError) throw myRecError;
 
-      // Build user's reviews query with explicit typing
+      // Build user's reviews query - simplified select
       let myReviewQuery = supabase
         .from('reviews')
-        .select(`
-          id,
-          title,
-          description,
-          rating,
-          category,
-          image_url,
-          created_at,
-          user_id,
-          entity_id,
-          venue,
-          visibility,
-          status,
-          subtitle,
-          experience_date,
-          media,
-          metadata
-        `)
+        .select('id, title, description, rating, category, image_url, created_at, user_id, entity_id, venue, visibility, status, subtitle, experience_date, media, metadata')
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
