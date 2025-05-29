@@ -29,6 +29,7 @@ import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
+import { useCircleRating } from '@/hooks/use-circle-rating';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -55,6 +56,13 @@ const EntityDetail = () => {
     error,
     refreshData
   } = useEntityDetail(slug || '');
+  
+  // Add circle rating hook
+  const {
+    circleRating,
+    circleRatingCount,
+    isLoading: isCircleRatingLoading
+  } = useCircleRating(entity?.id || '');
   
   useEffect(() => {
     if (!isLoading) {
@@ -408,7 +416,8 @@ const EntityDetail = () => {
           <div className="container max-w-6xl mx-auto px-4">
             <div className="flex flex-wrap items-center gap-6 justify-between">
               {/* Rating Display */}
-              <div className="flex items-center gap-4 ml-4">
+              <div className="flex items-center gap-8 ml-4">
+                {/* Overall Rating */}
                 {stats.averageRating !== null ? (
                   <div className="flex items-center gap-4">
                     {/* Rings and rating number together */}
@@ -455,12 +464,74 @@ const EntityDetail = () => {
                     
                     {/* Text labels */}
                     <div className="leading-tight min-w-[140px]">
-                      <div className="font-semibold text-sm whitespace-nowrap">Not yet rated</div>
+                      <div className="font-semibold text-sm whitespace-nowrap">Overall Rating</div>
                       <div className="text-xs text-muted-foreground">
-                        Be the first to rate this
+                        Not yet rated
                       </div>
                     </div>
                   </div>
+                )}
+
+                {/* Vertical Divider */}
+                {user && (
+                  <div className="h-12 w-px bg-border"></div>
+                )}
+
+                {/* Circle Rating */}
+                {user && (
+                  circleRating !== null ? (
+                    <div className="flex items-center gap-4">
+                      {/* Rings and rating number together */}
+                      <div className="flex items-center gap-2">
+                        <div className="w-fit">
+                          <ConnectedRingsRating
+                            value={circleRating}
+                            variant="badge"
+                            showValue={false}
+                            size="md"
+                            minimal={true}
+                          />
+                        </div>
+                        <span className="text-lg font-bold" style={{ color: circleRating < 2 ? "#ea384c" : circleRating < 3 ? "#F97316" : circleRating < 4 ? "#FEC006" : circleRating < 4.5 ? "#84cc16" : "#22c55e" }}>
+                          {circleRating.toFixed(1)}
+                        </span>
+                      </div>
+                      
+                      {/* Text labels */}
+                      <div className="leading-tight min-w-[140px]">
+                        <div className="font-semibold text-sm whitespace-nowrap">Circle Rating</div>
+                        <div className="text-xs text-muted-foreground">
+                          Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                      {/* Rings and rating number together */}
+                      <div className="flex items-center gap-2">
+                        <div className="w-fit">
+                          <ConnectedRingsRating
+                            value={0}
+                            variant="badge"
+                            showValue={false}
+                            size="md"
+                            minimal={true}
+                          />
+                        </div>
+                        <span className="text-lg font-bold text-muted-foreground">
+                          0
+                        </span>
+                      </div>
+                      
+                      {/* Text labels */}
+                      <div className="leading-tight min-w-[140px]">
+                        <div className="font-semibold text-sm whitespace-nowrap">Circle Rating</div>
+                        <div className="text-xs text-muted-foreground">
+                          No ratings from your circle
+                        </div>
+                      </div>
+                    </div>
+                  )
                 )}
               </div>
               
