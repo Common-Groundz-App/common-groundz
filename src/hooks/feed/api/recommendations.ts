@@ -17,6 +17,11 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
         created_at,
         updated_at,
         visibility,
+        category,
+        is_certified,
+        view_count,
+        venue,
+        image_url,
         entities:entity_id(*)
       `)
       .eq('visibility', 'public')
@@ -170,12 +175,12 @@ export const processRecommendations = async (
       commentsCount.set(comment.recommendation_id, current + 1);
     });
 
-    // Process recommendations with profile data
+    // Process recommendations with profile data - ensure all required FeedItem properties are included
     const processedRecommendations: RecommendationFeedItem[] = recsData.map(rec => {
       const profile = profilesMap[rec.user_id];
       
       return {
-        ...rec,
+        ...rec, // This spreads all original recommendation properties including category, is_certified, view_count
         is_post: false,
         username: profile?.displayName || profile?.username || null,
         avatar_url: profile?.avatar_url || null,
