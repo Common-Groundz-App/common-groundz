@@ -10,12 +10,32 @@ interface UseCirclePicksFetchProps {
   sortBy: 'recent' | 'most_liked' | 'highest_rated';
 }
 
-// Define valid categories to match the database enum
-const VALID_CATEGORIES = ['Food', 'Drink', 'Movie', 'Book', 'Product', 'Place', 'Activity', 'Music', 'Art', 'TV', 'Travel'] as const;
+// Define valid categories to match the database enum (lowercase)
+const VALID_CATEGORIES = ['food', 'drink', 'movie', 'book', 'product', 'place', 'activity', 'music', 'art', 'tv', 'travel'] as const;
 type ValidCategory = typeof VALID_CATEGORIES[number];
 
 function isValidCategory(category: string): category is ValidCategory {
-  return VALID_CATEGORIES.includes(category as ValidCategory);
+  // Convert to lowercase and check
+  return VALID_CATEGORIES.includes(category.toLowerCase() as ValidCategory);
+}
+
+// Map frontend categories to database categories
+function mapCategoryToDb(category: string): ValidCategory | null {
+  const categoryMap: Record<string, ValidCategory> = {
+    'Food': 'food',
+    'Drink': 'drink', 
+    'Movie': 'movie',
+    'Book': 'book',
+    'Product': 'product',
+    'Place': 'place',
+    'Activity': 'activity',
+    'Music': 'music',
+    'Art': 'art',
+    'TV': 'tv',
+    'Travel': 'travel'
+  };
+  
+  return categoryMap[category] || null;
 }
 
 export const useCirclePicksFetch = ({ 
@@ -49,16 +69,33 @@ export const useCirclePicksFetch = ({
         return { recommendations: [], reviews: [] };
       }
 
-      // Build recommendations query
+      // Build recommendations query with explicit typing
+      const dbCategory = category && category !== 'all' ? mapCategoryToDb(category) : null;
+      
       let recQuery = supabase
         .from('recommendations')
-        .select('*')
+        .select(`
+          id,
+          title,
+          description,
+          rating,
+          category,
+          image_url,
+          created_at,
+          user_id,
+          entity_id,
+          venue,
+          visibility,
+          is_certified,
+          view_count,
+          comment_count
+        `)
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
       // Apply category filter only if it's valid
-      if (category && category !== 'all' && isValidCategory(category)) {
-        recQuery = recQuery.eq('category', category);
+      if (dbCategory) {
+        recQuery = recQuery.eq('category', dbCategory);
       }
 
       // Apply sorting
@@ -72,10 +109,27 @@ export const useCirclePicksFetch = ({
       
       if (recError) throw recError;
 
-      // Build reviews query
+      // Build reviews query with explicit typing
       let reviewQuery = supabase
         .from('reviews')
-        .select('*')
+        .select(`
+          id,
+          title,
+          description,
+          rating,
+          category,
+          image_url,
+          created_at,
+          user_id,
+          entity_id,
+          venue,
+          visibility,
+          status,
+          subtitle,
+          experience_date,
+          media,
+          metadata
+        `)
         .in('user_id', followedIds)
         .eq('is_deleted', false);
 
@@ -141,16 +195,33 @@ export const useCirclePicksFetch = ({
     queryFn: async () => {
       if (!userId) return { recommendations: [], reviews: [] };
 
-      // Build user's recommendations query
+      // Build user's recommendations query with explicit typing
+      const dbCategory = category && category !== 'all' ? mapCategoryToDb(category) : null;
+      
       let myRecQuery = supabase
         .from('recommendations')
-        .select('*')
+        .select(`
+          id,
+          title,
+          description,
+          rating,
+          category,
+          image_url,
+          created_at,
+          user_id,
+          entity_id,
+          venue,
+          visibility,
+          is_certified,
+          view_count,
+          comment_count
+        `)
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
       // Apply category filter only if it's valid
-      if (category && category !== 'all' && isValidCategory(category)) {
-        myRecQuery = myRecQuery.eq('category', category);
+      if (dbCategory) {
+        myRecQuery = myRecQuery.eq('category', dbCategory);
       }
 
       if (sortBy === 'recent') {
@@ -163,10 +234,27 @@ export const useCirclePicksFetch = ({
       
       if (myRecError) throw myRecError;
 
-      // Build user's reviews query
+      // Build user's reviews query with explicit typing
       let myReviewQuery = supabase
         .from('reviews')
-        .select('*')
+        .select(`
+          id,
+          title,
+          description,
+          rating,
+          category,
+          image_url,
+          created_at,
+          user_id,
+          entity_id,
+          venue,
+          visibility,
+          status,
+          subtitle,
+          experience_date,
+          media,
+          metadata
+        `)
         .eq('user_id', userId)
         .eq('is_deleted', false);
 
