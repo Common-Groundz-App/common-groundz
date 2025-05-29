@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,6 +62,31 @@ const RecommendationCard = ({
     entityName: recommendation.entity?.name,
     entityImageUrl: entityImageUrl
   });
+
+  // Helper function to get entity route based on type and slug
+  const getEntityRoute = (entity: any) => {
+    if (!entity || !entity.slug) {
+      return null;
+    }
+
+    // Map entity types to route prefixes
+    const typeToRoute: Record<string, string> = {
+      'place': '/place',
+      'food': '/place',
+      'drink': '/place',
+      'movie': '/movie',
+      'book': '/book',
+      'product': '/product',
+      'tv': '/entity',
+      'music': '/entity',
+      'art': '/entity',
+      'activity': '/entity',
+      'travel': '/entity'
+    };
+
+    const routePrefix = typeToRoute[entity.type?.toLowerCase()] || '/entity';
+    return `${routePrefix}/${entity.slug}`;
+  };
 
   // Process media items for proper fallback handling
   const mediaItems = React.useMemo(() => {
@@ -218,7 +244,14 @@ const RecommendationCard = ({
       return;
     }
     
-    navigate(`/recommendations/${recommendation.id}`);
+    // Try to navigate to entity page if entity exists
+    const entityRoute = getEntityRoute(recommendation.entity);
+    if (entityRoute) {
+      navigate(entityRoute);
+    } else {
+      // Fallback to recommendation detail page if no entity
+      navigate(`/recommendations/${recommendation.id}`);
+    }
   };
 
   return (
