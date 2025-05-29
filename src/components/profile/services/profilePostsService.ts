@@ -11,6 +11,9 @@ export interface Post {
   visibility: 'public' | 'circle_only' | 'private';
   created_at: string;
   updated_at: string;
+  user_id: string;
+  username?: string;
+  avatar_url?: string;
   tagged_entities?: Entity[];
   media?: MediaItem[];
 }
@@ -19,7 +22,10 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
   try {
     let query = supabase
       .from('posts')
-      .select('*')
+      .select(`
+        *,
+        profiles:user_id(username, avatar_url)
+      `)
       .eq('user_id', profileUserId)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
@@ -59,7 +65,7 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
         });
       }
       
-      // Add entities to posts
+      // Add entities and flatten profile data to posts
       const enrichedPosts = (postsData || []).map(post => {
         // Process media properly with type safety
         let mediaItems: MediaItem[] | undefined;
@@ -79,10 +85,16 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
           }));
         }
 
+        // Flatten the profiles data
+        const profile = post.profiles;
+
         return {
           ...post,
+          username: profile?.username || null,
+          avatar_url: profile?.avatar_url || null,
           tagged_entities: entitiesByPostId[post.id] || [],
-          media: mediaItems
+          media: mediaItems,
+          profiles: undefined // Remove the nested profiles object
         };
       });
       
@@ -107,9 +119,15 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
           }));
         }
 
+        // Flatten the profiles data
+        const profile = post.profiles;
+
         return {
           ...post,
-          media: mediaItems
+          username: profile?.username || null,
+          avatar_url: profile?.avatar_url || null,
+          media: mediaItems,
+          profiles: undefined // Remove the nested profiles object
         };
       }) as Post[];
     }
