@@ -8,6 +8,7 @@ import { LucideIcon, MoreHorizontal, Settings, Home, Star, Search, User, Bell } 
 import { cn } from "@/lib/utils";
 import Logo from "@/components/Logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
@@ -46,8 +47,11 @@ export function VerticalTubelightNavbar({
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const { unreadCount } = useNotifications();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
 
-  const defaultNavItems: NavItem[] = [
+  // Navigation items for authenticated users
+  const authenticatedNavItems: NavItem[] = [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User },
@@ -61,11 +65,10 @@ export function VerticalTubelightNavbar({
     { name: 'Settings', url: '/settings', icon: Settings }
   ];
 
-  const items = propItems || defaultNavItems;
+  // Use prop items if provided, otherwise use conditional items based on auth state
+  const items = propItems || (user ? authenticatedNavItems : []);
 
-  const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState(initialActiveTab || (items.length > 0 ? items[0].name : ''));
   
   // Use enhanced profile service
   const { data: profile, isLoading } = useProfile(user?.id);
@@ -127,71 +130,100 @@ export function VerticalTubelightNavbar({
         </div>
 
         <div className="p-2 flex-grow flex flex-col">
-          <div className={cn(
-            "w-full flex flex-col items-center md:items-start gap-2 py-1 px-1 rounded-md"
-          )}>
-            {items.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.name;
-              return (
-                <div 
-                  key={item.name} 
-                  onClick={() => handleNavItemClick(item)}
-                  className={cn(
-                    "relative cursor-pointer text-sm font-semibold w-full rounded-md transition-colors", 
-                    "text-foreground/80 hover:text-primary"
-                  )}
-                >
-                  {(item.url.startsWith('#') || item.onClick) ? (
-                    <button 
-                      className={cn(
-                        "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md relative",
-                        isActive && "bg-muted text-primary"
-                      )}
-                      onClick={item.onClick}
-                    >
-                      <Icon size={18} strokeWidth={2.5} />
-                      <span className="hidden md:inline">{item.name}</span>
-                      {item.badge && (
-                        <span className="absolute right-2 top-2 md:relative md:right-auto md:top-auto md:ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white">
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  ) : (
-                    <Link 
-                      to={item.url} 
-                      className={cn(
-                        "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",
-                        isActive && "bg-muted text-primary"
-                      )}
-                    >
-                      <Icon size={18} strokeWidth={2.5} />
-                      <span className="hidden md:inline">{item.name}</span>
-                    </Link>
-                  )}
-                  {isActive && (
-                    <motion.div 
-                      layoutId="vertical-lamp" 
-                      className="absolute inset-0 w-full bg-primary/10 rounded-md -z-10" 
-                      initial={false} 
-                      transition={{
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 30
-                      }}
-                    >
-                      <div className="absolute -left-2 top-1/2 -translate-y-1/2 h-8 w-1 bg-brand-orange rounded-full">
-                        <div className="absolute h-12 w-6 bg-brand-orange/20 rounded-full blur-md -left-2 -top-2" />
-                        <div className="absolute h-8 w-6 bg-brand-orange/20 rounded-full blur-md -left-1" />
-                        <div className="absolute h-4 w-4 bg-brand-orange/20 rounded-full blur-sm -left-0.5" />
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {user ? (
+            // Authenticated user navigation
+            <div className={cn(
+              "w-full flex flex-col items-center md:items-start gap-2 py-1 px-1 rounded-md"
+            )}>
+              {items.map(item => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.name;
+                return (
+                  <div 
+                    key={item.name} 
+                    onClick={() => handleNavItemClick(item)}
+                    className={cn(
+                      "relative cursor-pointer text-sm font-semibold w-full rounded-md transition-colors", 
+                      "text-foreground/80 hover:text-primary"
+                    )}
+                  >
+                    {(item.url.startsWith('#') || item.onClick) ? (
+                      <button 
+                        className={cn(
+                          "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md relative",
+                          isActive && "bg-muted text-primary"
+                        )}
+                        onClick={item.onClick}
+                      >
+                        <Icon size={18} strokeWidth={2.5} />
+                        <span className="hidden md:inline">{item.name}</span>
+                        {item.badge && (
+                          <span className="absolute right-2 top-2 md:relative md:right-auto md:top-auto md:ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white">
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    ) : (
+                      <Link 
+                        to={item.url} 
+                        className={cn(
+                          "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",
+                          isActive && "bg-muted text-primary"
+                        )}
+                      >
+                        <Icon size={18} strokeWidth={2.5} />
+                        <span className="hidden md:inline">{item.name}</span>
+                      </Link>
+                    )}
+                    {isActive && (
+                      <motion.div 
+                        layoutId="vertical-lamp" 
+                        className="absolute inset-0 w-full bg-primary/10 rounded-md -z-10" 
+                        initial={false} 
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 30
+                        }}
+                      >
+                        <div className="absolute -left-2 top-1/2 -translate-y-1/2 h-8 w-1 bg-brand-orange rounded-full">
+                          <div className="absolute h-12 w-6 bg-brand-orange/20 rounded-full blur-md -left-2 -top-2" />
+                          <div className="absolute h-8 w-6 bg-brand-orange/20 rounded-full blur-md -left-1" />
+                          <div className="absolute h-4 w-4 bg-brand-orange/20 rounded-full blur-sm -left-0.5" />
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            // Non-authenticated user content
+            <div className="w-full flex flex-col items-center md:items-start gap-4 py-4 px-3">
+              <div className="text-center md:text-left mb-6">
+                <h3 className="text-lg font-semibold mb-2 hidden md:block">Welcome!</h3>
+                <p className="text-sm text-muted-foreground hidden md:block">
+                  Join our community to discover and share amazing recommendations.
+                </p>
+              </div>
+              
+              <div className="w-full space-y-3">
+                <Button asChild variant="gradient" className="w-full justify-center">
+                  <Link to="/auth">
+                    <span className="hidden md:inline">Log In</span>
+                    <span className="md:hidden">Login</span>
+                  </Link>
+                </Button>
+                
+                <Button asChild variant="outline" className="w-full justify-center">
+                  <Link to="/auth?tab=signup">
+                    <span className="hidden md:inline">Sign Up</span>
+                    <span className="md:hidden">Signup</span>
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {user && (
