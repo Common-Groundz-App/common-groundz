@@ -122,11 +122,13 @@ export function VerticalTubelightNavbar({
         "h-full w-16 md:w-64 bg-background border-r flex flex-col",
         className
       )}>
-        <div className="p-4 flex justify-center md:justify-start">
+        {/* Logo Section */}
+        <div className="p-4 flex justify-center md:justify-start flex-shrink-0">
           <Logo size={logoSize} />
         </div>
 
-        <div className="p-2 flex-grow flex flex-col">
+        {/* Navigation Items - Use flex-1 to take remaining space */}
+        <div className="p-2 flex-1 flex flex-col min-h-0">
           <div className={cn(
             "w-full flex flex-col items-center md:items-start gap-2 py-1 px-1 rounded-md"
           )}>
@@ -194,13 +196,14 @@ export function VerticalTubelightNavbar({
           </div>
         </div>
 
+        {/* User Menu - Fixed to bottom with flex-shrink-0 */}
         {user && (
-          <div className="p-2 mt-auto mb-4">
+          <div className="p-2 flex-shrink-0 mt-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="w-full flex items-center px-3 py-2 rounded-md hover:bg-accent transition-colors">
                   <div className="flex items-center w-full">
-                    <Avatar className="h-9 w-9">
+                    <Avatar className="h-9 w-9 flex-shrink-0">
                       <AvatarImage src={profile?.avatar_url || ""} />
                       <AvatarFallback>{getInitials()}</AvatarFallback>
                     </Avatar>
@@ -208,7 +211,7 @@ export function VerticalTubelightNavbar({
                       <p className="text-sm font-medium truncate">{displayName}</p>
                       <p className="text-xs text-muted-foreground truncate">@{username}</p>
                     </div>
-                    <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block" />
+                    <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block flex-shrink-0" />
                   </div>
                 </button>
               </DropdownMenuTrigger>

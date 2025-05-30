@@ -29,7 +29,8 @@ import { Badge } from '@/components/ui/badge';
 
 const Explore = () => {
   const { user } = useAuth();
-  const isMobile = useIsMobile();
+  // Use larger breakpoint (1024px) for better tablet/mobile detection
+  const isMobile = useIsMobile(1024);
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
@@ -152,14 +153,17 @@ const Explore = () => {
       
       <div className="flex flex-1">
         {!isMobile && (
-          <VerticalTubelightNavbar 
-            initialActiveTab={getInitialActiveTab()}
-            className="fixed left-0 top-0 h-screen pt-4" 
-          />
+          <div className="fixed left-0 top-0 h-screen">
+            <VerticalTubelightNavbar 
+              initialActiveTab={getInitialActiveTab()}
+              className="h-full"
+            />
+          </div>
         )}
         
         <div className={cn(
-          "flex-1 pt-16 md:pl-64",
+          "flex-1",
+          isMobile ? "pt-16" : "pl-16 md:pl-64"
         )}>
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <div className="flex justify-between items-center mb-6">
