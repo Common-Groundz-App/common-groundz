@@ -15,11 +15,19 @@ export function NavBarComponent() {
   const [activeTab, setActiveTab] = React.useState('Home');
   const { user } = useAuth();
   
-  const navItems = [
+  // Different navigation items based on authentication state
+  const authenticatedNavItems = [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User }
   ];
+
+  const unauthenticatedNavItems = [
+    { name: 'Login', url: '/auth', icon: User },
+    { name: 'Sign Up', url: '/auth?tab=signup', icon: User }
+  ];
+
+  const navItems = user ? authenticatedNavItems : unauthenticatedNavItems;
 
   React.useEffect(() => {
     const handleOpenSearch = () => {
@@ -56,6 +64,7 @@ export function NavBarComponent() {
         }
         initialActiveTab={activeTab}
         className="relative z-50 sticky top-0"
+        isAuthenticated={!!user}
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>
