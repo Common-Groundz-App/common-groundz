@@ -32,7 +32,7 @@ const HeroSection = () => {
           <GlowElements />
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl relative z-10">
             Recommendations <span className="from-word">from</span>{" "}
-            <span className="relative inline-block overflow-hidden pb-2">
+            <span className="relative inline-block overflow-hidden pb-2 highlight">
               <span className="invisible">people you trust</span>
               {titles.map((title, index) => (
                 <motion.span

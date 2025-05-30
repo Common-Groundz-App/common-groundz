@@ -103,4 +103,11 @@
       display: block;
     }
   }
+
+  /* Fix for Hero section animated text alignment between 748px and 767px */
+  @media (min-width: 748px) and (max-width: 767px) {
+    .highlight {
+      display: block;
+    }
+  }
 }
