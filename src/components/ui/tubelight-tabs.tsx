@@ -66,9 +66,7 @@ export function TubelightTabs({
                 <div className="flex items-center space-x-2">
                   <span className="hidden md:inline">{item.label}</span>
                   {Icon && (
-                    <span className="md:hidden">
-                      <Icon size={18} strokeWidth={2.5} />
-                    </span>
+                    <Icon className="md:hidden" size={18} strokeWidth={2.5} />
                   )}
                 </div>
                 
