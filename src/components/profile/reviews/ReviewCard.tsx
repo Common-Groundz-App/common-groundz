@@ -90,13 +90,13 @@ const ReviewCard = ({
   // Determine if media should be shown based on hideEntityFallbacks setting
   const shouldShowMedia = React.useMemo(() => {
     if (!hideEntityFallbacks) {
-      return mediaItems.length > 0; // Show everything normally
+      return mediaItems.length > 0; // Show everything normally (profile/feed pages)
     }
     
-    // On entity pages, only show user-uploaded content
-    const hasUserContent = mediaItems.some(item => !item.source || item.source !== 'entity');
-    return hasUserContent;
-  }, [mediaItems, hideEntityFallbacks]);
+    // On entity pages: only show if there's actual user content in media array
+    const hasUserMediaArray = review.media && Array.isArray(review.media) && review.media.length > 0;
+    return hasUserMediaArray;
+  }, [review.media, hideEntityFallbacks, mediaItems.length]);
   
   // Get a category-specific fallback image URL for when no image is available
   const getCategoryFallbackImage = (category: string): string => {
@@ -359,7 +359,7 @@ const ReviewCard = ({
           {shouldShowMedia && (
             <div className="mt-3">
               <PostMediaDisplay 
-                media={mediaItems.filter(item => !hideEntityFallbacks || !item.source || item.source !== 'entity')} 
+                media={mediaItems} 
                 className="mt-2 mb-3"
                 aspectRatio="maintain"
                 objectFit="contain"
