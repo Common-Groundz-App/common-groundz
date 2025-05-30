@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User, Settings } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
+import { useToast } from "@/hooks/use-toast";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
@@ -21,6 +22,8 @@ export function UserMenu() {
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   const { data: profile, isLoading } = useProfile(user?.id);
   const { invalidateProfile } = useProfileCacheActions();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   // Listen for profile update events
   React.useEffect(() => {
@@ -41,9 +44,33 @@ export function UserMenu() {
     try {
       setIsSigningOut(true);
       setIsOpen(false); // Close dropdown immediately
-      await signOut();
+      
+      const { error } = await signOut();
+      
+      if (error) {
+        toast({
+          title: "Sign out failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Navigate to landing page
+      navigate('/', { replace: true });
+      
+      // Show success message
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account.",
+      });
     } catch (error) {
       console.error('Error during sign out:', error);
+      toast({
+        title: "Sign out failed",
+        description: "An unexpected error occurred while signing out.",
+        variant: "destructive",
+      });
     } finally {
       setIsSigningOut(false);
     }

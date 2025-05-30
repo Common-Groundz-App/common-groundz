@@ -1,10 +1,8 @@
 
 import React from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType } from '@/types/auth';
-import { useToast } from '@/hooks/use-toast';
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
@@ -12,8 +10,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [session, setSession] = React.useState<Session | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const navigate = useNavigate();
-  const { toast } = useToast();
 
   React.useEffect(() => {
     const setupAuth = async () => {
@@ -79,33 +75,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Error signing out:', error);
-        toast({
-          title: "Sign out failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
+        return { error };
       }
       
       // Clear local state immediately
       setSession(null);
       setUser(null);
       
-      // Navigate to landing page
-      navigate('/', { replace: true });
-      
-      // Show success message
-      toast({
-        title: "Signed out successfully",
-        description: "You have been logged out of your account.",
-      });
+      return { error: null };
     } catch (error) {
       console.error('Error during sign out:', error);
-      toast({
-        title: "Sign out failed",
-        description: "An unexpected error occurred while signing out.",
-        variant: "destructive",
-      });
+      return { error: error as Error };
     }
   };
 
