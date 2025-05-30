@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ interface ReviewCardProps {
   onConvert?: (id: string) => void;
   refreshReviews: () => Promise<void>;
   hideEntityFallbacks?: boolean;
+  compact?: boolean;
 }
 
 const ReviewCard = ({ 
@@ -42,7 +44,8 @@ const ReviewCard = ({
   onSave,
   onConvert,
   refreshReviews,
-  hideEntityFallbacks = false
+  hideEntityFallbacks = false,
+  compact = false
 }: ReviewCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -247,25 +250,27 @@ const ReviewCard = ({
       <Card 
         className="overflow-hidden hover:shadow-md transition-shadow duration-200"
       >
-        <CardContent className="p-6">
+        <CardContent className={compact ? "p-4" : "p-6"}>
           {/* Card Header with User Info */}
           <div className="flex justify-between items-start">
-            <div className="flex items-start gap-3">
+            <div className={cn("flex items-start gap-3", compact && "gap-2")}>
               <UsernameLink 
                 userId={review.user_id}
                 className="hover:opacity-80 transition-opacity"
               >
-                <Avatar className="h-10 w-10 border">
+                <Avatar className={cn("border", compact ? "h-8 w-8" : "h-10 w-10")}>
                   <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
                   <AvatarFallback>{getInitials(review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
-              <div>
-                <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
-                <div className="text-muted-foreground text-xs mt-0.5">
-                  <span>{formatRelativeDate(review.created_at)}</span>
+              <div className={compact ? "flex-1" : ""}>
+                <div className={cn("flex items-center", compact ? "gap-3" : "flex-col items-start")}>
+                  <UsernameLink userId={review.user_id} username={review.user?.username} className={cn("font-medium hover:underline", compact ? "text-sm" : "")} />
+                  <div className={cn("text-muted-foreground", compact ? "text-xs" : "text-xs mt-0.5")}>
+                    <span>{formatRelativeDate(review.created_at)}</span>
+                  </div>
                 </div>
-                <div className="mt-1">
+                <div className={compact ? "flex items-center mt-1" : "mt-1"}>
                   <RatingDisplay rating={review.rating} />
                 </div>
               </div>
@@ -278,9 +283,9 @@ const ReviewCard = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="rounded-full h-8 w-8 p-0"
+                    className={cn("rounded-full p-0", compact ? "h-6 w-6" : "h-8 w-8")}
                   >
-                    <MoreVertical className="h-4 w-4" />
+                    <MoreVertical className={cn(compact ? "h-3 w-3" : "h-4 w-4")} />
                     <span className="sr-only">Menu</span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -329,25 +334,25 @@ const ReviewCard = ({
           </div>
           
           {/* Title and Category */}
-          <div className="mt-4">
+          <div className={compact ? "mt-2" : "mt-4"}>
             {/* Display Review Headline/Title (subtitle) if available */}
             {review.subtitle && (
-              <h3 className="font-semibold text-lg">{review.subtitle}</h3>
+              <h3 className={cn("font-semibold", compact ? "text-base" : "text-lg")}>{review.subtitle}</h3>
             )}
             
             {/* Always display the content name (title) */}
-            <h3 className={`${review.subtitle ? "text-base mt-1" : "font-semibold text-lg"}`}>
+            <h3 className={cn(review.subtitle ? (compact ? "text-sm mt-1" : "text-base mt-1") : (compact ? "text-base" : "font-semibold text-lg"))}>
               {review.title}
             </h3>
             
-            <div className="flex flex-wrap gap-2 mt-1">
+            <div className={cn("flex flex-wrap gap-2", compact ? "mt-1" : "mt-1")}>
               {review.category && (
-                <Badge className={cn("font-normal", getCategoryColor(review.category))} variant="outline">
+                <Badge className={cn("font-normal", compact ? "text-xs px-2 py-0.5" : "", getCategoryColor(review.category))} variant="outline">
                   {getCategoryLabel(review.category)}
                 </Badge>
               )}
               
-              {review.entity && (
+              {review.entity && !compact && (
                 <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
                   {review.entity.name}
                 </Badge>
@@ -357,10 +362,10 @@ const ReviewCard = ({
           
           {/* Media - conditionally rendered based on shouldShowMedia */}
           {shouldShowMedia && (
-            <div className="mt-3">
+            <div className={compact ? "mt-2" : "mt-3"}>
               <PostMediaDisplay 
                 media={mediaItems} 
-                className="mt-2 mb-3"
+                className={compact ? "mt-1 mb-2" : "mt-2 mb-3"}
                 aspectRatio="maintain"
                 objectFit="contain"
                 enableBackground={true}
@@ -371,8 +376,8 @@ const ReviewCard = ({
           
           {/* Fallback when no media should be shown */}
           {!shouldShowMedia && !hideEntityFallbacks && mediaItems.length === 0 && (
-            <div className="mt-3">
-              <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
+            <div className={compact ? "mt-2" : "mt-3"}>
+              <div className={cn("rounded-md overflow-hidden relative bg-gray-50", compact ? "mt-1 mb-2 h-32" : "mt-2 mb-3 h-48")}>
                 <ImageWithFallback
                   src={getFallbackImage()}
                   alt={`${review.title} - ${review.category || 'Review'}`}
@@ -385,21 +390,21 @@ const ReviewCard = ({
           
           {/* Description */}
           {review.description && (
-            <div className="mt-3 text-sm text-muted-foreground">
-              <p className="line-clamp-3">{review.description}</p>
+            <div className={cn("text-sm text-muted-foreground", compact ? "mt-2" : "mt-3")}>
+              <p className={compact ? "line-clamp-2" : "line-clamp-3"}>{review.description}</p>
             </div>
           )}
           
           {/* Venue */}
           {review.venue && (
-            <div className="mt-3 text-sm">
+            <div className={cn("text-sm", compact ? "mt-2" : "mt-3")}>
               <span className="font-medium">Location: </span>
               <span>{review.venue}</span>
             </div>
           )}
           
           {/* Experience date */}
-          {review.experience_date && (
+          {review.experience_date && !compact && (
             <div className="text-xs text-gray-500 flex items-center mt-3">
               <Calendar className="h-3 w-3 mr-1" />
               <span>Experienced: {format(new Date(review.experience_date), 'MMM d, yyyy')}</span>
@@ -407,13 +412,14 @@ const ReviewCard = ({
           )}
           
           {/* Social Actions */}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t">
-            <div className="flex items-center gap-3 sm:gap-6">
+          <div className={cn("flex items-center justify-between border-t", compact ? "mt-3 pt-3" : "mt-4 pt-4")}>
+            <div className={cn("flex items-center", compact ? "gap-4" : "gap-3 sm:gap-6")}>
               <Button 
                 variant="ghost" 
-                size="sm" 
+                size={compact ? "sm" : "sm"}
                 className={cn(
-                  "flex items-center gap-1 py-0 px-2 sm:px-4", 
+                  "flex items-center gap-1 py-0", 
+                  compact ? "px-1 text-xs" : "px-2 sm:px-4",
                   review.isLiked && "text-red-500 hover:text-red-600"
                 )}
                 onClick={(e) => {
@@ -422,24 +428,25 @@ const ReviewCard = ({
                   onLike(review.id);
                 }}
               >
-                <Heart className={cn("h-5 w-5", review.isLiked && "fill-current")} />
+                <Heart className={cn(compact ? "h-4 w-4" : "h-5 w-5", review.isLiked && "fill-current")} />
                 <span>{review.likes}</span>
               </Button>
               
               <Button
                 variant="ghost"
-                size="sm" 
-                className="flex items-center gap-1 py-0 px-2 sm:px-4"
+                size={compact ? "sm" : "sm"}
+                className={cn("flex items-center gap-1 py-0", compact ? "px-1 text-xs" : "px-2 sm:px-4")}
               >
-                <MessageCircle className="h-5 w-5" />
+                <MessageCircle className={cn(compact ? "h-4 w-4" : "h-5 w-5")} />
                 <span>{review.comment_count || 0}</span>
               </Button>
               
               <Button
                 variant="ghost"
-                size="sm" 
+                size={compact ? "sm" : "sm"}
                 className={cn(
-                  "flex items-center gap-1 py-0 px-2 sm:px-4",
+                  "flex items-center gap-1 py-0",
+                  compact ? "px-1 text-xs" : "px-2 sm:px-4",
                   review.isSaved && "text-primary"
                 )}
                 onClick={(e) => {
@@ -448,17 +455,17 @@ const ReviewCard = ({
                   onSave(review.id);
                 }}
               >
-                <Bookmark className={cn("h-5 w-5", review.isSaved && "fill-current")} />
+                <Bookmark className={cn(compact ? "h-4 w-4" : "h-5 w-5", review.isSaved && "fill-current")} />
               </Button>
             </div>
             
             {/* Share button */}
             <Button
               variant="ghost"
-              size="sm" 
-              className="flex items-center gap-1 py-0 px-2 sm:px-4"
+              size={compact ? "sm" : "sm"}
+              className={cn("flex items-center gap-1 py-0", compact ? "px-1 text-xs" : "px-2 sm:px-4")}
             >
-              <Share2 className="h-5 w-5" />
+              <Share2 className={cn(compact ? "h-4 w-4" : "h-5 w-5")} />
             </Button>
           </div>
         </CardContent>

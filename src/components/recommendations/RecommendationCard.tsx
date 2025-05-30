@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ interface RecommendationCardProps {
   highlightCommentId?: string | null;
   onDeleted?: () => void;
   hideEntityFallbacks?: boolean;
+  compact?: boolean;
 }
 
 const RecommendationCard = ({ 
@@ -38,7 +40,8 @@ const RecommendationCard = ({
   onSave, 
   highlightCommentId,
   onDeleted,
-  hideEntityFallbacks = false
+  hideEntityFallbacks = false,
+  compact = false
 }: RecommendationCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -269,23 +272,28 @@ const RecommendationCard = ({
       className="overflow-hidden hover:shadow-md transition-shadow duration-200"
       onClick={handleCardClick}
     >
-      <CardContent className="p-6">
+      <CardContent className={compact ? "p-4" : "p-6"}>
         {/* Card Header with User Info using ProfileDisplay */}
         <div className="flex justify-between items-start">
-          <div className="flex items-center gap-3">
+          <div className={cn("flex items-center gap-3", compact && "gap-2")}>
             <ProfileDisplay
               userId={recommendation.user_id}
-              size="md"
+              size={compact ? "sm" : "md"}
               showUsername={true}
               showLink={true}
               className="hover:opacity-80 transition-opacity"
             />
-            <div>
-              <div className="flex items-center gap-1 text-muted-foreground text-xs">
+            <div className={compact ? "flex items-center gap-3" : ""}>
+              <div className={cn("flex items-center gap-1 text-muted-foreground", compact ? "text-xs" : "text-xs")}>
                 <span>{formatRelativeDate(recommendation.created_at)}</span>
-                <span>·</span>
-                <RatingDisplay rating={recommendation.rating} />
+                {!compact && <span>·</span>}
+                {!compact && <RatingDisplay rating={recommendation.rating} />}
               </div>
+              {compact && (
+                <div className="flex items-center">
+                  <RatingDisplay rating={recommendation.rating} />
+                </div>
+              )}
             </div>
           </div>
           
@@ -296,9 +304,9 @@ const RecommendationCard = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="rounded-full h-8 w-8 p-0"
+                  className={cn("rounded-full p-0", compact ? "h-6 w-6" : "h-8 w-8")}
                 >
-                  <MoreVertical className="h-4 w-4" />
+                  <MoreVertical className={cn(compact ? "h-3 w-3" : "h-4 w-4")} />
                   <span className="sr-only">Menu</span>
                 </Button>
               </DropdownMenuTrigger>
@@ -315,16 +323,16 @@ const RecommendationCard = ({
         </div>
         
         {/* Title and Category */}
-        <div className="mt-4">
-          <h3 className="font-semibold text-lg">{recommendation.title}</h3>
-          <div className="flex flex-wrap gap-2 mt-1">
+        <div className={compact ? "mt-2" : "mt-4"}>
+          <h3 className={cn("font-semibold", compact ? "text-base" : "text-lg")}>{recommendation.title}</h3>
+          <div className={cn("flex flex-wrap gap-2", compact ? "mt-1" : "mt-1")}>
             {recommendation.category && (
-              <Badge className={cn("font-normal", getCategoryColor(recommendation.category))} variant="outline">
+              <Badge className={cn("font-normal", compact ? "text-xs px-2 py-0.5" : "", getCategoryColor(recommendation.category))} variant="outline">
                 {getCategoryLabel(recommendation.category)}
               </Badge>
             )}
             
-            {recommendation.entity && (
+            {recommendation.entity && !compact && (
               <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
                 {recommendation.entity.name}
               </Badge>
@@ -334,10 +342,10 @@ const RecommendationCard = ({
         
         {/* Media - conditionally rendered based on shouldShowMedia */}
         {shouldShowMedia && (
-          <div className="mt-3">
+          <div className={compact ? "mt-2" : "mt-3"}>
             <PostMediaDisplay 
               media={mediaItems} 
-              className="mt-2 mb-3"
+              className={compact ? "mt-1 mb-2" : "mt-2 mb-3"}
               aspectRatio="maintain"
               objectFit="contain"
               enableBackground={true}
@@ -348,8 +356,8 @@ const RecommendationCard = ({
         
         {/* Fallback when no media should be shown */}
         {!shouldShowMedia && !hideEntityFallbacks && mediaItems.length === 0 && (
-          <div className="mt-3">
-            <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
+          <div className={compact ? "mt-2" : "mt-3"}>
+            <div className={cn("rounded-md overflow-hidden relative bg-gray-50", compact ? "mt-1 mb-2 h-32" : "mt-2 mb-3 h-48")}>
               <ImageWithFallback
                 src={getFallbackImage()}
                 alt={`${recommendation.title} - ${recommendation.category || 'Recommendation'}`}
@@ -362,27 +370,28 @@ const RecommendationCard = ({
         
         {/* Description */}
         {recommendation.description && (
-          <div className="mt-3 text-sm text-muted-foreground">
-            <p className="line-clamp-3">{recommendation.description}</p>
+          <div className={cn("text-sm text-muted-foreground", compact ? "mt-2" : "mt-3")}>
+            <p className={compact ? "line-clamp-2" : "line-clamp-3"}>{recommendation.description}</p>
           </div>
         )}
         
         {/* Venue */}
         {recommendation.venue && (
-          <div className="mt-3 text-sm">
+          <div className={cn("text-sm", compact ? "mt-2" : "mt-3")}>
             <span className="font-medium">Location: </span>
             <span>{recommendation.venue}</span>
           </div>
         )}
         
         {/* Social Actions */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t">
-          <div className="flex items-center gap-3 sm:gap-6">
+        <div className={cn("flex items-center justify-between border-t", compact ? "mt-3 pt-3" : "mt-4 pt-4")}>
+          <div className={cn("flex items-center", compact ? "gap-4" : "gap-3 sm:gap-6")}>
             <Button 
               variant="ghost" 
-              size="sm" 
+              size={compact ? "sm" : "sm"}
               className={cn(
-                "flex items-center gap-1 py-0 px-2 sm:px-4", 
+                "flex items-center gap-1 py-0", 
+                compact ? "px-1 text-xs" : "px-2 sm:px-4",
                 isLiked && "text-red-500 hover:text-red-600"
               )}
               onClick={(e) => {
@@ -390,28 +399,29 @@ const RecommendationCard = ({
                 handleLike();
               }}
             >
-              <Heart className={cn("h-5 w-5", isLiked && "fill-current")} />
+              <Heart className={cn(compact ? "h-4 w-4" : "h-5 w-5", isLiked && "fill-current")} />
               <span>{likes}</span>
             </Button>
             
             <Button
               variant="ghost"
-              size="sm" 
-              className="flex items-center gap-1 py-0 px-2 sm:px-4"
+              size={compact ? "sm" : "sm"}
+              className={cn("flex items-center gap-1 py-0", compact ? "px-1 text-xs" : "px-2 sm:px-4")}
               onClick={(e) => {
                 e.stopPropagation();
                 navigate(`/recommendations/${recommendation.id}?commentId=new`);
               }}
             >
-              <MessageCircle className="h-5 w-5" />
+              <MessageCircle className={cn(compact ? "h-4 w-4" : "h-5 w-5")} />
               <span>{recommendation.comment_count || 0}</span>
             </Button>
             
             <Button
               variant="ghost"
-              size="sm" 
+              size={compact ? "sm" : "sm"}
               className={cn(
-                "flex items-center gap-1 py-0 px-2 sm:px-4",
+                "flex items-center gap-1 py-0",
+                compact ? "px-1 text-xs" : "px-2 sm:px-4",
                 isSaved && "text-primary"
               )}
               onClick={(e) => {
@@ -419,21 +429,21 @@ const RecommendationCard = ({
                 handleSave();
               }}
             >
-              <Bookmark className={cn("h-5 w-5", isSaved && "fill-current")} />
+              <Bookmark className={cn(compact ? "h-4 w-4" : "h-5 w-5", isSaved && "fill-current")} />
             </Button>
           </div>
           
           {/* Share button */}
           <Button
             variant="ghost"
-            size="sm" 
-            className="flex items-center gap-1 py-0 px-2 sm:px-4"
+            size={compact ? "sm" : "sm"}
+            className={cn("flex items-center gap-1 py-0", compact ? "px-1 text-xs" : "px-2 sm:px-4")}
             onClick={(e) => {
               e.stopPropagation();
               handleShare();
             }}
           >
-            <Share2 className="h-5 w-5" />
+            <Share2 className={cn(compact ? "h-4 w-4" : "h-5 w-5")} />
           </Button>
         </div>
       </CardContent>
