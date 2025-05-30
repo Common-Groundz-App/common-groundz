@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -245,32 +244,234 @@ const ReviewCard = ({
     return colors[getCategoryLabel(category)] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
   };
 
+  if (compact) {
+    return (
+      <>
+        <Card className="overflow-hidden hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-3">
+            {/* Compact Rating-First Layout */}
+            <div className="flex items-start justify-between mb-2">
+              {/* Rating and Title Section */}
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <RatingDisplay rating={review.rating} />
+                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {review.rating.toFixed(1)}
+                  </span>
+                </div>
+                {/* Display Review Headline/Title (subtitle) if available */}
+                {review.subtitle && (
+                  <h3 className="font-semibold text-base leading-tight mb-1">{review.subtitle}</h3>
+                )}
+                {/* Content name (title) - less prominent if subtitle exists */}
+                <h4 className={cn(review.subtitle ? "text-sm text-muted-foreground" : "font-semibold text-base leading-tight")}>
+                  {review.title}
+                </h4>
+              </div>
+              
+              {/* Options Menu for own content */}
+              {(isOwner || isAdmin) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full p-0 h-6 w-6 ml-2"
+                    >
+                      <MoreVertical className="h-3 w-3" />
+                      <span className="sr-only">Menu</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {isOwner && (
+                      <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
+                        <Pencil className="h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                    )}
+                    
+                    {!review.is_converted && isOwner && onConvert && (
+                      <DropdownMenuItem onClick={handleConvertClick} className="flex items-center gap-2">
+                        <UploadCloud className="h-4 w-4" /> Convert to Recommendation
+                      </DropdownMenuItem>
+                    )}
+                    
+                    {isAdmin && review.status !== 'flagged' && (
+                      <DropdownMenuItem 
+                        onClick={() => handleStatusChange('flagged')}
+                        className="flex items-center gap-2"
+                      >
+                        <Flag className="h-4 w-4" /> Flag for Review
+                      </DropdownMenuItem>
+                    )}
+                    
+                    {isAdmin && review.status === 'flagged' && (
+                      <DropdownMenuItem 
+                        onClick={() => handleStatusChange('published')}
+                        className="flex items-center gap-2"
+                      >
+                        <Flag className="h-4 w-4" /> Remove Flag
+                      </DropdownMenuItem>
+                    )}
+                    
+                    {(isOwner || isAdmin) && (
+                      <DropdownMenuItem 
+                        onClick={handleDeleteClick} 
+                        className="text-destructive focus:text-destructive flex items-center gap-2"
+                      >
+                        <Trash2 className="h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+            
+            {/* User Info - Compact */}
+            <div className="flex items-center gap-2 mb-2">
+              <UsernameLink 
+                userId={review.user_id}
+                className="hover:opacity-80 transition-opacity"
+              >
+                <Avatar className="border h-6 w-6">
+                  <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
+                  <AvatarFallback>{getInitials(review.user?.username)}</AvatarFallback>
+                </Avatar>
+              </UsernameLink>
+              <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline text-sm" />
+              <span className="text-xs text-muted-foreground">
+                {formatRelativeDate(review.created_at)}
+              </span>
+            </div>
+            
+            {/* Description - More prominent */}
+            {review.description && (
+              <div className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                <p className="line-clamp-4">{review.description}</p>
+              </div>
+            )}
+            
+            {/* Media - smaller and less prominent */}
+            {shouldShowMedia && (
+              <div className="mb-3">
+                <PostMediaDisplay 
+                  media={mediaItems} 
+                  className="mb-2"
+                  aspectRatio="maintain"
+                  objectFit="contain"
+                  enableBackground={true}
+                  thumbnailDisplay="none"
+                />
+              </div>
+            )}
+            
+            {/* Social Actions - Minimal */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className={cn(
+                    "flex items-center gap-1 py-0 px-1 text-xs", 
+                    review.isLiked && "text-red-500 hover:text-red-600"
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onLike(review.id);
+                  }}
+                >
+                  <Heart className={cn("h-3 w-3", review.isLiked && "fill-current")} />
+                  <span>{review.likes}</span>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center gap-1 py-0 px-1 text-xs"
+                >
+                  <MessageCircle className="h-3 w-3" />
+                  <span>{review.comment_count || 0}</span>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "flex items-center gap-1 py-0 px-1 text-xs",
+                    review.isSaved && "text-primary"
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onSave(review.id);
+                  }}
+                >
+                  <Bookmark className={cn("h-3 w-3", review.isSaved && "fill-current")} />
+                </Button>
+              </div>
+              
+              {/* Share button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-1 py-0 px-1 text-xs"
+              >
+                <Share2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          isOpen={isDeleteDialogOpen}
+          onClose={() => setIsDeleteDialogOpen(false)}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Review"
+          description="Are you sure you want to delete this review? This action cannot be undone."
+          isLoading={isDeleting}
+        />
+        
+        {/* Edit Form Dialog */}
+        {isEditing && (
+          <ReviewForm
+            isOpen={isEditing}
+            onClose={() => setIsEditing(false)}
+            onSubmit={refreshReviews}
+            review={review}
+            isEditMode={true}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       <Card 
         className="overflow-hidden hover:shadow-md transition-shadow duration-200"
       >
-        <CardContent className={compact ? "p-4" : "p-6"}>
+        <CardContent className="p-6">
           {/* Card Header with User Info */}
           <div className="flex justify-between items-start">
-            <div className={cn("flex items-start gap-3", compact && "gap-2")}>
+            <div className="flex items-start gap-3">
               <UsernameLink 
                 userId={review.user_id}
                 className="hover:opacity-80 transition-opacity"
               >
-                <Avatar className={cn("border", compact ? "h-8 w-8" : "h-10 w-10")}>
+                <Avatar className="border h-10 w-10">
                   <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
                   <AvatarFallback>{getInitials(review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
-              <div className={compact ? "flex-1" : ""}>
-                <div className={cn("flex items-center", compact ? "gap-3" : "flex-col items-start")}>
-                  <UsernameLink userId={review.user_id} username={review.user?.username} className={cn("font-medium hover:underline", compact ? "text-sm" : "")} />
-                  <div className={cn("text-muted-foreground", compact ? "text-xs" : "text-xs mt-0.5")}>
+              <div>
+                <div className="flex items-center flex-col items-start">
+                  <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
+                  <div className="text-muted-foreground text-xs mt-0.5">
                     <span>{formatRelativeDate(review.created_at)}</span>
                   </div>
                 </div>
-                <div className={compact ? "flex items-center mt-1" : "mt-1"}>
+                <div className="mt-1">
                   <RatingDisplay rating={review.rating} />
                 </div>
               </div>
@@ -283,9 +484,9 @@ const ReviewCard = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={cn("rounded-full p-0", compact ? "h-6 w-6" : "h-8 w-8")}
+                    className="rounded-full p-0 h-8 w-8"
                   >
-                    <MoreVertical className={cn(compact ? "h-3 w-3" : "h-4 w-4")} />
+                    <MoreVertical className="h-4 w-4" />
                     <span className="sr-only">Menu</span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -334,25 +535,25 @@ const ReviewCard = ({
           </div>
           
           {/* Title and Category */}
-          <div className={compact ? "mt-2" : "mt-4"}>
+          <div className="mt-4">
             {/* Display Review Headline/Title (subtitle) if available */}
             {review.subtitle && (
-              <h3 className={cn("font-semibold", compact ? "text-base" : "text-lg")}>{review.subtitle}</h3>
+              <h3 className="font-semibold text-lg">{review.subtitle}</h3>
             )}
             
             {/* Always display the content name (title) */}
-            <h3 className={cn(review.subtitle ? (compact ? "text-sm mt-1" : "text-base mt-1") : (compact ? "text-base" : "font-semibold text-lg"))}>
+            <h3 className={cn(review.subtitle ? "text-base mt-1" : "font-semibold text-lg")}>
               {review.title}
             </h3>
             
-            <div className={cn("flex flex-wrap gap-2", compact ? "mt-1" : "mt-1")}>
+            <div className="flex flex-wrap gap-2 mt-1">
               {review.category && (
-                <Badge className={cn("font-normal", compact ? "text-xs px-2 py-0.5" : "", getCategoryColor(review.category))} variant="outline">
+                <Badge className="font-normal" variant="outline">
                   {getCategoryLabel(review.category)}
                 </Badge>
               )}
               
-              {review.entity && !compact && (
+              {review.entity && (
                 <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
                   {review.entity.name}
                 </Badge>
@@ -362,10 +563,10 @@ const ReviewCard = ({
           
           {/* Media - conditionally rendered based on shouldShowMedia */}
           {shouldShowMedia && (
-            <div className={compact ? "mt-2" : "mt-3"}>
+            <div className="mt-3">
               <PostMediaDisplay 
                 media={mediaItems} 
-                className={compact ? "mt-1 mb-2" : "mt-2 mb-3"}
+                className="mt-2 mb-3"
                 aspectRatio="maintain"
                 objectFit="contain"
                 enableBackground={true}
@@ -376,8 +577,8 @@ const ReviewCard = ({
           
           {/* Fallback when no media should be shown */}
           {!shouldShowMedia && !hideEntityFallbacks && mediaItems.length === 0 && (
-            <div className={compact ? "mt-2" : "mt-3"}>
-              <div className={cn("rounded-md overflow-hidden relative bg-gray-50", compact ? "mt-1 mb-2 h-32" : "mt-2 mb-3 h-48")}>
+            <div className="mt-3">
+              <div className="rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48">
                 <ImageWithFallback
                   src={getFallbackImage()}
                   alt={`${review.title} - ${review.category || 'Review'}`}
@@ -390,21 +591,21 @@ const ReviewCard = ({
           
           {/* Description */}
           {review.description && (
-            <div className={cn("text-sm text-muted-foreground", compact ? "mt-2" : "mt-3")}>
-              <p className={compact ? "line-clamp-2" : "line-clamp-3"}>{review.description}</p>
+            <div className="text-sm text-muted-foreground mt-3">
+              <p className="line-clamp-3">{review.description}</p>
             </div>
           )}
           
           {/* Venue */}
           {review.venue && (
-            <div className={cn("text-sm", compact ? "mt-2" : "mt-3")}>
+            <div className="text-sm mt-3">
               <span className="font-medium">Location: </span>
               <span>{review.venue}</span>
             </div>
           )}
           
           {/* Experience date */}
-          {review.experience_date && !compact && (
+          {review.experience_date && (
             <div className="text-xs text-gray-500 flex items-center mt-3">
               <Calendar className="h-3 w-3 mr-1" />
               <span>Experienced: {format(new Date(review.experience_date), 'MMM d, yyyy')}</span>
@@ -412,14 +613,13 @@ const ReviewCard = ({
           )}
           
           {/* Social Actions */}
-          <div className={cn("flex items-center justify-between border-t", compact ? "mt-3 pt-3" : "mt-4 pt-4")}>
-            <div className={cn("flex items-center", compact ? "gap-4" : "gap-3 sm:gap-6")}>
+          <div className="flex items-center justify-between border-t mt-4 pt-4">
+            <div className="flex items-center gap-3 sm:gap-6">
               <Button 
                 variant="ghost" 
-                size={compact ? "sm" : "sm"}
+                size="sm"
                 className={cn(
-                  "flex items-center gap-1 py-0", 
-                  compact ? "px-1 text-xs" : "px-2 sm:px-4",
+                  "flex items-center gap-1 py-0 px-2 sm:px-4",
                   review.isLiked && "text-red-500 hover:text-red-600"
                 )}
                 onClick={(e) => {
@@ -428,25 +628,24 @@ const ReviewCard = ({
                   onLike(review.id);
                 }}
               >
-                <Heart className={cn(compact ? "h-4 w-4" : "h-5 w-5", review.isLiked && "fill-current")} />
+                <Heart className={cn("h-5 w-5", review.isLiked && "fill-current")} />
                 <span>{review.likes}</span>
               </Button>
               
               <Button
                 variant="ghost"
-                size={compact ? "sm" : "sm"}
-                className={cn("flex items-center gap-1 py-0", compact ? "px-1 text-xs" : "px-2 sm:px-4")}
+                size="sm"
+                className="flex items-center gap-1 py-0 px-2 sm:px-4"
               >
-                <MessageCircle className={cn(compact ? "h-4 w-4" : "h-5 w-5")} />
+                <MessageCircle className="h-5 w-5" />
                 <span>{review.comment_count || 0}</span>
               </Button>
               
               <Button
                 variant="ghost"
-                size={compact ? "sm" : "sm"}
+                size="sm"
                 className={cn(
-                  "flex items-center gap-1 py-0",
-                  compact ? "px-1 text-xs" : "px-2 sm:px-4",
+                  "flex items-center gap-1 py-0 px-2 sm:px-4",
                   review.isSaved && "text-primary"
                 )}
                 onClick={(e) => {
@@ -455,17 +654,17 @@ const ReviewCard = ({
                   onSave(review.id);
                 }}
               >
-                <Bookmark className={cn(compact ? "h-4 w-4" : "h-5 w-5", review.isSaved && "fill-current")} />
+                <Bookmark className={cn("h-5 w-5", review.isSaved && "fill-current")} />
               </Button>
             </div>
             
             {/* Share button */}
             <Button
               variant="ghost"
-              size={compact ? "sm" : "sm"}
-              className={cn("flex items-center gap-1 py-0", compact ? "px-1 text-xs" : "px-2 sm:px-4")}
+              size="sm"
+              className="flex items-center gap-1 py-0 px-2 sm:px-4"
             >
-              <Share2 className={cn(compact ? "h-4 w-4" : "h-5 w-5")} />
+              <Share2 className="h-5 w-5" />
             </Button>
           </div>
         </CardContent>
