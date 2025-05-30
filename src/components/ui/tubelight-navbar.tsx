@@ -23,12 +23,14 @@ interface NavBarProps {
   className?: string;
   rightSection?: React.ReactNode;
   initialActiveTab?: string;
+  hideHamburgerMenu?: boolean;
 }
 export function NavBar({
   items,
   className,
   rightSection,
-  initialActiveTab
+  initialActiveTab,
+  hideHamburgerMenu = false
 }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const [scrolled, setScrolled] = useState(false);
@@ -124,7 +126,7 @@ export function NavBar({
                 </div>;
               })}
             </div>
-          </div> : <div className="flex-grow flex justify-end">
+          </div> : !hideHamburgerMenu && <div className="flex-grow flex justify-end">
             <Sheet>
               <SheetTrigger asChild>
                 <button className={cn(

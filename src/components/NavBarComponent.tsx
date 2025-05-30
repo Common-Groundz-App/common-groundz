@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { Home, Search, User } from 'lucide-react';
 import { NavBar } from "@/components/ui/tubelight-navbar";
@@ -44,6 +43,9 @@ export function NavBarComponent() {
     }
   }, [location.pathname]);
 
+  // Check if we're on the Profile page
+  const isProfilePage = location.pathname.startsWith('/profile');
+
   return (
     <>
       <NavBar 
@@ -56,6 +58,7 @@ export function NavBarComponent() {
         }
         initialActiveTab={activeTab}
         className="relative z-50 sticky top-0"
+        hideHamburgerMenu={isProfilePage}
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>
