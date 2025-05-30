@@ -5,6 +5,7 @@ import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import ProfileContent from '@/components/profile/ProfileContent';
 import Footer from '@/components/Footer';
+import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 
 const Profile = () => {
   const { user } = useAuth();
@@ -23,6 +24,11 @@ const Profile = () => {
         <ProfileContent profileUserId={id} defaultActiveTab={activeTab} />
       </div>
       <Footer />
+      
+      {/* Mobile Bottom Navigation - Only show on mobile screens */}
+      <div className="xl:hidden">
+        <BottomNavigation />
+      </div>
     </div>
   );
 };
