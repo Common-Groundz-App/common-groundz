@@ -1,6 +1,6 @@
 
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
-import { FileText, ThumbsUp, MessageSquare, Users } from 'lucide-react';
+import { BookOpen, Star, Users, User } from 'lucide-react';
 import ProfilePosts from './ProfilePosts';
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileReviews from './ProfileReviews';
@@ -25,22 +25,22 @@ const ProfileTabs = ({
     {
       value: "posts",
       label: "Posts",
-      icon: FileText
+      icon: BookOpen
     },
     {
       value: "recommendations",
       label: "Recs",
-      icon: ThumbsUp
+      icon: Star
     },
     {
       value: "reviews",
       label: "Reviews",
-      icon: MessageSquare
+      icon: Users
     },
     {
       value: "circles",
       label: "Circles",
-      icon: Users
+      icon: User
     }
   ];
 
