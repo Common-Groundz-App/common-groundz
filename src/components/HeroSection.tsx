@@ -31,7 +31,7 @@ const HeroSection = () => {
         <div className="flex flex-col items-center text-center mb-16 relative">
           <GlowElements />
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl relative z-10">
-            Recommendations from{" "}
+            Recommendations <span className="min-[410px]:max-[453px]:block">from</span>{" "}
             <span className="relative inline-block overflow-hidden pb-2">
               <span className="invisible">people you trust</span>
               {titles.map((title, index) => (
