@@ -7,6 +7,7 @@ import { fetchFollowerCount, fetchFollowingCount } from '@/services/profileServi
 import { useProfileFollows } from './profile/use-profile-follows';
 import { useProfileImages } from './profile/use-profile-images';
 import { useProfileMetadata } from './profile/use-profile-metadata';
+import { supabase } from '@/integrations/supabase/client';
 
 const defaultCoverImage = 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1600&h=400&q=80';
 
@@ -48,6 +49,29 @@ export const useProfileData = (userId?: string) => {
     setProfileMetadata
   } = useProfileMetadata();
 
+  // Fetch raw profile data to get cover_url
+  const { data: rawProfile } = useQuery({
+    queryKey: ['rawProfile', viewingUserId],
+    queryFn: async () => {
+      if (!viewingUserId) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('cover_url, avatar_url')
+        .eq('id', viewingUserId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching raw profile:', error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!viewingUserId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false,
+  });
+
   // Use React Query to fetch follower and following counts
   const { data: followerCountData } = useQuery({
     queryKey: ['followerCount', viewingUserId],
@@ -74,8 +98,9 @@ export const useProfileData = (userId?: string) => {
       const currentViewingUserId = userId || user.id;
       setIsOwnProfile(!userId || userId === user.id);
       
-      if (profile) {
+      if (profile && rawProfile) {
         console.log("Enhanced profile data loaded:", profile);
+        console.log("Raw profile data loaded:", rawProfile);
         
         setUsername(profile.displayName);
         setProfileMetadata(user.user_metadata, { 
@@ -85,15 +110,15 @@ export const useProfileData = (userId?: string) => {
         });
         
         setInitialImages({ 
-          avatar_url: profile.avatar_url,
-          cover_url: profile.cover_url 
+          avatar_url: rawProfile.avatar_url,
+          cover_url: rawProfile.cover_url 
         });
       }
     } catch (err) {
       console.error('Error:', err);
       setError(err instanceof Error ? err : new Error('Failed to load profile data'));
     }
-  }, [user, userId, profile, setUsername, setProfileMetadata, setInitialImages]);
+  }, [user, userId, profile, rawProfile, setUsername, setProfileMetadata, setInitialImages]);
   
   // Update follower and following counts when data changes
   useEffect(() => {
