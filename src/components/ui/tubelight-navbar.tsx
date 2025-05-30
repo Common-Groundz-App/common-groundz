@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -9,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Logo from "@/components/Logo";
-import { Button } from "@/components/ui/button";
 
 interface NavItem {
   name: string;
@@ -22,14 +20,12 @@ interface NavBarProps {
   className?: string;
   rightSection?: React.ReactNode;
   initialActiveTab?: string;
-  isAuthenticated?: boolean;
 }
 export function NavBar({
   items,
   className,
   rightSection,
-  initialActiveTab,
-  isAuthenticated = false
+  initialActiveTab
 }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const [scrolled, setScrolled] = useState(false);
@@ -139,43 +135,21 @@ export function NavBar({
                   <div className="mb-6">
                     <Logo size="lg" />
                   </div>
-                  
-                  {isAuthenticated ? (
-                    <nav className="flex flex-col space-y-4">
-                      {items.map(item => {
-                        const Icon = item.icon;
-                        const isActive = activeTab === item.name;
-                        return <div 
-                            key={item.name} 
-                            onClick={() => handleNavItemClick(item)}
-                            className={cn("flex items-center space-x-2 px-3 py-2 rounded-md transition-colors cursor-pointer", 
-                              isActive ? "bg-primary/10 text-primary" : "hover:bg-accent text-foreground/80 hover:text-primary")}
-                          >
-                            <Icon size={20} strokeWidth={2} />
-                            <span>{item.name}</span>
-                          </div>;
-                      })}
-                    </nav>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="text-center">
-                        <h3 className="text-lg font-semibold mb-2">Welcome!</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Join our community to discover and share amazing recommendations.
-                        </p>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <Button asChild variant="gradient" className="w-full">
-                          <Link to="/auth">Log In</Link>
-                        </Button>
-                        
-                        <Button asChild variant="outline" className="w-full">
-                          <Link to="/auth?tab=signup">Sign Up</Link>
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                  <nav className="flex flex-col space-y-4">
+                    {items.map(item => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.name;
+                  return <div 
+                          key={item.name} 
+                          onClick={() => handleNavItemClick(item)}
+                          className={cn("flex items-center space-x-2 px-3 py-2 rounded-md transition-colors cursor-pointer", 
+                            isActive ? "bg-primary/10 text-primary" : "hover:bg-accent text-foreground/80 hover:text-primary")}
+                        >
+                          <Icon size={20} strokeWidth={2} />
+                          <span>{item.name}</span>
+                        </div>;
+                })}
+                  </nav>
                 </div>
               </SheetContent>
             </Sheet>
