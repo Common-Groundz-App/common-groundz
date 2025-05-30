@@ -86,7 +86,7 @@ export const useProfileData = (userId?: string) => {
         
         setInitialImages({ 
           avatar_url: profile.avatar_url,
-          cover_url: null 
+          cover_url: profile.cover_url 
         });
       }
     } catch (err) {
