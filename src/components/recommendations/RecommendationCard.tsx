@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +29,7 @@ interface RecommendationCardProps {
   onSave?: (id: string) => void;
   highlightCommentId?: string | null;
   onDeleted?: () => void;
+  hideEntityFallbacks?: boolean;
 }
 
 const RecommendationCard = ({ 
@@ -37,7 +37,8 @@ const RecommendationCard = ({
   onLike, 
   onSave, 
   highlightCommentId,
-  onDeleted 
+  onDeleted,
+  hideEntityFallbacks = false
 }: RecommendationCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -95,13 +96,13 @@ const RecommendationCard = ({
       entityId: recommendation.entity?.id,
     });
     
-    // If media array is already provided
+    // If media array is already provided (user uploads)
     if (recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0) {
       console.log(`Using ${recommendation.media.length} media items from recommendation.media`);
       return recommendation.media as MediaItem[];
     }
     
-    // If we have a legacy image_url, convert it to a media item
+    // If we have a legacy image_url (user upload)
     if (recommendation.image_url) {
       console.log(`Using legacy image_url: ${recommendation.image_url}`);
       return [{
@@ -120,13 +121,24 @@ const RecommendationCard = ({
         type: 'image' as const,
         order: 0,
         id: `entity-${recommendation.entity?.id}`,
-        source: 'entity' // This is now defined in the MediaItem interface
+        source: 'entity' // Mark as entity fallback
       }] as MediaItem[];
     }
     
     console.log(`No media found for recommendation ${recommendation.id}, using empty array`);
     return [] as MediaItem[];
   }, [recommendation, entityImageUrl]);
+
+  // Determine if media should be shown based on hideEntityFallbacks setting
+  const shouldShowMedia = React.useMemo(() => {
+    if (!hideEntityFallbacks) {
+      return mediaItems.length > 0; // Show everything normally
+    }
+    
+    // On entity pages, only show user-uploaded content
+    const hasUserContent = mediaItems.some(item => !item.source || item.source !== 'entity');
+    return hasUserContent;
+  }, [mediaItems, hideEntityFallbacks]);
 
   // Get a category-specific fallback image URL
   const getCategoryFallbackImage = (category: string): string => {
@@ -320,18 +332,23 @@ const RecommendationCard = ({
           </div>
         </div>
         
-        {/* Media - Using enhanced PostMediaDisplay with improved fallback */}
-        <div className="mt-3">
-          {mediaItems.length > 0 ? (
+        {/* Media - conditionally rendered based on shouldShowMedia */}
+        {shouldShowMedia && (
+          <div className="mt-3">
             <PostMediaDisplay 
-              media={mediaItems} 
+              media={mediaItems.filter(item => !hideEntityFallbacks || !item.source || item.source !== 'entity')} 
               className="mt-2 mb-3"
               aspectRatio="maintain"
               objectFit="contain"
               enableBackground={true}
               thumbnailDisplay="none"
             />
-          ) : (
+          </div>
+        )}
+        
+        {/* Fallback when no media should be shown */}
+        {!shouldShowMedia && !hideEntityFallbacks && mediaItems.length === 0 && (
+          <div className="mt-3">
             <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
               <ImageWithFallback
                 src={getFallbackImage()}
@@ -340,8 +357,8 @@ const RecommendationCard = ({
                 fallbackSrc={recommendation.category ? getCategoryFallbackImage(recommendation.category) : undefined}
               />
             </div>
-          )}
-        </div>
+          </div>
+        )}
         
         {/* Description */}
         {recommendation.description && (

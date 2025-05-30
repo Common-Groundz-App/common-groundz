@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns'; // Add the missing import
+import { format } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +33,7 @@ interface ReviewCardProps {
   onSave: (id: string) => void;
   onConvert?: (id: string) => void;
   refreshReviews: () => Promise<void>;
+  hideEntityFallbacks?: boolean;
 }
 
 const ReviewCard = ({ 
@@ -41,7 +41,8 @@ const ReviewCard = ({
   onLike, 
   onSave,
   onConvert,
-  refreshReviews 
+  refreshReviews,
+  hideEntityFallbacks = false
 }: ReviewCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -57,10 +58,12 @@ const ReviewCard = ({
   
   // Process media items for display with improved fallback handling
   const mediaItems = React.useMemo(() => {
+    // If media array is already provided (user uploads)
     if (review.media && Array.isArray(review.media) && review.media.length > 0) {
       return review.media as MediaItem[];
     }
     
+    // If we have a legacy image_url (user upload)
     if (review.image_url) {
       return [{
         url: review.image_url,
@@ -70,18 +73,30 @@ const ReviewCard = ({
       }] as MediaItem[];
     }
     
+    // If we have an entity with an image, use it as fallback
     if (entityImageUrl) {
       return [{
         url: entityImageUrl,
         type: 'image' as const,
         order: 0,
         id: `entity-${review.entity?.id}`,
-        source: 'entity'
+        source: 'entity' // Mark as entity fallback
       }] as MediaItem[];
     }
     
     return [] as MediaItem[];
   }, [review, entityImageUrl]);
+
+  // Determine if media should be shown based on hideEntityFallbacks setting
+  const shouldShowMedia = React.useMemo(() => {
+    if (!hideEntityFallbacks) {
+      return mediaItems.length > 0; // Show everything normally
+    }
+    
+    // On entity pages, only show user-uploaded content
+    const hasUserContent = mediaItems.some(item => !item.source || item.source !== 'entity');
+    return hasUserContent;
+  }, [mediaItems, hideEntityFallbacks]);
   
   // Get a category-specific fallback image URL for when no image is available
   const getCategoryFallbackImage = (category: string): string => {
@@ -340,18 +355,23 @@ const ReviewCard = ({
             </div>
           </div>
           
-          {/* Media */}
-          <div className="mt-3">
-            {mediaItems.length > 0 ? (
+          {/* Media - conditionally rendered based on shouldShowMedia */}
+          {shouldShowMedia && (
+            <div className="mt-3">
               <PostMediaDisplay 
-                media={mediaItems} 
+                media={mediaItems.filter(item => !hideEntityFallbacks || !item.source || item.source !== 'entity')} 
                 className="mt-2 mb-3"
                 aspectRatio="maintain"
                 objectFit="contain"
                 enableBackground={true}
                 thumbnailDisplay="none"
               />
-            ) : (
+            </div>
+          )}
+          
+          {/* Fallback when no media should be shown */}
+          {!shouldShowMedia && !hideEntityFallbacks && mediaItems.length === 0 && (
+            <div className="mt-3">
               <div className="mt-2 mb-3 rounded-md overflow-hidden relative h-48 bg-gray-50">
                 <ImageWithFallback
                   src={getFallbackImage()}
@@ -360,8 +380,8 @@ const ReviewCard = ({
                   fallbackSrc={review.category ? getCategoryFallbackImage(review.category) : undefined}
                 />
               </div>
-            )}
-          </div>
+            </div>
+          )}
           
           {/* Description */}
           {review.description && (
