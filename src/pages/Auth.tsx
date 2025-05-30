@@ -32,7 +32,7 @@ const Auth = () => {
           <Logo size="md" />
         </div>
         
-        <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="max-w-md w-full">
+        <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="max-w-md w-full mt-16 lg:mt-0">
           <TabsList className="grid w-full grid-cols-2 mb-8 bg-muted/50">
             <TabsTrigger value="signin" className="data-[state=active]:bg-brand-orange data-[state=active]:text-white">Sign In</TabsTrigger>
             <TabsTrigger value="signup" className="data-[state=active]:bg-brand-orange data-[state=active]:text-white">Sign Up</TabsTrigger>
