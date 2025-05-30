@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -272,18 +273,18 @@ const RecommendationCard = ({
         className="overflow-hidden hover:shadow-md transition-shadow duration-200"
         onClick={handleCardClick}
       >
-        <CardContent className="p-3">
-          {/* Compact Rating-First Layout */}
+        <CardContent className="p-2">
+          {/* Enhanced Compact Layout - Rating First */}
           <div className="flex items-start justify-between mb-2">
             {/* Rating and Title Section */}
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-3 mb-1">
                 <RatingDisplay rating={recommendation.rating} />
-                <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   {recommendation.rating.toFixed(1)}
                 </span>
               </div>
-              <h3 className="font-semibold text-base leading-tight mb-1">{recommendation.title}</h3>
+              <h3 className="font-bold text-lg leading-tight mb-1">{recommendation.title}</h3>
             </div>
             
             {/* Options Menu for own content */}
@@ -311,11 +312,11 @@ const RecommendationCard = ({
             )}
           </div>
           
-          {/* User Info - Compact */}
+          {/* Ultra-Compact User Info */}
           <div className="flex items-center gap-2 mb-2">
             <ProfileDisplay
               userId={recommendation.user_id}
-              size="sm"
+              size="xs"
               showUsername={true}
               showLink={true}
               className="hover:opacity-80 transition-opacity"
@@ -325,10 +326,10 @@ const RecommendationCard = ({
             </span>
           </div>
           
-          {/* Description - More prominent */}
+          {/* Description - More prominent and longer */}
           {recommendation.description && (
             <div className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-              <p className="line-clamp-4">{recommendation.description}</p>
+              <p className="line-clamp-6">{recommendation.description}</p>
             </div>
           )}
           
@@ -346,14 +347,26 @@ const RecommendationCard = ({
             </div>
           )}
           
-          {/* Social Actions - Minimal */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
+          {/* Compact Category Badge - Only show if different from entity type */}
+          {recommendation.category && (
+            <div className="mb-2">
+              <Badge 
+                className={cn("text-xs py-0 px-2 h-5", getCategoryColor(recommendation.category))} 
+                variant="outline"
+              >
+                {getCategoryLabel(recommendation.category)}
+              </Badge>
+            </div>
+          )}
+          
+          {/* Minimal Social Actions */}
+          <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
             <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
                 size="sm"
                 className={cn(
-                  "flex items-center gap-1 py-0 px-1 text-xs", 
+                  "flex items-center gap-1 py-0 px-1 text-xs h-6", 
                   isLiked && "text-red-500 hover:text-red-600"
                 )}
                 onClick={(e) => {
@@ -368,7 +381,7 @@ const RecommendationCard = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-1 py-0 px-1 text-xs"
+                className="flex items-center gap-1 py-0 px-1 text-xs h-6"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/recommendations/${recommendation.id}?commentId=new`);
@@ -382,7 +395,7 @@ const RecommendationCard = ({
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "flex items-center gap-1 py-0 px-1 text-xs",
+                  "flex items-center gap-1 py-0 px-1 text-xs h-6",
                   isSaved && "text-primary"
                 )}
                 onClick={(e) => {
@@ -398,7 +411,7 @@ const RecommendationCard = ({
             <Button
               variant="ghost"
               size="sm"
-              className="flex items-center gap-1 py-0 px-1 text-xs"
+              className="flex items-center gap-1 py-0 px-1 text-xs h-6"
               onClick={(e) => {
                 e.stopPropagation();
                 handleShare();

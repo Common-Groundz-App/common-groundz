@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -248,23 +249,23 @@ const ReviewCard = ({
     return (
       <>
         <Card className="overflow-hidden hover:shadow-md transition-shadow duration-200">
-          <CardContent className="p-3">
-            {/* Compact Rating-First Layout */}
+          <CardContent className="p-2">
+            {/* Enhanced Compact Layout - Rating First */}
             <div className="flex items-start justify-between mb-2">
               {/* Rating and Title Section */}
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-3 mb-1">
                   <RatingDisplay rating={review.rating} />
-                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     {review.rating.toFixed(1)}
                   </span>
                 </div>
                 {/* Display Review Headline/Title (subtitle) if available */}
                 {review.subtitle && (
-                  <h3 className="font-semibold text-base leading-tight mb-1">{review.subtitle}</h3>
+                  <h3 className="font-bold text-lg leading-tight mb-1">{review.subtitle}</h3>
                 )}
                 {/* Content name (title) - less prominent if subtitle exists */}
-                <h4 className={cn(review.subtitle ? "text-sm text-muted-foreground" : "font-semibold text-base leading-tight")}>
+                <h4 className={cn(review.subtitle ? "text-sm text-muted-foreground" : "font-bold text-lg leading-tight")}>
                   {review.title}
                 </h4>
               </div>
@@ -326,27 +327,27 @@ const ReviewCard = ({
               )}
             </div>
             
-            {/* User Info - Compact */}
+            {/* Ultra-Compact User Info */}
             <div className="flex items-center gap-2 mb-2">
               <UsernameLink 
                 userId={review.user_id}
                 className="hover:opacity-80 transition-opacity"
               >
-                <Avatar className="border h-6 w-6">
+                <Avatar className="border h-5 w-5">
                   <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
-                  <AvatarFallback>{getInitials(review.user?.username)}</AvatarFallback>
+                  <AvatarFallback className="text-xs">{getInitials(review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
-              <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline text-sm" />
+              <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline text-xs" />
               <span className="text-xs text-muted-foreground">
                 {formatRelativeDate(review.created_at)}
               </span>
             </div>
             
-            {/* Description - More prominent */}
+            {/* Description - More prominent and longer */}
             {review.description && (
               <div className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                <p className="line-clamp-4">{review.description}</p>
+                <p className="line-clamp-6">{review.description}</p>
               </div>
             )}
             
@@ -364,14 +365,26 @@ const ReviewCard = ({
               </div>
             )}
             
-            {/* Social Actions - Minimal */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
+            {/* Compact Category Badge - Only show if different from entity type */}
+            {review.category && (
+              <div className="mb-2">
+                <Badge 
+                  className="text-xs py-0 px-2 h-5 font-normal" 
+                  variant="outline"
+                >
+                  {getCategoryLabel(review.category)}
+                </Badge>
+              </div>
+            )}
+            
+            {/* Minimal Social Actions */}
+            <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-3">
                 <Button 
                   variant="ghost" 
                   size="sm"
                   className={cn(
-                    "flex items-center gap-1 py-0 px-1 text-xs", 
+                    "flex items-center gap-1 py-0 px-1 text-xs h-6", 
                     review.isLiked && "text-red-500 hover:text-red-600"
                   )}
                   onClick={(e) => {
@@ -387,7 +400,7 @@ const ReviewCard = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="flex items-center gap-1 py-0 px-1 text-xs"
+                  className="flex items-center gap-1 py-0 px-1 text-xs h-6"
                 >
                   <MessageCircle className="h-3 w-3" />
                   <span>{review.comment_count || 0}</span>
@@ -397,7 +410,7 @@ const ReviewCard = ({
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "flex items-center gap-1 py-0 px-1 text-xs",
+                    "flex items-center gap-1 py-0 px-1 text-xs h-6",
                     review.isSaved && "text-primary"
                   )}
                   onClick={(e) => {
@@ -414,7 +427,7 @@ const ReviewCard = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-1 py-0 px-1 text-xs"
+                className="flex items-center gap-1 py-0 px-1 text-xs h-6"
               >
                 <Share2 className="h-3 w-3" />
               </Button>
