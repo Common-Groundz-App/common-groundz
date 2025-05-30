@@ -45,9 +45,11 @@ export function UserMenu() {
       setIsSigningOut(true);
       setIsOpen(false); // Close dropdown immediately
       
+      console.log('UserMenu: Starting sign out process');
       const { error } = await signOut();
       
       if (error) {
+        console.error('UserMenu: Sign out error', error);
         toast({
           title: "Sign out failed",
           description: error.message,
@@ -56,16 +58,21 @@ export function UserMenu() {
         return;
       }
       
-      // Navigate to landing page
-      navigate('/', { replace: true });
+      console.log('UserMenu: Sign out successful, navigating to home');
       
-      // Show success message
-      toast({
-        title: "Signed out successfully",
-        description: "You have been logged out of your account.",
-      });
+      // Wait a moment for auth state to update, then navigate
+      setTimeout(() => {
+        navigate('/', { replace: true });
+        
+        // Show success message
+        toast({
+          title: "Signed out successfully",
+          description: "You have been logged out of your account.",
+        });
+      }, 100);
+      
     } catch (error) {
-      console.error('Error during sign out:', error);
+      console.error('UserMenu: Error during sign out:', error);
       toast({
         title: "Sign out failed",
         description: "An unexpected error occurred while signing out.",
