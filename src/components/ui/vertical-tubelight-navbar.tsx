@@ -119,18 +119,18 @@ export function VerticalTubelightNavbar({
   return (
     <>
       <div className={cn(
-        "h-full w-16 md:w-64 bg-background border-r flex flex-col",
+        "h-full w-16 xl:w-64 bg-background border-r flex flex-col",
         className
       )}>
         {/* Logo Section */}
-        <div className="p-4 flex justify-center md:justify-start flex-shrink-0">
+        <div className="p-4 flex justify-center xl:justify-start flex-shrink-0">
           <Logo size={logoSize} />
         </div>
 
         {/* Navigation Items - Use flex-1 to take remaining space */}
         <div className="p-2 flex-1 flex flex-col min-h-0">
           <div className={cn(
-            "w-full flex flex-col items-center md:items-start gap-2 py-1 px-1 rounded-md"
+            "w-full flex flex-col items-center xl:items-start gap-2 py-1 px-1 rounded-md"
           )}>
             {items.map(item => {
               const Icon = item.icon;
@@ -147,15 +147,15 @@ export function VerticalTubelightNavbar({
                   {(item.url.startsWith('#') || item.onClick) ? (
                     <button 
                       className={cn(
-                        "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md relative",
+                        "flex items-center w-full space-x-2 px-3 py-3 xl:py-2 rounded-md relative",
                         isActive && "bg-muted text-primary"
                       )}
                       onClick={item.onClick}
                     >
                       <Icon size={18} strokeWidth={2.5} />
-                      <span className="hidden md:inline">{item.name}</span>
+                      <span className="hidden xl:inline">{item.name}</span>
                       {item.badge && (
-                        <span className="absolute right-2 top-2 md:relative md:right-auto md:top-auto md:ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white">
+                        <span className="absolute right-2 top-2 xl:relative xl:right-auto xl:top-auto xl:ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white">
                           {item.badge}
                         </span>
                       )}
@@ -164,12 +164,12 @@ export function VerticalTubelightNavbar({
                     <Link 
                       to={item.url} 
                       className={cn(
-                        "flex items-center w-full space-x-2 px-3 py-3 md:py-2 rounded-md",
+                        "flex items-center w-full space-x-2 px-3 py-3 xl:py-2 rounded-md",
                         isActive && "bg-muted text-primary"
                       )}
                     >
                       <Icon size={18} strokeWidth={2.5} />
-                      <span className="hidden md:inline">{item.name}</span>
+                      <span className="hidden xl:inline">{item.name}</span>
                     </Link>
                   )}
                   {isActive && (
@@ -207,11 +207,11 @@ export function VerticalTubelightNavbar({
                       <AvatarImage src={profile?.avatar_url || ""} />
                       <AvatarFallback>{getInitials()}</AvatarFallback>
                     </Avatar>
-                    <div className="ml-3 flex-1 min-w-0 hidden md:block text-left">
+                    <div className="ml-3 flex-1 min-w-0 hidden xl:block text-left">
                       <p className="text-sm font-medium truncate">{displayName}</p>
                       <p className="text-xs text-muted-foreground truncate">@{username}</p>
                     </div>
-                    <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden md:block flex-shrink-0" />
+                    <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden xl:block flex-shrink-0" />
                   </div>
                 </button>
               </DropdownMenuTrigger>

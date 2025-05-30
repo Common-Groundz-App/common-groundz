@@ -72,8 +72,6 @@ const Explore = () => {
     return <div>Loading...</div>;
   };
   
-  // ... keep existing code (tabItems, hasResults, hasCategorizedResults, renderSectionHeader)
-
   const tabItems = [
     {
       value: "featured",
@@ -146,22 +144,22 @@ const Explore = () => {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Mobile Header - Only show on mobile screens */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+      <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
         <div className="container p-3 mx-auto flex justify-start">
           <Logo size="sm" />
         </div>
       </div>
       
       <div className="flex flex-1">
-        {/* Desktop Sidebar - Only show on lg+ screens */}
-        <div className="hidden lg:block fixed left-0 top-0 h-screen">
+        {/* Desktop Sidebar - Only show on xl+ screens */}
+        <div className="hidden xl:block fixed left-0 top-0 h-screen">
           <VerticalTubelightNavbar 
             initialActiveTab={getInitialActiveTab()}
             className="h-full"
           />
         </div>
         
-        <div className="flex-1 pt-16 lg:pt-0 lg:pl-16 xl:pl-64">
+        <div className="flex-1 pt-16 xl:pt-0 xl:pl-64">
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-3xl font-bold">Explore</h1>
@@ -425,7 +423,7 @@ const Explore = () => {
       </div>
       
       {/* Mobile Bottom Navigation - Only show on mobile screens */}
-      <div className="lg:hidden">
+      <div className="xl:hidden">
         <BottomNavigation />
       </div>
     </div>

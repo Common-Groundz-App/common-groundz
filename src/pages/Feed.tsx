@@ -270,7 +270,7 @@ const Feed = React.memo(() => {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Mobile Header - Only show on mobile screens */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+      <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
         <div className="container p-3 mx-auto flex justify-between items-center">
           <Logo size="sm" />
           <div className="flex items-center gap-3">
@@ -343,24 +343,24 @@ const Feed = React.memo(() => {
       </AnimatePresence>
       
       <div className="flex flex-1">
-        {/* Desktop Sidebar - Only show on lg+ screens */}
-        <div className="hidden lg:block">
+        {/* Desktop Sidebar - Only show on xl+ screens */}
+        <div className="hidden xl:block">
           <VerticalTubelightNavbar 
             initialActiveTab={getInitialActiveTab()}
             className="fixed left-0 top-0 h-screen pt-4 pl-4" 
           />
         </div>
         
-        <div className="flex-1 flex flex-col pt-16 lg:pt-0 lg:ml-16 xl:ml-64">
+        <div className="flex-1 flex flex-col pt-16 xl:pt-0 xl:ml-64">
           {/* Main Content Area - Three Column Layout on Desktop */}
-          <div className="w-full mx-auto grid justify-center lg:grid-cols-7 xl:grid-cols-7 gap-4 px-4 py-6">
+          <div className="w-full mx-auto grid justify-center xl:grid-cols-7 gap-4 px-4 py-6">
             {/* Left Column for Navigation on Smaller Desktop */}
-            <div className="hidden lg:block col-span-1">
+            <div className="hidden xl:block col-span-1">
               {/* This is just a spacer since VerticalTubelightNavbar is fixed */}
             </div>
             
             {/* Middle Column - Feed Content */}
-            <div className="col-span-1 lg:col-span-4 xl:col-span-4 max-w-2xl w-full mx-auto px-0 lg:px-4">
+            <div className="col-span-1 xl:col-span-4 max-w-2xl w-full mx-auto px-0 xl:px-4">
               {/* Feed Header - Part of normal document flow */}
               <div className="px-4 py-6 md:py-4 mb-2">
                 <div className="flex justify-between items-center">
@@ -437,7 +437,7 @@ const Feed = React.memo(() => {
                 <AnimatePresence>
                   {showNewPosts && newContentAvailable && (
                     <motion.div 
-                      className="sticky z-30 py-2 px-4 flex justify-center top-16 lg:top-0"
+                      className="sticky z-30 py-2 px-4 flex justify-center top-16 xl:top-0"
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
@@ -468,7 +468,7 @@ const Feed = React.memo(() => {
             </div>
             
             {/* Right Column - Trending & Recommendations - Desktop Only */}
-            <div className="hidden lg:block col-span-2 xl:col-span-2">
+            <div className="hidden xl:block col-span-2">
               <div className="sticky top-4 space-y-4">
                 {/* Search */}
                 <div className="bg-background rounded-xl border p-4">
@@ -529,7 +529,7 @@ const Feed = React.memo(() => {
       </div>
       
       {/* Mobile Bottom Navigation - Only show on mobile screens */}
-      <div className="lg:hidden">
+      <div className="xl:hidden">
         <BottomNavigation />
       </div>
       <Toaster />
