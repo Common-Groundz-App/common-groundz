@@ -45,7 +45,7 @@ export function TubelightTabs({
     <RadixTabs.Root value={activeTab} onValueChange={handleTabChange} className="px-0 py-[96px]">
       <div className="flex justify-center mb-6">
         <RadixTabs.List className={cn(
-          "flex items-center gap-2 xl:gap-2 py-1 px-1 rounded-full shadow-lg",
+          "flex items-center gap-2 py-1 px-1 rounded-full shadow-lg",
           "bg-background/30 border border-white/10 backdrop-blur-md"
         )}>
           {items.map(item => {
@@ -59,8 +59,8 @@ export function TubelightTabs({
                 className={cn(
                   "relative cursor-pointer text-sm font-semibold rounded-full transition-colors",
                   "text-foreground/80 hover:text-primary flex items-center justify-center",
-                  "px-4 py-2 xl:px-6 xl:py-2", // Increased base padding from px-3 to px-4
-                  "min-w-[60px] xl:min-w-auto", // Increased minimum width from 44px to 60px
+                  "px-4 py-2 md:px-5 md:py-2 lg:px-5 lg:py-2 xl:px-6 xl:py-2",
+                  "min-w-[60px] md:min-w-[70px] lg:min-w-[80px] xl:min-w-auto",
                   isActive && "text-primary"
                 )}
               >
