@@ -40,30 +40,42 @@ export function UserMenu() {
     };
   }, [user?.id, invalidateProfile]);
 
+  // Listen for auth state changes to handle navigation
+  React.useEffect(() => {
+    if (!user && !isSigningOut) {
+      // User has been signed out, navigate to landing page
+      console.log('User signed out, navigating to landing page');
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate, isSigningOut]);
+
   const handleSignOut = async () => {
     try {
       setIsSigningOut(true);
       setIsOpen(false); // Close dropdown immediately
       
+      console.log('Starting sign out process...');
       const { error } = await signOut();
       
       if (error) {
+        console.error('Sign out failed:', error);
         toast({
           title: "Sign out failed",
           description: error.message,
           variant: "destructive",
         });
+        setIsSigningOut(false);
         return;
       }
-      
-      // Navigate to landing page
-      navigate('/', { replace: true });
       
       // Show success message
       toast({
         title: "Signed out successfully",
         description: "You have been logged out of your account.",
       });
+      
+      // Note: Navigation will happen automatically when user becomes null
+      // due to the useEffect above that listens to auth state changes
     } catch (error) {
       console.error('Error during sign out:', error);
       toast({
@@ -71,7 +83,6 @@ export function UserMenu() {
         description: "An unexpected error occurred while signing out.",
         variant: "destructive",
       });
-    } finally {
       setIsSigningOut(false);
     }
   };
