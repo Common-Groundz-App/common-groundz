@@ -11,5 +11,5 @@ export type AuthContextType = {
     lastName?: string;
     username?: string;
   }) => Promise<{ error: Error | null, user: User | null }>;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<{ error: Error | null }>;
 };
