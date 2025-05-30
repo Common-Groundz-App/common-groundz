@@ -1,5 +1,4 @@
 
-
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @tailwind base;
 @tailwind components;
@@ -97,5 +96,11 @@
       transform: translateY(0);
     }
   }
-}
 
+  /* Fix for Hero section text alignment between 410px and 452px */
+  @media (min-width: 410px) and (max-width: 452px) {
+    .from-word {
+      display: block;
+    }
+  }
+}
