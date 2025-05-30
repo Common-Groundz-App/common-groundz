@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -17,6 +16,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const Feed = React.memo(() => {
+  // Keep useIsMobile only for logic, not layout rendering
   const isMobile = useIsMobile();
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState("for-you");
@@ -269,41 +269,39 @@ const Feed = React.memo(() => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Mobile Header - Fixed Position */}
-      {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
-          <div className="container p-3 mx-auto flex justify-between items-center">
-            <Logo size="sm" />
-            <div className="flex items-center gap-3">
+      {/* Mobile Header - Only show on mobile screens */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+        <div className="container p-3 mx-auto flex justify-between items-center">
+          <Logo size="sm" />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const event = new CustomEvent('open-search-dialog');
+                window.dispatchEvent(event);
+              }}
+              className="p-2 rounded-full hover:bg-accent"
+            >
+              <Search size={20} />
+            </button>
+            {user && (
               <button
                 onClick={() => {
-                  const event = new CustomEvent('open-search-dialog');
+                  const event = new CustomEvent('open-notifications');
                   window.dispatchEvent(event);
                 }}
-                className="p-2 rounded-full hover:bg-accent"
+                className="p-2 rounded-full hover:bg-accent relative"
               >
-                <Search size={20} />
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
-              {user && (
-                <button
-                  onClick={() => {
-                    const event = new CustomEvent('open-notifications');
-                    window.dispatchEvent(event);
-                  }}
-                  className="p-2 rounded-full hover:bg-accent relative"
-                >
-                  <Bell size={20} />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-              )}
-            </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
       
       {/* Pull-to-Refresh Indicator - Fixed at top of viewport */}
       <AnimatePresence>
@@ -345,36 +343,24 @@ const Feed = React.memo(() => {
       </AnimatePresence>
       
       <div className="flex flex-1">
-        {/* Left Sidebar - Only visible on desktop */}
-        {!isMobile && (
+        {/* Desktop Sidebar - Only show on lg+ screens */}
+        <div className="hidden lg:block">
           <VerticalTubelightNavbar 
             initialActiveTab={getInitialActiveTab()}
             className="fixed left-0 top-0 h-screen pt-4 pl-4" 
           />
-        )}
+        </div>
         
-        <div className={cn(
-          "flex-1 flex flex-col",
-          !isMobile && "md:ml-16 lg:ml-64", // Account for collapsed and expanded sidebar
-          isMobile && "pt-16" // Account for mobile header
-        )}>
+        <div className="flex-1 flex flex-col pt-16 lg:pt-0 lg:ml-16 xl:ml-64">
           {/* Main Content Area - Three Column Layout on Desktop */}
-          <div className={cn(
-            "w-full mx-auto grid justify-center",
-            !isMobile && "grid-cols-1 lg:grid-cols-7 xl:grid-cols-7 gap-4 px-4 py-6"
-          )}>
+          <div className="w-full mx-auto grid justify-center lg:grid-cols-7 xl:grid-cols-7 gap-4 px-4 py-6">
             {/* Left Column for Navigation on Smaller Desktop */}
-            {!isMobile && (
-              <div className="hidden lg:block col-span-1">
-                {/* This is just a spacer since VerticalTubelightNavbar is fixed */}
-              </div>
-            )}
+            <div className="hidden lg:block col-span-1">
+              {/* This is just a spacer since VerticalTubelightNavbar is fixed */}
+            </div>
             
             {/* Middle Column - Feed Content */}
-            <div className={cn(
-              "col-span-1 lg:col-span-4 xl:col-span-4 max-w-2xl w-full mx-auto",
-              isMobile && "px-0" // Full width on mobile
-            )}>
+            <div className="col-span-1 lg:col-span-4 xl:col-span-4 max-w-2xl w-full mx-auto px-0 lg:px-4">
               {/* Feed Header - Part of normal document flow */}
               <div className="px-4 py-6 md:py-4 mb-2">
                 <div className="flex justify-between items-center">
@@ -451,10 +437,7 @@ const Feed = React.memo(() => {
                 <AnimatePresence>
                   {showNewPosts && newContentAvailable && (
                     <motion.div 
-                      className={cn(
-                        "sticky z-30 py-2 px-4 flex justify-center",
-                        isMobile ? "top-16" : "top-0" // Position below mobile header when on mobile
-                      )}
+                      className="sticky z-30 py-2 px-4 flex justify-center top-16 lg:top-0"
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
@@ -485,70 +468,70 @@ const Feed = React.memo(() => {
             </div>
             
             {/* Right Column - Trending & Recommendations - Desktop Only */}
-            {!isMobile && (
-              <div className="hidden lg:block col-span-2 xl:col-span-2">
-                <div className="sticky top-4 space-y-4">
-                  {/* Search */}
-                  <div className="bg-background rounded-xl border p-4">
-                    <button 
-                      onClick={() => {
-                        const event = new CustomEvent('open-search-dialog');
-                        window.dispatchEvent(event);
-                      }}
-                      className="flex items-center w-full gap-2 text-muted-foreground rounded-md border px-3 py-2 hover:bg-accent transition-colors"
-                    >
-                      <Search size={18} />
-                      <span>Search...</span>
-                    </button>
-                  </div>
+            <div className="hidden lg:block col-span-2 xl:col-span-2">
+              <div className="sticky top-4 space-y-4">
+                {/* Search */}
+                <div className="bg-background rounded-xl border p-4">
+                  <button 
+                    onClick={() => {
+                      const event = new CustomEvent('open-search-dialog');
+                      window.dispatchEvent(event);
+                    }}
+                    className="flex items-center w-full gap-2 text-muted-foreground rounded-md border px-3 py-2 hover:bg-accent transition-colors"
+                  >
+                    <Search size={18} />
+                    <span>Search...</span>
+                  </button>
+                </div>
 
-                  {/* Trending Topics */}
-                  <div className="bg-background rounded-xl border p-4">
-                    <h3 className="font-semibold text-lg mb-3">Trending Topics</h3>
-                    <div className="space-y-3">
-                      {["Photography", "Technology", "Travel", "Art", "Food"].map((topic, i) => (
-                        <div key={topic} className="flex justify-between items-center group cursor-pointer hover:bg-accent/20 -mx-2 px-2 py-1 rounded-md">
+                {/* Trending Topics */}
+                <div className="bg-background rounded-xl border p-4">
+                  <h3 className="font-semibold text-lg mb-3">Trending Topics</h3>
+                  <div className="space-y-3">
+                    {["Photography", "Technology", "Travel", "Art", "Food"].map((topic, i) => (
+                      <div key={topic} className="flex justify-between items-center group cursor-pointer hover:bg-accent/20 -mx-2 px-2 py-1 rounded-md">
+                        <div>
+                          <div className="text-xs text-muted-foreground">Trending #{i + 1}</div>
+                          <div className="font-medium">{topic}</div>
+                          <div className="text-xs text-muted-foreground">{200 - i * 30}+ posts</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Who to Follow */}
+                <div className="bg-background rounded-xl border p-4">
+                  <h3 className="font-semibold text-lg mb-3">Who to Follow</h3>
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                            <span className="text-xs">User</span>
+                          </div>
                           <div>
-                            <div className="text-xs text-muted-foreground">Trending #{i + 1}</div>
-                            <div className="font-medium">{topic}</div>
-                            <div className="text-xs text-muted-foreground">{200 - i * 30}+ posts</div>
+                            <div className="font-medium text-sm">User Name {i}</div>
+                            <div className="text-xs text-muted-foreground">@username{i}</div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Who to Follow */}
-                  <div className="bg-background rounded-xl border p-4">
-                    <h3 className="font-semibold text-lg mb-3">Who to Follow</h3>
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                              <span className="text-xs">User</span>
-                            </div>
-                            <div>
-                              <div className="font-medium text-sm">User Name {i}</div>
-                              <div className="text-xs text-muted-foreground">@username{i}</div>
-                            </div>
-                          </div>
-                          <button className="text-xs bg-primary text-primary-foreground rounded-full px-3 py-1 hover:bg-primary/90 transition-colors">
-                            Follow
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                        <button className="text-xs bg-primary text-primary-foreground rounded-full px-3 py-1 hover:bg-primary/90 transition-colors">
+                          Follow
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Mobile Bottom Navigation */}
-      {isMobile && <BottomNavigation />}
+      {/* Mobile Bottom Navigation - Only show on mobile screens */}
+      <div className="lg:hidden">
+        <BottomNavigation />
+      </div>
       <Toaster />
     </div>
   );

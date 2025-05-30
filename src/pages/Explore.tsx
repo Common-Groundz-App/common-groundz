@@ -29,8 +29,8 @@ import { Badge } from '@/components/ui/badge';
 
 const Explore = () => {
   const { user } = useAuth();
-  // Use larger breakpoint (1024px) for better tablet/mobile detection
-  const isMobile = useIsMobile(1024);
+  // Keep useIsMobile only for search logic, not layout rendering
+  const isMobile = useIsMobile();
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
@@ -72,6 +72,8 @@ const Explore = () => {
     return <div>Loading...</div>;
   };
   
+  // ... keep existing code (tabItems, hasResults, hasCategorizedResults, renderSectionHeader)
+
   const tabItems = [
     {
       value: "featured",
@@ -143,28 +145,23 @@ const Explore = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
-          <div className="container p-3 mx-auto flex justify-start">
-            <Logo size="sm" />
-          </div>
+      {/* Mobile Header - Only show on mobile screens */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+        <div className="container p-3 mx-auto flex justify-start">
+          <Logo size="sm" />
         </div>
-      )}
+      </div>
       
       <div className="flex flex-1">
-        {!isMobile && (
-          <div className="fixed left-0 top-0 h-screen">
-            <VerticalTubelightNavbar 
-              initialActiveTab={getInitialActiveTab()}
-              className="h-full"
-            />
-          </div>
-        )}
+        {/* Desktop Sidebar - Only show on lg+ screens */}
+        <div className="hidden lg:block fixed left-0 top-0 h-screen">
+          <VerticalTubelightNavbar 
+            initialActiveTab={getInitialActiveTab()}
+            className="h-full"
+          />
+        </div>
         
-        <div className={cn(
-          "flex-1",
-          isMobile ? "pt-16" : "pl-16 md:pl-64"
-        )}>
+        <div className="flex-1 pt-16 lg:pt-0 lg:pl-16 xl:pl-64">
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-3xl font-bold">Explore</h1>
@@ -427,7 +424,10 @@ const Explore = () => {
         </div>
       </div>
       
-      {isMobile && <BottomNavigation />}
+      {/* Mobile Bottom Navigation - Only show on mobile screens */}
+      <div className="lg:hidden">
+        <BottomNavigation />
+      </div>
     </div>
   );
 };
