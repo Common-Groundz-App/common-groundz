@@ -18,6 +18,7 @@ import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
 export function UserMenu() {
   const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = React.useState(false);
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
   const { data: profile, isLoading } = useProfile(user?.id);
   const { invalidateProfile } = useProfileCacheActions();
 
@@ -36,6 +37,18 @@ export function UserMenu() {
     };
   }, [user?.id, invalidateProfile]);
 
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true);
+      setIsOpen(false); // Close dropdown immediately
+      await signOut();
+    } catch (error) {
+      console.error('Error during sign out:', error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
   if (!user) {
     return (
       <Button asChild size="sm" className="bg-brand-orange hover:bg-brand-orange/90 text-white">
@@ -51,7 +64,7 @@ export function UserMenu() {
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full" disabled={isSigningOut}>
           <Avatar className="h-8 w-8">
             <AvatarImage 
               src={profile?.avatar_url || ""} 
@@ -88,13 +101,11 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="cursor-pointer"
-          onClick={async () => {
-            setIsOpen(false);
-            await signOut();
-          }}
+          onClick={handleSignOut}
+          disabled={isSigningOut}
         >
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
+          <span>{isSigningOut ? 'Signing out...' : 'Log out'}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
