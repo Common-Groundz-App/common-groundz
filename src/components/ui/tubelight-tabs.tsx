@@ -58,17 +58,19 @@ export function TubelightTabs({
                 value={item.value} 
                 className={cn(
                   "relative cursor-pointer text-sm font-semibold rounded-full transition-colors",
-                  "text-foreground/80 hover:text-primary flex items-center space-x-2",
+                  "text-foreground/80 hover:text-primary",
                   "px-6 py-2",
                   isActive && "text-primary"
                 )}
               >
-                {Icon && (
-                  <span className="md:hidden">
-                    <Icon size={18} strokeWidth={2.5} />
-                  </span>
-                )}
-                <span className="hidden md:inline">{item.label}</span>
+                <div className="flex items-center space-x-2">
+                  <span className="hidden md:inline">{item.label}</span>
+                  {Icon && (
+                    <span className="md:hidden">
+                      <Icon size={18} strokeWidth={2.5} />
+                    </span>
+                  )}
+                </div>
                 
                 {isActive && (
                   <motion.div 
