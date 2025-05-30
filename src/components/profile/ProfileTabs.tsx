@@ -1,5 +1,6 @@
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
+import { FileText, ThumbsUp, MessageSquare, Users } from 'lucide-react';
 import ProfilePosts from './ProfilePosts';
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileReviews from './ProfileReviews';
@@ -20,15 +21,36 @@ const ProfileTabs = ({
   profileUserId,
   username
 }: ProfileTabsProps) => {
+  const tabItems = [
+    {
+      value: "posts",
+      label: "Posts",
+      icon: FileText
+    },
+    {
+      value: "recommendations",
+      label: "Recs",
+      icon: ThumbsUp
+    },
+    {
+      value: "reviews",
+      label: "Reviews",
+      icon: MessageSquare
+    },
+    {
+      value: "circles",
+      label: "Circles",
+      icon: Users
+    }
+  ];
+
   return (
-    <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-      <TabsList className="w-full max-w-2xl mx-auto grid grid-cols-4 mb-8">
-        <TabsTrigger value="posts">Posts</TabsTrigger>
-        <TabsTrigger value="recommendations">Recs</TabsTrigger>
-        <TabsTrigger value="reviews">Reviews</TabsTrigger>
-        <TabsTrigger value="circles">Circles</TabsTrigger>
-      </TabsList>
-      
+    <TubelightTabs 
+      defaultValue={activeTab} 
+      onValueChange={onTabChange}
+      items={tabItems}
+      className="w-full"
+    >
       <TabsContent value="posts">
         <ProfilePosts 
           profileUserId={profileUserId} 
@@ -56,7 +78,7 @@ const ProfileTabs = ({
           isOwnProfile={isOwnProfile}
         />
       </TabsContent>
-    </Tabs>
+    </TubelightTabs>
   );
 };
 
