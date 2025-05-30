@@ -9,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { cn } from '@/lib/utils';
-import { Filter, Users, Search, Film, Book, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -76,7 +76,7 @@ const Explore = () => {
     {
       value: "featured",
       label: "Featured",
-      icon: MapPin
+      icon: Star
     },
     {
       value: "places",
@@ -91,12 +91,12 @@ const Explore = () => {
     {
       value: "books",
       label: "Books",
-      icon: Book
+      icon: BookOpen
     },
     {
       value: "food",
       label: "Food",
-      icon: ShoppingBag
+      icon: Utensils
     },
     {
       value: "products",
