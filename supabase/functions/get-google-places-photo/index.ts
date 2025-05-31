@@ -13,15 +13,40 @@ serve(async (req) => {
   }
 
   try {
-    const { photoReference, maxWidth = 400 } = await req.json()
+    // Parse query parameters from URL
+    const url = new URL(req.url)
+    const photoReference = url.searchParams.get('photoReference')
+    const maxWidth = url.searchParams.get('maxWidth') || '400'
+    
+    console.log(`Received request for photo: ${photoReference}, maxWidth: ${maxWidth}`)
     
     if (!photoReference) {
-      throw new Error('Photo reference is required')
+      console.error('No photoReference provided in query parameters')
+      return new Response(
+        JSON.stringify({ error: 'Photo reference is required' }),
+        { 
+          status: 400,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          },
+        }
+      )
     }
 
     const apiKey = Deno.env.get('GOOGLE_PLACES_API_KEY')
     if (!apiKey) {
-      throw new Error('Google Places API key not configured')
+      console.error('Google Places API key not configured')
+      return new Response(
+        JSON.stringify({ error: 'Google Places API key not configured' }),
+        { 
+          status: 500,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          },
+        }
+      )
     }
 
     console.log(`Fetching Google Places photo: ${photoReference}`)
@@ -34,11 +59,22 @@ serve(async (req) => {
     
     if (!response.ok) {
       console.error(`Google Places API error: ${response.status} ${response.statusText}`)
-      throw new Error(`Failed to fetch photo: ${response.status}`)
+      return new Response(
+        JSON.stringify({ error: `Failed to fetch photo: ${response.status}` }),
+        { 
+          status: response.status,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          },
+        }
+      )
     }
 
     // Get the image as a blob
     const imageBlob = await response.blob()
+    
+    console.log(`Successfully fetched image: ${imageBlob.size} bytes, type: ${imageBlob.type}`)
     
     // Return the image with proper headers
     return new Response(imageBlob, {
@@ -53,7 +89,8 @@ serve(async (req) => {
     console.error('Error in get-google-places-photo function:', error)
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Failed to fetch photo' 
+        error: error.message || 'Failed to fetch photo',
+        details: error.toString()
       }),
       { 
         status: 500,
