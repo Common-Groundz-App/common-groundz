@@ -43,3 +43,6 @@ verify_jwt = false
 
 [functions.search-all]
 verify_jwt = false
+
+[functions.get-google-places-photo]
+verify_jwt = false

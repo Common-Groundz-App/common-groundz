@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ensureHttps } from '@/utils/urlUtils';
 import { isValidImageUrl, isGooglePlacesImage, getEntityTypeFallbackImage } from '@/utils/imageUtils';
@@ -27,16 +26,22 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 1;
 
-  // Check if URL has CORS issues and needs proxying
+  // Check if URL has CORS issues and needs proxying (updated for Google Places proxy)
   const needsProxy = (url: string): boolean => {
     if (!url) return false;
+    
+    // Don't proxy our own proxy URLs
+    if (url.includes('supabase.co/functions/v1/get-google-places-photo')) {
+      return false;
+    }
     
     // Known problematic domains that need CORS proxy
     const corsProblematicDomains = [
       'covers.openlibrary.org',
       'books.google.com',
       'images-amazon.com',
-      'm.media-amazon.com'
+      'm.media-amazon.com',
+      'maps.googleapis.com' // Google Places direct URLs
     ];
     
     return corsProblematicDomains.some(domain => url.includes(domain));
@@ -54,7 +59,9 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       setHasError(false);
       setRetryCount(0);
       
-      if (!isValidImageUrl(src)) {
+      console.log('ImageWithFallback: Processing image URL:', src);
+      
+      if (!isValidImageUrl(src) && !src.includes('supabase.co/functions/v1/get-google-places-photo')) {
         console.log("ImageWithFallback: Invalid image URL, using fallback for entity type:", entityType);
         setImgSrc(actualFallback);
         setHasError(true);
@@ -63,13 +70,18 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       
       const secureUrl = ensureHttps(src);
       
-      if (!secureUrl) {
+      if (!secureUrl && !src.includes('supabase.co/functions/v1/get-google-places-photo')) {
         console.log("ImageWithFallback: Using fallback image for entity type:", entityType);
         setImgSrc(actualFallback);
         setHasError(true);
       } else {
+        // For our Google Places proxy URLs, use them directly
+        if (src.includes('supabase.co/functions/v1/get-google-places-photo')) {
+          console.log('ImageWithFallback: Using Google Places proxy URL:', src);
+          setImgSrc(src);
+        }
         // Check if URL needs CORS proxy
-        if (needsProxy(secureUrl)) {
+        else if (needsProxy(secureUrl)) {
           console.log("ImageWithFallback: Using CORS proxy for:", secureUrl);
           const proxiedUrl = createProxyUrl(secureUrl);
           setImgSrc(proxiedUrl);
@@ -86,8 +98,21 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const currentUrl = imgSrc;
     
+    console.log('ImageWithFallback: Image load error for URL:', currentUrl);
+    
     if (!hasError && retryCount < maxRetries && currentUrl) {
       setRetryCount(prev => prev + 1);
+      
+      // If it's a Google Places proxy URL that failed, try fallback immediately
+      if (currentUrl.includes('supabase.co/functions/v1/get-google-places-photo')) {
+        console.log('Google Places proxy failed, using fallback for type:', entityType);
+        setImgSrc(actualFallback);
+        setHasError(true);
+        if (onError) {
+          onError(e);
+        }
+        return;
+      }
       
       // If the original URL was proxied and failed, try the original
       if (currentUrl.includes('allorigins.win') && src) {

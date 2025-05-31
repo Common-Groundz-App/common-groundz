@@ -149,31 +149,40 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
     return "Use my location";
   };
 
-  // Get image URL for entity or result based on type
+  // Get image URL for entity or result based on type with improved Google Places handling
   const getImageUrl = (item: any) => {
-    if (item.image_url) return item.image_url;
+    console.log('SimpleEntitySelector - Getting image URL for item:', item);
+    
+    if (item.image_url) {
+      console.log('SimpleEntitySelector - Using existing image_url:', item.image_url);
+      return item.image_url;
+    }
     
     // For place/food results from Google, check for photos in metadata
     if ((entityType === 'place' || entityType === 'food') && 
         item.metadata?.photos && 
         item.metadata.photos.length > 0) {
-      // In a real app, you'd proxy this through a Supabase function
-      // return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&photoreference=${
-      //   item.metadata.photos[0].photo_reference
-      // }&key=YOUR_API_KEY`;
       
-      // For now, use a placeholder for places
-      return "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      const photoReference = item.metadata.photos[0].photo_reference;
+      console.log('SimpleEntitySelector - Found Google Places photo reference:', photoReference);
+      
+      // Use our Supabase Edge Function to proxy the Google Places photo
+      const proxyUrl = `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/get-google-places-photo`;
+      return `${proxyUrl}?photoReference=${photoReference}&maxWidth=100`;
     }
     
-    // Type-specific placeholder images
+    // Type-specific placeholder images with better fallbacks
     switch (entityType) {
       case 'movie':
-        return "https://images.unsplash.com/photo-1542204165-65bf26472b9b?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+        return "https://images.unsplash.com/photo-1489599510961-b3f9db2a06be?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
       case 'book':
-        return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+        return "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
       case 'product':
-        return "https://images.unsplash.com/photo-1546868871-7041f2a55e12?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+        return "https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      case 'food':
+        return "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      case 'place':
+        return "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
       default:
         return "https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
     }
@@ -282,13 +291,17 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                         role="option"
                         aria-selected="false"
                       >
-                        {/* Entity Image */}
+                        {/* Entity Image with enhanced error handling */}
                         <div className="flex-shrink-0 mr-2">
                           <ImageWithFallback
                             src={getImageUrl(entity)}
                             alt={entity.name}
                             className="w-8 h-8 object-cover rounded"
                             fallbackSrc={getImageUrl({})}
+                            entityType={entity.type}
+                            onError={(e) => {
+                              console.log('SimpleEntitySelector - Image failed to load for entity:', entity.name, 'URL:', getImageUrl(entity));
+                            }}
                           />
                         </div>
                         
@@ -317,13 +330,18 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }:
                         role="option"
                         aria-selected="false"
                       >
-                        {/* Result Image */}
+                        {/* Result Image with enhanced error handling */}
                         <div className="flex-shrink-0 mr-2">
                           <ImageWithFallback
                             src={getImageUrl(result)}
                             alt={result.name}
                             className="w-8 h-8 object-cover rounded"
                             fallbackSrc={getImageUrl({})}
+                            entityType={entityType}
+                            onError={(e) => {
+                              console.log('SimpleEntitySelector - Image failed to load for external result:', result.name, 'URL:', getImageUrl(result));
+                              console.log('SimpleEntitySelector - Result metadata:', result.metadata);
+                            }}
                           />
                         </div>
                         
