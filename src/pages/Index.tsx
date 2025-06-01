@@ -2,7 +2,6 @@
 import * as React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import HeroSection from '@/components/HeroSection';
 import FeaturesSection from '@/components/FeaturesSection';
 import TestimonialsSection from '@/components/TestimonialsSection';
@@ -11,25 +10,19 @@ import Footer from '@/components/Footer';
 import NavBarComponent from '@/components/NavBarComponent';
 
 const Index = () => {
-  const { user, isLoading } = useAuth();
+  const { user } = useAuth();
 
-  // Show loading state
-  if (isLoading) {
-    return (
-      <LoadingSpinner 
-        size="lg" 
-        text="Loading..." 
-        className="min-h-screen flex items-center justify-center" 
-      />
-    );
-  }
+  console.log('🏠 [Index] Rendering - user:', user ? 'authenticated' : 'not authenticated');
 
-  // Redirect authenticated users
+  // Simple redirect logic - auth is already initialized by AuthInitializer
   if (user) {
+    console.log('🔀 [Index] User authenticated, redirecting to /home');
     return <Navigate to="/home" replace />;
   }
 
-  // Show landing page
+  console.log('📄 [Index] Showing landing page');
+  
+  // Show landing page for unauthenticated users
   return (
     <div className="min-h-screen">
       <NavBarComponent />

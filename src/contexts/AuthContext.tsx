@@ -9,47 +9,64 @@ const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [session, setSession] = React.useState<Session | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true); // Start with loading true
+  const [isInitialized, setIsInitialized] = React.useState(false);
 
   React.useEffect(() => {
     let mounted = true;
     
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        if (mounted) {
-          setSession(currentSession);
-          setUser(currentSession?.user ?? null);
-          setIsLoading(false);
-        }
-      }
-    );
-
-    // Get initial session
-    const getInitialSession = async () => {
+    console.log('🔧 [AuthProvider] Starting initialization...');
+    
+    const initializeAuth = async () => {
       try {
+        // Step 1: Get initial session first
+        console.log('📋 [AuthProvider] Getting initial session...');
         const { data, error } = await supabase.auth.getSession();
         
         if (mounted && !error) {
+          console.log('✅ [AuthProvider] Initial session retrieved:', data.session ? 'Found' : 'None');
           setSession(data.session);
           setUser(data.session?.user ?? null);
         }
         
         if (mounted) {
+          console.log('🎯 [AuthProvider] Setting up auth state listener...');
+          
+          // Step 2: Set up auth state listener for future changes
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, currentSession) => {
+              if (mounted) {
+                console.log('🔄 [AuthProvider] Auth state changed:', event, currentSession ? 'Has session' : 'No session');
+                setSession(currentSession);
+                setUser(currentSession?.user ?? null);
+              }
+            }
+          );
+          
+          // Step 3: Mark as fully initialized
+          setIsInitialized(true);
           setIsLoading(false);
+          console.log('✨ [AuthProvider] Initialization complete!');
+          
+          return () => {
+            mounted = false;
+            subscription.unsubscribe();
+          };
         }
       } catch (error) {
+        console.error('❌ [AuthProvider] Initialization error:', error);
         if (mounted) {
           setIsLoading(false);
+          setIsInitialized(true); // Still mark as initialized to prevent infinite loading
         }
       }
     };
 
-    getInitialSession();
-
+    const cleanup = initializeAuth();
+    
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      cleanup?.then(cleanupFn => cleanupFn?.());
     };
   }, []);
 

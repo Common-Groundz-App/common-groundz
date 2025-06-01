@@ -11,15 +11,7 @@ export function NavBarComponent() {
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('Home');
-
-  // Get auth context safely
-  let user = null;
-  try {
-    const auth = useAuth();
-    user = auth.user;
-  } catch (error) {
-    // Auth context not ready, use defaults
-  }
+  const { user } = useAuth();
 
   // Memoize the navigation items
   const navItems = React.useMemo(() => [
