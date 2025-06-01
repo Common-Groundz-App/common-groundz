@@ -28,10 +28,15 @@ const Index = () => {
     );
   }
 
-  // Allow authenticated users to see landing page but also provide easy access to feed
-  // This is better UX than forcing redirect since they might want to see the landing page
+  // Simple redirect logic - auth is already initialized by AuthInitializer
+  if (user) {
+    console.log('🔀 [Index] User authenticated, redirecting to /home');
+    return <Navigate to="/home" replace />;
+  }
+
   console.log('📄 [Index] Showing landing page');
   
+  // Show landing page for unauthenticated users
   return (
     <div className="min-h-screen">
       <NavBarComponent />
