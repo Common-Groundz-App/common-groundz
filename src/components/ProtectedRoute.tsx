@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -13,26 +13,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // Show loading state while authentication is being checked
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="w-full max-w-md space-y-4">
-          <Skeleton className="h-8 w-3/4 mx-auto" />
-          <Skeleton className="h-32 w-full" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-            <Skeleton className="h-4 w-4/6" />
-          </div>
-        </div>
-        <p className="text-muted-foreground mt-4">Loading your account...</p>
-      </div>
-    );
+    return <LoadingSpinner size="lg" text="Loading your account..." className="min-h-screen flex items-center justify-center" />;
   }
 
-  // Redirect to auth page if user is not authenticated
+  // Redirect to landing page if user is not authenticated
   if (!user) {
-    console.log("User not authenticated, redirecting to /auth");
-    return <Navigate to="/auth" replace />;
+    console.log("User not authenticated, redirecting to /");
+    return <Navigate to="/" replace />;
   }
 
   // If user is authenticated, render the children
