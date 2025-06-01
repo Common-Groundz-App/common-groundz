@@ -25,7 +25,7 @@ const PreferencesOnboardingModal = () => {
   // Get preferences context safely
   let shouldShowOnboarding = false;
   let hasPreferences = false;
-  let setShouldShowOnboarding = () => {};
+  let setShouldShowOnboarding = (show: boolean) => {};
 
   try {
     const preferences = usePreferences();
