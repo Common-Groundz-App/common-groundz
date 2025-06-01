@@ -13,9 +13,18 @@ import NavBarComponent from '@/components/NavBarComponent';
 const Index = () => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
+  const [hasRedirected, setHasRedirected] = React.useState(false);
+
+  console.log('🏠 Index render:', { 
+    isLoading, 
+    hasUser: !!user, 
+    pathname: location.pathname,
+    hasRedirected 
+  });
 
   // Show loading state while authentication is being checked
   if (isLoading) {
+    console.log('⏳ Showing loading state...');
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <div className="w-full max-w-md space-y-4">
@@ -32,13 +41,22 @@ const Index = () => {
     );
   }
 
-  // Redirect to /home if user is logged in (only after loading is complete)
-  // Only redirect if we're actually on the root path to avoid unnecessary redirects
-  if (user && location.pathname === '/') {
+  // Redirect to /home if user is logged in and we're on the root path
+  // Add guards to prevent redirect loops
+  if (user && location.pathname === '/' && !hasRedirected) {
+    console.log('🔄 Authenticated user on root path, redirecting to /home');
+    setHasRedirected(true);
     return <Navigate to="/home" replace />;
   }
 
-  // Render landing page if user is not authenticated
+  // If we're not on the root path and user is authenticated, don't redirect
+  if (user && location.pathname !== '/') {
+    console.log('✅ Authenticated user on non-root path, staying put');
+    return null; // Let the router handle the current path
+  }
+
+  // Render landing page if user is not authenticated or we're explicitly on root
+  console.log('🎨 Rendering landing page');
   return (
     <div className="min-h-screen">
       <NavBarComponent />
