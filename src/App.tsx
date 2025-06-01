@@ -1,35 +1,34 @@
 
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ContentViewerProvider } from '@/contexts/ContentViewerContext';
 import AuthErrorBoundary from '@/components/AuthErrorBoundary';
+import AuthInitializer from '@/components/AuthInitializer';
+import SimpleLandingPage from '@/components/SimpleLandingPage';
+import SimpleDashboard from '@/components/SimpleDashboard';
 
 // Create a client
 const queryClient = new QueryClient();
 
 function App() {
-  console.log('🏗️ [App] Rendering - Phase 1 Debug Mode');
+  console.log('🏗️ [App] Rendering - Phase 2+3 with AuthInitializer and simple routing');
   
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <ContentViewerProvider>
           <AuthErrorBoundary>
-            <div className="min-h-screen flex items-center justify-center bg-background">
-              <div className="text-center space-y-4 p-8">
-                <h1 className="text-2xl font-bold text-foreground">
-                  🔧 Phase 1: AuthProvider Isolation Test
-                </h1>
-                <p className="text-muted-foreground">
-                  Testing AuthProvider stability without routing...
-                </p>
-                <div className="text-sm text-muted-foreground">
-                  Check console for AuthProvider logs
-                </div>
-              </div>
-            </div>
+            <Router>
+              <AuthInitializer>
+                <Routes>
+                  <Route path="/" element={<SimpleLandingPage />} />
+                  <Route path="/home" element={<SimpleDashboard />} />
+                </Routes>
+              </AuthInitializer>
+            </Router>
             <Toaster />
           </AuthErrorBoundary>
         </ContentViewerProvider>
