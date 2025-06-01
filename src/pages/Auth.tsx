@@ -1,16 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Glow } from '@/components/ui/glow';
 import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel';
 import Logo from '@/components/Logo';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Auth = () => {
   const [activeTab, setActiveTab] = useState('signin');
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isLoading } = useAuth();
+
+  console.log('🔐 [Auth] Rendering - isLoading:', isLoading, 'user:', user ? 'authenticated' : 'not authenticated');
 
   useEffect(() => {
     // Check if there's a tab parameter in the URL
@@ -18,8 +23,38 @@ const Auth = () => {
     const tabParam = params.get('tab');
     if (tabParam === 'signup') {
       setActiveTab('signup');
+    } else if (tabParam === 'signin') {
+      setActiveTab('signin');
     }
-  }, [location]);
+  }, [location.search]);
+
+  // Redirect authenticated users to home
+  useEffect(() => {
+    if (!isLoading && user) {
+      console.log('🔀 [Auth] User is authenticated, redirecting to /home');
+      navigate('/home', { replace: true });
+    }
+  }, [user, isLoading, navigate]);
+
+  // Show loading state while auth is initializing
+  if (isLoading) {
+    console.log('⏳ [Auth] Auth loading, showing spinner...');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="w-6 h-6 border-2 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render auth forms if user is already authenticated
+  if (user) {
+    return null; // This will be brief before redirect
+  }
+
+  console.log('📝 [Auth] Showing auth forms');
 
   return (
     <div className="flex min-h-screen relative overflow-hidden">

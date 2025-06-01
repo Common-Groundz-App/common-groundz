@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { UserIcon, KeyIcon } from 'lucide-react';
 
 const SignInForm = () => {
@@ -15,19 +15,37 @@ const SignInForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
+      console.log('🔑 [SignInForm] Attempting to sign in...');
       const { error } = await signIn(email, password);
-      if (error) throw error;
-      toast.success('Successfully signed in!');
-      navigate('/home');
+      
+      if (error) {
+        console.error('❌ [SignInForm] Sign in error:', error);
+        throw error;
+      }
+      
+      console.log('✅ [SignInForm] Sign in successful, navigating to /home');
+      toast({
+        title: 'Welcome back!',
+        description: 'Successfully signed in.',
+      });
+      
+      // Navigation will be handled by the Auth component's useEffect
+      // when the user state updates, but we can also navigate here as backup
+      navigate('/home', { replace: true });
     } catch (error: any) {
-      toast.error(error.message || 'Error signing in');
-      console.error(error);
+      console.error('❌ [SignInForm] Sign in failed:', error);
+      toast({
+        title: 'Sign in failed',
+        description: error.message || 'Failed to sign in. Please check your credentials.',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -55,6 +73,7 @@ const SignInForm = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="pl-10"
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -69,13 +88,25 @@ const SignInForm = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="pl-10"
+                disabled={isLoading}
               />
             </div>
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" disabled={isLoading}>
-            {isLoading ? 'Signing In...' : 'Sign In'}
+          <Button 
+            type="submit" 
+            className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" 
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Signing In...</span>
+              </div>
+            ) : (
+              'Sign In'
+            )}
           </Button>
         </CardFooter>
       </form>

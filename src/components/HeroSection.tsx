@@ -1,110 +1,103 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Star, Book, Film, Sun, Heart } from 'lucide-react';
-import GlowElements from './GlowElements';
-import { motion } from "framer-motion";
-import { Glow } from '@/components/ui/glow';
+import { ArrowRight, Star, Users, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const HeroSection = () => {
-  const [titleNumber, setTitleNumber] = useState(0);
-  const titles = useMemo(
-    () => ["you trust", "like you"],
-    []
-  );
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (titleNumber === titles.length - 1) {
-        setTitleNumber(0);
-      } else {
-        setTitleNumber(titleNumber + 1);
-      }
-    }, 2500);
-    return () => clearTimeout(timeoutId);
-  }, [titleNumber, titles]);
+  const { user, isLoading } = useAuth();
 
   return (
-    <section className="pt-36 pb-16 md:pt-44 md:pb-24 relative overflow-hidden">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col items-center text-center mb-16 relative">
-          <GlowElements />
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight max-w-4xl relative z-10">
-            Recommendations <span className="from-word">from</span>{" "}
-            <span className="relative inline-block overflow-hidden pb-2 highlight">
-              <span className="invisible">people you trust</span>
-              {titles.map((title, index) => (
-                <motion.span
-                  key={index}
-                  className="absolute inset-0 text-primary whitespace-nowrap"
-                  initial={{ opacity: 0, y: "50px" }}
-                  transition={{ type: "spring", stiffness: 50 }}
-                  animate={
-                    titleNumber === index
-                      ? {
-                          y: 0,
-                          opacity: 1,
-                        }
-                      : {
-                          y: titleNumber > index ? -80 : 80,
-                          opacity: 0,
-                        }
-                  }
-                >
-                  people {title}
-                </motion.span>
-              ))}
+    <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+      <div className="absolute top-20 left-10 w-72 h-72 bg-brand-orange/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+      
+      <div className="container px-4 mx-auto text-center relative z-10">
+        <div className="max-w-4xl mx-auto">
+          {/* Main heading */}
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
+            Discover Your Next
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-brand-orange to-orange-500">
+              Favorite Thing
             </span>
           </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl relative z-10">
-            Discover the best books, movies, products, and more - recommended by your friends, family, and trusted circle.
+          
+          {/* Subheading */}
+          <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
+            Get personalized recommendations from people you trust. Share what you love and discover amazing new experiences.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 relative z-10">
-            <Button size="lg" className="px-8">
-              <Link to="/auth">Get Started</Link>
-            </Button>
-            <Button size="lg" variant="outline" className="px-8">Learn More</Button>
+          
+          {/* Social proof */}
+          <div className="flex items-center justify-center gap-6 mb-10 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-brand-orange" />
+              <span>Trusted by thousands</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Star className="w-5 h-5 text-brand-orange" />
+              <span>5-star experiences</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-brand-orange" />
+              <span>Instant recommendations</span>
+            </div>
           </div>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in relative z-10" style={{
-          animationDelay: '0.2s'
-        }}>
-          <CategoryCard icon={<Book className="h-10 w-10 text-brand-orange" />} title="Books" description="Find your next great read" className="bg-brand-orange/10" />
-          <CategoryCard icon={<Film className="h-10 w-10 text-brand-blue" />} title="Movies" description="What to watch next" className="bg-brand-blue/10" />
-          <CategoryCard icon={<Sun className="h-10 w-10 text-brand-teal" />} title="Products" description="Genuine product reviews" className="bg-brand-teal/10" />
-          <CategoryCard icon={<div className="relative">
-              <Star className="h-10 w-10 text-primary" />
-              <Heart className="h-5 w-5 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-            </div>} title="And More" description="Any recommendation" className="bg-primary/10" />
+          
+          {/* CTA buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            {!isLoading && !user ? (
+              <>
+                <Button 
+                  size="lg" 
+                  className="bg-brand-orange hover:bg-brand-orange/90 text-white px-8 py-3 rounded-full text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                  asChild
+                >
+                  <Link to="/auth?tab=signup" className="flex items-center gap-2">
+                    Get Started Free
+                    <ArrowRight className="w-5 h-5" />
+                  </Link>
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  className="px-8 py-3 rounded-full text-lg border-2 hover:bg-accent"
+                  asChild
+                >
+                  <Link to="/auth?tab=signin">
+                    Sign In
+                  </Link>
+                </Button>
+              </>
+            ) : user ? (
+              <Button 
+                size="lg" 
+                className="bg-brand-orange hover:bg-brand-orange/90 text-white px-8 py-3 rounded-full text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                asChild
+              >
+                <Link to="/home" className="flex items-center gap-2">
+                  Go to Feed
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="w-6 h-6 border-2 border-brand-orange border-t-transparent rounded-full animate-spin" />
+                <span>Loading...</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Additional info */}
+          <p className="text-sm text-muted-foreground mt-8">
+            No credit card required • Free forever • Start exploring in seconds
+          </p>
         </div>
       </div>
-      
-      <Glow variant="bottom" className="opacity-80" />
     </section>
-  );
-};
-
-interface CategoryCardProps {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  className?: string;
-}
-
-const CategoryCard = ({
-  icon,
-  title,
-  description,
-  className
-}: CategoryCardProps) => {
-  return (
-    <div className={`p-6 rounded-lg card-hover ${className}`}>
-      <div className="mb-4">{icon}</div>
-      <h3 className="font-bold text-lg mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
-    </div>
   );
 };
 

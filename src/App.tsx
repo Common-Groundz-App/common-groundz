@@ -8,13 +8,14 @@ import { ContentViewerProvider } from '@/contexts/ContentViewerContext';
 import AuthErrorBoundary from '@/components/AuthErrorBoundary';
 import AuthInitializer from '@/components/AuthInitializer';
 import Index from '@/pages/Index';
+import Auth from '@/pages/Auth';
 import Feed from '@/pages/Feed';
 
 // Create a client
 const queryClient = new QueryClient();
 
 function App() {
-  console.log('🏗️ [App] Rendering - Phase 4.2 with Feed component and safeguards');
+  console.log('🏗️ [App] Rendering - Phase 4.3 with complete auth flow');
   
   return (
     <QueryClientProvider client={queryClient}>
@@ -25,6 +26,7 @@ function App() {
               <AuthInitializer>
                 <Routes>
                   <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
                   <Route path="/home" element={<Feed />} />
                 </Routes>
               </AuthInitializer>
