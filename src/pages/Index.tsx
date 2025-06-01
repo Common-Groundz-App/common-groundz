@@ -13,75 +13,97 @@ import NavBarComponent from '@/components/NavBarComponent';
 const Index = () => {
   const { user, isLoading } = useAuth();
   const [renderCount, setRenderCount] = React.useState(0);
-  const [lastAction, setLastAction] = React.useState('initial');
+  const lastStateRef = React.useRef({ user: null, isLoading: true });
 
-  // Track renders
+  // Track renders with a limit to prevent infinite loops
   React.useEffect(() => {
-    setRenderCount(prev => prev + 1);
+    setRenderCount(prev => {
+      const newCount = prev + 1;
+      if (newCount > 100) {
+        console.error('🚨 [Index] Too many renders detected! Stopping count.');
+        return 100;
+      }
+      return newCount;
+    });
   });
 
-  // Track state changes over time
+  // Track state changes over time (but only when they actually change)
   React.useEffect(() => {
     const timestamp = new Date().toISOString();
-    console.log(`🔍 [${timestamp}] Index state change:`, { 
-      renderCount,
-      isLoading, 
-      hasUser: !!user,
-      userId: user?.id || 'none',
-      userEmail: user?.email || 'none'
-    });
+    const currentState = { user: !!user, isLoading };
+    const lastState = lastStateRef.current;
+    
+    // Only log if state actually changed
+    if (currentState.user !== !!lastState.user || currentState.isLoading !== lastState.isLoading) {
+      console.log(`🔍 [${timestamp}] Index state change:`, { 
+        renderCount,
+        isLoading, 
+        hasUser: !!user,
+        userId: user?.id || 'none',
+        userEmail: user?.email || 'none'
+      });
+      
+      lastStateRef.current = { user, isLoading };
+    }
   }, [isLoading, user, renderCount]);
 
-  // Log every render with timestamp
-  const timestamp = new Date().toISOString();
-  console.log(`🏠 [${timestamp}] Index render #${renderCount}:`, { 
-    isLoading, 
-    hasUser: !!user,
-    action: 'rendering'
-  });
-
-  // Show loading state while authentication is being checked
-  if (isLoading) {
-    const action = 'showing-loading';
-    if (lastAction !== action) {
+  // Memoize the decision logic to prevent unnecessary re-calculations
+  const routingDecision = React.useMemo(() => {
+    const timestamp = new Date().toISOString();
+    
+    if (isLoading) {
       console.log(`⏳ [${timestamp}] Loading state active - render #${renderCount}`);
-      setLastAction(action);
+      return { type: 'loading' };
     }
-    return <LoadingSpinner size="lg" text="Loading..." className="min-h-screen flex items-center justify-center" />;
-  }
 
-  // Redirect to /home if user is authenticated
-  if (user) {
-    const action = 'redirecting-to-home';
-    if (lastAction !== action) {
+    if (user) {
       console.log(`🔄 [${timestamp}] Authenticated user detected, redirecting to /home - render #${renderCount}`, {
         userId: user.id,
         email: user.email
       });
-      setLastAction(action);
+      return { type: 'redirect' };
     }
-    return <Navigate to="/home" replace />;
-  }
 
-  // Render landing page if user is not authenticated
-  const action = 'rendering-landing-page';
-  if (lastAction !== action) {
     console.log(`🎨 [${timestamp}] Rendering landing page - render #${renderCount}`);
-    setLastAction(action);
+    return { type: 'landing' };
+  }, [isLoading, user, renderCount]);
+
+  // Prevent renders beyond reasonable limit
+  if (renderCount > 50) {
+    console.error('🚨 [Index] Render limit exceeded, forcing stable state');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Render Loop Detected</h1>
+          <p className="text-gray-600">Please refresh the page</p>
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <div className="min-h-screen">
-      <NavBarComponent />
-      <main>
-        <HeroSection />
-        <FeaturesSection />
-        <TestimonialsSection />
-        <CTASection />
-      </main>
-      <Footer />
-    </div>
-  );
+  // Handle routing decisions
+  switch (routingDecision.type) {
+    case 'loading':
+      return <LoadingSpinner size="lg" text="Loading..." className="min-h-screen flex items-center justify-center" />;
+    
+    case 'redirect':
+      return <Navigate to="/home" replace />;
+    
+    case 'landing':
+    default:
+      return (
+        <div className="min-h-screen">
+          <NavBarComponent />
+          <main>
+            <HeroSection />
+            <FeaturesSection />
+            <TestimonialsSection />
+            <CTASection />
+          </main>
+          <Footer />
+        </div>
+      );
+  }
 };
 
 export default Index;

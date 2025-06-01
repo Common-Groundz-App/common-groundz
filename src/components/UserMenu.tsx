@@ -24,16 +24,6 @@ export function UserMenu() {
   const { invalidateProfile } = useProfileCacheActions();
   const { toast } = useToast();
 
-  // Log UserMenu renders
-  React.useEffect(() => {
-    const timestamp = new Date().toISOString();
-    console.log(`👤 [${timestamp}] UserMenu rendered:`, {
-      hasUser: !!user,
-      isLoading,
-      isSigningOut
-    });
-  });
-
   // Listen for profile update events
   React.useEffect(() => {
     const handleProfileUpdate = () => {
@@ -49,7 +39,7 @@ export function UserMenu() {
     };
   }, [user?.id, invalidateProfile]);
 
-  const handleSignOut = async () => {
+  const handleSignOut = React.useCallback(async () => {
     try {
       setIsSigningOut(true);
       setIsOpen(false); // Close dropdown immediately
@@ -85,7 +75,14 @@ export function UserMenu() {
       });
       setIsSigningOut(false);
     }
-  };
+  }, [signOut, toast]);
+
+  // Memoize the computed values to prevent unnecessary re-renders
+  const { displayName, initials } = React.useMemo(() => {
+    const name = profile?.displayName || user?.email?.split('@')[0] || 'User';
+    const userInitials = profile?.initials || name.substring(0, 2).toUpperCase();
+    return { displayName: name, initials: userInitials };
+  }, [profile?.displayName, profile?.initials, user?.email]);
 
   if (!user) {
     return (
@@ -94,10 +91,6 @@ export function UserMenu() {
       </Button>
     );
   }
-
-  // Use enhanced profile data with fallbacks
-  const displayName = profile?.displayName || user.email?.split('@')[0] || 'User';
-  const initials = profile?.initials || displayName.substring(0, 2).toUpperCase();
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>

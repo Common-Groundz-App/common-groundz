@@ -5,7 +5,6 @@ import { NavBar } from "@/components/ui/tubelight-navbar";
 import { UserMenu } from './UserMenu';
 import { useLocation } from 'react-router-dom';
 import { SearchDialog } from '@/components/SearchDialog';
-import { supabase } from '@/integrations/supabase/client';
 import NotificationBell from './notifications/NotificationBell';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -15,21 +14,12 @@ export function NavBarComponent() {
   const [activeTab, setActiveTab] = React.useState('Home');
   const { user } = useAuth();
 
-  // Log component render
-  React.useEffect(() => {
-    const timestamp = new Date().toISOString();
-    console.log(`🧭 [${timestamp}] NavBarComponent rendered:`, {
-      pathname: location.pathname,
-      hasUser: !!user,
-      activeTab
-    });
-  });
-  
-  const navItems = [
+  // Memoize the navigation items to prevent unnecessary re-renders
+  const navItems = React.useMemo(() => [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User }
-  ];
+  ], []);
 
   React.useEffect(() => {
     const handleOpenSearch = () => {
@@ -57,16 +47,19 @@ export function NavBarComponent() {
   // Check if we're on the Profile page
   const isProfilePage = location.pathname.startsWith('/profile');
 
+  // Memoize the right section to prevent unnecessary re-renders
+  const rightSection = React.useMemo(() => (
+    <div className="flex items-center gap-2">
+      {user && <NotificationBell />}
+      <UserMenu />
+    </div>
+  ), [user]);
+
   return (
     <>
       <NavBar 
         items={navItems} 
-        rightSection={
-          <div className="flex items-center gap-2">
-            {user && <NotificationBell />}
-            <UserMenu />
-          </div>
-        }
+        rightSection={rightSection}
         initialActiveTab={activeTab}
         className="relative z-50 sticky top-0"
         hideHamburgerMenu={isProfilePage}

@@ -14,66 +14,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     let mounted = true;
-    let hasInitialized = false;
-    const startTime = Date.now();
-
+    
     console.log('🔧 [AuthContext] Starting auth initialization...');
 
-    const initializeAuth = async () => {
-      try {
-        // Set up auth state listener first
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          (event, currentSession) => {
-            const timestamp = new Date().toISOString();
-            const timeSinceStart = Date.now() - startTime;
-            
-            console.log(`🔄 [${timestamp}] Auth state changed (+${timeSinceStart}ms):`, {
-              event,
-              hasUser: !!currentSession?.user,
-              userId: currentSession?.user?.id || 'none',
-              email: currentSession?.user?.email || 'none',
-              mounted,
-              hasInitialized
-            });
-            
-            if (mounted) {
-              setSession(currentSession);
-              setUser(currentSession?.user ?? null);
-              
-              // Only set loading to false after we've processed the first auth event
-              if (!hasInitialized) {
-                hasInitialized = true;
-                // Add minimum 100ms to prevent flash
-                const minLoadTime = 100;
-                const elapsed = Date.now() - startTime;
-                const delay = Math.max(0, minLoadTime - elapsed);
-                
-                setTimeout(() => {
-                  if (mounted) {
-                    console.log(`✅ [${new Date().toISOString()}] Auth initialized via state change (+${Date.now() - startTime}ms)`);
-                    setIsLoading(false);
-                  }
-                }, delay);
-              }
-            }
-          }
-        );
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        const timestamp = new Date().toISOString();
+        
+        console.log(`🔄 [${timestamp}] Auth state changed:`, {
+          event,
+          hasUser: !!currentSession?.user,
+          userId: currentSession?.user?.id || 'none',
+          email: currentSession?.user?.email || 'none',
+          mounted
+        });
+        
+        if (mounted) {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          setIsLoading(false);
+        }
+      }
+    );
 
-        // Then check for existing session
+    // Check for existing session
+    const getInitialSession = async () => {
+      try {
         console.log('📋 [AuthContext] Checking for existing session...');
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('❌ [AuthContext] Error getting session:', error);
-          if (mounted && !hasInitialized) {
-            hasInitialized = true;
+          if (mounted) {
             setIsLoading(false);
           }
           return;
         }
 
-        const timeSinceStart = Date.now() - startTime;
-        console.log(`📋 [AuthContext] Initial session check (+${timeSinceStart}ms):`, {
+        console.log(`📋 [AuthContext] Initial session check:`, {
           hasSession: !!data.session,
           hasUser: !!data.session?.user,
           userId: data.session?.user?.id || 'none',
@@ -83,55 +62,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted) {
           setSession(data.session);
           setUser(data.session?.user ?? null);
-          
-          // If no auth state change has occurred yet, initialize here
-          if (!hasInitialized) {
-            hasInitialized = true;
-            const minLoadTime = 100;
-            const elapsed = Date.now() - startTime;
-            const delay = Math.max(0, minLoadTime - elapsed);
-            
-            setTimeout(() => {
-              if (mounted) {
-                console.log(`✅ [AuthContext] Auth initialized via session check (+${Date.now() - startTime}ms)`);
-                setIsLoading(false);
-              }
-            }, delay);
-          }
+          setIsLoading(false);
         }
-
-        return () => {
-          console.log('🧹 [AuthContext] Cleaning up auth subscription');
-          subscription.unsubscribe();
-        };
       } catch (error) {
         console.error('❌ [AuthContext] Error setting up auth:', error);
-        if (mounted && !hasInitialized) {
-          hasInitialized = true;
+        if (mounted) {
           setIsLoading(false);
         }
       }
     };
 
-    const cleanup = initializeAuth();
-    
-    // Failsafe timeout
-    const failsafeTimeout = setTimeout(() => {
-      if (mounted && !hasInitialized) {
-        console.log('⏰ [AuthContext] Failsafe timeout triggered, setting loading to false');
-        hasInitialized = true;
-        setIsLoading(false);
-      }
-    }, 5000);
-    
+    getInitialSession();
+
+    // Cleanup function
     return () => {
       mounted = false;
-      clearTimeout(failsafeTimeout);
-      cleanup.then(cleanupFn => cleanupFn?.());
+      console.log('🧹 [AuthContext] Cleaning up auth subscription');
+      subscription.unsubscribe();
     };
-  }, []);
+  }, []); // Empty dependency array to prevent re-runs
 
-  // Log context state changes
+  // Log context state changes (but don't use this in useEffect dependencies)
   React.useEffect(() => {
     const timeSinceInit = Date.now() - initStartTime;
     console.log(`📊 [AuthContext] State update (+${timeSinceInit}ms):`, {
@@ -139,9 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasUser: !!user,
       hasSession: !!session
     });
-  }, [isLoading, user, session, initStartTime]);
+  }, [isLoading, user, session]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = React.useCallback(async (email: string, password: string) => {
     try {
       console.log('🔑 Attempting sign in for:', email);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -150,9 +101,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('❌ Sign in error:', error);
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const signUp = async (email: string, password: string, userData?: { 
+  const signUp = React.useCallback(async (email: string, password: string, userData?: { 
     firstName?: string;
     lastName?: string;
     username?: string;
@@ -175,9 +126,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('❌ Sign up error:', error);
       return { error: error as Error, user: null };
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = React.useCallback(async () => {
     try {
       console.log('🚪 Attempting sign out...');
       const { error } = await supabase.auth.signOut();
@@ -193,16 +144,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('❌ Error during sign out:', error);
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const value = {
+  const value = React.useMemo(() => ({
     user,
     session,
     isLoading,
     signIn,
     signUp,
     signOut
-  };
+  }), [user, session, isLoading, signIn, signUp, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
