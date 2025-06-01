@@ -10,81 +10,104 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [session, setSession] = React.useState<Session | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [initStartTime] = React.useState(Date.now());
 
   React.useEffect(() => {
     let mounted = true;
-    let authInitialized = false;
+    let hasInitialized = false;
+    const startTime = Date.now();
+
+    console.log('🔧 [AuthContext] Starting auth initialization...');
 
     const initializeAuth = async () => {
       try {
-        console.log('🔄 Initializing auth...');
-        
-        // Set up auth state listener FIRST
+        // Set up auth state listener first
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           (event, currentSession) => {
-            console.log('🔄 Auth state changed:', event, currentSession?.user?.email || 'no user');
+            const timestamp = new Date().toISOString();
+            const timeSinceStart = Date.now() - startTime;
+            
+            console.log(`🔄 [${timestamp}] Auth state changed (+${timeSinceStart}ms):`, {
+              event,
+              hasUser: !!currentSession?.user,
+              userId: currentSession?.user?.id || 'none',
+              email: currentSession?.user?.email || 'none',
+              mounted,
+              hasInitialized
+            });
             
             if (mounted) {
               setSession(currentSession);
               setUser(currentSession?.user ?? null);
               
-              // Only set loading to false once we've handled the auth state change
-              if (!authInitialized) {
-                authInitialized = true;
-                console.log('✅ Auth initialized via state change');
-                setIsLoading(false);
+              // Only set loading to false after we've processed the first auth event
+              if (!hasInitialized) {
+                hasInitialized = true;
+                // Add minimum 100ms to prevent flash
+                const minLoadTime = 100;
+                const elapsed = Date.now() - startTime;
+                const delay = Math.max(0, minLoadTime - elapsed);
+                
+                setTimeout(() => {
+                  if (mounted) {
+                    console.log(`✅ [${new Date().toISOString()}] Auth initialized via state change (+${Date.now() - startTime}ms)`);
+                    setIsLoading(false);
+                  }
+                }, delay);
               }
             }
           }
         );
 
-        // Add a timeout fallback to prevent infinite loading
-        const timeoutId = setTimeout(() => {
-          if (!authInitialized && mounted) {
-            console.log('⏰ Auth initialization timeout, setting loading to false');
-            authInitialized = true;
-            setIsLoading(false);
-          }
-        }, 3000);
-
-        // THEN check for existing session
+        // Then check for existing session
+        console.log('📋 [AuthContext] Checking for existing session...');
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('❌ Error getting session:', error);
-          if (!authInitialized && mounted) {
-            authInitialized = true;
+          console.error('❌ [AuthContext] Error getting session:', error);
+          if (mounted && !hasInitialized) {
+            hasInitialized = true;
             setIsLoading(false);
           }
           return;
         }
 
-        console.log('📋 Initial session check:', data.session?.user?.email || 'no user');
+        const timeSinceStart = Date.now() - startTime;
+        console.log(`📋 [AuthContext] Initial session check (+${timeSinceStart}ms):`, {
+          hasSession: !!data.session,
+          hasUser: !!data.session?.user,
+          userId: data.session?.user?.id || 'none',
+          email: data.session?.user?.email || 'none'
+        });
         
         if (mounted) {
           setSession(data.session);
           setUser(data.session?.user ?? null);
           
-          // Set loading to false if we haven't already via the state change listener
-          if (!authInitialized) {
-            authInitialized = true;
-            console.log('✅ Auth initialized via session check');
-            setIsLoading(false);
+          // If no auth state change has occurred yet, initialize here
+          if (!hasInitialized) {
+            hasInitialized = true;
+            const minLoadTime = 100;
+            const elapsed = Date.now() - startTime;
+            const delay = Math.max(0, minLoadTime - elapsed);
+            
+            setTimeout(() => {
+              if (mounted) {
+                console.log(`✅ [AuthContext] Auth initialized via session check (+${Date.now() - startTime}ms)`);
+                setIsLoading(false);
+              }
+            }, delay);
           }
         }
 
-        // Clear the timeout since we've completed initialization
-        clearTimeout(timeoutId);
-
         return () => {
-          console.log('🧹 Cleaning up auth subscription');
+          console.log('🧹 [AuthContext] Cleaning up auth subscription');
           subscription.unsubscribe();
-          clearTimeout(timeoutId);
         };
       } catch (error) {
-        console.error('❌ Error setting up auth:', error);
-        if (mounted && !authInitialized) {
-          authInitialized = true;
+        console.error('❌ [AuthContext] Error setting up auth:', error);
+        if (mounted && !hasInitialized) {
+          hasInitialized = true;
           setIsLoading(false);
         }
       }
@@ -92,11 +115,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const cleanup = initializeAuth();
     
+    // Failsafe timeout
+    const failsafeTimeout = setTimeout(() => {
+      if (mounted && !hasInitialized) {
+        console.log('⏰ [AuthContext] Failsafe timeout triggered, setting loading to false');
+        hasInitialized = true;
+        setIsLoading(false);
+      }
+    }, 5000);
+    
     return () => {
       mounted = false;
+      clearTimeout(failsafeTimeout);
       cleanup.then(cleanupFn => cleanupFn?.());
     };
   }, []);
+
+  // Log context state changes
+  React.useEffect(() => {
+    const timeSinceInit = Date.now() - initStartTime;
+    console.log(`📊 [AuthContext] State update (+${timeSinceInit}ms):`, {
+      isLoading,
+      hasUser: !!user,
+      hasSession: !!session
+    });
+  }, [isLoading, user, session, initStartTime]);
 
   const signIn = async (email: string, password: string) => {
     try {

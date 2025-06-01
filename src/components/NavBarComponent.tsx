@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { Home, Search, User } from 'lucide-react';
 import { NavBar } from "@/components/ui/tubelight-navbar";
@@ -13,6 +14,16 @@ export function NavBarComponent() {
   const [showSearchDialog, setShowSearchDialog] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('Home');
   const { user } = useAuth();
+
+  // Log component render
+  React.useEffect(() => {
+    const timestamp = new Date().toISOString();
+    console.log(`🧭 [${timestamp}] NavBarComponent rendered:`, {
+      pathname: location.pathname,
+      hasUser: !!user,
+      activeTab
+    });
+  });
   
   const navItems = [
     { name: 'Home', url: '/home', icon: Home },

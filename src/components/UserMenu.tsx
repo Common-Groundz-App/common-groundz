@@ -24,6 +24,16 @@ export function UserMenu() {
   const { invalidateProfile } = useProfileCacheActions();
   const { toast } = useToast();
 
+  // Log UserMenu renders
+  React.useEffect(() => {
+    const timestamp = new Date().toISOString();
+    console.log(`👤 [${timestamp}] UserMenu rendered:`, {
+      hasUser: !!user,
+      isLoading,
+      isSigningOut
+    });
+  });
+
   // Listen for profile update events
   React.useEffect(() => {
     const handleProfileUpdate = () => {
@@ -44,11 +54,11 @@ export function UserMenu() {
       setIsSigningOut(true);
       setIsOpen(false); // Close dropdown immediately
       
-      console.log('Starting sign out process...');
+      console.log('🚪 [UserMenu] Starting sign out process...');
       const { error } = await signOut();
       
       if (error) {
-        console.error('Sign out failed:', error);
+        console.error('❌ [UserMenu] Sign out failed:', error);
         toast({
           title: "Sign out failed",
           description: error.message,
@@ -58,6 +68,7 @@ export function UserMenu() {
         return;
       }
       
+      console.log('✅ [UserMenu] Sign out successful');
       // Show success message
       toast({
         title: "Signed out successfully",
@@ -66,7 +77,7 @@ export function UserMenu() {
       
       // No need for manual navigation - the auth state change will handle routing
     } catch (error) {
-      console.error('Error during sign out:', error);
+      console.error('❌ [UserMenu] Error during sign out:', error);
       toast({
         title: "Sign out failed",
         description: "An unexpected error occurred while signing out.",
