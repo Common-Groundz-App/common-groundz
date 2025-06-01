@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User, Settings } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
 import { useToast } from "@/hooks/use-toast";
 
@@ -22,7 +22,6 @@ export function UserMenu() {
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   const { data: profile, isLoading } = useProfile(user?.id);
   const { invalidateProfile } = useProfileCacheActions();
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   // Listen for profile update events
@@ -39,15 +38,6 @@ export function UserMenu() {
       window.removeEventListener('profile-updated', handleProfileUpdate);
     };
   }, [user?.id, invalidateProfile]);
-
-  // Listen for auth state changes to handle navigation
-  React.useEffect(() => {
-    if (!user && !isSigningOut) {
-      // User has been signed out, navigate to landing page
-      console.log('User signed out, navigating to landing page');
-      navigate('/', { replace: true });
-    }
-  }, [user, navigate, isSigningOut]);
 
   const handleSignOut = async () => {
     try {
@@ -74,8 +64,7 @@ export function UserMenu() {
         description: "You have been logged out of your account.",
       });
       
-      // Note: Navigation will happen automatically when user becomes null
-      // due to the useEffect above that listens to auth state changes
+      // No need for manual navigation - the auth state change will handle routing
     } catch (error) {
       console.error('Error during sign out:', error);
       toast({

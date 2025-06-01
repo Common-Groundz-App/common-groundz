@@ -4,7 +4,6 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
-import { AuthProvider } from '@/contexts/AuthContext';
 import { initializeStorageService } from '@/services/storageService';
 import './index.css';
 
@@ -19,12 +18,10 @@ const root = createRoot(rootElement);
 
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      <PreferencesProvider>
-        <LocationProvider>
-          <App />
-        </LocationProvider>
-      </PreferencesProvider>
-    </AuthProvider>
+    <PreferencesProvider>
+      <LocationProvider>
+        <App />
+      </LocationProvider>
+    </PreferencesProvider>
   </React.StrictMode>
 );

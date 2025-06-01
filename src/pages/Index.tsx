@@ -1,6 +1,6 @@
 
 import * as React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import HeroSection from '@/components/HeroSection';
@@ -12,6 +12,7 @@ import NavBarComponent from '@/components/NavBarComponent';
 
 const Index = () => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   // Show loading state while authentication is being checked
   if (isLoading) {
@@ -32,7 +33,8 @@ const Index = () => {
   }
 
   // Redirect to /home if user is logged in (only after loading is complete)
-  if (user) {
+  // Only redirect if we're actually on the root path to avoid unnecessary redirects
+  if (user && location.pathname === '/') {
     return <Navigate to="/home" replace />;
   }
 
