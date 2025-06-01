@@ -22,15 +22,34 @@ interface SmartComposerButtonProps {
 type ContentType = 'post' | 'review' | 'journal' | 'recommendation' | 'watching';
 
 export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartComposerButtonProps) {
+  const { user, isLoading } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [entityData, setEntityData] = useState<any>(null); // Store entity data for forms
-  const { user } = useAuth();
   const { handleImageUpload } = useRecommendationUploads();
   const { toast } = useToast();
+
+  console.log('✏️ [SmartComposerButton] Rendering - isLoading:', isLoading, 'user:', user ? 'authenticated' : 'not authenticated');
+
+  // CRITICAL: Don't render button until auth is ready
+  if (isLoading) {
+    console.log('⏳ [SmartComposerButton] Auth loading, showing skeleton...');
+    return (
+      <Button disabled className="bg-muted text-muted-foreground gap-2">
+        <PlusCircle size={18} />
+        Loading...
+      </Button>
+    );
+  }
+
+  // Don't render if no user
+  if (!user) {
+    console.log('❌ [SmartComposerButton] No user, not rendering button');
+    return null;
+  }
 
   // Fetch the user's profile data when needed
   useEffect(() => {

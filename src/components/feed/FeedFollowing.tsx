@@ -17,11 +17,32 @@ interface FeedFollowingProps {
 }
 
 const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const { toast } = useToast();
+
+  console.log('👥 [FeedFollowing] Rendering - isLoading:', isLoading, 'user:', user ? 'authenticated' : 'not authenticated');
+
+  // CRITICAL: Don't render feed logic until auth is ready
+  if (isLoading) {
+    console.log('⏳ [FeedFollowing] Auth loading, showing skeleton...');
+    return <FeedSkeleton />;
+  }
+
+  // Don't render if no user
+  if (!user) {
+    console.log('❌ [FeedFollowing] No user, should not render');
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Authentication required</p>
+        </div>
+      </div>
+    );
+  }
+
   const { 
     items, 
-    isLoading, 
+    isLoading: feedLoading, 
     error, 
     hasMore, 
     loadMore, 
@@ -75,7 +96,7 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
             </Button>
           </AlertDescription>
         </Alert>
-      ) : isLoading ? (
+      ) : feedLoading ? (
         <FeedSkeleton />
       ) : items.length === 0 ? (
         <Card className="border-dashed">

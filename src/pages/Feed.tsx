@@ -14,13 +14,44 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 const Feed = React.memo(() => {
+  const { user, isLoading } = useAuth();
+
+  console.log('🍽️ [Feed] Rendering - isLoading:', isLoading, 'user:', user ? 'authenticated' : 'not authenticated');
+
+  // CRITICAL: Don't render complex feed logic until auth is ready
+  if (isLoading) {
+    console.log('⏳ [Feed] Auth still loading, showing spinner...');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <LoadingSpinner size="lg" />
+          <p className="text-muted-foreground">Loading feed...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect unauthenticated users - this should be handled by routing but adding as safeguard
+  if (!user) {
+    console.log('🔀 [Feed] No user, this should not happen in /home route');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">Authentication required</p>
+        </div>
+      </div>
+    );
+  }
+
+  console.log('✅ [Feed] Auth ready, rendering feed content...');
+
   // Keep useIsMobile only for logic, not layout rendering
   const isMobile = useIsMobile();
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState("for-you");
-  const { user } = useAuth();
   const { unreadCount } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);
