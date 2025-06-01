@@ -9,8 +9,8 @@ interface RenderProtectionProps {
 
 const RenderProtection: React.FC<RenderProtectionProps> = ({ 
   children, 
-  maxRenders = 100, 
-  timeWindow = 5000 
+  maxRenders = 30, 
+  timeWindow = 2000 
 }) => {
   const renderCount = useRef(0);
   const startTime = useRef(Date.now());
@@ -28,27 +28,32 @@ const RenderProtection: React.FC<RenderProtectionProps> = ({
       return;
     }
 
-    console.log(`🔄 [RenderProtection] Render count: ${renderCount.current}/${maxRenders} in ${now - startTime.current}ms`);
-
     if (renderCount.current > maxRenders) {
-      console.error(`🚨 [RenderProtection] INFINITE RENDER DETECTED! Blocking further renders. Count: ${renderCount.current}`);
+      console.error(`🚨 INFINITE RENDER DETECTED! Blocking app. Count: ${renderCount.current}`);
       setIsBlocked(true);
+      
+      // Force stop any further rendering
+      setTimeout(() => {
+        if (renderCount.current > maxRenders) {
+          window.location.href = '/';
+        }
+      }, 1000);
     }
   });
 
   if (isBlocked) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-red-50">
         <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Render Loop Detected</h1>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">App Stopped</h1>
           <p className="text-gray-600 mb-4">
-            The app detected an infinite render loop and stopped to prevent browser crash.
+            The app detected too many renders and stopped to prevent browser crash.
           </p>
           <button 
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            Reload Page
+            Reload App
           </button>
         </div>
       </div>

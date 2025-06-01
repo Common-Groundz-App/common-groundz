@@ -1,2 +1,19 @@
 
+# Handle client-side routing
+/auth    /index.html   200
+/home    /index.html   200
+/profile/*    /index.html   200
+/explore    /index.html   200
+/settings    /index.html   200
+/search/*    /index.html   200
+/post/*    /index.html   200
+/recommendations/*    /index.html   200
+/entity/*    /index.html   200
+/place/*    /index.html   200
+/movie/*    /index.html   200
+/book/*    /index.html   200
+/food/*    /index.html   200
+/product/*    /index.html   200
+
+# Catch-all fallback for any other routes
 /*    /index.html   200

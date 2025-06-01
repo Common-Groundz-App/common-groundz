@@ -11,19 +11,10 @@ import Footer from '@/components/Footer';
 import NavBarComponent from '@/components/NavBarComponent';
 
 const Index = () => {
-  const renderCount = React.useRef(0);
-  
-  // Increment render count for debugging
-  renderCount.current++;
-  console.log(`📄 [Index] Render #${renderCount.current}`);
-
   const { user, isLoading } = useAuth();
-
-  console.log(`📄 [Index] Auth state - isLoading: ${isLoading}, hasUser: ${!!user}`);
 
   // Show loading state
   if (isLoading) {
-    console.log('📄 [Index] Showing loading state');
     return (
       <LoadingSpinner 
         size="lg" 
@@ -35,12 +26,10 @@ const Index = () => {
 
   // Redirect authenticated users
   if (user) {
-    console.log('🔄 [Index] User authenticated, redirecting to /home');
     return <Navigate to="/home" replace />;
   }
 
   // Show landing page
-  console.log('🎨 [Index] Rendering landing page');
   return (
     <div className="min-h-screen">
       <NavBarComponent />

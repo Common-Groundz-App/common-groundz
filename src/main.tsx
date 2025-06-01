@@ -19,16 +19,14 @@ if (!rootElement) throw new Error('Failed to find the root element');
 
 const root = createRoot(rootElement);
 
-console.log('🔧 [main] Rendering app with simplified provider chain...');
+console.log('🔧 [main] Rendering app without StrictMode...');
 
 root.render(
-  <React.StrictMode>
-    <RenderProtection maxRenders={50} timeWindow={3000}>
-      <AuthContextBoundary>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </AuthContextBoundary>
-    </RenderProtection>
-  </React.StrictMode>
+  <RenderProtection maxRenders={30} timeWindow={2000}>
+    <AuthContextBoundary>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </AuthContextBoundary>
+  </RenderProtection>
 );

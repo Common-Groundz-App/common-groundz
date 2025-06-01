@@ -8,14 +8,9 @@ import { SearchDialog } from '@/components/SearchDialog';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function NavBarComponent() {
-  const renderCount = React.useRef(0);
-  renderCount.current++;
-  
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('Home');
-
-  console.log(`🧭 [NavBarComponent] Render #${renderCount.current} on ${location.pathname}`);
 
   // Get auth context safely
   let user = null;
@@ -23,10 +18,10 @@ export function NavBarComponent() {
     const auth = useAuth();
     user = auth.user;
   } catch (error) {
-    console.warn('⚠️ [NavBarComponent] Auth context not ready, using defaults');
+    // Auth context not ready, use defaults
   }
 
-  // Memoize the navigation items to prevent unnecessary re-renders
+  // Memoize the navigation items
   const navItems = React.useMemo(() => [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
@@ -56,10 +51,8 @@ export function NavBarComponent() {
     }
   }, [location.pathname]);
 
-  // Check if we're on the Profile page
   const isProfilePage = location.pathname.startsWith('/profile');
 
-  // Memoize the right section to prevent unnecessary re-renders
   const rightSection = React.useMemo(() => (
     <div className="flex items-center gap-2">
       <UserMenu />
