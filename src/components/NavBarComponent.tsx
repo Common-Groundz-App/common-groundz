@@ -5,14 +5,26 @@ import { NavBar } from "@/components/ui/tubelight-navbar";
 import { UserMenu } from './UserMenu';
 import { useLocation } from 'react-router-dom';
 import { SearchDialog } from '@/components/SearchDialog';
-import NotificationBell from './notifications/NotificationBell';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function NavBarComponent() {
+  const renderCount = React.useRef(0);
+  renderCount.current++;
+  
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('Home');
-  const { user } = useAuth();
+
+  console.log(`🧭 [NavBarComponent] Render #${renderCount.current} on ${location.pathname}`);
+
+  // Get auth context safely
+  let user = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+  } catch (error) {
+    console.warn('⚠️ [NavBarComponent] Auth context not ready, using defaults');
+  }
 
   // Memoize the navigation items to prevent unnecessary re-renders
   const navItems = React.useMemo(() => [
@@ -50,10 +62,9 @@ export function NavBarComponent() {
   // Memoize the right section to prevent unnecessary re-renders
   const rightSection = React.useMemo(() => (
     <div className="flex items-center gap-2">
-      {user && <NotificationBell />}
       <UserMenu />
     </div>
-  ), [user]);
+  ), []);
 
   return (
     <>

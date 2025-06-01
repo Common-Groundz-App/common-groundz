@@ -11,46 +11,48 @@ import Footer from '@/components/Footer';
 import NavBarComponent from '@/components/NavBarComponent';
 
 const Index = () => {
+  const renderCount = React.useRef(0);
+  
+  // Increment render count for debugging
+  renderCount.current++;
+  console.log(`📄 [Index] Render #${renderCount.current}`);
+
   const { user, isLoading } = useAuth();
 
-  // Simple memoization to prevent unnecessary re-calculations
-  const routingDecision = React.useMemo(() => {
-    if (isLoading) {
-      return { type: 'loading' };
-    }
+  console.log(`📄 [Index] Auth state - isLoading: ${isLoading}, hasUser: ${!!user}`);
 
-    if (user) {
-      console.log('🔄 [Index] Authenticated user detected, redirecting to /home');
-      return { type: 'redirect' };
-    }
-
-    console.log('🎨 [Index] Rendering landing page');
-    return { type: 'landing' };
-  }, [isLoading, user]);
-
-  // Handle routing decisions
-  switch (routingDecision.type) {
-    case 'loading':
-      return <LoadingSpinner size="lg" text="Loading..." className="min-h-screen flex items-center justify-center" />;
-    
-    case 'redirect':
-      return <Navigate to="/home" replace />;
-    
-    case 'landing':
-    default:
-      return (
-        <div className="min-h-screen">
-          <NavBarComponent />
-          <main>
-            <HeroSection />
-            <FeaturesSection />
-            <TestimonialsSection />
-            <CTASection />
-          </main>
-          <Footer />
-        </div>
-      );
+  // Show loading state
+  if (isLoading) {
+    console.log('📄 [Index] Showing loading state');
+    return (
+      <LoadingSpinner 
+        size="lg" 
+        text="Loading..." 
+        className="min-h-screen flex items-center justify-center" 
+      />
+    );
   }
+
+  // Redirect authenticated users
+  if (user) {
+    console.log('🔄 [Index] User authenticated, redirecting to /home');
+    return <Navigate to="/home" replace />;
+  }
+
+  // Show landing page
+  console.log('🎨 [Index] Rendering landing page');
+  return (
+    <div className="min-h-screen">
+      <NavBarComponent />
+      <main>
+        <HeroSection />
+        <FeaturesSection />
+        <TestimonialsSection />
+        <CTASection />
+      </main>
+      <Footer />
+    </div>
+  );
 };
 
 export default Index;

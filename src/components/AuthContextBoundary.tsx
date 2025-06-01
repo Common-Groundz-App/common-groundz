@@ -19,7 +19,7 @@ class AuthContextBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: Error): AuthContextBoundaryState {
-    console.error('🚨 [AuthContextBoundary] Caught auth context error:', error);
+    console.error('🚨 [AuthContextBoundary] Caught error:', error.message);
     
     // Check if it's the specific auth context error
     if (error.message.includes('useAuth must be used within an AuthProvider')) {
@@ -31,19 +31,19 @@ class AuthContextBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('🚨 [AuthContextBoundary] Auth context error details:', error, errorInfo);
+    console.error('🚨 [AuthContextBoundary] Error details:', error.message);
     
     // Only handle auth context errors
     if (error.message.includes('useAuth must be used within an AuthProvider')) {
       // Auto-retry after a short delay
-      if (this.state.retryCount < 3) {
+      if (this.state.retryCount < 2) {
         this.retryTimer = setTimeout(() => {
-          console.log('🔄 [AuthContextBoundary] Retrying auth context initialization...');
+          console.log('🔄 [AuthContextBoundary] Retrying...');
           this.setState(prevState => ({
             hasError: false,
             retryCount: prevState.retryCount + 1
           }));
-        }, 100 * (this.state.retryCount + 1)); // Exponential backoff
+        }, 500 * (this.state.retryCount + 1));
       }
     }
   }
@@ -56,13 +56,12 @@ class AuthContextBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
-      if (this.state.retryCount >= 3) {
-        // If we've retried too many times, show an error
+      if (this.state.retryCount >= 2) {
         return (
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
               <h1 className="text-2xl font-bold text-red-600 mb-4">Authentication Error</h1>
-              <p className="text-gray-600 mb-4">Unable to initialize authentication system</p>
+              <p className="text-gray-600 mb-4">Unable to initialize authentication</p>
               <button 
                 onClick={() => window.location.reload()}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -74,10 +73,9 @@ class AuthContextBoundary extends React.Component<
         );
       }
 
-      // Show loading while retrying
       return (
         <div className="min-h-screen flex items-center justify-center">
-          <LoadingSpinner size="lg" text="Initializing authentication..." />
+          <LoadingSpinner size="lg" text="Initializing..." />
         </div>
       );
     }

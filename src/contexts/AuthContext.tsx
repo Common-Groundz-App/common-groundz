@@ -7,65 +7,66 @@ import { AuthContextType } from '@/types/auth';
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const renderCount = React.useRef(0);
+  renderCount.current++;
+  
   const [user, setUser] = React.useState<User | null>(null);
   const [session, setSession] = React.useState<Session | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [initStartTime] = React.useState(Date.now());
+
+  console.log(`🔑 [AuthContext] Render #${renderCount.current} - isLoading: ${isLoading}, hasUser: ${!!user}`);
 
   React.useEffect(() => {
     let mounted = true;
+    let hasInitialized = false;
     
-    console.log('🔧 [AuthContext] Starting auth initialization...');
+    console.log('🔧 [AuthContext] Setting up auth listener...');
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        const timestamp = new Date().toISOString();
+        console.log(`🔄 [AuthContext] Auth event: ${event}, hasUser: ${!!currentSession?.user}, mounted: ${mounted}`);
         
-        console.log(`🔄 [${timestamp}] Auth state changed:`, {
-          event,
-          hasUser: !!currentSession?.user,
-          userId: currentSession?.user?.id || 'none',
-          email: currentSession?.user?.email || 'none',
-          mounted
-        });
-        
-        if (mounted) {
+        if (mounted && !hasInitialized) {
+          hasInitialized = true;
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
           setIsLoading(false);
+          console.log('✅ [AuthContext] Initial auth state set');
+        } else if (mounted && hasInitialized) {
+          // Only update if this is a subsequent change
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
         }
       }
     );
 
-    // Check for existing session
+    // Check for existing session - but only once
     const getInitialSession = async () => {
+      if (hasInitialized) return;
+      
       try {
-        console.log('📋 [AuthContext] Checking for existing session...');
+        console.log('📋 [AuthContext] Checking initial session...');
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('❌ [AuthContext] Error getting session:', error);
+          console.error('❌ [AuthContext] Session error:', error);
           if (mounted) {
             setIsLoading(false);
           }
           return;
         }
 
-        console.log(`📋 [AuthContext] Initial session check:`, {
-          hasSession: !!data.session,
-          hasUser: !!data.session?.user,
-          userId: data.session?.user?.id || 'none',
-          email: data.session?.user?.email || 'none'
-        });
+        console.log(`📋 [AuthContext] Initial session: ${!!data.session}`);
         
-        if (mounted) {
+        if (mounted && !hasInitialized) {
+          hasInitialized = true;
           setSession(data.session);
           setUser(data.session?.user ?? null);
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('❌ [AuthContext] Error setting up auth:', error);
+        console.error('❌ [AuthContext] Setup error:', error);
         if (mounted) {
           setIsLoading(false);
         }
@@ -74,23 +75,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getInitialSession();
 
-    // Cleanup function
     return () => {
       mounted = false;
-      console.log('🧹 [AuthContext] Cleaning up auth subscription');
+      console.log('🧹 [AuthContext] Cleaning up subscription');
       subscription.unsubscribe();
     };
-  }, []); // Empty dependency array to prevent re-runs
-
-  // Log context state changes (but don't use this in useEffect dependencies)
-  React.useEffect(() => {
-    const timeSinceInit = Date.now() - initStartTime;
-    console.log(`📊 [AuthContext] State update (+${timeSinceInit}ms):`, {
-      isLoading,
-      hasUser: !!user,
-      hasSession: !!session
-    });
-  }, [isLoading, user, session]);
+  }, []); // No dependencies to prevent re-runs
 
   const signIn = React.useCallback(async (email: string, password: string) => {
     try {
@@ -138,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error };
       }
       
-      console.log('✅ Sign out successful - auth state will be cleared by onAuthStateChange');
+      console.log('✅ Sign out successful');
       return { error: null };
     } catch (error) {
       console.error('❌ Error during sign out:', error);
