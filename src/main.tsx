@@ -5,6 +5,7 @@ import App from './App.tsx';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
+import AuthContextBoundary from '@/components/AuthContextBoundary';
 import { initializeStorageService } from '@/services/storageService';
 import './index.css';
 
@@ -19,12 +20,14 @@ const root = createRoot(rootElement);
 
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      <PreferencesProvider>
-        <LocationProvider>
-          <App />
-        </LocationProvider>
-      </PreferencesProvider>
-    </AuthProvider>
+    <AuthContextBoundary>
+      <AuthProvider>
+        <PreferencesProvider>
+          <LocationProvider>
+            <App />
+          </LocationProvider>
+        </PreferencesProvider>
+      </AuthProvider>
+    </AuthContextBoundary>
   </React.StrictMode>
 );

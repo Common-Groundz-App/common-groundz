@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,24 +17,47 @@ interface PreferencesContextType {
 const PreferencesContext = createContext<PreferencesContextType | undefined>(undefined);
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const { toast } = useToast();
   const [preferences, setPreferences] = useState<any>({});
   const [isLoading, setIsLoading] = useState(true);
   const [shouldShowOnboarding, setShouldShowOnboarding] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const { toast } = useToast();
+
+  // Get auth context safely with error handling
+  let user = null;
+  let authIsLoading = true;
+  
+  try {
+    const auth = useAuth();
+    user = auth.user;
+    authIsLoading = auth.isLoading;
+  } catch (error) {
+    console.warn('⚠️ [PreferencesProvider] Auth context not ready yet, will retry...', error);
+    // Auth context not ready yet, keep defaults
+  }
 
   // Calculate if the user has any meaningful preferences set
   const hasPreferences = Object.keys(preferences || {}).length > 0;
 
+  // Track when auth is ready
+  useEffect(() => {
+    if (!authIsLoading) {
+      setAuthReady(true);
+    }
+  }, [authIsLoading]);
+
   useEffect(() => {
     const fetchPreferences = async () => {
-      if (!user) {
+      // Only proceed if auth is ready and we have a user
+      if (!authReady || !user) {
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
       try {
+        console.log('📋 [PreferencesProvider] Fetching preferences for user:', user.id);
+        
         const { data, error } = await supabase
           .from('profiles')
           .select('preferences')
@@ -43,7 +65,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
           .single();
 
         if (error) {
-          console.error('Error fetching preferences:', error);
+          console.error('❌ [PreferencesProvider] Error fetching preferences:', error);
           return;
         }
 
@@ -55,14 +77,14 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
           setShouldShowOnboarding(true);
         }
       } catch (err) {
-        console.error('Error in fetchPreferences:', err);
+        console.error('❌ [PreferencesProvider] Error in fetchPreferences:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchPreferences();
-  }, [user]);
+  }, [authReady, user?.id]); // Only depend on authReady and user.id
 
   const updatePreferences = async (newPreferences: any) => {
     if (!user) return false;
@@ -86,7 +108,6 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     }
   };
   
-  // Add a specific function to reset preferences
   const resetPreferences = async () => {
     if (!user) return false;
     

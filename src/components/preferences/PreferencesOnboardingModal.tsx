@@ -8,11 +8,34 @@ import { useAuth } from '@/contexts/AuthContext';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 
 const PreferencesOnboardingModal = () => {
-  const { user } = useAuth();
-  const { shouldShowOnboarding, setShouldShowOnboarding, hasPreferences } = usePreferences();
   const [openModal, setOpenModal] = React.useState(false);
   const [showForm, setShowForm] = React.useState(false);
   const [showExitConfirmation, setShowExitConfirmation] = React.useState(false);
+
+  // Get auth context safely
+  let user = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+  } catch (error) {
+    console.warn('⚠️ [PreferencesOnboardingModal] Auth context not ready, skipping modal');
+    return null;
+  }
+
+  // Get preferences context safely
+  let shouldShowOnboarding = false;
+  let hasPreferences = false;
+  let setShouldShowOnboarding = () => {};
+
+  try {
+    const preferences = usePreferences();
+    shouldShowOnboarding = preferences.shouldShowOnboarding;
+    hasPreferences = preferences.hasPreferences;
+    setShouldShowOnboarding = preferences.setShouldShowOnboarding;
+  } catch (error) {
+    console.warn('⚠️ [PreferencesOnboardingModal] Preferences context not ready, skipping modal');
+    return null;
+  }
 
   useEffect(() => {
     // Only show when logged in, preferences are empty, and onboarding flag is true
