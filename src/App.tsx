@@ -7,14 +7,14 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ContentViewerProvider } from '@/contexts/ContentViewerContext';
 import AuthErrorBoundary from '@/components/AuthErrorBoundary';
 import AuthInitializer from '@/components/AuthInitializer';
-import SimpleLandingPage from '@/components/SimpleLandingPage';
+import Index from '@/pages/Index';
 import SimpleDashboard from '@/components/SimpleDashboard';
 
 // Create a client
 const queryClient = new QueryClient();
 
 function App() {
-  console.log('🏗️ [App] Rendering - Phase 2+3 with AuthInitializer and simple routing');
+  console.log('🏗️ [App] Rendering - Phase 4.1 with Index component and safeguards');
   
   return (
     <QueryClientProvider client={queryClient}>
@@ -24,7 +24,7 @@ function App() {
             <Router>
               <AuthInitializer>
                 <Routes>
-                  <Route path="/" element={<SimpleLandingPage />} />
+                  <Route path="/" element={<Index />} />
                   <Route path="/home" element={<SimpleDashboard />} />
                 </Routes>
               </AuthInitializer>
