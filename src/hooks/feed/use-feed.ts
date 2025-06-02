@@ -14,59 +14,39 @@ export const useFeed = (feedType: FeedVisibility) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [state, setState] = useState<FeedState>({
-    items: [],
-    isLoading: true,
-    error: null,
-    hasMore: false,
-    page: 0,
-    isLoadingMore: false
-  });
+  const [page, setPage] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Use React Query to fetch the feed data - removed page from query key
+  // Use React Query to fetch the feed data with proper key management
   const { 
     data: feedData,
     error: feedError,
     isLoading: isFeedLoading,
-    refetch
+    refetch,
+    isRefetching
   } = useQuery({
-    queryKey: ['feed', feedType, user?.id],
+    queryKey: ['feed', feedType, user?.id, page],
     queryFn: async () => {
       const fetchFunction = feedType === 'for_you' ? fetchForYouFeed : fetchFollowingFeed;
       return await fetchFunction({ 
         userId: user?.id || '', 
-        page: state.page,
+        page,
         itemsPerPage: ITEMS_PER_PAGE
       });
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2, // 2 minutes
+    gcTime: 1000 * 60 * 5, // 5 minutes (was cacheTime)
   });
 
-  // Update state when data changes
-  useEffect(() => {
-    if (feedData) {
-      setState(prev => ({
-        ...prev,
-        items: prev.page === 0 ? feedData.items : [...prev.items, ...feedData.items],
-        hasMore: feedData.hasMore,
-        isLoading: false,
-        isLoadingMore: false,
-        error: null
-      }));
-    }
-  }, [feedData]);
+  // Combine items from all pages
+  const allItems = feedData?.items || [];
+  const hasMore = feedData?.hasMore || false;
 
   // Handle errors
   useEffect(() => {
     if (feedError) {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        isLoadingMore: false,
-        error: feedError instanceof Error ? feedError : new Error('Failed to fetch feed')
-      }));
-      
+      console.error('Feed error:', feedError);
       toast({
         title: 'Feed Error',
         description: feedError instanceof Error ? feedError.message : 'Failed to load feed items',
@@ -76,35 +56,61 @@ export const useFeed = (feedType: FeedVisibility) => {
   }, [feedError, toast]);
 
   // Load more data
-  const loadMore = useCallback(() => {
-    if (state.isLoadingMore || !state.hasMore) return;
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore || isFeedLoading) return;
     
-    setState(prev => ({ 
-      ...prev, 
-      page: prev.page + 1,
-      isLoadingMore: true 
-    }));
-  }, [state.isLoadingMore, state.hasMore]);
+    setIsLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const fetchFunction = feedType === 'for_you' ? fetchForYouFeed : fetchFollowingFeed;
+      const newData = await fetchFunction({ 
+        userId: user?.id || '', 
+        page: nextPage,
+        itemsPerPage: ITEMS_PER_PAGE
+      });
+      
+      // Update cache with combined data
+      queryClient.setQueryData(['feed', feedType, user?.id, nextPage], newData);
+      setPage(nextPage);
+    } catch (error) {
+      console.error('Error loading more:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load more items',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, hasMore, isFeedLoading, page, feedType, user?.id, queryClient, toast]);
 
-  // Refresh feed - fixed to properly reset state and invalidate cache
+  // Refresh feed - simplified and more reliable
   const refreshFeed = useCallback(async () => {
-    // Reset state to initial values
-    setState(prev => ({ 
-      ...prev, 
-      page: 0,
-      items: [],
-      isLoading: true,
-      error: null
-    }));
+    try {
+      // Reset to first page
+      setPage(0);
+      
+      // Invalidate all pages of this feed
+      await queryClient.invalidateQueries({
+        queryKey: ['feed', feedType, user?.id]
+      });
 
-    // Invalidate the query cache to force fresh data
-    await queryClient.invalidateQueries({
-      queryKey: ['feed', feedType, user?.id]
-    });
+      // Force refetch with timeout fallback
+      const refreshPromise = refetch();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Refresh timeout')), 10000)
+      );
 
-    // Refetch the data
-    await refetch();
-  }, [queryClient, feedType, user?.id, refetch]);
+      await Promise.race([refreshPromise, timeoutPromise]);
+    } catch (error) {
+      console.error('Error refreshing feed:', error);
+      toast({
+        title: 'Refresh Error',
+        description: 'Failed to refresh feed. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  }, [queryClient, feedType, user?.id, refetch, toast]);
 
   const { handleLike: interactionLike, handleSave: interactionSave } = useInteractions();
 
@@ -119,26 +125,29 @@ export const useFeed = (feedType: FeedVisibility) => {
     }
 
     try {
-      const item = state.items.find(r => r.id === id);
+      const item = allItems.find(r => r.id === id);
       if (!item) return;
       
       const itemType = isItemPost(item) ? 'post' : 'recommendation';
 
-      // Optimistically update UI
-      setState(prev => ({
-        ...prev,
-        items: prev.items.map(item => {
-          if (item.id === id) {
-            const isLiked = !item.is_liked;
-            return {
-              ...item,
-              is_liked: isLiked,
-              likes: (item.likes || 0) + (isLiked ? 1 : -1)
-            };
-          }
-          return item;
-        })
-      }));
+      // Optimistically update cache
+      queryClient.setQueryData(['feed', feedType, user?.id, page], (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          items: oldData.items.map((item: any) => {
+            if (item.id === id) {
+              const isLiked = !item.is_liked;
+              return {
+                ...item,
+                is_liked: isLiked,
+                likes: (item.likes || 0) + (isLiked ? 1 : -1)
+              };
+            }
+            return item;
+          })
+        };
+      });
 
       await toggleFeedItemLike(item, user.id);
     } catch (err) {
@@ -150,20 +159,9 @@ export const useFeed = (feedType: FeedVisibility) => {
       });
       
       // Revert optimistic update on error
-      setState(prev => ({
-        ...prev,
-        items: prev.items.map(item => {
-          if (item.id === id) {
-            const isLiked = !item.is_liked;
-            return {
-              ...item,
-              is_liked: !isLiked,
-              likes: (item.likes || 0) + (isLiked ? -1 : 1)
-            };
-          }
-          return item;
-        })
-      }));
+      queryClient.invalidateQueries({
+        queryKey: ['feed', feedType, user?.id, page]
+      });
     }
   };
 
@@ -178,24 +176,27 @@ export const useFeed = (feedType: FeedVisibility) => {
     }
 
     try {
-      const item = state.items.find(r => r.id === id);
+      const item = allItems.find(r => r.id === id);
       if (!item) return;
       
       const itemType = isItemPost(item) ? 'post' : 'recommendation';
 
-      // Optimistically update UI
-      setState(prev => ({
-        ...prev,
-        items: prev.items.map(item => {
-          if (item.id === id) {
-            return {
-              ...item,
-              is_saved: !item.is_saved
-            };
-          }
-          return item;
-        })
-      }));
+      // Optimistically update cache
+      queryClient.setQueryData(['feed', feedType, user?.id, page], (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          items: oldData.items.map((item: any) => {
+            if (item.id === id) {
+              return {
+                ...item,
+                is_saved: !item.is_saved
+              };
+            }
+            return item;
+          })
+        };
+      });
 
       await toggleFeedItemSave(item, user.id);
     } catch (err) {
@@ -207,28 +208,24 @@ export const useFeed = (feedType: FeedVisibility) => {
       });
       
       // Revert optimistic update on error
-      setState(prev => ({
-        ...prev,
-        items: prev.items.map(item => {
-          if (item.id === id) {
-            return {
-              ...item,
-              is_saved: !item.is_saved
-            };
-          }
-          return item;
-        })
-      }));
+      queryClient.invalidateQueries({
+        queryKey: ['feed', feedType, user?.id, page]
+      });
     }
   };
 
   const handleDelete = useCallback(async (id: string) => {
-    setState(prev => ({
-      ...prev,
-      items: prev.items.filter(item => item.id !== id)
-    }));
-  }, []);
+    // Update cache to remove deleted item
+    queryClient.setQueryData(['feed', feedType, user?.id, page], (oldData: any) => {
+      if (!oldData) return oldData;
+      return {
+        ...oldData,
+        items: oldData.items.filter((item: any) => item.id !== id)
+      };
+    });
+  }, [queryClient, feedType, user?.id, page]);
 
+  // Global refresh event listener
   useEffect(() => {
     const handleGlobalRefresh = () => {
       console.log(`Refreshing ${feedType} feed due to global event`);
@@ -243,8 +240,11 @@ export const useFeed = (feedType: FeedVisibility) => {
   }, [refreshFeed, feedType]);
 
   return {
-    ...state,
-    isLoading: state.isLoading || isFeedLoading,
+    items: allItems,
+    isLoading: isFeedLoading || isRefetching,
+    error: feedError,
+    hasMore,
+    isLoadingMore,
     loadMore,
     refreshFeed,
     handleLike,

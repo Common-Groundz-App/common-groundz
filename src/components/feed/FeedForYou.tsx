@@ -10,7 +10,6 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface FeedForYouProps {
   refreshing?: boolean;
@@ -75,6 +74,11 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
     }
   }, [refreshing, refreshFeed]);
 
+  // Show loading skeleton only for initial load or when explicitly refreshing
+  if (feedLoading && items.length === 0) {
+    return <FeedSkeleton />;
+  }
+
   return (
     <div className="space-y-6">
       {error ? (
@@ -93,9 +97,7 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
             </Button>
           </AlertDescription>
         </Alert>
-      ) : feedLoading ? (
-        <FeedSkeleton />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !feedLoading ? (
         <FeedEmptyState />
       ) : (
         <>

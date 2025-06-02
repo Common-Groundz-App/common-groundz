@@ -74,6 +74,11 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
     }
   }, [refreshing, refreshFeed]);
 
+  // Show loading skeleton only for initial load or when explicitly refreshing
+  if (feedLoading && items.length === 0) {
+    return <FeedSkeleton />;
+  }
+
   return (
     <div className="space-y-6">
       {error ? (
@@ -92,9 +97,7 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
             </Button>
           </AlertDescription>
         </Alert>
-      ) : feedLoading ? (
-        <FeedSkeleton />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !feedLoading ? (
         <Card className="border-dashed">
           <CardContent className="text-center py-12 flex flex-col items-center">
             <div className="mb-4 p-4 bg-muted rounded-full">

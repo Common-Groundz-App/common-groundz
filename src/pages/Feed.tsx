@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -13,8 +14,8 @@ import { Bell, Search, ChevronDown, ArrowUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { checkForNewContent, getLastRefreshTime, setLastRefreshTime, NewContentCheckResult } from '@/services/feedContentService';
 
 const Feed = React.memo(() => {
   const { user, isLoading } = useAuth();
@@ -58,21 +59,23 @@ const Feed = React.memo(() => {
   const [pullIntent, setPullIntent] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [startY, setStartY] = useState(0);
-  const [newContentAvailable, setNewContentAvailable] = useState(false);
   
-  // Add missing state variables
+  // New content detection state
+  const [newContentAvailable, setNewContentAvailable] = useState(false);
+  const [newPostCount, setNewPostCount] = useState(0);
   const [hasScrolledDown, setHasScrolledDown] = useState(false);
   const [showNewPosts, setShowNewPosts] = useState(false);
-  const [newPostCount, setNewPostCount] = useState(0);
-
+  
   // Add missing refs
   const lastScrollTop = useRef(0);
   const frameId = useRef(0);
   const lastUpdateTime = useRef(0);
+  const contentCheckInterval = useRef<NodeJS.Timeout>();
   
   // Add missing constants
   const pullThreshold = 80;
   const startThreshold = 10;
+  const contentCheckIntervalMs = 3 * 60 * 1000; // 3 minutes
   
   const getInitialActiveTab = () => {
     if (location.pathname === '/home' || location.pathname === '/feed') {
@@ -81,13 +84,48 @@ const Feed = React.memo(() => {
     return 'Home';
   };
 
-  // Check for scroll direction
+  // Real content detection function
+  const checkForNewContentPeriodically = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const lastRefreshTime = getLastRefreshTime(activeTab, user.id);
+      const result = await checkForNewContent(activeTab as 'for_you' | 'following', user.id, lastRefreshTime);
+      
+      if (result.hasNewContent && !newContentAvailable) {
+        setNewContentAvailable(true);
+        setNewPostCount(result.newItemCount);
+        console.log(`🆕 Found ${result.newItemCount} new items for ${activeTab} feed`);
+      }
+    } catch (error) {
+      console.error('Error checking for new content:', error);
+    }
+  }, [user, activeTab, newContentAvailable]);
+
+  // Set up periodic content checking
+  useEffect(() => {
+    if (!user) return;
+    
+    // Check immediately
+    checkForNewContentPeriodically();
+    
+    // Set up interval
+    contentCheckInterval.current = setInterval(checkForNewContentPeriodically, contentCheckIntervalMs);
+    
+    return () => {
+      if (contentCheckInterval.current) {
+        clearInterval(contentCheckInterval.current);
+      }
+    };
+  }, [user, activeTab, checkForNewContentPeriodically]);
+
+  // Check for scroll direction and show/hide new posts button
   useEffect(() => {
     const handleScroll = () => {
       const st = window.scrollY;
       
       // Detect if user has scrolled down at all
-      if (st > 50) {
+      if (st > 100) {
         setHasScrolledDown(true);
       }
       
@@ -96,6 +134,11 @@ const Feed = React.memo(() => {
         setShowNewPosts(true);
       } else if (st > lastScrollTop.current + 50) {
         // Hide when scrolling down significantly
+        setShowNewPosts(false);
+      }
+      
+      // Hide when at top
+      if (st <= 50) {
         setShowNewPosts(false);
       }
       
@@ -108,25 +151,6 @@ const Feed = React.memo(() => {
     };
   }, [newContentAvailable, hasScrolledDown]);
 
-  const checkForNewContent = useCallback(() => {
-    // In a real implementation, this would check the API for new content
-    // For now, we'll simulate new content being available randomly
-    const hasNewContent = Math.random() > 0.5;
-    if (hasNewContent && !newContentAvailable) {
-      setNewContentAvailable(true);
-      setNewPostCount(Math.floor(Math.random() * 5) + 1); // Random number of new posts (1-5)
-    }
-  }, [newContentAvailable]);
-
-  // Set up automatic refresh interval
-  useEffect(() => {
-    const interval = setInterval(() => {
-      checkForNewContent();
-    }, 3 * 60 * 1000); // Check every 3 minutes
-    
-    return () => clearInterval(interval);
-  }, [checkForNewContent]);
-
   const handleRefresh = useCallback(() => {
     if (refreshing) return; // Prevent multiple refreshes
     
@@ -135,6 +159,12 @@ const Feed = React.memo(() => {
     setShowNewPosts(false);
     setNewPostCount(0);
     
+    // Update last refresh time
+    if (user) {
+      setLastRefreshTime(activeTab, user.id);
+    }
+    
+    // Trigger refresh event
     if (activeTab === "for-you") {
       const event = new CustomEvent('refresh-for-you-feed');
       window.dispatchEvent(event);
@@ -148,13 +178,13 @@ const Feed = React.memo(() => {
       navigator.vibrate(50);
     }
     
-    // Simulate network delay
+    // Auto-hide refreshing state after reasonable time
     setTimeout(() => {
       setRefreshing(false);
       // Scroll to top after refresh
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 1000);
-  }, [activeTab, refreshing]);
+    }, 2000);
+  }, [activeTab, refreshing, user]);
   
   // Check if we're at the top of the window
   const isScrollAtTop = useCallback(() => {
@@ -250,6 +280,11 @@ const Feed = React.memo(() => {
   };
 
   const handlePostCreated = () => {
+    // Reset new content state and refresh
+    setNewContentAvailable(false);
+    setShowNewPosts(false);
+    setNewPostCount(0);
+    
     if (activeTab === "for-you") {
       const event = new CustomEvent('refresh-for-you-feed');
       window.dispatchEvent(event);
@@ -258,6 +293,15 @@ const Feed = React.memo(() => {
       window.dispatchEvent(event);
     }
   };
+
+  // Handle tab change - reset new content state
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    setNewContentAvailable(false);
+    setShowNewPosts(false);
+    setNewPostCount(0);
+    setHasScrolledDown(false);
+  }, []);
 
   // Attach pull-to-refresh handlers at document level
   useEffect(() => {
@@ -282,21 +326,6 @@ const Feed = React.memo(() => {
       document.removeEventListener('mouseleave', handleTouchEnd);
     };
   }, [refreshing, isActive, startY, pullIntent, pullProgress]);
-  
-  // Handle tab change with memoization
-  const handleTabChange = useCallback((tab: string) => {
-    setActiveTab(tab);
-  }, []);
-  
-  // Reset the refreshing state after a delay
-  useEffect(() => {
-    if (refreshing) {
-      const timer = setTimeout(() => {
-        setRefreshing(false);
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [refreshing]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -408,7 +437,7 @@ const Feed = React.memo(() => {
               <div className="w-full">
                 <div className="flex items-center w-full text-muted-foreground bg-background border-b">
                   <div 
-                    onClick={() => setActiveTab("for-you")} 
+                    onClick={() => handleTabChange("for-you")} 
                     className={cn(
                       "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
                       activeTab === "for-you" ? "text-primary" : "hover:text-primary"
@@ -436,7 +465,7 @@ const Feed = React.memo(() => {
                   </div>
                   
                   <div 
-                    onClick={() => setActiveTab("following")} 
+                    onClick={() => handleTabChange("following")} 
                     className={cn(
                       "relative cursor-pointer font-semibold px-6 py-3 transition-colors w-1/2 text-center",
                       activeTab === "following" ? "text-primary" : "hover:text-primary"
@@ -481,7 +510,7 @@ const Feed = React.memo(() => {
                         whileTap={{ scale: 0.97 }}
                       >
                         <ArrowUp size={14} />
-                        <span>New Posts</span>
+                        <span>{newPostCount} New Post{newPostCount !== 1 ? 's' : ''}</span>
                       </motion.button>
                     </motion.div>
                   )}
