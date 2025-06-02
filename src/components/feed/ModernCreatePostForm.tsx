@@ -8,11 +8,7 @@ import { X, MapPin, Users, Globe, Lock, Image as ImageIcon, Smile, Hash, AtSign 
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { RichTextEditor } from '@/components/editor/RichTextEditor';
-import { MediaUploader } from '@/components/media/MediaUploader';
 import { TwitterStyleMediaPreview } from '@/components/feed/TwitterStyleMediaPreview';
-import { EntityTagSelector } from '@/components/feed/EntityTagSelector';
-import { LocationSearchInput } from '@/components/feed/LocationSearchInput';
 import {
   Select,
   SelectContent,
@@ -207,10 +203,6 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
     }
   };
 
-  const handleContentChange = (json: object, html: string) => {
-    setContent(html);
-  };
-
   const handleMediaRemove = (media: MediaItem) => {
     handleRemoveMedia(media.id);
   };
@@ -231,11 +223,11 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
 
         {/* Content Editor */}
         <div>
-          <RichTextEditor
-            content={content}
-            onChange={handleContentChange}
+          <Textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
             placeholder="What's on your mind?"
-            className="min-h-[120px]"
+            className="min-h-[120px] resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </div>
 
@@ -299,23 +291,17 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
         {/* Action Bar */}
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="flex items-center gap-2">
-            <MediaUploader onUpload={handleMediaUpload}>
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <ImageIcon className="h-5 w-5" />
-              </Button>
-            </MediaUploader>
+            <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <ImageIcon className="h-5 w-5" />
+            </Button>
             
-            <EntityTagSelector onEntitySelect={handleEntityTag}>
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <AtSign className="h-5 w-5" />
-              </Button>
-            </EntityTagSelector>
+            <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <AtSign className="h-5 w-5" />
+            </Button>
             
-            <LocationSearchInput onLocationSelect={handleLocationTag}>
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <MapPin className="h-5 w-5" />
-              </Button>
-            </LocationSearchInput>
+            <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <MapPin className="h-5 w-5" />
+            </Button>
           </div>
 
           <div className="flex items-center gap-3">

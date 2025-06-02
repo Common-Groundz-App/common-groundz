@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Plus } from 'lucide-react';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
-import CreatePostButton from '@/components/feed/CreatePostButton';
+import { CreatePostButton } from '@/components/feed/CreatePostButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { feedbackActions } from '@/services/feedbackService';
@@ -21,7 +22,11 @@ const Feed = () => {
       setIsRefreshing(true);
       
       // Trigger haptic and sound feedback for refresh
-      feedbackActions.refresh();
+      try {
+        feedbackActions.refresh();
+      } catch (error) {
+        console.error('Error triggering refresh feedback:', error);
+      }
       
       // Dispatch refresh events for both feed types
       window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));

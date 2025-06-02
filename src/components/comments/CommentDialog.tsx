@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -101,13 +102,22 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
     setIsSubmitting(true);
     try {
       const tableName = itemType === 'post' ? 'post_comments' : 'recommendation_comments';
-      const foreignKey = itemType === 'post' ? 'post_id' : 'recommendation_id';
       
-      const insertData = {
-        [foreignKey]: itemId,
-        user_id: user.id,
-        content: newComment.trim()
-      };
+      // Create the insert data with the correct structure for each table type
+      let insertData: any;
+      if (itemType === 'post') {
+        insertData = {
+          post_id: itemId,
+          user_id: user.id,
+          content: newComment.trim()
+        };
+      } else {
+        insertData = {
+          recommendation_id: itemId,
+          user_id: user.id,
+          content: newComment.trim()
+        };
+      }
 
       const { data, error } = await supabase
         .from(tableName)
