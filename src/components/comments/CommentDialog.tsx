@@ -54,34 +54,38 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
         const tableName = itemType === 'post' ? 'post_comments' : 'recommendation_comments';
         const columnName = itemType === 'post' ? 'post_id' : 'recommendation_id';
 
-        const { data, error } = await supabase
+        // First get comments
+        const { data: commentsData, error: commentsError } = await supabase
           .from(tableName)
-          .select(`
-            id,
-            content,
-            created_at,
-            user_id,
-            is_deleted,
-            users:user_id (
-              username,
-              user_metadata
-            )
-          `)
+          .select('id, content, created_at, user_id, is_deleted')
           .eq(columnName, itemId)
           .eq('is_deleted', false)
           .order('created_at', { ascending: true });
 
-        if (error) throw error;
+        if (commentsError) throw commentsError;
 
-        const enrichedComments: Comment[] = data.map((comment: any) => ({
-          id: comment.id,
-          content: comment.content,
-          created_at: comment.created_at,
-          user_id: comment.user_id,
-          username: comment.users?.user_metadata?.displayName || comment.users?.username || 'Anonymous',
-          avatar_url: comment.users?.user_metadata?.avatar_url,
-          is_deleted: comment.is_deleted
-        }));
+        // Then get user profiles for those comments
+        const userIds = commentsData?.map(comment => comment.user_id) || [];
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', userIds);
+
+        if (profilesError) throw profilesError;
+
+        // Combine the data
+        const enrichedComments: Comment[] = (commentsData || []).map((comment) => {
+          const profile = profilesData?.find(p => p.id === comment.user_id);
+          return {
+            id: comment.id,
+            content: comment.content,
+            created_at: comment.created_at,
+            user_id: comment.user_id,
+            username: profile?.username || 'Anonymous',
+            avatar_url: profile?.avatar_url || undefined,
+            is_deleted: comment.is_deleted
+          };
+        });
 
         setComments(enrichedComments);
       } catch (error) {
@@ -108,7 +112,7 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
     try {
       const tableName = itemType === 'post' ? 'post_comments' : 'recommendation_comments';
       
-      let insertData: any;
+      let insertData;
       if (itemType === 'post') {
         insertData = {
           user_id: user.id,
