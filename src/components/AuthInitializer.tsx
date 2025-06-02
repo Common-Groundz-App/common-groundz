@@ -10,8 +10,6 @@ interface AuthInitializerProps {
 const AuthInitializer: React.FC<AuthInitializerProps> = ({ children }) => {
   const { isLoading } = useAuth();
 
-  console.log('🚀 [AuthInitializer] Render - isLoading:', isLoading);
-
   // Show full-screen loading until auth is completely ready
   if (isLoading) {
     return (
@@ -23,8 +21,6 @@ const AuthInitializer: React.FC<AuthInitializerProps> = ({ children }) => {
       </div>
     );
   }
-
-  console.log('✅ [AuthInitializer] Auth ready, rendering app...');
   
   // Only render children when auth is fully initialized
   return <>{children}</>;

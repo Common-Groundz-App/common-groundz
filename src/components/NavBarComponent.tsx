@@ -13,11 +13,8 @@ export function NavBarComponent() {
   const [activeTab, setActiveTab] = React.useState('Home');
   const { user, isLoading } = useAuth();
 
-  console.log('🧭 [NavBarComponent] Rendering - isLoading:', isLoading, 'user:', user ? 'authenticated' : 'not authenticated');
-
-  // CRITICAL: Don't render complex nav logic until auth is ready
+  // Don't render complex nav logic until auth is ready
   if (isLoading) {
-    console.log('⏳ [NavBarComponent] Auth loading, showing minimal nav...');
     return (
       <div className="relative z-50 sticky top-0 h-16 bg-background border-b">
         <div className="flex items-center justify-center h-full">

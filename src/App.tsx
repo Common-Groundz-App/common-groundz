@@ -24,8 +24,6 @@ import NotFound from '@/pages/NotFound';
 const queryClient = new QueryClient();
 
 function App() {
-  console.log('🏗️ [App] Rendering - Phase 6.4 with all core routes restored');
-  
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
