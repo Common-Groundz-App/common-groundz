@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ContentViewerProvider } from '@/contexts/ContentViewerContext';
 import AuthErrorBoundary from '@/components/AuthErrorBoundary';
 import AuthInitializer from '@/components/AuthInitializer';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import Index from '@/pages/Index';
 import Feed from '@/pages/Feed';
 import Auth from '@/pages/Auth';
@@ -34,17 +35,61 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/home" element={<Feed />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/profile/:id" element={<Profile />} />
-                  <Route path="/explore" element={<Explore />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/search" element={<Search />} />
-                  <Route path="/search/:query" element={<Search />} />
-                  <Route path="/entity/:slug" element={<EntityDetail />} />
-                  <Route path="/post/:postId" element={<PostView />} />
-                  <Route path="/recommendations/:recommendationId" element={<RecommendationView />} />
-                  <Route path="/product-search/:query" element={<ProductSearch />} />
+                  <Route path="/home" element={
+                    <ProtectedRoute>
+                      <Feed />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile" element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile/:id" element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/explore" element={
+                    <ProtectedRoute>
+                      <Explore />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/settings" element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/search" element={
+                    <ProtectedRoute>
+                      <Search />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/search/:query" element={
+                    <ProtectedRoute>
+                      <Search />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/entity/:slug" element={
+                    <ProtectedRoute>
+                      <EntityDetail />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/post/:postId" element={
+                    <ProtectedRoute>
+                      <PostView />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/recommendations/:recommendationId" element={
+                    <ProtectedRoute>
+                      <RecommendationView />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/product-search/:query" element={
+                    <ProtectedRoute>
+                      <ProductSearch />
+                    </ProtectedRoute>
+                  } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </AuthInitializer>

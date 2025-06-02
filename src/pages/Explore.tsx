@@ -65,10 +65,6 @@ const Explore = () => {
   const getInitialActiveTab = () => {
     return 'Explore';
   };
-
-  if (!user) {
-    return <div>Loading...</div>;
-  };
   
   const tabItems = [
     {
