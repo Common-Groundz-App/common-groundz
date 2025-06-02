@@ -59,10 +59,10 @@ export function NavBarComponent() {
 
   const rightSection = React.useMemo(() => (
     <div className="flex items-center gap-2">
-      <NotificationBell />
+      {user && isProfilePage && <NotificationBell />}
       <UserMenu />
     </div>
-  ), []);
+  ), [user, isProfilePage]);
 
   return (
     <>
