@@ -3,6 +3,7 @@ import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { PreferencesProvider } from '@/contexts/PreferencesContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 import AuthContextBoundary from '@/components/AuthContextBoundary';
 import RenderProtection from '@/components/RenderProtection';
@@ -26,9 +27,11 @@ root.render(
   <RenderProtection maxRenders={30} timeWindow={2000}>
     <AuthContextBoundary>
       <AuthProvider>
-        <LocationProvider>
-          <App />
-        </LocationProvider>
+        <PreferencesProvider>
+          <LocationProvider>
+            <App />
+          </LocationProvider>
+        </PreferencesProvider>
       </AuthProvider>
     </AuthContextBoundary>
   </RenderProtection>
