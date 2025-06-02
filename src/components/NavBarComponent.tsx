@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Home, Search, User } from 'lucide-react';
 import { NavBar } from "@/components/ui/tubelight-navbar";
 import { UserMenu } from './UserMenu';
+import { NotificationBell } from './notifications/NotificationBell';
 import { useLocation } from 'react-router-dom';
 import { SearchDialog } from '@/components/SearchDialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,6 +59,7 @@ export function NavBarComponent() {
 
   const rightSection = React.useMemo(() => (
     <div className="flex items-center gap-2">
+      <NotificationBell />
       <UserMenu />
     </div>
   ), []);
