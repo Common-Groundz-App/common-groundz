@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -154,6 +153,9 @@ const Feed = React.memo(() => {
   const handleRefresh = useCallback(() => {
     if (refreshing) return; // Prevent multiple refreshes
     
+    // Immediately scroll to top when refresh is triggered
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
     setRefreshing(true);
     setNewContentAvailable(false);
     setShowNewPosts(false);
@@ -181,7 +183,7 @@ const Feed = React.memo(() => {
     // Auto-hide refreshing state after reasonable time
     setTimeout(() => {
       setRefreshing(false);
-      // Scroll to top after refresh
+      // Fallback scroll to top after refresh (in case immediate scroll didn't work)
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 2000);
   }, [activeTab, refreshing, user]);
@@ -510,7 +512,7 @@ const Feed = React.memo(() => {
                         whileTap={{ scale: 0.97 }}
                       >
                         <ArrowUp size={14} />
-                        <span>{newPostCount} New Post{newPostCount !== 1 ? 's' : ''}</span>
+                        <span>{newPostCount > 9 ? '9+' : newPostCount} New Post{(newPostCount > 9 || newPostCount !== 1) ? 's' : ''}</span>
                       </motion.button>
                     </motion.div>
                   )}
