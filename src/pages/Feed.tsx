@@ -1,11 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Plus } from 'lucide-react';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
-import { CreatePostButton } from '@/components/feed/CreatePostButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { feedbackActions } from '@/services/feedbackService';
@@ -53,6 +51,11 @@ const Feed = () => {
     };
   }, []);
 
+  const handleCreatePost = () => {
+    // Dispatch event to open the create post dialog
+    window.dispatchEvent(new CustomEvent('open-create-post-dialog'));
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto max-w-2xl px-4 py-6">
@@ -72,11 +75,9 @@ const Feed = () => {
               <RefreshCw className="h-4 w-4" />
             </Button>
             {user && (
-              <CreatePostButton>
-                <Button size="icon">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </CreatePostButton>
+              <Button size="icon" onClick={handleCreatePost}>
+                <Plus className="h-4 w-4" />
+              </Button>
             )}
           </div>
         </div>

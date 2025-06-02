@@ -24,12 +24,16 @@ interface ModernCreatePostFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   postToEdit?: PostFeedItem | null;
+  profileData?: any;
+  defaultPostType?: 'story' | 'journal' | 'watching';
 }
 
 export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
   onSuccess,
   onCancel,
-  postToEdit = null
+  postToEdit = null,
+  profileData,
+  defaultPostType = 'story'
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -101,7 +105,7 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
         visibility,
         media: media.length > 0 ? JSON.parse(JSON.stringify(media)) : null,
         tags: locationTags.length > 0 ? locationTags : null,
-        post_type: 'story' as const,
+        post_type: defaultPostType,
         status: 'published'
       };
 
@@ -212,7 +216,7 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
       <CardContent className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">
-            {isEditing ? 'Edit Post' : 'Create Post'}
+            {isEditing ? 'Edit Post' : `Create ${defaultPostType === 'journal' ? 'Journal Entry' : defaultPostType === 'watching' ? 'Currently Watching/Using' : 'Post'}`}
           </h3>
           {onCancel && (
             <Button variant="ghost" size="icon" onClick={onCancel}>
@@ -226,7 +230,13 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="What's on your mind?"
+            placeholder={
+              defaultPostType === 'journal' 
+                ? "What happened today? Share your thoughts..." 
+                : defaultPostType === 'watching' 
+                ? "What are you currently watching, reading, or using?" 
+                : "What's on your mind?"
+            }
             className="min-h-[120px] resize-none border-0 p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </div>

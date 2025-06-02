@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -56,32 +55,34 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
       const tableName = itemType === 'post' ? 'post_comments' : 'recommendation_comments';
       const foreignKey = itemType === 'post' ? 'post_id' : 'recommendation_id';
       
+      // Simplified query to avoid type instantiation issues
       const { data, error } = await supabase
         .from(tableName)
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id,
-          profiles:user_id (
-            username,
-            avatar_url
-          )
-        `)
+        .select('id, content, created_at, user_id')
         .eq(foreignKey, itemId)
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
 
-      const formattedComments = data?.map(comment => ({
-        id: comment.id,
-        content: comment.content,
-        created_at: comment.created_at,
-        user_id: comment.user_id,
-        username: (comment.profiles as any)?.username || 'Anonymous',
-        avatar_url: (comment.profiles as any)?.avatar_url
-      })) || [];
+      // Fetch profiles separately to avoid complex joins
+      const userIds = data?.map(comment => comment.user_id) || [];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds);
+
+      const formattedComments = data?.map(comment => {
+        const profile = profiles?.find(p => p.id === comment.user_id);
+        return {
+          id: comment.id,
+          content: comment.content,
+          created_at: comment.created_at,
+          user_id: comment.user_id,
+          username: profile?.username || 'Anonymous',
+          avatar_url: profile?.avatar_url
+        };
+      }) || [];
 
       setComments(formattedComments);
     } catch (error) {
@@ -122,12 +123,7 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
       const { data, error } = await supabase
         .from(tableName)
         .insert(insertData)
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id
-        `)
+        .select('id, content, created_at, user_id')
         .single();
 
       if (error) throw error;
