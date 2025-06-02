@@ -10,12 +10,13 @@ import AuthInitializer from '@/components/AuthInitializer';
 import Index from '@/pages/Index';
 import Feed from '@/pages/Feed';
 import Auth from '@/pages/Auth';
+import Profile from '@/pages/Profile';
 
 // Create a client
 const queryClient = new QueryClient();
 
 function App() {
-  console.log('🏗️ [App] Rendering - Phase 4.3 with Auth route added');
+  console.log('🏗️ [App] Rendering - Phase 6.1 with Profile route added');
   
   return (
     <QueryClientProvider client={queryClient}>
@@ -28,6 +29,8 @@ function App() {
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/home" element={<Feed />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/profile/:id" element={<Profile />} />
                 </Routes>
               </AuthInitializer>
             </Router>
