@@ -153,8 +153,12 @@ const Feed = React.memo(() => {
   const handleRefresh = useCallback(() => {
     if (refreshing) return; // Prevent multiple refreshes
     
-    // Immediately scroll to top when refresh is triggered
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Use requestAnimationFrame to ensure scroll happens after DOM updates
+    requestAnimationFrame(() => {
+      // Account for mobile header - scroll to 64px on mobile (pt-16 = 4rem = 64px) and 0 on desktop
+      const scrollTop = window.innerWidth < 1280 ? 64 : 0; // xl breakpoint is 1280px
+      window.scrollTo({ top: scrollTop, behavior: 'smooth' });
+    });
     
     setRefreshing(true);
     setNewContentAvailable(false);
@@ -183,8 +187,6 @@ const Feed = React.memo(() => {
     // Auto-hide refreshing state after reasonable time
     setTimeout(() => {
       setRefreshing(false);
-      // Fallback scroll to top after refresh (in case immediate scroll didn't work)
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 2000);
   }, [activeTab, refreshing, user]);
   
