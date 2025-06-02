@@ -20,17 +20,13 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
 
-  console.log('📰 [FeedForYou] Rendering - isLoading:', isLoading, 'user:', user ? 'authenticated' : 'not authenticated');
-
   // CRITICAL: Don't render feed logic until auth is ready
   if (isLoading) {
-    console.log('⏳ [FeedForYou] Auth loading, showing skeleton...');
     return <FeedSkeleton />;
   }
 
   // Don't render if no user
   if (!user) {
-    console.log('❌ [FeedForYou] No user, should not render');
     return (
       <div className="space-y-6">
         <div className="text-center py-12">
