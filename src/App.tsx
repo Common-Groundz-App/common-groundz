@@ -13,12 +13,18 @@ import Auth from '@/pages/Auth';
 import Profile from '@/pages/Profile';
 import Explore from '@/pages/Explore';
 import Settings from '@/pages/Settings';
+import Search from '@/pages/Search';
+import EntityDetail from '@/pages/EntityDetail';
+import PostView from '@/pages/PostView';
+import RecommendationView from '@/pages/RecommendationView';
+import ProductSearch from '@/pages/ProductSearch';
+import NotFound from '@/pages/NotFound';
 
 // Create a client
 const queryClient = new QueryClient();
 
 function App() {
-  console.log('🏗️ [App] Rendering - Phase 6.3 with Settings route added');
+  console.log('🏗️ [App] Rendering - Phase 6.4 with all core routes restored');
   
   return (
     <QueryClientProvider client={queryClient}>
@@ -35,6 +41,13 @@ function App() {
                   <Route path="/profile/:id" element={<Profile />} />
                   <Route path="/explore" element={<Explore />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/search" element={<Search />} />
+                  <Route path="/search/:query" element={<Search />} />
+                  <Route path="/entity/:slug" element={<EntityDetail />} />
+                  <Route path="/post/:postId" element={<PostView />} />
+                  <Route path="/recommendations/:recommendationId" element={<RecommendationView />} />
+                  <Route path="/product-search/:query" element={<ProductSearch />} />
+                  <Route path="*" element={<NotFound />} />
                 </Routes>
               </AuthInitializer>
             </Router>
