@@ -114,25 +114,3 @@ export const toggleSave = async (postId: string, userId: string): Promise<boolea
     throw error;
   }
 };
-
-/**
- * Delete a post by marking it as deleted
- * @param postId The ID of the post to delete
- * @returns Promise<void>
- */
-export const deletePost = async (postId: string): Promise<void> => {
-  try {
-    const { error } = await supabase
-      .from('posts')
-      .update({ is_deleted: true })
-      .eq('id', postId);
-
-    if (error) {
-      console.error('Error deleting post:', error);
-      throw error;
-    }
-  } catch (error) {
-    console.error('Error in deletePost:', error);
-    throw error;
-  }
-};

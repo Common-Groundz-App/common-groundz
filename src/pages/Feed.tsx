@@ -15,7 +15,6 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { checkForNewContent, getLastRefreshTime, setLastRefreshTime, NewContentCheckResult } from '@/services/feedContentService';
-import { feedbackActions } from '@/services/feedbackService';
 
 const Feed = React.memo(() => {
   const { user, isLoading } = useAuth();
@@ -154,9 +153,6 @@ const Feed = React.memo(() => {
   const handleRefresh = useCallback(() => {
     if (refreshing) return; // Prevent multiple refreshes
     
-    // Trigger feedback for refresh action
-    feedbackActions.refresh();
-    
     // Use requestAnimationFrame to ensure scroll happens after DOM updates
     requestAnimationFrame(() => {
       // Account for mobile header - scroll to 64px on mobile (pt-16 = 4rem = 64px) and 0 on desktop
@@ -183,17 +179,22 @@ const Feed = React.memo(() => {
       window.dispatchEvent(event);
     }
     
+    // Provide haptic feedback on supported devices
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+    
     // Auto-hide refreshing state after reasonable time
     setTimeout(() => {
       setRefreshing(false);
     }, 2000);
   }, [activeTab, refreshing, user]);
-
+  
   // Check if we're at the top of the window
   const isScrollAtTop = useCallback(() => {
     return window.scrollY <= 1;
   }, []);
-
+  
   // Throttle function to limit update frequency
   const throttlePullProgress = (progress: number) => {
     const now = Date.now();
@@ -202,7 +203,7 @@ const Feed = React.memo(() => {
       setPullProgress(progress);
     }
   };
-
+  
   // Handle touch/mouse start event with improved intent detection
   const handleTouchStart = (e: TouchEvent | MouseEvent) => {
     // Ignore if already refreshing
@@ -223,7 +224,7 @@ const Feed = React.memo(() => {
       }
     }
   };
-
+  
   // Handle touch/mouse move with animation frame for smoother updates
   const handleTouchMove = (e: TouchEvent | MouseEvent) => {
     // If not active or already refreshing, ignore
@@ -263,7 +264,7 @@ const Feed = React.memo(() => {
       setPullProgress(0);
     }
   };
-
+  
   const handleTouchEnd = () => {
     // Cancel any existing animation frame
     if (frameId.current) {
@@ -283,9 +284,6 @@ const Feed = React.memo(() => {
   };
 
   const handlePostCreated = () => {
-    // Trigger feedback for post creation
-    feedbackActions.post();
-    
     // Reset new content state and refresh
     setNewContentAvailable(false);
     setShowNewPosts(false);
