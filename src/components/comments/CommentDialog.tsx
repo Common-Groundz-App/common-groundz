@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -104,13 +103,15 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
       const tableName = itemType === 'post' ? 'post_comments' : 'recommendation_comments';
       const foreignKey = itemType === 'post' ? 'post_id' : 'recommendation_id';
       
+      const insertData = {
+        [foreignKey]: itemId,
+        user_id: user.id,
+        content: newComment.trim()
+      };
+
       const { data, error } = await supabase
         .from(tableName)
-        .insert({
-          [foreignKey]: itemId,
-          user_id: user.id,
-          content: newComment.trim()
-        })
+        .insert(insertData)
         .select(`
           id,
           content,

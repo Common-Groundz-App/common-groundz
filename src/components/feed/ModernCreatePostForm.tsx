@@ -84,9 +84,10 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
     setTaggedEntities(prev => prev.filter(e => e.id !== entityId));
   };
 
-  const handleLocationTag = (location: string) => {
-    if (!locationTags.includes(location)) {
-      setLocationTags(prev => [...prev, location]);
+  const handleLocationTag = (location: { name: string; address: string; placeId: string; coordinates: { lat: number; lng: number; }; }) => {
+    const locationName = location.name;
+    if (!locationTags.includes(locationName)) {
+      setLocationTags(prev => [...prev, locationName]);
     }
   };
 
@@ -102,7 +103,7 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
       const postData = {
         content: content.trim(),
         visibility,
-        media: media.length > 0 ? media : null,
+        media: media.length > 0 ? JSON.parse(JSON.stringify(media)) : null,
         tags: locationTags.length > 0 ? locationTags : null,
         post_type: 'story' as const,
         status: 'published'
@@ -206,6 +207,14 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
     }
   };
 
+  const handleContentChange = (json: object, html: string) => {
+    setContent(html);
+  };
+
+  const handleMediaRemove = (media: MediaItem) => {
+    handleRemoveMedia(media.id);
+  };
+
   return (
     <Card className="w-full">
       <CardContent className="p-6 space-y-4">
@@ -224,7 +233,7 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
         <div>
           <RichTextEditor
             content={content}
-            onChange={setContent}
+            onChange={handleContentChange}
             placeholder="What's on your mind?"
             className="min-h-[120px]"
           />
@@ -234,7 +243,7 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
         {media.length > 0 && (
           <TwitterStyleMediaPreview
             media={media}
-            onRemove={handleRemoveMedia}
+            onRemove={handleMediaRemove}
             className="rounded-lg"
           />
         )}
