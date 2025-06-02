@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { cn } from '@/lib/utils';
 import { feedbackActions } from '@/services/feedbackService';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface Comment {
   id: string;
@@ -107,13 +109,16 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
       const tableName = itemType === 'post' ? 'post_comments' : 'recommendation_comments';
       const columnName = itemType === 'post' ? 'post_id' : 'recommendation_id';
       
+      // Create the insert object with the correct column name
+      const insertData = {
+        user_id: user.id,
+        content: newComment.trim(),
+        [columnName]: itemId
+      };
+      
       const { data, error } = await supabase
         .from(tableName)
-        .insert({
-          [columnName]: itemId,
-          user_id: user.id,
-          content: newComment.trim(),
-        })
+        .insert(insertData)
         .select()
         .single();
 

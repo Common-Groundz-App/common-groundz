@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -64,6 +65,9 @@ const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   
   const isOwner = user?.id === post.user_id;
+
+  // Type guard to check if this is actually a post (not a recommendation)
+  const isPost = 'title' in post && 'content' in post;
 
   useEffect(() => {
     const getInitialCommentCount = async () => {
@@ -170,18 +174,23 @@ const PostFeedItem: React.FC<PostFeedItemProps> = ({
   };
 
   const handleLocationClick = () => {
-    if (post.location) {
+    if (isPost && 'location' in post && post.location) {
       window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location)}`, '_blank');
     }
   };
 
   const handleExternalLinkClick = () => {
-    if (post.content.startsWith('http://') || post.content.startsWith('https://')) {
+    if (isPost && 'content' in post && post.content && (post.content.startsWith('http://') || post.content.startsWith('https://'))) {
       window.open(post.content, '_blank');
     }
   };
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : post.comment_count;
+
+  // If this is not a post, don't render anything
+  if (!isPost) {
+    return null;
+  }
 
   return (
     <Card className="overflow-hidden">
@@ -202,7 +211,7 @@ const PostFeedItem: React.FC<PostFeedItemProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            {post.post_type && (
+            {'post_type' in post && post.post_type && (
               <Badge>{post.post_type}</Badge>
             )}
             
@@ -230,16 +239,18 @@ const PostFeedItem: React.FC<PostFeedItemProps> = ({
           </div>
         </div>
         
-        <h3 className="text-xl font-semibold mb-2">{post.title}</h3>
+        {'title' in post && post.title && (
+          <h3 className="text-xl font-semibold mb-2">{post.title}</h3>
+        )}
         
-        {post.location && (
+        {'location' in post && post.location && (
           <div className="mb-2 text-sm text-muted-foreground flex items-center gap-1 hover:underline cursor-pointer" onClick={handleLocationClick}>
             <MapPin size={16} className="inline-block mr-1" />
             {post.location}
           </div>
         )}
         
-        {post.content && (
+        {'content' in post && post.content && (
           <div className="text-muted-foreground mb-4">
             {post.content.startsWith('http://') || post.content.startsWith('https://') ? (
               <div className="flex items-center gap-1 hover:underline cursor-pointer" onClick={handleExternalLinkClick}>
@@ -254,11 +265,11 @@ const PostFeedItem: React.FC<PostFeedItemProps> = ({
           </div>
         )}
         
-        {post.media && post.media.length > 0 && (
+        {'media' in post && post.media && post.media.length > 0 && (
           <PostMediaDisplay media={post.media} />
         )}
         
-        {post.tagged_entities && post.tagged_entities.length > 0 && (
+        {'tagged_entities' in post && post.tagged_entities && post.tagged_entities.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {post.tagged_entities.map((entity: any) => (
               <EntityBadge key={entity.id} entity={entity} />
