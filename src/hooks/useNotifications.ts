@@ -5,14 +5,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 
 export function useNotifications(pollInterval = 10000) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [markingAsRead, setMarkingAsRead] = useState<boolean>(false);
   const [error, setError] = useState<any>(null);
 
   const fetchAll = useCallback(async () => {
-    if (!user) return;
+    // Don't fetch if user is not authenticated or still loading
+    if (!user || isLoading) return;
+    
     setLoading(true);
     try {
       const data = await fetchNotifications();
@@ -27,10 +29,10 @@ export function useNotifications(pollInterval = 10000) {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, isLoading]);
 
   const markAsRead = async (ids: string[]) => {
-    if (!user || !ids.length) return;
+    if (!user || !ids.length || isLoading) return;
     setMarkingAsRead(true);
     try {
       await markNotificationsAsRead(ids);
@@ -58,11 +60,13 @@ export function useNotifications(pollInterval = 10000) {
   const unreadCount = unreadNotifications.length;
 
   useEffect(() => {
+    // Only set up polling if user is authenticated and not loading
+    if (!user || isLoading) return;
+    
     fetchAll();
-    if (!user) return;
     const interval = setInterval(fetchAll, pollInterval);
     return () => clearInterval(interval);
-  }, [user, fetchAll, pollInterval]);
+  }, [user, isLoading, fetchAll, pollInterval]);
 
   return { 
     notifications, 

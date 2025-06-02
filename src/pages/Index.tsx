@@ -13,11 +13,8 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 const Index = () => {
   const { user, isLoading } = useAuth();
 
-  console.log('🏠 [Index] Rendering - isLoading:', isLoading, 'user:', user ? 'authenticated' : 'not authenticated');
-
   // CRITICAL: Don't do anything until auth is fully initialized
   if (isLoading) {
-    console.log('⏳ [Index] Auth still loading, showing spinner...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -30,11 +27,8 @@ const Index = () => {
 
   // Simple redirect logic - auth is already initialized by AuthInitializer
   if (user) {
-    console.log('🔀 [Index] User authenticated, redirecting to /home');
     return <Navigate to="/home" replace />;
   }
-
-  console.log('📄 [Index] Showing landing page');
   
   // Show landing page for unauthenticated users
   return (

@@ -1,9 +1,16 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 // Initialize storage service on application load
 export const initializeStorageService = async (): Promise<void> => {
   try {
-    console.log('Initializing enhanced storage service...');
+    // Check if user is authenticated before initializing
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      // Skip storage initialization for unauthenticated users
+      return;
+    }
     
     // Ensure required buckets exist and have proper policies
     await Promise.all([
@@ -13,8 +20,8 @@ export const initializeStorageService = async (): Promise<void> => {
       ensureBucketPolicies('enhanced-entity-data') // New bucket for enhanced data
     ]);
 
-    console.log('Enhanced storage service initialized successfully');
   } catch (error) {
+    // Silently handle errors for unauthenticated users
     console.error('Error initializing storage service:', error);
   }
 };
@@ -32,11 +39,8 @@ export const ensureBucketPolicies = async (bucketName: string): Promise<boolean>
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
-      console.warn(`No active session found for bucket policy setup. Bucket: ${bucketName}`);
       return false;
     }
-    
-    console.log(`Ensuring bucket policies for: ${bucketName}`);
     
     const { data, error } = await supabase.functions.invoke('ensure-bucket-policies', {
       body: { bucketName }
@@ -47,7 +51,6 @@ export const ensureBucketPolicies = async (bucketName: string): Promise<boolean>
       return false;
     }
     
-    console.log(`Successfully ensured policies for bucket ${bucketName}:`, data);
     return data?.success || false;
   } catch (error) {
     console.error(`Error calling ensure-bucket-policies function:`, error);
