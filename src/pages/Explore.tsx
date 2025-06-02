@@ -8,7 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
-import { cn } from '@/lib/utils';
 import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,7 +51,6 @@ const Explore = () => {
 
   const handleComplexProductSearch = () => {
     if (searchQuery.trim().length >= 2) {
-      console.log(`🎯 Redirecting to quick product search for: "${searchQuery}"`);
       const encodedQuery = encodeURIComponent(searchQuery.trim());
       navigate(`/search?q=${encodedQuery}&mode=quick`);
     }

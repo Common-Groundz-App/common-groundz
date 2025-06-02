@@ -6,7 +6,6 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '@/lib/utils';
 import { StarIcon } from 'lucide-react';
 import { isGooglePlacesImage } from '@/utils/imageUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
@@ -34,7 +33,6 @@ export const FeaturedEntities = () => {
           .limit(3);
         
         if (error) throw error;
-        console.log(`FeaturedEntities: Fetched ${data?.length || 0} featured entities`);
         
         // Check if any entities have Google Places images that might need refreshing
         const entitiesToUpdate = data?.filter(entity => 
@@ -45,8 +43,6 @@ export const FeaturedEntities = () => {
         );
         
         if (entitiesToUpdate && entitiesToUpdate.length > 0) {
-          console.log(`Found ${entitiesToUpdate.length} entities with Google Places images that may need refreshing`);
-          
           // Process one entity to avoid rate limiting
           const entityToRefresh = entitiesToUpdate[0];
           

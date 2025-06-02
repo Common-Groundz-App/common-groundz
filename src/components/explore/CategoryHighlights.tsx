@@ -1,11 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '@/lib/utils';
 import { StarIcon } from 'lucide-react';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 
@@ -48,7 +47,6 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
         const { data, error } = await query;
         
         if (error) throw error;
-        console.log(`CategoryHighlights: Fetched ${data?.length || 0} entities for type: ${entityType || 'all'}`);
         setEntities(data || []);
       } catch (error) {
         console.error('Error fetching entities:', error);

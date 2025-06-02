@@ -18,12 +18,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // Redirect to landing page if user is not authenticated
   if (!user) {
-    console.log("User not authenticated, redirecting to /");
     return <Navigate to="/" replace />;
   }
 
   // If user is authenticated, render the children
-  console.log("User authenticated, rendering protected content");
   return <>{children}</>;
 };
 
