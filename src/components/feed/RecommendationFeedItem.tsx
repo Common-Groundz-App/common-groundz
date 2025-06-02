@@ -28,6 +28,7 @@ import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { formatRelativeDate } from '@/utils/dateUtils';
+import { feedbackActions } from '@/services/feedbackService';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -132,6 +133,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   };
 
   const handleCommentAdded = () => {
+    // Trigger feedback for comment creation
+    feedbackActions.comment();
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
 
@@ -207,6 +210,10 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    
+    // Trigger feedback for like action
+    feedbackActions.like();
+    
     if (onLike) onLike(recommendation.id);
   };
   
@@ -215,6 +222,16 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsLightboxOpen(true);
+  };
+
+  const handleSave = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // Trigger feedback for save action
+    feedbackActions.save();
+    
+    if (onSave) onSave(recommendation.id);
   };
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
@@ -361,7 +378,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             "flex items-center gap-1",
             recommendation.is_saved && "text-brand-orange"
           )}
-          onClick={() => onSave && onSave(recommendation.id)}
+          onClick={handleSave}
         >
           <Bookmark 
             size={18} 
