@@ -175,13 +175,17 @@ const PostFeedItem: React.FC<PostFeedItemProps> = ({
 
   const handleLocationClick = () => {
     if (isPost && 'location' in post && post.location) {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location)}`, '_blank');
+      const location = String(post.location);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank');
     }
   };
 
   const handleExternalLinkClick = () => {
-    if (isPost && 'content' in post && post.content && (post.content.startsWith('http://') || post.content.startsWith('https://'))) {
-      window.open(post.content, '_blank');
+    if (isPost && 'content' in post && post.content) {
+      const content = String(post.content);
+      if (content.startsWith('http://') || content.startsWith('https://')) {
+        window.open(content, '_blank');
+      }
     }
   };
 
@@ -191,6 +195,13 @@ const PostFeedItem: React.FC<PostFeedItemProps> = ({
   if (!isPost) {
     return null;
   }
+
+  const postLocation = 'location' in post ? String(post.location || '') : '';
+  const postContent = 'content' in post ? String(post.content || '') : '';
+  const postTitle = 'title' in post ? String(post.title || '') : '';
+  const postType = 'post_type' in post ? String(post.post_type || '') : '';
+  const taggedEntities = 'tagged_entities' in post ? (post.tagged_entities as any[]) || [] : [];
+  const media = 'media' in post ? (post.media as any[]) || [] : [];
 
   return (
     <Card className="overflow-hidden">
@@ -211,8 +222,8 @@ const PostFeedItem: React.FC<PostFeedItemProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            {'post_type' in post && post.post_type && (
-              <Badge>{post.post_type}</Badge>
+            {postType && (
+              <Badge>{postType}</Badge>
             )}
             
             {isOwner && (
@@ -239,39 +250,39 @@ const PostFeedItem: React.FC<PostFeedItemProps> = ({
           </div>
         </div>
         
-        {'title' in post && post.title && (
-          <h3 className="text-xl font-semibold mb-2">{post.title}</h3>
+        {postTitle && (
+          <h3 className="text-xl font-semibold mb-2">{postTitle}</h3>
         )}
         
-        {'location' in post && post.location && (
+        {postLocation && (
           <div className="mb-2 text-sm text-muted-foreground flex items-center gap-1 hover:underline cursor-pointer" onClick={handleLocationClick}>
             <MapPin size={16} className="inline-block mr-1" />
-            {post.location}
+            {postLocation}
           </div>
         )}
         
-        {'content' in post && post.content && (
+        {postContent && (
           <div className="text-muted-foreground mb-4">
-            {post.content.startsWith('http://') || post.content.startsWith('https://') ? (
+            {postContent.startsWith('http://') || postContent.startsWith('https://') ? (
               <div className="flex items-center gap-1 hover:underline cursor-pointer" onClick={handleExternalLinkClick}>
                 <ExternalLink size={16} className="inline-block mr-1" />
-                <a href={post.content} target="_blank" rel="noopener noreferrer">
-                  {post.content}
+                <a href={postContent} target="_blank" rel="noopener noreferrer">
+                  {postContent}
                 </a>
               </div>
             ) : (
-              <p>{post.content}</p>
+              <p>{postContent}</p>
             )}
           </div>
         )}
         
-        {'media' in post && post.media && post.media.length > 0 && (
-          <PostMediaDisplay media={post.media} />
+        {media && media.length > 0 && (
+          <PostMediaDisplay media={media} />
         )}
         
-        {'tagged_entities' in post && post.tagged_entities && post.tagged_entities.length > 0 && (
+        {taggedEntities && taggedEntities.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
-            {post.tagged_entities.map((entity: any) => (
+            {taggedEntities.map((entity: any) => (
               <EntityBadge key={entity.id} entity={entity} />
             ))}
           </div>

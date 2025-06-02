@@ -107,14 +107,21 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
     setIsSubmitting(true);
     try {
       const tableName = itemType === 'post' ? 'post_comments' : 'recommendation_comments';
-      const columnName = itemType === 'post' ? 'post_id' : 'recommendation_id';
       
-      // Create the insert object with the correct column name
-      const insertData = {
-        user_id: user.id,
-        content: newComment.trim(),
-        [columnName]: itemId
-      };
+      let insertData: any;
+      if (itemType === 'post') {
+        insertData = {
+          user_id: user.id,
+          content: newComment.trim(),
+          post_id: itemId
+        };
+      } else {
+        insertData = {
+          user_id: user.id,
+          content: newComment.trim(),
+          recommendation_id: itemId
+        };
+      }
       
       const { data, error } = await supabase
         .from(tableName)
