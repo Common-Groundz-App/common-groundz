@@ -15,6 +15,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { checkForNewContent, getLastRefreshTime, setLastRefreshTime, NewContentCheckResult } from '@/services/feedContentService';
+import { feedbackActions } from '@/services/feedbackService';
 
 const Feed = React.memo(() => {
   const { user, isLoading } = useAuth();
@@ -170,6 +171,13 @@ const Feed = React.memo(() => {
       setLastRefreshTime(activeTab, user.id);
     }
     
+    // Provide enhanced feedback (haptic + sound)
+    try {
+      feedbackActions.refresh();
+    } catch (error) {
+      console.error('Feedback error:', error);
+    }
+    
     // Trigger refresh event
     if (activeTab === "for-you") {
       const event = new CustomEvent('refresh-for-you-feed');
@@ -177,11 +185,6 @@ const Feed = React.memo(() => {
     } else {
       const event = new CustomEvent('refresh-following-feed');
       window.dispatchEvent(event);
-    }
-    
-    // Provide haptic feedback on supported devices
-    if (navigator.vibrate) {
-      navigator.vibrate(50);
     }
     
     // Auto-hide refreshing state after reasonable time
