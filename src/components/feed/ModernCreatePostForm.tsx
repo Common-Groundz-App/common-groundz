@@ -23,6 +23,7 @@ import { getDisplayName } from '@/services/profileService';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
+import { feedbackActions } from '@/services/feedbackService';
 
 // Emoji picker styles are now in global CSS (index.css)
 
@@ -274,6 +275,13 @@ export function ModernCreatePostForm({
               });
           }
         }
+
+        // Provide haptic + sound feedback for successful post submission
+        try {
+          feedbackActions.post();
+        } catch (error) {
+          console.error('Feedback error:', error);
+        }
         
         toast({ 
           title: 'Post updated!',
@@ -299,6 +307,13 @@ export function ModernCreatePostForm({
                 entity_id: entity.id
               });
           }
+        }
+
+        // Provide haptic + sound feedback for successful post submission
+        try {
+          feedbackActions.post();
+        } catch (error) {
+          console.error('Feedback error:', error);
         }
         
         toast({ 
