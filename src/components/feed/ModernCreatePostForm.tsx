@@ -203,6 +203,13 @@ export function ModernCreatePostForm({
   const onSubmit = async (data: FormData) => {
     if (!user) return;
     
+    // Trigger haptic feedback immediately on user interaction (before async operations)
+    try {
+      feedbackActions.post();
+    } catch (error) {
+      console.error('Haptic feedback error:', error);
+    }
+    
     setIsSubmitting(true);
     
     try {
