@@ -23,7 +23,7 @@ import { getDisplayName } from '@/services/profileService';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
-import { feedbackActions } from '@/services/feedbackService';
+import { triggerHaptic, playSound } from '@/services/feedbackService';
 
 // Emoji picker styles are now in global CSS (index.css)
 
@@ -203,11 +203,15 @@ export function ModernCreatePostForm({
   const onSubmit = async (data: FormData) => {
     if (!user) return;
     
-    // Trigger haptic feedback immediately on user interaction (before async operations)
+    // Use the form's content or contentHtml
+    const content = data.content || contentHtml;
+    if (!content.trim()) return;
+    
+    // ✅ Trigger haptic immediately after validation, before any async operation
     try {
-      feedbackActions.post();
+      triggerHaptic('light');
     } catch (error) {
-      console.error('Haptic feedback error:', error);
+      console.error('Haptic trigger failed:', error);
     }
     
     setIsSubmitting(true);
@@ -226,9 +230,6 @@ export function ModernCreatePostForm({
       
       // Map to valid database post type
       const databasePostType = mapPostTypeToDatabase(data.post_type);
-      
-      // Use the form's content or contentHtml
-      const content = data.content || contentHtml;
       
       // Store location data in metadata if available
       let postMetadata: any = {};
@@ -283,11 +284,11 @@ export function ModernCreatePostForm({
           }
         }
 
-        // Provide haptic + sound feedback for successful post submission
+        // ✅ Play sound after successful post update
         try {
-          feedbackActions.post();
+          playSound('/sounds/post.mp3');
         } catch (error) {
-          console.error('Feedback error:', error);
+          console.error('Sound playback error:', error);
         }
         
         toast({ 
@@ -316,11 +317,11 @@ export function ModernCreatePostForm({
           }
         }
 
-        // Provide haptic + sound feedback for successful post submission
+        // ✅ Play sound after successful post creation
         try {
-          feedbackActions.post();
+          playSound('/sounds/post.mp3');
         } catch (error) {
-          console.error('Feedback error:', error);
+          console.error('Sound playback error:', error);
         }
         
         toast({ 
