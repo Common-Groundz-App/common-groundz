@@ -45,14 +45,16 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Simplified fetchComments function to avoid deep type instantiation
   const fetchComments = async () => {
     if (!isOpen) return;
     
     setIsLoading(true);
     try {
+      const tableName = itemType === 'post' ? 'post_comments' : 'recommendation_comments';
+      const idField = itemType === 'post' ? 'post_id' : 'recommendation_id';
+      
       const { data, error } = await supabase
-        .from('comments')
+        .from(tableName)
         .select(`
           id,
           content,
@@ -60,8 +62,8 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
           user_id,
           profiles!inner(username, avatar_url)
         `)
-        .eq('item_id', itemId)
-        .eq('item_type', itemType)
+        .eq(idField, itemId)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -98,12 +100,14 @@ const CommentDialog: React.FC<CommentDialogProps> = ({
 
     setIsSubmitting(true);
     try {
+      const tableName = itemType === 'post' ? 'post_comments' : 'recommendation_comments';
+      const idField = itemType === 'post' ? 'post_id' : 'recommendation_id';
+      
       const { error } = await supabase
-        .from('comments')
+        .from(tableName)
         .insert({
           content: newComment.trim(),
-          item_id: itemId,
-          item_type: itemType,
+          [idField]: itemId,
           user_id: user.id
         });
 

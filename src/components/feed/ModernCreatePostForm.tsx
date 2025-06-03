@@ -14,7 +14,7 @@ import { PostFeedItem } from '@/hooks/feed/types';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { MediaItem } from '@/types/media';
 import { LocationSearchInput } from './LocationSearchInput';
-import { TagInput } from '@/components/preferences/TagInput';
+import TagInput from '@/components/preferences/TagInput';
 
 export interface ModernCreatePostFormProps {
   onSuccess: () => void;
@@ -130,8 +130,12 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
     return name.charAt(0).toUpperCase();
   };
 
-  const handleMediaUpload = (newMedia: MediaItem[]) => {
+  const handleMediaUploaded = (newMedia: MediaItem[]) => {
     setMedia(newMedia);
+  };
+
+  const handleContentChange = (_json: object, html: string) => {
+    setContent(html);
   };
 
   return (
@@ -212,7 +216,7 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
         <div className="space-y-3">
           <RichTextEditor
             content={content}
-            onChange={setContent}
+            onChange={handleContentChange}
             placeholder="What's on your mind?"
             className="min-h-[120px] border-0 p-0 focus-visible:ring-0"
           />
@@ -220,7 +224,7 @@ export const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({
 
         {/* Media Upload */}
         <MediaUploader
-          onMediaUpload={handleMediaUpload}
+          onMediaUploaded={handleMediaUploaded}
           existingMedia={media}
           maxFiles={4}
         />
