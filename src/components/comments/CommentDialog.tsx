@@ -14,6 +14,7 @@ import { MoreHorizontal, MessageCircle, Send, X } from 'lucide-react';
 import { fetchUserProfile } from '@/services/profileService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import UsernameLink from '@/components/common/UsernameLink';
+import { feedbackActions } from '@/services/feedbackService';
 
 interface CommentDialogProps {
   isOpen: boolean;
@@ -139,6 +140,13 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
       const refreshEventName = `refresh-${itemType}-comment-count`;
       const refreshEvent = new CustomEvent(refreshEventName, { detail: { itemId } });
       window.dispatchEvent(refreshEvent);
+
+      // Provide haptic + sound feedback
+      try {
+        feedbackActions.comment();
+      } catch (error) {
+        console.error('Feedback error:', error);
+      }
 
       toast({
         title: "Comment added",
