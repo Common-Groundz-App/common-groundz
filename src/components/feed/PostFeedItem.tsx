@@ -136,6 +136,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         
         setLocalIsSaved(true);
       }
+      
+      // Provide haptic + sound feedback
+      try {
+        feedbackActions.save();
+      } catch (error) {
+        console.error('Feedback error:', error);
+      }
     } catch (err) {
       console.error('Error toggling save:', err);
     }
