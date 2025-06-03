@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -15,6 +16,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { checkForNewContent, getLastRefreshTime, setLastRefreshTime, NewContentCheckResult } from '@/services/feedContentService';
+import { feedbackActions } from '@/services/feedbackService';
 
 const Feed = React.memo(() => {
   const { user, isLoading } = useAuth();
@@ -170,6 +172,13 @@ const Feed = React.memo(() => {
       setLastRefreshTime(activeTab, user.id);
     }
     
+    // Provide enhanced feedback (haptic + sound) - Step 1 implementation
+    try {
+      feedbackActions.refresh();
+    } catch (error) {
+      console.error('Feedback error:', error);
+    }
+    
     // Trigger refresh event
     if (activeTab === "for-you") {
       const event = new CustomEvent('refresh-for-you-feed');
@@ -177,11 +186,6 @@ const Feed = React.memo(() => {
     } else {
       const event = new CustomEvent('refresh-following-feed');
       window.dispatchEvent(event);
-    }
-    
-    // Provide haptic feedback on supported devices
-    if (navigator.vibrate) {
-      navigator.vibrate(50);
     }
     
     // Auto-hide refreshing state after reasonable time
@@ -564,7 +568,6 @@ const Feed = React.memo(() => {
                   </div>
                 </div>
 
-                {/* Who to Follow */}
                 <div className="bg-background rounded-xl border p-4">
                   <h3 className="font-semibold text-lg mb-3">Who to Follow</h3>
                   <div className="space-y-3">
