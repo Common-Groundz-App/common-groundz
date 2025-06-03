@@ -28,6 +28,7 @@ import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { formatRelativeDate } from '@/utils/dateUtils';
+import { feedbackActions } from '@/services/feedbackService';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -207,7 +208,16 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    if (onLike) onLike(recommendation.id);
+    if (onLike) {
+      onLike(recommendation.id);
+      
+      // Provide haptic + sound feedback
+      try {
+        feedbackActions.like();
+      } catch (error) {
+        console.error('Feedback error:', error);
+      }
+    }
   };
   
   // Add handler to open lightbox when image is clicked

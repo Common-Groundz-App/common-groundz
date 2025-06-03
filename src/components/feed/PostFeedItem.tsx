@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getPostTypeLabel } from './utils/postUtils';
 import TagBadge from './TagBadge';
+import { feedbackActions } from '@/services/feedbackService';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -103,6 +104,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         
         setLocalIsLiked(true);
         setLocalLikes(prev => prev + 1);
+      }
+      
+      // Provide haptic + sound feedback
+      try {
+        feedbackActions.like();
+      } catch (error) {
+        console.error('Feedback error:', error);
       }
     } catch (err) {
       console.error('Error toggling like:', err);
