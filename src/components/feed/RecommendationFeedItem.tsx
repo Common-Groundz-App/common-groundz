@@ -28,7 +28,6 @@ import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { formatRelativeDate } from '@/utils/dateUtils';
-import { feedbackActions } from '@/services/feedbackService';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -208,33 +207,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    
-    if (onLike) {
-      onLike(recommendation.id);
-      
-      // Trigger haptic and sound feedback for like action
-      try {
-        feedbackActions.like();
-      } catch (error) {
-        console.error('Error triggering like feedback:', error);
-      }
-    }
-  };
-
-  const handleSave = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    
-    if (onSave) {
-      onSave(recommendation.id);
-      
-      // Trigger haptic and sound feedback for save action
-      try {
-        feedbackActions.save();
-      } catch (error) {
-        console.error('Error triggering save feedback:', error);
-      }
-    }
+    if (onLike) onLike(recommendation.id);
   };
   
   // Add handler to open lightbox when image is clicked
@@ -388,7 +361,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             "flex items-center gap-1",
             recommendation.is_saved && "text-brand-orange"
           )}
-          onClick={handleSave}
+          onClick={() => onSave && onSave(recommendation.id)}
         >
           <Bookmark 
             size={18} 
