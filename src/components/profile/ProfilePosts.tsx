@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
@@ -62,8 +61,10 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   };
 
   const handleCreatePost = () => {
-    // Dispatch custom event to open the create post form - fixed event name
-    window.dispatchEvent(new CustomEvent('open-create-post-dialog'));
+    // Dispatch custom event with contentType to directly open post modal
+    window.dispatchEvent(new CustomEvent('open-create-post-dialog', {
+      detail: { contentType: 'post' }
+    }));
   };
 
   if (loading) {

@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCardStyles } from '@/utils/theme-utils';
 import ProfileCard from './ProfileCard';
 import { useAuth } from '@/contexts/AuthContext';
+import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
 
 interface ProfileContentProps {
   profileUserId?: string;
@@ -80,6 +81,14 @@ const ProfileContent = React.memo(({ profileUserId, defaultActiveTab = 'posts' }
 
   return (
     <div className="pb-12">
+      {/* Hidden SmartComposerButton to handle create post events */}
+      <div className="hidden">
+        <SmartComposerButton onContentCreated={() => {
+          // Refresh profile posts when content is created
+          window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+        }} />
+      </div>
+
       <ProfileHeader 
         coverImage={coverImage}
         isLoading={isLoading}
