@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { BookOpen, Star, Users, User } from 'lucide-react';
 import ProfileHeader from './ProfileHeader';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
@@ -49,12 +49,12 @@ const ProfileContent = React.memo(({ profileUserId, defaultActiveTab = 'posts' }
   // Memoize the profile user ID to prevent unnecessary rerenders
   const profileUserIdToUse = useMemo(() => userId || user?.id, [userId, user?.id]);
   
-  // Memoize tab items to prevent unnecessary rerenders
+  // Memoize tab items to prevent unnecessary rerenders - NOW WITH ICONS
   const tabItems = useMemo(() => [
-    { value: 'posts', label: 'Posts' },
-    { value: 'recommendations', label: 'Recs' },
-    { value: 'reviews', label: 'Reviews' },
-    { value: 'circles', label: 'Circles' }
+    { value: 'posts', label: 'Posts', icon: BookOpen },
+    { value: 'recommendations', label: 'Recs', icon: Star },
+    { value: 'reviews', label: 'Reviews', icon: Users },
+    { value: 'circles', label: 'Circles', icon: User }
   ], []);
 
   if (isLoading) {
