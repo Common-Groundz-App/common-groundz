@@ -1,13 +1,10 @@
 
 import React, { useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
 import EmptyReviews from './reviews/EmptyReviews';
 import { useReviews } from '@/hooks/use-reviews';
 import ReviewCard from './reviews/ReviewCard';
 import ReviewForm from './reviews/ReviewForm';
 import ReviewFilters from './reviews/ReviewFilters';
-import { useReviewFilters } from '@/hooks/reviews/use-review-filters';
 
 interface ProfileReviewsProps {
   profileUserId: string;
@@ -16,6 +13,8 @@ interface ProfileReviewsProps {
 
 const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'latest' | 'highestRated' | 'mostLiked'>('latest');
   
   const {
     reviews,
@@ -27,21 +26,39 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     convertToRecommendation,
   } = useReviews({ profileUserId });
 
-  const {
-    activeFilter,
-    setActiveFilter,
-    sortBy,
-    setSortBy,
-    filteredReviews,
-    categories,
-    clearFilters
-  } = useReviewFilters(reviews || []);
-
   // Create a wrapped version of refreshReviews that returns void
   const handleRefreshReviews = useCallback(async () => {
     await refreshReviews();
-    // Return void to satisfy the type requirements
   }, [refreshReviews]);
+
+  // Filter and sort reviews
+  const filteredReviews = React.useMemo(() => {
+    if (!reviews) return [];
+    
+    return reviews
+      .filter(item => !activeFilter || item.category === activeFilter)
+      .sort((a, b) => {
+        if (sortBy === 'latest') {
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        } else if (sortBy === 'highestRated') {
+          return b.rating - a.rating;
+        } else if (sortBy === 'mostLiked') {
+          return (b.likes || 0) - (a.likes || 0);
+        }
+        return 0;
+      });
+  }, [reviews, activeFilter, sortBy]);
+
+  // Extract unique categories from reviews
+  const categories = React.useMemo(() => {
+    if (!reviews || reviews.length === 0) return [];
+    return [...new Set(reviews.map(item => item.category))];
+  }, [reviews]);
+
+  const clearFilters = () => {
+    setActiveFilter(null);
+    setSortBy('latest');
+  };
 
   if (isLoading) {
     return (
@@ -92,35 +109,18 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
   }
 
   return (
-    <div className="space-y-6">
-      {/* Filters and Header */}
-      <div className="space-y-4">
-        <ReviewFilters
-          activeFilter={activeFilter}
-          setActiveFilter={setActiveFilter}
-          sortBy={sortBy}
-          setSortBy={setSortBy}
-          categories={categories}
-          clearFilters={clearFilters}
-          isOwnProfile={isOwnProfile}
-        />
-        
-        {/* Add Review Button */}
-        {isOwnProfile && (
-          <div className="flex justify-end">
-            <Button 
-              onClick={() => setIsFormOpen(true)} 
-              variant="gradient"
-              className="flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
-            >
-              <PlusCircle className="h-4 w-4" />
-              Add Review
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Reviews Grid */}
+    <div className="space-y-6 mx-0 my-0">
+      <ReviewFilters 
+        isOwnProfile={isOwnProfile}
+        activeFilter={activeFilter}
+        sortBy={sortBy}
+        categories={categories}
+        onFilterChange={setActiveFilter}
+        onSortChange={setSortBy}
+        onClearFilters={clearFilters}
+        onAddNew={() => setIsFormOpen(true)}
+      />
+      
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredReviews.map(review => (
           <ReviewCard 
