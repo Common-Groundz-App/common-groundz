@@ -45,24 +45,87 @@ const RecommendationFilters = ({
   onAddNew
 }: RecommendationFiltersProps) => {
   return (
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
-        {isOwnProfile ? 'My Recommendations' : 'Recommendations'}
-      </h2>
-      
-      <div className="flex items-center gap-2">
-        {isOwnProfile && (
-          <Button 
-            onClick={onAddNew}
-            size="sm" 
-            className="bg-brand-orange hover:bg-brand-orange/90 text-white"
-          >
-            <Plus size={16} className="mr-1" /> Add New
-          </Button>
-        )}
+    <div className="mb-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
+          {isOwnProfile ? 'My Recommendations' : 'Recommendations'}
+        </h2>
         
-        {activeFilter && (
-          <Badge variant="outline" className="flex items-center gap-1 px-3 py-1">
+        <div className="flex items-center gap-2">
+          {/* Filter Button - Always on the left */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center gap-1">
+                <Filter size={14} />
+                <span className="max-[500px]:hidden">Filter</span>
+                <ChevronDown size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56">
+              <DropdownMenuGroup>
+                <DropdownMenuItem 
+                  className="text-sm font-medium text-gray-500 py-1.5"
+                  disabled
+                >
+                  Categories
+                </DropdownMenuItem>
+                {categories.map(category => (
+                  <DropdownMenuItem 
+                    key={category}
+                    onClick={() => onFilterChange(category)}
+                    className={cn(
+                      "cursor-pointer",
+                      activeFilter === category ? "bg-gray-100" : ""
+                    )}
+                  >
+                    {getCategoryLabel(category)}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem 
+                  className="text-sm font-medium text-gray-500 py-1.5 mt-2"
+                  disabled
+                >
+                  Sort By
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => onSortChange('latest')}
+                  className={cn("cursor-pointer", sortBy === 'latest' ? "bg-gray-100" : "")}
+                >
+                  Latest
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => onSortChange('highestRated')}
+                  className={cn("cursor-pointer", sortBy === 'highestRated' ? "bg-gray-100" : "")}
+                >
+                  Highest Rated
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => onSortChange('mostLiked')}
+                  className={cn("cursor-pointer", sortBy === 'mostLiked' ? "bg-gray-100" : "")}
+                >
+                  Most Liked
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Add New Button - Always on the right */}
+          {isOwnProfile && (
+            <Button 
+              onClick={onAddNew}
+              size="sm" 
+              className="bg-brand-orange hover:bg-brand-orange/90 text-white max-[500px]:text-sm max-[500px]:px-2"
+            >
+              <Plus size={16} className="mr-1" /> Add New
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      {/* Active Filter Badge */}
+      {activeFilter && (
+        <div className="mt-2">
+          <Badge variant="outline" className="flex items-center gap-1 px-3 py-1 w-fit">
             {getCategoryLabel(activeFilter)}
             <button 
               onClick={onClearFilters}
@@ -71,64 +134,8 @@ const RecommendationFilters = ({
               ×
             </button>
           </Badge>
-        )}
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="flex items-center gap-1">
-              <Filter size={14} />
-              Filter
-              <ChevronDown size={14} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56">
-            <DropdownMenuGroup>
-              <DropdownMenuItem 
-                className="text-sm font-medium text-gray-500 py-1.5"
-                disabled
-              >
-                Categories
-              </DropdownMenuItem>
-              {categories.map(category => (
-                <DropdownMenuItem 
-                  key={category}
-                  onClick={() => onFilterChange(category)}
-                  className={cn(
-                    "cursor-pointer",
-                    activeFilter === category ? "bg-gray-100" : ""
-                  )}
-                >
-                  {getCategoryLabel(category)}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuItem 
-                className="text-sm font-medium text-gray-500 py-1.5 mt-2"
-                disabled
-              >
-                Sort By
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => onSortChange('latest')}
-                className={cn("cursor-pointer", sortBy === 'latest' ? "bg-gray-100" : "")}
-              >
-                Latest
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => onSortChange('highestRated')}
-                className={cn("cursor-pointer", sortBy === 'highestRated' ? "bg-gray-100" : "")}
-              >
-                Highest Rated
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => onSortChange('mostLiked')}
-                className={cn("cursor-pointer", sortBy === 'mostLiked' ? "bg-gray-100" : "")}
-              >
-                Most Liked
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

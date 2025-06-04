@@ -3,9 +3,18 @@ import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Filter, ChevronDown } from 'lucide-react';
 import FollowersList from './circles/FollowersList';
 import FollowingList from './circles/FollowingList';
 import { useCircleData } from './circles/useCircleData';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ProfileCirclesProps {
   profileUserId: string;
@@ -57,6 +66,35 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
         <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
           {isOwnProfile ? 'My Circles' : 'Circles'}
         </h2>
+        
+        <div className="flex items-center gap-2">
+          {/* Filter Button */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center gap-1">
+                <Filter size={14} />
+                <span className="max-[500px]:hidden">Filter</span>
+                <ChevronDown size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56">
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="text-sm font-medium text-gray-500 py-1.5" disabled>
+                  Sort By
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  Recent
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  Alphabetical
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  Most Active
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Tabs Content */}

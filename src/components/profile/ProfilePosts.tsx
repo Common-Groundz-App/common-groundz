@@ -1,12 +1,19 @@
 
 import React, { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Filter, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProfilePostItem from './ProfilePostItem';
 import ProfilePostsEmpty from './ProfilePostsEmpty';
 import ProfilePostsLoading from './ProfilePostsLoading';
 import { fetchUserPosts, Post } from './services/profilePostsService';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ProfilePostsProps {
   profileUserId: string;
@@ -83,16 +90,48 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
         <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
           {isOwnProfile ? 'My Posts' : 'Posts'}
         </h2>
-        {isOwnProfile && (
-          <Button 
-            onClick={handleCreatePost}
-            variant="gradient"
-            className="flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
-          >
-            <PlusCircle className="h-4 w-4" />
-            Create Post
-          </Button>
-        )}
+        
+        <div className="flex items-center gap-2">
+          {/* Filter Button - Always on the left */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center gap-1">
+                <Filter size={14} />
+                <span className="max-[500px]:hidden">Filter</span>
+                <ChevronDown size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56">
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="text-sm font-medium text-gray-500 py-1.5" disabled>
+                  Sort By
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  Latest
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  Most Liked
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  Most Commented
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Create Post Button - Always on the right */}
+          {isOwnProfile && (
+            <Button 
+              onClick={handleCreatePost}
+              variant="gradient"
+              size="sm"
+              className="flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300 max-[500px]:text-sm max-[500px]:px-2"
+            >
+              <PlusCircle className="h-4 w-4" />
+              Create Post
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Posts List */}
