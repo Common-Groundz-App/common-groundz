@@ -29,8 +29,37 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
     navigate(`/profile/${userId}`);
   };
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="h-7 w-32 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+        </div>
+        
+        {/* Tabs Skeleton */}
+        <div className="w-full h-10 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+        
+        {/* Content Skeleton */}
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">
+          {isOwnProfile ? 'My Circles' : 'Circles'}
+        </h2>
+      </div>
+
+      {/* Tabs Content */}
       <Tabs defaultValue="followers" onValueChange={(value) => setActiveTab(value as 'followers' | 'following')}>
         <TabsList className="grid w-full grid-cols-2 mb-6">
           <TabsTrigger value="followers">Followers</TabsTrigger>
