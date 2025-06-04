@@ -47,7 +47,7 @@ const ProfileTabs = ({
     }
   ];
 
-  // Mobile menu items with proper icon components
+  // Mobile menu items with proper icon components and value property
   const mobileMenuItems = [
     {
       value: "posts",
