@@ -6,7 +6,8 @@ import EmptyReviews from './reviews/EmptyReviews';
 import { useReviews } from '@/hooks/use-reviews';
 import ReviewCard from './reviews/ReviewCard';
 import ReviewForm from './reviews/ReviewForm';
-import { formatRelativeDate } from '@/utils/dateUtils';
+import ReviewFilters from './reviews/ReviewFilters';
+import { useReviewFilters } from '@/hooks/reviews/use-review-filters';
 
 interface ProfileReviewsProps {
   profileUserId: string;
@@ -25,6 +26,16 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     refreshReviews,
     convertToRecommendation,
   } = useReviews({ profileUserId });
+
+  const {
+    activeFilter,
+    setActiveFilter,
+    sortBy,
+    setSortBy,
+    filteredReviews,
+    categories,
+    clearFilters
+  } = useReviewFilters(reviews || []);
 
   // Create a wrapped version of refreshReviews that returns void
   const handleRefreshReviews = useCallback(async () => {
@@ -82,26 +93,36 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">
-          {isOwnProfile ? 'My Reviews' : 'Reviews'}
-        </h2>
+      {/* Filters and Header */}
+      <div className="space-y-4">
+        <ReviewFilters
+          activeFilter={activeFilter}
+          setActiveFilter={setActiveFilter}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          categories={categories}
+          clearFilters={clearFilters}
+          isOwnProfile={isOwnProfile}
+        />
+        
+        {/* Add Review Button */}
         {isOwnProfile && (
-          <Button 
-            onClick={() => setIsFormOpen(true)} 
-            variant="gradient"
-            className="flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
-          >
-            <PlusCircle className="h-4 w-4" />
-            Add Review
-          </Button>
+          <div className="flex justify-end">
+            <Button 
+              onClick={() => setIsFormOpen(true)} 
+              variant="gradient"
+              className="flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
+            >
+              <PlusCircle className="h-4 w-4" />
+              Add Review
+            </Button>
+          </div>
         )}
       </div>
 
       {/* Reviews Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {reviews.map(review => (
+        {filteredReviews.map(review => (
           <ReviewCard 
             key={review.id}
             review={review}

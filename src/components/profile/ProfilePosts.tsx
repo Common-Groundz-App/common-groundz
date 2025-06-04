@@ -62,8 +62,8 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   };
 
   const handleCreatePost = () => {
-    // Dispatch custom event to open the create post form
-    window.dispatchEvent(new CustomEvent('open-create-post-form'));
+    // Dispatch custom event to open the create post form - fixed event name
+    window.dispatchEvent(new CustomEvent('open-create-post-dialog'));
   };
 
   if (loading) {
