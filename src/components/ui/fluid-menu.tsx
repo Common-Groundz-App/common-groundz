@@ -86,7 +86,7 @@ export function MenuContainer({ children }: { children: React.ReactNode }) {
     <div className="relative w-full max-w-sm mx-auto">
       <div 
         ref={scrollContainerRef}
-        className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 px-4"
+        className="flex gap-3 overflow-x-auto pb-2 px-4 scrollbar-none"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
@@ -106,16 +106,6 @@ export function MenuContainer({ children }: { children: React.ReactNode }) {
       {/* Fade effects for scroll indication */}
       <div className="absolute left-0 top-0 w-8 h-full bg-gradient-to-r from-background to-transparent pointer-events-none" />
       <div className="absolute right-0 top-0 w-8 h-full bg-gradient-to-l from-background to-transparent pointer-events-none" />
-      
-      <style jsx>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
     </div>
   )
 }
