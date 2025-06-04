@@ -8,8 +8,9 @@ import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
+import { MenuItem, MenuContainer } from '@/components/ui/fluid-menu';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
-import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils } from 'lucide-react';
+import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils, Menu as MenuIcon, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ const Explore = () => {
   const isMobile = useIsMobile();
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('featured');
   const navigate = useNavigate();
 
   // Use the enhanced search hook
@@ -135,6 +137,9 @@ const Explore = () => {
       </div>
     </div>
   );
+
+  // Find the currently active tab item
+  const activeTabItem = tabItems.find(item => item.value === activeTab) || tabItems[0];
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
@@ -362,60 +367,101 @@ const Explore = () => {
               )}
             </div>
             
-            <div className="overflow-x-auto">
-              <TubelightTabs defaultValue="featured" items={tabItems}>
-                <TabsContent value="featured">
-                  <div className="space-y-8">
-                    <FeaturedEntities />
-                    <CategoryHighlights />
-                  </div>
-                </TabsContent>
-                <TabsContent value="places">
-                  <CategoryHighlights entityType="place" />
-                </TabsContent>
-                <TabsContent value="movies">
-                  <CategoryHighlights entityType="movie" />
-                </TabsContent>
-                <TabsContent value="books">
-                  <CategoryHighlights entityType="book" />
-                </TabsContent>
-                <TabsContent value="food">
-                  <CategoryHighlights entityType="food" />
-                </TabsContent>
-                
-                <TabsContent value="products">
-                  <div className="mt-4 p-8 text-center">
-                    <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <h3 className="text-lg font-medium mb-2">Discover Products</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Search for products to get comprehensive analysis from reviews, forums, and multiple sources
-                    </p>
-                    <div className="flex items-center justify-center">
-                      <div className="relative flex-1 max-w-md min-w-0">
-                        <Input
-                          type="text"
-                          placeholder="Search for products..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          onKeyDown={handleKeyDown}
-                          className="pr-20 min-w-0"
-                        />
-                        <Button 
-                          className="absolute right-0 top-0 rounded-l-none bg-brand-orange hover:bg-brand-orange/90 shrink-0"
-                          onClick={handleComplexProductSearch}
-                        >
-                          Search
-                        </Button>
+            {/* Navigation - Responsive */}
+            <div className="overflow-x-hidden mb-6">
+              {/* Fluid Menu for screens < 630px */}
+              <div className="max-[629px]:flex max-[629px]:justify-center min-[630px]:hidden">
+                <MenuContainer>
+                  {/* Menu trigger with current active tab icon */}
+                  <MenuItem 
+                    icon={
+                      <div className="relative w-6 h-6">
+                        <div className="absolute inset-0 transition-all duration-300 ease-in-out origin-center opacity-100 scale-100 rotate-0 [div[data-expanded=true]_&]:opacity-0 [div[data-expanded=true]_&]:scale-0 [div[data-expanded=true]_&]:rotate-180">
+                          <activeTabItem.icon size={24} strokeWidth={1.5} className="text-brand-orange" />
+                        </div>
+                        <div className="absolute inset-0 transition-all duration-300 ease-in-out origin-center opacity-0 scale-0 -rotate-180 [div[data-expanded=true]_&]:opacity-100 [div[data-expanded=true]_&]:scale-100 [div[data-expanded=true]_&]:rotate-0">
+                          <X size={24} strokeWidth={1.5} className="text-brand-orange" />
+                        </div>
                       </div>
+                    } 
+                  />
+                  {/* Menu items */}
+                  {tabItems.map((item) => (
+                    <MenuItem 
+                      key={item.value}
+                      icon={<item.icon size={24} strokeWidth={1.5} />} 
+                      onClick={() => setActiveTab(item.value)}
+                      isActive={activeTab === item.value}
+                    />
+                  ))}
+                </MenuContainer>
+              </div>
+
+              {/* TubelightTabs for screens >= 630px */}
+              <div className="max-[629px]:hidden">
+                <TubelightTabs 
+                  defaultValue={activeTab} 
+                  items={tabItems}
+                  onValueChange={setActiveTab}
+                >
+                  {/* Tab content will be rendered below */}
+                </TubelightTabs>
+              </div>
+            </div>
+
+            {/* Tab Content */}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsContent value="featured">
+                <div className="space-y-8">
+                  <FeaturedEntities />
+                  <CategoryHighlights />
+                </div>
+              </TabsContent>
+              <TabsContent value="places">
+                <CategoryHighlights entityType="place" />
+              </TabsContent>
+              <TabsContent value="movies">
+                <CategoryHighlights entityType="movie" />
+              </TabsContent>
+              <TabsContent value="books">
+                <CategoryHighlights entityType="book" />
+              </TabsContent>
+              <TabsContent value="food">
+                <CategoryHighlights entityType="food" />
+              </TabsContent>
+              
+              <TabsContent value="products">
+                <div className="mt-4 p-8 text-center">
+                  <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="text-lg font-medium mb-2">Discover Products</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Search for products to get comprehensive analysis from reviews, forums, and multiple sources
+                  </p>
+                  <div className="flex items-center justify-center">
+                    <div className="relative flex-1 max-w-md min-w-0">
+                      <Input
+                        type="text"
+                        placeholder="Search for products..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        className="pr-20 min-w-0"
+                      />
+                      <Button 
+                        className="absolute right-0 top-0 rounded-l-none bg-brand-orange hover:bg-brand-orange/90 shrink-0"
+                        onClick={handleComplexProductSearch}
+                      >
+                        Search
+                      </Button>
                     </div>
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="people">
-                  <UserDirectoryList sortOption={sortOption} />
-                </TabsContent>
-              </TubelightTabs>
-            </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="people">
+                <UserDirectoryList sortOption={sortOption} />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
