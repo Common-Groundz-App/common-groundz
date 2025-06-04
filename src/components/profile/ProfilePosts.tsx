@@ -79,21 +79,19 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
           {isOwnProfile ? 'My Posts' : 'Posts'}
         </h2>
         {isOwnProfile && (
-          <div className="flex justify-end">
-            <Button 
-              onClick={handleCreatePost}
-              variant="gradient"
-              className="flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
-            >
-              <PlusCircle className="h-4 w-4" />
-              Create Post
-            </Button>
-          </div>
+          <Button 
+            onClick={handleCreatePost}
+            variant="gradient"
+            className="flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Create Post
+          </Button>
         )}
       </div>
 

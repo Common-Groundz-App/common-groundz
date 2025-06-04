@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -32,7 +33,9 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
     return (
       <div className="space-y-6">
         {/* Header Skeleton */}
-        <div className="h-7 w-32 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+        <div className="flex items-center justify-between">
+          <div className="h-7 w-32 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
+        </div>
         
         {/* Tabs Skeleton */}
         <div className="w-full h-10 bg-gray-100 dark:bg-gray-800 animate-pulse rounded"></div>
@@ -50,7 +53,7 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
+      <div className="flex items-center justify-between">
         <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
           {isOwnProfile ? 'My Circles' : 'Circles'}
         </h2>

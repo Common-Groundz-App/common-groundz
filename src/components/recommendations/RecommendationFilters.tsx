@@ -45,12 +45,12 @@ const RecommendationFilters = ({
   onAddNew
 }: RecommendationFiltersProps) => {
   return (
-    <div className="space-y-3 mb-4">
+    <div className="flex justify-between items-center mb-4">
       <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
         {isOwnProfile ? 'My Recommendations' : 'Recommendations'}
       </h2>
       
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center gap-2">
         {isOwnProfile && (
           <Button 
             onClick={onAddNew}
