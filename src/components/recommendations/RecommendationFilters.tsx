@@ -46,7 +46,7 @@ const RecommendationFilters = ({
 }: RecommendationFiltersProps) => {
   return (
     <div className="flex justify-between items-center mb-4">
-      <h2 className="text-base sm:text-lg lg:text-xl max-[800px]:text-sm max-[800px]:sm:text-base max-[800px]:lg:text-lg font-semibold">
+      <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
         {isOwnProfile ? 'My Recommendations' : 'Recommendations'}
       </h2>
       

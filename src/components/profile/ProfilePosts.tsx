@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
@@ -81,7 +80,7 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-base sm:text-lg lg:text-xl max-[800px]:text-sm max-[800px]:sm:text-base max-[800px]:lg:text-lg font-semibold">
+        <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
           {isOwnProfile ? 'My Posts' : 'Posts'}
         </h2>
         {isOwnProfile && (
