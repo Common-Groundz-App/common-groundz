@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Filter, ChevronDown } from 'lucide-react';
+import { Plus, Filter, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProfilePostItem from './ProfilePostItem';
 import ProfilePostsEmpty from './ProfilePostsEmpty';
@@ -125,10 +125,10 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
               onClick={handleCreatePost}
               variant="gradient"
               size="sm"
-              className="flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300 max-[500px]:text-sm max-[500px]:px-2"
+              className="flex items-center shadow-md hover:shadow-lg transition-all duration-300 max-[500px]:text-sm max-[500px]:px-2"
             >
-              <PlusCircle className="h-4 w-4" />
-              Create Post
+              <Plus size={16} className="max-[500px]:mr-0 min-[500px]:mr-2" />
+              <span className="max-[500px]:hidden">Create Post</span>
             </Button>
           )}
         </div>

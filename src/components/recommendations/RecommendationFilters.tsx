@@ -116,7 +116,8 @@ const RecommendationFilters = ({
               size="sm" 
               className="bg-brand-orange hover:bg-brand-orange/90 text-white max-[500px]:text-sm max-[500px]:px-2"
             >
-              <Plus size={16} className="mr-1" /> Add New
+              <Plus size={16} className="max-[500px]:mr-0 min-[500px]:mr-1" />
+              <span className="max-[500px]:hidden">Add New</span>
             </Button>
           )}
         </div>
