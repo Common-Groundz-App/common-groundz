@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
@@ -78,53 +79,43 @@ export function MenuItem({ children, onClick, disabled = false, icon, isActive =
 }
 
 export function MenuContainer({ children }: { children: React.ReactNode }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const childrenArray = React.Children.toArray(children)
-  const totalItems = childrenArray.length
-
-  const handleToggle = () => {
-    if (isExpanded) {
-      setIsExpanded(false)
-    } else {
-      setIsExpanded(true)
-    }
-  }
 
   return (
-    <div className="relative h-[64px]" data-expanded={isExpanded} style={{ width: isExpanded ? `${totalItems * 48}px` : '64px' }}>
-      {/* Container for all items */}
-      <div className="relative">
-        {/* First item - always visible */}
-        <div 
-          className="relative w-16 h-16 bg-gray-100 dark:bg-gray-800 cursor-pointer rounded-full group will-change-transform z-50"
-          onClick={handleToggle}
-        >
-          {childrenArray[0]}
-        </div>
-
-        {/* Other items */}
-        {childrenArray.slice(1).map((child, index) => (
+    <div className="relative w-full max-w-sm mx-auto">
+      <div 
+        ref={scrollContainerRef}
+        className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 px-4"
+        style={{
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch'
+        }}
+      >
+        {childrenArray.map((child, index) => (
           <div 
-            key={index} 
-            className="absolute top-0 left-0 w-16 h-16 bg-gray-100 dark:bg-gray-800 will-change-transform"
-            style={{
-              transform: `translateX(${isExpanded ? (index + 1) * 48 : 0}px)`,
-              opacity: isExpanded ? 1 : 0,
-              zIndex: 40 - index,
-              clipPath: index === childrenArray.length - 2 
-                ? "circle(50% at 50% 50%)" 
-                : "circle(50% at 50% 50%)",
-              transition: `transform ${isExpanded ? '300ms' : '300ms'} cubic-bezier(0.4, 0, 0.2, 1),
-                         opacity ${isExpanded ? '300ms' : '350ms'}`,
-              backfaceVisibility: 'hidden',
-              perspective: 1000,
-              WebkitFontSmoothing: 'antialiased'
-            }}
+            key={index}
+            className="flex-shrink-0 w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full"
           >
             {child}
           </div>
         ))}
       </div>
+      
+      {/* Fade effects for scroll indication */}
+      <div className="absolute left-0 top-0 w-8 h-full bg-gradient-to-r from-background to-transparent pointer-events-none" />
+      <div className="absolute right-0 top-0 w-8 h-full bg-gradient-to-l from-background to-transparent pointer-events-none" />
+      
+      <style jsx>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   )
 }
