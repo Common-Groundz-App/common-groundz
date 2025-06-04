@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -136,7 +137,7 @@ const Explore = () => {
   );
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       {/* Mobile Header - Only show on mobile screens */}
       <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
         <div className="container p-3 mx-auto flex justify-start">
@@ -144,7 +145,7 @@ const Explore = () => {
         </div>
       </div>
       
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-x-hidden">
         {/* Desktop Sidebar - Only show on xl+ screens */}
         <div className="hidden xl:block fixed left-0 top-0 h-screen">
           <VerticalTubelightNavbar 
@@ -153,8 +154,8 @@ const Explore = () => {
           />
         </div>
         
-        <div className="flex-1 pt-16 xl:pt-0 xl:pl-64">
-          <div className="container max-w-4xl mx-auto p-4 md:p-8">
+        <div className="flex-1 pt-16 xl:pt-0 xl:pl-64 min-w-0">
+          <div className="container max-w-4xl mx-auto p-4 md:p-8 min-w-0">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-3xl font-bold">Explore</h1>
               
@@ -175,9 +176,9 @@ const Explore = () => {
               </DropdownMenu>
             </div>
             
-            <div className="relative mb-6">
-              <div className="flex items-center border rounded-lg overflow-hidden bg-background">
-                <div className="pl-3 text-muted-foreground">
+            <div className="relative mb-6 overflow-hidden">
+              <div className="flex items-center border rounded-lg overflow-hidden bg-background min-w-0">
+                <div className="pl-3 text-muted-foreground shrink-0">
                   <Search size={18} />
                 </div>
                 <Input
@@ -186,28 +187,29 @@ const Explore = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0"
                 />
                 {searchQuery && (
                   <Button 
                     variant="default" 
                     size="sm"
-                    className="mr-1 bg-brand-orange hover:bg-brand-orange/90"
+                    className="mr-1 bg-brand-orange hover:bg-brand-orange/90 shrink-0 max-[500px]:text-xs max-[500px]:px-2"
                     onClick={handleComplexProductSearch}
                   >
-                    Search More
+                    <span className="max-[400px]:hidden">Search More</span>
+                    <span className="min-[401px]:hidden">More</span>
                   </Button>
                 )}
               </div>
               
               {/* Search Classification Info - Only show confidence percentage */}
               {classification && searchQuery && (
-                <div className="mt-2 flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
+                <div className="mt-2 flex items-center gap-2 overflow-x-auto">
+                  <Badge variant="secondary" className="text-xs shrink-0">
                     {classification.classification} ({Math.round(classification.confidence * 100)}% confidence)
                   </Badge>
                   {isLoading && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       Searching...
                     </div>
@@ -360,58 +362,60 @@ const Explore = () => {
               )}
             </div>
             
-            <TubelightTabs defaultValue="featured" items={tabItems}>
-              <TabsContent value="featured">
-                <div className="space-y-8">
-                  <FeaturedEntities />
-                  <CategoryHighlights />
-                </div>
-              </TabsContent>
-              <TabsContent value="places">
-                <CategoryHighlights entityType="place" />
-              </TabsContent>
-              <TabsContent value="movies">
-                <CategoryHighlights entityType="movie" />
-              </TabsContent>
-              <TabsContent value="books">
-                <CategoryHighlights entityType="book" />
-              </TabsContent>
-              <TabsContent value="food">
-                <CategoryHighlights entityType="food" />
-              </TabsContent>
-              
-              <TabsContent value="products">
-                <div className="mt-4 p-8 text-center">
-                  <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <h3 className="text-lg font-medium mb-2">Discover Products</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Search for products to get comprehensive analysis from reviews, forums, and multiple sources
-                  </p>
-                  <div className="flex items-center justify-center">
-                    <div className="relative flex-1 max-w-md">
-                      <Input
-                        type="text"
-                        placeholder="Search for products..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        className="pr-20"
-                      />
-                      <Button 
-                        className="absolute right-0 top-0 rounded-l-none bg-brand-orange hover:bg-brand-orange/90"
-                        onClick={handleComplexProductSearch}
-                      >
-                        Search
-                      </Button>
+            <div className="overflow-x-auto">
+              <TubelightTabs defaultValue="featured" items={tabItems}>
+                <TabsContent value="featured">
+                  <div className="space-y-8">
+                    <FeaturedEntities />
+                    <CategoryHighlights />
+                  </div>
+                </TabsContent>
+                <TabsContent value="places">
+                  <CategoryHighlights entityType="place" />
+                </TabsContent>
+                <TabsContent value="movies">
+                  <CategoryHighlights entityType="movie" />
+                </TabsContent>
+                <TabsContent value="books">
+                  <CategoryHighlights entityType="book" />
+                </TabsContent>
+                <TabsContent value="food">
+                  <CategoryHighlights entityType="food" />
+                </TabsContent>
+                
+                <TabsContent value="products">
+                  <div className="mt-4 p-8 text-center">
+                    <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <h3 className="text-lg font-medium mb-2">Discover Products</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Search for products to get comprehensive analysis from reviews, forums, and multiple sources
+                    </p>
+                    <div className="flex items-center justify-center">
+                      <div className="relative flex-1 max-w-md min-w-0">
+                        <Input
+                          type="text"
+                          placeholder="Search for products..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          className="pr-20 min-w-0"
+                        />
+                        <Button 
+                          className="absolute right-0 top-0 rounded-l-none bg-brand-orange hover:bg-brand-orange/90 shrink-0"
+                          onClick={handleComplexProductSearch}
+                        >
+                          Search
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="people">
-                <UserDirectoryList sortOption={sortOption} />
-              </TabsContent>
-            </TubelightTabs>
+                </TabsContent>
+                
+                <TabsContent value="people">
+                  <UserDirectoryList sortOption={sortOption} />
+                </TabsContent>
+              </TubelightTabs>
+            </div>
           </div>
         </div>
       </div>
