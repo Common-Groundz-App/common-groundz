@@ -47,7 +47,7 @@ const ReviewFilters = ({
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
+        <h2 className="text-lg sm:text-lg lg:text-xl font-semibold">
           {isOwnProfile ? 'My Reviews' : 'Reviews'}
         </h2>
         
@@ -114,9 +114,9 @@ const ReviewFilters = ({
             <Button 
               onClick={onAddNew}
               size="sm" 
-              className="bg-brand-orange hover:bg-brand-orange/90 text-white max-[500px]:text-sm max-[500px]:px-2"
+              className="bg-brand-orange hover:bg-brand-orange/90 text-white max-[500px]:text-sm max-[500px]:px-2 max-[500px]:h-10 max-[500px]:w-10 max-[500px]:p-0 max-[500px]:rounded-md max-[500px]:text-[18px]"
             >
-              <Plus size={16} className="max-[500px]:mr-0 min-[500px]:mr-1" />
+              <Plus size={18} className="max-[500px]:mr-0 min-[500px]:mr-1" />
               <span className="max-[500px]:hidden">Add New</span>
             </Button>
           )}

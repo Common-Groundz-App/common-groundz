@@ -87,7 +87,7 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
+        <h2 className="text-lg sm:text-lg lg:text-xl font-semibold">
           {isOwnProfile ? 'My Posts' : 'Posts'}
         </h2>
         
@@ -125,9 +125,9 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
               onClick={handleCreatePost}
               variant="gradient"
               size="sm"
-              className="flex items-center shadow-md hover:shadow-lg transition-all duration-300 max-[500px]:text-sm max-[500px]:px-2"
+              className="flex items-center shadow-md hover:shadow-lg transition-all duration-300 max-[500px]:text-sm max-[500px]:px-2 max-[500px]:h-10 max-[500px]:w-10 max-[500px]:p-0 max-[500px]:rounded-md max-[500px]:text-[18px]"
             >
-              <Plus size={16} className="max-[500px]:mr-0 min-[500px]:mr-2" />
+              <Plus size={18} className="max-[500px]:mr-0 min-[500px]:mr-2" />
               <span className="max-[500px]:hidden">Create Post</span>
             </Button>
           )}
