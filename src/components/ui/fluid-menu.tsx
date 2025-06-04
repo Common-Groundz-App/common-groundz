@@ -91,7 +91,7 @@ export function MenuContainer({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="relative w-[64px]" data-expanded={isExpanded}>
+    <div className="relative h-[64px]" data-expanded={isExpanded} style={{ width: isExpanded ? `${totalItems * 48}px` : '64px' }}>
       {/* Container for all items */}
       <div className="relative">
         {/* First item - always visible */}
@@ -108,12 +108,12 @@ export function MenuContainer({ children }: { children: React.ReactNode }) {
             key={index} 
             className="absolute top-0 left-0 w-16 h-16 bg-gray-100 dark:bg-gray-800 will-change-transform"
             style={{
-              transform: `translateY(${isExpanded ? (index + 1) * 48 : 0}px)`,
+              transform: `translateX(${isExpanded ? (index + 1) * 48 : 0}px)`,
               opacity: isExpanded ? 1 : 0,
               zIndex: 40 - index,
               clipPath: index === childrenArray.length - 2 
                 ? "circle(50% at 50% 50%)" 
-                : "circle(50% at 50% 55%)",
+                : "circle(50% at 50% 50%)",
               transition: `transform ${isExpanded ? '300ms' : '300ms'} cubic-bezier(0.4, 0, 0.2, 1),
                          opacity ${isExpanded ? '300ms' : '350ms'}`,
               backfaceVisibility: 'hidden',
