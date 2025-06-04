@@ -54,7 +54,7 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">
+        <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
           {isOwnProfile ? 'My Circles' : 'Circles'}
         </h2>
       </div>

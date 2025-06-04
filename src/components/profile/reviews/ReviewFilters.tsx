@@ -46,7 +46,7 @@ const ReviewFilters = ({
 }: ReviewFiltersProps) => {
   return (
     <div className="flex justify-between items-center mb-4">
-      <h2 className="text-xl font-semibold">
+      <h2 className="text-base sm:text-lg lg:text-xl font-semibold">
         {isOwnProfile ? 'My Reviews' : 'Reviews'}
       </h2>
       
