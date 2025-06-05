@@ -62,24 +62,47 @@ export const transformProfile = (profile: StandardProfile, userMetadata?: any): 
 };
 
 /**
+ * Fetch user metadata from Supabase auth
+ */
+const fetchUserMetadata = async (userId: string) => {
+  try {
+    const { data, error } = await supabase.auth.admin.getUserById(userId);
+    
+    if (error) {
+      console.error('Error fetching user metadata:', error);
+      return null;
+    }
+    
+    return data.user?.user_metadata || null;
+  } catch (error) {
+    console.error('Error in fetchUserMetadata:', error);
+    return null;
+  }
+};
+
+/**
  * Fetch a single profile by user ID
  */
 export const fetchSingleProfile = async (userId: string): Promise<ProfileWithFallbacks | null> => {
   if (!userId) return null;
 
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url, bio, location, created_at')
-      .eq('id', userId)
-      .single();
+    // Fetch profile data and user metadata in parallel
+    const [profileResult, userMetadata] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, username, avatar_url, bio, location, created_at')
+        .eq('id', userId)
+        .single(),
+      fetchUserMetadata(userId)
+    ]);
 
-    if (error) {
-      console.error('Error fetching profile:', error);
+    if (profileResult.error) {
+      console.error('Error fetching profile:', profileResult.error);
       return null;
     }
 
-    return transformProfile(data);
+    return transformProfile(profileResult.data, userMetadata);
   } catch (error) {
     console.error('Error in fetchSingleProfile:', error);
     return null;
@@ -93,7 +116,8 @@ export const fetchMultipleProfiles = async (userIds: string[]): Promise<Record<s
   if (!userIds.length) return {};
 
   try {
-    const { data, error } = await supabase
+    // Fetch profile data
+    const { data: profiles, error } = await supabase
       .from('profiles')
       .select('id, username, avatar_url, bio, location, created_at')
       .in('id', userIds);
@@ -105,9 +129,11 @@ export const fetchMultipleProfiles = async (userIds: string[]): Promise<Record<s
 
     const profileMap: Record<string, ProfileWithFallbacks> = {};
     
-    data?.forEach(profile => {
-      profileMap[profile.id] = transformProfile(profile);
-    });
+    // For each profile, fetch user metadata and transform
+    for (const profile of profiles || []) {
+      const userMetadata = await fetchUserMetadata(profile.id);
+      profileMap[profile.id] = transformProfile(profile, userMetadata);
+    }
 
     // Add fallback profiles for missing user IDs
     userIds.forEach(userId => {
