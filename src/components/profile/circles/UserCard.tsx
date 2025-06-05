@@ -46,6 +46,8 @@ const UserCard = ({
   // Don't show follow button if viewing your own card
   const isViewingOwnUser = currentUserId === id;
   
+  console.log('UserCard Debug:', { id, username, isFollowing, relationshipType, isViewingOwnUser });
+  
   // Get the follow button props based on relationship and follow status
   const getFollowButtonProps = () => {
     // Don't show any follow button if viewing your own card
@@ -53,10 +55,11 @@ const UserCard = ({
       return null;
     }
     
-    // In "Following" modal context
+    // In "Following" modal context - these are people the profile user follows
     if (relationshipType === 'following') {
-      // The profile user follows this person, so show "Following" with unfollow option
+      // The current user's relationship with people in the following list
       if (isFollowing) {
+        // Current user also follows this person (mutual follow)
         return {
           variant: isHovering ? "destructive" : "outline",
           text: isHovering ? "Unfollow" : "Following",
@@ -64,7 +67,7 @@ const UserCard = ({
           className: "min-w-20 transition-all"
         };
       } else {
-        // This case shouldn't happen in following list, but fallback to follow
+        // Current user doesn't follow this person yet
         return {
           variant: "default",
           text: "Follow",
@@ -74,7 +77,7 @@ const UserCard = ({
       }
     }
     
-    // In "Followers" modal context
+    // In "Followers" modal context - these are people who follow the profile user
     if (relationshipType === 'follower') {
       if (isFollowing) {
         // Current user already follows this follower back (mutual follow)

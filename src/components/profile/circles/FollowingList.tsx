@@ -24,6 +24,13 @@ const FollowingList = ({
   currentUserId,
   onNavigate
 }: FollowingListProps) => {
+  console.log('FollowingList Debug:', { 
+    followingCount: following.length, 
+    following: following.map(f => ({ id: f.id, username: f.username, isFollowing: f.isFollowing })),
+    currentUserId,
+    isOwnProfile 
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-4">

@@ -20,7 +20,16 @@ export const fetchFollowers = async (profileUserId: string, currentUserId?: stri
     
     console.log(`Fetched ${followersData?.length || 0} followers for profile ${profileUserId}:`, followersData);
     
-    return followersData || [];
+    // Map the data to ensure property consistency
+    const mappedData = followersData?.map(follower => ({
+      id: follower.id,
+      username: follower.username,
+      avatar_url: follower.avatar_url,
+      isFollowing: follower.isFollowing // This should now match
+    })) || [];
+    
+    console.log('Mapped followers data:', mappedData);
+    return mappedData;
   } catch (error) {
     console.error('Error in fetchFollowers:', error);
     return [];
@@ -45,7 +54,16 @@ export const fetchFollowing = async (profileUserId: string, currentUserId?: stri
     
     console.log(`Fetched ${followingData?.length || 0} following for profile ${profileUserId}:`, followingData);
     
-    return followingData || [];
+    // Map the data to ensure property consistency
+    const mappedData = followingData?.map(following => ({
+      id: following.id,
+      username: following.username,
+      avatar_url: following.avatar_url,
+      isFollowing: following.isFollowing // This should now match
+    })) || [];
+    
+    console.log('Mapped following data:', mappedData);
+    return mappedData;
   } catch (error) {
     console.error('Error in fetchFollowing:', error);
     return [];
