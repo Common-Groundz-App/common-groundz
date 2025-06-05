@@ -720,7 +720,9 @@ export type Database = {
           bio: string | null
           cover_url: string | null
           created_at: string
+          first_name: string | null
           id: string
+          last_name: string | null
           location: string | null
           preferences: Json | null
           updated_at: string
@@ -731,7 +733,9 @@ export type Database = {
           bio?: string | null
           cover_url?: string | null
           created_at?: string
+          first_name?: string | null
           id: string
+          last_name?: string | null
           location?: string | null
           preferences?: Json | null
           updated_at?: string
@@ -742,7 +746,9 @@ export type Database = {
           bio?: string | null
           cover_url?: string | null
           created_at?: string
+          first_name?: string | null
           id?: string
+          last_name?: string | null
           location?: string | null
           preferences?: Json | null
           updated_at?: string

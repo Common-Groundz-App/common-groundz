@@ -8,6 +8,8 @@ export interface StandardProfile {
   bio?: string | null;
   location?: string | null;
   created_at?: string;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 export interface ProfileWithFallbacks {
@@ -24,20 +26,16 @@ export interface ProfileWithFallbacks {
 /**
  * Transforms a raw profile into a standardized format with fallbacks
  */
-export const transformProfile = (profile: StandardProfile, userMetadata?: any): ProfileWithFallbacks => {
+export const transformProfile = (profile: StandardProfile): ProfileWithFallbacks => {
   // Generate display name with fallbacks - prioritize first_name + last_name
   let displayName = '';
   
-  // First try to construct from first_name and last_name
-  if (userMetadata) {
-    const firstName = userMetadata.first_name || '';
-    const lastName = userMetadata.last_name || '';
-    if (firstName || lastName) {
-      displayName = `${firstName} ${lastName}`.trim();
-    }
+  // First try to construct from first_name and last_name from profiles table
+  if (profile.first_name || profile.last_name) {
+    displayName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
   }
   
-  // If no name from metadata, fall back to username
+  // If no name from profiles, fall back to username
   if (!displayName) {
     displayName = profile.username || 'Anonymous User';
   }
@@ -62,47 +60,24 @@ export const transformProfile = (profile: StandardProfile, userMetadata?: any): 
 };
 
 /**
- * Fetch user metadata from Supabase auth
- */
-const fetchUserMetadata = async (userId: string) => {
-  try {
-    const { data, error } = await supabase.auth.admin.getUserById(userId);
-    
-    if (error) {
-      console.error('Error fetching user metadata:', error);
-      return null;
-    }
-    
-    return data.user?.user_metadata || null;
-  } catch (error) {
-    console.error('Error in fetchUserMetadata:', error);
-    return null;
-  }
-};
-
-/**
  * Fetch a single profile by user ID
  */
 export const fetchSingleProfile = async (userId: string): Promise<ProfileWithFallbacks | null> => {
   if (!userId) return null;
 
   try {
-    // Fetch profile data and user metadata in parallel
-    const [profileResult, userMetadata] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select('id, username, avatar_url, bio, location, created_at')
-        .eq('id', userId)
-        .single(),
-      fetchUserMetadata(userId)
-    ]);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, bio, location, created_at, first_name, last_name')
+      .eq('id', userId)
+      .single();
 
-    if (profileResult.error) {
-      console.error('Error fetching profile:', profileResult.error);
+    if (error) {
+      console.error('Error fetching profile:', error);
       return null;
     }
 
-    return transformProfile(profileResult.data, userMetadata);
+    return transformProfile(data);
   } catch (error) {
     console.error('Error in fetchSingleProfile:', error);
     return null;
@@ -116,10 +91,9 @@ export const fetchMultipleProfiles = async (userIds: string[]): Promise<Record<s
   if (!userIds.length) return {};
 
   try {
-    // Fetch profile data
     const { data: profiles, error } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, bio, location, created_at')
+      .select('id, username, avatar_url, bio, location, created_at, first_name, last_name')
       .in('id', userIds);
 
     if (error) {
@@ -129,11 +103,10 @@ export const fetchMultipleProfiles = async (userIds: string[]): Promise<Record<s
 
     const profileMap: Record<string, ProfileWithFallbacks> = {};
     
-    // For each profile, fetch user metadata and transform
-    for (const profile of profiles || []) {
-      const userMetadata = await fetchUserMetadata(profile.id);
-      profileMap[profile.id] = transformProfile(profile, userMetadata);
-    }
+    // Transform each profile
+    profiles?.forEach(profile => {
+      profileMap[profile.id] = transformProfile(profile);
+    });
 
     // Add fallback profiles for missing user IDs
     userIds.forEach(userId => {
