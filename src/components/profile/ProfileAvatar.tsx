@@ -33,7 +33,7 @@ const ProfileAvatar = ({
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [selectedImageSrc, setSelectedImageSrc] = useState<string>('');
   const { data: profile } = useProfile(userId || user?.id);
-  const { updateProfileCache } = useProfileCacheActions();
+  const { invalidateProfile } = useProfileCacheActions();
   
   console.log("ProfileAvatar rendering with profileImage:", propProfileImage);
 
@@ -60,7 +60,7 @@ const ProfileAvatar = ({
   };
 
   const handleCropComplete = async (croppedImageBlob: Blob) => {
-    if (!user || !onProfileImageChange) return;
+    if (!user) return;
     
     try {
       setUploading(true);
@@ -82,31 +82,30 @@ const ProfileAvatar = ({
         return;
       }
       
-      // Get the public URL
+      // Get the public URL (without timestamp for database storage)
       const { data: { publicUrl } } = supabase.storage
         .from('profile_images')
         .getPublicUrl(filePath);
       
-      // Add a timestamp to force refresh
-      const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
+      console.log("New profile image URL:", publicUrl);
       
-      console.log("New profile image URL:", urlWithTimestamp);
+      // Immediately save to database
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
       
-      // Store the image URL in temporary state
-      if (onImageSelected) {
-        onImageSelected(publicUrl);
-      }
-      
-      // Update the visual display
-      onProfileImageChange(urlWithTimestamp);
-      
-      // Update the profile cache
-      if (profile) {
-        updateProfileCache(user.id, {
-          ...profile,
-          avatar_url: publicUrl
+      if (updateError) {
+        toast({
+          title: 'Failed to update profile',
+          description: updateError.message,
+          variant: 'destructive'
         });
+        return;
       }
+      
+      // Invalidate profile cache to trigger re-renders everywhere
+      invalidateProfile(user.id);
       
       // Close the crop modal
       setIsCropModalOpen(false);
@@ -144,7 +143,7 @@ const ProfileAvatar = ({
             className="w-24 h-24 md:w-32 md:h-32 border-4 border-white"
           />
           
-          {isEditable && onProfileImageChange && (
+          {isEditable && (
             <>
               <label 
                 htmlFor="profile-upload" 

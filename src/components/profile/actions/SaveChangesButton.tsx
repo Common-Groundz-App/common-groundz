@@ -19,6 +19,9 @@ const SaveChangesButton = ({
 }: SaveChangesButtonProps) => {
   const isMobile = useIsMobile();
   
+  // Only show if there are actual changes that need saving
+  // Avatar changes are now saved immediately, so this button
+  // should only appear for other profile changes
   if (!hasChanges) {
     return null;
   }
