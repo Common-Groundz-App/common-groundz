@@ -1,4 +1,3 @@
-
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { fetchSingleProfile, fetchMultipleProfiles, ProfileWithFallbacks } from '@/services/enhancedProfileService';
 
@@ -20,6 +19,7 @@ export const useProfile = (userId: string | null | undefined) => {
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
     refetchOnWindowFocus: false,
+    retry: 1, // Reduce retries to prevent flickering
   });
 };
 
@@ -87,11 +87,17 @@ export const useProfileCacheActions = () => {
   const queryClient = useQueryClient();
 
   const invalidateProfile = (userId: string) => {
-    queryClient.invalidateQueries({ queryKey: profileKeys.single(userId) });
-    queryClient.invalidateQueries({ queryKey: profileKeys.all });
+    console.log("Invalidating profile cache for user:", userId);
+    
+    // Use a debounced approach to prevent rapid successive invalidations
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: profileKeys.single(userId) });
+      queryClient.invalidateQueries({ queryKey: profileKeys.all });
+    }, 100);
   };
 
   const updateProfileCache = (userId: string, updatedProfile: ProfileWithFallbacks) => {
+    console.log("Updating profile cache for user:", userId, updatedProfile);
     queryClient.setQueryData(profileKeys.single(userId), updatedProfile);
   };
 

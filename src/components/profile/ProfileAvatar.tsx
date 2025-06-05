@@ -35,7 +35,11 @@ const ProfileAvatar = ({
   const { data: profile } = useProfile(userId || user?.id);
   const { invalidateProfile } = useProfileCacheActions();
   
-  console.log("ProfileAvatar rendering with profileImage:", propProfileImage);
+  console.log("ProfileAvatar (profile directory) rendering with:", {
+    userId: userId || user?.id,
+    profileImage: propProfileImage,
+    profile
+  });
 
   const handleFileSelection = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -100,7 +104,7 @@ const ProfileAvatar = ({
       
       console.log("Generated public URL:", publicUrl);
       
-      // Immediately save to database
+      // Update database with the new avatar URL
       console.log("Updating database with new avatar URL...");
       const { error: updateError, data: updateData } = await supabase
         .from('profiles')
@@ -120,12 +124,14 @@ const ProfileAvatar = ({
       
       console.log("Database updated successfully:", updateData);
       
-      // Invalidate profile cache to trigger re-renders everywhere
-      console.log("Invalidating profile cache for user:", user.id);
-      invalidateProfile(user.id);
-      
-      // Also trigger a global profile update event for other components
-      window.dispatchEvent(new CustomEvent('profile-updated'));
+      // Add a small delay before invalidating cache to ensure database is updated
+      setTimeout(() => {
+        console.log("Invalidating profile cache for user:", user.id);
+        invalidateProfile(user.id);
+        
+        // Dispatch profile update event
+        window.dispatchEvent(new CustomEvent('profile-updated'));
+      }, 500);
       
       // Close the crop modal
       setIsCropModalOpen(false);

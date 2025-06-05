@@ -17,6 +17,8 @@ export function UserAvatar({
   className,
   size = 'md'
 }: UserAvatarProps) {
+  console.log("UserAvatar component called with:", { userId, username, imageUrl });
+  
   // Use the standardized ProfileAvatar component
   return (
     <ProfileAvatar 

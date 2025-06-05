@@ -27,7 +27,9 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
   fallbackClassName,
   showTooltip = false
 }) => {
-  const { data: profile, isLoading } = useProfile(userId);
+  const { data: profile, isLoading, error } = useProfile(userId);
+
+  console.log("ProfileAvatar rendering for user:", userId, "profile data:", profile);
 
   if (!userId) {
     return (
@@ -49,12 +51,26 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
     );
   }
 
-  // Add cache busting timestamp to force image refresh
-  const avatarUrl = profile?.avatar_url ? 
-    `${profile.avatar_url}?t=${Date.now()}` : 
-    '';
+  if (error) {
+    console.error("ProfileAvatar error for user:", userId, error);
+    return (
+      <Avatar className={cn(sizeClasses[size], className)}>
+        <AvatarFallback className={cn('bg-brand-orange text-white', fallbackClassName)}>
+          AU
+        </AvatarFallback>
+      </Avatar>
+    );
+  }
 
-  console.log("ProfileAvatar rendering for user:", userId, "with URL:", avatarUrl);
+  // Use the avatar URL without cache busting timestamp to prevent flickering
+  const avatarUrl = profile?.avatar_url || '';
+
+  console.log("ProfileAvatar displaying:", {
+    userId,
+    avatarUrl,
+    displayName: profile?.displayName,
+    initials: profile?.initials
+  });
 
   return (
     <Avatar className={cn(sizeClasses[size], className)}>
@@ -62,10 +78,10 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
         src={avatarUrl} 
         alt={profile?.displayName || 'User'}
         onError={(e) => {
-          console.error("Avatar image failed to load:", avatarUrl);
+          console.error("Avatar image failed to load:", avatarUrl, "for user:", userId);
         }}
         onLoad={() => {
-          console.log("Avatar image loaded successfully:", avatarUrl);
+          console.log("Avatar image loaded successfully:", avatarUrl, "for user:", userId);
         }}
       />
       <AvatarFallback className={cn('bg-brand-orange text-white font-semibold', fallbackClassName)}>

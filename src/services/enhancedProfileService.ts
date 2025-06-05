@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface StandardProfile {
@@ -27,6 +26,8 @@ export interface ProfileWithFallbacks {
  * Transforms a raw profile into a standardized format with fallbacks
  */
 export const transformProfile = (profile: StandardProfile): ProfileWithFallbacks => {
+  console.log("Transforming profile:", profile);
+  
   // Generate display name with fallbacks - prioritize first_name + last_name
   let displayName = '';
   
@@ -40,23 +41,57 @@ export const transformProfile = (profile: StandardProfile): ProfileWithFallbacks
     displayName = profile.username || 'Anonymous User';
   }
 
-  // Generate initials
-  const getInitials = (name: string): string => {
-    if (!name || name === 'Anonymous User') return 'AU';
+  // Generate initials with improved logic
+  const getInitials = (name: string, firstName?: string | null, lastName?: string | null): string => {
+    console.log("Generating initials for:", { name, firstName, lastName });
     
-    const words = name.trim().split(' ');
-    if (words.length === 1) {
-      return words[0].substring(0, 2).toUpperCase();
+    // First try to use first_name and last_name directly
+    if (firstName && lastName) {
+      const initials = (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
+      console.log("Generated initials from first/last name:", initials);
+      return initials;
     }
-    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    
+    // If only one name is available
+    if (firstName) {
+      const initials = firstName.substring(0, 2).toUpperCase();
+      console.log("Generated initials from first name only:", initials);
+      return initials;
+    }
+    
+    if (lastName) {
+      const initials = lastName.substring(0, 2).toUpperCase();
+      console.log("Generated initials from last name only:", initials);
+      return initials;
+    }
+    
+    // Fall back to display name parsing
+    if (!name || name === 'Anonymous User') {
+      console.log("Using default initials: AU");
+      return 'AU';
+    }
+    
+    const words = name.trim().split(' ').filter(word => word.length > 0);
+    if (words.length === 1) {
+      const initials = words[0].substring(0, 2).toUpperCase();
+      console.log("Generated initials from single word:", initials);
+      return initials;
+    }
+    
+    const initials = (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    console.log("Generated initials from multiple words:", initials);
+    return initials;
   };
 
-  return {
+  const result = {
     ...profile,
     username: profile.username || displayName,
     displayName,
-    initials: getInitials(displayName)
+    initials: getInitials(displayName, profile.first_name, profile.last_name)
   };
+
+  console.log("Transformed profile result:", result);
+  return result;
 };
 
 /**
