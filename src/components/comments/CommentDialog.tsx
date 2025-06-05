@@ -214,6 +214,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   };
 
   const handleDeleteClick = (commentId: string) => {
+    console.log("Delete button clicked for comment:", commentId);
     commentToDeleteRef.current = commentId;
     console.log("Delete button clicked for comment:", commentId, "Stored in ref:", commentToDeleteRef.current);
     
@@ -434,19 +435,33 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                                 <Button 
                                   variant="ghost" 
                                   size="icon" 
-                                  className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="h-7 w-7 text-muted-foreground opacity-50 sm:opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    console.log("Dropdown trigger clicked for comment:", comment.id);
+                                    e.stopPropagation();
+                                  }}
                                 >
                                   <MoreHorizontal size={14} />
                                   <span className="sr-only">More options</span>
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem onClick={() => handleEditClick(comment)}>
+                              <DropdownMenuContent align="end" className="w-40 z-[105]">
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    console.log("Edit menu item clicked for comment:", comment.id);
+                                    e.stopPropagation();
+                                    handleEditClick(comment);
+                                  }}
+                                >
                                   Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   className="text-destructive focus:text-destructive"
-                                  onClick={() => handleDeleteClick(comment.id)}
+                                  onClick={(e) => {
+                                    console.log("Delete menu item clicked for comment:", comment.id);
+                                    e.stopPropagation();
+                                    handleDeleteClick(comment.id);
+                                  }}
                                 >
                                   Delete
                                 </DropdownMenuItem>
@@ -503,7 +518,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
         }}
       >
         <AlertDialogContent 
-          className="bg-white rounded-xl border-none shadow-lg max-w-sm z-[102]"
+          className="bg-white rounded-xl border-none shadow-lg max-w-sm z-[105]"
           aria-describedby="delete-comment-description"
           forceMount
         >
