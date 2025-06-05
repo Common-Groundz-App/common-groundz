@@ -7,6 +7,7 @@ import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
+import { PillTabs } from '@/components/ui/pill-tabs';
 import { MenuItem, MenuContainer } from '@/components/ui/fluid-menu';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils, Menu as MenuIcon, X } from 'lucide-react';
@@ -375,32 +376,13 @@ const Explore = () => {
             
             {/* Navigation - Responsive */}
             <div className="overflow-x-hidden mb-6">
-              {/* Fluid Menu for screens < 630px */}
-              <div className="max-[629px]:flex max-[629px]:justify-center min-[630px]:hidden">
-                <MenuContainer>
-                  {/* Menu trigger with current active tab icon */}
-                  <MenuItem 
-                    icon={
-                      <div className="relative w-6 h-6">
-                        <div className="absolute inset-0 transition-all duration-300 ease-in-out origin-center opacity-100 scale-100 rotate-0 [div[data-expanded=true]_&]:opacity-0 [div[data-expanded=true]_&]:scale-0 [div[data-expanded=true]_&]:rotate-180">
-                          <activeTabItem.icon size={24} strokeWidth={1.5} className="text-brand-orange" />
-                        </div>
-                        <div className="absolute inset-0 transition-all duration-300 ease-in-out origin-center opacity-0 scale-0 -rotate-180 [div[data-expanded=true]_&]:opacity-100 [div[data-expanded=true]_&]:scale-100 [div[data-expanded=true]_&]:rotate-0">
-                          <X size={24} strokeWidth={1.5} className="text-brand-orange" />
-                        </div>
-                      </div>
-                    } 
-                  />
-                  {/* Menu items */}
-                  {tabItems.map((item) => (
-                    <MenuItem 
-                      key={item.value}
-                      icon={<item.icon size={24} strokeWidth={1.5} />} 
-                      onClick={() => setActiveTab(item.value)}
-                      isActive={activeTab === item.value}
-                    />
-                  ))}
-                </MenuContainer>
+              {/* Pill Navigation for screens < 630px */}
+              <div className="max-[629px]:block min-[630px]:hidden">
+                <PillTabs 
+                  items={tabItems}
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
+                />
               </div>
 
               {/* TubelightTabs for screens >= 630px */}
