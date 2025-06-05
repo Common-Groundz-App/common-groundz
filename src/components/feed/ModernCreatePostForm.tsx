@@ -1,31 +1,36 @@
+
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { ImageIcon, X } from 'lucide-react';
-import { useUploadThing } from "@/utils/uploadthing";
-import { generateReactHelpers } from "@uploadthing/react/hooks";
-import { useDebounce } from '@/hooks/use-debounce';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 
 interface ModernCreatePostFormProps {
   onSuccess?: () => void;
   initialContent?: string;
+  postToEdit?: any;
+  onCancel?: () => void;
+  defaultPostType?: string;
+  profileData?: any;
 }
 
-const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({ onSuccess, initialContent }) => {
+const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({ 
+  onSuccess, 
+  initialContent,
+  postToEdit,
+  onCancel,
+  defaultPostType,
+  profileData
+}) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [content, setContent] = useState(initialContent || '');
+  const [content, setContent] = useState(initialContent || postToEdit?.content || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const debouncedContent = useDebounce(content, 500);
-
-  const { startUpload } = useUploadThing("imageUploader");
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(postToEdit?.image_url || null);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
@@ -58,39 +63,47 @@ const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({ onSuccess, 
       return;
     }
 
+    if (!content.trim()) {
+      toast({
+        title: "Content required",
+        description: "Please enter some content for your post.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let imageUrl: string | undefined = undefined;
 
+      // For now, skip image upload functionality since uploadthing is not available
       if (selectedFile) {
-        const files = [selectedFile];
-        const uploadResult = await startUpload(files);
-
-        if (uploadResult && uploadResult[0]?.fileUrl) {
-          imageUrl = uploadResult[0].fileUrl;
-        } else {
-          toast({
-            title: "Image upload failed",
-            description: "There was an error uploading your image.",
-            variant: "destructive",
-          });
-          setIsSubmitting(false);
-          return;
-        }
+        toast({
+          title: "Image upload temporarily unavailable",
+          description: "Image upload feature is currently being updated.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
 
-      const response = await fetch('/api/createPost', {
+      const endpoint = postToEdit ? '/api/updatePost' : '/api/createPost';
+      const body = postToEdit 
+        ? { id: postToEdit.id, content, imageUrl }
+        : { content, imageUrl, post_type: defaultPostType || 'post' };
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content: debouncedContent, imageUrl }),
+        body: JSON.stringify(body),
       });
 
       if (response.ok) {
         toast({
-          title: "Post created",
-          description: "Your post has been created successfully.",
+          title: postToEdit ? "Post updated" : "Post created",
+          description: `Your post has been ${postToEdit ? 'updated' : 'created'} successfully.`,
         });
         setContent('');
         setSelectedFile(null);
@@ -101,15 +114,15 @@ const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({ onSuccess, 
       } else {
         const errorData = await response.json();
         toast({
-          title: "Failed to create post",
-          description: errorData.message || "An error occurred while creating the post.",
+          title: `Failed to ${postToEdit ? 'update' : 'create'} post`,
+          description: errorData.message || "An error occurred while processing the post.",
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Create post error:", error);
+      console.error("Post operation error:", error);
       toast({
-        title: "Failed to create post",
+        title: `Failed to ${postToEdit ? 'update' : 'create'} post`,
         description: "An unexpected error occurred.",
         variant: "destructive",
       });
@@ -165,20 +178,33 @@ const ModernCreatePostForm: React.FC<ModernCreatePostFormProps> = ({ onSuccess, 
                   onChange={handleFileChange}
                 />
                 <label htmlFor="image-upload">
-                  <Button variant="ghost" size="sm" disabled={isSubmitting}>
-                    <ImageIcon className="mr-2 h-4 w-4" />
-                    Add Image
+                  <Button variant="ghost" size="sm" disabled={isSubmitting} asChild>
+                    <span>
+                      <ImageIcon className="mr-2 h-4 w-4" />
+                      Add Image
+                    </span>
                   </Button>
                 </label>
               </div>
-              <Button
-                size="sm"
-                onClick={handleSubmit}
-                disabled={isSubmitting || !debouncedContent.trim()}
-                isLoading={isSubmitting}
-              >
-                Post
-              </Button>
+              <div className="flex gap-2">
+                {onCancel && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onCancel}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !content.trim()}
+                >
+                  {isSubmitting ? 'Posting...' : (postToEdit ? 'Update' : 'Post')}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
