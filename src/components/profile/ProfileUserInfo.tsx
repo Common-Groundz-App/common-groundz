@@ -10,6 +10,7 @@ interface ProfileUserInfoProps {
   formattedUsername?: string;
   onEditClick?: () => void;
   isVerified?: boolean;
+  displayName?: string;
 }
 
 const ProfileUserInfo = ({ 
@@ -18,12 +19,15 @@ const ProfileUserInfo = ({
   isOwnProfile, 
   formattedUsername,
   onEditClick,
-  isVerified = false
+  isVerified = false,
+  displayName
 }: ProfileUserInfoProps) => {
   return (
     <div className="w-full text-center mb-6">
       <div className="flex items-center justify-center">
-        <h2 className="text-xl md:text-2xl font-bold text-foreground">{username}</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-foreground">
+          {displayName || username}
+        </h2>
         {isVerified && (
           <CheckCircle 
             size={16} 

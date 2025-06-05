@@ -25,10 +25,11 @@ export interface ProfileWithFallbacks {
  * Transforms a raw profile into a standardized format with fallbacks
  */
 export const transformProfile = (profile: StandardProfile, userMetadata?: any): ProfileWithFallbacks => {
-  // Generate display name with fallbacks
-  let displayName = profile.username || '';
+  // Generate display name with fallbacks - prioritize first_name + last_name
+  let displayName = '';
   
-  if (!displayName && userMetadata) {
+  // First try to construct from first_name and last_name
+  if (userMetadata) {
     const firstName = userMetadata.first_name || '';
     const lastName = userMetadata.last_name || '';
     if (firstName || lastName) {
@@ -36,8 +37,9 @@ export const transformProfile = (profile: StandardProfile, userMetadata?: any): 
     }
   }
   
+  // If no name from metadata, fall back to username
   if (!displayName) {
-    displayName = 'Anonymous User';
+    displayName = profile.username || 'Anonymous User';
   }
 
   // Generate initials

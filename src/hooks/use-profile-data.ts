@@ -102,6 +102,7 @@ export const useProfileData = (userId?: string) => {
         console.log("Enhanced profile data loaded:", profile);
         console.log("Raw profile data loaded:", rawProfile);
         
+        // Use displayName which now prioritizes first_name + last_name
         setUsername(profile.displayName);
         setProfileMetadata(user.user_metadata, { 
           username: profile.username,

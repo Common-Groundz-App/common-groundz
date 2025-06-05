@@ -89,11 +89,12 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
           />
           
           <ProfileUserInfo 
-            username={displayName}
+            username={username || ''}
             bio={currentBio}
             isOwnProfile={isOwnProfile}
             formattedUsername={formattedUsername}
             onEditClick={isOwnProfile ? () => setIsEditModalOpen(true) : undefined}
+            displayName={displayName}
           />
           
           <ProfileBadges isOwnProfile={isOwnProfile} />
