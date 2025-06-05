@@ -20,12 +20,12 @@ export const fetchFollowers = async (profileUserId: string, currentUserId?: stri
     
     console.log(`Fetched ${followersData?.length || 0} followers for profile ${profileUserId}:`, followersData);
     
-    // Map the data to ensure property consistency
+    // Map the data to ensure property consistency - convert snake_case to camelCase
     const mappedData = followersData?.map(follower => ({
       id: follower.id,
       username: follower.username,
       avatar_url: follower.avatar_url,
-      isFollowing: follower.isFollowing // This should now match
+      isFollowing: follower.is_following // Map snake_case to camelCase
     })) || [];
     
     console.log('Mapped followers data:', mappedData);
@@ -54,12 +54,12 @@ export const fetchFollowing = async (profileUserId: string, currentUserId?: stri
     
     console.log(`Fetched ${followingData?.length || 0} following for profile ${profileUserId}:`, followingData);
     
-    // Map the data to ensure property consistency
+    // Map the data to ensure property consistency - convert snake_case to camelCase
     const mappedData = followingData?.map(following => ({
       id: following.id,
       username: following.username,
       avatar_url: following.avatar_url,
-      isFollowing: following.isFollowing // This should now match
+      isFollowing: following.is_following // Map snake_case to camelCase
     })) || [];
     
     console.log('Mapped following data:', mappedData);
