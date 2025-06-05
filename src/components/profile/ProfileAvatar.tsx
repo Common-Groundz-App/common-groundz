@@ -1,9 +1,12 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile, useProfileCacheActions } from '@/hooks/use-profile-cache';
 import { ProfileAvatar as CommonProfileAvatar } from '@/components/common/ProfileAvatar';
+import { AvatarCropModal } from './AvatarCropModal';
+import { fileToDataUrl } from '@/utils/imageProcessing';
 
 interface ProfileAvatarProps {
   userId?: string | null;
@@ -27,25 +30,48 @@ const ProfileAvatar = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [selectedImageSrc, setSelectedImageSrc] = useState<string>('');
   const { data: profile } = useProfile(userId || user?.id);
   const { updateProfileCache } = useProfileCacheActions();
   
   console.log("ProfileAvatar rendering with profileImage:", propProfileImage);
 
-  const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelection = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user || !onProfileImageChange) return;
+    if (!file || !user) return;
+    
+    try {
+      // Convert file to data URL for cropping
+      const imageSrc = await fileToDataUrl(file);
+      setSelectedImageSrc(imageSrc);
+      setIsCropModalOpen(true);
+    } catch (error) {
+      console.error('Error reading file:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to read the selected image',
+        variant: 'destructive'
+      });
+    }
+    
+    // Reset file input
+    e.target.value = '';
+  };
+
+  const handleCropComplete = async (croppedImageBlob: Blob) => {
+    if (!user || !onProfileImageChange) return;
     
     try {
       setUploading(true);
       
-      // Upload to Supabase Storage
-      const fileExt = file.name.split('.').pop();
+      // Upload the cropped image to Supabase Storage
+      const fileExt = 'jpg'; // Always use jpg for cropped images
       const filePath = `${user.id}/avatar.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('profile_images')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, croppedImageBlob, { upsert: true });
       
       if (uploadError) {
         toast({
@@ -82,6 +108,15 @@ const ProfileAvatar = ({
         });
       }
       
+      // Close the crop modal
+      setIsCropModalOpen(false);
+      setSelectedImageSrc('');
+      
+      toast({
+        title: 'Avatar updated',
+        description: 'Your profile picture has been updated successfully',
+      });
+      
     } catch (error) {
       console.error('Error uploading profile image:', error);
       toast({
@@ -94,37 +129,52 @@ const ProfileAvatar = ({
     }
   };
 
+  const handleCropCancel = () => {
+    setIsCropModalOpen(false);
+    setSelectedImageSrc('');
+  };
+
   return (
-    <div className="relative mb-4">
-      <div className="relative">
-        <CommonProfileAvatar 
-          userId={userId || user?.id}
-          size="xl"
-          className="w-24 h-24 md:w-32 md:h-32 border-4 border-white"
-        />
-        
-        {isEditable && onProfileImageChange && (
-          <>
-            <label 
-              htmlFor="profile-upload" 
-              className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
-            >
-              <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
-                {uploading || isLoading ? '...' : '+'}
-              </div>
-            </label>
-            <input 
-              id="profile-upload" 
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
-              onChange={handleProfileUpload}
-              disabled={uploading || isLoading}
-            />
-          </>
-        )}
+    <>
+      <div className="relative mb-4">
+        <div className="relative">
+          <CommonProfileAvatar 
+            userId={userId || user?.id}
+            size="xl"
+            className="w-24 h-24 md:w-32 md:h-32 border-4 border-white"
+          />
+          
+          {isEditable && onProfileImageChange && (
+            <>
+              <label 
+                htmlFor="profile-upload" 
+                className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
+              >
+                <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
+                  {uploading || isLoading ? '...' : '+'}
+                </div>
+              </label>
+              <input 
+                id="profile-upload" 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleFileSelection}
+                disabled={uploading || isLoading}
+              />
+            </>
+          )}
+        </div>
       </div>
-    </div>
+
+      <AvatarCropModal
+        isOpen={isCropModalOpen}
+        onClose={handleCropCancel}
+        imageSrc={selectedImageSrc}
+        onCropComplete={handleCropComplete}
+        isProcessing={uploading}
+      />
+    </>
   );
 };
 
