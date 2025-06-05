@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -73,37 +72,44 @@ const Explore = () => {
     {
       value: "featured",
       label: "Featured",
-      icon: Star
+      icon: Star,
+      emoji: "⭐"
     },
     {
       value: "places",
       label: "Places",
-      icon: MapPin
+      icon: MapPin,
+      emoji: "📍"
     },
     {
       value: "movies",
       label: "Movies",
-      icon: Film
+      icon: Film,
+      emoji: "🎬"
     },
     {
       value: "books",
       label: "Books",
-      icon: BookOpen
+      icon: BookOpen,
+      emoji: "📚"
     },
     {
       value: "food",
       label: "Food",
-      icon: Utensils
+      icon: Utensils,
+      emoji: "🍽️"
     },
     {
       value: "products",
       label: "Products",
-      icon: ShoppingBag
+      icon: ShoppingBag,
+      emoji: "🛍️"
     },
     {
       value: "people",
       label: "People",
-      icon: Users
+      icon: Users,
+      emoji: "👥"
     }
   ];
 
