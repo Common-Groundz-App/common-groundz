@@ -188,9 +188,14 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
         throw new Error("Failed to update comment");
       }
       
+      // Update the comment in local state and add edited_at timestamp
       setComments(prev => prev.map(comment => 
         comment.id === editingCommentId 
-          ? { ...comment, content: editCommentContent } 
+          ? { 
+              ...comment, 
+              content: editCommentContent,
+              edited_at: new Date().toISOString() // Add current timestamp for immediate UI update
+            } 
           : comment
       ));
       
@@ -320,6 +325,10 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
     }
   };
 
+  const isCommentEdited = (comment: CommentData) => {
+    return comment.edited_at && comment.edited_at !== comment.created_at;
+  };
+
   const isCurrentUserComment = (userId: string) => {
     return user && user.id === userId;
   };
@@ -390,9 +399,15 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                                 userId={comment.user_id}
                                 className="text-sm"
                               />
-                              <span className="text-xs text-muted-foreground">
-                                {formatRelativeTime(comment.created_at)}
-                              </span>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <span>{formatRelativeTime(comment.created_at)}</span>
+                                {isCommentEdited(comment) && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="text-muted-foreground italic">Edited</span>
+                                  </>
+                                )}
+                              </div>
                             </div>
                             
                             {editingCommentId === comment.id ? (

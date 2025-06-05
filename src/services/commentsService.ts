@@ -8,6 +8,7 @@ export interface CommentData {
   user_id: string;
   username?: string;
   avatar_url?: string;
+  edited_at?: string;
 }
 
 export const fetchComments = async (itemId: string, itemType: 'recommendation' | 'post'): Promise<CommentData[]> => {
@@ -30,7 +31,8 @@ export const fetchComments = async (itemId: string, itemType: 'recommendation' |
       created_at: comment.created_at,
       user_id: comment.user_id,
       username: comment.username || 'Unknown user',
-      avatar_url: comment.avatar_url
+      avatar_url: comment.avatar_url,
+      edited_at: comment.edited_at
     })) : [];
   } catch (error) {
     console.error(`Error fetching ${itemType} comments:`, error);

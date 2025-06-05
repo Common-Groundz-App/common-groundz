@@ -469,6 +469,7 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          edited_at: string | null
           id: string
           is_deleted: boolean
           post_id: string
@@ -478,6 +479,7 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
+          edited_at?: string | null
           id?: string
           is_deleted?: boolean
           post_id: string
@@ -487,6 +489,7 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          edited_at?: string | null
           id?: string
           is_deleted?: boolean
           post_id?: string
@@ -751,6 +754,7 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          edited_at: string | null
           id: string
           is_deleted: boolean
           recommendation_id: string
@@ -760,6 +764,7 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
+          edited_at?: string | null
           id?: string
           is_deleted?: boolean
           recommendation_id: string
@@ -769,6 +774,7 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          edited_at?: string | null
           id?: string
           is_deleted?: boolean
           recommendation_id?: string
@@ -1257,6 +1263,7 @@ export type Database = {
           user_id: string
           username: string
           avatar_url: string
+          edited_at: string
         }[]
       }
       get_follower_count_by_user_id: {
