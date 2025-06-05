@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,6 +50,18 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Sort comments: current user's comments first, then others by most recent
+  const sortedComments = useMemo(() => {
+    if (!user || comments.length === 0) return comments;
+    
+    const currentUserComments = comments.filter(c => c.user_id === user.id);
+    const otherComments = comments
+      .filter(c => c.user_id !== user.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    
+    return [...currentUserComments, ...otherComments];
+  }, [comments, user]);
   
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -379,7 +391,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                 </div>
               ) : (
                 <div className="space-y-3 pt-2 pb-4">
-                  {comments.map((comment) => (
+                  {sortedComments.map((comment) => (
                     <div 
                       key={comment.id} 
                       className={`relative group flex gap-3 p-3 rounded-lg transition-colors ${
