@@ -45,27 +45,22 @@ export function UserMenu() {
       setIsSigningOut(true);
       setIsOpen(false);
       
-      console.log('🚪 UserMenu: Starting enhanced sign out process');
+      console.log('UserMenu: Starting sign out process');
       
       const { error } = await signOut();
       
       if (error) {
-        console.error('❌ UserMenu: Sign out failed:', error);
+        console.error('UserMenu: Sign out failed:', error);
         
         // Check if it's a session-related error that we can ignore
-        if (error.message?.includes('session') || 
-            error.message?.includes('missing') || 
-            error.message?.includes('expired') ||
-            error.message?.includes('Auth session missing')) {
-          console.log('✅ UserMenu: Session error handled, user signed out successfully');
+        if (error.message?.includes('session') || error.message?.includes('missing')) {
+          console.log('UserMenu: Session error ignored, user likely already signed out');
           toast({
             title: "Signed out successfully",
             description: "You have been logged out of your account.",
           });
           // Force navigation to home page
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 100);
+          navigate('/', { replace: true });
           return;
         }
         
@@ -78,29 +73,24 @@ export function UserMenu() {
         return;
       }
       
-      console.log('✅ UserMenu: Sign out successful');
+      console.log('UserMenu: Sign out successful');
       toast({
         title: "Signed out successfully",
         description: "You have been logged out of your account.",
       });
       
       // Force navigation to home page after successful logout
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
+      navigate('/', { replace: true });
     } catch (error) {
-      console.error('💥 UserMenu: Unexpected error during sign out:', error);
+      console.error('UserMenu: Error during sign out:', error);
       toast({
-        title: "Signed out successfully", // Still show success to user
-        description: "You have been logged out of your account.",
+        title: "Sign out failed",
+        description: "An unexpected error occurred while signing out.",
+        variant: "destructive",
       });
       setIsSigningOut(false);
-      // Force navigation even on error
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
     }
-  }, [signOut, toast]);
+  }, [signOut, toast, navigate]);
 
   // Memoize the computed values to prevent unnecessary re-renders
   const { displayName, initials } = React.useMemo(() => {
@@ -109,18 +99,8 @@ export function UserMenu() {
     return { displayName: name, initials: userInitials };
   }, [profile?.displayName, profile?.initials, user?.email]);
 
-  // Enhanced validation - check both user AND session
+  // Don't render if no user or session
   if (!user || !session) {
-    return (
-      <Button asChild size="sm" className="bg-brand-orange hover:bg-brand-orange/90 text-white">
-        <Link to="/auth">Sign In</Link>
-      </Button>
-    );
-  }
-
-  // Additional session validation
-  if (session.expires_at && new Date(session.expires_at * 1000) < new Date()) {
-    console.log('🚫 UserMenu: Session expired, showing sign in button');
     return (
       <Button asChild size="sm" className="bg-brand-orange hover:bg-brand-orange/90 text-white">
         <Link to="/auth">Sign In</Link>
