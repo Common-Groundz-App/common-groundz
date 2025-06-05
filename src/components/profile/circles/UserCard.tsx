@@ -43,18 +43,59 @@ const UserCard = ({
 }: UserCardProps) => {
   const [isHovering, setIsHovering] = useState(false);
   
-  // Determine if this user follows the current user (for "Follow Back" logic)
-  const isFollower = relationshipType === 'follower';
+  // Don't show follow button if viewing your own card
   const isViewingOwnUser = currentUserId === id;
   
-  // Get the follow button props based on relationship
+  // Get the follow button props based on relationship and follow status
   const getFollowButtonProps = () => {
     // Don't show any follow button if viewing your own card
     if (isViewingOwnUser) {
       return null;
     }
     
-    // User is already following this person
+    // In "Following" modal context
+    if (relationshipType === 'following') {
+      // The profile user follows this person, so show "Following" with unfollow option
+      if (isFollowing) {
+        return {
+          variant: isHovering ? "destructive" : "outline",
+          text: isHovering ? "Unfollow" : "Following",
+          icon: isHovering ? <UserMinus size={14} className="mr-1" /> : <UserCheck size={14} className="mr-1" />,
+          className: "min-w-20 transition-all"
+        };
+      } else {
+        // This case shouldn't happen in following list, but fallback to follow
+        return {
+          variant: "default",
+          text: "Follow",
+          icon: <UserPlus size={14} className="mr-1" />,
+          className: "min-w-20 bg-brand-orange hover:bg-brand-orange/90 transition-all transform hover:scale-105"
+        };
+      }
+    }
+    
+    // In "Followers" modal context
+    if (relationshipType === 'follower') {
+      if (isFollowing) {
+        // Current user already follows this follower back (mutual follow)
+        return {
+          variant: isHovering ? "destructive" : "outline",
+          text: isHovering ? "Unfollow" : "Following",
+          icon: isHovering ? <UserMinus size={14} className="mr-1" /> : <UserCheck size={14} className="mr-1" />,
+          className: "min-w-20 transition-all"
+        };
+      } else {
+        // Current user doesn't follow this follower back
+        return {
+          variant: "default",
+          text: "Follow Back",
+          icon: <UserPlus size={14} className="mr-1" />,
+          className: "min-w-22 bg-brand-orange hover:bg-brand-orange/90 transition-all transform hover:scale-105"
+        };
+      }
+    }
+    
+    // Default case: general follow button
     if (isFollowing) {
       return {
         variant: isHovering ? "destructive" : "outline",
@@ -62,25 +103,14 @@ const UserCard = ({
         icon: isHovering ? <UserMinus size={14} className="mr-1" /> : <UserCheck size={14} className="mr-1" />,
         className: "min-w-20 transition-all"
       };
-    }
-    
-    // This person follows the user but user doesn't follow back
-    if (isFollower && !isFollowing) {
+    } else {
       return {
         variant: "default",
-        text: "Follow Back",
+        text: "Follow",
         icon: <UserPlus size={14} className="mr-1" />,
-        className: "min-w-22 bg-brand-orange hover:bg-brand-orange/90 transition-all transform hover:scale-105"
+        className: "min-w-20 bg-brand-orange hover:bg-brand-orange/90 transition-all transform hover:scale-105"
       };
     }
-    
-    // Default case: user doesn't follow this person
-    return {
-      variant: "default",
-      text: "Follow",
-      icon: <UserPlus size={14} className="mr-1" />,
-      className: "min-w-20 transition-all transform hover:scale-105"
-    };
   };
   
   const followButtonProps = getFollowButtonProps();

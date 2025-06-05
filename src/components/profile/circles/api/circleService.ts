@@ -18,6 +18,8 @@ export const fetchFollowers = async (profileUserId: string, currentUserId?: stri
       return [];
     }
     
+    console.log(`Fetched ${followersData?.length || 0} followers for profile ${profileUserId}:`, followersData);
+    
     return followersData || [];
   } catch (error) {
     console.error('Error in fetchFollowers:', error);
@@ -40,6 +42,8 @@ export const fetchFollowing = async (profileUserId: string, currentUserId?: stri
       console.error('Error fetching following:', followingError);
       return [];
     }
+    
+    console.log(`Fetched ${followingData?.length || 0} following for profile ${profileUserId}:`, followingData);
     
     return followingData || [];
   } catch (error) {
@@ -66,6 +70,7 @@ export const toggleFollowStatus = async (
         .eq('following_id', targetUserId);
       
       if (error) throw error;
+      console.log(`User ${currentUserId} unfollowed ${targetUserId}`);
       return false; // Not following anymore
     } else {
       // Follow
@@ -77,6 +82,7 @@ export const toggleFollowStatus = async (
         });
       
       if (error) throw error;
+      console.log(`User ${currentUserId} followed ${targetUserId}`);
       return true; // Now following
     }
   } catch (error) {
