@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export const ensureBucketPolicies = async (bucketName: string): Promise<void> => {
@@ -39,5 +40,17 @@ export const ensureStorageBucket = async (bucketName: string, isPublic: boolean 
     }
   } catch (error) {
     console.error('Error ensuring storage bucket:', error);
+  }
+};
+
+// Initialize storage service by ensuring required buckets exist
+export const initializeStorageService = async (): Promise<void> => {
+  try {
+    console.log('Initializing storage service...');
+    await ensureStorageBucket('profile_images', true);
+    await ensureStorageBucket('entity-images', true);
+    console.log('Storage service initialized successfully');
+  } catch (error) {
+    console.error('Error initializing storage service:', error);
   }
 };
