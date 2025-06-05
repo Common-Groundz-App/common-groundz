@@ -49,11 +49,24 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
     );
   }
 
+  // Add cache busting timestamp to force image refresh
+  const avatarUrl = profile?.avatar_url ? 
+    `${profile.avatar_url}?t=${Date.now()}` : 
+    '';
+
+  console.log("ProfileAvatar rendering for user:", userId, "with URL:", avatarUrl);
+
   return (
     <Avatar className={cn(sizeClasses[size], className)}>
       <AvatarImage 
-        src={profile?.avatar_url || ''} 
-        alt={profile?.displayName || 'User'} 
+        src={avatarUrl} 
+        alt={profile?.displayName || 'User'}
+        onError={(e) => {
+          console.error("Avatar image failed to load:", avatarUrl);
+        }}
+        onLoad={() => {
+          console.log("Avatar image loaded successfully:", avatarUrl);
+        }}
       />
       <AvatarFallback className={cn('bg-brand-orange text-white font-semibold', fallbackClassName)}>
         {profile?.initials || 'AU'}
