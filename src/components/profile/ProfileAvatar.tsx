@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useProfile, useProfileCacheActions } from '@/hooks/use-profile-cache';
+import { ProfileAvatar as CommonProfileAvatar } from '@/components/common/ProfileAvatar';
 
 interface ProfileAvatarProps {
   userId?: string | null;
@@ -31,23 +30,7 @@ const ProfileAvatar = ({
   const { data: profile } = useProfile(userId || user?.id);
   const { updateProfileCache } = useProfileCacheActions();
   
-  // Use cached profile data with prop fallbacks
-  const username = propUsername || profile?.displayName || profile?.username || 'User';
-  const profileImage = propProfileImage || profile?.avatar_url || '';
-  
-  console.log("ProfileAvatar rendering with profileImage:", profileImage);
-
-  // Get initials from username
-  const getInitials = () => {
-    if (!username) return 'U';
-    
-    const words = username.trim().split(' ');
-    if (words.length === 1) {
-      return words[0].substring(0, 2).toUpperCase();
-    }
-    
-    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
-  };
+  console.log("ProfileAvatar rendering with profileImage:", propProfileImage);
 
   const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -111,47 +94,36 @@ const ProfileAvatar = ({
     }
   };
 
-  // Determine if we should show the initials placeholder
-  const showInitials = !profileImage || profileImage.trim() === '';
-
   return (
     <div className="relative mb-4">
-      <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white">
-        {showInitials ? (
-          <div className="w-full h-full flex items-center justify-center bg-brand-orange text-white text-2xl md:text-3xl font-bold">
-            {getInitials()}
-          </div>
-        ) : (
-          <ImageWithFallback 
-            src={profileImage} 
-            alt={`${username}'s profile`}
-            className="w-full h-full object-cover"
-            onError={(e) => console.error("Profile image failed to load:", profileImage)}
-            fallbackSrc=""
-          />
+      <div className="relative">
+        <CommonProfileAvatar 
+          userId={userId || user?.id}
+          size="xl"
+          className="w-24 h-24 md:w-32 md:h-32 border-4 border-white"
+        />
+        
+        {isEditable && onProfileImageChange && (
+          <>
+            <label 
+              htmlFor="profile-upload" 
+              className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
+            >
+              <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
+                {uploading || isLoading ? '...' : '+'}
+              </div>
+            </label>
+            <input 
+              id="profile-upload" 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={handleProfileUpload}
+              disabled={uploading || isLoading}
+            />
+          </>
         )}
       </div>
-      
-      {isEditable && onProfileImageChange && (
-        <>
-          <label 
-            htmlFor="profile-upload" 
-            className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
-          >
-            <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
-              {uploading || isLoading ? '...' : '+'}
-            </div>
-          </label>
-          <input 
-            id="profile-upload" 
-            type="file" 
-            accept="image/*" 
-            className="hidden" 
-            onChange={handleProfileUpload}
-            disabled={uploading || isLoading}
-          />
-        </>
-      )}
     </div>
   );
 };

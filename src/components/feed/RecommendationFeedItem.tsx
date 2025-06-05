@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bookmark, Heart, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
@@ -29,6 +28,7 @@ import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { feedbackActions } from '@/services/feedbackService';
+import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -253,10 +253,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     <Card className="overflow-hidden">
       <CardContent className="pt-6">
         <div className="flex items-center space-x-4 mb-4">
-          <Avatar className="h-10 w-10 border">
-            <AvatarImage src={recommendation.avatar_url || undefined} alt={recommendation.username || 'User'} />
-            <AvatarFallback>{getInitials(recommendation.username)}</AvatarFallback>
-          </Avatar>
+          <ProfileAvatar userId={recommendation.user_id} size="md" className="border" />
           <div className="flex-grow">
             <UsernameLink 
               username={recommendation.username} 

@@ -1,6 +1,4 @@
-
 import * as React from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,6 +13,7 @@ import { LogOut, User, Settings } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
 import { useToast } from "@/hooks/use-toast";
+import { ProfileAvatar } from "@/components/common/ProfileAvatar";
 
 export function UserMenu() {
   const { user, session, signOut } = useAuth();
@@ -93,11 +92,10 @@ export function UserMenu() {
   }, [signOut, toast, navigate]);
 
   // Memoize the computed values to prevent unnecessary re-renders
-  const { displayName, initials } = React.useMemo(() => {
+  const { displayName } = React.useMemo(() => {
     const name = profile?.displayName || user?.email?.split('@')[0] || 'User';
-    const userInitials = profile?.initials || name.substring(0, 2).toUpperCase();
-    return { displayName: name, initials: userInitials };
-  }, [profile?.displayName, profile?.initials, user?.email]);
+    return { displayName: name };
+  }, [profile?.displayName, user?.email]);
 
   // Don't render if no user or session
   if (!user || !session) {
@@ -112,15 +110,7 @@ export function UserMenu() {
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full" disabled={isSigningOut}>
-          <Avatar className="h-8 w-8">
-            <AvatarImage 
-              src={profile?.avatar_url || ""} 
-              alt={displayName} 
-            />
-            <AvatarFallback className="bg-brand-orange text-white">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+          <ProfileAvatar userId={user?.id} size="sm" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
