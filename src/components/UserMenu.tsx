@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User, Settings } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
 import { useToast } from "@/hooks/use-toast";
 
 export function UserMenu() {
-  const { user, signOut } = useAuth();
+  const { user, session, signOut } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   const { data: profile } = useProfile(user?.id);
@@ -44,10 +45,25 @@ export function UserMenu() {
       setIsSigningOut(true);
       setIsOpen(false);
       
+      console.log('UserMenu: Starting sign out process');
+      
       const { error } = await signOut();
       
       if (error) {
-        console.error('Sign out failed:', error);
+        console.error('UserMenu: Sign out failed:', error);
+        
+        // Check if it's a session-related error that we can ignore
+        if (error.message?.includes('session') || error.message?.includes('missing')) {
+          console.log('UserMenu: Session error ignored, user likely already signed out');
+          toast({
+            title: "Signed out successfully",
+            description: "You have been logged out of your account.",
+          });
+          // Force navigation to home page
+          navigate('/', { replace: true });
+          return;
+        }
+        
         toast({
           title: "Sign out failed",
           description: error.message,
@@ -57,12 +73,16 @@ export function UserMenu() {
         return;
       }
       
+      console.log('UserMenu: Sign out successful');
       toast({
         title: "Signed out successfully",
         description: "You have been logged out of your account.",
       });
+      
+      // Force navigation to home page after successful logout
+      navigate('/', { replace: true });
     } catch (error) {
-      console.error('Error during sign out:', error);
+      console.error('UserMenu: Error during sign out:', error);
       toast({
         title: "Sign out failed",
         description: "An unexpected error occurred while signing out.",
@@ -70,7 +90,7 @@ export function UserMenu() {
       });
       setIsSigningOut(false);
     }
-  }, [signOut, toast]);
+  }, [signOut, toast, navigate]);
 
   // Memoize the computed values to prevent unnecessary re-renders
   const { displayName, initials } = React.useMemo(() => {
@@ -79,7 +99,8 @@ export function UserMenu() {
     return { displayName: name, initials: userInitials };
   }, [profile?.displayName, profile?.initials, user?.email]);
 
-  if (!user) {
+  // Don't render if no user or session
+  if (!user || !session) {
     return (
       <Button asChild size="sm" className="bg-brand-orange hover:bg-brand-orange/90 text-white">
         <Link to="/auth">Sign In</Link>

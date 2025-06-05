@@ -9,19 +9,27 @@ type ProtectedRouteProps = {
 };
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, isLoading } = useAuth();
+  const { user, session, isLoading } = useAuth();
 
   // Show loading state while authentication is being checked
   if (isLoading) {
     return <LoadingSpinner size="lg" text="Loading your account..." className="min-h-screen flex items-center justify-center" />;
   }
 
-  // Redirect to landing page if user is not authenticated
-  if (!user) {
+  // More strict authentication check - require both user AND valid session
+  if (!user || !session) {
+    console.log('ProtectedRoute: No user or session, redirecting to landing page');
     return <Navigate to="/" replace />;
   }
 
-  // If user is authenticated, render the children
+  // Additional session validation
+  if (session.expires_at && new Date(session.expires_at * 1000) < new Date()) {
+    console.log('ProtectedRoute: Session expired, redirecting to landing page');
+    return <Navigate to="/" replace />;
+  }
+
+  console.log('ProtectedRoute: User authenticated, rendering protected content');
+  // If user is authenticated with valid session, render the children
   return <>{children}</>;
 };
 

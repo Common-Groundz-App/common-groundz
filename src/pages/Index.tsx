@@ -11,7 +11,7 @@ import NavBarComponent from '@/components/NavBarComponent';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 const Index = () => {
-  const { user, isLoading } = useAuth();
+  const { user, session, isLoading } = useAuth();
 
   // CRITICAL: Don't do anything until auth is fully initialized
   if (isLoading) {
@@ -25,12 +25,19 @@ const Index = () => {
     );
   }
 
-  // Simple redirect logic - auth is already initialized by AuthInitializer
-  if (user) {
-    return <Navigate to="/home" replace />;
+  // Enhanced redirect logic - require both user AND valid session
+  if (user && session) {
+    // Additional session validation
+    if (session.expires_at && new Date(session.expires_at * 1000) > new Date()) {
+      console.log('Index: Valid user and session found, redirecting to home');
+      return <Navigate to="/home" replace />;
+    } else {
+      console.log('Index: Session expired, showing landing page');
+    }
   }
   
-  // Show landing page for unauthenticated users
+  console.log('Index: No valid authentication, showing landing page');
+  // Show landing page for unauthenticated users or expired sessions
   return (
     <div className="min-h-screen">
       <NavBarComponent />

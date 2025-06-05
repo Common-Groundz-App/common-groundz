@@ -20,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await supabase.auth.getSession();
         
         if (mounted && !error) {
+          console.log('Initial session:', data.session ? 'Found' : 'None');
           setSession(data.session);
           setUser(data.session?.user ?? null);
         }
@@ -28,9 +29,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Set up auth state listener for future changes
           const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, currentSession) => {
+              console.log('Auth event:', event, currentSession ? 'Session present' : 'No session');
+              
               if (mounted) {
                 setSession(currentSession);
                 setUser(currentSession?.user ?? null);
+                
+                // Handle sign out event specifically
+                if (event === 'SIGNED_OUT') {
+                  console.log('User signed out - clearing all state');
+                  setSession(null);
+                  setUser(null);
+                }
               }
             }
           );
@@ -93,9 +103,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = React.useCallback(async () => {
     try {
+      console.log('Attempting to sign out...');
+      
+      // Check if we have a valid session before attempting logout
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession) {
+        console.log('No active session found, clearing local state');
+        // Force clear state even if no session
+        setSession(null);
+        setUser(null);
+        return { error: null };
+      }
+      
+      console.log('Active session found, proceeding with logout');
       const { error } = await supabase.auth.signOut();
-      return { error };
+      
+      if (error) {
+        console.error('Logout error:', error);
+        // If logout fails due to session issues, still clear local state
+        if (error.message?.includes('session') || error.message?.includes('missing')) {
+          console.log('Session error during logout, forcing local state clear');
+          setSession(null);
+          setUser(null);
+          return { error: null }; // Don't return the error since we handled it
+        }
+        return { error };
+      }
+      
+      console.log('Logout successful');
+      // Force clear state immediately after successful logout
+      setSession(null);
+      setUser(null);
+      return { error: null };
     } catch (error) {
+      console.error('Unexpected error during signOut:', error);
+      // Force clear state on any error
+      setSession(null);
+      setUser(null);
       return { error: error as Error };
     }
   }, []);
