@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.log('🔄 Auth event:', event, currentSession ? 'Session present' : 'No session');
               
               if (mounted) {
-                // Handle SIGNED_OUT event with extra safeguards
+                // Handle specific events
                 if (event === 'SIGNED_OUT') {
                   console.log('🚨 SIGNED_OUT event - forcing complete state reset');
                   setSession(null);
@@ -108,9 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setSession(currentSession);
                 setUser(currentSession?.user ?? null);
                 
-                // Handle sign out event specifically (fallback)
-                if (event === 'SIGNED_OUT' || (!currentSession && event === 'TOKEN_REFRESHED')) {
-                  console.log('🚨 Auth state cleared - ensuring complete logout');
+                // Additional check for token refresh events without session
+                if (event === 'TOKEN_REFRESHED' && !currentSession) {
+                  console.log('🚨 Token refresh failed - ensuring complete logout');
                   setSession(null);
                   setUser(null);
                   forceAuthStateReset();
