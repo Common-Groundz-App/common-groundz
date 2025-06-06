@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share2, Globe, Lock, Users, ChevronDown, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
@@ -26,7 +27,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { getPostTypeLabel } from './utils/postUtils';
 import TagBadge from './TagBadge';
 import { feedbackActions } from '@/services/feedbackService';
-import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -351,7 +351,10 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         {/* User Info and Post Meta */}
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
-            <ProfileAvatar userId={post.user_id} size="md" className="border" />
+            <Avatar className="h-10 w-10 border">
+              <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
+              <AvatarFallback>{(post.username || 'U')[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
             <div>
               <UsernameLink 
                 userId={post.user_id} 

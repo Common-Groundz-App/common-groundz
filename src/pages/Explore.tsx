@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import { VerticalTubelightNavBar } from '@/components/ui/vertical-tubelight-navbar';
+import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,7 +10,7 @@ import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { PillTabs } from '@/components/ui/pill-tabs';
 import { MenuItem, MenuContainer } from '@/components/ui/fluid-menu';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
-import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils, Menu as MenuIcon, X, Home, User } from 'lucide-react';
+import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils, Menu as MenuIcon, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -64,13 +64,6 @@ const Explore = () => {
       handleComplexProductSearch();
     }
   };
-  
-  // Navigation items for the navbar
-  const navItems = [
-    { name: 'Home', url: '/home', icon: Home },
-    { name: 'Explore', url: '/explore', icon: Search },
-    { name: 'Profile', url: '/profile', icon: User }
-  ];
   
   const getInitialActiveTab = () => {
     return 'Explore';
@@ -167,8 +160,7 @@ const Explore = () => {
       <div className="flex flex-1 overflow-x-hidden">
         {/* Desktop Sidebar - Only show on xl+ screens */}
         <div className="hidden xl:block fixed left-0 top-0 h-screen">
-          <VerticalTubelightNavBar 
-            items={navItems}
+          <VerticalTubelightNavbar 
             initialActiveTab={getInitialActiveTab()}
             className="h-full"
           />

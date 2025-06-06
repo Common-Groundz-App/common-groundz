@@ -3,13 +3,13 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
-import { VerticalTubelightNavBar } from '@/components/ui/vertical-tubelight-navbar';
+import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
-import { Bell, Search, ChevronDown, ArrowUp, Home, User } from 'lucide-react';
+import { Bell, Search, ChevronDown, ArrowUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
@@ -60,13 +60,6 @@ const Feed = React.memo(() => {
   const [isActive, setIsActive] = useState(false);
   const [startY, setStartY] = useState(0);
   
-  // Navigation items for the navbar
-  const navItems = [
-    { name: 'Home', url: '/home', icon: Home },
-    { name: 'Explore', url: '/explore', icon: Search },
-    { name: 'Profile', url: '/profile', icon: User }
-  ];
-
   // New content detection state
   const [newContentAvailable, setNewContentAvailable] = useState(false);
   const [newPostCount, setNewPostCount] = useState(0);
@@ -419,8 +412,7 @@ const Feed = React.memo(() => {
       <div className="flex flex-1">
         {/* Desktop Sidebar - Only show on xl+ screens */}
         <div className="hidden xl:block">
-          <VerticalTubelightNavBar 
-            items={navItems}
+          <VerticalTubelightNavbar 
             initialActiveTab={getInitialActiveTab()}
             className="fixed left-0 top-0 h-screen pt-4 pl-4" 
           />
@@ -431,7 +423,7 @@ const Feed = React.memo(() => {
           <div className="w-full mx-auto grid justify-center xl:grid-cols-7 gap-4 px-4 py-6">
             {/* Left Column for Navigation on Smaller Desktop */}
             <div className="hidden xl:block col-span-1">
-              {/* This is just a spacer since VerticalTubelightNavBar is fixed */}
+              {/* This is just a spacer since VerticalTubelightNavbar is fixed */}
             </div>
             
             {/* Middle Column - Feed Content */}

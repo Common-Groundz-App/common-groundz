@@ -52,6 +52,7 @@ const FollowingList = ({
           <UserCard
             id={follow.id}
             username={follow.username}
+            avatarUrl={follow.avatar_url}
             isFollowing={follow.isFollowing}
             relationshipType="following"
             onFollowToggle={() => onFollowToggle(follow.id, follow.isFollowing)}

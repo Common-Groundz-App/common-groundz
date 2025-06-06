@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
-import { ProfileAvatar } from '@/components/common/ProfileAvatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { PlusCircle, Image, Video, X, AtSign, Smile, MapPin } from 'lucide-react';
 import { MediaUploader } from '@/components/media/MediaUploader';
@@ -408,7 +408,10 @@ export function ModernCreatePostForm({
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="flex gap-3 items-start">
           {/* User Avatar */}
-          <ProfileAvatar userId={user?.id} size="md" className="mt-1" />
+          <Avatar className="h-10 w-10 mt-1">
+            <AvatarImage src={avatarUrl} alt={userDisplayName} />
+            <AvatarFallback>{userDisplayName.charAt(0).toUpperCase()}</AvatarFallback>
+          </Avatar>
           
           {/* Content Area */}
           <div className="flex-1 space-y-4">

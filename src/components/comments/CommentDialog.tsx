@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ProfileAvatar } from '@/components/common/ProfileAvatar';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/contexts/AuthContext';
@@ -398,7 +398,10 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                         editingCommentId === comment.id ? "bg-gray-50" : ""
                       }`}
                     >
-                      <ProfileAvatar userId={comment.user_id} size="sm" className="flex-shrink-0" />
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src={comment.avatar_url || undefined} />
+                        <AvatarFallback>{getInitials(comment.username)}</AvatarFallback>
+                      </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start">
                           <div className="flex-1">
@@ -503,7 +506,10 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
             <Separator className="my-3" />
             
             <div className="relative flex gap-2 items-start">
-              <ProfileAvatar userId={user?.id} size="sm" className="mt-1" />
+              <Avatar className="h-8 w-8 mt-1">
+                <AvatarImage src={userProfile?.avatar_url} />
+                <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
+              </Avatar>
               <div className="flex-1 relative">
                 <Textarea
                   placeholder="Add a comment..."

@@ -172,13 +172,14 @@ const UserListModal = ({
                   <UserCard
                     id={userProfile.id}
                     username={userProfile.username}
+                    avatarUrl={userProfile.avatar_url}
                     isFollowing={userProfile.isFollowing}
                     relationshipType={listType === 'followers' ? 'follower' : 'following'}
                     onFollowToggle={() => handleFollowToggle(userProfile.id, userProfile.isFollowing)}
                     isLoading={actionLoading === userProfile.id}
                     isOwnProfile={isOwnProfile}
                     currentUserId={user?.id}
-                    onNavigate={() => handleUserClick(userProfile.id)}
+                    onNavigate={handleUserClick}
                   />
                 </div>
               ))}

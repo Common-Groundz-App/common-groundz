@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation, setLocationStatus } from '@/contexts/LocationContext';
@@ -6,8 +7,8 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Bell, User, Shield, Palette, Globe, MapPin, Info, AlertTriangle, Home, Search } from 'lucide-react';
-import { VerticalTubelightNavBar } from '@/components/ui/vertical-tubelight-navbar';
+import { Bell, User, Shield, Palette, Globe, MapPin, Info, AlertTriangle } from 'lucide-react';
+import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Logo from '@/components/Logo';
@@ -49,13 +50,6 @@ const Settings = () => {
   if (!user) {
     return <div>Loading...</div>;
   }
-  
-  // Navigation items for the navbar
-  const navItems = [
-    { name: 'Home', url: '/home', icon: Home },
-    { name: 'Explore', url: '/explore', icon: Search },
-    { name: 'Profile', url: '/profile', icon: User }
-  ];
   
   // Using the getInitialActiveTab similar to Feed page
   const getInitialActiveTab = () => {
@@ -115,8 +109,7 @@ const Settings = () => {
       
       <div className="flex flex-1">
         {!isMobile && (
-          <VerticalTubelightNavBar 
-            items={navItems}
+          <VerticalTubelightNavbar 
             initialActiveTab={getInitialActiveTab()}
             className="fixed left-0 top-0 h-screen pt-4" 
           />
@@ -254,7 +247,7 @@ const Settings = () => {
                     </div>
                     
                     {permissionStatus === 'denied' && (
-                      <div className="rounded-md bg-red-50 dark:bg-red-950 p-4 border border-red-200 dark:border-red-800">
+                      <div className="rounded-md bg-red-50 dark:bg-red-950 p-4 border border-red-200 dark:border-red-900">
                         <div className="flex items-start space-x-3">
                           <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                           <div className="space-y-2">

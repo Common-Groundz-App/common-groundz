@@ -1,12 +1,9 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useProfile, useProfileCacheActions } from '@/hooks/use-profile-cache';
 import { ProfileAvatar as CommonProfileAvatar } from '@/components/common/ProfileAvatar';
-import { AvatarCropModal } from './AvatarCropModal';
-import { fileToDataUrl } from '@/utils/imageProcessing';
 
 interface ProfileAvatarProps {
   userId?: string | null;
@@ -30,56 +27,27 @@ const ProfileAvatar = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
-  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
-  const [selectedImageSrc, setSelectedImageSrc] = useState<string>('');
   const { data: profile } = useProfile(userId || user?.id);
-  const { invalidateProfile } = useProfileCacheActions();
+  const { updateProfileCache } = useProfileCacheActions();
   
-  console.log("🖼️ [ProfileAvatar] Rendering with profileImage:", propProfileImage);
+  console.log("ProfileAvatar rendering with profileImage:", propProfileImage);
 
-  const handleFileSelection = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
-    
-    try {
-      console.log("📁 [ProfileAvatar] File selected for upload:", file.name, file.size);
-      
-      // Convert file to data URL for cropping
-      const imageSrc = await fileToDataUrl(file);
-      setSelectedImageSrc(imageSrc);
-      setIsCropModalOpen(true);
-    } catch (error) {
-      console.error('❌ [ProfileAvatar] Error reading file:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to read the selected image',
-        variant: 'destructive'
-      });
-    }
-    
-    // Reset file input
-    e.target.value = '';
-  };
-
-  const handleCropComplete = async (croppedImageBlob: Blob) => {
-    if (!user) return;
+    if (!file || !user || !onProfileImageChange) return;
     
     try {
       setUploading(true);
-      console.log("🔄 [ProfileAvatar] Starting upload process for user:", user.id);
       
-      // Upload the cropped image to Supabase Storage
-      const fileExt = 'jpg'; // Always use jpg for cropped images
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop();
       const filePath = `${user.id}/avatar.${fileExt}`;
-      
-      console.log("📤 [ProfileAvatar] Uploading to path:", filePath);
       
       const { error: uploadError } = await supabase.storage
         .from('profile_images')
-        .upload(filePath, croppedImageBlob, { upsert: true });
+        .upload(filePath, file, { upsert: true });
       
       if (uploadError) {
-        console.error('❌ [ProfileAvatar] Upload failed:', uploadError);
         toast({
           title: 'Upload failed',
           description: uploadError.message,
@@ -88,47 +56,34 @@ const ProfileAvatar = ({
         return;
       }
       
-      // Get the public URL (without timestamp for database storage)
+      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from('profile_images')
         .getPublicUrl(filePath);
       
-      console.log("🔗 [ProfileAvatar] New profile image URL:", publicUrl);
+      // Add a timestamp to force refresh
+      const urlWithTimestamp = publicUrl + '?t=' + new Date().getTime();
       
-      // Immediately save to database
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', user.id);
+      console.log("New profile image URL:", urlWithTimestamp);
       
-      if (updateError) {
-        console.error('❌ [ProfileAvatar] Database update failed:', updateError);
-        toast({
-          title: 'Failed to update profile',
-          description: updateError.message,
-          variant: 'destructive'
-        });
-        return;
+      // Store the image URL in temporary state
+      if (onImageSelected) {
+        onImageSelected(publicUrl);
       }
       
-      console.log("✅ [ProfileAvatar] Successfully updated avatar in database");
+      // Update the visual display
+      onProfileImageChange(urlWithTimestamp);
       
-      // Invalidate profile cache to trigger re-renders everywhere
-      invalidateProfile(user.id);
-      
-      // Close the crop modal
-      setIsCropModalOpen(false);
-      setSelectedImageSrc('');
-      
-      toast({
-        title: 'Avatar updated',
-        description: 'Your profile picture has been updated successfully',
-      });
-      
-      console.log("🎉 [ProfileAvatar] Avatar update process completed successfully");
+      // Update the profile cache
+      if (profile) {
+        updateProfileCache(user.id, {
+          ...profile,
+          avatar_url: publicUrl
+        });
+      }
       
     } catch (error) {
-      console.error('❌ [ProfileAvatar] Error uploading profile image:', error);
+      console.error('Error uploading profile image:', error);
       toast({
         title: 'Something went wrong',
         description: 'Please try again later.',
@@ -139,52 +94,37 @@ const ProfileAvatar = ({
     }
   };
 
-  const handleCropCancel = () => {
-    setIsCropModalOpen(false);
-    setSelectedImageSrc('');
-  };
-
   return (
-    <>
-      <div className="relative mb-4">
-        <div className="relative">
-          <CommonProfileAvatar 
-            userId={userId || user?.id}
-            size="xl"
-            className="w-24 h-24 md:w-32 md:h-32 border-4 border-white"
-          />
-          
-          {isEditable && (
-            <>
-              <label 
-                htmlFor="profile-upload" 
-                className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
-              >
-                <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
-                  {uploading || isLoading ? '...' : '+'}
-                </div>
-              </label>
-              <input 
-                id="profile-upload" 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                onChange={handleFileSelection}
-                disabled={uploading || isLoading}
-              />
-            </>
-          )}
-        </div>
+    <div className="relative mb-4">
+      <div className="relative">
+        <CommonProfileAvatar 
+          userId={userId || user?.id}
+          size="xl"
+          className="w-24 h-24 md:w-32 md:h-32 border-4 border-white"
+        />
+        
+        {isEditable && onProfileImageChange && (
+          <>
+            <label 
+              htmlFor="profile-upload" 
+              className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow cursor-pointer"
+            >
+              <div className="w-8 h-8 flex items-center justify-center bg-brand-orange text-white rounded-full">
+                {uploading || isLoading ? '...' : '+'}
+              </div>
+            </label>
+            <input 
+              id="profile-upload" 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={handleProfileUpload}
+              disabled={uploading || isLoading}
+            />
+          </>
+        )}
       </div>
-
-      <AvatarCropModal
-        isOpen={isCropModalOpen}
-        onClose={handleCropCancel}
-        imageSrc={selectedImageSrc}
-        onCropComplete={handleCropComplete}
-        isProcessing={uploading}
-      />
-    </>
+    </div>
   );
 };
 

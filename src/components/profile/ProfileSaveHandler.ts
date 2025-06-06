@@ -25,18 +25,33 @@ export const useProfileSaveHandler = ({
     if (!userId) return;
     
     try {
-      // Avatar changes are now handled immediately in ProfileAvatar component
-      // This handler only processes other profile changes (like cover image)
-      
-      // Forward to parent's save handler for non-avatar changes
-      if (hasChanges && onSaveChanges) {
-        onSaveChanges();
-      }
-      
-      // Clear any temporary avatar state (shouldn't be needed anymore)
+      // If we have local profile image changes
       if (tempProfileImage) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ avatar_url: tempProfileImage })
+          .eq('id', userId);
+        
+        if (updateError) {
+          toast({
+            title: 'Failed to update profile',
+            description: updateError.message,
+            variant: 'destructive'
+          });
+          return;
+        }
+        
+        // Clear the temporary state
         setTempProfileImage(null);
         setLocalHasChanges(false);
+        
+        // Refresh the UserMenu component by triggering a global event
+        window.dispatchEvent(new CustomEvent('profile-updated'));
+      }
+      
+      // Forward to parent's save handler for any other changes (like cover image)
+      if (hasChanges && onSaveChanges) {
+        onSaveChanges();
       }
       
       toast({

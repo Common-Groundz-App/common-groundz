@@ -83,6 +83,8 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
             username={displayName}
             profileImage={avatarUrl || ''}
             isLoading={isLoading}
+            onProfileImageChange={isOwnProfile ? handleSaveChanges : undefined}
+            onImageSelected={setTempProfileImage}
             isEditable={isOwnProfile}
           />
           
