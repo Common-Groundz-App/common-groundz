@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +22,7 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ensureHttps } from '@/utils/urlUtils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import UsernameLink from '@/components/common/UsernameLink';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { Separator } from "@/components/ui/separator";
@@ -333,10 +332,7 @@ const ReviewCard = ({
                 userId={review.user_id}
                 className="hover:opacity-80 transition-opacity"
               >
-                <Avatar className="border h-5 w-5">
-                  <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
-                  <AvatarFallback className="text-xs">{getInitials(review.user?.username)}</AvatarFallback>
-                </Avatar>
+                <ProfileAvatar userId={review.user_id} size="xs" className="border" />
               </UsernameLink>
               <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline text-xs" />
               <span className="text-xs text-muted-foreground">
@@ -472,10 +468,7 @@ const ReviewCard = ({
                 userId={review.user_id}
                 className="hover:opacity-80 transition-opacity"
               >
-                <Avatar className="border h-10 w-10">
-                  <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
-                  <AvatarFallback>{getInitials(review.user?.username)}</AvatarFallback>
-                </Avatar>
+                <ProfileAvatar userId={review.user_id} size="md" className="border" />
               </UsernameLink>
               <div>
                 <div className="flex items-center flex-col items-start">

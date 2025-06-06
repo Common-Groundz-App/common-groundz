@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -237,10 +236,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
         <Card key={user.id}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <Avatar>
-                <AvatarImage src={user.avatar_url || undefined} />
-                <AvatarFallback>{getInitials(user.username)}</AvatarFallback>
-              </Avatar>
+              <ProfileAvatar userId={user.id} size="md" />
               <div className="flex-1 min-w-0">
                 <Link to={`/profile/${user.id}`} className="font-medium hover:underline truncate block">
                   {user.username || 'Anonymous'}
