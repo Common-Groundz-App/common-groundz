@@ -7,7 +7,6 @@ import { Shell } from 'lucide-react';
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { useSearchParams } from 'react-router-dom';
-import { useProfile } from '@/hooks/use-profile-cache';
 
 interface PostContentViewerProps {
   postId: string;
@@ -23,9 +22,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
   const [error, setError] = React.useState<string | null>(null);
   const [showComments, setShowComments] = React.useState(false);
   const [searchParams] = useSearchParams();
-  
-  // Use the profile cache for the post author
-  const { data: authorProfile } = useProfile(post?.user_id);
   
   React.useEffect(() => {
     if (highlightCommentId || searchParams.has('commentId')) {
@@ -139,17 +135,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
       fetchPost();
     }
   }, [postId, user?.id]);
-
-  // Update post with profile data when available
-  React.useEffect(() => {
-    if (post && authorProfile) {
-      setPost(prevPost => ({
-        ...prevPost,
-        username: authorProfile.displayName || authorProfile.username,
-        avatar_url: authorProfile.avatar_url
-      }));
-    }
-  }, [post, authorProfile]);
 
   const handlePostLike = async () => {
     if (!user || !post) return;

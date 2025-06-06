@@ -7,7 +7,6 @@ import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { Shell } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { useProfile } from '@/hooks/use-profile-cache';
 
 interface RecommendationContentViewerProps {
   recommendationId: string;
@@ -28,9 +27,6 @@ const RecommendationContentViewer = ({
   const [showComments, setShowComments] = React.useState(false);
   const [searchParams] = useSearchParams();
 
-  // Use the profile cache for the recommendation author
-  const { data: authorProfile } = useProfile(recommendation?.user_id);
-
   // Determine if we should auto-open comments based on URL params or highlightCommentId
   React.useEffect(() => {
     if (highlightCommentId || searchParams.has('commentId')) {
@@ -43,6 +39,7 @@ const RecommendationContentViewer = ({
       try {
         setLoading(true);
         
+        // Removed avatar_url from query - using ProfileAvatar component instead
         const { data, error } = await supabase
           .from('recommendations')
           .select('*')
@@ -131,17 +128,6 @@ const RecommendationContentViewer = ({
       fetchRecommendation();
     }
   }, [recommendationId, user?.id]);
-
-  // Update recommendation with profile data when available
-  React.useEffect(() => {
-    if (recommendation && authorProfile) {
-      setRecommendation(prevRec => ({
-        ...prevRec,
-        username: authorProfile.displayName || authorProfile.username,
-        avatar_url: authorProfile.avatar_url
-      }));
-    }
-  }, [recommendation, authorProfile]);
 
   const handleRecommendationLike = async () => {
     if (!user || !recommendation) return;
