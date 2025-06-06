@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
+import { VerticalTubelightNavBar } from '@/components/ui/vertical-tubelight-navbar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
@@ -160,7 +160,7 @@ const Explore = () => {
       <div className="flex flex-1 overflow-x-hidden">
         {/* Desktop Sidebar - Only show on xl+ screens */}
         <div className="hidden xl:block fixed left-0 top-0 h-screen">
-          <VerticalTubelightNavbar 
+          <VerticalTubelightNavBar 
             initialActiveTab={getInitialActiveTab()}
             className="h-full"
           />

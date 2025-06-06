@@ -3,7 +3,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
-import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
+import { VerticalTubelightNavBar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
@@ -412,7 +412,7 @@ const Feed = React.memo(() => {
       <div className="flex flex-1">
         {/* Desktop Sidebar - Only show on xl+ screens */}
         <div className="hidden xl:block">
-          <VerticalTubelightNavbar 
+          <VerticalTubelightNavBar 
             initialActiveTab={getInitialActiveTab()}
             className="fixed left-0 top-0 h-screen pt-4 pl-4" 
           />
@@ -423,7 +423,7 @@ const Feed = React.memo(() => {
           <div className="w-full mx-auto grid justify-center xl:grid-cols-7 gap-4 px-4 py-6">
             {/* Left Column for Navigation on Smaller Desktop */}
             <div className="hidden xl:block col-span-1">
-              {/* This is just a spacer since VerticalTubelightNavbar is fixed */}
+              {/* This is just a spacer since VerticalTubelightNavBar is fixed */}
             </div>
             
             {/* Middle Column - Feed Content */}
