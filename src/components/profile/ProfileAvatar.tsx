@@ -35,24 +35,17 @@ const ProfileAvatar = ({
   const { data: profile } = useProfile(userId || user?.id);
   const { invalidateProfile } = useProfileCacheActions();
   
-  console.log("ProfileAvatar (profile directory) rendering with:", {
-    userId: userId || user?.id,
-    profileImage: propProfileImage,
-    profile
-  });
+  console.log("ProfileAvatar rendering with profileImage:", propProfileImage);
 
   const handleFileSelection = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     
     try {
-      console.log("File selected:", file.name, file.size, file.type);
-      
       // Convert file to data URL for cropping
       const imageSrc = await fileToDataUrl(file);
       setSelectedImageSrc(imageSrc);
       setIsCropModalOpen(true);
-      console.log("Image cropping modal opened");
     } catch (error) {
       console.error('Error reading file:', error);
       toast({
@@ -71,22 +64,16 @@ const ProfileAvatar = ({
     
     try {
       setUploading(true);
-      console.log("Starting avatar upload process for user:", user.id);
-      
-      // Create unique filename with timestamp to avoid caching issues
-      const timestamp = Date.now();
-      const fileExt = 'jpg'; // Always use jpg for cropped images
-      const filePath = `${user.id}/avatar-${timestamp}.${fileExt}`;
-      
-      console.log("Uploading to path:", filePath);
       
       // Upload the cropped image to Supabase Storage
-      const { error: uploadError, data: uploadData } = await supabase.storage
+      const fileExt = 'jpg'; // Always use jpg for cropped images
+      const filePath = `${user.id}/avatar.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
         .from('profile_images')
         .upload(filePath, croppedImageBlob, { upsert: true });
       
       if (uploadError) {
-        console.error("Upload error:", uploadError);
         toast({
           title: 'Upload failed',
           description: uploadError.message,
@@ -95,25 +82,20 @@ const ProfileAvatar = ({
         return;
       }
       
-      console.log("Upload successful:", uploadData);
-      
       // Get the public URL (without timestamp for database storage)
       const { data: { publicUrl } } = supabase.storage
         .from('profile_images')
         .getPublicUrl(filePath);
       
-      console.log("Generated public URL:", publicUrl);
+      console.log("New profile image URL:", publicUrl);
       
-      // Update database with the new avatar URL
-      console.log("Updating database with new avatar URL...");
-      const { error: updateError, data: updateData } = await supabase
+      // Immediately save to database
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
-        .eq('id', user.id)
-        .select();
+        .eq('id', user.id);
       
       if (updateError) {
-        console.error("Database update error:", updateError);
         toast({
           title: 'Failed to update profile',
           description: updateError.message,
@@ -122,22 +104,12 @@ const ProfileAvatar = ({
         return;
       }
       
-      console.log("Database updated successfully:", updateData);
-      
-      // Add a small delay before invalidating cache to ensure database is updated
-      setTimeout(() => {
-        console.log("Invalidating profile cache for user:", user.id);
-        invalidateProfile(user.id);
-        
-        // Dispatch profile update event
-        window.dispatchEvent(new CustomEvent('profile-updated'));
-      }, 500);
+      // Invalidate profile cache to trigger re-renders everywhere
+      invalidateProfile(user.id);
       
       // Close the crop modal
       setIsCropModalOpen(false);
       setSelectedImageSrc('');
-      
-      console.log("Avatar update process completed successfully");
       
       toast({
         title: 'Avatar updated',
@@ -159,7 +131,6 @@ const ProfileAvatar = ({
   const handleCropCancel = () => {
     setIsCropModalOpen(false);
     setSelectedImageSrc('');
-    console.log("Avatar crop cancelled");
   };
 
   return (

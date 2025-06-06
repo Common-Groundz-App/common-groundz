@@ -295,10 +295,15 @@ async function uploadImageToStorage(blob: Blob, entityId: string, originalUrl: s
 }
 
 // Helper function to ensure the entity-images bucket exists with proper policies
-async function ensureBucketForImage(): Promise<boolean> {
+async function ensureBucketForImage() {
   try {
     // Ensure the bucket has proper policies
-    await ensureBucketPolicies('entity-images');
+    const policiesSet = await ensureBucketPolicies('entity-images');
+    
+    if (!policiesSet) {
+      console.warn('Could not set policies for entity-images bucket');
+    }
+    
     return true;
   } catch (error) {
     console.error('Error ensuring bucket for image:', error);
