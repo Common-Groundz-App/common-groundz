@@ -9,7 +9,7 @@ import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
-import { Bell, Search, ChevronDown, ArrowUp } from 'lucide-react';
+import { Bell, Search, ChevronDown, ArrowUp, Home, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Toaster } from '@/components/ui/toaster';
@@ -60,6 +60,13 @@ const Feed = React.memo(() => {
   const [isActive, setIsActive] = useState(false);
   const [startY, setStartY] = useState(0);
   
+  // Navigation items for the navbar
+  const navItems = [
+    { name: 'Home', url: '/home', icon: Home },
+    { name: 'Explore', url: '/explore', icon: Search },
+    { name: 'Profile', url: '/profile', icon: User }
+  ];
+
   // New content detection state
   const [newContentAvailable, setNewContentAvailable] = useState(false);
   const [newPostCount, setNewPostCount] = useState(0);
@@ -413,6 +420,7 @@ const Feed = React.memo(() => {
         {/* Desktop Sidebar - Only show on xl+ screens */}
         <div className="hidden xl:block">
           <VerticalTubelightNavBar 
+            items={navItems}
             initialActiveTab={getInitialActiveTab()}
             className="fixed left-0 top-0 h-screen pt-4 pl-4" 
           />

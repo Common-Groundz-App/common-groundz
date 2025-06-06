@@ -6,7 +6,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Bell, User, Shield, Palette, Globe, MapPin, Info, AlertTriangle } from 'lucide-react';
+import { Bell, User, Shield, Palette, Globe, MapPin, Info, AlertTriangle, Home, Search } from 'lucide-react';
 import { VerticalTubelightNavBar } from '@/components/ui/vertical-tubelight-navbar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -49,6 +49,13 @@ const Settings = () => {
   if (!user) {
     return <div>Loading...</div>;
   }
+  
+  // Navigation items for the navbar
+  const navItems = [
+    { name: 'Home', url: '/home', icon: Home },
+    { name: 'Explore', url: '/explore', icon: Search },
+    { name: 'Profile', url: '/profile', icon: User }
+  ];
   
   // Using the getInitialActiveTab similar to Feed page
   const getInitialActiveTab = () => {
@@ -109,6 +116,7 @@ const Settings = () => {
       <div className="flex flex-1">
         {!isMobile && (
           <VerticalTubelightNavBar 
+            items={navItems}
             initialActiveTab={getInitialActiveTab()}
             className="fixed left-0 top-0 h-screen pt-4" 
           />
