@@ -35,19 +35,21 @@ const ProfileAvatar = ({
   const { data: profile } = useProfile(userId || user?.id);
   const { invalidateProfile } = useProfileCacheActions();
   
-  console.log("ProfileAvatar rendering with profileImage:", propProfileImage);
+  console.log("🖼️ [ProfileAvatar] Rendering with profileImage:", propProfileImage);
 
   const handleFileSelection = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     
     try {
+      console.log("📁 [ProfileAvatar] File selected for upload:", file.name, file.size);
+      
       // Convert file to data URL for cropping
       const imageSrc = await fileToDataUrl(file);
       setSelectedImageSrc(imageSrc);
       setIsCropModalOpen(true);
     } catch (error) {
-      console.error('Error reading file:', error);
+      console.error('❌ [ProfileAvatar] Error reading file:', error);
       toast({
         title: 'Error',
         description: 'Failed to read the selected image',
@@ -64,16 +66,20 @@ const ProfileAvatar = ({
     
     try {
       setUploading(true);
+      console.log("🔄 [ProfileAvatar] Starting upload process for user:", user.id);
       
       // Upload the cropped image to Supabase Storage
       const fileExt = 'jpg'; // Always use jpg for cropped images
       const filePath = `${user.id}/avatar.${fileExt}`;
+      
+      console.log("📤 [ProfileAvatar] Uploading to path:", filePath);
       
       const { error: uploadError } = await supabase.storage
         .from('profile_images')
         .upload(filePath, croppedImageBlob, { upsert: true });
       
       if (uploadError) {
+        console.error('❌ [ProfileAvatar] Upload failed:', uploadError);
         toast({
           title: 'Upload failed',
           description: uploadError.message,
@@ -87,7 +93,7 @@ const ProfileAvatar = ({
         .from('profile_images')
         .getPublicUrl(filePath);
       
-      console.log("New profile image URL:", publicUrl);
+      console.log("🔗 [ProfileAvatar] New profile image URL:", publicUrl);
       
       // Immediately save to database
       const { error: updateError } = await supabase
@@ -96,6 +102,7 @@ const ProfileAvatar = ({
         .eq('id', user.id);
       
       if (updateError) {
+        console.error('❌ [ProfileAvatar] Database update failed:', updateError);
         toast({
           title: 'Failed to update profile',
           description: updateError.message,
@@ -103,6 +110,8 @@ const ProfileAvatar = ({
         });
         return;
       }
+      
+      console.log("✅ [ProfileAvatar] Successfully updated avatar in database");
       
       // Invalidate profile cache to trigger re-renders everywhere
       invalidateProfile(user.id);
@@ -116,8 +125,10 @@ const ProfileAvatar = ({
         description: 'Your profile picture has been updated successfully',
       });
       
+      console.log("🎉 [ProfileAvatar] Avatar update process completed successfully");
+      
     } catch (error) {
-      console.error('Error uploading profile image:', error);
+      console.error('❌ [ProfileAvatar] Error uploading profile image:', error);
       toast({
         title: 'Something went wrong',
         description: 'Please try again later.',

@@ -4,77 +4,63 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { LucideIcon, MoreHorizontal, Settings, Home, Star, Search, User, Bell } from "lucide-react";
+import { LucideIcon, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Logo from "@/components/Logo";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
-import { SearchDialog } from "@/components/SearchDialog";
-import { useNotifications } from "@/hooks/useNotifications";
-import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
-import { useProfile } from "@/hooks/use-profile-cache";
+import { ProfileAvatar } from "@/components/common/ProfileAvatar";
+import Logo from "@/components/Logo";
 
 interface NavItem {
   name: string;
   url: string;
   icon: LucideIcon;
   onClick?: () => void;
-  badge?: number;
 }
 
-interface VerticalNavBarProps {
-  items?: NavItem[];
+interface NavBarProps {
+  items: NavItem[];
   className?: string;
+  rightSection?: React.ReactNode;
   initialActiveTab?: string;
-  logoSize?: "sm" | "md" | "lg";
+  hideHamburgerMenu?: boolean;
 }
 
-export function VerticalTubelightNavbar({
-  items: propItems,
+export function VerticalTubelightNavBar({
+  items,
   className,
+  rightSection,
   initialActiveTab,
-  logoSize = "md"
-}: VerticalNavBarProps) {
-  const [showSearchDialog, setShowSearchDialog] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const { unreadCount } = useNotifications();
-
-  const defaultNavItems: NavItem[] = [
-    { name: 'Home', url: '/home', icon: Home },
-    { name: 'Explore', url: '/explore', icon: Search },
-    { name: 'Profile', url: '/profile', icon: User },
-    { 
-      name: 'Notifications', 
-      url: '#notifications', 
-      icon: Bell,
-      onClick: () => setShowNotifications(true),
-      badge: unreadCount > 0 ? unreadCount : undefined
-    },
-    { name: 'Settings', url: '/settings', icon: Settings }
-  ];
-
-  const items = propItems || defaultNavItems;
-
+  hideHamburgerMenu = false
+}: NavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
-  
-  // Use enhanced profile service
-  const { data: profile, isLoading } = useProfile(user?.id);
+  const [scrolled, setScrolled] = useState(false);
+  const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const isSmallMobile = useIsMobile(650);
 
   useEffect(() => {
     if (initialActiveTab) {
       setActiveTab(initialActiveTab);
     }
   }, [initialActiveTab]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 50) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   const handleNavItemClick = (item: NavItem) => {
     setActiveTab(item.name);
@@ -83,157 +69,148 @@ export function VerticalTubelightNavbar({
     }
   };
 
-  const getInitials = () => {
-    if (profile?.initials) {
-      return profile.initials;
-    }
-    
-    if (user?.email) {
-      return user.email.substring(0, 2).toUpperCase();
-    }
-    
-    return "U";
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast({
-        title: "Signed out successfully",
-        description: "You have been signed out of your account",
-      });
-    } catch (error) {
-      console.error("Error signing out:", error);
-      toast({
-        title: "Error signing out",
-        description: "There was a problem signing you out",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Use enhanced profile data with fallbacks
-  const displayName = profile?.displayName || user?.email?.split('@')[0] || 'User';
-  const username = profile?.username || user?.email?.split('@')[0] || 'user';
-
   return (
-    <>
-      <div className={cn(
-        "h-full w-16 xl:w-64 bg-background border-r flex flex-col",
-        className
-      )}>
+    <div className={cn(
+      "fixed top-0 left-0 right-0 z-50 py-4 px-4 transition-all duration-300", 
+      scrolled ? "bg-background/90 backdrop-blur-md shadow-sm" : "bg-transparent", 
+      className
+    )}>
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo Section */}
-        <div className="p-4 flex justify-center xl:justify-start flex-shrink-0">
-          <Logo size={logoSize} />
+        <div className="flex-shrink-0">
+          <Link to="/" className="flex items-center">
+            <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
+              <Logo size="md" />
+            </div>
+          </Link>
         </div>
 
-        {/* Navigation Items - Use flex-1 to take remaining space */}
-        <div className="p-2 flex-1 flex flex-col min-h-0">
-          <div className={cn(
-            "w-full flex flex-col items-center xl:items-start gap-2 py-1 px-1 rounded-md"
-          )}>
-            {items.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.name;
-              return (
-                <div 
-                  key={item.name} 
-                  onClick={() => handleNavItemClick(item)}
-                  className={cn(
-                    "relative cursor-pointer text-sm font-semibold w-full rounded-md transition-colors", 
-                    "text-foreground/80 hover:text-primary"
-                  )}
-                >
-                  {(item.url.startsWith('#') || item.onClick) ? (
-                    <button 
-                      className={cn(
-                        "flex items-center w-full space-x-2 px-3 py-3 xl:py-2 rounded-md relative",
-                        isActive && "bg-muted text-primary"
-                      )}
-                      onClick={item.onClick}
-                    >
-                      <Icon size={18} strokeWidth={2.5} />
-                      <span className="hidden xl:inline">{item.name}</span>
-                      {item.badge && (
-                        <span className="absolute right-2 top-2 xl:relative xl:right-auto xl:top-auto xl:ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white">
-                          {item.badge}
+        {/* Navigation Items - Centered for Desktop */}
+        {!isSmallMobile ? (
+          <div className="flex-grow flex justify-center">
+            <div className={cn(
+              "flex items-center gap-2 py-1 px-1 rounded-full shadow-lg transition-all duration-300",
+              scrolled ? "bg-background/5 border border-border backdrop-blur-lg" : "bg-background/30 border border-white/10 backdrop-blur-md"
+            )}>
+              {items.map(item => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.name;
+                return (
+                  <div 
+                    key={item.name} 
+                    onClick={() => handleNavItemClick(item)} 
+                    className={cn(
+                      "relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors", 
+                      "text-foreground/80 hover:text-primary", 
+                      isActive && "bg-muted text-primary"
+                    )}
+                  >
+                    {item.url.startsWith('#') || item.onClick ? (
+                      <button className="flex items-center space-x-2" onClick={item.onClick}>
+                        <span className="hidden md:inline">{item.name}</span>
+                        <span className="md:hidden">
+                          <Icon size={18} strokeWidth={2.5} />
                         </span>
-                      )}
-                    </button>
+                      </button>
+                    ) : (
+                      <Link to={item.url} className="flex items-center space-x-2">
+                        <span className="hidden md:inline">{item.name}</span>
+                        <span className="md:hidden">
+                          <Icon size={18} strokeWidth={2.5} />
+                        </span>
+                      </Link>
+                    )}
+                    {isActive && (
+                      <motion.div 
+                        layoutId="lamp" 
+                        className="absolute inset-0 w-full bg-primary/10 rounded-full -z-10" 
+                        initial={false} 
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 30
+                        }}
+                      >
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-brand-orange rounded-t-full">
+                          <div className="absolute w-12 h-6 bg-brand-orange/20 rounded-full blur-md -top-2 -left-2" />
+                          <div className="absolute w-8 h-6 bg-brand-orange/20 rounded-full blur-md -top-1" />
+                          <div className="absolute w-4 h-4 bg-brand-orange/20 rounded-full blur-sm top-0 left-2" />
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : !hideHamburgerMenu && (
+          <div className="flex-grow flex justify-end">
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className={cn(
+                  "p-2 rounded-md transition-colors",
+                  scrolled ? "hover:bg-gray-100 dark:hover:bg-gray-800" : "hover:bg-white/10"
+                )}>
+                  <Menu size={24} className="text-foreground" />
+                </button>
+              </SheetTrigger>
+              <SheetContent className="w-[250px] sm:w-[300px]">
+                <div className="py-6">
+                  <div className="mb-6">
+                    <Logo size="lg" />
+                  </div>
+                  
+                  {user ? (
+                    // Logged-in user: Show navigation items
+                    <nav className="flex flex-col space-y-4">
+                      {items.map(item => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === item.name;
+                        return (
+                          <div 
+                            key={item.name} 
+                            onClick={() => handleNavItemClick(item)}
+                            className={cn(
+                              "flex items-center space-x-2 px-3 py-2 rounded-md transition-colors cursor-pointer", 
+                              isActive ? "bg-primary/10 text-primary" : "hover:bg-accent text-foreground/80 hover:text-primary"
+                            )}
+                          >
+                            <Icon size={20} strokeWidth={2} />
+                            <span>{item.name}</span>
+                          </div>
+                        );
+                      })}
+                    </nav>
                   ) : (
-                    <Link 
-                      to={item.url} 
-                      className={cn(
-                        "flex items-center w-full space-x-2 px-3 py-3 xl:py-2 rounded-md",
-                        isActive && "bg-muted text-primary"
-                      )}
-                    >
-                      <Icon size={18} strokeWidth={2.5} />
-                      <span className="hidden xl:inline">{item.name}</span>
-                    </Link>
-                  )}
-                  {isActive && (
-                    <motion.div 
-                      layoutId="vertical-lamp" 
-                      className="absolute inset-0 w-full bg-primary/10 rounded-md -z-10" 
-                      initial={false} 
-                      transition={{
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 30
-                      }}
-                    >
-                      <div className="absolute -left-2 top-1/2 -translate-y-1/2 h-8 w-1 bg-brand-orange rounded-full">
-                        <div className="absolute h-12 w-6 bg-brand-orange/20 rounded-full blur-md -left-2 -top-2" />
-                        <div className="absolute h-8 w-6 bg-brand-orange/20 rounded-full blur-md -left-1" />
-                        <div className="absolute h-4 w-4 bg-brand-orange/20 rounded-full blur-sm -left-0.5" />
+                    // Logged-out user: Show auth buttons
+                    <div className="flex flex-col space-y-4">
+                      <div className="text-center mb-6">
+                        <h3 className="text-lg font-semibold text-foreground mb-2">Welcome!</h3>
+                        <p className="text-sm text-muted-foreground">Join our community to explore, share, and discover amazing recommendations.</p>
                       </div>
-                    </motion.div>
+                      
+                      <Button asChild className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white">
+                        <Link to="/auth">Sign Up</Link>
+                      </Button>
+                      
+                      <Button asChild variant="outline" className="w-full">
+                        <Link to="/auth">Log In</Link>
+                      </Button>
+                    </div>
                   )}
                 </div>
-              );
-            })}
+              </SheetContent>
+            </Sheet>
           </div>
-        </div>
-
-        {/* User Menu - Fixed to bottom with flex-shrink-0 */}
-        {user && (
-          <div className="p-2 flex-shrink-0 mt-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="w-full flex items-center px-3 py-2 rounded-md hover:bg-accent transition-colors">
-                  <div className="flex items-center w-full">
-                    <Avatar className="h-9 w-9 flex-shrink-0">
-                      <AvatarImage src={profile?.avatar_url || ""} />
-                      <AvatarFallback>{getInitials()}</AvatarFallback>
-                    </Avatar>
-                    <div className="ml-3 flex-1 min-w-0 hidden xl:block text-left">
-                      <p className="text-sm font-medium truncate">{displayName}</p>
-                      <p className="text-xs text-muted-foreground truncate">@{username}</p>
-                    </div>
-                    <MoreHorizontal size={18} className="ml-auto text-muted-foreground hover:text-foreground hidden xl:block flex-shrink-0" />
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end">
-                <DropdownMenuItem asChild>
-                  <Link to="/profile" className="cursor-pointer">View Profile</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/settings" className="cursor-pointer">Settings</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        )}
+        
+        {/* Right section for user menu */}
+        {!isSmallMobile && (
+          <div className="flex-shrink-0 w-[150px] flex justify-end">
+            {rightSection}
           </div>
         )}
       </div>
-
-      <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
-      <NotificationDrawer open={showNotifications} onOpenChange={setShowNotifications} />
-    </>
+    </div>
   );
 }

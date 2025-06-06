@@ -1,15 +1,14 @@
 
 import React from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 import { useProfile } from '@/hooks/use-profile-cache';
-import { cn } from '@/lib/utils';
 
 interface ProfileAvatarProps {
-  userId: string | null | undefined;
+  userId?: string | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  fallbackClassName?: string;
-  showTooltip?: boolean;
+  fallbackText?: string;
 }
 
 const sizeClasses = {
@@ -20,43 +19,90 @@ const sizeClasses = {
   xl: 'h-16 w-16 text-lg'
 };
 
-export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
-  userId,
-  size = 'md',
+export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({ 
+  userId, 
+  size = 'md', 
   className,
-  fallbackClassName,
-  showTooltip = false
+  fallbackText 
 }) => {
-  const { data: profile, isLoading } = useProfile(userId);
+  const { data: profile, isLoading, error } = useProfile(userId);
+  
+  // Enhanced logging for debugging
+  React.useEffect(() => {
+    if (userId) {
+      console.log('🖼️ [ProfileAvatar] Rendering for user:', {
+        userId,
+        profileLoaded: !!profile,
+        isLoading,
+        hasError: !!error,
+        avatarUrl: profile?.avatar_url ? 'present' : 'missing',
+        initials: profile?.initials,
+        displayName: profile?.displayName
+      });
+    }
+  }, [userId, profile, isLoading, error]);
 
+  // Don't render if no userId provided
   if (!userId) {
+    console.log('⚠️ [ProfileAvatar] No userId provided, rendering fallback');
     return (
       <Avatar className={cn(sizeClasses[size], className)}>
-        <AvatarFallback className={cn('bg-brand-orange text-white', fallbackClassName)}>
-          AU
-        </AvatarFallback>
+        <AvatarFallback>{fallbackText || '?'}</AvatarFallback>
       </Avatar>
     );
   }
 
+  // Show loading state
   if (isLoading) {
     return (
       <Avatar className={cn(sizeClasses[size], className)}>
-        <AvatarFallback className={cn('bg-muted animate-pulse', fallbackClassName)}>
-          ...
-        </AvatarFallback>
+        <AvatarFallback className="animate-pulse bg-muted">...</AvatarFallback>
       </Avatar>
     );
   }
 
+  // Handle error state
+  if (error) {
+    console.error('❌ [ProfileAvatar] Error loading profile for user:', userId, error);
+    return (
+      <Avatar className={cn(sizeClasses[size], className)}>
+        <AvatarFallback>?</AvatarFallback>
+      </Avatar>
+    );
+  }
+
+  // Generate avatar URL with cache busting for immediate updates
+  const avatarUrl = profile?.avatar_url 
+    ? `${profile.avatar_url}?t=${Date.now()}` 
+    : null;
+
+  // Use enhanced initials from the profile service
+  const initials = profile?.initials || fallbackText || '?';
+
+  console.log('🎨 [ProfileAvatar] Rendering avatar with:', {
+    userId,
+    avatarUrl: avatarUrl ? 'present' : 'missing',
+    initials,
+    displayName: profile?.displayName
+  });
+
   return (
     <Avatar className={cn(sizeClasses[size], className)}>
-      <AvatarImage 
-        src={profile?.avatar_url || ''} 
-        alt={profile?.displayName || 'User'} 
-      />
-      <AvatarFallback className={cn('bg-brand-orange text-white font-semibold', fallbackClassName)}>
-        {profile?.initials || 'AU'}
+      {avatarUrl && (
+        <AvatarImage 
+          src={avatarUrl} 
+          alt={profile?.displayName || 'Profile'} 
+          className="object-cover"
+          onError={(e) => {
+            console.log('❌ [ProfileAvatar] Image failed to load for user:', userId, avatarUrl);
+          }}
+          onLoad={() => {
+            console.log('✅ [ProfileAvatar] Image loaded successfully for user:', userId);
+          }}
+        />
+      )}
+      <AvatarFallback className="font-medium">
+        {initials}
       </AvatarFallback>
     </Avatar>
   );
