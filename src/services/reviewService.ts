@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -164,28 +165,52 @@ export const updateReviewStatus = async (reviewId: string, status: string): Prom
   }
 };
 
-// Fetch user reviews with enhanced fields - Fixed foreign key references
+// Fetch user reviews with enhanced fields - Using manual joins to avoid foreign key issues
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
-    const { data: reviews, error } = await supabase
+    // First, get the reviews
+    const { data: reviews, error: reviewsError } = await supabase
       .from('reviews')
-      .select(`
-        *,
-        profiles!reviews_user_id_fkey(username, avatar_url),
-        entities(id, name, type, image_url)
-      `)
+      .select('*')
       .eq('user_id', profileUserId)
       .eq('status', 'published')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching reviews:', error);
+    if (reviewsError) {
+      console.error('Error fetching reviews:', reviewsError);
       return [];
     }
 
     if (!reviews?.length) return [];
 
     const reviewIds = reviews.map(r => r.id);
+    const userIds = reviews.map(r => r.user_id);
+    const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
+
+    // Get user profiles
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', userIds);
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+    }
+
+    // Get entities if any exist
+    let entities = [];
+    if (entityIds.length > 0) {
+      const { data: entitiesData, error: entitiesError } = await supabase
+        .from('entities')
+        .select('id, name, type, image_url')
+        .in('id', entityIds);
+
+      if (entitiesError) {
+        console.error('Error fetching entities:', entitiesError);
+      } else {
+        entities = entitiesData || [];
+      }
+    }
 
     // Get interaction data if user is logged in
     let likeData = [];
@@ -213,23 +238,28 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     }
 
     // Map reviews with interaction data and proper typing
-    return reviews.map(review => ({
-      ...review,
-      user: review.profiles ? {
-        username: review.profiles.username,
-        avatar_url: review.profiles.avatar_url
-      } : undefined,
-      entity: review.entities ? {
-        id: review.entities.id,
-        name: review.entities.name,
-        type: review.entities.type,
-        image_url: review.entities.image_url
-      } : undefined,
-      comment_count: 0, // Placeholder for future comment system
-      isLiked: likeData.some(like => like.review_id === review.id),
-      isSaved: saveData.some(save => save.review_id === review.id),
-      likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
-    }));
+    return reviews.map(review => {
+      const userProfile = profiles?.find(p => p.id === review.user_id);
+      const entity = entities.find(e => e.id === review.entity_id);
+
+      return {
+        ...review,
+        user: userProfile ? {
+          username: userProfile.username,
+          avatar_url: userProfile.avatar_url
+        } : undefined,
+        entity: entity ? {
+          id: entity.id,
+          name: entity.name,
+          type: entity.type,
+          image_url: entity.image_url
+        } : undefined,
+        comment_count: 0, // Placeholder for future comment system
+        isLiked: likeData.some(like => like.review_id === review.id),
+        isSaved: saveData.some(save => save.review_id === review.id),
+        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
+      };
+    });
 
   } catch (error) {
     console.error('Error in fetchUserReviews:', error);
@@ -237,29 +267,53 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
   }
 };
 
-// Fetch reviews that are marked as recommendations (4+ stars) - Fixed foreign key references
+// Fetch reviews that are marked as recommendations (4+ stars) - Using manual joins
 export const fetchUserRecommendations = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
-    const { data: reviews, error } = await supabase
+    // First, get the reviews
+    const { data: reviews, error: reviewsError } = await supabase
       .from('reviews')
-      .select(`
-        *,
-        profiles!reviews_user_id_fkey(username, avatar_url),
-        entities(id, name, type, image_url)
-      `)
+      .select('*')
       .eq('user_id', profileUserId)
       .eq('status', 'published')
       .eq('is_recommended', true)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching recommendations:', error);
+    if (reviewsError) {
+      console.error('Error fetching recommendations:', reviewsError);
       return [];
     }
 
     if (!reviews?.length) return [];
 
     const reviewIds = reviews.map(r => r.id);
+    const userIds = reviews.map(r => r.user_id);
+    const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
+
+    // Get user profiles
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', userIds);
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+    }
+
+    // Get entities if any exist
+    let entities = [];
+    if (entityIds.length > 0) {
+      const { data: entitiesData, error: entitiesError } = await supabase
+        .from('entities')
+        .select('id, name, type, image_url')
+        .in('id', entityIds);
+
+      if (entitiesError) {
+        console.error('Error fetching entities:', entitiesError);
+      } else {
+        entities = entitiesData || [];
+      }
+    }
 
     // Get interaction data if user is logged in
     let likeData = [];
@@ -287,23 +341,28 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
     }
 
     // Map reviews with interaction data and proper typing
-    return reviews.map(review => ({
-      ...review,
-      user: review.profiles ? {
-        username: review.profiles.username,
-        avatar_url: review.profiles.avatar_url
-      } : undefined,
-      entity: review.entities ? {
-        id: review.entities.id,
-        name: review.entities.name,
-        type: review.entities.type,
-        image_url: review.entities.image_url
-      } : undefined,
-      comment_count: 0, // Placeholder for future comment system
-      isLiked: likeData.some(like => like.review_id === review.id),
-      isSaved: saveData.some(save => save.review_id === review.id),
-      likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
-    }));
+    return reviews.map(review => {
+      const userProfile = profiles?.find(p => p.id === review.user_id);
+      const entity = entities.find(e => e.id === review.entity_id);
+
+      return {
+        ...review,
+        user: userProfile ? {
+          username: userProfile.username,
+          avatar_url: userProfile.avatar_url
+        } : undefined,
+        entity: entity ? {
+          id: entity.id,
+          name: entity.name,
+          type: entity.type,
+          image_url: entity.image_url
+        } : undefined,
+        comment_count: 0, // Placeholder for future comment system
+        isLiked: likeData.some(like => like.review_id === review.id),
+        isSaved: saveData.some(save => save.review_id === review.id),
+        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
+      };
+    });
 
   } catch (error) {
     console.error('Error in fetchUserRecommendations:', error);
