@@ -7,7 +7,7 @@ interface EmptyRecommendationsProps {
   isOwnProfile: boolean;
   hasActiveFilter: boolean;
   onClearFilters: () => void;
-  onAddNew: () => void;
+  onAddNew?: () => void; // Make optional
 }
 
 const EmptyRecommendations = ({ 
@@ -35,7 +35,8 @@ const EmptyRecommendations = ({
           Clear Filters
         </Button>
       )}
-      {isOwnProfile && !hasActiveFilter && (
+      {/* Only render Add Recommendation button if onAddNew is provided */}
+      {isOwnProfile && !hasActiveFilter && onAddNew && (
         <Button 
           variant="outline" 
           className="mt-4 bg-brand-orange text-white hover:bg-brand-orange/90"

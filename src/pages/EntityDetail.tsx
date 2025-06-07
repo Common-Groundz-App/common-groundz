@@ -722,8 +722,7 @@ const EntityDetail = () => {
                 <CardContent className="space-y-3">
                   <Button 
                     onClick={handleAddReview}
-                    variant="outline" 
-                    className="w-full gap-2"
+                    className="w-full gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
                   >
                     <MessageSquare className="h-4 w-4" />
                     Write Review

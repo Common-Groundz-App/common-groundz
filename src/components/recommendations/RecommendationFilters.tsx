@@ -20,7 +20,7 @@ interface RecommendationFiltersProps {
   onFilterChange: (category: string) => void;
   onSortChange: (sort: 'latest' | 'highestRated' | 'mostLiked') => void;
   onClearFilters: () => void;
-  onAddNew: () => void;
+  onAddNew?: () => void; // Make optional
 }
 
 export const getCategoryLabel = (category: string): string => {
@@ -109,8 +109,8 @@ const RecommendationFilters = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Add New Button - Always on the right */}
-          {isOwnProfile && (
+          {/* Add New Button - Only render if onAddNew is provided */}
+          {isOwnProfile && onAddNew && (
             <Button 
               onClick={onAddNew}
               size="sm" 

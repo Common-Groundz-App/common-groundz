@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -89,8 +88,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
         isOwnProfile={isOwnProfile}
         hasActiveFilter={!!activeFilter}
         onClearFilters={clearFilters}
-        // Remove onAddNew since users can no longer create recommendations directly
-        onAddNew={undefined}
+        // Don't pass onAddNew - this will hide the button completely
       />
     );
   }
@@ -105,8 +103,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
         onFilterChange={setActiveFilter}
         onSortChange={setSortBy}
         onClearFilters={clearFilters}
-        // Remove onAddNew since users can no longer create recommendations directly
-        onAddNew={undefined}
+        // Don't pass onAddNew - this will hide the button completely
       />
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
