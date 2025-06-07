@@ -20,9 +20,21 @@ interface ReviewFiltersProps {
   onFilterChange: (category: string) => void;
   onSortChange: (sort: 'latest' | 'highestRated' | 'mostLiked') => void;
   onClearFilters: () => void;
+  onAddNew?: () => void;
   title?: string;
   subtitle?: string;
 }
+
+export const getCategoryLabel = (category: string): string => {
+  const labels: Record<string, string> = {
+    food: 'Food',
+    movie: 'Movie',
+    product: 'Product',
+    book: 'Book',
+    place: 'Place'
+  };
+  return labels[category] || category;
+};
 
 const ReviewFilters = ({
   isOwnProfile,
@@ -32,6 +44,7 @@ const ReviewFilters = ({
   onFilterChange,
   onSortChange,
   onClearFilters,
+  onAddNew,
   title,
   subtitle
 }: ReviewFiltersProps) => {
@@ -109,8 +122,8 @@ const ReviewFilters = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Add New Button - Always on the right */}
-          {isOwnProfile && (
+          {/* Add New Button - Only render if onAddNew is provided */}
+          {isOwnProfile && onAddNew && (
             <Button 
               onClick={onAddNew}
               size="sm" 

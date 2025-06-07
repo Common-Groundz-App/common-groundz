@@ -1,9 +1,26 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Heart, MessageSquare, Save, Share2, Flag, CheckCircle, Star } from 'lucide-react';
+import { 
+  MoreHorizontal, 
+  Heart, 
+  MessageSquare, 
+  Save, 
+  Share2, 
+  Flag, 
+  CheckCircle, 
+  Star 
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { deleteReview, toggleReviewLike, toggleReviewSave } from '@/services/reviewService';
@@ -20,7 +37,7 @@ interface ReviewCardProps {
   review: any;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
-  onDeleted?: (id: string) => void;
+  onDeleted?: () => void;
   refreshReviews?: () => void;
   hideEntityFallbacks?: boolean;
   compact?: boolean;

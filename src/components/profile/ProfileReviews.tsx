@@ -94,8 +94,9 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     return (
       <div className="max-w-3xl mx-auto">
         <EmptyReviews 
-          isOwnProfile={isOwnProfile} 
-          onCreateReview={() => setIsFormOpen(true)} 
+          isOwnProfile={isOwnProfile}
+          hasActiveFilter={false}
+          onClearFilters={clearFilters}
         />
         {isFormOpen && isOwnProfile && (
           <ReviewForm 
@@ -128,7 +129,6 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
             review={review}
             onLike={handleLike}
             onSave={handleSave}
-            onConvert={isOwnProfile ? convertToRecommendation : undefined}
             refreshReviews={handleRefreshReviews}
           />
         ))}
