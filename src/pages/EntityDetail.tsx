@@ -35,6 +35,7 @@ import { TimelinePreview } from '@/components/profile/reviews/TimelinePreview';
 import { TimelineBadge } from '@/components/profile/reviews/TimelineBadge';
 import { DynamicReviewsSummary } from '@/components/profile/reviews/DynamicReviewsSummary';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -48,6 +49,8 @@ const EntityDetail = () => {
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isRefreshingImage, setIsRefreshingImage] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
+  const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
   
@@ -81,6 +84,40 @@ const EntityDetail = () => {
     if (!reviews) return [];
     return reviews.filter(review => !review.has_timeline || !review.timeline_count || review.timeline_count === 0);
   }, [reviews]);
+
+  // Check if current user has reviewed this entity
+  const userReview = React.useMemo(() => {
+    if (!user || !reviews) return null;
+    return reviews.find(review => review.user_id === user.id);
+  }, [user, reviews]);
+
+  // Determine sidebar button text and action
+  const getSidebarButtonConfig = () => {
+    if (!userReview) {
+      return {
+        text: 'Write Review',
+        icon: MessageSquare,
+        action: handleAddReview,
+        tooltip: null
+      };
+    }
+    
+    if (userReview.has_timeline && userReview.timeline_count && userReview.timeline_count > 0) {
+      return {
+        text: 'Add Timeline Update',
+        icon: MessageSquare,
+        action: () => handleStartTimeline(userReview.id),
+        tooltip: 'Continue tracking how your experience evolves'
+      };
+    }
+    
+    return {
+      text: 'Update Your Review',
+      icon: MessageSquare,
+      action: () => handleStartTimeline(userReview.id),
+      tooltip: 'Already reviewed this? Add how it\'s going now.'
+    };
+  };
   
   useEffect(() => {
     if (!isLoading) {
@@ -88,6 +125,7 @@ const EntityDetail = () => {
       console.log('EntityDetail component received reviews:', reviews?.length);
       console.log('Dynamic reviews:', dynamicReviews.length);
       console.log('Static reviews:', staticReviews.length);
+      console.log('User review:', userReview);
       if (recommendations?.length > 0) {
         console.log('Sample recommendation:', recommendations[0]);
       }
@@ -95,7 +133,7 @@ const EntityDetail = () => {
         console.log('Sample review:', reviews[0]);
       }
     }
-  }, [isLoading, recommendations, reviews, dynamicReviews, staticReviews]);
+  }, [isLoading, recommendations, reviews, dynamicReviews, staticReviews, userReview]);
 
   // Log contributors when available for debugging
   useEffect(() => {
@@ -233,6 +271,20 @@ const EntityDetail = () => {
     setIsReviewFormOpen(true);
   };
 
+  const handleStartTimeline = (reviewId: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to start a timeline",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setTimelineReviewId(reviewId);
+    setIsTimelineViewerOpen(true);
+  };
+
   const handleRecommendationAction = (action: string, id: string) => {
     console.log(`Recommendation ${action} action for ${id}`);
     refreshData();
@@ -276,6 +328,15 @@ const EntityDetail = () => {
       console.error('Error adding review:', error);
       return Promise.reject(error);
     }
+  };
+
+  const handleTimelineUpdate = async () => {
+    await refreshData();
+  };
+
+  const handleTimelineViewerClose = () => {
+    setIsTimelineViewerOpen(false);
+    setTimelineReviewId(null);
   };
 
   const handleImageRefresh = async () => {
@@ -341,6 +402,8 @@ const EntityDetail = () => {
       id: entity?.id || 'entity-image'
     };
   };
+
+  const sidebarButtonConfig = getSidebarButtonConfig();
 
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
@@ -610,12 +673,12 @@ const EntityDetail = () => {
                 </Button>
                 
                 <Button 
-                  onClick={handleAddReview}
+                  onClick={sidebarButtonConfig.action}
                   variant="outline" 
                   className="flex-1 gap-2"
                 >
-                  <MessageSquare className="h-4 w-4" />
-                  Review
+                  <sidebarButtonConfig.icon className="h-4 w-4" />
+                  {sidebarButtonConfig.text}
                 </Button>
               </div>
               
@@ -668,7 +731,7 @@ const EntityDetail = () => {
                             Showing {staticReviews.length} review{staticReviews.length !== 1 ? 's' : ''}
                           </p>
                           <Button 
-                            onClick={handleAddReview}
+                            onClick={sidebarButtonConfig.action}
                             size="sm"
                             variant="outline"
                             className="gap-2 hidden md:flex"
@@ -679,16 +742,31 @@ const EntityDetail = () => {
                         </div>
                         <div className="space-y-4">
                           {staticReviews.map((review) => (
-                            <ReviewCard
-                              key={review.id}
-                              review={review}
-                              onLike={() => handleReviewAction('like', review.id)}
-                              onSave={() => handleReviewAction('save', review.id)}
-                              refreshReviews={refreshData}
-                              hideEntityFallbacks={true}
-                              compact={true}
-                              showTimelineFeatures={false}
-                            />
+                            <div key={review.id} className="relative">
+                              <ReviewCard
+                                review={review}
+                                onLike={() => handleReviewAction('like', review.id)}
+                                onSave={() => handleReviewAction('save', review.id)}
+                                refreshReviews={refreshData}
+                                hideEntityFallbacks={true}
+                                compact={true}
+                                showTimelineFeatures={false}
+                              />
+                              {/* Start Timeline Button for User's Own Static Reviews */}
+                              {user && review.user_id === user.id && (!review.has_timeline || !review.timeline_count) && (
+                                <div className="mt-2 pl-4">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleStartTimeline(review.id)}
+                                    className="text-xs gap-1 h-7"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                    Start Timeline
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </>
@@ -718,7 +796,7 @@ const EntityDetail = () => {
                             Showing {dynamicReviews.length} dynamic review{dynamicReviews.length !== 1 ? 's' : ''}
                           </p>
                           <Button 
-                            onClick={handleAddReview}
+                            onClick={sidebarButtonConfig.action}
                             size="sm"
                             variant="outline"
                             className="gap-2 hidden md:flex"
@@ -757,13 +835,30 @@ const EntityDetail = () => {
                   <CardTitle className="text-lg font-medium">Share Your Experience</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button 
-                    onClick={handleAddReview}
-                    className="w-full gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    Write Review
-                  </Button>
+                  {sidebarButtonConfig.tooltip ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          onClick={sidebarButtonConfig.action}
+                          className="w-full gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
+                        >
+                          <sidebarButtonConfig.icon className="h-4 w-4" />
+                          {sidebarButtonConfig.text}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{sidebarButtonConfig.tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <Button 
+                      onClick={sidebarButtonConfig.action}
+                      className="w-full gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
+                    >
+                      <sidebarButtonConfig.icon className="h-4 w-4" />
+                      {sidebarButtonConfig.text}
+                    </Button>
+                  )}
                   
                   <Button variant="outline" className="w-full gap-2">
                     <Share2 className="h-4 w-4" />
@@ -841,6 +936,19 @@ const EntityDetail = () => {
             description: entity.description || '',
             metadata: entity.metadata
           }}
+        />
+      )}
+
+      {/* Timeline Viewer Modal */}
+      {timelineReviewId && userReview && (
+        <ReviewTimelineViewer
+          isOpen={isTimelineViewerOpen}
+          onClose={handleTimelineViewerClose}
+          reviewId={timelineReviewId}
+          reviewOwnerId={userReview.user_id}
+          reviewTitle={userReview.title}
+          initialRating={userReview.rating}
+          onTimelineUpdate={handleTimelineUpdate}
         />
       )}
 

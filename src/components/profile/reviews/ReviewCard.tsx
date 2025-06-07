@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share2, Clock } from 'lucide-react';
+import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share2, Clock, Plus } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +38,7 @@ interface ReviewCardProps {
   hideEntityFallbacks?: boolean;
   compact?: boolean;
   showTimelineFeatures?: boolean; // New prop to control timeline features display
+  onStartTimeline?: (reviewId: string) => void; // New prop for starting timeline
 }
 
 const ReviewCard = ({ 
@@ -49,7 +49,8 @@ const ReviewCard = ({
   refreshReviews,
   hideEntityFallbacks = false,
   compact = false,
-  showTimelineFeatures = false // Default to false to maintain existing behavior
+  showTimelineFeatures = false, // Default to false to maintain existing behavior
+  onStartTimeline
 }: ReviewCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -60,6 +61,9 @@ const ReviewCard = ({
   
   const isOwner = user?.id === review.user_id;
   const isAdmin = user?.email?.includes('@lovable.dev') || false; // Simple admin check
+  
+  // Check if user can start timeline (owns review and has no timeline)
+  const canStartTimeline = isOwner && (!review.has_timeline || !review.timeline_count || review.timeline_count === 0);
   
   // Get entity image URL if available, ensuring it uses HTTPS
   const entityImageUrl = review.entity?.image_url ? ensureHttps(review.entity.image_url) : null;
@@ -644,6 +648,21 @@ const ReviewCard = ({
             </div>
           )}
           
+          {/* Start Timeline Button for Static Reviews */}
+          {showTimelineFeatures && canStartTimeline && (
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStartTimelineClick}
+                className="gap-2 border-dashed"
+              >
+                <Plus className="h-4 w-4" />
+                Start Timeline
+              </Button>
+            </div>
+          )}
+          
           {/* Media - conditionally rendered based on shouldShowMedia */}
           {shouldShowMedia && (
             <div className="mt-3">
@@ -757,12 +776,12 @@ const ReviewCard = ({
       {showTimelineFeatures && review.has_timeline && (
         <ReviewTimelineViewer
           isOpen={isTimelineViewerOpen}
-          onClose={handleTimelineViewerClose}
+          onClose={() => setIsTimelineViewerOpen(false)}
           reviewId={review.id}
           reviewOwnerId={review.user_id}
           reviewTitle={review.title}
           initialRating={review.rating}
-          onTimelineUpdate={handleTimelineUpdate}
+          onTimelineUpdate={refreshReviews}
         />
       )}
 
