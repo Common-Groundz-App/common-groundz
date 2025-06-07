@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -164,15 +163,15 @@ export const updateReviewStatus = async (reviewId: string, status: string): Prom
   }
 };
 
-// Fetch user reviews with enhanced fields
+// Fetch user reviews with enhanced fields - Fixed foreign key references
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
     const { data: reviews, error } = await supabase
       .from('reviews')
       .select(`
         *,
-        profiles!reviews_user_id_fkey(username, avatar_url),
-        entities!reviews_entity_id_fkey(id, name, image_url)
+        profiles!inner(username, avatar_url),
+        entities(id, name, image_url)
       `)
       .eq('user_id', profileUserId)
       .eq('status', 'published')
@@ -236,15 +235,15 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
   }
 };
 
-// Fetch reviews that are marked as recommendations (4+ stars)
+// Fetch reviews that are marked as recommendations (4+ stars) - Fixed foreign key references
 export const fetchUserRecommendations = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
     const { data: reviews, error } = await supabase
       .from('reviews')
       .select(`
         *,
-        profiles!reviews_user_id_fkey(username, avatar_url),
-        entities!reviews_entity_id_fkey(id, name, image_url)
+        profiles!inner(username, avatar_url),
+        entities(id, name, image_url)
       `)
       .eq('user_id', profileUserId)
       .eq('status', 'published')

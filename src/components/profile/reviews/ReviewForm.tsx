@@ -17,11 +17,11 @@ import StepFour from './steps/StepFour';
 import StepIndicator from './StepIndicator';
 import StepNavigation from './StepNavigation';
 
-// Define the entity interface for pre-populating entity data
+// Define the entity interface for pre-populating entity data - now includes type property
 interface EntityData {
   id: string;
   name: string;
-  type: string;
+  type: string; // Added missing type property
   venue?: string;
   image_url?: string;
   description?: string;
