@@ -610,32 +610,32 @@ const EntityDetail = () => {
               >
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger value="recommendations" className="py-3">
-                    Recommendations ({stats.recommendationCount})
+                    Dynamic Reviews ({stats.recommendationCount})
                   </TabsTrigger>
                   <TabsTrigger value="reviews" className="py-3">
-                    Reviews ({stats.reviewCount})
+                    All Reviews ({stats.reviewCount})
                   </TabsTrigger>
                 </TabsList>
                 
-                {/* Recommendations Tab */}
+                {/* Dynamic Reviews Tab (formerly Recommendations) */}
                 <TabsContent value="recommendations" className="space-y-4 mt-2">
                   {!recommendations || recommendations.length === 0 ? (
                     <div className="py-12 text-center border rounded-lg bg-violet-50/30 dark:bg-violet-900/5">
                       <MessageSquareHeart className="h-12 w-12 mx-auto text-violet-300 dark:text-violet-700" />
-                      <h3 className="font-medium text-lg mt-4">No recommendations yet</h3>
+                      <h3 className="font-medium text-lg mt-4">No dynamic reviews yet</h3>
                       <p className="text-muted-foreground mt-2">
-                        Be the first to recommend {entity?.name}!
+                        Be the first to create a dynamic review for {entity?.name}!
                       </p>
                       <Button onClick={handleAddRecommendation} className="mt-4 gap-2">
                         <Plus className="h-4 w-4" />
-                        Add Recommendation
+                        Add Dynamic Review
                       </Button>
                     </div>
                   ) : (
                     <>
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                          Showing {recommendations.length} recommendation{recommendations.length !== 1 ? 's' : ''}
+                          Showing {recommendations.length} dynamic review{recommendations.length !== 1 ? 's' : ''}
                         </p>
                         <Button 
                           onClick={handleAddRecommendation}
@@ -663,7 +663,7 @@ const EntityDetail = () => {
                   )}
                 </TabsContent>
                 
-                {/* Reviews Tab */}
+                {/* All Reviews Tab */}
                 <TabsContent value="reviews" className="space-y-4 mt-2">
                   {!reviews || reviews.length === 0 ? (
                     <div className="py-12 text-center border rounded-lg bg-amber-50/30 dark:bg-amber-900/5">
@@ -703,6 +703,7 @@ const EntityDetail = () => {
                             refreshReviews={refreshData}
                             hideEntityFallbacks={true}
                             compact={true}
+                            showTimelineIndicator={true}
                           />
                         ))}
                       </div>

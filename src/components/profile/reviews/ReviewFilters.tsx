@@ -20,19 +20,9 @@ interface ReviewFiltersProps {
   onFilterChange: (category: string) => void;
   onSortChange: (sort: 'latest' | 'highestRated' | 'mostLiked') => void;
   onClearFilters: () => void;
-  onAddNew: () => void;
+  title?: string;
+  subtitle?: string;
 }
-
-export const getCategoryLabel = (category: string): string => {
-  const labels: Record<string, string> = {
-    food: 'Food',
-    movie: 'Movie',
-    product: 'Product',
-    book: 'Book',
-    place: 'Place'
-  };
-  return labels[category] || category;
-};
 
 const ReviewFilters = ({
   isOwnProfile,
@@ -42,14 +32,24 @@ const ReviewFilters = ({
   onFilterChange,
   onSortChange,
   onClearFilters,
-  onAddNew
+  title,
+  subtitle
 }: ReviewFiltersProps) => {
+  const defaultTitle = isOwnProfile ? 'My Reviews' : 'Reviews';
+
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg sm:text-lg lg:text-xl font-semibold">
-          {isOwnProfile ? 'My Reviews' : 'Reviews'}
-        </h2>
+        <div>
+          <h2 className="text-lg sm:text-lg lg:text-xl font-semibold">
+            {title || defaultTitle}
+          </h2>
+          {subtitle && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {subtitle}
+            </p>
+          )}
+        </div>
         
         <div className="flex items-center gap-2">
           {/* Filter Button - Always on the left */}

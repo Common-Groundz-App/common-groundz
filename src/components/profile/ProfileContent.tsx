@@ -13,6 +13,7 @@ import { useCardStyles } from '@/utils/theme-utils';
 import ProfileCard from './ProfileCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
+import ProfileDynamicReviews from './ProfileDynamicReviews';
 
 interface ProfileContentProps {
   profileUserId?: string;
@@ -50,9 +51,10 @@ const ProfileContent = React.memo(({ profileUserId, defaultActiveTab = 'posts' }
   // Memoize the profile user ID to prevent unnecessary rerenders
   const profileUserIdToUse = useMemo(() => userId || user?.id, [userId, user?.id]);
   
-  // Memoize tab items to prevent unnecessary rerenders - NOW WITH UPDATED ICONS
+  // Memoize tab items to prevent unnecessary rerenders - NOW WITH TIMELINE TAB
   const tabItems = useMemo(() => [
     { value: 'posts', label: 'Posts', icon: Newspaper },
+    { value: 'timeline', label: 'Timeline', icon: Crown },
     { value: 'recommendations', label: 'Recs', icon: Crown },
     { value: 'reviews', label: 'Reviews', icon: Star },
     { value: 'circles', label: 'Circles', icon: UsersRound }
@@ -114,6 +116,13 @@ const ProfileContent = React.memo(({ profileUserId, defaultActiveTab = 'posts' }
                   <ProfilePosts 
                     profileUserId={profileUserIdToUse} 
                     isOwnProfile={isOwnProfile} 
+                  />
+                </TabsContent>
+                
+                <TabsContent value="timeline">
+                  <ProfileDynamicReviews 
+                    profileUserId={profileUserIdToUse}
+                    isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
                 
