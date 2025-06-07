@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -53,6 +52,10 @@ export interface ReviewUpdate {
   comment: string;
   created_at: string;
   updated_at: string;
+  profiles?: {
+    username?: string;
+    avatar_url?: string;
+  };
 }
 
 // Create a new review

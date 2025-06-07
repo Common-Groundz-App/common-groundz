@@ -169,7 +169,7 @@ export const ReviewTimelineViewer = ({
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={update.profiles?.avatar_url || undefined} />
                       <AvatarFallback className="text-xs">
-                        {getInitials(update.profiles?.username)}
+                        {getInitials(update.profiles?.username || null)}
                       </AvatarFallback>
                     </Avatar>
                     
@@ -240,7 +240,7 @@ export const ReviewTimelineViewer = ({
                     <ConnectedRingsRating
                       value={newRating || 0}
                       onChange={setNewRating}
-                      variant="interactive"
+                      variant="default"
                       size="md"
                       showValue={false}
                       isInteractive={true}
