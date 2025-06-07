@@ -659,31 +659,31 @@ const EntityDetail = () => {
         
         {/* Main Content Area */}
         <div className="container max-w-6xl mx-auto py-6 px-4">
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Main Content */}
-            <div className="flex-1">
-              {/* Action Buttons - Mobile Only */}
-              <div className="flex gap-3 mb-6 md:hidden">
-                <Button 
-                  onClick={handleAddRecommendation}
-                  className="flex-1 gap-2"
-                >
-                  <MessageSquareHeart className="h-4 w-4" />
-                  Recommend
-                </Button>
+          <TooltipProvider>
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Main Content */}
+              <div className="flex-1">
+                {/* Action Buttons - Mobile Only */}
+                <div className="flex gap-3 mb-6 md:hidden">
+                  <Button 
+                    onClick={handleAddRecommendation}
+                    className="flex-1 gap-2"
+                  >
+                    <MessageSquareHeart className="h-4 w-4" />
+                    Recommend
+                  </Button>
+                  
+                  <Button 
+                    onClick={sidebarButtonConfig.action}
+                    variant="outline" 
+                    className="flex-1 gap-2"
+                  >
+                    <sidebarButtonConfig.icon className="h-4 w-4" />
+                    {sidebarButtonConfig.text}
+                  </Button>
+                </div>
                 
-                <Button 
-                  onClick={sidebarButtonConfig.action}
-                  variant="outline" 
-                  className="flex-1 gap-2"
-                >
-                  <sidebarButtonConfig.icon className="h-4 w-4" />
-                  {sidebarButtonConfig.text}
-                </Button>
-              </div>
-              
-              {/* Content Tabs - Updated for Dynamic Reviews */}
-              <TooltipProvider>
+                {/* Content Tabs - Updated for Dynamic Reviews */}
                 <Tabs 
                   defaultValue="reviews" 
                   value={activeTab}
@@ -824,81 +824,81 @@ const EntityDetail = () => {
                     )}
                   </TabsContent>
                 </Tabs>
-              </TooltipProvider>
-            </div>
-            
-            {/* Enhanced Right Sidebar with new metadata components */}
-            <div className="w-full md:w-72 lg:w-80 space-y-5 order-first md:order-last">
-              {/* Share Your Experience Card */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Share Your Experience</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {sidebarButtonConfig.tooltip ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          onClick={sidebarButtonConfig.action}
-                          className="w-full gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
-                        >
-                          <sidebarButtonConfig.icon className="h-4 w-4" />
-                          {sidebarButtonConfig.text}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{sidebarButtonConfig.tooltip}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <Button 
-                      onClick={sidebarButtonConfig.action}
-                      className="w-full gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
-                    >
-                      <sidebarButtonConfig.icon className="h-4 w-4" />
-                      {sidebarButtonConfig.text}
-                    </Button>
-                  )}
-                  
-                  <Button variant="outline" className="w-full gap-2">
-                    <Share2 className="h-4 w-4" />
-                    Share
-                  </Button>
-                </CardContent>
-              </Card>
+              </div>
               
-              {/* Enhanced Entity Metadata Card */}
-              {entity && <EntityMetadataCard entity={entity} />}
-              
-              {/* Entity Specifications Card */}
-              {entity && <EntitySpecsCard entity={entity} />}
-              
-              {/* Related Entities Card */}
-              {entity && <EntityRelatedCard entity={entity} />}
-              
-              {/* Simplified Basic Info Card - only essential fields */}
-              {entity && (
+              {/* Enhanced Right Sidebar with new metadata components */}
+              <div className="w-full md:w-72 lg:w-80 space-y-5 order-first md:order-last">
+                {/* Share Your Experience Card */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-medium">Basic Information</CardTitle>
+                    <CardTitle className="text-lg font-medium">Share Your Experience</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="text-sm">
-                      <div className="font-medium">Type</div>
-                      <div className="text-muted-foreground capitalize">{entity.type}</div>
-                    </div>
-                    
-                    {contextualField?.value && (
-                      <div className="text-sm">
-                        <div className="font-medium">{contextualField.label}</div>
-                        <div className="text-muted-foreground">{contextualField.value}</div>
-                      </div>
+                    {sidebarButtonConfig.tooltip ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            onClick={sidebarButtonConfig.action}
+                            className="w-full gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
+                          >
+                            <sidebarButtonConfig.icon className="h-4 w-4" />
+                            {sidebarButtonConfig.text}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{sidebarButtonConfig.tooltip}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Button 
+                        onClick={sidebarButtonConfig.action}
+                        className="w-full gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
+                      >
+                        <sidebarButtonConfig.icon className="h-4 w-4" />
+                        {sidebarButtonConfig.text}
+                      </Button>
                     )}
+                    
+                    <Button variant="outline" className="w-full gap-2">
+                      <Share2 className="h-4 w-4" />
+                      Share
+                    </Button>
                   </CardContent>
                 </Card>
-              )}
+                
+                {/* Enhanced Entity Metadata Card */}
+                {entity && <EntityMetadataCard entity={entity} />}
+                
+                {/* Entity Specifications Card */}
+                {entity && <EntitySpecsCard entity={entity} />}
+                
+                {/* Related Entities Card */}
+                {entity && <EntityRelatedCard entity={entity} />}
+                
+                {/* Simplified Basic Info Card - only essential fields */}
+                {entity && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg font-medium">Basic Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="text-sm">
+                        <div className="font-medium">Type</div>
+                        <div className="text-muted-foreground capitalize">{entity.type}</div>
+                      </div>
+                      
+                      {contextualField?.value && (
+                        <div className="text-sm">
+                          <div className="font-medium">{contextualField.label}</div>
+                          <div className="text-muted-foreground">{contextualField.value}</div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
-          </div>
+          </TooltipProvider>
         </div>
       </div>
       
