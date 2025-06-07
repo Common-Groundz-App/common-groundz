@@ -5,44 +5,36 @@ import { Star } from 'lucide-react';
 
 interface EmptyReviewsProps {
   isOwnProfile: boolean;
-  hasActiveFilter: boolean;
-  onClearFilters: () => void;
-  type?: 'reviews' | 'dynamic';
-  message?: string;
+  onCreateReview: () => void;
 }
 
-const EmptyReviews = ({ 
-  isOwnProfile, 
-  hasActiveFilter, 
-  onClearFilters,
-  type = 'reviews',
-  message
-}: EmptyReviewsProps) => {
-  const defaultMessage = type === 'dynamic' 
-    ? (isOwnProfile 
-        ? "You haven't created any dynamic reviews yet. Share highly-rated experiences or add timeline updates!"
-        : "This user hasn't created any dynamic reviews yet.")
-    : (isOwnProfile 
-        ? "You haven't written any reviews yet. Share your experiences to help others discover great places!"
-        : "This user hasn't written any reviews yet.");
-
+const EmptyReviews = ({ isOwnProfile, onCreateReview }: EmptyReviewsProps) => {
   return (
-    <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-lg">
-      <p className="text-lg mb-2">
-        {type === 'dynamic' ? 'No dynamic reviews found' : 'No reviews found'}
+    <div className="w-full py-12 flex flex-col items-center justify-center text-center">
+      <div className="rounded-full bg-muted/50 p-6 mb-4">
+        <Star 
+          size={40} 
+          className="text-muted-foreground stroke-[1.5] stroke-brand-orange/70 fill-brand-orange/10" 
+        />
+      </div>
+      
+      <h3 className="text-xl font-semibold mb-2">
+        {isOwnProfile ? "You haven't written any reviews yet" : "No reviews yet"}
+      </h3>
+      
+      <p className="text-muted-foreground mb-6 max-w-md">
+        {isOwnProfile 
+          ? "Share your honest thoughts on products, places, and experiences before turning them into recommendations."
+          : "This user hasn't written any reviews yet."}
       </p>
-      <p className="text-sm">
-        {hasActiveFilter 
-          ? 'Try clearing your filters or add new reviews'
-          : (message || defaultMessage)}
-      </p>
-      {hasActiveFilter && (
+      
+      {isOwnProfile && (
         <Button 
-          variant="outline" 
-          className="mt-4"
-          onClick={onClearFilters}
+          onClick={onCreateReview}
+          className="flex items-center gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white"
         >
-          Clear Filters
+          <Star size={16} />
+          <span>Write Your First Review</span>
         </Button>
       )}
     </div>

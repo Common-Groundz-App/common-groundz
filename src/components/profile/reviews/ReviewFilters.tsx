@@ -20,9 +20,7 @@ interface ReviewFiltersProps {
   onFilterChange: (category: string) => void;
   onSortChange: (sort: 'latest' | 'highestRated' | 'mostLiked') => void;
   onClearFilters: () => void;
-  onAddNew?: () => void;
-  title?: string;
-  subtitle?: string;
+  onAddNew: () => void;
 }
 
 export const getCategoryLabel = (category: string): string => {
@@ -44,25 +42,14 @@ const ReviewFilters = ({
   onFilterChange,
   onSortChange,
   onClearFilters,
-  onAddNew,
-  title,
-  subtitle
+  onAddNew
 }: ReviewFiltersProps) => {
-  const defaultTitle = isOwnProfile ? 'My Reviews' : 'Reviews';
-
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg sm:text-lg lg:text-xl font-semibold">
-            {title || defaultTitle}
-          </h2>
-          {subtitle && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {subtitle}
-            </p>
-          )}
-        </div>
+        <h2 className="text-lg sm:text-lg lg:text-xl font-semibold">
+          {isOwnProfile ? 'My Reviews' : 'Reviews'}
+        </h2>
         
         <div className="flex items-center gap-2">
           {/* Filter Button - Always on the left */}
@@ -122,8 +109,8 @@ const ReviewFilters = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Add New Button - Only render if onAddNew is provided */}
-          {isOwnProfile && onAddNew && (
+          {/* Add New Button - Always on the right */}
+          {isOwnProfile && (
             <Button 
               onClick={onAddNew}
               size="sm" 
