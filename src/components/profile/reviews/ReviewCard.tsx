@@ -27,7 +27,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { Review } from '@/services/reviewService';
-import RatingStarsEnhanced from './RatingStarsEnhanced';
+import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
 import ReviewForm from './ReviewForm';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -197,7 +197,12 @@ const ReviewCard = ({
         <CardContent className="pt-0">
           {/* Rating */}
           <div className="flex items-center gap-2 mb-3">
-            <RatingStarsEnhanced rating={review.rating} size="sm" />
+            <ConnectedRingsRating 
+              value={review.rating} 
+              size="sm" 
+              showValue={false}
+              isInteractive={false}
+            />
             <span className="text-sm font-medium">{review.rating}/5</span>
           </div>
 

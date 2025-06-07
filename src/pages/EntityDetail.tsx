@@ -17,10 +17,10 @@ import { useRecommendations } from '@/hooks/use-recommendations';
 import { useReviews } from '@/hooks/use-reviews';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import ReviewCard from '@/components/profile/reviews/ReviewCard';
-import EntityDetailSkeleton from '@/components/entity/EntityDetailSkeleton';
-import EntityMetadataCard from '@/components/entity/EntityMetadataCard';
-import EntitySpecsCard from '@/components/entity/EntitySpecsCard';
-import EntityRelatedCard from '@/components/entity/EntityRelatedCard';
+import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
+import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
+import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
+import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { ensureHttps } from '@/utils/urlUtils';
 
 const EntityDetail = () => {
@@ -33,38 +33,33 @@ const EntityDetail = () => {
   
   const {
     entity,
+    recommendations,
+    reviews,
+    stats,
     isLoading,
     error,
-    refreshEntity
+    refreshData
   } = useEntityDetail(slug || '');
 
   const {
-    recommendations,
-    isLoading: recommendationsLoading,
     handleLike: handleRecommendationLike,
     handleSave: handleRecommendationSave,
     refreshRecommendations
   } = useRecommendations({ 
-    profileUserId: entity?.created_by || undefined 
+    profileUserId: undefined 
   });
 
   const {
-    reviews,
-    isLoading: reviewsLoading,
     handleLike: handleReviewLike,
     handleSave: handleReviewSave,
     refreshReviews
   } = useReviews({ 
-    profileUserId: entity?.created_by || '' 
+    profileUserId: '' 
   });
-
-  // Filter recommendations and reviews for this specific entity
-  const entityRecommendations = recommendations?.filter(rec => rec.entity?.id === entity?.id) || [];
-  const entityReviews = reviews?.filter(review => review.entity_id === entity?.id) || [];
 
   const handleReviewSubmit = async () => {
     await refreshReviews();
-    await refreshEntity();
+    await refreshData();
     setIsReviewFormOpen(false);
   };
 
@@ -223,11 +218,11 @@ const EntityDetail = () => {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="recommendations" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Recommendations ({entityRecommendations.length})
+              Recommendations ({recommendations?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="reviews" className="flex items-center gap-2">
               <Star className="h-4 w-4" />
-              Reviews ({entityReviews.length})
+              Reviews ({reviews?.length || 0})
             </TabsTrigger>
           </TabsList>
 
@@ -235,24 +230,12 @@ const EntityDetail = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Community Recommendations</h2>
-                <Badge variant="outline">{entityRecommendations.length} recommendations</Badge>
+                <Badge variant="outline">{recommendations?.length || 0} recommendations</Badge>
               </div>
               
-              {recommendationsLoading ? (
+              {recommendations && recommendations.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[...Array(6)].map((_, i) => (
-                    <Card key={i} className="animate-pulse">
-                      <CardContent className="p-4">
-                        <div className="h-32 bg-muted rounded mb-4"></div>
-                        <div className="h-4 bg-muted rounded mb-2"></div>
-                        <div className="h-3 bg-muted rounded"></div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : entityRecommendations.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {entityRecommendations.map((recommendation) => (
+                  {recommendations.map((recommendation) => (
                     <RecommendationCard
                       key={recommendation.id}
                       recommendation={recommendation}
@@ -287,22 +270,12 @@ const EntityDetail = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">All Reviews</h2>
-                <Badge variant="outline">{entityReviews.length} reviews</Badge>
+                <Badge variant="outline">{reviews?.length || 0} reviews</Badge>
               </div>
               
-              {reviewsLoading ? (
+              {reviews && reviews.length > 0 ? (
                 <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <Card key={i} className="animate-pulse">
-                      <CardContent className="p-4">
-                        <div className="h-24 bg-muted rounded"></div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : entityReviews.length > 0 ? (
-                <div className="space-y-4">
-                  {entityReviews.map((review) => (
+                  {reviews.map((review) => (
                     <ReviewCard
                       key={review.id}
                       review={review}
