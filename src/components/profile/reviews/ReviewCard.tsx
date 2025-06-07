@@ -262,6 +262,17 @@ const ReviewCard = ({
     return colors[getCategoryLabel(category)] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
   };
 
+  const handleStartTimelineClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onStartTimeline) {
+      onStartTimeline(review.id);
+    } else {
+      // Fallback: open timeline viewer which can handle starting a timeline
+      setIsTimelineViewerOpen(true);
+    }
+  };
+
   if (compact) {
     return (
       <>
