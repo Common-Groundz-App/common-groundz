@@ -31,6 +31,17 @@ export interface Review {
   isLiked?: boolean;
   isSaved?: boolean;
   likes?: number;
+  // Additional fields for ReviewCard compatibility
+  user?: {
+    username?: string;
+    avatar_url?: string;
+  };
+  entity?: {
+    id: string;
+    name: string;
+    image_url?: string;
+  };
+  comment_count?: number;
 }
 
 export interface ReviewUpdate {
@@ -43,6 +54,116 @@ export interface ReviewUpdate {
   updated_at: string;
 }
 
+// Create a new review
+export const createReview = async (reviewData: {
+  title: string;
+  subtitle?: string;
+  venue?: string;
+  description?: string;
+  rating: number;
+  image_url?: string;
+  media?: any;
+  category: string;
+  visibility: 'public' | 'private' | 'circle_only';
+  entity_id?: string;
+  experience_date?: string;
+  metadata?: any;
+  user_id: string;
+}): Promise<Review> => {
+  try {
+    const { data, error } = await supabase
+      .from('reviews')
+      .insert(reviewData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating review:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in createReview:', error);
+    throw error;
+  }
+};
+
+// Update an existing review
+export const updateReview = async (reviewId: string, updates: {
+  title?: string;
+  subtitle?: string;
+  venue?: string;
+  description?: string;
+  rating?: number;
+  image_url?: string;
+  media?: any;
+  category?: string;
+  visibility?: 'public' | 'private' | 'circle_only';
+  entity_id?: string;
+  experience_date?: string;
+  metadata?: any;
+}): Promise<Review> => {
+  try {
+    const { data, error } = await supabase
+      .from('reviews')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', reviewId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating review:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in updateReview:', error);
+    throw error;
+  }
+};
+
+// Delete a review
+export const deleteReview = async (reviewId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('reviews')
+      .delete()
+      .eq('id', reviewId);
+
+    if (error) {
+      console.error('Error deleting review:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in deleteReview:', error);
+    return false;
+  }
+};
+
+// Update review status (for admin actions)
+export const updateReviewStatus = async (reviewId: string, status: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('reviews')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', reviewId);
+
+    if (error) {
+      console.error('Error updating review status:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in updateReviewStatus:', error);
+    return false;
+  }
+};
+
 // Fetch user reviews with enhanced fields
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
@@ -50,7 +171,8 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       .from('reviews')
       .select(`
         *,
-        profiles!reviews_user_id_fkey(username, avatar_url)
+        profiles!reviews_user_id_fkey(username, avatar_url),
+        entities!reviews_entity_id_fkey(id, name, image_url)
       `)
       .eq('user_id', profileUserId)
       .eq('status', 'published')
@@ -90,9 +212,19 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       likeCounts = likeCountsResponse.data || [];
     }
 
-    // Map reviews with interaction data
+    // Map reviews with interaction data and proper typing
     return reviews.map(review => ({
       ...review,
+      user: review.profiles ? {
+        username: review.profiles.username,
+        avatar_url: review.profiles.avatar_url
+      } : undefined,
+      entity: review.entities ? {
+        id: review.entities.id,
+        name: review.entities.name,
+        image_url: review.entities.image_url
+      } : undefined,
+      comment_count: 0, // Placeholder for future comment system
       isLiked: likeData.some(like => like.review_id === review.id),
       isSaved: saveData.some(save => save.review_id === review.id),
       likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
@@ -111,7 +243,8 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
       .from('reviews')
       .select(`
         *,
-        profiles!reviews_user_id_fkey(username, avatar_url)
+        profiles!reviews_user_id_fkey(username, avatar_url),
+        entities!reviews_entity_id_fkey(id, name, image_url)
       `)
       .eq('user_id', profileUserId)
       .eq('status', 'published')
@@ -152,9 +285,19 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
       likeCounts = likeCountsResponse.data || [];
     }
 
-    // Map reviews with interaction data
+    // Map reviews with interaction data and proper typing
     return reviews.map(review => ({
       ...review,
+      user: review.profiles ? {
+        username: review.profiles.username,
+        avatar_url: review.profiles.avatar_url
+      } : undefined,
+      entity: review.entities ? {
+        id: review.entities.id,
+        name: review.entities.name,
+        image_url: review.entities.image_url
+      } : undefined,
+      comment_count: 0, // Placeholder for future comment system
       isLiked: likeData.some(like => like.review_id === review.id),
       isSaved: saveData.some(save => save.review_id === review.id),
       likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
@@ -190,7 +333,6 @@ export const fetchReviewUpdates = async (reviewId: string): Promise<ReviewUpdate
   }
 };
 
-// Add a review update to timeline
 export const addReviewUpdate = async (reviewId: string, userId: string, rating: number | null, comment: string): Promise<boolean> => {
   try {
     const { error } = await supabase
@@ -214,7 +356,6 @@ export const addReviewUpdate = async (reviewId: string, userId: string, rating: 
   }
 };
 
-// Toggle review like
 export const toggleReviewLike = async (reviewId: string, userId: string): Promise<boolean> => {
   try {
     const { data, error } = await supabase.rpc('toggle_review_like', {
@@ -227,14 +368,13 @@ export const toggleReviewLike = async (reviewId: string, userId: string): Promis
       return false;
     }
 
-    return data; // Returns true if liked, false if unliked
+    return data;
   } catch (error) {
     console.error('Error in toggleReviewLike:', error);
     return false;
   }
 };
 
-// Toggle review save
 export const toggleReviewSave = async (reviewId: string, userId: string): Promise<boolean> => {
   try {
     const { data, error } = await supabase.rpc('toggle_review_save', {
@@ -247,17 +387,15 @@ export const toggleReviewSave = async (reviewId: string, userId: string): Promis
       return false;
     }
 
-    return data; // Returns true if saved, false if unsaved
+    return data;
   } catch (error) {
     console.error('Error in toggleReviewSave:', error);
     return false;
   }
 };
 
-// Convert review to recommendation (this will now be automatic for 4+ star reviews)
 export const convertReviewToRecommendation = async (reviewId: string): Promise<boolean> => {
   try {
-    // Update the review to ensure it's marked as recommended
     const { error } = await supabase
       .from('reviews')
       .update({ 
