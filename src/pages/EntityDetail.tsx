@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image } from 'lucide-react';
+import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
@@ -31,6 +31,10 @@ import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
+import { TimelinePreview } from '@/components/profile/reviews/TimelinePreview';
+import { TimelineBadge } from '@/components/profile/reviews/TimelineBadge';
+import { DynamicReviewsSummary } from '@/components/profile/reviews/DynamicReviewsSummary';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -66,10 +70,24 @@ const EntityDetail = () => {
     isLoading: isCircleRatingLoading
   } = useCircleRating(entity?.id || '');
   
+  // Filter dynamic reviews (reviews with timeline updates)
+  const dynamicReviews = React.useMemo(() => {
+    if (!reviews) return [];
+    return reviews.filter(review => review.has_timeline && review.timeline_count && review.timeline_count > 0);
+  }, [reviews]);
+
+  // Filter static reviews (reviews without timeline updates)
+  const staticReviews = React.useMemo(() => {
+    if (!reviews) return [];
+    return reviews.filter(review => !review.has_timeline || !review.timeline_count || review.timeline_count === 0);
+  }, [reviews]);
+  
   useEffect(() => {
     if (!isLoading) {
       console.log('EntityDetail component received recommendations:', recommendations?.length);
       console.log('EntityDetail component received reviews:', reviews?.length);
+      console.log('Dynamic reviews:', dynamicReviews.length);
+      console.log('Static reviews:', staticReviews.length);
       if (recommendations?.length > 0) {
         console.log('Sample recommendation:', recommendations[0]);
       }
@@ -77,7 +95,7 @@ const EntityDetail = () => {
         console.log('Sample review:', reviews[0]);
       }
     }
-  }, [isLoading, recommendations, reviews]);
+  }, [isLoading, recommendations, reviews, dynamicReviews, staticReviews]);
 
   // Log contributors when available for debugging
   useEffect(() => {
@@ -601,115 +619,158 @@ const EntityDetail = () => {
                 </Button>
               </div>
               
-              {/* Content Tabs */}
-              <Tabs 
-                defaultValue="recommendations" 
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="mt-2"
-              >
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="recommendations" className="py-3">
-                    Recommendations ({stats.recommendationCount})
-                  </TabsTrigger>
-                  <TabsTrigger value="reviews" className="py-3">
-                    Reviews ({stats.reviewCount})
-                  </TabsTrigger>
-                </TabsList>
-                
-                {/* Recommendations Tab */}
-                <TabsContent value="recommendations" className="space-y-4 mt-2">
-                  {!recommendations || recommendations.length === 0 ? (
-                    <div className="py-12 text-center border rounded-lg bg-violet-50/30 dark:bg-violet-900/5">
-                      <MessageSquareHeart className="h-12 w-12 mx-auto text-violet-300 dark:text-violet-700" />
-                      <h3 className="font-medium text-lg mt-4">No recommendations yet</h3>
-                      <p className="text-muted-foreground mt-2">
-                        Be the first to recommend {entity?.name}!
-                      </p>
-                      <Button onClick={handleAddRecommendation} className="mt-4 gap-2">
-                        <Plus className="h-4 w-4" />
-                        Add Recommendation
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          Showing {recommendations.length} recommendation{recommendations.length !== 1 ? 's' : ''}
+              {/* Content Tabs - Updated for Dynamic Reviews */}
+              <TooltipProvider>
+                <Tabs 
+                  defaultValue="reviews" 
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="mt-2"
+                >
+                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                    <TabsTrigger value="reviews" className="py-3">
+                      Reviews ({staticReviews.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="dynamic-reviews" className="py-3 flex items-center gap-2">
+                      Dynamic Reviews ({dynamicReviews.length})
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-sm">
+                            Reviews that evolve over time with timeline updates, 
+                            showing how opinions change with extended use.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  {/* Static Reviews Tab */}
+                  <TabsContent value="reviews" className="space-y-4 mt-2">
+                    {!staticReviews || staticReviews.length === 0 ? (
+                      <div className="py-12 text-center border rounded-lg bg-amber-50/30 dark:bg-amber-900/5">
+                        <MessageSquare className="h-12 w-12 mx-auto text-amber-300 dark:text-amber-700" />
+                        <h3 className="font-medium text-lg mt-4">No reviews yet</h3>
+                        <p className="text-muted-foreground mt-2">
+                          Be the first to review {entity?.name}!
                         </p>
-                        <Button 
-                          onClick={handleAddRecommendation}
-                          size="sm"
-                          variant="outline"
-                          className="gap-2 hidden md:flex"
-                        >
+                        <Button onClick={handleAddReview} className="mt-4 gap-2" variant="outline">
                           <Plus className="h-4 w-4" />
-                          Add
+                          Add Review
                         </Button>
                       </div>
-                      <div className="space-y-4">
-                        {recommendations.map((recommendation) => (
-                          <RecommendationCard
-                            key={recommendation.id}
-                            recommendation={recommendation}
-                            onLike={() => handleRecommendationAction('like', recommendation.id)}
-                            onSave={() => handleRecommendationAction('save', recommendation.id)}
-                            hideEntityFallbacks={true}
-                            compact={true}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </TabsContent>
-                
-                {/* Reviews Tab */}
-                <TabsContent value="reviews" className="space-y-4 mt-2">
-                  {!reviews || reviews.length === 0 ? (
-                    <div className="py-12 text-center border rounded-lg bg-amber-50/30 dark:bg-amber-900/5">
-                      <MessageSquare className="h-12 w-12 mx-auto text-amber-300 dark:text-amber-700" />
-                      <h3 className="font-medium text-lg mt-4">No reviews yet</h3>
-                      <p className="text-muted-foreground mt-2">
-                        Be the first to review {entity?.name}!
-                      </p>
-                      <Button onClick={handleAddReview} className="mt-4 gap-2" variant="outline">
-                        <Plus className="h-4 w-4" />
-                        Add Review
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          Showing {reviews.length} review{reviews.length !== 1 ? 's' : ''}
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            Showing {staticReviews.length} review{staticReviews.length !== 1 ? 's' : ''}
+                          </p>
+                          <Button 
+                            onClick={handleAddReview}
+                            size="sm"
+                            variant="outline"
+                            className="gap-2 hidden md:flex"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add
+                          </Button>
+                        </div>
+                        <div className="space-y-4">
+                          {staticReviews.map((review) => (
+                            <ReviewCard
+                              key={review.id}
+                              review={review}
+                              onLike={() => handleReviewAction('like', review.id)}
+                              onSave={() => handleReviewAction('save', review.id)}
+                              refreshReviews={refreshData}
+                              hideEntityFallbacks={true}
+                              compact={true}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </TabsContent>
+                  
+                  {/* Dynamic Reviews Tab */}
+                  <TabsContent value="dynamic-reviews" className="space-y-4 mt-2">
+                    {!dynamicReviews || dynamicReviews.length === 0 ? (
+                      <div className="py-12 text-center border rounded-lg bg-violet-50/30 dark:bg-violet-900/5">
+                        <MessageSquare className="h-12 w-12 mx-auto text-violet-300 dark:text-violet-700" />
+                        <h3 className="font-medium text-lg mt-4">No dynamic reviews yet</h3>
+                        <p className="text-muted-foreground mt-2">
+                          Dynamic reviews show how opinions evolve over time. Start with a regular review and update it later!
                         </p>
-                        <Button 
-                          onClick={handleAddReview}
-                          size="sm"
-                          variant="outline"
-                          className="gap-2 hidden md:flex"
-                        >
+                        <Button onClick={handleAddReview} className="mt-4 gap-2" variant="outline">
                           <Plus className="h-4 w-4" />
-                          Add
+                          Add Review
                         </Button>
                       </div>
-                      <div className="space-y-4">
-                        {reviews.map((review) => (
-                          <ReviewCard
-                            key={review.id}
-                            review={review}
-                            onLike={() => handleReviewAction('like', review.id)}
-                            onSave={() => handleReviewAction('save', review.id)}
-                            refreshReviews={refreshData}
-                            hideEntityFallbacks={true}
-                            compact={true}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </TabsContent>
-              </Tabs>
+                    ) : (
+                      <>
+                        <DynamicReviewsSummary dynamicReviews={dynamicReviews} />
+                        
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            Showing {dynamicReviews.length} dynamic review{dynamicReviews.length !== 1 ? 's' : ''}
+                          </p>
+                          <Button 
+                            onClick={handleAddReview}
+                            size="sm"
+                            variant="outline"
+                            className="gap-2 hidden md:flex"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add
+                          </Button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          {dynamicReviews.map((review) => (
+                            <div key={review.id} className="relative">
+                              <ReviewCard
+                                review={review}
+                                onLike={() => handleReviewAction('like', review.id)}
+                                onSave={() => handleReviewAction('save', review.id)}
+                                refreshReviews={refreshData}
+                                hideEntityFallbacks={true}
+                                compact={true}
+                              />
+                              
+                              {/* Timeline Preview Overlay */}
+                              {review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+                                <div className="absolute top-2 right-2">
+                                  <TimelineBadge 
+                                    updateCount={review.timeline_count} 
+                                    variant="secondary"
+                                  />
+                                </div>
+                              )}
+                              
+                              {/* Timeline Preview at bottom of card */}
+                              {review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+                                <div className="mt-2 p-3 bg-muted/30 rounded-lg border">
+                                  <div className="text-xs font-medium text-muted-foreground mb-2">
+                                    Timeline Preview:
+                                  </div>
+                                  <TimelinePreview
+                                    initialRating={review.rating}
+                                    latestRating={review.rating} // Placeholder - will be enhanced with actual timeline data
+                                    updateCount={review.timeline_count}
+                                    compact={true}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </TooltipProvider>
             </div>
             
             {/* Enhanced Right Sidebar with new metadata components */}
