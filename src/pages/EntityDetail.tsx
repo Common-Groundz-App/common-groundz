@@ -721,14 +721,6 @@ const EntityDetail = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <Button 
-                    onClick={handleAddRecommendation}
-                    className="w-full gap-2"
-                  >
-                    <MessageSquareHeart className="h-4 w-4" />
-                    Recommend
-                  </Button>
-                  
-                  <Button 
                     onClick={handleAddReview}
                     variant="outline" 
                     className="w-full gap-2"

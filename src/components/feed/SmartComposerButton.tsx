@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Star, Book, Tag, FileText, Eye } from 'lucide-react';
@@ -214,13 +213,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               >
                 <Star size={16} className="text-yellow-500" />
                 <span>Review</span>
-              </button>
-              <button
-                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
-                onClick={handleRecommendationSelect}
-              >
-                <Tag size={16} className="text-red-500" />
-                <span>Recommendation</span>
               </button>
               <button
                 className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
