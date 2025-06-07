@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share2 } from 'lucide-react';
+import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share2, Clock } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +27,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import UsernameLink from '@/components/common/UsernameLink';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { Separator } from "@/components/ui/separator";
+import { TimelineBadge } from './TimelineBadge';
+import { ReviewTimelineViewer } from './ReviewTimelineViewer';
 
 interface ReviewCardProps {
   review: Review;
@@ -36,6 +38,7 @@ interface ReviewCardProps {
   refreshReviews: () => Promise<void>;
   hideEntityFallbacks?: boolean;
   compact?: boolean;
+  showTimelineFeatures?: boolean; // New prop to control timeline features display
 }
 
 const ReviewCard = ({ 
@@ -45,13 +48,15 @@ const ReviewCard = ({
   onConvert,
   refreshReviews,
   hideEntityFallbacks = false,
-  compact = false
+  compact = false,
+  showTimelineFeatures = false // Default to false to maintain existing behavior
 }: ReviewCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   
   const isOwner = user?.id === review.user_id;
   const isAdmin = user?.email?.includes('@lovable.dev') || false; // Simple admin check
@@ -203,6 +208,14 @@ const ReviewCard = ({
     }
   };
 
+  const handleTimelineViewerClose = () => {
+    setIsTimelineViewerOpen(false);
+  };
+
+  const handleTimelineUpdate = async () => {
+    await refreshReviews();
+  };
+
   const getStatusBadge = () => {
     if (review.status === 'flagged') {
       return (
@@ -259,6 +272,13 @@ const ReviewCard = ({
                   <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     {review.rating.toFixed(1)}
                   </span>
+                  {/* Timeline Badge for Dynamic Reviews */}
+                  {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+                    <TimelineBadge 
+                      updateCount={review.timeline_count} 
+                      variant="secondary"
+                    />
+                  )}
                 </div>
                 {/* Display Review Headline/Title (subtitle) if available */}
                 {review.subtitle && (
@@ -351,6 +371,21 @@ const ReviewCard = ({
               </div>
             )}
             
+            {/* Timeline Features for Dynamic Reviews */}
+            {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+              <div className="mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsTimelineViewerOpen(true)}
+                  className="text-xs h-6 px-2"
+                >
+                  <Clock className="h-3 w-3 mr-1" />
+                  View Timeline
+                </Button>
+              </div>
+            )}
+            
             {/* Media - smaller and less prominent */}
             {shouldShowMedia && (
               <div className="mb-3">
@@ -435,6 +470,19 @@ const ReviewCard = ({
           </CardContent>
         </Card>
 
+        {/* Timeline Viewer Modal */}
+        {showTimelineFeatures && review.has_timeline && (
+          <ReviewTimelineViewer
+            isOpen={isTimelineViewerOpen}
+            onClose={handleTimelineViewerClose}
+            reviewId={review.id}
+            reviewOwnerId={review.user_id}
+            reviewTitle={review.title}
+            initialRating={review.rating}
+            onTimelineUpdate={handleTimelineUpdate}
+          />
+        )}
+
         {/* Delete Confirmation Dialog */}
         <DeleteConfirmationDialog
           isOpen={isDeleteDialogOpen}
@@ -484,8 +532,15 @@ const ReviewCard = ({
                     <span>{formatRelativeDate(review.created_at)}</span>
                   </div>
                 </div>
-                <div className="mt-1">
+                <div className="mt-1 flex items-center gap-2">
                   <RatingDisplay rating={review.rating} />
+                  {/* Timeline Badge for Dynamic Reviews */}
+                  {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+                    <TimelineBadge 
+                      updateCount={review.timeline_count} 
+                      variant="secondary"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -573,6 +628,21 @@ const ReviewCard = ({
               )}
             </div>
           </div>
+
+          {/* Timeline Features for Dynamic Reviews */}
+          {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsTimelineViewerOpen(true)}
+                className="gap-2"
+              >
+                <Clock className="h-4 w-4" />
+                View Timeline ({review.timeline_count} updates)
+              </Button>
+            </div>
+          )}
           
           {/* Media - conditionally rendered based on shouldShowMedia */}
           {shouldShowMedia && (
@@ -682,6 +752,19 @@ const ReviewCard = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Timeline Viewer Modal */}
+      {showTimelineFeatures && review.has_timeline && (
+        <ReviewTimelineViewer
+          isOpen={isTimelineViewerOpen}
+          onClose={handleTimelineViewerClose}
+          reviewId={review.id}
+          reviewOwnerId={review.user_id}
+          reviewTitle={review.title}
+          initialRating={review.rating}
+          onTimelineUpdate={handleTimelineUpdate}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog

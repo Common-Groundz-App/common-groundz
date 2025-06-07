@@ -687,6 +687,7 @@ const EntityDetail = () => {
                               refreshReviews={refreshData}
                               hideEntityFallbacks={true}
                               compact={true}
+                              showTimelineFeatures={false}
                             />
                           ))}
                         </div>
@@ -729,41 +730,16 @@ const EntityDetail = () => {
                         
                         <div className="space-y-4">
                           {dynamicReviews.map((review) => (
-                            <div key={review.id} className="relative">
-                              <ReviewCard
-                                review={review}
-                                onLike={() => handleReviewAction('like', review.id)}
-                                onSave={() => handleReviewAction('save', review.id)}
-                                refreshReviews={refreshData}
-                                hideEntityFallbacks={true}
-                                compact={true}
-                              />
-                              
-                              {/* Timeline Preview Overlay */}
-                              {review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
-                                <div className="absolute top-2 right-2">
-                                  <TimelineBadge 
-                                    updateCount={review.timeline_count} 
-                                    variant="secondary"
-                                  />
-                                </div>
-                              )}
-                              
-                              {/* Timeline Preview at bottom of card */}
-                              {review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
-                                <div className="mt-2 p-3 bg-muted/30 rounded-lg border">
-                                  <div className="text-xs font-medium text-muted-foreground mb-2">
-                                    Timeline Preview:
-                                  </div>
-                                  <TimelinePreview
-                                    initialRating={review.rating}
-                                    latestRating={review.rating} // Placeholder - will be enhanced with actual timeline data
-                                    updateCount={review.timeline_count}
-                                    compact={true}
-                                  />
-                                </div>
-                              )}
-                            </div>
+                            <ReviewCard
+                              key={review.id}
+                              review={review}
+                              onLike={() => handleReviewAction('like', review.id)}
+                              onSave={() => handleReviewAction('save', review.id)}
+                              refreshReviews={refreshData}
+                              hideEntityFallbacks={true}
+                              compact={true}
+                              showTimelineFeatures={true}
+                            />
                           ))}
                         </div>
                       </>
