@@ -1,14 +1,15 @@
 
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useReviewsFetch } from './reviews/use-reviews-fetch';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from './use-toast';
-import { useQueryClient } from '@tanstack/react-query';
 import { 
   toggleReviewLike, 
   toggleReviewSave,
-  convertReviewToRecommendation 
+  convertReviewToRecommendation,
+  Review
 } from '@/services/reviewService';
-import { useReviewsFetch } from './reviews/use-reviews-fetch';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface UseReviewsProps {
   profileUserId: string;
@@ -19,38 +20,35 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const {
+  const { 
     data: reviews,
     isLoading,
-    isError,
     error,
     refetch
   } = useReviewsFetch({ profileUserId });
 
-  // Handle like action
-  const handleLike = useCallback(async (id: string) => {
+  const handleLike = async (id: string) => {
     if (!user) {
       toast({
-        title: 'Authentication required',
-        description: 'Please sign in to like reviews',
-        variant: 'destructive'
+        title: "Authentication required",
+        description: "Please sign in to like reviews",
+        variant: "destructive"
       });
       return;
     }
 
     try {
-      const item = reviews?.find(r => r.id === id);
-      if (!item) return;
-
       // Optimistic update
       queryClient.setQueryData(['reviews', profileUserId, user.id], 
-        (old: any) => old?.map((item: any) => {
+        (old: Review[]) => old?.map((item: Review) => {
           if (item.id === id) {
             const isLiked = !item.isLiked;
             return {
               ...item,
               isLiked,
-              likes: (item.likes || 0) + (isLiked ? 1 : -1)
+              likes: isLiked 
+                ? (item.likes || 0) + 1 
+                : Math.max(0, (item.likes || 0) - 1)
             };
           }
           return item;
@@ -58,41 +56,37 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
       );
 
       // Server update
-      await toggleReviewLike(id, user.id, !!item.isLiked);
+      await toggleReviewLike(id, user.id);
     } catch (err) {
       console.error('Error toggling like:', err);
       // Revert on failure
       refetch();
       toast({
-        title: 'Error',
-        description: 'Failed to update like status. Please try again.',
-        variant: 'destructive'
+        title: "Error",
+        description: "Failed to update like status",
+        variant: "destructive"
       });
     }
-  }, [reviews, user, toast, profileUserId, refetch, queryClient]);
+  };
 
-  // Handle save action
-  const handleSave = useCallback(async (id: string) => {
+  const handleSave = async (id: string) => {
     if (!user) {
       toast({
-        title: 'Authentication required',
-        description: 'Please sign in to save reviews',
-        variant: 'destructive'
+        title: "Authentication required",
+        description: "Please sign in to save reviews",
+        variant: "destructive"
       });
       return;
     }
 
     try {
-      const item = reviews?.find(r => r.id === id);
-      if (!item) return;
-
       // Optimistic update
       queryClient.setQueryData(['reviews', profileUserId, user.id], 
-        (old: any) => old?.map((item: any) => {
+        (old: Review[]) => old?.map((item: Review) => {
           if (item.id === id) {
             return {
               ...item,
-              isSaved: !item.isSaved
+              isSaved: !item.isSaved,
             };
           }
           return item;
@@ -100,57 +94,68 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
       );
 
       // Server update
-      await toggleReviewSave(id, user.id, !!item.isSaved);
+      await toggleReviewSave(id, user.id);
     } catch (err) {
       console.error('Error toggling save:', err);
       // Revert on failure
       refetch();
       toast({
-        title: 'Error',
-        description: 'Failed to update save status. Please try again.',
-        variant: 'destructive'
+        title: "Error",
+        description: "Failed to update save status",
+        variant: "destructive"
       });
     }
-  }, [reviews, user, toast, profileUserId, refetch, queryClient]);
+  };
 
-  // Convert to recommendation
-  const convertToRecommendation = useCallback(async (id: string) => {
+  const refreshReviews = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const convertToRecommendation = async (reviewId: string) => {
     if (!user) {
       toast({
-        title: 'Authentication required',
-        description: 'Please sign in to convert reviews',
-        variant: 'destructive'
+        title: "Authentication required",
+        description: "Please sign in to convert reviews",
+        variant: "destructive"
       });
       return;
     }
 
     try {
-      await convertReviewToRecommendation(id, user.id);
+      const success = await convertReviewToRecommendation(reviewId);
       
-      toast({
-        title: 'Success',
-        description: 'Review successfully converted to recommendation'
-      });
-      
-      // Refresh the list
-      refetch();
+      if (success) {
+        toast({
+          title: "Review converted",
+          description: "Your review has been converted to a recommendation",
+        });
+        
+        // Refresh data
+        await refreshReviews();
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to convert review to recommendation",
+          variant: "destructive"
+        });
+      }
     } catch (err) {
       console.error('Error converting review:', err);
       toast({
-        title: 'Error',
-        description: 'Failed to convert review. Please try again.',
-        variant: 'destructive'
+        title: "Error",
+        description: "Failed to convert review to recommendation",
+        variant: "destructive"
       });
     }
-  }, [user, toast, refetch]);
+  };
 
   return {
     reviews,
     isLoading,
-    error: isError ? error : null,
+    error,
     handleLike,
     handleSave,
-    refreshReviews: refetch,
+    refreshReviews,
     convertToRecommendation
   };
 };

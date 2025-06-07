@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useRecommendations } from '@/hooks/use-recommendations';
-import RecommendationForm from '@/components/recommendations/RecommendationForm';
 import RecommendationFilters from '@/components/recommendations/RecommendationFilters';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import RecommendationSkeleton from '@/components/recommendations/RecommendationSkeleton';
@@ -17,22 +16,17 @@ type ProfileRecommendationsProps = {
 const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: ProfileRecommendationsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'latest' | 'highestRated' | 'mostLiked'>('latest');
   
   console.log('ProfileRecommendations rendering with profileUserId:', profileUserId);
   
   const {
     recommendations,
     isLoading,
-    activeFilter,
-    setActiveFilter,
-    sortBy,
-    setSortBy,
+    error,
     handleLike,
     handleSave,
-    handleImageUpload,
-    addRecommendation,
-    clearFilters,
     refreshRecommendations
   } = useRecommendations({ 
     profileUserId
@@ -46,47 +40,60 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     }
   }, [recommendations]);
   
+  // Filter and sort recommendations
+  const filteredRecommendations = React.useMemo(() => {
+    if (!recommendations) return [];
+    
+    return recommendations
+      .filter(item => !activeFilter || item.category === activeFilter)
+      .sort((a, b) => {
+        if (sortBy === 'latest') {
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        } else if (sortBy === 'highestRated') {
+          return b.rating - a.rating;
+        } else if (sortBy === 'mostLiked') {
+          return (b.likes || 0) - (a.likes || 0);
+        }
+        return 0;
+      });
+  }, [recommendations, activeFilter, sortBy]);
+  
   const categories = recommendations.length > 0 
     ? [...new Set(recommendations.map(item => item.category))] 
     : [];
-  
-  useEffect(() => {
-    const handleOpenForm = () => {
-      setIsFormOpen(true);
-    };
-    
-    window.addEventListener('open-recommendation-form', handleOpenForm);
-    return () => {
-      window.removeEventListener('open-recommendation-form', handleOpenForm);
-    };
-  }, []);
-  
-  const handleFormSubmit = async (values: any) => {
-    const result = await addRecommendation({
-      title: values.title,
-      venue: values.venue || null,
-      description: values.description || null,
-      rating: values.rating,
-      image_url: values.image_url,
-      category: values.category,
-      visibility: values.visibility,
-      is_certified: false,
-      view_count: 0,
-      entity_id: values.entity_id || null
-    });
-    
-    if (result) {
-      toast({
-        title: "Recommendation added",
-        description: "Your recommendation has been added successfully"
-      });
-      setIsFormOpen(false);
-    }
+
+  const clearFilters = () => {
+    setActiveFilter(null);
+    setSortBy('latest');
   };
 
   const handleRecommendationDeleted = () => {
     refreshRecommendations();
   };
+
+  if (isLoading) {
+    return <RecommendationSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8 rounded-xl bg-destructive/5 p-6">
+        <p className="text-destructive">Error loading recommendations. Please try again.</p>
+      </div>
+    );
+  }
+
+  if (recommendations.length === 0) {
+    return (
+      <EmptyRecommendations 
+        isOwnProfile={isOwnProfile}
+        hasActiveFilter={!!activeFilter}
+        onClearFilters={clearFilters}
+        // Remove onAddNew since users can no longer create recommendations directly
+        onAddNew={undefined}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 mx-0 my-0">
@@ -98,40 +105,21 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
         onFilterChange={setActiveFilter}
         onSortChange={setSortBy}
         onClearFilters={clearFilters}
-        onAddNew={() => setIsFormOpen(true)}
+        // Remove onAddNew since users can no longer create recommendations directly
+        onAddNew={undefined}
       />
       
-      {isLoading ? (
-        <RecommendationSkeleton />
-      ) : recommendations.length === 0 ? (
-        <EmptyRecommendations 
-          isOwnProfile={isOwnProfile}
-          hasActiveFilter={!!activeFilter}
-          onClearFilters={clearFilters}
-          onAddNew={() => setIsFormOpen(true)}
-        />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recommendations.map(item => (
-            <RecommendationCard 
-              key={item.id}
-              recommendation={item}
-              onLike={handleLike}
-              onSave={handleSave}
-              onDeleted={handleRecommendationDeleted}
-            />
-          ))}
-        </div>
-      )}
-      
-      {user && (
-        <RecommendationForm
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          onSubmit={handleFormSubmit}
-          onImageUpload={handleImageUpload}
-        />
-      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredRecommendations.map(item => (
+          <RecommendationCard 
+            key={item.id}
+            recommendation={item}
+            onLike={handleLike}
+            onSave={handleSave}
+            onDeleted={handleRecommendationDeleted}
+          />
+        ))}
+      </div>
     </div>
   );
 }

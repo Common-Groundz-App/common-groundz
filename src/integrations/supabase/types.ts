@@ -1041,6 +1041,44 @@ export type Database = {
           },
         ]
       }
+      review_updates: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          rating: number | null
+          review_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string
+          id?: string
+          rating?: number | null
+          review_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          rating?: number | null
+          review_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_updates_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           category: string
@@ -1048,16 +1086,21 @@ export type Database = {
           description: string | null
           entity_id: string | null
           experience_date: string | null
+          has_timeline: boolean | null
           id: string
           image_url: string | null
           is_converted: boolean
+          is_recommended: boolean | null
+          is_verified: boolean | null
           media: Json | null
           metadata: Json | null
           rating: number
           recommendation_id: string | null
           status: string
           subtitle: string | null
+          timeline_count: number | null
           title: string
+          trust_score: number | null
           updated_at: string
           user_id: string
           venue: string | null
@@ -1069,16 +1112,21 @@ export type Database = {
           description?: string | null
           entity_id?: string | null
           experience_date?: string | null
+          has_timeline?: boolean | null
           id?: string
           image_url?: string | null
           is_converted?: boolean
+          is_recommended?: boolean | null
+          is_verified?: boolean | null
           media?: Json | null
           metadata?: Json | null
           rating: number
           recommendation_id?: string | null
           status?: string
           subtitle?: string | null
+          timeline_count?: number | null
           title: string
+          trust_score?: number | null
           updated_at?: string
           user_id: string
           venue?: string | null
@@ -1090,16 +1138,21 @@ export type Database = {
           description?: string | null
           entity_id?: string | null
           experience_date?: string | null
+          has_timeline?: boolean | null
           id?: string
           image_url?: string | null
           is_converted?: boolean
+          is_recommended?: boolean | null
+          is_verified?: boolean | null
           media?: Json | null
           metadata?: Json | null
           rating?: number
           recommendation_id?: string | null
           status?: string
           subtitle?: string | null
+          timeline_count?: number | null
           title?: string
+          trust_score?: number | null
           updated_at?: string
           user_id?: string
           venue?: string | null
@@ -1208,6 +1261,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      calculate_trust_score: {
+        Args: { p_review_id: string }
+        Returns: number
+      }
       check_post_like: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: boolean
@@ -1260,6 +1317,14 @@ export type Database = {
           venue: string | null
         }[]
       }
+      get_circle_rating: {
+        Args: { p_entity_id: string; p_user_id: string }
+        Returns: number
+      }
+      get_circle_recommendation_count: {
+        Args: { p_entity_id: string; p_user_id: string }
+        Returns: number
+      }
       get_comments_with_profiles: {
         Args: { p_table_name: string; p_id_field: string; p_item_id: string }
         Returns: {
@@ -1271,6 +1336,10 @@ export type Database = {
           avatar_url: string
           edited_at: string
         }[]
+      }
+      get_dynamic_rating: {
+        Args: { p_entity_id: string }
+        Returns: number
       }
       get_follower_count_by_user_id: {
         Args: { user_id: string }
@@ -1298,12 +1367,20 @@ export type Database = {
           is_following: boolean
         }[]
       }
+      get_overall_rating: {
+        Args: { p_entity_id: string }
+        Returns: number
+      }
       get_post_likes_by_posts: {
         Args: { p_post_ids: string[] }
         Returns: {
           post_id: string
           like_count: number
         }[]
+      }
+      get_recommendation_count: {
+        Args: { p_entity_id: string }
+        Returns: number
       }
       get_recommendation_likes_by_ids: {
         Args: { p_recommendation_ids: string[] }
