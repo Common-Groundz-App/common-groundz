@@ -38,6 +38,7 @@ export interface Review {
   entity?: {
     id: string;
     name: string;
+    type: string;
     image_url?: string;
   };
   comment_count?: number;
@@ -170,8 +171,8 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       .from('reviews')
       .select(`
         *,
-        profiles!inner(username, avatar_url),
-        entities(id, name, image_url)
+        profiles!reviews_user_id_fkey(username, avatar_url),
+        entities(id, name, type, image_url)
       `)
       .eq('user_id', profileUserId)
       .eq('status', 'published')
@@ -221,6 +222,7 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       entity: review.entities ? {
         id: review.entities.id,
         name: review.entities.name,
+        type: review.entities.type,
         image_url: review.entities.image_url
       } : undefined,
       comment_count: 0, // Placeholder for future comment system
@@ -242,8 +244,8 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
       .from('reviews')
       .select(`
         *,
-        profiles!inner(username, avatar_url),
-        entities(id, name, image_url)
+        profiles!reviews_user_id_fkey(username, avatar_url),
+        entities(id, name, type, image_url)
       `)
       .eq('user_id', profileUserId)
       .eq('status', 'published')
@@ -294,6 +296,7 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
       entity: review.entities ? {
         id: review.entities.id,
         name: review.entities.name,
+        type: review.entities.type,
         image_url: review.entities.image_url
       } : undefined,
       comment_count: 0, // Placeholder for future comment system
