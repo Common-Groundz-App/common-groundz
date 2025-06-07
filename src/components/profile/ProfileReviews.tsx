@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import EmptyReviews from './reviews/EmptyReviews';
 import { useReviews } from '@/hooks/use-reviews';
@@ -22,6 +23,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     handleLike,
     handleSave,
     refreshReviews,
+    convertToRecommendation,
   } = useReviews({ profileUserId });
 
   // Create a wrapped version of refreshReviews that returns void
@@ -126,7 +128,8 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
             review={review}
             onLike={handleLike}
             onSave={handleSave}
-            onDeleted={handleRefreshReviews}
+            onConvert={isOwnProfile ? convertToRecommendation : undefined}
+            refreshReviews={handleRefreshReviews}
           />
         ))}
       </div>
