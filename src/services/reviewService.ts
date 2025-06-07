@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -376,21 +377,42 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
 // Fetch review timeline updates
 export const fetchReviewUpdates = async (reviewId: string): Promise<ReviewUpdate[]> => {
   try {
-    const { data, error } = await supabase
+    // First get the review updates
+    const { data: updates, error: updatesError } = await supabase
       .from('review_updates')
-      .select(`
-        *,
-        profiles!review_updates_user_id_fkey(username, avatar_url)
-      `)
+      .select('*')
       .eq('review_id', reviewId)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching review updates:', error);
+    if (updatesError) {
+      console.error('Error fetching review updates:', updatesError);
       return [];
     }
 
-    return data || [];
+    if (!updates?.length) return [];
+
+    // Get unique user IDs from the updates
+    const userIds = [...new Set(updates.map(update => update.user_id))];
+
+    // Fetch profiles for these users
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', userIds);
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+    }
+
+    // Map updates with their corresponding profiles
+    return updates.map(update => ({
+      ...update,
+      profiles: profiles?.find(profile => profile.id === update.user_id) ? {
+        username: profiles.find(profile => profile.id === update.user_id)?.username,
+        avatar_url: profiles.find(profile => profile.id === update.user_id)?.avatar_url
+      } : undefined
+    }));
+
   } catch (error) {
     console.error('Error in fetchReviewUpdates:', error);
     return [];
