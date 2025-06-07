@@ -1,10 +1,11 @@
 
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
-import { BookOpen, Star, Users, User } from 'lucide-react';
+import { BookOpen, Star, Users, User, TrendingUp } from 'lucide-react';
 import ProfilePosts from './ProfilePosts';
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileReviews from './ProfileReviews';
 import ProfileCircles from './ProfileCircles';
+import ProfileDynamicReviews from './ProfileDynamicReviews';
 
 interface ProfileTabsProps {
   activeTab: string;
@@ -38,6 +39,11 @@ const ProfileTabs = ({
       icon: Users
     },
     {
+      value: "dynamic-reviews",
+      label: "Timeline",
+      icon: TrendingUp
+    },
+    {
       value: "circles",
       label: "Circles",
       icon: User
@@ -68,6 +74,13 @@ const ProfileTabs = ({
       <TabsContent value="reviews">
         <ProfileReviews 
           profileUserId={profileUserId} 
+          isOwnProfile={isOwnProfile}
+        />
+      </TabsContent>
+      
+      <TabsContent value="dynamic-reviews">
+        <ProfileDynamicReviews 
+          profileUserId={profileUserId}
           isOwnProfile={isOwnProfile}
         />
       </TabsContent>

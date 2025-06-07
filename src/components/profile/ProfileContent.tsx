@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { Newspaper, Crown, Star, UsersRound } from 'lucide-react';
+import { Newspaper, Crown, Star, UsersRound, TrendingUp } from 'lucide-react';
 import ProfileHeader from './ProfileHeader';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
 import ProfilePosts from './ProfilePosts';
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileReviews from './ProfileReviews';
 import ProfileCircles from './ProfileCircles';
+import ProfileDynamicReviews from './ProfileDynamicReviews';
 import { useProfileData } from '@/hooks/use-profile-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCardStyles } from '@/utils/theme-utils';
@@ -55,6 +56,7 @@ const ProfileContent = React.memo(({ profileUserId, defaultActiveTab = 'posts' }
     { value: 'posts', label: 'Posts', icon: Newspaper },
     { value: 'recommendations', label: 'Recs', icon: Crown },
     { value: 'reviews', label: 'Reviews', icon: Star },
+    { value: 'dynamic-reviews', label: 'Timeline', icon: TrendingUp },
     { value: 'circles', label: 'Circles', icon: UsersRound }
   ], []);
 
@@ -127,6 +129,13 @@ const ProfileContent = React.memo(({ profileUserId, defaultActiveTab = 'posts' }
                 <TabsContent value="reviews">
                   <ProfileReviews 
                     profileUserId={profileUserIdToUse} 
+                    isOwnProfile={isOwnProfile}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="dynamic-reviews">
+                  <ProfileDynamicReviews 
+                    profileUserId={profileUserIdToUse}
                     isOwnProfile={isOwnProfile}
                   />
                 </TabsContent>
