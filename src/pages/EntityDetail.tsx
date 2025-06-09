@@ -36,6 +36,7 @@ import { TimelineBadge } from '@/components/profile/reviews/TimelineBadge';
 import { DynamicReviewsSummary } from '@/components/profile/reviews/DynamicReviewsSummary';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
+import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -78,6 +79,14 @@ const EntityDetail = () => {
     if (!reviews) return [];
     return reviews.filter(review => review.has_timeline && review.timeline_count && review.timeline_count > 0);
   }, [reviews]);
+
+  // Add timeline summary hook
+  const dynamicReviewIds = React.useMemo(() => 
+    dynamicReviews.map(review => review.id), 
+    [dynamicReviews]
+  );
+  
+  const { timelineData } = useEntityTimelineSummary(entity?.id || '', dynamicReviewIds);
 
   // Filter static reviews (reviews without timeline updates)
   const staticReviews = React.useMemo(() => {
@@ -789,7 +798,10 @@ const EntityDetail = () => {
                       </div>
                     ) : (
                       <>
-                        <DynamicReviewsSummary dynamicReviews={dynamicReviews} />
+                        <DynamicReviewsSummary 
+                          dynamicReviews={dynamicReviews}
+                          timelineData={timelineData}
+                        />
                         
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-muted-foreground">
