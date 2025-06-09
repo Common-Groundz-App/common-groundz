@@ -115,6 +115,7 @@ const ReviewCard = ({
     const fallbacks: Record<string, string> = {
       'food': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1',
       'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
+      'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
       'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
       'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
       'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
@@ -784,7 +785,7 @@ const ReviewCard = ({
       </Card>
 
       {/* Timeline Viewer Modal */}
-      {showTimelineFeatures && review.has_timeline && (
+      {showTimelineFeatures && (
         <ReviewTimelineViewer
           isOpen={isTimelineViewerOpen}
           onClose={() => setIsTimelineViewerOpen(false)}
