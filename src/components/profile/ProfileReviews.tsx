@@ -5,6 +5,7 @@ import { useReviews } from '@/hooks/use-reviews';
 import ReviewCard from './reviews/ReviewCard';
 import ReviewForm from './reviews/ReviewForm';
 import ReviewFilters from './reviews/ReviewFilters';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProfileReviewsProps {
   profileUserId: string;
@@ -12,6 +13,7 @@ interface ProfileReviewsProps {
 }
 
 const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) => {
+  const { user } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'latest' | 'highestRated' | 'mostLiked'>('latest');
@@ -130,6 +132,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
             onSave={handleSave}
             onConvert={isOwnProfile ? convertToRecommendation : undefined}
             refreshReviews={handleRefreshReviews}
+            showTimelineFeatures={isOwnProfile && user?.id === review.user_id}
           />
         ))}
       </div>
