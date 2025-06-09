@@ -7,7 +7,7 @@ interface TimelineData {
   averageLatestRating: number;
   averageUpdateDays: number;
   totalTimelineUpdates: number;
-  // New AI summary fields
+  // AI summary fields (preserved for future use)
   aiSummary?: string;
   aiSummaryLastGenerated?: string;
   aiSummaryModel?: string;
@@ -37,7 +37,10 @@ export const useEntityTimelineSummary = (entityId: string, dynamicReviewIds: str
           .in('review_id', dynamicReviewIds)
           .order('created_at', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching timeline updates:', error);
+          throw error;
+        }
 
         // Fetch the original reviews to get initial ratings and dates + AI summaries
         const { data: reviews, error: reviewsError } = await supabase
@@ -45,9 +48,13 @@ export const useEntityTimelineSummary = (entityId: string, dynamicReviewIds: str
           .select('id, rating, created_at, ai_summary, ai_summary_last_generated_at, ai_summary_model_used')
           .in('id', dynamicReviewIds);
 
-        if (reviewsError) throw reviewsError;
+        if (reviewsError) {
+          console.error('Error fetching reviews:', reviewsError);
+          throw reviewsError;
+        }
 
         if (!updates || !reviews) {
+          console.log('No updates or reviews found');
           setTimelineData(null);
           return;
         }
@@ -98,7 +105,7 @@ export const useEntityTimelineSummary = (entityId: string, dynamicReviewIds: str
 
         const reviewCount = dynamicReviewIds.length;
         
-        // Find the most recent AI summary from reviews
+        // Find the most recent AI summary from reviews (if any exist)
         const reviewsWithSummaries = reviews.filter(r => r.ai_summary);
         const mostRecentSummary = reviewsWithSummaries.length > 0
           ? reviewsWithSummaries.reduce((latest, current) => {
@@ -107,6 +114,13 @@ export const useEntityTimelineSummary = (entityId: string, dynamicReviewIds: str
               return currentDate > latestDate ? current : latest;
             })
           : null;
+        
+        console.log('Timeline data calculated successfully:', {
+          reviewCount,
+          totalUpdates,
+          averageInitialRating: totalInitialRating / reviewCount,
+          averageLatestRating: totalLatestRating / reviewCount
+        });
         
         setTimelineData({
           averageInitialRating: totalInitialRating / reviewCount,
