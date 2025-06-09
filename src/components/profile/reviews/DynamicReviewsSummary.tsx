@@ -5,6 +5,7 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { Review } from '@/services/reviewService';
 import { TrendingUp, TrendingDown, Minus, Clock, Brain } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatRelativeDate } from '@/utils/dateUtils';
 
 interface DynamicReviewsSummaryProps {
   dynamicReviews: Review[];
@@ -13,6 +14,9 @@ interface DynamicReviewsSummaryProps {
     averageLatestRating: number;
     averageUpdateDays: number;
     totalTimelineUpdates: number;
+    aiSummary?: string;
+    aiSummaryLastGenerated?: string;
+    aiSummaryModel?: string;
   };
 }
 
@@ -59,9 +63,92 @@ export const DynamicReviewsSummary = ({
     }
   };
 
+  const renderAISummary = () => {
+    if (timelineData?.aiSummary) {
+      return (
+        <Card className="border-violet-200 bg-gradient-to-r from-violet-50/50 to-transparent dark:from-violet-900/10 dark:border-violet-800">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-violet-100 dark:bg-violet-900/30 flex-shrink-0">
+                <Brain className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium text-sm text-violet-900 dark:text-violet-100">
+                    AI Long-term Experience Insights
+                  </h4>
+                  {timelineData.aiSummaryLastGenerated && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-xs text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-2 py-0.5 rounded-full">
+                          {timelineData.aiSummaryModel === 'gemini-1.5-flash' ? 'Gemini' : 'GPT'}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          Generated {formatRelativeDate(timelineData.aiSummaryLastGenerated)} using {timelineData.aiSummaryModel}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {timelineData.aiSummary}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Show loading/generation state for reviews with timeline updates
+    if (dynamicReviews.some(review => review.timeline_count && review.timeline_count > 0)) {
+      return (
+        <Card className="border-dashed border-2 border-violet-200 dark:border-violet-800">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3 text-violet-600 dark:text-violet-400">
+              <div className="p-2 rounded-full bg-violet-50 dark:bg-violet-900/20">
+                <Brain className="h-4 w-4 animate-pulse" />
+              </div>
+              <div className="flex-1">
+                <div className="font-medium text-sm mb-1">Generating AI Insights</div>
+                <div className="text-xs text-muted-foreground">
+                  Analyzing long-term experience trends from timeline updates...
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Fallback for when no timeline updates exist yet
+    return (
+      <Card className="border-dashed border-2 border-muted-foreground/20">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <div className="p-2 rounded-full bg-muted/50">
+              <Brain className="h-4 w-4" />
+            </div>
+            <div className="flex-1">
+              <div className="font-medium text-sm mb-1">AI Insights</div>
+              <div className="text-xs">
+                Common long-term experience trends will appear here after more timeline updates.
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <TooltipProvider>
       <div className="space-y-4 mb-6">
+        {/* AI Summary Card */}
+        {renderAISummary()}
+
         {/* Main Rating Evolution Card */}
         <Card className="border-violet-200 bg-gradient-to-r from-violet-50/50 to-transparent dark:from-violet-900/10 dark:border-violet-800">
           <CardHeader className="pb-3">
@@ -146,23 +233,6 @@ export const DynamicReviewsSummary = ({
               <span className="text-muted-foreground">
                 {formatUpdateTiming()}
               </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* AI Summary Placeholder */}
-        <Card className="border-dashed border-2 border-muted-foreground/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <div className="p-2 rounded-full bg-muted/50">
-                <Brain className="h-4 w-4" />
-              </div>
-              <div className="flex-1">
-                <div className="font-medium text-sm mb-1">AI Insights</div>
-                <div className="text-xs">
-                  Common long-term experience trends will appear here.
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>

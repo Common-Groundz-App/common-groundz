@@ -1081,6 +1081,9 @@ export type Database = {
       }
       reviews: {
         Row: {
+          ai_summary: string | null
+          ai_summary_last_generated_at: string | null
+          ai_summary_model_used: string | null
           category: string
           created_at: string
           description: string | null
@@ -1107,6 +1110,9 @@ export type Database = {
           visibility: Database["public"]["Enums"]["recommendation_visibility"]
         }
         Insert: {
+          ai_summary?: string | null
+          ai_summary_last_generated_at?: string | null
+          ai_summary_model_used?: string | null
           category: string
           created_at?: string
           description?: string | null
@@ -1133,6 +1139,9 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["recommendation_visibility"]
         }
         Update: {
+          ai_summary?: string | null
+          ai_summary_last_generated_at?: string | null
+          ai_summary_model_used?: string | null
           category?: string
           created_at?: string
           description?: string | null

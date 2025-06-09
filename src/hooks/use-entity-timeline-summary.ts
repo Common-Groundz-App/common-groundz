@@ -7,6 +7,10 @@ interface TimelineData {
   averageLatestRating: number;
   averageUpdateDays: number;
   totalTimelineUpdates: number;
+  // New AI summary fields
+  aiSummary?: string;
+  aiSummaryLastGenerated?: string;
+  aiSummaryModel?: string;
 }
 
 export const useEntityTimelineSummary = (entityId: string, dynamicReviewIds: string[]) => {
@@ -35,10 +39,10 @@ export const useEntityTimelineSummary = (entityId: string, dynamicReviewIds: str
 
         if (error) throw error;
 
-        // Fetch the original reviews to get initial ratings and dates
+        // Fetch the original reviews to get initial ratings and dates + AI summaries
         const { data: reviews, error: reviewsError } = await supabase
           .from('reviews')
-          .select('id, rating, created_at')
+          .select('id, rating, created_at, ai_summary, ai_summary_last_generated_at, ai_summary_model_used')
           .in('id', dynamicReviewIds);
 
         if (reviewsError) throw reviewsError;
@@ -94,11 +98,24 @@ export const useEntityTimelineSummary = (entityId: string, dynamicReviewIds: str
 
         const reviewCount = dynamicReviewIds.length;
         
+        // Find the most recent AI summary from reviews
+        const reviewsWithSummaries = reviews.filter(r => r.ai_summary);
+        const mostRecentSummary = reviewsWithSummaries.length > 0
+          ? reviewsWithSummaries.reduce((latest, current) => {
+              const latestDate = latest.ai_summary_last_generated_at ? new Date(latest.ai_summary_last_generated_at) : new Date(0);
+              const currentDate = current.ai_summary_last_generated_at ? new Date(current.ai_summary_last_generated_at) : new Date(0);
+              return currentDate > latestDate ? current : latest;
+            })
+          : null;
+        
         setTimelineData({
           averageInitialRating: totalInitialRating / reviewCount,
           averageLatestRating: totalLatestRating / reviewCount,
           averageUpdateDays: reviewsWithUpdates > 0 ? totalUpdateDays / reviewsWithUpdates : 0,
-          totalTimelineUpdates: totalUpdates
+          totalTimelineUpdates: totalUpdates,
+          aiSummary: mostRecentSummary?.ai_summary || undefined,
+          aiSummaryLastGenerated: mostRecentSummary?.ai_summary_last_generated_at || undefined,
+          aiSummaryModel: mostRecentSummary?.ai_summary_model_used || undefined,
         });
 
       } catch (error) {
