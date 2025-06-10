@@ -1,6 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchReviews } from '@/services/reviewService'; // Changed from fetchUserReviews
+import { fetchUserReviews } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface UseReviewsFetchProps {
@@ -13,7 +13,7 @@ export const useReviewsFetch = ({ profileUserId, enabled = true }: UseReviewsFet
   
   return useQuery({
     queryKey: ['reviews', profileUserId, user?.id],
-    queryFn: () => fetchReviews(profileUserId, user?.id || undefined),
+    queryFn: () => fetchUserReviews(user?.id || null, profileUserId),
     enabled: !!profileUserId && enabled,
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false,

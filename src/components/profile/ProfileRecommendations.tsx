@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -28,7 +27,9 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     handleLike,
     handleSave,
     refreshRecommendations
-  } = useRecommendations(profileUserId);
+  } = useRecommendations({ 
+    profileUserId
+  });
   
   // Debug log recommendations when they change
   useEffect(() => {
@@ -47,6 +48,8 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
       .sort((a, b) => {
         if (sortBy === 'latest') {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        } else if (sortBy === 'highestRated') {
+          return b.rating - a.rating;
         } else if (sortBy === 'mostLiked') {
           return (b.likes || 0) - (a.likes || 0);
         }
