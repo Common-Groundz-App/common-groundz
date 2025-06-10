@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_actions: {
+        Row: {
+          action_type: string
+          admin_user_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          action_type: string
+          admin_user_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          action_type?: string
+          admin_user_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
       cached_products: {
         Row: {
           api_ref: string | null
@@ -1310,6 +1340,16 @@ export type Database = {
         Args: { name: string }
         Returns: string
       }
+      get_admin_analytics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_reviews: number
+          total_entities: number
+          reviews_with_ai_summary: number
+          entities_with_dynamic_reviews: number
+          recent_ai_generations: number
+        }[]
+      }
       get_cached_products: {
         Args: { query_text: string }
         Returns: {
@@ -1454,6 +1494,10 @@ export type Database = {
       insert_post_save: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
+      }
+      is_admin_user: {
+        Args: { user_email: string }
+        Returns: boolean
       }
       is_query_fresh: {
         Args: { query_text: string; ttl_hours?: number }

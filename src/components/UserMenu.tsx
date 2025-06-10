@@ -1,5 +1,8 @@
-import * as React from "react";
-import { Button } from "@/components/ui/button";
+
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,144 +10,133 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, User, Settings } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
-import { useToast } from "@/hooks/use-toast";
-import { ProfileAvatar } from "@/components/common/ProfileAvatar";
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  User, 
+  Settings, 
+  LogOut, 
+  Shield,
+  ChevronDown 
+} from 'lucide-react';
+import { checkAdminAccess } from '@/services/adminService';
 
-export function UserMenu() {
-  const { user, session, signOut } = useAuth();
+const UserMenu = () => {
+  const { user, signOut, profile } = useAuth();
   const navigate = useNavigate();
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [isSigningOut, setIsSigningOut] = React.useState(false);
-  const { data: profile } = useProfile(user?.id);
-  const { invalidateProfile } = useProfileCacheActions();
-  const { toast } = useToast();
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Listen for profile update events
-  React.useEffect(() => {
-    const handleProfileUpdate = () => {
-      if (user?.id) {
-        invalidateProfile(user.id);
+  useEffect(() => {
+    const verifyAdminAccess = async () => {
+      if (user) {
+        const hasAccess = await checkAdminAccess();
+        setIsAdmin(hasAccess);
       }
     };
 
-    window.addEventListener('profile-updated', handleProfileUpdate);
-    
-    return () => {
-      window.removeEventListener('profile-updated', handleProfileUpdate);
-    };
-  }, [user?.id, invalidateProfile]);
+    verifyAdminAccess();
+  }, [user]);
 
-  const handleSignOut = React.useCallback(async () => {
+  const handleSignOut = async () => {
     try {
-      setIsSigningOut(true);
-      setIsOpen(false);
-      
-      console.log('UserMenu: Starting sign out process');
-      
-      const { error } = await signOut();
-      
-      if (error) {
-        console.error('UserMenu: Sign out failed:', error);
-        
-        // Check if it's a session-related error that we can ignore
-        if (error.message?.includes('session') || error.message?.includes('missing')) {
-          console.log('UserMenu: Session error ignored, user likely already signed out');
-          toast({
-            title: "Signed out successfully",
-            description: "You have been logged out of your account.",
-          });
-          // Force navigation to home page
-          navigate('/', { replace: true });
-          return;
-        }
-        
-        toast({
-          title: "Sign out failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        setIsSigningOut(false);
-        return;
-      }
-      
-      console.log('UserMenu: Sign out successful');
-      toast({
-        title: "Signed out successfully",
-        description: "You have been logged out of your account.",
-      });
-      
-      // Force navigation to home page after successful logout
-      navigate('/', { replace: true });
+      await signOut();
+      navigate('/');
     } catch (error) {
-      console.error('UserMenu: Error during sign out:', error);
-      toast({
-        title: "Sign out failed",
-        description: "An unexpected error occurred while signing out.",
-        variant: "destructive",
-      });
-      setIsSigningOut(false);
+      console.error('Error signing out:', error);
     }
-  }, [signOut, toast, navigate]);
+  };
 
-  // Memoize the computed values to prevent unnecessary re-renders
-  const { displayName } = React.useMemo(() => {
-    const name = profile?.displayName || user?.email?.split('@')[0] || 'User';
-    return { displayName: name };
-  }, [profile?.displayName, user?.email]);
+  const getInitials = (name: string | null) => {
+    if (!name) return 'U';
+    return name.charAt(0).toUpperCase();
+  };
 
-  // Don't render if no user or session
-  if (!user || !session) {
-    return (
-      <Button asChild size="sm" className="bg-brand-orange hover:bg-brand-orange/90 text-white">
-        <Link to="/auth">Sign In</Link>
-      </Button>
-    );
-  }
+  const getDisplayName = () => {
+    if (profile?.username) return profile.username;
+    if (profile?.first_name) return profile.first_name;
+    return user?.email?.split('@')[0] || 'User';
+  };
+
+  if (!user) return null;
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full" disabled={isSigningOut}>
-          <ProfileAvatar userId={user?.id} size="sm" />
+        <Button variant="ghost" className="flex items-center gap-2 px-2">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={profile?.avatar_url || undefined} />
+            <AvatarFallback>
+              {getInitials(getDisplayName())}
+            </AvatarFallback>
+          </Avatar>
+          <div className="hidden md:flex items-center gap-1">
+            <span className="text-sm font-medium">{getDisplayName()}</span>
+            {isAdmin && (
+              <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                Admin
+              </Badge>
+            )}
+          </div>
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{displayName}</p>
-            <p className="text-xs leading-none text-muted-foreground">
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>
+          <div className="flex flex-col">
+            <span>{getDisplayName()}</span>
+            <span className="text-xs text-muted-foreground font-normal">
               {user.email}
-            </p>
+            </span>
+            {isAdmin && (
+              <Badge variant="secondary" className="text-xs mt-1 w-fit">
+                Administrator
+              </Badge>
+            )}
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/profile" className="flex items-center cursor-pointer">
-            <User className="mr-2 h-4 w-4" />
-            <span>Profile</span>
-          </Link>
+        
+        <DropdownMenuItem
+          onClick={() => navigate(`/profile/${profile?.username || user.id}`)}
+          className="cursor-pointer"
+        >
+          <User className="mr-2 h-4 w-4" />
+          Profile
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/settings" className="flex items-center cursor-pointer">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-          </Link>
+        
+        <DropdownMenuItem
+          onClick={() => navigate('/settings')}
+          className="cursor-pointer"
+        >
+          <Settings className="mr-2 h-4 w-4" />
+          Settings
         </DropdownMenuItem>
+
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => navigate('/admin')}
+              className="cursor-pointer"
+            >
+              <Shield className="mr-2 h-4 w-4" />
+              Admin Portal
+            </DropdownMenuItem>
+          </>
+        )}
+        
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          className="cursor-pointer"
           onClick={handleSignOut}
-          disabled={isSigningOut}
+          className="cursor-pointer text-red-600"
         >
           <LogOut className="mr-2 h-4 w-4" />
-          <span>{isSigningOut ? 'Signing out...' : 'Log out'}</span>
+          Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+};
+
+export default UserMenu;
