@@ -31,6 +31,8 @@ interface ReviewCardProps {
   onConvert?: (id: string) => void;
   refreshReviews: () => void;
   showTimelineFeatures?: boolean;
+  hideEntityFallbacks?: boolean;
+  compact?: boolean;
 }
 
 const ReviewCard = ({ 
@@ -39,7 +41,9 @@ const ReviewCard = ({
   onSave, 
   onConvert, 
   refreshReviews,
-  showTimelineFeatures = false 
+  showTimelineFeatures = false,
+  hideEntityFallbacks = false,
+  compact = false
 }: ReviewCardProps) => {
   const { user } = useAuth();
   const { generateReviewSummary, isGenerating } = useAISummaryGeneration();
@@ -127,7 +131,7 @@ const ReviewCard = ({
               {/* Timeline Badge Overlay */}
               {review.has_timeline && (
                 <div className="absolute top-3 left-3">
-                  <TimelineBadge count={review.timeline_count || 0} />
+                  <TimelineBadge updateCount={review.timeline_count || 0} />
                 </div>
               )}
               {/* Rating Overlay */}
@@ -156,7 +160,7 @@ const ReviewCard = ({
                 {!review.image_url && (
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {review.has_timeline && (
-                      <TimelineBadge count={review.timeline_count || 0} />
+                      <TimelineBadge updateCount={review.timeline_count || 0} />
                     )}
                     <ConnectedRingsRating
                       value={review.rating}
@@ -193,8 +197,9 @@ const ReviewCard = ({
             {/* Timeline Preview */}
             {review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
               <TimelinePreview 
-                timelineCount={review.timeline_count}
+                updateCount={review.timeline_count}
                 initialRating={review.rating}
+                latestRating={review.rating} // This would need to be fetched from latest update
                 onViewTimeline={() => setIsTimelineOpen(true)}
               />
             )}

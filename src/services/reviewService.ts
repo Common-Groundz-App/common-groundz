@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -83,11 +84,16 @@ export async function fetchReviews(profileUserId: string, currentUserId?: string
 
   return data?.map(review => ({
     ...review,
+    // Map database visibility values to interface values
+    visibility: review.visibility === 'circle_only' ? 'friends' : review.visibility,
     isLiked: review.isLiked?.length > 0,
     isSaved: review.isSaved?.length > 0,
     likes: review.likes_count?.length > 0 ? review.likes_count[0].count : 0,
   })) || [];
 }
+
+// Alias for compatibility
+export const fetchUserReviews = fetchReviews;
 
 export async function fetchReviewById(id: string): Promise<Review | null> {
   const { data, error } = await supabase
@@ -101,7 +107,13 @@ export async function fetchReviewById(id: string): Promise<Review | null> {
     throw error;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    // Map database visibility values to interface values
+    visibility: data.visibility === 'circle_only' ? 'friends' : data.visibility,
+  };
 }
 
 export async function deleteReview(id: string): Promise<boolean> {
@@ -133,25 +145,26 @@ export async function createReview(
   entity_id: string | undefined,
   status: string | undefined,
 ): Promise<Review | null> {
+  // Map interface visibility to database visibility
+  const dbVisibility = visibility === 'friends' ? 'circle_only' : visibility;
+  
   const { data, error } = await supabase
     .from('reviews')
-    .insert([
-      {
-        title,
-        description,
-        rating,
-        image_url,
-        venue,
-        category,
-        visibility,
-        experience_date,
-        subtitle,
-        media,
-        metadata,
-        entity_id,
-        status
-      }
-    ])
+    .insert({
+      title,
+      description,
+      rating,
+      image_url,
+      venue,
+      category,
+      visibility: dbVisibility,
+      experience_date,
+      subtitle,
+      media,
+      metadata,
+      entity_id,
+      status
+    })
     .select('*')
     .single();
 
@@ -160,7 +173,13 @@ export async function createReview(
     return null;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    // Map database visibility back to interface visibility
+    visibility: data.visibility === 'circle_only' ? 'friends' : data.visibility,
+  };
 }
 
 export async function fetchReviewUpdates(reviewId: string): Promise<ReviewUpdate[]> {
@@ -168,7 +187,7 @@ export async function fetchReviewUpdates(reviewId: string): Promise<ReviewUpdate
     .from('review_updates')
     .select(`
       *,
-      profiles:user_id (
+      profiles (
         username,
         avatar_url
       )
@@ -271,4 +290,15 @@ export async function generateReviewAISummary(reviewId: string): Promise<boolean
     console.error('Error generating AI summary:', error);
     return false;
   }
+}
+
+// Add placeholder exports for compatibility
+export async function updateReview(): Promise<boolean> {
+  // Placeholder - implement if needed
+  return false;
+}
+
+export async function fetchUserRecommendations(): Promise<any[]> {
+  // Placeholder - implement if needed
+  return [];
 }
