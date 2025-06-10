@@ -1,6 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchReviews } from '@/services/reviewService';
+import { fetchReviews } from '@/services/reviewService'; // Changed from fetchUserReviews
 import { useAuth } from '@/contexts/AuthContext';
 
 interface UseReviewsFetchProps {

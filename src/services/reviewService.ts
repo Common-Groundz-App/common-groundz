@@ -35,6 +35,8 @@ export interface Review {
   isLiked?: boolean;
   isSaved?: boolean;
   likes?: number;
+  // Entity information (for edit mode)
+  entity?: any;
 }
 
 export interface ReviewUpdate {
@@ -89,6 +91,8 @@ export async function fetchReviews(profileUserId: string, currentUserId?: string
     isLiked: review.isLiked?.length > 0,
     isSaved: review.isSaved?.length > 0,
     likes: review.likes_count?.length > 0 ? review.likes_count[0].count : 0,
+    // Ensure media is always an array
+    media: Array.isArray(review.media) ? review.media : (review.media ? [review.media] : []),
   })) || [];
 }
 
@@ -113,6 +117,8 @@ export async function fetchReviewById(id: string): Promise<Review | null> {
     ...data,
     // Map database visibility values to interface values
     visibility: data.visibility === 'circle_only' ? 'friends' : data.visibility,
+    // Ensure media is always an array
+    media: Array.isArray(data.media) ? data.media : (data.media ? [data.media] : []),
   };
 }
 
@@ -130,40 +136,42 @@ export async function deleteReview(id: string): Promise<boolean> {
   return true;
 }
 
-export async function createReview(
-  title: string,
-  description: string,
-  rating: number,
-  image_url: string | undefined,
-  venue: string | undefined,
-  category: string,
-  visibility: 'public' | 'private' | 'friends',
-  experience_date: string | undefined,
-  subtitle: string | undefined,
-  media: any[] | undefined,
-  metadata: any | undefined,
-  entity_id: string | undefined,
-  status: string | undefined,
-): Promise<Review | null> {
+export async function createReview(reviewData: {
+  title: string;
+  description: string;
+  rating: number;
+  image_url?: string;
+  venue?: string;
+  category: string;
+  visibility: 'public' | 'private' | 'friends';
+  experience_date?: string;
+  subtitle?: string;
+  media?: any[];
+  metadata?: any;
+  entity_id?: string;
+  status?: string;
+  user_id: string;
+}): Promise<Review | null> {
   // Map interface visibility to database visibility
-  const dbVisibility = visibility === 'friends' ? 'circle_only' : visibility;
+  const dbVisibility = reviewData.visibility === 'friends' ? 'circle_only' : reviewData.visibility;
   
   const { data, error } = await supabase
     .from('reviews')
     .insert({
-      title,
-      description,
-      rating,
-      image_url,
-      venue,
-      category,
+      title: reviewData.title,
+      description: reviewData.description,
+      rating: reviewData.rating,
+      image_url: reviewData.image_url,
+      venue: reviewData.venue,
+      category: reviewData.category,
       visibility: dbVisibility,
-      experience_date,
-      subtitle,
-      media,
-      metadata,
-      entity_id,
-      status
+      experience_date: reviewData.experience_date,
+      subtitle: reviewData.subtitle,
+      media: reviewData.media,
+      metadata: reviewData.metadata,
+      entity_id: reviewData.entity_id,
+      status: reviewData.status || 'published',
+      user_id: reviewData.user_id
     })
     .select('*')
     .single();
@@ -179,6 +187,54 @@ export async function createReview(
     ...data,
     // Map database visibility back to interface visibility
     visibility: data.visibility === 'circle_only' ? 'friends' : data.visibility,
+    // Ensure media is always an array
+    media: Array.isArray(data.media) ? data.media : (data.media ? [data.media] : []),
+  };
+}
+
+export async function updateReview(
+  id: string,
+  updateData: {
+    title?: string;
+    subtitle?: string;
+    venue?: string;
+    description?: string;
+    rating?: number;
+    image_url?: string;
+    media?: any[];
+    category?: string;
+    visibility?: 'public' | 'private' | 'friends';
+    entity_id?: string;
+    experience_date?: string;
+    metadata?: any;
+  }
+): Promise<Review | null> {
+  // Map interface visibility to database visibility if provided
+  const dbData = {
+    ...updateData,
+    visibility: updateData.visibility === 'friends' ? 'circle_only' : updateData.visibility,
+  };
+
+  const { data, error } = await supabase
+    .from('reviews')
+    .update(dbData)
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('Error updating review:', error);
+    return null;
+  }
+
+  if (!data) return null;
+
+  return {
+    ...data,
+    // Map database visibility back to interface visibility
+    visibility: data.visibility === 'circle_only' ? 'friends' : data.visibility,
+    // Ensure media is always an array
+    media: Array.isArray(data.media) ? data.media : (data.media ? [data.media] : []),
   };
 }
 
@@ -187,7 +243,7 @@ export async function fetchReviewUpdates(reviewId: string): Promise<ReviewUpdate
     .from('review_updates')
     .select(`
       *,
-      profiles (
+      profiles!review_updates_user_id_fkey (
         username,
         avatar_url
       )
@@ -293,11 +349,6 @@ export async function generateReviewAISummary(reviewId: string): Promise<boolean
 }
 
 // Add placeholder exports for compatibility
-export async function updateReview(): Promise<boolean> {
-  // Placeholder - implement if needed
-  return false;
-}
-
 export async function fetchUserRecommendations(): Promise<any[]> {
   // Placeholder - implement if needed
   return [];

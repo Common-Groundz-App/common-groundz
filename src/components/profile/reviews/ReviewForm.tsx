@@ -131,21 +131,24 @@ const ReviewForm = ({
   
   // If in edit mode, populate entity once review is available, or use provided entity
   useEffect(() => {
-    if (isEditMode && review?.entity) {
-      // Process the entity to ensure image_url is properly formatted
-      const processedEntity = { ...review.entity };
-      if (processedEntity.image_url) {
-        processedEntity.image_url = ensureHttps(processedEntity.image_url);
+    if (isEditMode && review) {
+      // Set the entity if it exists in the review
+      if (review.entity) {
+        // Process the entity to ensure image_url is properly formatted
+        const processedEntity = { ...review.entity };
+        if (processedEntity.image_url) {
+          processedEntity.image_url = ensureHttps(processedEntity.image_url);
+        }
+        
+        // Convert the string type to EntityType enum if possible
+        if (typeof processedEntity.type === 'string') {
+          // Map from string to EntityType enum
+          const mappedType = mapStringToEntityType(processedEntity.type);
+          processedEntity.type = mappedType;
+        }
+        
+        setSelectedEntity(processedEntity as RecommendationEntity);
       }
-      
-      // Convert the string type to EntityType enum if possible
-      if (typeof processedEntity.type === 'string') {
-        // Map from string to EntityType enum
-        const mappedType = mapStringToEntityType(processedEntity.type);
-        processedEntity.type = mappedType;
-      }
-      
-      setSelectedEntity(processedEntity as RecommendationEntity);
     } else if (entity && !selectedEntity) {
       // Convert provided entity to expected format
       const entityToUse: any = {
@@ -549,7 +552,7 @@ const ReviewForm = ({
       const finalTitle = category === 'food' ? foodName : contentName;
       
       if (isEditMode && review) {
-        await updateReview(review.id, {
+        const updatedReview = await updateReview(review.id, {
           title: finalTitle, // Use the content name as the title
           subtitle: reviewTitle, // Store the review headline in the subtitle field
           venue,
@@ -558,17 +561,22 @@ const ReviewForm = ({
           image_url,
           media: selectedMedia,
           category,
-          visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
+          visibility: visibility as "public" | "private" | "friends",
           entity_id: entityId,
           experience_date: formattedExperienceDate,
           metadata,
         });
+        
+        if (!updatedReview) {
+          throw new Error('Failed to update review');
+        }
+        
         toast({
           title: 'Success',
           description: 'Review has been updated successfully'
         });
       } else {
-        await createReview({
+        const newReview = await createReview({
           title: finalTitle, // Use the content name as the title
           subtitle: reviewTitle, // Store the review headline in the subtitle field
           venue,
@@ -577,12 +585,17 @@ const ReviewForm = ({
           image_url,
           media: selectedMedia,
           category,
-          visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
+          visibility: visibility as "public" | "private" | "friends",
           entity_id: entityId,
           experience_date: formattedExperienceDate,
           metadata,
           user_id: user.id
         });
+        
+        if (!newReview) {
+          throw new Error('Failed to create review');
+        }
+        
         toast({
           title: 'Success',
           description: 'Review has been added successfully'
