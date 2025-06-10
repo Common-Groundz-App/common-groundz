@@ -2,14 +2,35 @@
 import React from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { AuthContextType } from '@/types/auth';
+import { AuthContextType, Profile } from '@/types/auth';
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [session, setSession] = React.useState<Session | null>(null);
+  const [profile, setProfile] = React.useState<Profile | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+
+  // Function to fetch user profile
+  const fetchProfile = React.useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      setProfile(data);
+    } catch (error) {
+      console.error('Error in fetchProfile:', error);
+    }
+  }, []);
 
   React.useEffect(() => {
     let mounted = true;
@@ -23,6 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Initial session:', data.session ? 'Found' : 'None');
           setSession(data.session);
           setUser(data.session?.user ?? null);
+          
+          // Fetch profile if user exists
+          if (data.session?.user) {
+            await fetchProfile(data.session.user.id);
+          }
         }
         
         if (mounted) {
@@ -40,6 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   console.log('User signed out - clearing all state');
                   setSession(null);
                   setUser(null);
+                  setProfile(null);
+                } else if (currentSession?.user) {
+                  // Fetch profile for signed in user
+                  setTimeout(() => {
+                    fetchProfile(currentSession.user.id);
+                  }, 0);
                 }
               }
             }
@@ -67,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       cleanup?.then(cleanupFn => cleanupFn?.());
     };
-  }, []);
+  }, [fetchProfile]);
 
   const signIn = React.useCallback(async (email: string, password: string) => {
     try {
@@ -113,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Force clear state even if no session
         setSession(null);
         setUser(null);
+        setProfile(null);
         return { error: null };
       }
       
@@ -126,6 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Session error during logout, forcing local state clear');
           setSession(null);
           setUser(null);
+          setProfile(null);
           return { error: null }; // Don't return the error since we handled it
         }
         return { error };
@@ -135,12 +169,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Force clear state immediately after successful logout
       setSession(null);
       setUser(null);
+      setProfile(null);
       return { error: null };
     } catch (error) {
       console.error('Unexpected error during signOut:', error);
       // Force clear state on any error
       setSession(null);
       setUser(null);
+      setProfile(null);
       return { error: error as Error };
     }
   }, []);
@@ -148,11 +184,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = React.useMemo(() => ({
     user,
     session,
+    profile,
     isLoading,
     signIn,
     signUp,
     signOut
-  }), [user, session, isLoading, signIn, signUp, signOut]);
+  }), [user, session, profile, isLoading, signIn, signUp, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
