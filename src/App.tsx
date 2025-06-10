@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthContextBoundary } from "./components/AuthContextBoundary";
+import AuthContextBoundary from "./components/AuthContextBoundary";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
@@ -19,10 +19,10 @@ import PostView from "./pages/PostView";
 import NotFound from "./pages/NotFound";
 import AdminPortal from "./pages/AdminPortal";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { ProfileRedirect } from "./components/ProfileRedirect";
-import { AuthInitializer } from "./components/AuthInitializer";
-import { PreferencesContextProvider } from "./contexts/PreferencesContext";
-import { ContentViewerContextProvider } from "./contexts/ContentViewerContext";
+import ProfileRedirect from "./components/ProfileRedirect";
+import AuthInitializer from "./components/AuthInitializer";
+import { PreferencesProvider } from "./contexts/PreferencesContext";
+import { ContentViewerProvider } from "./contexts/ContentViewerContext";
 
 const queryClient = new QueryClient();
 
@@ -34,8 +34,8 @@ const App = () => (
       <BrowserRouter>
         <AuthContextBoundary>
           <AuthInitializer>
-            <PreferencesContextProvider>
-              <ContentViewerContextProvider>
+            <PreferencesProvider>
+              <ContentViewerProvider>
                 <div className="min-h-screen bg-background font-sans antialiased">
                   <Routes>
                     <Route path="/" element={<Index />} />
@@ -83,8 +83,8 @@ const App = () => (
                     <Route path="*" element={<Navigate to="/404" replace />} />
                   </Routes>
                 </div>
-              </ContentViewerContextProvider>
-            </PreferencesContextProvider>
+              </ContentViewerProvider>
+            </PreferencesProvider>
           </AuthInitializer>
         </AuthContextBoundary>
       </BrowserRouter>
