@@ -1,25 +1,8 @@
 
 import { useState, useEffect } from 'react';
-import { fetchUserRecommendations } from '@/services/recommendationService';
+import { fetchUserRecommendations, Recommendation } from '@/services/recommendationService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-
-export interface Recommendation {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  title: string;
-  description: string;
-  image_url?: string;
-  link?: string;
-  category: string;
-  user_id: string;
-  metadata?: any;
-  likes?: number;
-  saves?: number;
-  isLiked?: boolean;
-  isSaved?: boolean;
-}
 
 export const useRecommendations = (profileUserId: string) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
