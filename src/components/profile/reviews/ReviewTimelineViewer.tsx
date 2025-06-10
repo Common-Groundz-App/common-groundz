@@ -1,16 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Calendar, User } from 'lucide-react';
+import { Plus, Calendar, User, Brain, Loader } from 'lucide-react';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { fetchReviewUpdates, addReviewUpdate, type ReviewUpdate } from '@/services/reviewService';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAISummaryGeneration } from '@/hooks/use-ai-summary-generation';
 
 interface ReviewTimelineViewerProps {
   isOpen: boolean;
@@ -20,6 +20,11 @@ interface ReviewTimelineViewerProps {
   reviewTitle: string;
   initialRating: number;
   onTimelineUpdate?: () => void;
+  // AI summary props
+  aiSummary?: string;
+  aiSummaryLastGenerated?: string;
+  aiSummaryModel?: string;
+  timelineCount?: number;
 }
 
 export const ReviewTimelineViewer = ({
@@ -29,10 +34,15 @@ export const ReviewTimelineViewer = ({
   reviewOwnerId,
   reviewTitle,
   initialRating,
-  onTimelineUpdate
+  onTimelineUpdate,
+  aiSummary,
+  aiSummaryLastGenerated,
+  aiSummaryModel,
+  timelineCount = 0
 }: ReviewTimelineViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { generateReviewSummary, isGenerating } = useAISummaryGeneration();
   const [timelineUpdates, setTimelineUpdates] = useState<ReviewUpdate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
@@ -41,6 +51,8 @@ export const ReviewTimelineViewer = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isOwner = user?.id === reviewOwnerId;
+  const isAdmin = user?.email?.endsWith('@lovable.dev');
+  const canShowAISummary = timelineCount >= 2;
 
   useEffect(() => {
     if (isOpen) {
@@ -115,6 +127,64 @@ export const ReviewTimelineViewer = ({
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
+  };
+
+  const handleGenerateAISummary = async () => {
+    const success = await generateReviewSummary(reviewId);
+    if (success && onTimelineUpdate) {
+      onTimelineUpdate();
+    }
+  };
+
+  const renderAISummarySection = () => {
+    if (!canShowAISummary) return null;
+
+    return (
+      <div className="border-t pt-4 mt-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Brain className="h-4 w-4 text-violet-600" />
+            <span className="font-medium text-sm">AI Timeline Summary</span>
+          </div>
+          {isAdmin && (
+            <Button
+              onClick={handleGenerateAISummary}
+              disabled={isGenerating}
+              size="sm"
+              variant="outline"
+              className="gap-2"
+            >
+              {isGenerating && <Loader className="h-3 w-3 animate-spin" />}
+              {aiSummary ? 'Regenerate' : 'Generate'}
+            </Button>
+          )}
+        </div>
+
+        {aiSummary ? (
+          <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-4">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-2">
+              {aiSummary}
+            </p>
+            {aiSummaryLastGenerated && (
+              <div className="text-xs text-violet-600 dark:text-violet-400 flex items-center gap-2">
+                <span>Generated {formatRelativeDate(aiSummaryLastGenerated)}</span>
+                {aiSummaryModel && (
+                  <Badge variant="outline" className="text-xs px-2 py-0">
+                    {aiSummaryModel === 'gemini-1.5-flash' ? 'Gemini' : 'GPT'}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-muted/30 border border-dashed border-muted-foreground/20 rounded-lg p-4 text-center">
+            <p className="text-sm text-muted-foreground">
+              {isAdmin ? 'Click "Generate" to create an AI summary of this timeline.' : 'AI summary not available yet.'}
+            </p>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -216,6 +286,9 @@ export const ReviewTimelineViewer = ({
                   )}
                 </div>
               )}
+
+              {/* AI Summary Section */}
+              {renderAISummarySection()}
             </>
           )}
         </div>

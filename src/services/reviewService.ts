@@ -1,48 +1,39 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
   id: string;
-  user_id: string;
   title: string;
-  venue?: string;
   description?: string;
   rating: number;
   image_url?: string;
+  venue?: string;
   category: string;
   created_at: string;
   updated_at: string;
+  user_id: string;
   entity_id?: string;
-  visibility: 'public' | 'private' | 'circle_only';
-  status: string;
-  is_converted: boolean;
-  recommendation_id?: string;
+  visibility: 'public' | 'private' | 'friends';
   experience_date?: string;
-  media?: any;
-  metadata?: any;
   subtitle?: string;
-  // New Dynamic Reviews fields
-  trust_score?: number;
+  media?: any[];
+  metadata?: any;
+  status: string;
   is_recommended?: boolean;
-  timeline_count?: number;
+  recommendation_id?: string;
+  is_converted: boolean;
+  // Timeline fields
   has_timeline?: boolean;
+  timeline_count?: number;
+  trust_score?: number;
   is_verified?: boolean;
-  // Interaction states
+  // AI summary fields
+  ai_summary?: string;
+  ai_summary_last_generated_at?: string;
+  ai_summary_model_used?: string;
+  // Interaction fields (populated by queries)
   isLiked?: boolean;
   isSaved?: boolean;
   likes?: number;
-  // Additional fields for ReviewCard compatibility
-  user?: {
-    username?: string;
-    avatar_url?: string;
-  };
-  entity?: {
-    id: string;
-    name: string;
-    type: string;
-    image_url?: string;
-  };
-  comment_count?: number;
 }
 
 export interface ReviewUpdate {
@@ -54,450 +45,230 @@ export interface ReviewUpdate {
   created_at: string;
   updated_at: string;
   profiles?: {
-    username?: string;
+    username: string;
     avatar_url?: string;
   };
 }
 
-// Create a new review
-export const createReview = async (reviewData: {
-  title: string;
-  subtitle?: string;
-  venue?: string;
-  description?: string;
-  rating: number;
-  image_url?: string;
-  media?: any;
-  category: string;
-  visibility: 'public' | 'private' | 'circle_only';
-  entity_id?: string;
-  experience_date?: string;
-  metadata?: any;
-  user_id: string;
-}): Promise<Review> => {
-  try {
-    const { data, error } = await supabase
-      .from('reviews')
-      .insert(reviewData)
-      .select()
-      .single();
+export async function fetchReviews(profileUserId: string, currentUserId?: string): Promise<Review[]> {
+  let query = supabase
+    .from('reviews')
+    .select(`
+      *,
+      likes_count: review_likes(count),
+      isLiked: review_likes(
+        user_id,
+        count
+      ),
+      isSaved: review_saves(
+        user_id,
+        count
+      )
+    `)
+    .eq('user_id', profileUserId)
+    .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error creating review:', error);
-      throw error;
-    }
+  if (currentUserId) {
+    query = query.or(`user_id.eq.${currentUserId},visibility.eq.public,visibility.eq.friends`);
+  } else {
+    query = query.eq('visibility', 'public');
+  }
 
-    return data;
-  } catch (error) {
-    console.error('Error in createReview:', error);
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching reviews:', error);
     throw error;
   }
-};
 
-// Update an existing review
-export const updateReview = async (reviewId: string, updates: {
-  title?: string;
-  subtitle?: string;
-  venue?: string;
-  description?: string;
-  rating?: number;
-  image_url?: string;
-  media?: any;
-  category?: string;
-  visibility?: 'public' | 'private' | 'circle_only';
-  entity_id?: string;
-  experience_date?: string;
-  metadata?: any;
-}): Promise<Review> => {
-  try {
-    const { data, error } = await supabase
-      .from('reviews')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', reviewId)
-      .select()
-      .single();
+  return data?.map(review => ({
+    ...review,
+    isLiked: review.isLiked?.length > 0,
+    isSaved: review.isSaved?.length > 0,
+    likes: review.likes_count?.length > 0 ? review.likes_count[0].count : 0,
+  })) || [];
+}
 
-    if (error) {
-      console.error('Error updating review:', error);
-      throw error;
-    }
+export async function fetchReviewById(id: string): Promise<Review | null> {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('id', id)
+    .single();
 
-    return data;
-  } catch (error) {
-    console.error('Error in updateReview:', error);
+  if (error) {
+    console.error('Error fetching review by ID:', error);
     throw error;
   }
-};
 
-// Delete a review
-export const deleteReview = async (reviewId: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('reviews')
-      .delete()
-      .eq('id', reviewId);
+  return data;
+}
 
-    if (error) {
-      console.error('Error deleting review:', error);
-      return false;
-    }
+export async function deleteReview(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('reviews')
+    .delete()
+    .eq('id', id);
 
-    return true;
-  } catch (error) {
-    console.error('Error in deleteReview:', error);
+  if (error) {
+    console.error('Error deleting review:', error);
     return false;
   }
-};
 
-// Update review status (for admin actions)
-export const updateReviewStatus = async (reviewId: string, status: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('reviews')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', reviewId);
+  return true;
+}
 
-    if (error) {
-      console.error('Error updating review status:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error in updateReviewStatus:', error);
-    return false;
-  }
-};
-
-// Fetch user reviews with enhanced fields - Using manual joins to avoid foreign key issues
-export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
-  try {
-    // First, get the reviews
-    const { data: reviews, error: reviewsError } = await supabase
-      .from('reviews')
-      .select('*')
-      .eq('user_id', profileUserId)
-      .eq('status', 'published')
-      .order('created_at', { ascending: false });
-
-    if (reviewsError) {
-      console.error('Error fetching reviews:', reviewsError);
-      return [];
-    }
-
-    if (!reviews?.length) return [];
-
-    const reviewIds = reviews.map(r => r.id);
-    const userIds = reviews.map(r => r.user_id);
-    const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
-
-    // Get user profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-    }
-
-    // Get entities if any exist
-    let entities = [];
-    if (entityIds.length > 0) {
-      const { data: entitiesData, error: entitiesError } = await supabase
-        .from('entities')
-        .select('id, name, type, image_url')
-        .in('id', entityIds);
-
-      if (entitiesError) {
-        console.error('Error fetching entities:', entitiesError);
-      } else {
-        entities = entitiesData || [];
+export async function createReview(
+  title: string,
+  description: string,
+  rating: number,
+  image_url: string | undefined,
+  venue: string | undefined,
+  category: string,
+  visibility: 'public' | 'private' | 'friends',
+  experience_date: string | undefined,
+  subtitle: string | undefined,
+  media: any[] | undefined,
+  metadata: any | undefined,
+  entity_id: string | undefined,
+  status: string | undefined,
+): Promise<Review | null> {
+  const { data, error } = await supabase
+    .from('reviews')
+    .insert([
+      {
+        title,
+        description,
+        rating,
+        image_url,
+        venue,
+        category,
+        visibility,
+        experience_date,
+        subtitle,
+        media,
+        metadata,
+        entity_id,
+        status
       }
-    }
+    ])
+    .select('*')
+    .single();
 
-    // Get interaction data if user is logged in
-    let likeData = [];
-    let saveData = [];
-    let likeCounts = [];
-
-    if (currentUserId) {
-      const [likesResponse, savesResponse, likeCountsResponse] = await Promise.all([
-        supabase.rpc('get_user_review_likes', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_user_review_saves', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_review_likes_batch', { 
-          p_review_ids: reviewIds 
-        })
-      ]);
-
-      likeData = likesResponse.data || [];
-      saveData = savesResponse.data || [];
-      likeCounts = likeCountsResponse.data || [];
-    }
-
-    // Map reviews with interaction data and proper typing
-    return reviews.map(review => {
-      const userProfile = profiles?.find(p => p.id === review.user_id);
-      const entity = entities.find(e => e.id === review.entity_id);
-
-      return {
-        ...review,
-        user: userProfile ? {
-          username: userProfile.username,
-          avatar_url: userProfile.avatar_url
-        } : undefined,
-        entity: entity ? {
-          id: entity.id,
-          name: entity.name,
-          type: entity.type,
-          image_url: entity.image_url
-        } : undefined,
-        comment_count: 0, // Placeholder for future comment system
-        isLiked: likeData.some(like => like.review_id === review.id),
-        isSaved: saveData.some(save => save.review_id === review.id),
-        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
-      };
-    });
-
-  } catch (error) {
-    console.error('Error in fetchUserReviews:', error);
-    return [];
+  if (error) {
+    console.error('Error creating review:', error);
+    return null;
   }
-};
 
-// Fetch reviews that are marked as recommendations (4+ stars) - Using manual joins
-export const fetchUserRecommendations = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
-  try {
-    // First, get the reviews
-    const { data: reviews, error: reviewsError } = await supabase
-      .from('reviews')
-      .select('*')
-      .eq('user_id', profileUserId)
-      .eq('status', 'published')
-      .eq('is_recommended', true)
-      .order('created_at', { ascending: false });
+  return data;
+}
 
-    if (reviewsError) {
-      console.error('Error fetching recommendations:', reviewsError);
-      return [];
-    }
+export async function fetchReviewUpdates(reviewId: string): Promise<ReviewUpdate[]> {
+  const { data, error } = await supabase
+    .from('review_updates')
+    .select(`
+      *,
+      profiles:user_id (
+        username,
+        avatar_url
+      )
+    `)
+    .eq('review_id', reviewId)
+    .order('created_at', { ascending: true });
 
-    if (!reviews?.length) return [];
-
-    const reviewIds = reviews.map(r => r.id);
-    const userIds = reviews.map(r => r.user_id);
-    const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
-
-    // Get user profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-    }
-
-    // Get entities if any exist
-    let entities = [];
-    if (entityIds.length > 0) {
-      const { data: entitiesData, error: entitiesError } = await supabase
-        .from('entities')
-        .select('id, name, type, image_url')
-        .in('id', entityIds);
-
-      if (entitiesError) {
-        console.error('Error fetching entities:', entitiesError);
-      } else {
-        entities = entitiesData || [];
-      }
-    }
-
-    // Get interaction data if user is logged in
-    let likeData = [];
-    let saveData = [];
-    let likeCounts = [];
-
-    if (currentUserId) {
-      const [likesResponse, savesResponse, likeCountsResponse] = await Promise.all([
-        supabase.rpc('get_user_review_likes', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_user_review_saves', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_review_likes_batch', { 
-          p_review_ids: reviewIds 
-        })
-      ]);
-
-      likeData = likesResponse.data || [];
-      saveData = savesResponse.data || [];
-      likeCounts = likeCountsResponse.data || [];
-    }
-
-    // Map reviews with interaction data and proper typing
-    return reviews.map(review => {
-      const userProfile = profiles?.find(p => p.id === review.user_id);
-      const entity = entities.find(e => e.id === review.entity_id);
-
-      return {
-        ...review,
-        user: userProfile ? {
-          username: userProfile.username,
-          avatar_url: userProfile.avatar_url
-        } : undefined,
-        entity: entity ? {
-          id: entity.id,
-          name: entity.name,
-          type: entity.type,
-          image_url: entity.image_url
-        } : undefined,
-        comment_count: 0, // Placeholder for future comment system
-        isLiked: likeData.some(like => like.review_id === review.id),
-        isSaved: saveData.some(save => save.review_id === review.id),
-        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
-      };
-    });
-
-  } catch (error) {
-    console.error('Error in fetchUserRecommendations:', error);
-    return [];
+  if (error) {
+    console.error('Error fetching review updates:', error);
+    throw error;
   }
-};
 
-// Fetch review timeline updates
-export const fetchReviewUpdates = async (reviewId: string): Promise<ReviewUpdate[]> => {
-  try {
-    // First get the review updates
-    const { data: updates, error: updatesError } = await supabase
-      .from('review_updates')
-      .select('*')
-      .eq('review_id', reviewId)
-      .order('created_at', { ascending: false });
+  return data || [];
+}
 
-    if (updatesError) {
-      console.error('Error fetching review updates:', updatesError);
-      return [];
-    }
-
-    if (!updates?.length) return [];
-
-    // Get unique user IDs from the updates
-    const userIds = [...new Set(updates.map(update => update.user_id))];
-
-    // Fetch profiles for these users
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-    }
-
-    // Map updates with their corresponding profiles
-    return updates.map(update => ({
-      ...update,
-      profiles: profiles?.find(profile => profile.id === update.user_id) ? {
-        username: profiles.find(profile => profile.id === update.user_id)?.username,
-        avatar_url: profiles.find(profile => profile.id === update.user_id)?.avatar_url
-      } : undefined
-    }));
-
-  } catch (error) {
-    console.error('Error in fetchReviewUpdates:', error);
-    return [];
-  }
-};
-
-export const addReviewUpdate = async (reviewId: string, userId: string, rating: number | null, comment: string): Promise<boolean> => {
+export async function addReviewUpdate(
+  reviewId: string,
+  userId: string,
+  rating: number | null,
+  comment: string
+): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('review_updates')
       .insert({
         review_id: reviewId,
         user_id: userId,
-        rating: rating,
-        comment: comment
+        rating,
+        comment
       });
 
     if (error) {
       console.error('Error adding review update:', error);
-      return false;
+      throw error;
     }
 
     return true;
   } catch (error) {
-    console.error('Error in addReviewUpdate:', error);
+    console.error('Error adding review update:', error);
     return false;
   }
-};
+}
 
-export const toggleReviewLike = async (reviewId: string, userId: string): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase.rpc('toggle_review_like', {
-      p_review_id: reviewId,
-      p_user_id: userId
-    });
+export async function toggleReviewLike(reviewId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('toggle_review_like', {
+    p_review_id: reviewId,
+    p_user_id: userId
+  });
 
-    if (error) {
-      console.error('Error toggling review like:', error);
-      return false;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in toggleReviewLike:', error);
-    return false;
+  if (error) {
+    console.error('Error toggling review like:', error);
+    throw error;
   }
-};
+}
 
-export const toggleReviewSave = async (reviewId: string, userId: string): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase.rpc('toggle_review_save', {
-      p_review_id: reviewId,
-      p_user_id: userId
-    });
+export async function toggleReviewSave(reviewId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('toggle_review_save', {
+    p_review_id: reviewId,
+    p_user_id: userId
+  });
 
-    if (error) {
-      console.error('Error toggling review save:', error);
-      return false;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in toggleReviewSave:', error);
-    return false;
+  if (error) {
+    console.error('Error toggling review save:', error);
+    throw error;
   }
-};
+}
 
-export const convertReviewToRecommendation = async (reviewId: string): Promise<boolean> => {
+export async function convertReviewToRecommendation(reviewId: string): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('reviews')
-      .update({ 
-        is_recommended: true,
-        updated_at: new Date().toISOString()
-      })
+      .update({ is_converted: true })
       .eq('id', reviewId);
 
     if (error) {
       console.error('Error converting review to recommendation:', error);
-      return false;
+      throw error;
     }
 
     return true;
   } catch (error) {
-    console.error('Error in convertReviewToRecommendation:', error);
+    console.error('Error converting review to recommendation:', error);
     return false;
   }
-};
+}
+
+export async function generateReviewAISummary(reviewId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-ai-summary', {
+      body: { reviewId }
+    });
+
+    if (error) {
+      console.error('Error generating AI summary:', error);
+      throw error;
+    }
+
+    return data?.success || false;
+  } catch (error) {
+    console.error('Error generating AI summary:', error);
+    return false;
+  }
+}
