@@ -241,11 +241,13 @@ export async function fetchReviewUpdates(reviewId: string): Promise<ReviewUpdate
   const { data, error } = await supabase
     .from('review_updates')
     .select(`
-      *,
-      profiles (
-        username,
-        avatar_url
-      )
+      id,
+      review_id,
+      user_id,
+      rating,
+      comment,
+      created_at,
+      updated_at
     `)
     .eq('review_id', reviewId)
     .order('created_at', { ascending: true });
@@ -255,7 +257,30 @@ export async function fetchReviewUpdates(reviewId: string): Promise<ReviewUpdate
     throw error;
   }
 
-  return data || [];
+  // Fetch profiles separately to avoid join issues
+  const userIds = [...new Set(data?.map(update => update.user_id) || [])];
+  
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', userIds);
+
+    const profileMap = profiles?.reduce((acc, profile) => {
+      acc[profile.id] = { username: profile.username, avatar_url: profile.avatar_url };
+      return acc;
+    }, {} as Record<string, { username: string; avatar_url?: string }>) || {};
+
+    return data?.map(update => ({
+      ...update,
+      profiles: profileMap[update.user_id] || { username: 'Unknown User' }
+    })) || [];
+  }
+
+  return data?.map(update => ({
+    ...update,
+    profiles: { username: 'Unknown User' }
+  })) || [];
 }
 
 export async function addReviewUpdate(

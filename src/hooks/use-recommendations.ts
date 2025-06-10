@@ -32,8 +32,17 @@ export const useRecommendations = (profileUserId: string) => {
     setError(null);
     
     try {
-      const data = await fetchUserRecommendations();
-      setRecommendations(data);
+      // Pass the required arguments to fetchUserRecommendations
+      const result = await fetchUserRecommendations(
+        user?.id || null,
+        profileUserId,
+        undefined, // category
+        'latest', // sortBy
+        1, // page
+        10 // limit
+      );
+      // Extract just the recommendations array from the result
+      setRecommendations(result.recommendations);
     } catch (err) {
       console.error('Error fetching recommendations:', err);
       setError('Failed to load recommendations');
