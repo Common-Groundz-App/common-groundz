@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { fetchRecommendations } from '@/services/recommendationService';
+import { fetchUserRecommendations } from '@/services/recommendationService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -26,12 +27,12 @@ export const useRecommendations = (profileUserId: string) => {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const fetchUserRecommendations = async () => {
+  const fetchUserRecommendationsData = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const data = await fetchRecommendations(); // Remove the arguments
+      const data = await fetchUserRecommendations();
       setRecommendations(data);
     } catch (err) {
       console.error('Error fetching recommendations:', err);
@@ -42,13 +43,26 @@ export const useRecommendations = (profileUserId: string) => {
   };
 
   useEffect(() => {
-    fetchUserRecommendations();
+    fetchUserRecommendationsData();
   }, [profileUserId, user]);
+
+  const handleLike = async (id: string) => {
+    // Stub implementation for compatibility
+    console.log('Like recommendation:', id);
+  };
+
+  const handleSave = async (id: string) => {
+    // Stub implementation for compatibility
+    console.log('Save recommendation:', id);
+  };
 
   return {
     recommendations,
     isLoading,
     error,
-    refetch: fetchUserRecommendations,
+    refetch: fetchUserRecommendationsData,
+    handleLike,
+    handleSave,
+    refreshRecommendations: fetchUserRecommendationsData,
   };
 };

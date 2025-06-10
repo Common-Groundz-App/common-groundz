@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -212,7 +211,7 @@ export async function updateReview(
   // Map interface visibility to database visibility if provided
   const dbData = {
     ...updateData,
-    visibility: updateData.visibility === 'friends' ? 'circle_only' : updateData.visibility,
+    visibility: updateData.visibility === 'friends' ? 'circle_only' as const : updateData.visibility as 'public' | 'private' | 'circle_only',
   };
 
   const { data, error } = await supabase
@@ -243,7 +242,7 @@ export async function fetchReviewUpdates(reviewId: string): Promise<ReviewUpdate
     .from('review_updates')
     .select(`
       *,
-      profiles!review_updates_user_id_fkey (
+      profiles (
         username,
         avatar_url
       )
