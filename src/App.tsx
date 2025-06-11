@@ -8,6 +8,7 @@ import { ContentViewerProvider } from '@/contexts/ContentViewerContext';
 import AuthErrorBoundary from '@/components/AuthErrorBoundary';
 import AuthInitializer from '@/components/AuthInitializer';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import AdminRoute from '@/components/AdminRoute';
 import Index from '@/pages/Index';
 import Feed from '@/pages/Feed';
 import Auth from '@/pages/Auth';
@@ -19,6 +20,7 @@ import EntityDetail from '@/pages/EntityDetail';
 import PostView from '@/pages/PostView';
 import RecommendationView from '@/pages/RecommendationView';
 import ProductSearch from '@/pages/ProductSearch';
+import AdminPortal from '@/pages/AdminPortal';
 import NotFound from '@/pages/NotFound';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
@@ -114,6 +116,11 @@ function App() {
                     <ProtectedRoute>
                       <ProductSearch />
                     </ProtectedRoute>
+                  } />
+                  <Route path="/admin" element={
+                    <AdminRoute>
+                      <AdminPortal />
+                    </AdminRoute>
                   } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

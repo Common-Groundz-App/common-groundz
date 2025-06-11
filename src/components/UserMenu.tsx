@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, User, Settings } from "lucide-react";
+import { LogOut, User, Settings, Shield } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
 import { useToast } from "@/hooks/use-toast";
@@ -92,9 +93,10 @@ export function UserMenu() {
   }, [signOut, toast, navigate]);
 
   // Memoize the computed values to prevent unnecessary re-renders
-  const { displayName } = React.useMemo(() => {
+  const { displayName, isAdmin } = React.useMemo(() => {
     const name = profile?.displayName || user?.email?.split('@')[0] || 'User';
-    return { displayName: name };
+    const admin = user?.email?.endsWith('@lovable.dev') || false;
+    return { displayName: name, isAdmin: admin };
   }, [profile?.displayName, user?.email]);
 
   // Don't render if no user or session
@@ -129,6 +131,14 @@ export function UserMenu() {
             <span>Profile</span>
           </Link>
         </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link to="/admin" className="flex items-center cursor-pointer">
+              <Shield className="mr-2 h-4 w-4" />
+              <span>Admin Portal</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <Link to="/settings" className="flex items-center cursor-pointer">
             <Settings className="mr-2 h-4 w-4" />
