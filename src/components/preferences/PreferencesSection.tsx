@@ -10,6 +10,18 @@ import PreferencesForm from './PreferencesForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash2 } from 'lucide-react';
 
+// Helper function to safely render array items as tags
+const renderPreferenceTags = (items: any, otherItems?: any) => {
+  const safeItems = Array.isArray(items) ? items : (typeof items === 'string' ? [items] : []);
+  const safeOtherItems = Array.isArray(otherItems) ? otherItems : (typeof otherItems === 'string' ? [otherItems] : []);
+  
+  return [...safeItems, ...safeOtherItems].map((item: string, index: number) => (
+    <div key={`${item}-${index}`} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
+      {item}
+    </div>
+  ));
+};
+
 const PreferencesSection = () => {
   const { preferences, updatePreferences, isLoading } = usePreferences();
   const [isEditing, setIsEditing] = useState(false);
@@ -110,16 +122,7 @@ const PreferencesSection = () => {
                 <div className="space-y-1">
                   <h4 className="font-medium text-sm">🧴 Skin Type</h4>
                   <div className="flex flex-wrap gap-1">
-                    {preferences.skin_type.map((type: string) => (
-                      <div key={type} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {type}
-                      </div>
-                    ))}
-                    {preferences.other_skin_type?.map((type: string) => (
-                      <div key={type} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {type}
-                      </div>
-                    ))}
+                    {renderPreferenceTags(preferences.skin_type, preferences.other_skin_type)}
                   </div>
                   <Separator className="my-2" />
                 </div>
@@ -129,16 +132,7 @@ const PreferencesSection = () => {
                 <div className="space-y-1">
                   <h4 className="font-medium text-sm">💇 Hair Type</h4>
                   <div className="flex flex-wrap gap-1">
-                    {preferences.hair_type.map((type: string) => (
-                      <div key={type} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {type}
-                      </div>
-                    ))}
-                    {preferences.other_hair_type?.map((type: string) => (
-                      <div key={type} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {type}
-                      </div>
-                    ))}
+                    {renderPreferenceTags(preferences.hair_type, preferences.other_hair_type)}
                   </div>
                   <Separator className="my-2" />
                 </div>
@@ -148,16 +142,7 @@ const PreferencesSection = () => {
                 <div className="space-y-1">
                   <h4 className="font-medium text-sm">🍱 Food Preferences</h4>
                   <div className="flex flex-wrap gap-1">
-                    {preferences.food_preferences.map((pref: string) => (
-                      <div key={pref} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {pref}
-                      </div>
-                    ))}
-                    {preferences.other_food_preferences?.map((pref: string) => (
-                      <div key={pref} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {pref}
-                      </div>
-                    ))}
+                    {renderPreferenceTags(preferences.food_preferences, preferences.other_food_preferences)}
                   </div>
                   <Separator className="my-2" />
                 </div>
@@ -167,16 +152,7 @@ const PreferencesSection = () => {
                 <div className="space-y-1">
                   <h4 className="font-medium text-sm">🧘 Lifestyle</h4>
                   <div className="flex flex-wrap gap-1">
-                    {preferences.lifestyle.map((style: string) => (
-                      <div key={style} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {style}
-                      </div>
-                    ))}
-                    {preferences.other_lifestyle?.map((style: string) => (
-                      <div key={style} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {style}
-                      </div>
-                    ))}
+                    {renderPreferenceTags(preferences.lifestyle, preferences.other_lifestyle)}
                   </div>
                   <Separator className="my-2" />
                 </div>
@@ -186,16 +162,7 @@ const PreferencesSection = () => {
                 <div className="space-y-1">
                   <h4 className="font-medium text-sm">🎬 Genre Preferences</h4>
                   <div className="flex flex-wrap gap-1">
-                    {preferences.genre_preferences.map((genre: string) => (
-                      <div key={genre} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {genre}
-                      </div>
-                    ))}
-                    {preferences.other_genre_preferences?.map((genre: string) => (
-                      <div key={genre} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {genre}
-                      </div>
-                    ))}
+                    {renderPreferenceTags(preferences.genre_preferences, preferences.other_genre_preferences)}
                   </div>
                   <Separator className="my-2" />
                 </div>
@@ -205,11 +172,7 @@ const PreferencesSection = () => {
                 <div className="space-y-1">
                   <h4 className="font-medium text-sm">🎯 Goals</h4>
                   <div className="flex flex-wrap gap-1">
-                    {preferences.goals.map((goal: string) => (
-                      <div key={goal} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-                        {goal}
-                      </div>
-                    ))}
+                    {renderPreferenceTags(preferences.goals)}
                   </div>
                 </div>
               )}
