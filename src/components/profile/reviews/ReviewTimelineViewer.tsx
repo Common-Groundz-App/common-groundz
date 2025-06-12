@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -203,50 +204,22 @@ export const ReviewTimelineViewer = ({
                 </Card>
               )}
 
-              {/* Initial Review Entry */}
-              <div className="p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
-                <div className="flex items-start gap-3">
-                  <Badge variant="outline" className="bg-primary/10 text-primary">
-                    Initial Review
-                  </Badge>
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <ConnectedRingsRating
-                    value={initialRating}
-                    variant="badge"
-                    showValue={false}
-                    size="sm"
-                    minimal={true}
-                  />
-                  <span className="font-medium">{initialRating.toFixed(1)}</span>
-                </div>
-              </div>
-
-              {/* AI Summary Section - Enhanced with better error handling */}
+              {/* AI Summary Section - Now with brand orange colors and positioned at top */}
               {showAISummary && (
-                <Card className="bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20 border-violet-200 dark:border-violet-800">
+                <Card className="bg-gradient-to-r from-orange-50 to-orange-100/80 dark:from-orange-950/20 dark:to-orange-900/30 border-orange-200 dark:border-orange-800">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-violet-800 dark:text-violet-200 flex items-center gap-2">
+                    <CardTitle className="text-sm font-medium text-orange-800 dark:text-orange-200 flex items-center gap-2">
                       <Sparkles className="h-4 w-4" />
                       AI Summary
-                      <Badge variant="outline" className="text-xs bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
+                      <Badge variant="outline" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 border-orange-300 dark:border-orange-700">
                         Timeline Analysis
                       </Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <p className="text-sm text-violet-700 dark:text-violet-300 leading-relaxed">
+                    <p className="text-sm text-orange-700 dark:text-orange-300 leading-relaxed">
                       {reviewData.ai_summary}
                     </p>
-                    {reviewData.ai_summary_last_generated_at && (
-                      <div className="mt-3 flex items-center gap-2 text-xs text-violet-600 dark:text-violet-400">
-                        <Calendar className="h-3 w-3" />
-                        Generated {formatRelativeDate(reviewData.ai_summary_last_generated_at)}
-                        {reviewData.ai_summary_model_used && (
-                          <span className="ml-2">• {reviewData.ai_summary_model_used}</span>
-                        )}
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               )}
@@ -262,6 +235,44 @@ export const ReviewTimelineViewer = ({
                   </CardContent>
                 </Card>
               )}
+
+              {/* Initial Review Entry - Enhanced with user info */}
+              <div className="p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={reviewData?.user?.avatar_url || undefined} />
+                    <AvatarFallback className="text-xs">
+                      {getInitials(reviewData?.user?.username || null)}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-medium text-sm">
+                        {reviewData?.user?.username || 'User'}
+                      </span>
+                      <Badge variant="outline" className="bg-primary/10 text-primary text-xs">
+                        Initial Review
+                      </Badge>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        {reviewData && formatRelativeDate(reviewData.created_at)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <ConnectedRingsRating
+                        value={initialRating}
+                        variant="badge"
+                        showValue={false}
+                        size="sm"
+                        minimal={true}
+                      />
+                      <span className="font-medium">{initialRating.toFixed(1)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Timeline Updates */}
               {timelineUpdates.map((update, index) => (
