@@ -186,6 +186,9 @@ export type Database = {
       }
       entities: {
         Row: {
+          ai_dynamic_review_summary: string | null
+          ai_dynamic_review_summary_last_generated_at: string | null
+          ai_dynamic_review_summary_model_used: string | null
           api_ref: string | null
           api_source: string | null
           authors: string[] | null
@@ -222,6 +225,9 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          ai_dynamic_review_summary?: string | null
+          ai_dynamic_review_summary_last_generated_at?: string | null
+          ai_dynamic_review_summary_model_used?: string | null
           api_ref?: string | null
           api_source?: string | null
           authors?: string[] | null
@@ -258,6 +264,9 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          ai_dynamic_review_summary?: string | null
+          ai_dynamic_review_summary_last_generated_at?: string | null
+          ai_dynamic_review_summary_model_used?: string | null
           api_ref?: string | null
           api_source?: string | null
           authors?: string[] | null

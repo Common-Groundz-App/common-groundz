@@ -2,149 +2,123 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-interface TimelineData {
+interface EntityTimelineSummary {
   averageInitialRating: number;
   averageLatestRating: number;
   averageUpdateDays: number;
   totalTimelineUpdates: number;
-  // AI summary fields (preserved for future use)
-  aiSummary?: string;
-  aiSummaryLastGenerated?: string;
-  aiSummaryModel?: string;
+  // Entity-level AI summary fields (from entities table)
+  entityAiSummary?: string;
+  entityAiSummaryLastGenerated?: string;
+  entityAiSummaryModel?: string;
 }
 
-export const useEntityTimelineSummary = (entityId: string, dynamicReviewIds: string[]) => {
-  const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
+export const useEntityTimelineSummary = (entityId: string | null) => {
+  const [summary, setSummary] = useState<EntityTimelineSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchTimelineData = async () => {
-      if (!entityId || !dynamicReviewIds.length) {
-        setTimelineData(null);
-        return;
-      }
+    if (!entityId) {
+      setSummary(null);
+      return;
+    }
 
+    const fetchSummary = async () => {
       setIsLoading(true);
-      try {
-        // Fetch timeline updates for dynamic reviews
-        const { data: updates, error } = await supabase
-          .from('review_updates')
-          .select(`
-            review_id,
-            rating,
-            created_at
-          `)
-          .in('review_id', dynamicReviewIds)
-          .order('created_at', { ascending: true });
+      setError(null);
 
-        if (error) {
-          console.error('Error fetching timeline updates:', error);
-          throw error;
+      try {
+        // First get entity-level AI summary data
+        const { data: entityData, error: entityError } = await supabase
+          .from('entities')
+          .select('ai_dynamic_review_summary, ai_dynamic_review_summary_last_generated_at, ai_dynamic_review_summary_model_used')
+          .eq('id', entityId)
+          .maybeSingle();
+
+        if (entityError) {
+          console.error('Error fetching entity AI summary:', entityError);
         }
 
-        // Fetch the original reviews to get initial ratings and dates + AI summaries
+        // Get all reviews for this entity with timeline updates
         const { data: reviews, error: reviewsError } = await supabase
           .from('reviews')
-          .select('id, rating, created_at, ai_summary, ai_summary_last_generated_at, ai_summary_model_used')
-          .in('id', dynamicReviewIds);
+          .select('id, rating, created_at, has_timeline')
+          .eq('entity_id', entityId)
+          .eq('status', 'published')
+          .eq('has_timeline', true);
 
-        if (reviewsError) {
-          console.error('Error fetching reviews:', reviewsError);
-          throw reviewsError;
-        }
+        if (reviewsError) throw reviewsError;
 
-        if (!updates || !reviews) {
-          console.log('No updates or reviews found');
-          setTimelineData(null);
+        if (!reviews || reviews.length === 0) {
+          setSummary(null);
           return;
         }
 
-        // Process the data
-        const reviewMap = new Map(reviews.map(r => [r.id, r]));
-        const updatesByReview = new Map<string, typeof updates>();
-        
-        // Group updates by review
-        updates.forEach(update => {
-          if (!updatesByReview.has(update.review_id)) {
-            updatesByReview.set(update.review_id, []);
-          }
-          updatesByReview.get(update.review_id)!.push(update);
-        });
+        // Get all timeline updates for these reviews
+        const reviewIds = reviews.map(r => r.id);
+        const { data: updates, error: updatesError } = await supabase
+          .from('review_updates')
+          .select('review_id, rating, created_at')
+          .in('review_id', reviewIds)
+          .order('created_at', { ascending: true });
 
-        let totalInitialRating = 0;
-        let totalLatestRating = 0;
-        let totalUpdateDays = 0;
-        let reviewsWithUpdates = 0;
-        let totalUpdates = 0;
+        if (updatesError) throw updatesError;
 
-        // Calculate metrics for each review
-        dynamicReviewIds.forEach(reviewId => {
-          const review = reviewMap.get(reviewId);
-          const reviewUpdates = updatesByReview.get(reviewId) || [];
+        // Calculate summary statistics
+        const initialRatings = reviews.map(r => r.rating);
+        const averageInitialRating = initialRatings.reduce((sum, rating) => sum + rating, 0) / initialRatings.length;
+
+        // Get latest rating for each review (either from updates or original rating)
+        const latestRatings = reviews.map(review => {
+          const reviewUpdates = updates?.filter(u => u.review_id === review.id) || [];
+          if (reviewUpdates.length === 0) return review.rating;
           
-          if (!review) return;
-
-          const initialRating = review.rating;
-          const latestRating = reviewUpdates.length > 0 
-            ? reviewUpdates[reviewUpdates.length - 1].rating || initialRating
-            : initialRating;
-
-          totalInitialRating += initialRating;
-          totalLatestRating += latestRating;
-          totalUpdates += reviewUpdates.length;
-
-          // Calculate days to first update
-          if (reviewUpdates.length > 0) {
-            const reviewDate = new Date(review.created_at);
-            const firstUpdateDate = new Date(reviewUpdates[0].created_at);
-            const daysDiff = Math.abs((firstUpdateDate.getTime() - reviewDate.getTime()) / (1000 * 60 * 60 * 24));
-            totalUpdateDays += daysDiff;
-            reviewsWithUpdates++;
-          }
+          // Get the latest update with a rating
+          const latestWithRating = reviewUpdates
+            .filter(u => u.rating !== null)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+          
+          return latestWithRating?.rating || review.rating;
         });
 
-        const reviewCount = dynamicReviewIds.length;
-        
-        // Find the most recent AI summary from reviews (if any exist)
-        const reviewsWithSummaries = reviews.filter(r => r.ai_summary);
-        const mostRecentSummary = reviewsWithSummaries.length > 0
-          ? reviewsWithSummaries.reduce((latest, current) => {
-              const latestDate = latest.ai_summary_last_generated_at ? new Date(latest.ai_summary_last_generated_at) : new Date(0);
-              const currentDate = current.ai_summary_last_generated_at ? new Date(current.ai_summary_last_generated_at) : new Date(0);
-              return currentDate > latestDate ? current : latest;
-            })
-          : null;
-        
-        console.log('Timeline data calculated successfully:', {
-          reviewCount,
-          totalUpdates,
-          averageInitialRating: totalInitialRating / reviewCount,
-          averageLatestRating: totalLatestRating / reviewCount
-        });
-        
-        setTimelineData({
-          averageInitialRating: totalInitialRating / reviewCount,
-          averageLatestRating: totalLatestRating / reviewCount,
-          averageUpdateDays: reviewsWithUpdates > 0 ? totalUpdateDays / reviewsWithUpdates : 0,
-          totalTimelineUpdates: totalUpdates,
-          aiSummary: mostRecentSummary?.ai_summary || undefined,
-          aiSummaryLastGenerated: mostRecentSummary?.ai_summary_last_generated_at || undefined,
-          aiSummaryModel: mostRecentSummary?.ai_summary_model_used || undefined,
+        const averageLatestRating = latestRatings.reduce((sum, rating) => sum + rating, 0) / latestRatings.length;
+
+        // Calculate average days between review creation and first update
+        const updateDelays = reviews.map(review => {
+          const firstUpdate = updates?.find(u => u.review_id === review.id);
+          if (!firstUpdate) return null;
+          
+          const reviewDate = new Date(review.created_at);
+          const updateDate = new Date(firstUpdate.created_at);
+          return (updateDate.getTime() - reviewDate.getTime()) / (1000 * 60 * 60 * 24);
+        }).filter(delay => delay !== null) as number[];
+
+        const averageUpdateDays = updateDelays.length > 0 
+          ? updateDelays.reduce((sum, days) => sum + days, 0) / updateDelays.length 
+          : 0;
+
+        setSummary({
+          averageInitialRating,
+          averageLatestRating,
+          averageUpdateDays,
+          totalTimelineUpdates: updates?.length || 0,
+          // Include entity-level AI summary data
+          entityAiSummary: entityData?.ai_dynamic_review_summary || undefined,
+          entityAiSummaryLastGenerated: entityData?.ai_dynamic_review_summary_last_generated_at || undefined,
+          entityAiSummaryModel: entityData?.ai_dynamic_review_summary_model_used || undefined,
         });
 
-      } catch (error) {
-        console.error('Error fetching timeline data:', error);
-        setTimelineData(null);
+      } catch (err) {
+        console.error('Error fetching entity timeline summary:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch timeline summary');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTimelineData();
-  }, [entityId, dynamicReviewIds]);
+    fetchSummary();
+  }, [entityId]);
 
-  return {
-    timelineData,
-    isLoading
-  };
+  return { summary, isLoading, error };
 };
