@@ -139,7 +139,7 @@ export const ReviewTimelineViewer = ({
   const shouldShowAISummary = () => {
     const hasReviewData = !!reviewData;
     const hasAiSummary = !!(reviewData?.ai_summary && reviewData.ai_summary.trim().length > 0);
-    const hasValidTimelineCount = typeof reviewData?.timeline_count === 'number' && reviewData.timeline_count >= 2;
+    const hasValidTimelineCount = typeof reviewData?.timeline_count === 'number' && reviewData.timeline_count >= 1;
     const hasTimeline = !!reviewData?.has_timeline;
 
     console.log('🤔 AI Summary Display Check:', {
@@ -252,7 +252,7 @@ export const ReviewTimelineViewer = ({
               )}
 
               {/* Show message when AI summary should appear but doesn't */}
-              {!showAISummary && reviewData && reviewData.timeline_count && reviewData.timeline_count >= 2 && (
+              {!showAISummary && reviewData && reviewData.timeline_count && reviewData.timeline_count >= 1 && (
                 <Card className="bg-gray-50 border-gray-200">
                   <CardContent className="pt-4">
                     <div className="text-sm text-gray-600 flex items-center gap-2">
