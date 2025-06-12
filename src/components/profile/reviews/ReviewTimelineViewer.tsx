@@ -1,14 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Calendar, User } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Calendar, User, Sparkles } from 'lucide-react';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { fetchReviewUpdates, addReviewUpdate, type ReviewUpdate } from '@/services/reviewService';
+import { fetchReviewUpdates, addReviewUpdate, fetchReviewWithSummary, type ReviewUpdate, type Review } from '@/services/reviewService';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -34,6 +34,7 @@ export const ReviewTimelineViewer = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [timelineUpdates, setTimelineUpdates] = useState<ReviewUpdate[]>([]);
+  const [reviewData, setReviewData] = useState<Review | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
   const [newRating, setNewRating] = useState<number | null>(null);
@@ -44,20 +45,26 @@ export const ReviewTimelineViewer = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadTimelineUpdates();
+      loadTimelineData();
     }
   }, [isOpen, reviewId]);
 
-  const loadTimelineUpdates = async () => {
+  const loadTimelineData = async () => {
     setIsLoading(true);
     try {
-      const updates = await fetchReviewUpdates(reviewId);
+      // Load both timeline updates and complete review data
+      const [updates, review] = await Promise.all([
+        fetchReviewUpdates(reviewId),
+        fetchReviewWithSummary(reviewId)
+      ]);
+      
       setTimelineUpdates(updates);
+      setReviewData(review);
     } catch (error) {
-      console.error('Error loading timeline updates:', error);
+      console.error('Error loading timeline data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load timeline updates',
+        description: 'Failed to load timeline data',
         variant: 'destructive'
       });
     } finally {
@@ -90,8 +97,8 @@ export const ReviewTimelineViewer = ({
         setNewComment('');
         setIsAddingUpdate(false);
         
-        // Reload timeline updates
-        await loadTimelineUpdates();
+        // Reload timeline data
+        await loadTimelineData();
         
         // Notify parent component to refresh data
         if (onTimelineUpdate) {
@@ -116,6 +123,12 @@ export const ReviewTimelineViewer = ({
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
   };
+
+  // Check if we should show AI summary
+  const shouldShowAISummary = reviewData && 
+    reviewData.ai_summary && 
+    reviewData.timeline_count && 
+    reviewData.timeline_count >= 2;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -161,6 +174,35 @@ export const ReviewTimelineViewer = ({
                   <span className="font-medium">{initialRating.toFixed(1)}</span>
                 </div>
               </div>
+
+              {/* AI Summary Section - Show only if conditions are met */}
+              {shouldShowAISummary && (
+                <Card className="bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20 border-violet-200 dark:border-violet-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-violet-800 dark:text-violet-200 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      AI Summary
+                      <Badge variant="outline" className="text-xs bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
+                        Timeline Analysis
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-sm text-violet-700 dark:text-violet-300 leading-relaxed">
+                      {reviewData.ai_summary}
+                    </p>
+                    {reviewData.ai_summary_last_generated_at && (
+                      <div className="mt-3 flex items-center gap-2 text-xs text-violet-600 dark:text-violet-400">
+                        <Calendar className="h-3 w-3" />
+                        Generated {formatRelativeDate(reviewData.ai_summary_last_generated_at)}
+                        {reviewData.ai_summary_model_used && (
+                          <span className="ml-2">• {reviewData.ai_summary_model_used}</span>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Timeline Updates */}
               {timelineUpdates.map((update, index) => (

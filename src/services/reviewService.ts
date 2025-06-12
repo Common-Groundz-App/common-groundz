@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -91,6 +90,40 @@ export const createReview = async (reviewData: {
   } catch (error) {
     console.error('Error in createReview:', error);
     throw error;
+  }
+};
+
+// Fetch complete review data including AI summary fields
+export const fetchReviewWithSummary = async (reviewId: string): Promise<Review | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select(`
+        *,
+        profiles!inner(
+          id,
+          username,
+          avatar_url
+        )
+      `)
+      .eq('id', reviewId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching review with summary:', error);
+      return null;
+    }
+
+    return {
+      ...data,
+      user: data.profiles ? {
+        username: data.profiles.username,
+        avatar_url: data.profiles.avatar_url
+      } : undefined
+    };
+  } catch (error) {
+    console.error('Error in fetchReviewWithSummary:', error);
+    return null;
   }
 };
 
