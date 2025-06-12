@@ -26,6 +26,10 @@ export interface Review {
   timeline_count?: number;
   has_timeline?: boolean;
   is_verified?: boolean;
+  // AI summary fields for individual reviews
+  ai_summary?: string;
+  ai_summary_last_generated_at?: string;
+  ai_summary_model_used?: string;
   // Interaction states
   isLiked?: boolean;
   isSaved?: boolean;
@@ -100,7 +104,7 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
       .from('reviews')
       .select(`
         *,
-        profiles!inner(
+        profiles(
           id,
           username,
           avatar_url
