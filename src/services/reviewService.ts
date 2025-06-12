@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -100,21 +101,41 @@ export const createReview = async (reviewData: {
 // Fetch complete review data including AI summary fields
 export const fetchReviewWithSummary = async (reviewId: string): Promise<Review | null> => {
   try {
-    // First get the review data
+    console.log('📊 fetchReviewWithSummary called for reviewId:', reviewId);
+    
+    // First get the review data with explicit AI summary fields
     const { data: reviewData, error: reviewError } = await supabase
       .from('reviews')
-      .select('*')
+      .select(`
+        *,
+        ai_summary,
+        ai_summary_last_generated_at,
+        ai_summary_model_used,
+        timeline_count,
+        has_timeline
+      `)
       .eq('id', reviewId)
-      .single();
+      .maybeSingle();
 
     if (reviewError) {
-      console.error('Error fetching review:', reviewError);
+      console.error('❌ Error fetching review:', reviewError);
       return null;
     }
 
     if (!reviewData) {
+      console.log('❌ No review data found for ID:', reviewId);
       return null;
     }
+
+    console.log('✅ Review data fetched:', {
+      id: reviewData.id,
+      title: reviewData.title,
+      ai_summary: reviewData.ai_summary ? `${reviewData.ai_summary.substring(0, 50)}...` : 'No AI summary',
+      ai_summary_length: reviewData.ai_summary?.length || 0,
+      timeline_count: reviewData.timeline_count,
+      has_timeline: reviewData.has_timeline,
+      ai_summary_last_generated_at: reviewData.ai_summary_last_generated_at
+    });
 
     // Then get the profile data separately
     const { data: profileData, error: profileError } = await supabase
@@ -128,15 +149,25 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
     }
 
     // Combine the data
-    return {
+    const combinedData = {
       ...reviewData,
       user: profileData ? {
         username: profileData.username,
         avatar_url: profileData.avatar_url
       } : undefined
     };
+
+    console.log('🔄 Combined review data for timeline:', {
+      id: combinedData.id,
+      hasAiSummary: !!combinedData.ai_summary,
+      aiSummaryLength: combinedData.ai_summary?.length || 0,
+      timelineCount: combinedData.timeline_count,
+      hasTimeline: combinedData.has_timeline
+    });
+
+    return combinedData;
   } catch (error) {
-    console.error('Error in fetchReviewWithSummary:', error);
+    console.error('❌ Error in fetchReviewWithSummary:', error);
     return null;
   }
 };

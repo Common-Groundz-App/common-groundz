@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Calendar, User, Sparkles } from 'lucide-react';
+import { Plus, Calendar, User, Sparkles, AlertCircle } from 'lucide-react';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -52,16 +52,27 @@ export const ReviewTimelineViewer = ({
   const loadTimelineData = async () => {
     setIsLoading(true);
     try {
+      console.log('🔄 Loading timeline data for review:', reviewId);
+      
       // Load both timeline updates and complete review data
       const [updates, review] = await Promise.all([
         fetchReviewUpdates(reviewId),
         fetchReviewWithSummary(reviewId)
       ]);
       
+      console.log('📋 Timeline updates loaded:', updates?.length || 0);
+      console.log('📊 Review data loaded:', {
+        id: review?.id,
+        hasAiSummary: !!review?.ai_summary,
+        aiSummaryLength: review?.ai_summary?.length || 0,
+        timelineCount: review?.timeline_count,
+        hasTimeline: review?.has_timeline
+      });
+      
       setTimelineUpdates(updates);
       setReviewData(review);
     } catch (error) {
-      console.error('Error loading timeline data:', error);
+      console.error('❌ Error loading timeline data:', error);
       toast({
         title: 'Error',
         description: 'Failed to load timeline data',
@@ -124,11 +135,27 @@ export const ReviewTimelineViewer = ({
     return name.charAt(0).toUpperCase();
   };
 
-  // Check if we should show AI summary
-  const shouldShowAISummary = reviewData && 
-    reviewData.ai_summary && 
-    reviewData.timeline_count && 
-    reviewData.timeline_count >= 2;
+  // Enhanced conditional check with detailed logging
+  const shouldShowAISummary = () => {
+    const hasReviewData = !!reviewData;
+    const hasAiSummary = !!(reviewData?.ai_summary && reviewData.ai_summary.trim().length > 0);
+    const hasValidTimelineCount = typeof reviewData?.timeline_count === 'number' && reviewData.timeline_count >= 2;
+    const hasTimeline = !!reviewData?.has_timeline;
+
+    console.log('🤔 AI Summary Display Check:', {
+      hasReviewData,
+      hasAiSummary,
+      aiSummaryLength: reviewData?.ai_summary?.length || 0,
+      hasValidTimelineCount,
+      timelineCount: reviewData?.timeline_count,
+      hasTimeline,
+      shouldShow: hasReviewData && hasAiSummary && hasValidTimelineCount
+    });
+
+    return hasReviewData && hasAiSummary && hasValidTimelineCount;
+  };
+
+  const showAISummary = shouldShowAISummary();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -156,6 +183,26 @@ export const ReviewTimelineViewer = ({
             </div>
           ) : (
             <>
+              {/* Debug Information Card - Remove in production */}
+              {process.env.NODE_ENV === 'development' && reviewData && (
+                <Card className="bg-yellow-50 border-yellow-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-yellow-800 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Debug Info
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-xs text-yellow-700 space-y-1">
+                      <div>AI Summary: {reviewData.ai_summary ? `${reviewData.ai_summary.length} chars` : 'None'}</div>
+                      <div>Timeline Count: {reviewData.timeline_count || 'undefined'}</div>
+                      <div>Has Timeline: {reviewData.has_timeline ? 'true' : 'false'}</div>
+                      <div>Should Show: {showAISummary ? 'YES' : 'NO'}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Initial Review Entry */}
               <div className="p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
                 <div className="flex items-start gap-3">
@@ -175,8 +222,8 @@ export const ReviewTimelineViewer = ({
                 </div>
               </div>
 
-              {/* AI Summary Section - Show only if conditions are met */}
-              {shouldShowAISummary && (
+              {/* AI Summary Section - Enhanced with better error handling */}
+              {showAISummary && (
                 <Card className="bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20 border-violet-200 dark:border-violet-800">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-violet-800 dark:text-violet-200 flex items-center gap-2">
@@ -200,6 +247,18 @@ export const ReviewTimelineViewer = ({
                         )}
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Show message when AI summary should appear but doesn't */}
+              {!showAISummary && reviewData && reviewData.timeline_count && reviewData.timeline_count >= 2 && (
+                <Card className="bg-gray-50 border-gray-200">
+                  <CardContent className="pt-4">
+                    <div className="text-sm text-gray-600 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      AI summary is being generated for this timeline...
+                    </div>
                   </CardContent>
                 </Card>
               )}
