@@ -100,29 +100,39 @@ export const createReview = async (reviewData: {
 // Fetch complete review data including AI summary fields
 export const fetchReviewWithSummary = async (reviewId: string): Promise<Review | null> => {
   try {
-    const { data, error } = await supabase
+    // First get the review data
+    const { data: reviewData, error: reviewError } = await supabase
       .from('reviews')
-      .select(`
-        *,
-        profiles(
-          id,
-          username,
-          avatar_url
-        )
-      `)
+      .select('*')
       .eq('id', reviewId)
       .single();
 
-    if (error) {
-      console.error('Error fetching review with summary:', error);
+    if (reviewError) {
+      console.error('Error fetching review:', reviewError);
       return null;
     }
 
+    if (!reviewData) {
+      return null;
+    }
+
+    // Then get the profile data separately
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .eq('id', reviewData.user_id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+    }
+
+    // Combine the data
     return {
-      ...data,
-      user: data.profiles ? {
-        username: data.profiles.username,
-        avatar_url: data.profiles.avatar_url
+      ...reviewData,
+      user: profileData ? {
+        username: profileData.username,
+        avatar_url: profileData.avatar_url
       } : undefined
     };
   } catch (error) {
