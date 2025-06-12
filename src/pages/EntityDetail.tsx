@@ -81,12 +81,7 @@ const EntityDetail = () => {
   }, [reviews]);
 
   // Add timeline summary hook
-  const dynamicReviewIds = React.useMemo(() => 
-    dynamicReviews.map(review => review.id), 
-    [dynamicReviews]
-  );
-  
-  const { timelineData } = useEntityTimelineSummary(entity?.id || '', dynamicReviewIds);
+  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
   // Filter static reviews (reviews without timeline updates)
   const staticReviews = React.useMemo(() => {
