@@ -184,26 +184,6 @@ export const ReviewTimelineViewer = ({
             </div>
           ) : (
             <>
-              {/* Debug Information Card - Remove in production */}
-              {process.env.NODE_ENV === 'development' && reviewData && (
-                <Card className="bg-yellow-50 border-yellow-200">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-yellow-800 flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4" />
-                      Debug Info
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="text-xs text-yellow-700 space-y-1">
-                      <div>AI Summary: {reviewData.ai_summary ? `${reviewData.ai_summary.length} chars` : 'None'}</div>
-                      <div>Timeline Count: {reviewData.timeline_count || 'undefined'}</div>
-                      <div>Has Timeline: {reviewData.has_timeline ? 'true' : 'false'}</div>
-                      <div>Should Show: {showAISummary ? 'YES' : 'NO'}</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
               {/* AI Summary Section - Now with brand orange colors and positioned at top */}
               {showAISummary && (
                 <Card className="bg-gradient-to-r from-orange-50 to-orange-100/80 dark:from-orange-950/20 dark:to-orange-900/30 border-orange-200 dark:border-orange-800">
@@ -260,7 +240,7 @@ export const ReviewTimelineViewer = ({
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mb-2">
                       <ConnectedRingsRating
                         value={initialRating}
                         variant="badge"
@@ -270,6 +250,12 @@ export const ReviewTimelineViewer = ({
                       />
                       <span className="font-medium">{initialRating.toFixed(1)}</span>
                     </div>
+                    
+                    {reviewData?.description && (
+                      <p className="text-sm text-muted-foreground">
+                        {reviewData.description}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
