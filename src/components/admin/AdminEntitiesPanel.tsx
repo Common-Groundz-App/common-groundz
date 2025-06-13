@@ -84,7 +84,7 @@ export const AdminEntitiesPanel = () => {
                       src={entity.image_url}
                       alt={entity.name}
                       className="w-full h-full object-cover"
-                      fallbackClassName="w-full h-full flex items-center justify-center"
+                      entityType={entity.type}
                     />
                   </div>
                   

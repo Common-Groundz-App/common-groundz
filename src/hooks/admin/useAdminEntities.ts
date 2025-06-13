@@ -54,9 +54,9 @@ export const useAdminEntities = () => {
       // For each entity, count dynamic reviews
       const entitiesWithCounts = await Promise.all(
         data.map(async (entity) => {
-          const { data: reviewCount, error: countError } = await supabase
+          const { count, error: countError } = await supabase
             .from('reviews')
-            .select('id', { count: 'exact', head: true })
+            .select('*', { count: 'exact', head: true })
             .eq('entity_id', entity.id)
             .eq('has_timeline', true)
             .eq('status', 'published');
@@ -71,7 +71,7 @@ export const useAdminEntities = () => {
 
           return {
             ...entity,
-            dynamic_review_count: reviewCount || 0
+            dynamic_review_count: count || 0
           };
         })
       );
