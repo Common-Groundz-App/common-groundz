@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +6,7 @@ import { Shield, ArrowLeft, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { AdminReviewsPanel } from '@/components/admin/AdminReviewsPanel';
+import { AdminEntitiesPanel } from '@/components/admin/AdminEntitiesPanel';
 
 const AdminPortal = () => {
   const { user } = useAuth();
@@ -57,8 +57,8 @@ const AdminPortal = () => {
               
               <div className="text-sm text-muted-foreground">
                 <p>
-                  This is Phase 4.2 of the admin system implementation. 
-                  You can now manage dynamic reviews and their AI summaries.
+                  This is Phase 4.4 of the admin system implementation. 
+                  You can now manage dynamic reviews, their AI summaries, and entity-level AI summaries.
                 </p>
               </div>
               
@@ -78,6 +78,9 @@ const AdminPortal = () => {
 
           {/* Review Management Section */}
           <AdminReviewsPanel />
+
+          {/* Entity AI Summaries Section */}
+          <AdminEntitiesPanel />
         </div>
       </div>
     </div>
