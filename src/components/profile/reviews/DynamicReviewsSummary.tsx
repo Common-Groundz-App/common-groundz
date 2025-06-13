@@ -68,31 +68,20 @@ export const DynamicReviewsSummary = ({
     // Only show entity-level AI summary, not individual review summaries
     if (timelineData?.entityAiSummary) {
       return (
-        <Card className="border-violet-200 bg-gradient-to-r from-violet-50/50 to-transparent dark:from-violet-900/10 dark:border-violet-800">
+        <Card className="border-orange-200 bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-900/10 dark:border-orange-800">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-full bg-violet-100 dark:bg-violet-900/30 flex-shrink-0">
-                <Brain className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+              <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/30 flex-shrink-0">
+                <Brain className="h-4 w-4 text-orange-600 dark:text-orange-400" />
               </div>
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2">
-                  <h4 className="font-medium text-sm text-violet-900 dark:text-violet-100">
-                    AI Long-term Experience Insights
+                  <h4 className="font-medium text-sm text-orange-900 dark:text-orange-100">
+                    AI Summary
                   </h4>
-                  {timelineData.entityAiSummaryLastGenerated && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="text-xs text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-2 py-0.5 rounded-full">
-                          {timelineData.entityAiSummaryModel === 'gemini-1.5-flash' ? 'Gemini' : 'GPT'}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">
-                          Generated {formatRelativeDate(timelineData.entityAiSummaryLastGenerated)} using {timelineData.entityAiSummaryModel}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
+                  <div className="text-xs text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 rounded-full">
+                    Timeline Analysis
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {timelineData.entityAiSummary}
@@ -107,10 +96,10 @@ export const DynamicReviewsSummary = ({
     // Show placeholder only when there are multiple dynamic reviews but no entity-level summary yet
     if (dynamicReviews.length >= 2) {
       return (
-        <Card className="border-dashed border-2 border-violet-200 dark:border-violet-800">
+        <Card className="border-dashed border-2 border-orange-200 dark:border-orange-800">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3 text-violet-600 dark:text-violet-400">
-              <div className="p-2 rounded-full bg-violet-50 dark:bg-violet-900/20">
+            <div className="flex items-center gap-3 text-orange-600 dark:text-orange-400">
+              <div className="p-2 rounded-full bg-orange-50 dark:bg-orange-900/20">
                 <Brain className="h-4 w-4" />
               </div>
               <div className="flex-1">
