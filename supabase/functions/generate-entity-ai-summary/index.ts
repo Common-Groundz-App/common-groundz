@@ -22,6 +22,7 @@ interface TimelineUpdate {
   comment: string;
   created_at: string;
   review_id: string;
+  user_id: string;
   username?: string;
 }
 
@@ -82,13 +83,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch all dynamic reviews for this entity with user data
+    // Fetch all dynamic reviews for this entity
     const { data: reviews, error: reviewsError } = await supabase
       .from('reviews')
-      .select(`
-        id, title, description, rating, created_at, user_id,
-        profiles!inner(username)
-      `)
+      .select('id, title, description, rating, created_at, user_id')
       .eq('entity_id', entityId)
       .eq('has_timeline', true)
       .eq('status', 'published')
@@ -110,14 +108,40 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get unique user IDs from reviews
+    const userIds = [...new Set(reviews.map(r => r.user_id))];
+
+    // Fetch profiles for these users
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .in('id', userIds);
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch user profiles' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create a map of user IDs to usernames
+    const userMap = new Map();
+    profiles?.forEach(profile => {
+      userMap.set(profile.id, profile.username || 'Unknown User');
+    });
+
+    // Add usernames to reviews
+    const reviewsWithUsernames: ReviewData[] = reviews.map(review => ({
+      ...review,
+      username: userMap.get(review.user_id) || 'Unknown User'
+    }));
+
     // Fetch all timeline updates for these reviews
     const reviewIds = reviews.map(r => r.id);
     const { data: updates, error: updatesError } = await supabase
       .from('review_updates')
-      .select(`
-        id, rating, comment, created_at, review_id,
-        profiles!inner(username)
-      `)
+      .select('id, rating, comment, created_at, review_id, user_id')
       .in('review_id', reviewIds)
       .order('created_at', { ascending: true });
 
@@ -129,8 +153,30 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get unique user IDs from updates (might include new users not in reviews)
+    const updateUserIds = [...new Set((updates || []).map(u => u.user_id))];
+    const newUserIds = updateUserIds.filter(id => !userMap.has(id));
+
+    // Fetch profiles for any new users if needed
+    if (newUserIds.length > 0) {
+      const { data: newProfiles } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', newUserIds);
+
+      newProfiles?.forEach(profile => {
+        userMap.set(profile.id, profile.username || 'Unknown User');
+      });
+    }
+
+    // Add usernames to timeline updates
+    const updatesWithUsernames: TimelineUpdate[] = (updates || []).map(update => ({
+      ...update,
+      username: userMap.get(update.user_id) || 'Unknown User'
+    }));
+
     // Generate AI summary
-    const summary = await generateEntityAISummary(entity, reviews, updates || []);
+    const summary = await generateEntityAISummary(entity, reviewsWithUsernames, updatesWithUsernames);
     
     if (!summary) {
       return new Response(
