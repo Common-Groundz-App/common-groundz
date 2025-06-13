@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, MapPin, Calendar, Loader2 } from 'lucide-react';
 import { useAdminEntities } from '@/hooks/admin/useAdminEntities';
 import { formatRelativeDate } from '@/utils/dateUtils';
-import ImageWithFallback from '@/components/common/ImageWithFallback';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 export const AdminEntitiesPanel = () => {
   const { entities, isLoading, isGenerating, generateEntitySummary } = useAdminEntities();
