@@ -157,13 +157,13 @@ export const useAdminReviews = () => {
     try {
       console.log('🚀 Starting bulk AI summary generation for reviews...');
       
-      // Get all reviews that need summaries (timeline_count >= 2 and no ai_summary)
+      // Get all reviews that need summaries (timeline_count >= 1 and no ai_summary)
       const { data: eligibleReviews, error } = await supabase
         .from('reviews')
         .select('id, title')
         .eq('has_timeline', true)
         .eq('status', 'published')
-        .gte('timeline_count', 2)
+        .gte('timeline_count', 1)
         .is('ai_summary', null);
 
       if (error) throw error;

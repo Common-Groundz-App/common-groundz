@@ -142,7 +142,7 @@ export const useAdminEntities = () => {
       
       // Get eligible entities (those with dynamic reviews but no summary)
       const eligibleEntities = entities.filter(
-        entity => entity.dynamic_review_count >= 2 && !entity.ai_dynamic_review_summary
+        entity => entity.dynamic_review_count >= 1 && !entity.ai_dynamic_review_summary
       );
 
       if (eligibleEntities.length === 0) {
