@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -782,13 +783,22 @@ const EntityDetail = () => {
                     {!dynamicReviews || dynamicReviews.length === 0 ? (
                       <div className="py-12 text-center border rounded-lg bg-violet-50/30 dark:bg-violet-900/5">
                         <MessageSquare className="h-12 w-12 mx-auto text-violet-300 dark:text-violet-700" />
-                        <h3 className="font-medium text-lg mt-4">No dynamic reviews yet</h3>
+                        <h3 className="font-medium text-lg mt-4">
+                          {userReview ? 'No timeline updates yet' : 'No dynamic reviews yet'}
+                        </h3>
                         <p className="text-muted-foreground mt-2">
-                          Dynamic reviews show how opinions evolve over time. Start with a regular review and update it later!
+                          {userReview ? 
+                            'Update your review to show how your experience evolves over time.' :
+                            'Dynamic reviews show how opinions evolve over time. Start with a regular review and update it later!'
+                          }
                         </p>
-                        <Button onClick={handleAddReview} className="mt-4 gap-2" variant="outline">
+                        <Button 
+                          onClick={userReview ? () => handleStartTimeline(userReview.id) : handleAddReview} 
+                          className="mt-4 gap-2" 
+                          variant="outline"
+                        >
                           <Plus className="h-4 w-4" />
-                          Add Review
+                          {userReview ? 'Update Review' : 'Add Review'}
                         </Button>
                       </div>
                     ) : (
