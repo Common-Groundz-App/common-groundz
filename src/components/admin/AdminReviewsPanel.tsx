@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAdminReviews, AdminReview, ReviewUpdate } from '@/hooks/admin/useAdminReviews';
 import { ReviewPreviewModal } from './ReviewPreviewModal';
 import { formatDistanceToNow } from 'date-fns';
-import { ChevronLeft, ChevronRight, Loader2, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Eye, Sparkles } from 'lucide-react';
 
 export const AdminReviewsPanel: React.FC = () => {
   const {
@@ -17,8 +17,10 @@ export const AdminReviewsPanel: React.FC = () => {
     totalPages,
     isLoading,
     generatingIds,
+    isBulkGenerating,
     fetchReviews,
     generateAISummary,
+    generateBulkSummaries,
     fetchReviewUpdates
   } = useAdminReviews();
 
@@ -51,15 +53,36 @@ export const AdminReviewsPanel: React.FC = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Dynamic Reviews Management
-            <Badge variant="outline">
-              {totalCount} Total Reviews
-            </Badge>
-          </CardTitle>
-          <CardDescription>
-            Manage AI summaries for reviews with timeline updates
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Dynamic Reviews Management
+                <Badge variant="outline">
+                  {totalCount} Total Reviews
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                Manage AI summaries for reviews with timeline updates
+              </CardDescription>
+            </div>
+            <Button
+              onClick={generateBulkSummaries}
+              disabled={isBulkGenerating || isLoading}
+              className="gap-2"
+            >
+              {isBulkGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Generate All Review Summaries
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (

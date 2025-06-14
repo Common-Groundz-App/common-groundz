@@ -18,6 +18,7 @@ export const useAdminEntities = () => {
   const [entities, setEntities] = useState<AdminEntity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState<Record<string, boolean>>({});
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
   const { toast } = useToast();
 
   const fetchEntities = async () => {
@@ -133,6 +134,90 @@ export const useAdminEntities = () => {
     }
   };
 
+  const generateBulkEntitySummaries = async () => {
+    setIsBulkGenerating(true);
+    
+    try {
+      console.log('🚀 Starting bulk AI summary generation for entities...');
+      
+      // Get eligible entities (those with dynamic reviews but no summary)
+      const eligibleEntities = entities.filter(
+        entity => entity.dynamic_review_count >= 2 && !entity.ai_dynamic_review_summary
+      );
+
+      if (eligibleEntities.length === 0) {
+        toast({
+          title: "No Entities to Process",
+          description: "All eligible entities already have AI summaries",
+        });
+        return;
+      }
+
+      console.log(`📋 Found ${eligibleEntities.length} entities eligible for bulk generation`);
+
+      let successCount = 0;
+      let failureCount = 0;
+      const failedIds: string[] = [];
+
+      // Process entities with delay to avoid rate limits
+      for (const entity of eligibleEntities) {
+        try {
+          const { error: summaryError } = await supabase.functions.invoke('generate-entity-ai-summary', {
+            body: { entityId: entity.id }
+          });
+
+          if (summaryError) {
+            throw summaryError;
+          }
+
+          successCount++;
+          console.log(`✅ Generated summary for entity: ${entity.name}`);
+        } catch (error) {
+          console.error(`❌ Failed to generate summary for entity ${entity.id}:`, error);
+          failureCount++;
+          failedIds.push(entity.id);
+        }
+
+        // Add delay between requests to avoid rate limits
+        if (eligibleEntities.indexOf(entity) < eligibleEntities.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      // Show completion toast
+      if (failureCount === 0) {
+        toast({
+          title: "Bulk Generation Complete",
+          description: `${successCount} entity summaries generated successfully`,
+        });
+      } else {
+        toast({
+          title: "Bulk Generation Complete",
+          description: `${successCount} summaries generated, ${failureCount} failed`,
+          variant: "destructive"
+        });
+        
+        // Log failed IDs for debugging
+        if (failedIds.length > 0) {
+          console.log('❌ Failed entity IDs:', failedIds);
+        }
+      }
+
+      // Refresh data
+      await fetchEntities();
+
+    } catch (error) {
+      console.error('❌ Error in bulk entity summary generation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start bulk generation",
+        variant: "destructive"
+      });
+    } finally {
+      setIsBulkGenerating(false);
+    }
+  };
+
   useEffect(() => {
     fetchEntities();
   }, []);
@@ -141,7 +226,9 @@ export const useAdminEntities = () => {
     entities,
     isLoading,
     isGenerating,
+    isBulkGenerating,
     generateEntitySummary,
+    generateBulkEntitySummaries,
     refetch: fetchEntities
   };
 };

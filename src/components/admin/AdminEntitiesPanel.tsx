@@ -9,7 +9,7 @@ import { formatRelativeDate } from '@/utils/dateUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 export const AdminEntitiesPanel = () => {
-  const { entities, isLoading, isGenerating, generateEntitySummary } = useAdminEntities();
+  const { entities, isLoading, isGenerating, isBulkGenerating, generateEntitySummary, generateBulkEntitySummaries } = useAdminEntities();
 
   if (isLoading) {
     return (
@@ -58,13 +58,34 @@ export const AdminEntitiesPanel = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Entity AI Summaries ({entities.length})
-        </CardTitle>
-        <CardDescription>
-          Generate and manage AI summaries for entities with dynamic reviews
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Entity AI Summaries ({entities.length})
+            </CardTitle>
+            <CardDescription>
+              Generate and manage AI summaries for entities with dynamic reviews
+            </CardDescription>
+          </div>
+          <Button
+            onClick={generateBulkEntitySummaries}
+            disabled={isBulkGenerating || isLoading}
+            className="gap-2"
+          >
+            {isBulkGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Generate All Entity Summaries
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

@@ -44,6 +44,7 @@ export const useAdminReviews = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
   const { toast } = useToast();
 
   const fetchReviews = async (page: number = 1) => {
@@ -150,6 +151,96 @@ export const useAdminReviews = () => {
     }
   };
 
+  const generateBulkSummaries = async () => {
+    setIsBulkGenerating(true);
+    
+    try {
+      console.log('🚀 Starting bulk AI summary generation for reviews...');
+      
+      // Get all reviews that need summaries (timeline_count >= 2 and no ai_summary)
+      const { data: eligibleReviews, error } = await supabase
+        .from('reviews')
+        .select('id, title')
+        .eq('has_timeline', true)
+        .eq('status', 'published')
+        .gte('timeline_count', 2)
+        .is('ai_summary', null);
+
+      if (error) throw error;
+
+      if (!eligibleReviews?.length) {
+        toast({
+          title: "No Reviews to Process",
+          description: "All eligible reviews already have AI summaries",
+        });
+        return;
+      }
+
+      console.log(`📋 Found ${eligibleReviews.length} reviews eligible for bulk generation`);
+
+      let successCount = 0;
+      let failureCount = 0;
+      const failedIds: string[] = [];
+
+      // Process reviews with delay to avoid rate limits
+      for (const review of eligibleReviews) {
+        try {
+          const { error: summaryError } = await supabase.functions.invoke('generate-ai-summary', {
+            body: { reviewId: review.id }
+          });
+
+          if (summaryError) {
+            throw summaryError;
+          }
+
+          successCount++;
+          console.log(`✅ Generated summary for review: ${review.title}`);
+        } catch (error) {
+          console.error(`❌ Failed to generate summary for review ${review.id}:`, error);
+          failureCount++;
+          failedIds.push(review.id);
+        }
+
+        // Add delay between requests to avoid rate limits
+        if (eligibleReviews.indexOf(review) < eligibleReviews.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      // Show completion toast
+      if (failureCount === 0) {
+        toast({
+          title: "Bulk Generation Complete",
+          description: `${successCount} review summaries generated successfully`,
+        });
+      } else {
+        toast({
+          title: "Bulk Generation Complete",
+          description: `${successCount} summaries generated, ${failureCount} failed`,
+          variant: "destructive"
+        });
+        
+        // Log failed IDs for debugging
+        if (failedIds.length > 0) {
+          console.log('❌ Failed review IDs:', failedIds);
+        }
+      }
+
+      // Refresh data
+      await fetchReviews(currentPage);
+
+    } catch (error) {
+      console.error('❌ Error in bulk summary generation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start bulk generation",
+        variant: "destructive"
+      });
+    } finally {
+      setIsBulkGenerating(false);
+    }
+  };
+
   const fetchReviewUpdates = async (reviewId: string): Promise<ReviewUpdate[]> => {
     try {
       const { data: updates, error } = await supabase
@@ -187,8 +278,10 @@ export const useAdminReviews = () => {
     currentPage,
     isLoading,
     generatingIds,
+    isBulkGenerating,
     fetchReviews,
     generateAISummary,
+    generateBulkSummaries,
     fetchReviewUpdates,
     totalPages: Math.ceil(totalCount / ITEMS_PER_PAGE)
   };

@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { Link } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { AdminReviewsPanel } from '@/components/admin/AdminReviewsPanel';
 import { AdminEntitiesPanel } from '@/components/admin/AdminEntitiesPanel';
+import { AdminDashboardSummary } from '@/components/admin/AdminDashboardSummary';
 
 const AdminPortal = () => {
   const { user } = useAuth();
@@ -57,8 +59,8 @@ const AdminPortal = () => {
               
               <div className="text-sm text-muted-foreground">
                 <p>
-                  This is Phase 4.4 of the admin system implementation. 
-                  You can now manage dynamic reviews, their AI summaries, and entity-level AI summaries.
+                  This is Phase 4.5 of the admin system implementation. 
+                  You can now manage dynamic reviews, their AI summaries, entity-level AI summaries, and perform bulk operations.
                 </p>
               </div>
               
@@ -75,6 +77,9 @@ const AdminPortal = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Dashboard Summary Section */}
+          <AdminDashboardSummary />
 
           {/* Review Management Section */}
           <AdminReviewsPanel />
