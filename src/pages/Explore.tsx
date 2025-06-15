@@ -10,7 +10,7 @@ import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { PillTabs } from '@/components/ui/pill-tabs';
 import { MenuItem, MenuContainer } from '@/components/ui/fluid-menu';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
-import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils, Menu as MenuIcon, X } from 'lucide-react';
+import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils, Menu as MenuIcon, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -143,17 +143,13 @@ const Explore = () => {
     </div>
   );
 
-  // Find the currently active tab item
-  const activeTabItem = tabItems.find(item => item.value === activeTab) || tabItems[0];
-
-  // Determine if dropdown should be shown
+  // Show dropdown when user has typed at least 1 character
   const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1;
-  const hasContent = hasResults || hasCategorizedResults || isLoading || Object.values(loadingStates).some(Boolean) || error;
+  const isAnyLoading = Object.values(loadingStates).some(Boolean);
 
   console.log('🔍 Search Debug:', {
     searchQuery,
     shouldShowDropdown,
-    hasContent,
     isLoading,
     loadingStates,
     hasResults,
@@ -227,32 +223,35 @@ const Explore = () => {
                 )}
               </div>
               
-              {/* Enhanced Real-time Search Results */}
+              {/* Enhanced Search Results - Show immediately when user types */}
               {shouldShowDropdown && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
                   
-                  {/* Loading States */}
-                  {(isLoading || Object.values(loadingStates).some(Boolean)) && (
+                  {/* Loading States - Show individual API status */}
+                  {isAnyLoading && (
                     <div className="p-3 text-center border-b">
-                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Searching across all sources...</span>
+                        <span>Searching...</span>
                       </div>
-                      <div className="flex gap-1 mt-2 justify-center flex-wrap">
-                        {loadingStates.local && <span className="text-xs text-muted-foreground">Local</span>}
-                        {loadingStates.books && <span className="text-xs text-muted-foreground">Books</span>}
-                        {loadingStates.movies && <span className="text-xs text-muted-foreground">Movies</span>}
-                        {loadingStates.places && <span className="text-xs text-muted-foreground">Places</span>}
-                        {loadingStates.food && <span className="text-xs text-muted-foreground">Food</span>}
+                      <div className="flex gap-2 justify-center flex-wrap text-xs">
+                        {loadingStates.local && <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">Local</span>}
+                        {loadingStates.books && <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Books</span>}
+                        {loadingStates.movies && <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">Movies</span>}
+                        {loadingStates.places && <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">Places</span>}
+                        {loadingStates.food && <span className="px-2 py-1 bg-red-100 text-red-700 rounded">Food</span>}
                       </div>
                     </div>
                   )}
 
-                  {/* Error State */}
-                  {error && !isLoading && !Object.values(loadingStates).some(Boolean) && (
-                    <div className="p-4 text-center text-destructive text-sm border-b">
-                      <p>⚠️ Some searches encountered issues</p>
-                      <p className="text-xs mt-1 text-muted-foreground">{error}</p>
+                  {/* Error State - Show but don't block results */}
+                  {error && (
+                    <div className="p-3 text-center border-b bg-yellow-50">
+                      <div className="flex items-center justify-center gap-2 text-sm text-yellow-700">
+                        <AlertCircle className="w-4 h-4" />
+                        <span>Some search sources are unavailable</span>
+                      </div>
+                      <p className="text-xs mt-1 text-yellow-600">Showing available results below</p>
                     </div>
                   )}
                   
@@ -344,7 +343,7 @@ const Explore = () => {
                     </div>
                   )}
 
-                  {/* Complex Product Search Option */}
+                  {/* Complex Product Search Option - Always show */}
                   {searchQuery.length >= 2 && (
                     <div className="p-3 text-center border-t">
                       <button 
@@ -352,20 +351,20 @@ const Explore = () => {
                         onClick={handleComplexProductSearch}
                       >
                         <Search className="w-3 h-3 mr-1" />
-                        Search More
+                        Search for "{searchQuery}" in more sources
                       </button>
                     </div>
                   )}
 
-                  {/* No Results State */}
-                  {!hasResults && !hasCategorizedResults && !isLoading && !Object.values(loadingStates).some(Boolean) && !error && (
+                  {/* No Results State - Only show when not loading and no results */}
+                  {!hasResults && !hasCategorizedResults && !isAnyLoading && (
                     <div className="p-4 text-center">
-                      <p className="text-sm text-muted-foreground">No results found. Try searching for more sources.</p>
+                      <p className="text-sm text-muted-foreground mb-2">No immediate results found</p>
                       <button 
-                        className="text-sm text-primary hover:underline mt-2"
+                        className="text-sm text-primary hover:underline"
                         onClick={handleComplexProductSearch}
                       >
-                        Search More
+                        Try searching in more sources
                       </button>
                     </div>
                   )}

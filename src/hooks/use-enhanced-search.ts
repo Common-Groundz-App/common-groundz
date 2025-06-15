@@ -74,12 +74,10 @@ interface EnhancedSearchState {
   };
 }
 
-// Enhanced query preprocessing
 const preprocessQuery = (query: string): string[] => {
   const normalizedQuery = query.toLowerCase().trim();
   const variations = [normalizedQuery];
   
-  // Add common variations
   if (normalizedQuery.startsWith('the ')) {
     variations.push(normalizedQuery.substring(4));
     variations.push('a ' + normalizedQuery.substring(4));
@@ -200,19 +198,18 @@ export const useEnhancedSearch = (query: string) => {
     }));
   }, []);
 
-  const setError = useCallback((error: string) => {
+  const setError = useCallback((error: string | null) => {
     setState(prev => ({ ...prev, error }));
   }, []);
 
-  // Enhanced local search with fuzzy matching
   const searchLocal = useCallback(async (searchQuery: string, searchId: number) => {
     console.log(`🏠 Starting local search for: "${searchQuery}"`);
     setLoadingState('local', true);
+    
     try {
       const queryVariations = preprocessQuery(searchQuery);
       console.log(`🔍 Search variations:`, queryVariations);
       
-      // Search entities with multiple variations and fuzzy matching
       const entitySearchPromises = queryVariations.map(variation => 
         supabase
           .from('entities')
@@ -225,11 +222,9 @@ export const useEnhancedSearch = (query: string) => {
       const entityResults = await Promise.all(entitySearchPromises);
       const allEntities = entityResults.flatMap(result => result.data || []);
       
-      // Remove duplicates and rank by relevance
       const uniqueEntities = Array.from(
         new Map(allEntities.map(entity => [entity.id, entity])).values()
       ).sort((a, b) => {
-        // Prioritize exact matches in name
         const aExact = queryVariations.some(v => a.name.toLowerCase().includes(v));
         const bExact = queryVariations.some(v => b.name.toLowerCase().includes(v));
         if (aExact && !bExact) return -1;
@@ -237,7 +232,6 @@ export const useEnhancedSearch = (query: string) => {
         return 0;
       });
 
-      // Search users with fuzzy matching
       const userSearchPromises = queryVariations.map(variation =>
         supabase
           .from('profiles')
@@ -264,14 +258,13 @@ export const useEnhancedSearch = (query: string) => {
     } catch (error) {
       console.error('❌ Local search failed:', error);
       if (searchId === searchIdRef.current) {
-        setError(`Local search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.warn('Local search failed, but continuing with other searches');
       }
     } finally {
       setLoadingState('local', false);
     }
-  }, [setLoadingState, updateLocalResults, setError]);
+  }, [setLoadingState, updateLocalResults]);
 
-  // Search specific API with improved error handling
   const searchSpecificAPI = useCallback(async (
     searchQuery: string, 
     apiType: string, 
@@ -301,7 +294,6 @@ export const useEnhancedSearch = (query: string) => {
 
       if (error) {
         console.error(`❌ ${apiType} API error:`, error);
-        // Don't throw error, just log and continue
         return;
       }
 
@@ -316,20 +308,18 @@ export const useEnhancedSearch = (query: string) => {
       }
     } catch (error) {
       console.error(`❌ ${apiType} search failed:`, error);
-      // Don't set global error, just log individual API failures
+      // Continue without setting global error
     } finally {
       setLoadingState(loadingKey, false);
     }
   }, [setLoadingState, updateCategorizedResults]);
 
-  // Search all external APIs in parallel
   const searchAllAPIs = useCallback(async (
     searchQuery: string,
     searchId: number
   ) => {
     console.log(`🚀 Starting parallel API search for: "${searchQuery}"`);
 
-    // Search all API types in parallel
     const searchPromises = [
       searchSpecificAPI(searchQuery, 'book', searchId),
       searchSpecificAPI(searchQuery, 'movie', searchId),
@@ -341,9 +331,8 @@ export const useEnhancedSearch = (query: string) => {
     console.log(`🏁 All API searches completed for: "${searchQuery}"`);
   }, [searchSpecificAPI]);
 
-  // Main search function
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery || searchQuery.trim().length < 2) {
+    if (!searchQuery || searchQuery.trim().length < 1) {
       resetResults();
       setState(prev => ({ 
         ...prev, 
@@ -367,7 +356,7 @@ export const useEnhancedSearch = (query: string) => {
     resetResults();
 
     try {
-      // Search local DB and all external APIs in parallel
+      // Search local DB and all external APIs in parallel - continue even if some fail
       await Promise.allSettled([
         searchLocal(searchQuery, searchId),
         searchAllAPIs(searchQuery, searchId)
@@ -378,19 +367,15 @@ export const useEnhancedSearch = (query: string) => {
     } catch (error) {
       console.error('💥 Search error:', error);
       if (searchId === searchIdRef.current) {
-        setState(prev => ({ 
-          ...prev, 
-          error: error instanceof Error ? error.message : 'Search failed' 
-        }));
+        setError('Some search sources are temporarily unavailable');
       }
     } finally {
       if (searchId === searchIdRef.current) {
         setState(prev => ({ ...prev, isLoading: false }));
       }
     }
-  }, [searchLocal, searchAllAPIs, resetResults]);
+  }, [searchLocal, searchAllAPIs, resetResults, setError]);
 
-  // Debounced search effect
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -407,7 +392,6 @@ export const useEnhancedSearch = (query: string) => {
     };
   }, [query, performSearch]);
 
-  // Calculate overall loading state
   const isAnyLoading = Object.values(state.loadingStates).some(Boolean);
 
   return {

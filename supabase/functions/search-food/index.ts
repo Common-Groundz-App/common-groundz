@@ -7,17 +7,13 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight request
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
   
   try {
     const SPOONACULAR_API_KEY = Deno.env.get("SPOONACULAR_API_KEY");
-    if (!SPOONACULAR_API_KEY) {
-      throw new Error("SPOONACULAR_API_KEY is not set");
-    }
-
+    
     const { query } = await req.json();
     if (!query) {
       return new Response(
@@ -26,7 +22,20 @@ serve(async (req) => {
       );
     }
 
-    // Call Spoonacular Search Recipes endpoint
+    // Handle missing API key gracefully
+    if (!SPOONACULAR_API_KEY) {
+      console.warn("SPOONACULAR_API_KEY is not configured - returning empty results");
+      return new Response(
+        JSON.stringify({ 
+          results: [],
+          message: "Food search temporarily unavailable" 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`🍽️ Searching food for query: "${query}"`);
+
     const params = new URLSearchParams({
       query,
       number: "5",
@@ -37,31 +46,44 @@ serve(async (req) => {
     const response = await fetch(url);
     const data = await response.json();
 
-    // Handle possible errors in the response
-    if (!response.ok || !data.results) {
-      console.error("Spoonacular error:", data);
+    if (!response.ok) {
+      console.error("Spoonacular API error:", response.status, data);
       return new Response(
-        JSON.stringify({ error: data.message || "Failed to fetch from Spoonacular" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          results: [],
+          message: "Food search temporarily unavailable" 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Map Spoonacular results to our external result structure
+    if (!data.results) {
+      console.log("No food results found");
+      return new Response(
+        JSON.stringify({ results: [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const results = data.results.map((item: any) => ({
       name: item.title,
-      venue: item.sourceName || "Unknown",
-      description: item.summary ? item.summary.replace(/(<([^>]+)>)/gi, "") : null,
+      venue: item.sourceName || "Recipe",
+      description: item.summary ? item.summary.replace(/(<([^>]+)>)/gi, "").substring(0, 200) : null,
       image_url: item.image || null,
       api_source: "spoonacular",
       api_ref: item.id?.toString(),
       metadata: {
-        cuisines: item.cuisines,
-        dishTypes: item.dishTypes,
+        cuisines: item.cuisines || [],
+        dishTypes: item.dishTypes || [],
         readyInMinutes: item.readyInMinutes,
         servings: item.servings,
-        sourceUrl: item.sourceUrl
+        sourceUrl: item.sourceUrl,
+        healthScore: item.healthScore,
+        spoonacularScore: item.spoonacularScore
       }
     }));
+
+    console.log(`✅ Found ${results.length} food results`);
 
     return new Response(
       JSON.stringify({ results }),
@@ -70,8 +92,11 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in search-food:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ 
+        results: [],
+        message: "Food search temporarily unavailable"
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
