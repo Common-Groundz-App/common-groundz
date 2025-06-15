@@ -6,12 +6,11 @@ import {
   DialogContent,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, X, Loader2, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { Search, X, Loader2, AlertCircle } from 'lucide-react';
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
 import { SearchResultHandler } from './search/SearchResultHandler';
-import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
-import { Button } from '@/components/ui/button';
+import { useUnifiedSearch } from '@/hooks/use-unified-search';
 
 interface SearchDialogProps {
   open: boolean;
@@ -22,15 +21,12 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   
-  // Use the working realtime unified search hook
+  // Use the unified search hook
   const { 
     results, 
     isLoading, 
-    loadingStates, 
-    error,
-    showAllResults,
-    toggleShowAll
-  } = useRealtimeUnifiedSearch(query, { mode: 'quick' });
+    error
+  } = useUnifiedSearch(query, { skipProductSearch: false });
 
   const handleResultClick = () => {
     onOpenChange(false);
@@ -44,28 +40,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     }
   };
 
-  const renderSectionHeader = (title: string, count: number, categoryKey?: keyof typeof showAllResults) => (
-    <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
-      <span>{title} ({count})</span>
-      <div className="flex items-center gap-2">
-        {categoryKey && count > 3 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs text-brand-orange font-semibold hover:text-brand-orange/80"
-            onClick={() => toggleShowAll(categoryKey)}
-          >
-            {showAllResults[categoryKey] ? (
-              <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
-            ) : (
-              <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
-            )}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-
   const renderLoadingState = () => (
     <div className="p-4 text-center">
       <div className="flex items-center justify-center gap-2 mb-2">
@@ -76,10 +50,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   );
 
   const hasLocalResults = results.entities.length > 0 || results.users.length > 0;
-  const hasExternalResults = results.categorized?.books?.length > 0 ||
-                            results.categorized?.movies?.length > 0 ||
-                            results.categorized?.places?.length > 0 ||
-                            results.categorized?.food?.length > 0;
+  const hasExternalResults = results.products.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,8 +103,10 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               {/* Already on Groundz - Local Results */}
               {results.entities.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('✨ Already on Groundz', results.entities.length, 'entities')}
-                  {(showAllResults.entities ? results.entities : results.entities.slice(0, 3)).map((entity) => (
+                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
+                    ✨ Already on Groundz ({results.entities.length})
+                  </div>
+                  {results.entities.slice(0, 3).map((entity) => (
                     <EntityResultItem
                       key={entity.id}
                       entity={entity}
@@ -143,59 +116,16 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 </div>
               )}
 
-              {/* Books */}
-              {results.categorized?.books?.length > 0 && (
+              {/* External Products */}
+              {results.products.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('Books', results.categorized.books.length, 'books')}
-                  {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
+                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
+                    🔍 External Results ({results.products.length})
+                  </div>
+                  {results.products.slice(0, 3).map((product, index) => (
                     <SearchResultHandler
-                      key={`${book.api_source}-${book.api_ref || index}`}
-                      result={book}
-                      query={query}
-                      onClose={handleResultClick}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Movies */}
-              {results.categorized?.movies?.length > 0 && (
-                <div className="flex flex-col">
-                  {renderSectionHeader('Movies & TV', results.categorized.movies.length, 'movies')}
-                  {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
-                    <SearchResultHandler
-                      key={`${movie.api_source}-${movie.api_ref || index}`}
-                      result={movie}
-                      query={query}
-                      onClose={handleResultClick}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Places */}
-              {results.categorized?.places?.length > 0 && (
-                <div className="flex flex-col">
-                  {renderSectionHeader('Places', results.categorized.places.length, 'places')}
-                  {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
-                    <SearchResultHandler
-                      key={`${place.api_source}-${place.api_ref || index}`}
-                      result={place}
-                      query={query}
-                      onClose={handleResultClick}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Food & Recipes */}
-              {results.categorized?.food?.length > 0 && (
-                <div className="flex flex-col">
-                  {renderSectionHeader('Food & Recipes', results.categorized.food.length, 'food')}
-                  {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
-                    <SearchResultHandler
-                      key={`${food.api_source}-${food.api_ref || index}`}
-                      result={food}
+                      key={`${product.api_source}-${product.api_ref || index}`}
+                      result={product}
                       query={query}
                       onClose={handleResultClick}
                     />
@@ -206,8 +136,10 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               {/* People */}
               {results.users.length > 0 && (
                 <div className="flex flex-col">
-                  {renderSectionHeader('People', results.users.length, 'users')}
-                  {(showAllResults.users ? results.users : results.users.slice(0, 3)).map((user) => (
+                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
+                    👥 People ({results.users.length})
+                  </div>
+                  {results.users.slice(0, 3).map((user) => (
                     <UserResultItem
                       key={user.id}
                       user={user}
