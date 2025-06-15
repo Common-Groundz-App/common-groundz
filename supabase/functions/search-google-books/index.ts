@@ -55,8 +55,19 @@ serve(async (req) => {
 
     console.log(`📚 Searching Google Books for: "${query}"`)
 
-    // Google Books API endpoint
-    const googleBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${maxResults}&printType=books&langRestrict=en`
+    // Get the Google Books API key from environment variables
+    const googleBooksApiKey = Deno.env.get("GOOGLE_BOOKS_API_KEY");
+    
+    // Google Books API endpoint - now with API key for enhanced limits
+    let googleBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${maxResults}&printType=books&langRestrict=en`;
+    
+    // Add API key if available for enhanced rate limits
+    if (googleBooksApiKey) {
+      googleBooksUrl += `&key=${googleBooksApiKey}`;
+      console.log('📚 Using authenticated Google Books API with enhanced rate limits');
+    } else {
+      console.log('📚 Using free Google Books API (limited rate)');
+    }
     
     const response = await fetch(googleBooksUrl)
     
