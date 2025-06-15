@@ -284,7 +284,9 @@ const ReviewCard = ({
               {/* Rating and Title Section */}
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-1">
-                  <RatingDisplay rating={review.rating} />
+                  <div className="w-fit">
+                    <RatingDisplay rating={review.rating} />
+                  </div>
                   <span 
                     className="text-lg font-bold"
                     style={{ color: getSentimentColor(review.rating) }}
