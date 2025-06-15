@@ -146,6 +146,21 @@ const Explore = () => {
   // Find the currently active tab item
   const activeTabItem = tabItems.find(item => item.value === activeTab) || tabItems[0];
 
+  // Determine if dropdown should be shown
+  const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1;
+  const hasContent = hasResults || hasCategorizedResults || isLoading || Object.values(loadingStates).some(Boolean) || error;
+
+  console.log('🔍 Search Debug:', {
+    searchQuery,
+    shouldShowDropdown,
+    hasContent,
+    isLoading,
+    loadingStates,
+    hasResults,
+    hasCategorizedResults,
+    error
+  });
+
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       {/* Mobile Header - Only show on mobile screens */}
@@ -213,7 +228,7 @@ const Explore = () => {
               </div>
               
               {/* Enhanced Real-time Search Results */}
-              {searchQuery && (hasResults || hasCategorizedResults || isLoading || Object.values(loadingStates).some(Boolean) || error) && (
+              {shouldShowDropdown && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
                   
                   {/* Loading States */}
@@ -233,9 +248,11 @@ const Explore = () => {
                     </div>
                   )}
 
-                  {error && (
-                    <div className="p-4 text-center text-destructive text-sm">
-                      {error}
+                  {/* Error State */}
+                  {error && !isLoading && !Object.values(loadingStates).some(Boolean) && (
+                    <div className="p-4 text-center text-destructive text-sm border-b">
+                      <p>⚠️ Some searches encountered issues</p>
+                      <p className="text-xs mt-1 text-muted-foreground">{error}</p>
                     </div>
                   )}
                   
@@ -339,19 +356,19 @@ const Explore = () => {
                       </button>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* No Results */}
-              {searchQuery && !hasResults && !hasCategorizedResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 p-4 text-center">
-                  <p className="text-sm text-muted-foreground">No results found locally. Try searching for more products.</p>
-                  <button 
-                    className="text-sm text-primary hover:underline mt-2"
-                    onClick={handleComplexProductSearch}
-                  >
-                    Search More
-                  </button>
+                  {/* No Results State */}
+                  {!hasResults && !hasCategorizedResults && !isLoading && !Object.values(loadingStates).some(Boolean) && !error && (
+                    <div className="p-4 text-center">
+                      <p className="text-sm text-muted-foreground">No results found. Try searching for more sources.</p>
+                      <button 
+                        className="text-sm text-primary hover:underline mt-2"
+                        onClick={handleComplexProductSearch}
+                      >
+                        Search More
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -1,14 +1,39 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { 
-  ProductSearchResult, 
-  EntitySearchResult, 
-  ReviewSearchResult, 
-  RecommendationSearchResult, 
-  SearchResult,
-  UnifiedSearchResults 
-} from './use-unified-search';
+
+export interface ProductSearchResult {
+  name: string;
+  venue: string;
+  description: string | null;
+  image_url: string;
+  api_source: string;
+  api_ref: string;
+  metadata: {
+    price?: string;
+    rating?: number;
+    seller?: string;
+    purchase_url?: string;
+    [key: string]: any;
+  };
+}
+
+export interface EntitySearchResult {
+  id: string;
+  name: string;
+  type: string;
+  venue: string | null;
+  image_url: string | null;
+  description: string | null;
+  slug: string | null;
+}
+
+export interface UserSearchResult {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+}
 
 interface CategorizedResults {
   books: ProductSearchResult[];
@@ -18,8 +43,17 @@ interface CategorizedResults {
   products: ProductSearchResult[];
 }
 
+interface UnifiedSearchResults {
+  products: ProductSearchResult[];
+  entities: EntitySearchResult[];
+  reviews: any[];
+  recommendations: any[];
+  users: UserSearchResult[];
+  categorized: CategorizedResults;
+}
+
 interface EnhancedSearchState {
-  results: UnifiedSearchResults & { categorized: CategorizedResults };
+  results: UnifiedSearchResults;
   isLoading: boolean;
   loadingStates: {
     local: boolean;
@@ -166,12 +200,15 @@ export const useEnhancedSearch = (query: string) => {
     }));
   }, []);
 
+  const setError = useCallback((error: string) => {
+    setState(prev => ({ ...prev, error }));
+  }, []);
+
   // Enhanced local search with fuzzy matching
   const searchLocal = useCallback(async (searchQuery: string, searchId: number) => {
+    console.log(`🏠 Starting local search for: "${searchQuery}"`);
     setLoadingState('local', true);
     try {
-      console.log(`🏠 Enhanced local search for: "${searchQuery}"`);
-      
       const queryVariations = preprocessQuery(searchQuery);
       console.log(`🔍 Search variations:`, queryVariations);
       
@@ -217,21 +254,24 @@ export const useEnhancedSearch = (query: string) => {
 
       if (searchId !== searchIdRef.current) return;
 
-      console.log(`✅ Enhanced local search found: ${uniqueEntities.length} entities, ${uniqueUsers.length} users`);
+      console.log(`✅ Local search completed: ${uniqueEntities.length} entities, ${uniqueUsers.length} users`);
       updateLocalResults({
         entities: uniqueEntities,
-        reviews: [], // Keep existing review search logic
-        recommendations: [], // Keep existing recommendation search logic
+        reviews: [],
+        recommendations: [],
         users: uniqueUsers
       });
     } catch (error) {
-      console.error('❌ Enhanced local search failed:', error);
+      console.error('❌ Local search failed:', error);
+      if (searchId === searchIdRef.current) {
+        setError(`Local search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     } finally {
       setLoadingState('local', false);
     }
-  }, [setLoadingState, updateLocalResults]);
+  }, [setLoadingState, updateLocalResults, setError]);
 
-  // Search specific API
+  // Search specific API with improved error handling
   const searchSpecificAPI = useCallback(async (
     searchQuery: string, 
     apiType: string, 
@@ -249,17 +289,21 @@ export const useEnhancedSearch = (query: string) => {
 
     if (!apiEndpoint) return;
 
+    console.log(`🔍 Starting ${apiType} search for: "${searchQuery}"`);
     setLoadingState(loadingKey, true);
+    
     try {
-      console.log(`🔍 Searching ${apiType}s for: "${searchQuery}"`);
-      
       const { data, error } = await supabase.functions.invoke(apiEndpoint, {
         body: { query: searchQuery }
       });
 
       if (searchId !== searchIdRef.current) return;
 
-      if (error) throw error;
+      if (error) {
+        console.error(`❌ ${apiType} API error:`, error);
+        // Don't throw error, just log and continue
+        return;
+      }
 
       if (data?.results && Array.isArray(data.results)) {
         console.log(`✅ Found ${data.results.length} ${apiType} results`);
@@ -267,9 +311,12 @@ export const useEnhancedSearch = (query: string) => {
           `${apiType}s` as keyof CategorizedResults, 
           data.results
         );
+      } else {
+        console.log(`⚠️ ${apiType} API returned no results or unexpected format`);
       }
     } catch (error) {
       console.error(`❌ ${apiType} search failed:`, error);
+      // Don't set global error, just log individual API failures
     } finally {
       setLoadingState(loadingKey, false);
     }
@@ -280,7 +327,7 @@ export const useEnhancedSearch = (query: string) => {
     searchQuery: string,
     searchId: number
   ) => {
-    console.log(`🚀 Searching all external APIs for: "${searchQuery}"`);
+    console.log(`🚀 Starting parallel API search for: "${searchQuery}"`);
 
     // Search all API types in parallel
     const searchPromises = [
@@ -290,7 +337,8 @@ export const useEnhancedSearch = (query: string) => {
       searchSpecificAPI(searchQuery, 'food', searchId)
     ];
 
-    await Promise.all(searchPromises);
+    await Promise.allSettled(searchPromises);
+    console.log(`🏁 All API searches completed for: "${searchQuery}"`);
   }, [searchSpecificAPI]);
 
   // Main search function
@@ -313,26 +361,28 @@ export const useEnhancedSearch = (query: string) => {
     }
 
     const searchId = ++searchIdRef.current;
+    console.log(`🚀 Starting enhanced search for: "${searchQuery}" (ID: ${searchId})`);
+    
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     resetResults();
 
     try {
-      console.log(`🚀 Starting parallel search for: "${searchQuery}" (ID: ${searchId})`);
-
       // Search local DB and all external APIs in parallel
-      await Promise.all([
+      await Promise.allSettled([
         searchLocal(searchQuery, searchId),
         searchAllAPIs(searchQuery, searchId)
       ]);
 
-      console.log(`✅ Parallel search completed for: "${searchQuery}"`);
+      console.log(`✅ Enhanced search completed for: "${searchQuery}"`);
 
     } catch (error) {
       console.error('💥 Search error:', error);
-      setState(prev => ({ 
-        ...prev, 
-        error: error instanceof Error ? error.message : 'Search failed' 
-      }));
+      if (searchId === searchIdRef.current) {
+        setState(prev => ({ 
+          ...prev, 
+          error: error instanceof Error ? error.message : 'Search failed' 
+        }));
+      }
     } finally {
       if (searchId === searchIdRef.current) {
         setState(prev => ({ ...prev, isLoading: false }));
