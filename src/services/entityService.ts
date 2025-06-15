@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 
@@ -213,10 +212,35 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
         profilesMap.set(profile.id, profile);
       });
     }
+
+    // Get latest ratings for reviews with timelines
+    const reviewsWithTimeline = reviewsData.filter(r => r.has_timeline);
+    const timelineReviewIds = reviewsWithTimeline.map(r => r.id);
     
-    // Combine review data with profile data
+    let latestRatingsMap = new Map();
+    if (timelineReviewIds.length > 0) {
+      const { data: timelineUpdates } = await supabase
+        .from('review_updates')
+        .select('review_id, rating, created_at')
+        .in('review_id', timelineReviewIds)
+        .not('rating', 'is', null)
+        .order('created_at', { ascending: false });
+      
+      if (timelineUpdates) {
+        // Get the latest rating for each review
+        timelineUpdates.forEach(update => {
+          if (!latestRatingsMap.has(update.review_id)) {
+            latestRatingsMap.set(update.review_id, update.rating);
+          }
+        });
+      }
+    }
+    
+    // Combine review data with profile data and latest ratings
     let reviews = reviewsData.map(rev => {
       const profile = profilesMap.get(rev.user_id);
+      const latestRating = latestRatingsMap.get(rev.id);
+      
       return {
         ...rev,
         // Add both direct properties for backward compatibility
@@ -227,7 +251,9 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
           id: rev.user_id,
           username: profile ? profile.username : null,
           avatar_url: profile ? profile.avatar_url : null
-        }
+        },
+        // Add latest rating for timeline reviews
+        latest_rating: latestRating
       };
     });
 
