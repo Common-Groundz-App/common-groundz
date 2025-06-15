@@ -1,6 +1,8 @@
 
 import React from 'react';
+import { ArrowRight } from 'lucide-react';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 
 interface RatingEvolutionDisplayProps {
   initialRating: number;
@@ -16,31 +18,47 @@ export const RatingEvolutionDisplay = ({
   variant = 'badge' 
 }: RatingEvolutionDisplayProps) => {
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-1 flex-wrap">
       {/* Initial Rating */}
-      <ConnectedRingsRating
-        value={initialRating}
-        size={size}
-        variant={variant}
-        showValue={false}
-        isInteractive={false}
-        showLabel={false}
-        minimal={true}
-      />
+      <div className="flex items-center gap-1">
+        <ConnectedRingsRating
+          value={initialRating}
+          size={size}
+          variant={variant}
+          showValue={false}
+          isInteractive={false}
+          showLabel={false}
+          minimal={true}
+        />
+        <span 
+          className="text-sm font-bold"
+          style={{ color: getSentimentColor(initialRating) }}
+        >
+          {initialRating.toFixed(1)}
+        </span>
+      </div>
       
       {/* Arrow */}
-      <span className="text-muted-foreground text-sm flex-shrink-0">→</span>
+      <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
       
       {/* Latest Rating */}
-      <ConnectedRingsRating
-        value={latestRating}
-        size={size}
-        variant={variant}
-        showValue={false}
-        isInteractive={false}
-        showLabel={false}
-        minimal={true}
-      />
+      <div className="flex items-center gap-1">
+        <ConnectedRingsRating
+          value={latestRating}
+          size={size}
+          variant={variant}
+          showValue={false}
+          isInteractive={false}
+          showLabel={false}
+          minimal={true}
+        />
+        <span 
+          className="text-sm font-bold"
+          style={{ color: getSentimentColor(latestRating) }}
+        >
+          {latestRating.toFixed(1)}
+        </span>
+      </div>
     </div>
   );
 };
