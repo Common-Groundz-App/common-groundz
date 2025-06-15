@@ -293,13 +293,6 @@ const ReviewCard = ({
                   >
                     {review.rating.toFixed(1)}
                   </span>
-                  {/* Timeline Badge for Dynamic Reviews */}
-                  {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
-                    <TimelineBadge 
-                      updateCount={review.timeline_count} 
-                      variant="secondary"
-                    />
-                  )}
                 </div>
                 {/* Display Review Headline/Title (subtitle) if available */}
                 {review.subtitle && (
@@ -311,61 +304,72 @@ const ReviewCard = ({
                 </h4>
               </div>
               
-              {/* Options Menu for own content */}
-              {(isOwner || isAdmin) && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="rounded-full p-0 h-6 w-6 ml-2"
-                    >
-                      <MoreVertical className="h-3 w-3" />
-                      <span className="sr-only">Menu</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {isOwner && (
-                      <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
-                        <Pencil className="h-4 w-4" /> Edit
-                      </DropdownMenuItem>
-                    )}
-                    
-                    {!review.is_converted && isOwner && onConvert && (
-                      <DropdownMenuItem onClick={handleConvertClick} className="flex items-center gap-2">
-                        <UploadCloud className="h-4 w-4" /> Convert to Recommendation
-                      </DropdownMenuItem>
-                    )}
-                    
-                    {isAdmin && review.status !== 'flagged' && (
-                      <DropdownMenuItem 
-                        onClick={() => handleStatusChange('flagged')}
-                        className="flex items-center gap-2"
+              {/* Right section with Timeline Badge and Options Menu */}
+              <div className="flex items-center gap-2 ml-2">
+                {/* Timeline Badge for Dynamic Reviews */}
+                {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+                  <TimelineBadge 
+                    updateCount={review.timeline_count} 
+                    variant="secondary"
+                  />
+                )}
+                
+                {/* Options Menu for own content */}
+                {(isOwner || isAdmin) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full p-0 h-6 w-6"
                       >
-                        <Flag className="h-4 w-4" /> Flag for Review
-                      </DropdownMenuItem>
-                    )}
-                    
-                    {isAdmin && review.status === 'flagged' && (
-                      <DropdownMenuItem 
-                        onClick={() => handleStatusChange('published')}
-                        className="flex items-center gap-2"
-                      >
-                        <Flag className="h-4 w-4" /> Remove Flag
-                      </DropdownMenuItem>
-                    )}
-                    
-                    {(isOwner || isAdmin) && (
-                      <DropdownMenuItem 
-                        onClick={handleDeleteClick} 
-                        className="text-destructive focus:text-destructive flex items-center gap-2"
-                      >
-                        <Trash2 className="h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                        <MoreVertical className="h-3 w-3" />
+                        <span className="sr-only">Menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isOwner && (
+                        <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
+                          <Pencil className="h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                      )}
+                      
+                      {!review.is_converted && isOwner && onConvert && (
+                        <DropdownMenuItem onClick={handleConvertClick} className="flex items-center gap-2">
+                          <UploadCloud className="h-4 w-4" /> Convert to Recommendation
+                        </DropdownMenuItem>
+                      )}
+                      
+                      {isAdmin && review.status !== 'flagged' && (
+                        <DropdownMenuItem 
+                          onClick={() => handleStatusChange('flagged')}
+                          className="flex items-center gap-2"
+                        >
+                          <Flag className="h-4 w-4" /> Flag for Review
+                        </DropdownMenuItem>
+                      )}
+                      
+                      {isAdmin && review.status === 'flagged' && (
+                        <DropdownMenuItem 
+                          onClick={() => handleStatusChange('published')}
+                          className="flex items-center gap-2"
+                        >
+                          <Flag className="h-4 w-4" /> Remove Flag
+                        </DropdownMenuItem>
+                      )}
+                      
+                      {(isOwner || isAdmin) && (
+                        <DropdownMenuItem 
+                          onClick={handleDeleteClick} 
+                          className="text-destructive focus:text-destructive flex items-center gap-2"
+                        >
+                          <Trash2 className="h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             </div>
             
             {/* Ultra-Compact User Info */}
