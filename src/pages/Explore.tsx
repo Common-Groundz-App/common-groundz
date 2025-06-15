@@ -26,7 +26,6 @@ import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
 import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
-import { Badge } from '@/components/ui/badge';
 
 const Explore = () => {
   const { user } = useAuth();
@@ -42,8 +41,7 @@ const Explore = () => {
     results, 
     isLoading, 
     loadingStates, 
-    error, 
-    classification,
+    error,
     showAllResults,
     toggleShowAll
   } = useEnhancedSearch(searchQuery);
@@ -214,21 +212,6 @@ const Explore = () => {
                 )}
               </div>
               
-              {/* Search Classification Info - Only show confidence percentage */}
-              {classification && searchQuery && (
-                <div className="mt-2 flex items-center gap-2 overflow-x-auto">
-                  <Badge variant="secondary" className="text-xs shrink-0">
-                    {classification.classification} ({Math.round(classification.confidence * 100)}% confidence)
-                  </Badge>
-                  {isLoading && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Searching...
-                    </div>
-                  )}
-                </div>
-              )}
-              
               {/* Enhanced Real-time Search Results */}
               {searchQuery && (hasResults || hasCategorizedResults) && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
@@ -241,12 +224,11 @@ const Explore = () => {
                         <span>Searching across all sources...</span>
                       </div>
                       <div className="flex gap-1 mt-2 justify-center flex-wrap">
-                        {loadingStates.classification && <Badge variant="outline" className="text-xs">Classifying</Badge>}
-                        {loadingStates.local && <Badge variant="outline" className="text-xs">Local</Badge>}
-                        {loadingStates.books && <Badge variant="outline" className="text-xs">Books</Badge>}
-                        {loadingStates.movies && <Badge variant="outline" className="text-xs">Movies</Badge>}
-                        {loadingStates.places && <Badge variant="outline" className="text-xs">Places</Badge>}
-                        {loadingStates.food && <Badge variant="outline" className="text-xs">Food</Badge>}
+                        {loadingStates.local && <span className="text-xs text-muted-foreground">Local</span>}
+                        {loadingStates.books && <span className="text-xs text-muted-foreground">Books</span>}
+                        {loadingStates.movies && <span className="text-xs text-muted-foreground">Movies</span>}
+                        {loadingStates.places && <span className="text-xs text-muted-foreground">Places</span>}
+                        {loadingStates.food && <span className="text-xs text-muted-foreground">Food</span>}
                       </div>
                     </div>
                   )}

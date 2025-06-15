@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -10,7 +11,6 @@ import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
 import { SearchResultHandler } from './search/SearchResultHandler';
 import { useEnhancedSearch } from '@/hooks/use-enhanced-search';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 interface SearchDialogProps {
@@ -26,8 +26,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     results, 
     isLoading, 
     loadingStates, 
-    error, 
-    classification,
+    error,
     showAllResults,
     toggleShowAll
   } = useEnhancedSearch(query);
@@ -72,13 +71,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
         <Loader2 className="w-4 h-4 animate-spin" />
         <span className="text-sm text-muted-foreground">Searching...</span>
       </div>
-      {classification && (
-        <div className="flex items-center justify-center gap-2">
-          <Badge variant="secondary" className="text-xs">
-            {classification.classification} ({Math.round(classification.confidence * 100)}%)
-          </Badge>
-        </div>
-      )}
     </div>
   );
 
@@ -127,11 +119,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
           {query && !hasResults && !hasCategorizedResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
             <div className="p-6 text-center">
               <p className="text-sm text-muted-foreground">No suggestions found. Press Enter to search more sources.</p>
-              {classification && (
-                <Badge variant="outline" className="text-xs mt-2 flex items-center gap-1 justify-center">
-                  Classified as: {classification.classification} ({Math.round(classification.confidence * 100)}%)
-                </Badge>
-              )}
             </div>
           )}
 
