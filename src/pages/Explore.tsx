@@ -213,7 +213,7 @@ const Explore = () => {
               </div>
               
               {/* Enhanced Real-time Search Results */}
-              {searchQuery && (hasResults || hasCategorizedResults) && (
+              {searchQuery && (hasResults || hasCategorizedResults || isLoading || Object.values(loadingStates).some(Boolean) || error) && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
                   
                   {/* Loading States */}
