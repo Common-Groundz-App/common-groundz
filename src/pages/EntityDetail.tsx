@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import ReviewCard from '@/components/profile/reviews/ReviewCard';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useRecommendations } from '@/hooks/use-recommendations';
-import { useReviews } from '@/hooks/use-reviews';
 import { Skeleton } from "@/components/ui/skeleton"
 import { ProfileDisplay } from '@/components/common/ProfileDisplay';
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -32,8 +31,7 @@ const EntityDetail = () => {
   } = useEntityDetail(slug as string);
   
   const { handleLike: handleLikeRecommendation, handleSave: handleSaveRecommendation } = useRecommendations();
-  const { handleLike: handleLikeReview, handleSave: handleSaveReview } = useReviews();
-
+  
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [dynamicReviews, setDynamicReviews] = useState<any[]>([]);
   const [dynamicReviewsCount, setDynamicReviewsCount] = useState(0);
@@ -146,7 +144,7 @@ const EntityDetail = () => {
                 <Separator orientation="vertical" className="h-10" />
                 <div>
                   <h3 className="text-lg font-semibold">Location</h3>
-                  <p>{entity.location || 'Unknown'}</p>
+                  <p>{entity.venue || 'Unknown'}</p>
                 </div>
               </div>
             </CardContent>
@@ -217,7 +215,7 @@ const EntityDetail = () => {
                   <h3 className="text-lg font-semibold">Additional Information</h3>
                   <div className="text-sm text-muted-foreground">
                     <p><strong>Type:</strong> {entity.type}</p>
-                    <p><strong>Location:</strong> {entity.location}</p>
+                    <p><strong>Location:</strong> {entity.venue || 'Unknown'}</p>
                     {entity.website_url && (
                       <p>
                         <strong>Website:</strong>
@@ -288,8 +286,8 @@ const EntityDetail = () => {
                 <ReviewCard 
                   key={review.id}
                   review={review}
-                  onLike={handleLikeReview}
-                  onSave={handleSaveReview}
+                  onLike={() => {}}
+                  onSave={() => {}}
                   refreshReviews={refreshData}
                   hideEntityFallbacks={true}
                   compact={true}
@@ -313,8 +311,8 @@ const EntityDetail = () => {
                 <ReviewCard 
                   key={review.id}
                   review={review}
-                  onLike={handleLikeReview}
-                  onSave={handleSaveReview}
+                  onLike={() => {}}
+                  onSave={() => {}}
                   refreshReviews={refreshData}
                   hideEntityFallbacks={true}
                   compact={true}
