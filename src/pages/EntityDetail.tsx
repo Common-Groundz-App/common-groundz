@@ -699,14 +699,14 @@ const EntityDetail = () => {
                       All Reviews ({allReviews.length})
                     </TabsTrigger>
                     <TabsTrigger value="dynamic-reviews" className="py-3 flex items-center gap-2">
-                      Dynamic Reviews ({dynamicReviews.length})
+                      Timeline Reviews ({dynamicReviews.length})
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Info className="h-3 w-3 text-muted-foreground" />
                         </TooltipTrigger>
                         <TooltipContent>
                           <p className="max-w-xs text-sm">
-                            Reviews that evolve over time with dynamic updates, 
+                            Reviews that evolve over time with timeline updates, 
                             showing how opinions change with extended use.
                           </p>
                         </TooltipContent>
@@ -755,7 +755,6 @@ const EntityDetail = () => {
                                 hideEntityFallbacks={true}
                                 compact={true}
                                 showTimelineFeatures={review.has_timeline && review.timeline_count && review.timeline_count > 0}
-                                showDynamicRating={review.has_timeline && review.timeline_count && review.timeline_count > 0}
                               />
                               {/* Start Timeline Button for User's Own Static Reviews */}
                               {user && review.user_id === user.id && (!review.has_timeline || !review.timeline_count) && (
@@ -784,7 +783,7 @@ const EntityDetail = () => {
                       <div className="py-12 text-center border rounded-lg bg-violet-50/30 dark:bg-violet-900/5">
                         <MessageSquare className="h-12 w-12 mx-auto text-violet-300 dark:text-violet-700" />
                         <h3 className="font-medium text-lg mt-4">
-                          {userReview ? 'No dynamic updates yet' : 'No dynamic reviews yet'}
+                          {userReview ? 'No timeline updates yet' : 'No dynamic reviews yet'}
                         </h3>
                         <p className="text-muted-foreground mt-2">
                           {userReview ? 
@@ -810,7 +809,7 @@ const EntityDetail = () => {
                         
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-muted-foreground">
-                            Showing {dynamicReviews.length} dynamic review{dynamicReviews.length !== 1 ? 's' : ''}
+                            Showing {dynamicReviews.length} timeline review{dynamicReviews.length !== 1 ? 's' : ''}
                           </p>
                           <Button 
                             onClick={sidebarButtonConfig.action}
@@ -834,7 +833,6 @@ const EntityDetail = () => {
                               hideEntityFallbacks={true}
                               compact={true}
                               showTimelineFeatures={true}
-                              showDynamicRating={true}
                             />
                           ))}
                         </div>
