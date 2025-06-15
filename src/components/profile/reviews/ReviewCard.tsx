@@ -283,10 +283,11 @@ const ReviewCard = ({
               {/* Rating and Title Section */}
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-1">
-                  <RatingDisplay rating={review.rating} />
-                  <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                    {review.rating.toFixed(1)}
-                  </span>
+                  <RatingDisplay 
+                    rating={review.rating} 
+                    hasTimeline={review.has_timeline && review.timeline_count && review.timeline_count > 0}
+                    review={review}
+                  />
                   {/* Timeline Badge for Dynamic Reviews */}
                   {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
                     <TimelineBadge 
@@ -548,7 +549,11 @@ const ReviewCard = ({
                   </div>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <RatingDisplay rating={review.rating} />
+                  <RatingDisplay 
+                    rating={review.rating} 
+                    hasTimeline={review.has_timeline && review.timeline_count && review.timeline_count > 0}
+                    review={review}
+                  />
                   {/* Timeline Badge for Dynamic Reviews */}
                   {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
                     <TimelineBadge 
@@ -820,18 +825,97 @@ const ReviewCard = ({
   );
 };
 
-// Updated RatingDisplay component - now on its own row below the date
-const RatingDisplay = ({ rating }: { rating: number }) => {
+// Enhanced RatingDisplay component with dynamic rating evolution
+const RatingDisplay = ({ 
+  rating, 
+  hasTimeline = false, 
+  review 
+}: { 
+  rating: number; 
+  hasTimeline?: boolean;
+  review?: any;
+}) => {
+  // For dynamic reviews, try to get the latest rating from timeline updates
+  const getLatestRating = () => {
+    if (!hasTimeline || !review?.timeline_updates || review.timeline_updates.length === 0) {
+      return rating;
+    }
+    
+    // Get the most recent update with a rating
+    const updatesWithRating = review.timeline_updates
+      .filter((update: any) => update.rating !== null && update.rating !== undefined)
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    
+    return updatesWithRating.length > 0 ? updatesWithRating[0].rating : rating;
+  };
+
+  const getRatingColor = (ratingValue: number) => {
+    if (ratingValue >= 4.5) return 'text-green-600';
+    if (ratingValue >= 3.5) return 'text-green-500';
+    if (ratingValue >= 2.5) return 'text-yellow-500';
+    if (ratingValue >= 1.5) return 'text-orange-500';
+    return 'text-red-500';
+  };
+
+  if (hasTimeline) {
+    const latestRating = getLatestRating();
+    const hasEvolved = Math.abs(rating - latestRating) > 0.1; // Consider significant if difference > 0.1
+    
+    if (hasEvolved) {
+      return (
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <ConnectedRingsRating
+              value={rating}
+              size="badge"
+              variant="badge"
+              showValue={false}
+              isInteractive={false}
+              showLabel={false}
+              minimal={true}
+            />
+            <span className={cn("text-sm font-medium", getRatingColor(rating))}>
+              {rating.toFixed(1)}
+            </span>
+          </div>
+          
+          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          
+          <div className="flex items-center gap-1">
+            <ConnectedRingsRating
+              value={latestRating}
+              size="badge"
+              variant="badge"
+              showValue={false}
+              isInteractive={false}
+              showLabel={false}
+              minimal={true}
+            />
+            <span className={cn("text-sm font-bold", getRatingColor(latestRating))}>
+              {latestRating.toFixed(1)}
+            </span>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // Default single rating display
   return (
-    <ConnectedRingsRating
-      value={rating}
-      size="badge"
-      variant="badge"
-      showValue={false}
-      isInteractive={false}
-      showLabel={false}
-      minimal={true}
-    />
+    <div className="flex items-center gap-1">
+      <ConnectedRingsRating
+        value={rating}
+        size="badge"
+        variant="badge"
+        showValue={false}
+        isInteractive={false}
+        showLabel={false}
+        minimal={true}
+      />
+      <span className={cn("text-sm font-medium", getRatingColor(rating))}>
+        {rating.toFixed(1)}
+      </span>
+    </div>
   );
 };
 
