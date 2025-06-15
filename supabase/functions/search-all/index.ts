@@ -1,252 +1,255 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { query, limit = 5, type = "all", mode = "quick" } = await req.json();
-
-    if (!query || query.trim().length < 2) {
+    const { query, limit = 20, type = 'all', mode = 'quick' } = await req.json()
+    
+    if (!query) {
       return new Response(
-        JSON.stringify({
-          users: [],
-          entities: [],
-          reviews: [],
-          recommendations: [],
-          products: [],
-          categorized: {
-            books: [],
-            movies: [],
-            places: []
-          },
-          mode: mode
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'Query parameter is required' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log(`🔍 Unified search for: "${query}" (${mode} mode)`)
 
-    console.log(`🔍 Unified search for: "${query}" (type: ${type}, mode: ${mode})`);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration missing')
+    }
 
-    // Search users (same for both modes)
-    const { data: users, error: usersError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url, bio')
-      .ilike('username', `%${query}%`)
-      .limit(limit);
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
-    if (usersError) console.error('Users search error:', usersError);
-
-    // Search entities (same for both modes)
-    const { data: entities, error: entitiesError } = await supabase
-      .from('entities')
-      .select('id, name, type, venue, image_url, description, slug')
-      .eq('is_deleted', false)
-      .ilike('name', `%${query}%`)
-      .limit(limit);
-
-    if (entitiesError) console.error('Entities search error:', entitiesError);
-
-    // Search reviews (same for both modes)
-    const { data: reviews, error: reviewsError } = await supabase
-      .from('reviews')
-      .select(`
-        id, title, subtitle, category, description, rating, entity_id,
-        entities:entity_id (id, name, slug, type, venue)
-      `)
-      .eq('status', 'published')
-      .ilike('title', `%${query}%`)
-      .limit(limit);
-
-    if (reviewsError) console.error('Reviews search error:', reviewsError);
-
-    // Search recommendations (same for both modes)
-    const { data: recommendations, error: recommendationsError } = await supabase
-      .from('recommendations')
-      .select(`
-        id, title, description, category, rating, entity_id,
-        entities:entity_id (id, name, slug, type, venue)
-      `)
-      .eq('visibility', 'public')
-      .ilike('title', `%${query}%`)
-      .limit(limit);
-
-    if (recommendationsError) console.error('Recommendations search error:', recommendationsError);
-
-    let products = [];
-    let categorizedResults = {
-      books: [],
-      movies: [],
-      places: []
-    };
-    let errors = [];
-
-    if (mode === "quick") {
-      console.log(`🏎️ Quick search mode: Searching external APIs for: "${query}"`);
-      
-      try {
-        // Call external APIs in parallel for quick results
-        const [moviesResponse, booksResponse, placesResponse] = await Promise.allSettled([
-          supabase.functions.invoke('search-movies', { body: { query } }),
-          supabase.functions.invoke('search-books', { body: { query } }),
-          supabase.functions.invoke('search-places', { body: { query } })
-        ]);
-
-        // Process movie results
-        if (moviesResponse.status === 'fulfilled' && moviesResponse.value?.data?.results) {
-          const movieResults = moviesResponse.value.data.results.slice(0, limit).map((movie: any) => ({
-            ...movie,
-            type: 'movie'
-          }));
-          products.push(...movieResults);
-          categorizedResults.movies = movieResults;
-          console.log(`🎬 Found ${movieResults.length} movie results`);
-        } else if (moviesResponse.status === 'rejected') {
-          console.error('Movies search failed:', moviesResponse.reason);
-          errors.push('Movie search temporarily unavailable');
-        }
-
-        // Process book results
-        if (booksResponse.status === 'fulfilled' && booksResponse.value?.data?.results) {
-          const bookResults = booksResponse.value.data.results.slice(0, limit).map((book: any) => ({
-            ...book,
-            type: 'book'
-          }));
-          products.push(...bookResults);
-          categorizedResults.books = bookResults;
-          console.log(`📚 Found ${bookResults.length} book results`);
-        } else if (booksResponse.status === 'rejected') {
-          console.error('Books search failed:', booksResponse.reason);
-          errors.push('Book search temporarily unavailable');
-        }
-
-        // Process place results
-        if (placesResponse.status === 'fulfilled' && placesResponse.value?.data?.results) {
-          const placeResults = placesResponse.value.data.results.slice(0, limit).map((place: any) => ({
-            ...place,
-            type: 'place'
-          }));
-          products.push(...placeResults);
-          categorizedResults.places = placeResults;
-          console.log(`📍 Found ${placeResults.length} place results`);
-        } else if (placesResponse.status === 'rejected') {
-          console.error('Places search failed:', placesResponse.reason);
-          errors.push('Places search temporarily unavailable');
-        }
-
-        // Limit total external results
-        products = products.slice(0, limit * 3);
-        console.log(`✅ Quick search found ${products.length} total external results`);
-
-      } catch (error) {
-        console.error('Error calling external APIs in quick mode:', error);
-        errors.push(`External API search failed: ${error.message}`);
+    // Initialize results and error tracking
+    let results = {
+      users: [],
+      entities: [],
+      reviews: [],
+      recommendations: [],
+      products: [],
+      categorized: {
+        books: [],
+        movies: [],
+        places: []
       }
     }
+    let errors = []
 
-    // Enhanced deep search mode with category-specific deep search
-    if (mode === "deep") {
-      console.log(`🔍 Deep search mode: Searching comprehensive sources for: "${query}"`);
+    // 1. Search local database (always fast, should not fail)
+    try {
+      console.log('🔍 Searching local database...')
       
+      // Search entities
+      const { data: entities } = await supabase
+        .from('entities')
+        .select('*')
+        .or(`name.ilike.%${query}%, description.ilike.%${query}%`)
+        .eq('is_deleted', false)
+        .limit(limit)
+
+      // Search users 
+      const { data: users } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url, bio')
+        .or(`username.ilike.%${query}%, bio.ilike.%${query}%`)
+        .limit(limit)
+
+      // Search reviews
+      const { data: reviews } = await supabase
+        .from('reviews')
+        .select(`
+          id, title, content, rating, created_at,
+          entities!inner(name, slug),
+          profiles!inner(username, avatar_url)
+        `)
+        .or(`title.ilike.%${query}%, content.ilike.%${query}%`)
+        .eq('status', 'published')
+        .limit(limit)
+
+      // Search recommendations  
+      const { data: recommendations } = await supabase
+        .from('recommendations')
+        .select(`
+          id, title, content, rating, category, created_at,
+          entities!inner(name, slug),
+          profiles!inner(username, avatar_url)
+        `)
+        .or(`title.ilike.%${query}%, content.ilike.%${query}%`)
+        .limit(limit)
+
+      results.entities = entities || []
+      results.users = users || []
+      results.reviews = (reviews || []).map(review => ({
+        ...review,
+        entity_name: review.entities?.name || '',
+        username: review.profiles?.username || '',
+        avatar_url: review.profiles?.avatar_url || null
+      }))
+      results.recommendations = (recommendations || []).map(rec => ({
+        ...rec,
+        entity_name: rec.entities?.name || '',
+        username: rec.profiles?.username || '',
+        avatar_url: rec.profiles?.avatar_url || null
+      }))
+      
+      console.log(`✅ Local search: ${results.entities.length} entities, ${results.users.length} users`)
+    } catch (localError) {
+      console.error('Local database search failed:', localError)
+      errors.push('Local search temporarily unavailable')
+    }
+
+    // 2. Search external APIs with individual error handling
+    if (mode === 'quick') {
+      // Books search
       try {
-        // Call all deep search functions in parallel
-        const [moviesDeepResponse, booksDeepResponse, placesDeepResponse, productsDeepResponse] = await Promise.allSettled([
-          supabase.functions.invoke('search-movies-deep', { body: { query } }),
-          supabase.functions.invoke('search-books-deep', { body: { query } }),
-          supabase.functions.invoke('search-places-deep', { body: { query } }),
-          supabase.functions.invoke('search-products', { body: { query } })
-        ]);
-
-        // Process deep movie results
-        if (moviesDeepResponse.status === 'fulfilled' && moviesDeepResponse.value?.data?.results) {
-          const movieResults = moviesDeepResponse.value.data.results.slice(0, 8);
-          products.push(...movieResults);
-          categorizedResults.movies = movieResults;
-          console.log(`🎬 Found ${movieResults.length} movies from deep search`);
-        } else if (moviesDeepResponse.status === 'rejected') {
-          console.error('Deep movies search failed:', moviesDeepResponse.reason);
-          errors.push('Movie search temporarily unavailable');
+        console.log('📚 Searching books...')
+        const { data: bookData, error: bookError } = await supabase.functions.invoke('search-books', {
+          body: { query, maxResults: 8 }
+        })
+        
+        if (bookError) {
+          console.error('Book search error:', bookError)
+          errors.push('Book search temporarily unavailable')
+        } else if (bookData?.results) {
+          results.categorized.books = bookData.results
+          console.log(`📚 Found ${bookData.results.length} books`)
         }
+      } catch (bookError) {
+        console.error('Book search failed:', bookError)
+        errors.push('Book search temporarily unavailable')
+      }
 
-        // Process deep book results
-        if (booksDeepResponse.status === 'fulfilled' && booksDeepResponse.value?.data?.results) {
-          const bookResults = booksDeepResponse.value.data.results.slice(0, 8);
-          products.push(...bookResults);
-          categorizedResults.books = bookResults;
-          console.log(`📚 Found ${bookResults.length} books from deep search`);
-        } else if (booksDeepResponse.status === 'rejected') {
-          console.error('Deep books search failed:', booksDeepResponse.reason);
-          errors.push('Book search temporarily unavailable');
+      // Movies search
+      try {
+        console.log('🎬 Searching movies...')
+        const { data: movieData, error: movieError } = await supabase.functions.invoke('search-movies', {
+          body: { query, maxResults: 5 }
+        })
+        
+        if (movieError) {
+          console.error('Movie search error:', movieError)
+          errors.push('Movie search temporarily unavailable')
+        } else if (movieData?.results) {
+          results.categorized.movies = movieData.results
+          console.log(`🎬 Found ${movieData.results.length} movies`)
         }
+      } catch (movieError) {
+        console.error('Movie search failed:', movieError)
+        errors.push('Movie search temporarily unavailable')
+      }
 
-        // Process deep place results
-        if (placesDeepResponse.status === 'fulfilled' && placesDeepResponse.value?.data?.results) {
-          const placeResults = placesDeepResponse.value.data.results.slice(0, 8);
-          products.push(...placeResults);
-          categorizedResults.places = placeResults;
-          console.log(`📍 Found ${placeResults.length} places from deep search`);
-        } else if (placesDeepResponse.status === 'rejected') {
-          console.error('Deep places search failed:', placesDeepResponse.reason);
-          errors.push('Places search temporarily unavailable');
+      // Places search
+      try {
+        console.log('📍 Searching places...')
+        const { data: placeData, error: placeError } = await supabase.functions.invoke('search-places', {
+          body: { query, maxResults: 20 }
+        })
+        
+        if (placeError) {
+          console.error('Place search error:', placeError)
+          errors.push('Place search temporarily unavailable')
+        } else if (placeData?.results) {
+          results.categorized.places = placeData.results
+          console.log(`📍 Found ${placeData.results.length} places`)
         }
+      } catch (placeError) {
+        console.error('Place search failed:', placeError)
+        errors.push('Place search temporarily unavailable')
+      }
+    } else if (mode === 'deep') {
+      // Deep search mode - more comprehensive but slower
+      const promises = []
 
-        // Process comprehensive product results
-        if (productsDeepResponse.status === 'fulfilled' && productsDeepResponse.value?.data?.results) {
-          const comprehensiveProducts = productsDeepResponse.value.data.results.map((product: any) => ({
-            name: product.product_name,
-            venue: product.brand || 'Unknown Brand',
-            description: product.summary,
-            image_url: product.image_url,
-            api_source: product.api_source,
-            api_ref: product.api_ref,
-            type: 'product',
-            metadata: {
-              price: product.insights?.price_range,
-              rating: product.insights?.overall_rating,
-              purchase_url: product.sources?.[0]?.url,
-              mention_frequency: product.mention_frequency,
-              quality_score: product.quality_score,
-              ...product.insights
+      // Books deep search
+      promises.push(
+        supabase.functions.invoke('search-books-deep', { body: { query, maxResults: 12 } })
+          .then(({ data, error }) => {
+            if (error) {
+              console.error('Deep book search error:', error)
+              errors.push('Deep book search temporarily unavailable')
+            } else if (data?.results) {
+              results.categorized.books = data.results
             }
-          })).slice(0, 8);
-          
-          products.push(...comprehensiveProducts);
-          console.log(`🛍️ Found ${comprehensiveProducts.length} comprehensive products from deep search`);
-        } else if (productsDeepResponse.status === 'rejected') {
-          console.error('Deep products search failed:', productsDeepResponse.reason);
-          errors.push('Product search temporarily unavailable');
-        }
+          })
+          .catch(err => {
+            console.error('Deep book search failed:', err)
+            errors.push('Deep book search temporarily unavailable')
+          })
+      )
 
-        console.log(`✅ Deep search found ${products.length} total results across all categories`);
+      // Movies deep search
+      promises.push(
+        supabase.functions.invoke('search-movies-deep', { body: { query, maxResults: 10 } })
+          .then(({ data, error }) => {
+            if (error) {
+              console.error('Deep movie search error:', error)
+              errors.push('Deep movie search temporarily unavailable')
+            } else if (data?.results) {
+              results.categorized.movies = data.results
+            }
+          })
+          .catch(err => {
+            console.error('Deep movie search failed:', err)
+            errors.push('Deep movie search temporarily unavailable')
+          })
+      )
 
-      } catch (error) {
-        console.error('Error calling deep search APIs:', error);
-        errors.push(`Deep search failed: ${error.message}`);
-      }
+      // Places deep search
+      promises.push(
+        supabase.functions.invoke('search-places-deep', { body: { query, maxResults: 30 } })
+          .then(({ data, error }) => {
+            if (error) {
+              console.error('Deep place search error:', error)
+              errors.push('Deep place search temporarily unavailable')  
+            } else if (data?.results) {
+              results.categorized.places = data.results
+            }
+          })
+          .catch(err => {
+            console.error('Deep place search failed:', err)
+            errors.push('Deep place search temporarily unavailable')
+          })
+      )
+
+      // Wait for all deep searches to complete
+      await Promise.all(promises)
     }
 
-    const results = {
-      users: users || [],
-      entities: entities || [],
-      reviews: reviews || [],
-      recommendations: recommendations || [],
-      products: products,
-      categorized: categorizedResults,
-      errors: errors.length > 0 ? errors : null,
-      mode: mode
-    };
+    // Combine all products for backwards compatibility
+    results.products = [
+      ...results.categorized.books,
+      ...results.categorized.movies,
+      ...results.categorized.places
+    ]
+
+    const totalExternalResults = results.products.length
+    console.log(`✅ ${mode.charAt(0).toUpperCase() + mode.slice(1)} search found ${totalExternalResults} total external results`)
+    console.log(`🎬 Found ${results.categorized.movies.length} movie results`)
+    console.log(`📚 Found ${results.categorized.books.length} book results`)
+    console.log(`📍 Found ${results.categorized.places.length} place results`)
+
+    const responseData = {
+      ...results,
+      total: totalExternalResults,
+      mode,
+      errors: errors.length > 0 ? errors : null
+    }
 
     console.log(`✅ Unified search results (${mode} mode):`, {
       users: results.users.length,
@@ -259,30 +262,26 @@ serve(async (req) => {
         movies: results.categorized.movies.length,
         places: results.categorized.places.length
       }
-    });
+    })
 
     return new Response(
-      JSON.stringify(results),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      JSON.stringify(responseData),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
 
   } catch (error) {
-    console.error("Error in search-all:", error);
+    console.error('Error in unified search:', error)
     return new Response(
       JSON.stringify({ 
-        error: error.message,
-        users: [],
-        entities: [],
-        reviews: [],
-        recommendations: [],
-        products: [],
-        categorized: {
-          books: [],
-          movies: [],
-          places: []
-        }
+        error: 'Search failed',
+        details: error.message 
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
   }
-});
+})

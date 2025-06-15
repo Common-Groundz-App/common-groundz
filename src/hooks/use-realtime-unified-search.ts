@@ -47,6 +47,7 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
     movies: false,
     places: false
   });
+  const [apiErrors, setApiErrors] = useState<string[]>([]);
   
   // Default to quick mode if not specified
   const searchMode = options?.mode || 'quick';
@@ -60,7 +61,8 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
 
   useEffect(() => {
     const performSearch = async () => {
-      if (!query || query.trim().length < 2) {
+      // Show dropdown for any query with 1+ characters
+      if (!query || query.trim().length < 1) {
         setResults({
           users: [],
           entities: [],
@@ -74,81 +76,88 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
           }
         });
         setClassification(null);
+        setApiErrors([]);
         return;
       }
 
       setIsLoading(true);
       setError(null);
+      setApiErrors([]);
       setLoadingStates(prev => ({ ...prev, local: true }));
 
       try {
-        // Get query classification to understand what kind of search it is
+        // Get query classification (non-blocking)
         setLoadingStates(prev => ({ ...prev, classification: true }));
         try {
           const { data: classData, error: classError } = await supabase.functions.invoke('classify-search-query', {
             body: { query }
           });
           
-          if (classError) {
-            console.error('Error classifying query:', classError);
-          } else if (classData) {
+          if (!classError && classData) {
             setClassification(classData);
             console.log('📊 Query classification:', classData);
           }
         } catch (classErr) {
-          console.error('Classification error:', classErr);
+          console.error('Classification error (non-blocking):', classErr);
         } finally {
           setLoadingStates(prev => ({ ...prev, classification: false }));
         }
 
-        // Perform main search
-        const { data, error: searchError } = await supabase.functions.invoke('search-all', {
-          body: { 
-            query,
-            limit: 20,
-            type: 'all',
-            mode: searchMode
+        // Perform main search with graceful error handling
+        try {
+          const { data, error: searchError } = await supabase.functions.invoke('search-all', {
+            body: { 
+              query,
+              limit: 20,
+              type: 'all',
+              mode: searchMode
+            }
+          });
+          
+          if (searchError) {
+            console.error('Search API error:', searchError);
+            setApiErrors(prev => [...prev, 'Main search temporarily unavailable']);
+          } else if (data) {
+            console.log(`🔍 Search results (${searchMode} mode):`, data);
+            
+            // Use categorized results from the backend with fallbacks
+            const categorizedResults = data?.categorized || {
+              books: [],
+              movies: [],
+              places: []
+            };
+
+            // Update results with properly categorized data
+            setResults({
+              users: data?.users || [],
+              entities: data?.entities || [],
+              reviews: data?.reviews || [],
+              recommendations: data?.recommendations || [],
+              products: data?.products || [],
+              categorized: categorizedResults
+            });
+            
+            // Collect any API errors from the backend
+            if (data?.errors?.length) {
+              setApiErrors(prev => [...prev, ...data.errors]);
+            }
           }
-        });
-        
-        if (searchError) {
-          throw new Error(`Search failed: ${searchError.message}`);
-        }
-
-        console.log(`🔍 Search results (${searchMode} mode):`, data);
-        
-        // Use categorized results from the backend
-        const categorizedResults = data?.categorized || {
-          books: [],
-          movies: [],
-          places: []
-        };
-
-        // Update results with properly categorized data
-        setResults({
-          users: data?.users || [],
-          entities: data?.entities || [],
-          reviews: data?.reviews || [],
-          recommendations: data?.recommendations || [],
-          products: data?.products || [],
-          categorized: categorizedResults
-        });
-        
-        // Update error if any
-        if (data?.errors?.length) {
-          setError(data.errors[0]);
+        } catch (searchErr) {
+          console.error('Search request failed:', searchErr);
+          setApiErrors(prev => [...prev, 'Search service temporarily unavailable']);
         }
         
       } catch (err) {
         console.error('Error performing search:', err);
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        setError('Search temporarily unavailable. Please try again.');
       } finally {
         setIsLoading(false);
         setLoadingStates(prev => ({ ...prev, local: false }));
       }
     };
 
-    const debounceTimer = setTimeout(performSearch, 300);
+    // Reduced debounce for faster response
+    const debounceTimer = setTimeout(performSearch, 200);
     return () => clearTimeout(debounceTimer);
   }, [query, searchMode]);
 
@@ -160,6 +169,7 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
     classification,
     showAllResults,
     toggleShowAll,
-    searchMode
+    searchMode,
+    apiErrors
   };
 };
