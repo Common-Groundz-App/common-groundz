@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 
@@ -38,8 +37,8 @@ export const RatingEvolutionDisplay = ({
         </span>
       </div>
       
-      {/* Arrow */}
-      <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+      {/* Arrow - replaced ArrowRight icon with arrow symbol */}
+      <span className="text-muted-foreground flex-shrink-0 mx-1">→</span>
       
       {/* Latest Rating */}
       <div className="flex items-center gap-1">

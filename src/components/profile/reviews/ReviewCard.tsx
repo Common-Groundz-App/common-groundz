@@ -288,12 +288,7 @@ const ReviewCard = ({
                   <div className="w-fit">
                     <RatingDisplay rating={review.rating} latestRating={review.latest_rating} />
                   </div>
-                  <span 
-                    className="text-lg font-bold"
-                    style={{ color: getSentimentColor(review.latest_rating || review.rating) }}
-                  >
-                    {(review.latest_rating || review.rating).toFixed(1)}
-                  </span>
+                  {/* Remove the duplicate large rating number - this was causing the double "1.0" display */}
                 </div>
                 {/* Display Review Headline/Title (subtitle) if available */}
                 {review.subtitle && (
