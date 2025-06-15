@@ -28,6 +28,7 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { Separator } from "@/components/ui/separator";
 import { TimelineBadge } from './TimelineBadge';
 import { ReviewTimelineViewer } from './ReviewTimelineViewer';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 
 interface ReviewCardProps {
   review: Review;
@@ -284,7 +285,10 @@ const ReviewCard = ({
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-1">
                   <RatingDisplay rating={review.rating} />
-                  <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  <span 
+                    className="text-lg font-bold"
+                    style={{ color: getSentimentColor(review.rating) }}
+                  >
                     {review.rating.toFixed(1)}
                   </span>
                   {/* Timeline Badge for Dynamic Reviews */}

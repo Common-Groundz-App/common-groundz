@@ -12,6 +12,7 @@ import { fetchReviewUpdates, addReviewUpdate, fetchReviewWithSummary, type Revie
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AISummaryCard } from '@/components/ui/ai-summary-card';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 
 interface ReviewTimelineViewerProps {
   isOpen: boolean;
@@ -233,7 +234,12 @@ export const ReviewTimelineViewer = ({
                         size="sm"
                         minimal={true}
                       />
-                      <span className="font-medium">{initialRating.toFixed(1)}</span>
+                      <span 
+                        className="font-medium"
+                        style={{ color: getSentimentColor(initialRating) }}
+                      >
+                        {initialRating.toFixed(1)}
+                      </span>
                     </div>
                     
                     {reviewData?.description && (
@@ -279,7 +285,12 @@ export const ReviewTimelineViewer = ({
                             size="sm"
                             minimal={true}
                           />
-                          <span className="font-medium">{update.rating.toFixed(1)}</span>
+                          <span 
+                            className="font-medium"
+                            style={{ color: getSentimentColor(update.rating) }}
+                          >
+                            {update.rating.toFixed(1)}
+                          </span>
                         </div>
                       )}
                       
@@ -329,7 +340,12 @@ export const ReviewTimelineViewer = ({
                       isInteractive={true}
                     />
                     {newRating && (
-                      <span className="font-medium">{newRating.toFixed(1)}</span>
+                      <span 
+                        className="font-medium"
+                        style={{ color: getSentimentColor(newRating) }}
+                      >
+                        {newRating.toFixed(1)}
+                      </span>
                     )}
                   </div>
                 </div>
