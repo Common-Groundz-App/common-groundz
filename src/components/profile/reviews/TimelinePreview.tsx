@@ -2,6 +2,7 @@
 import React from 'react';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { ChevronRight } from 'lucide-react';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 
 interface TimelinePreviewProps {
   initialRating: number;
@@ -26,7 +27,10 @@ export const TimelinePreview = ({
           size={compact ? "sm" : "md"}
           minimal={true}
         />
-        <span className="font-medium text-muted-foreground">
+        <span 
+          className="font-medium text-muted-foreground"
+          style={{ color: getSentimentColor(initialRating) }}
+        >
           {initialRating.toFixed(1)}
         </span>
       </div>
@@ -41,7 +45,10 @@ export const TimelinePreview = ({
           size={compact ? "sm" : "md"}
           minimal={true}
         />
-        <span className="font-medium">
+        <span 
+          className="font-medium"
+          style={{ color: getSentimentColor(latestRating) }}
+        >
           {latestRating.toFixed(1)}
         </span>
       </div>

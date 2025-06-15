@@ -37,6 +37,7 @@ import { DynamicReviewsSummary } from '@/components/profile/reviews/DynamicRevie
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 
 const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -525,7 +526,10 @@ const EntityDetail = () => {
                           minimal={true}
                         />
                       </div>
-                      <span className="text-lg font-bold" style={{ color: stats.averageRating < 2 ? "#ea384c" : stats.averageRating < 3 ? "#F97316" : stats.averageRating < 4 ? "#FEC006" : stats.averageRating < 4.5 ? "#84cc16" : "#22c55e" }}>
+                      <span 
+                        className="text-lg font-bold" 
+                        style={{ color: getSentimentColor(stats.averageRating) }}
+                      >
                         {stats.averageRating.toFixed(1)}
                       </span>
                     </div>
@@ -586,7 +590,10 @@ const EntityDetail = () => {
                             minimal={true}
                           />
                         </div>
-                        <span className="text-lg font-bold" style={{ color: circleRating < 2 ? "#ea384c" : circleRating < 3 ? "#F97316" : circleRating < 4 ? "#FEC006" : circleRating < 4.5 ? "#84cc16" : "#22c55e" }}>
+                        <span 
+                          className="text-lg font-bold" 
+                          style={{ color: getSentimentColor(circleRating) }}
+                        >
                           {circleRating.toFixed(1)}
                         </span>
                       </div>

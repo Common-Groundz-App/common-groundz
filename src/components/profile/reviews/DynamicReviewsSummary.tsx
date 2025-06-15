@@ -6,6 +6,7 @@ import { TrendingUp, TrendingDown, Minus, Clock, Brain } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { AISummaryCard } from '@/components/ui/ai-summary-card';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 
 interface DynamicReviewsSummaryProps {
   dynamicReviews: Review[];
@@ -149,7 +150,12 @@ export const DynamicReviewsSummary = ({
                           size="md"
                           minimal={true}
                         />
-                        <span className="font-bold text-lg">{avgInitialRating.toFixed(1)}</span>
+                        <span 
+                          className="font-bold text-lg"
+                          style={{ color: getSentimentColor(avgInitialRating) }}
+                        >
+                          {avgInitialRating.toFixed(1)}
+                        </span>
                       </div>
                     </div>
                   </TooltipTrigger>
@@ -180,7 +186,12 @@ export const DynamicReviewsSummary = ({
                           size="md"
                           minimal={true}
                         />
-                        <span className="font-bold text-lg">{avgLatestRating.toFixed(1)}</span>
+                        <span 
+                          className="font-bold text-lg"
+                          style={{ color: getSentimentColor(avgLatestRating) }}
+                        >
+                          {avgLatestRating.toFixed(1)}
+                        </span>
                       </div>
                     </div>
                   </TooltipTrigger>
