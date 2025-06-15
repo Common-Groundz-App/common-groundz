@@ -77,11 +77,13 @@ const EntityDetail = () => {
             <Skeleton className="h-4 w-1/2 mt-2" />
           </div>
 
-          <TabsList className="grid w-full grid-cols-4">
-            {tabs.map((tab) => (
-              <Skeleton key={tab.id} className="h-10 w-full" />
-            ))}
-          </TabsList>
+          <Tabs value="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              {tabs.map((tab) => (
+                <Skeleton key={tab.id} className="h-10 w-full" />
+              ))}
+            </TabsList>
+          </Tabs>
 
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
