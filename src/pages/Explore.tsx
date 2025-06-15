@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { useUnifiedSearch } from '@/hooks/use-unified-search';
+import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
 import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
@@ -36,12 +36,15 @@ const Explore = () => {
   const [activeTab, setActiveTab] = useState('featured');
   const navigate = useNavigate();
 
-  // Use the unified search hook
+  // Use the working realtime unified search hook
   const { 
     results, 
     isLoading, 
-    error
-  } = useUnifiedSearch(searchQuery, { skipProductSearch: false });
+    loadingStates, 
+    error,
+    showAllResults,
+    toggleShowAll
+  } = useRealtimeUnifiedSearch(searchQuery, { mode: 'quick' });
 
   const handleResultClick = () => {
     setSearchQuery('');
@@ -110,7 +113,32 @@ const Explore = () => {
   ];
 
   const hasLocalResults = results.entities.length > 0 || results.users.length > 0;
-  const hasExternalResults = results.products.length > 0;
+  const hasExternalResults = results.categorized.books.length > 0 ||
+                            results.categorized.movies.length > 0 ||
+                            results.categorized.places.length > 0 ||
+                            results.categorized.food.length > 0;
+
+  const renderSectionHeader = (title: string, count: number, categoryKey?: keyof typeof showAllResults) => (
+    <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
+      <span>{title} ({count})</span>
+      <div className="flex items-center gap-2">
+        {categoryKey && count > 3 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-brand-orange font-semibold hover:text-brand-orange/80"
+            onClick={() => toggleShowAll(categoryKey)}
+          >
+            {showAllResults[categoryKey] ? (
+              <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+            ) : (
+              <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+            )}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   // Show dropdown when user has typed at least 1 character
   const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1;
@@ -119,6 +147,7 @@ const Explore = () => {
     searchQuery,
     shouldShowDropdown,
     isLoading,
+    loadingStates,
     hasLocalResults,
     hasExternalResults,
     error,
@@ -219,10 +248,8 @@ const Explore = () => {
                   {/* Already on Groundz - Local Results (Priority Section) */}
                   {results.entities.length > 0 && (
                     <div className="border-b last:border-b-0">
-                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
-                        ✨ Already on Groundz ({results.entities.length})
-                      </div>
-                      {results.entities.slice(0, 3).map((entity) => (
+                      {renderSectionHeader('✨ Already on Groundz', results.entities.length, 'entities')}
+                      {(showAllResults.entities ? results.entities : results.entities.slice(0, 3)).map((entity) => (
                         <EntityResultItem
                           key={entity.id}
                           entity={entity}
@@ -232,16 +259,59 @@ const Explore = () => {
                     </div>
                   )}
 
-                  {/* External Products */}
-                  {results.products.length > 0 && (
+                  {/* Books from External APIs */}
+                  {results.categorized?.books?.length > 0 && (
                     <div className="border-b last:border-b-0">
-                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
-                        🔍 External Results ({results.products.length})
-                      </div>
-                      {results.products.slice(0, 3).map((product, index) => (
+                      {renderSectionHeader('📚 Books', results.categorized.books.length, 'books')}
+                      {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
                         <SearchResultHandler
-                          key={`${product.api_source}-${product.api_ref || index}`}
-                          result={product}
+                          key={`${book.api_source}-${book.api_ref || index}`}
+                          result={book}
+                          query={searchQuery}
+                          onClose={handleResultClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Movies from External APIs */}
+                  {results.categorized?.movies?.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      {renderSectionHeader('🎬 Movies', results.categorized.movies.length, 'movies')}
+                      {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
+                        <SearchResultHandler
+                          key={`${movie.api_source}-${movie.api_ref || index}`}
+                          result={movie}
+                          query={searchQuery}
+                          onClose={handleResultClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Places from External APIs */}
+                  {results.categorized?.places?.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      {renderSectionHeader('📍 Places', results.categorized.places.length, 'places')}
+                      {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
+                        <SearchResultHandler
+                          key={`${place.api_source}-${place.api_ref || index}`}
+                          result={place}
+                          query={searchQuery}
+                          onClose={handleResultClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Food from External APIs */}
+                  {results.categorized?.food?.length > 0 && (
+                    <div className="border-b last:border-b-0">
+                      {renderSectionHeader('🍽️ Food & Recipes', results.categorized.food.length, 'food')}
+                      {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
+                        <SearchResultHandler
+                          key={`${food.api_source}-${food.api_ref || index}`}
+                          result={food}
                           query={searchQuery}
                           onClose={handleResultClick}
                         />
@@ -252,10 +322,8 @@ const Explore = () => {
                   {/* People */}
                   {results.users.length > 0 && (
                     <div className="border-b last:border-b-0">
-                      <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
-                        👥 People ({results.users.length})
-                      </div>
-                      {results.users.slice(0, 3).map((user) => (
+                      {renderSectionHeader('👥 People', results.users.length, 'users')}
+                      {(showAllResults.users ? results.users : results.users.slice(0, 3)).map((user) => (
                         <UserResultItem
                           key={user.id}
                           user={user}
