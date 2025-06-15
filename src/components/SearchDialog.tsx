@@ -78,8 +78,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const hasLocalResults = results.entities.length > 0 || results.users.length > 0;
   const hasExternalResults = results.categorized?.books?.length > 0 ||
                             results.categorized?.movies?.length > 0 ||
-                            results.categorized?.places?.length > 0 ||
-                            results.categorized?.food?.length > 0;
+                            results.categorized?.places?.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,7 +87,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
           <Search className="w-4 h-4 text-muted-foreground shrink-0 mr-2" />
           <Input
             type="text"
-            placeholder="Search for people, places, food, products..."
+            placeholder="Search for people, places, products..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleSearch}
@@ -181,21 +180,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                     <SearchResultHandler
                       key={`${place.api_source}-${place.api_ref || index}`}
                       result={place}
-                      query={query}
-                      onClose={handleResultClick}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Food & Recipes */}
-              {results.categorized?.food?.length > 0 && (
-                <div className="flex flex-col">
-                  {renderSectionHeader('Food & Recipes', results.categorized.food.length, 'food')}
-                  {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
-                    <SearchResultHandler
-                      key={`${food.api_source}-${food.api_ref || index}`}
-                      result={food}
                       query={query}
                       onClose={handleResultClick}
                     />

@@ -115,8 +115,7 @@ const Explore = () => {
   const hasLocalResults = results.entities.length > 0 || results.users.length > 0;
   const hasExternalResults = results.categorized.books.length > 0 ||
                             results.categorized.movies.length > 0 ||
-                            results.categorized.places.length > 0 ||
-                            results.categorized.food.length > 0;
+                            results.categorized.places.length > 0;
 
   const renderSectionHeader = (title: string, count: number, categoryKey?: keyof typeof showAllResults) => (
     <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
@@ -297,21 +296,6 @@ const Explore = () => {
                         <SearchResultHandler
                           key={`${place.api_source}-${place.api_ref || index}`}
                           result={place}
-                          query={searchQuery}
-                          onClose={handleResultClick}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Food from External APIs */}
-                  {results.categorized?.food?.length > 0 && (
-                    <div className="border-b last:border-b-0">
-                      {renderSectionHeader('🍽️ Food & Recipes', results.categorized.food.length, 'food')}
-                      {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
-                        <SearchResultHandler
-                          key={`${food.api_source}-${food.api_ref || index}`}
-                          result={food}
                           query={searchQuery}
                           onClose={handleResultClick}
                         />

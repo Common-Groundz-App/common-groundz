@@ -9,7 +9,6 @@ export interface SearchLoading {
   books: boolean;
   movies: boolean;
   places: boolean;
-  food: boolean;
 }
 
 export interface Classification {
@@ -28,8 +27,7 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
     categorized: {
       books: [],
       movies: [],
-      places: [],
-      food: []
+      places: []
     }
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -38,8 +36,7 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
     classification: false,
     books: false,
     movies: false,
-    places: false,
-    food: false
+    places: false
   });
   const [error, setError] = useState<string | null>(null);
   const [classification, setClassification] = useState<Classification | null>(null);
@@ -48,8 +45,7 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
     entities: false,
     books: false,
     movies: false,
-    places: false,
-    food: false
+    places: false
   });
   
   // Default to quick mode if not specified
@@ -74,8 +70,7 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
           categorized: {
             books: [],
             movies: [],
-            places: [],
-            food: []
+            places: []
           }
         });
         setClassification(null);
@@ -126,8 +121,7 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
         const categorizedResults = data?.categorized || {
           books: [],
           movies: [],
-          places: [],
-          food: []
+          places: []
         };
 
         // Update results with properly categorized data

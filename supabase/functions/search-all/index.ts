@@ -26,8 +26,7 @@ serve(async (req) => {
           categorized: {
             books: [],
             movies: [],
-            places: [],
-            food: []
+            places: []
           },
           mode: mode
         }),
@@ -90,13 +89,12 @@ serve(async (req) => {
     let categorizedResults = {
       books: [],
       movies: [],
-      places: [],
-      food: []
+      places: []
     };
-    let errors = null;
+    let errors = [];
 
     if (mode === "quick") {
-      console.log(`🏎️ Quick search mode: Searching lightweight external APIs for: "${query}"`);
+      console.log(`🏎️ Quick search mode: Searching external APIs for: "${query}"`);
       
       try {
         // Call external APIs in parallel for quick results
@@ -106,7 +104,7 @@ serve(async (req) => {
           supabase.functions.invoke('search-places', { body: { query } })
         ]);
 
-        // Process movie results with proper categorization
+        // Process movie results
         if (moviesResponse.status === 'fulfilled' && moviesResponse.value?.data?.results) {
           const movieResults = moviesResponse.value.data.results.slice(0, limit).map((movie: any) => ({
             ...movie,
@@ -117,9 +115,10 @@ serve(async (req) => {
           console.log(`🎬 Found ${movieResults.length} movie results`);
         } else if (moviesResponse.status === 'rejected') {
           console.error('Movies search failed:', moviesResponse.reason);
+          errors.push('Movie search temporarily unavailable');
         }
 
-        // Process book results with proper categorization
+        // Process book results
         if (booksResponse.status === 'fulfilled' && booksResponse.value?.data?.results) {
           const bookResults = booksResponse.value.data.results.slice(0, limit).map((book: any) => ({
             ...book,
@@ -130,9 +129,10 @@ serve(async (req) => {
           console.log(`📚 Found ${bookResults.length} book results`);
         } else if (booksResponse.status === 'rejected') {
           console.error('Books search failed:', booksResponse.reason);
+          errors.push('Book search temporarily unavailable');
         }
 
-        // Process place results with proper categorization
+        // Process place results
         if (placesResponse.status === 'fulfilled' && placesResponse.value?.data?.results) {
           const placeResults = placesResponse.value.data.results.slice(0, limit).map((place: any) => ({
             ...place,
@@ -143,6 +143,7 @@ serve(async (req) => {
           console.log(`📍 Found ${placeResults.length} place results`);
         } else if (placesResponse.status === 'rejected') {
           console.error('Places search failed:', placesResponse.reason);
+          errors.push('Places search temporarily unavailable');
         }
 
         // Limit total external results
@@ -151,7 +152,7 @@ serve(async (req) => {
 
       } catch (error) {
         console.error('Error calling external APIs in quick mode:', error);
-        errors = [`External API search failed: ${error.message}`];
+        errors.push(`External API search failed: ${error.message}`);
       }
     }
 
@@ -176,6 +177,7 @@ serve(async (req) => {
           console.log(`🎬 Found ${movieResults.length} movies from deep search`);
         } else if (moviesDeepResponse.status === 'rejected') {
           console.error('Deep movies search failed:', moviesDeepResponse.reason);
+          errors.push('Movie search temporarily unavailable');
         }
 
         // Process deep book results
@@ -186,6 +188,7 @@ serve(async (req) => {
           console.log(`📚 Found ${bookResults.length} books from deep search`);
         } else if (booksDeepResponse.status === 'rejected') {
           console.error('Deep books search failed:', booksDeepResponse.reason);
+          errors.push('Book search temporarily unavailable');
         }
 
         // Process deep place results
@@ -196,6 +199,7 @@ serve(async (req) => {
           console.log(`📍 Found ${placeResults.length} places from deep search`);
         } else if (placesDeepResponse.status === 'rejected') {
           console.error('Deep places search failed:', placesDeepResponse.reason);
+          errors.push('Places search temporarily unavailable');
         }
 
         // Process comprehensive product results
@@ -222,13 +226,14 @@ serve(async (req) => {
           console.log(`🛍️ Found ${comprehensiveProducts.length} comprehensive products from deep search`);
         } else if (productsDeepResponse.status === 'rejected') {
           console.error('Deep products search failed:', productsDeepResponse.reason);
+          errors.push('Product search temporarily unavailable');
         }
 
         console.log(`✅ Deep search found ${products.length} total results across all categories`);
 
       } catch (error) {
         console.error('Error calling deep search APIs:', error);
-        errors = [`Deep search failed: ${error.message}`];
+        errors.push(`Deep search failed: ${error.message}`);
       }
     }
 
@@ -239,7 +244,7 @@ serve(async (req) => {
       recommendations: recommendations || [],
       products: products,
       categorized: categorizedResults,
-      errors: errors,
+      errors: errors.length > 0 ? errors : null,
       mode: mode
     };
 
@@ -252,8 +257,7 @@ serve(async (req) => {
       categorized: {
         books: results.categorized.books.length,
         movies: results.categorized.movies.length,
-        places: results.categorized.places.length,
-        food: results.categorized.food.length
+        places: results.categorized.places.length
       }
     });
 
@@ -275,8 +279,7 @@ serve(async (req) => {
         categorized: {
           books: [],
           movies: [],
-          places: [],
-          food: []
+          places: []
         }
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
