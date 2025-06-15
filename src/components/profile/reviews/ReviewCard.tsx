@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ interface ReviewCardProps {
   review: any;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
+  onConvert?: (reviewId: string) => Promise<void>;
   refreshReviews?: () => void;
   hideEntityFallbacks?: boolean;
   compact?: boolean;
