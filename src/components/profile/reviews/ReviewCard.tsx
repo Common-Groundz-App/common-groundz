@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { TimelineBadge } from './TimelineBadge';
 import { ReviewTimelineViewer } from './ReviewTimelineViewer';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { RatingEvolutionDisplay } from './RatingEvolutionDisplay';
 
 interface ReviewCardProps {
   review: Review;
@@ -285,13 +286,13 @@ const ReviewCard = ({
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-1">
                   <div className="w-fit">
-                    <RatingDisplay rating={review.rating} />
+                    <RatingDisplay rating={review.rating} latestRating={review.latest_rating} />
                   </div>
                   <span 
                     className="text-lg font-bold"
-                    style={{ color: getSentimentColor(review.rating) }}
+                    style={{ color: getSentimentColor(review.latest_rating || review.rating) }}
                   >
-                    {review.rating.toFixed(1)}
+                    {(review.latest_rating || review.rating).toFixed(1)}
                   </span>
                 </div>
                 {/* Display Review Headline/Title (subtitle) if available */}
@@ -558,7 +559,7 @@ const ReviewCard = ({
                   </div>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <RatingDisplay rating={review.rating} />
+                  <RatingDisplay rating={review.rating} latestRating={review.latest_rating} />
                   {/* Timeline Badge for Dynamic Reviews */}
                   {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
                     <TimelineBadge 
@@ -830,8 +831,21 @@ const ReviewCard = ({
   );
 };
 
-// Updated RatingDisplay component - now on its own row below the date
-const RatingDisplay = ({ rating }: { rating: number }) => {
+// Updated RatingDisplay component - now handles evolution display
+const RatingDisplay = ({ rating, latestRating }: { rating: number; latestRating?: number }) => {
+  // If we have a latest rating that's different from initial, show evolution
+  if (latestRating !== undefined && latestRating !== rating) {
+    return (
+      <RatingEvolutionDisplay
+        initialRating={rating}
+        latestRating={latestRating}
+        size="badge"
+        variant="badge"
+      />
+    );
+  }
+  
+  // Otherwise show single rating as before
   return (
     <ConnectedRingsRating
       value={rating}

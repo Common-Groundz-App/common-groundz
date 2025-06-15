@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -47,6 +46,8 @@ export interface Review {
     image_url?: string;
   };
   comment_count?: number;
+  // Rating evolution field for timeline reviews
+  latest_rating?: number;
 }
 
 export interface ReviewUpdate {
@@ -98,7 +99,7 @@ export const createReview = async (reviewData: {
   }
 };
 
-// Fetch complete review data including AI summary fields
+// Fetch complete review data including AI summary fields and latest rating
 export const fetchReviewWithSummary = async (reviewId: string): Promise<Review | null> => {
   try {
     console.log('📊 fetchReviewWithSummary called for reviewId:', reviewId);
@@ -127,9 +128,28 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
       return null;
     }
 
+    // Get the latest rating from timeline updates if review has timeline
+    let latestRating = undefined;
+    if (reviewData.has_timeline && reviewData.timeline_count && reviewData.timeline_count > 0) {
+      const { data: latestUpdate } = await supabase
+        .from('review_updates')
+        .select('rating')
+        .eq('review_id', reviewId)
+        .not('rating', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (latestUpdate?.rating) {
+        latestRating = latestUpdate.rating;
+      }
+    }
+
     console.log('✅ Review data fetched:', {
       id: reviewData.id,
       title: reviewData.title,
+      rating: reviewData.rating,
+      latest_rating: latestRating,
       ai_summary: reviewData.ai_summary ? `${reviewData.ai_summary.substring(0, 50)}...` : 'No AI summary',
       ai_summary_length: reviewData.ai_summary?.length || 0,
       timeline_count: reviewData.timeline_count,
@@ -151,6 +171,7 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
     // Combine the data
     const combinedData = {
       ...reviewData,
+      latest_rating: latestRating,
       user: profileData ? {
         username: profileData.username,
         avatar_url: profileData.avatar_url
@@ -162,7 +183,9 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
       hasAiSummary: !!combinedData.ai_summary,
       aiSummaryLength: combinedData.ai_summary?.length || 0,
       timelineCount: combinedData.timeline_count,
-      hasTimeline: combinedData.has_timeline
+      hasTimeline: combinedData.has_timeline,
+      initialRating: combinedData.rating,
+      latestRating: combinedData.latest_rating
     });
 
     return combinedData;
