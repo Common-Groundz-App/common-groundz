@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { useEnhancedSearch } from '@/hooks/use-enhanced-search';
+import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
 import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
@@ -36,7 +36,7 @@ const Explore = () => {
   const [activeTab, setActiveTab] = useState('featured');
   const navigate = useNavigate();
 
-  // Use the enhanced search hook
+  // Use the working realtime unified search hook
   const { 
     results, 
     isLoading, 
@@ -44,7 +44,7 @@ const Explore = () => {
     error,
     showAllResults,
     toggleShowAll
-  } = useEnhancedSearch(searchQuery);
+  } = useRealtimeUnifiedSearch(searchQuery, { mode: 'quick' });
 
   const handleResultClick = () => {
     setSearchQuery('');
@@ -112,14 +112,11 @@ const Explore = () => {
     }
   ];
 
-  const hasResults = results.products.length > 0 || 
-                   results.entities.length > 0 || 
-                   results.users.length > 0;
-
-  const hasCategorizedResults = results.categorized.books.length > 0 ||
-                               results.categorized.movies.length > 0 ||
-                               results.categorized.places.length > 0 ||
-                               results.categorized.food.length > 0;
+  const hasLocalResults = results.entities.length > 0 || results.users.length > 0;
+  const hasExternalResults = results.categorized.books.length > 0 ||
+                            results.categorized.movies.length > 0 ||
+                            results.categorized.places.length > 0 ||
+                            results.categorized.food.length > 0;
 
   const renderSectionHeader = (title: string, count: number, categoryKey?: keyof typeof showAllResults) => (
     <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
@@ -145,16 +142,16 @@ const Explore = () => {
 
   // Show dropdown when user has typed at least 1 character
   const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1;
-  const isAnyLoading = Object.values(loadingStates).some(Boolean);
 
   console.log('🔍 Search Debug:', {
     searchQuery,
     shouldShowDropdown,
     isLoading,
     loadingStates,
-    hasResults,
-    hasCategorizedResults,
-    error
+    hasLocalResults,
+    hasExternalResults,
+    error,
+    results
   });
 
   return (
@@ -223,23 +220,16 @@ const Explore = () => {
                 )}
               </div>
               
-              {/* Enhanced Search Results - Show immediately when user types */}
+              {/* Search Results Dropdown - Always show when user types */}
               {shouldShowDropdown && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
                   
-                  {/* Loading States - Show individual API status */}
-                  {isAnyLoading && (
+                  {/* Loading State */}
+                  {isLoading && (
                     <div className="p-3 text-center border-b">
                       <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span>Searching...</span>
-                      </div>
-                      <div className="flex gap-2 justify-center flex-wrap text-xs">
-                        {loadingStates.local && <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">Local</span>}
-                        {loadingStates.books && <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Books</span>}
-                        {loadingStates.movies && <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">Movies</span>}
-                        {loadingStates.places && <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">Places</span>}
-                        {loadingStates.food && <span className="px-2 py-1 bg-red-100 text-red-700 rounded">Food</span>}
                       </div>
                     </div>
                   )}
@@ -255,7 +245,7 @@ const Explore = () => {
                     </div>
                   )}
                   
-                  {/* Already on Groundz - Priority Section */}
+                  {/* Already on Groundz - Local Results (Priority Section) */}
                   {results.entities.length > 0 && (
                     <div className="border-b last:border-b-0">
                       {renderSectionHeader('✨ Already on Groundz', results.entities.length, 'entities')}
@@ -270,7 +260,7 @@ const Explore = () => {
                   )}
 
                   {/* Books from External APIs */}
-                  {results.categorized.books.length > 0 && (
+                  {results.categorized?.books?.length > 0 && (
                     <div className="border-b last:border-b-0">
                       {renderSectionHeader('📚 Books', results.categorized.books.length, 'books')}
                       {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
@@ -285,7 +275,7 @@ const Explore = () => {
                   )}
 
                   {/* Movies from External APIs */}
-                  {results.categorized.movies.length > 0 && (
+                  {results.categorized?.movies?.length > 0 && (
                     <div className="border-b last:border-b-0">
                       {renderSectionHeader('🎬 Movies', results.categorized.movies.length, 'movies')}
                       {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
@@ -300,7 +290,7 @@ const Explore = () => {
                   )}
 
                   {/* Places from External APIs */}
-                  {results.categorized.places.length > 0 && (
+                  {results.categorized?.places?.length > 0 && (
                     <div className="border-b last:border-b-0">
                       {renderSectionHeader('📍 Places', results.categorized.places.length, 'places')}
                       {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
@@ -315,7 +305,7 @@ const Explore = () => {
                   )}
 
                   {/* Food from External APIs */}
-                  {results.categorized.food.length > 0 && (
+                  {results.categorized?.food?.length > 0 && (
                     <div className="border-b last:border-b-0">
                       {renderSectionHeader('🍽️ Food & Recipes', results.categorized.food.length, 'food')}
                       {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
@@ -357,7 +347,7 @@ const Explore = () => {
                   )}
 
                   {/* No Results State - Only show when not loading and no results */}
-                  {!hasResults && !hasCategorizedResults && !isAnyLoading && (
+                  {!hasLocalResults && !hasExternalResults && !isLoading && (
                     <div className="p-4 text-center">
                       <p className="text-sm text-muted-foreground mb-2">No immediate results found</p>
                       <button 

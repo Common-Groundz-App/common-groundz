@@ -6,11 +6,11 @@ import {
   DialogContent,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, X, Loader2, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
 import { SearchResultHandler } from './search/SearchResultHandler';
-import { useEnhancedSearch } from '@/hooks/use-enhanced-search';
+import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
 import { Button } from '@/components/ui/button';
 
 interface SearchDialogProps {
@@ -22,6 +22,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   
+  // Use the working realtime unified search hook
   const { 
     results, 
     isLoading, 
@@ -29,7 +30,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     error,
     showAllResults,
     toggleShowAll
-  } = useEnhancedSearch(query);
+  } = useRealtimeUnifiedSearch(query, { mode: 'quick' });
 
   const handleResultClick = () => {
     onOpenChange(false);
@@ -74,14 +75,11 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     </div>
   );
 
-  const hasResults = results.products.length > 0 || 
-                   results.entities.length > 0 || 
-                   results.users.length > 0;
-
-  const hasCategorizedResults = results.categorized.books.length > 0 ||
-                               results.categorized.movies.length > 0 ||
-                               results.categorized.places.length > 0 ||
-                               results.categorized.food.length > 0;
+  const hasLocalResults = results.entities.length > 0 || results.users.length > 0;
+  const hasExternalResults = results.categorized?.books?.length > 0 ||
+                            results.categorized?.movies?.length > 0 ||
+                            results.categorized?.places?.length > 0 ||
+                            results.categorized?.food?.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -108,23 +106,30 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto">
+          {/* Error State */}
           {error && (
-            <div className="px-4 py-2 text-center text-xs text-destructive">
-              {error}
+            <div className="p-3 text-center border-b bg-yellow-50">
+              <div className="flex items-center justify-center gap-2 text-sm text-yellow-700">
+                <AlertCircle className="w-4 h-4" />
+                <span>Some search sources are unavailable</span>
+              </div>
             </div>
           )}
 
-          {(isLoading || Object.values(loadingStates).some(Boolean)) && renderLoadingState()}
+          {/* Loading State */}
+          {isLoading && renderLoadingState()}
 
-          {query && !hasResults && !hasCategorizedResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
+          {/* No Results State */}
+          {query && !hasLocalResults && !hasExternalResults && !isLoading && (
             <div className="p-6 text-center">
               <p className="text-sm text-muted-foreground">No suggestions found. Press Enter to search more sources.</p>
             </div>
           )}
 
-          {(hasResults || hasCategorizedResults) && (
+          {/* Search Results */}
+          {(hasLocalResults || hasExternalResults) && (
             <>
-              {/* Already on Groundz - Changed from "Saved Items" */}
+              {/* Already on Groundz - Local Results */}
               {results.entities.length > 0 && (
                 <div className="flex flex-col">
                   {renderSectionHeader('✨ Already on Groundz', results.entities.length, 'entities')}
@@ -139,7 +144,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               )}
 
               {/* Books */}
-              {results.categorized.books.length > 0 && (
+              {results.categorized?.books?.length > 0 && (
                 <div className="flex flex-col">
                   {renderSectionHeader('Books', results.categorized.books.length, 'books')}
                   {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
@@ -154,7 +159,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               )}
 
               {/* Movies */}
-              {results.categorized.movies.length > 0 && (
+              {results.categorized?.movies?.length > 0 && (
                 <div className="flex flex-col">
                   {renderSectionHeader('Movies & TV', results.categorized.movies.length, 'movies')}
                   {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
@@ -169,7 +174,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               )}
 
               {/* Places */}
-              {results.categorized.places.length > 0 && (
+              {results.categorized?.places?.length > 0 && (
                 <div className="flex flex-col">
                   {renderSectionHeader('Places', results.categorized.places.length, 'places')}
                   {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
@@ -184,7 +189,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               )}
 
               {/* Food & Recipes */}
-              {results.categorized.food.length > 0 && (
+              {results.categorized?.food?.length > 0 && (
                 <div className="flex flex-col">
                   {renderSectionHeader('Food & Recipes', results.categorized.food.length, 'food')}
                   {(showAllResults.food ? results.categorized.food : results.categorized.food.slice(0, 3)).map((food, index) => (
@@ -214,6 +219,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             </>
           )}
 
+          {/* Search More Option */}
           {query.length >= 2 && (
             <div className="p-3 text-center border-t">
               <button 
