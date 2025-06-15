@@ -1,136 +1,104 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const { query } = await req.json();
-
-    if (!query || query.trim().length < 2) {
+    const { query, maxResults = 12 } = await req.json()
+    
+    if (!query) {
       return new Response(
-        JSON.stringify({ results: [] }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'Query parameter is required' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    console.log(`📚 Deep book search for: "${query}"`);
+    console.log(`📚 Deep searching books for: "${query}"`)
 
-    const results = [];
+    let results = []
+    let errors = []
 
-    // Search Google Books API for comprehensive book data
+    // Use Google Books API for comprehensive book search
     try {
-      const googleBooksApiKey = Deno.env.get("GOOGLE_BOOKS_API_KEY");
-      const url = googleBooksApiKey 
-        ? `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10&key=${googleBooksApiKey}`
-        : `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10`;
-      
-      console.log("📚 Searching Google Books API...");
-      const response = await fetch(url);
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.items) {
-          for (const item of data.items) {
-            const volumeInfo = item.volumeInfo;
-            results.push({
-              name: volumeInfo.title,
-              venue: volumeInfo.authors ? volumeInfo.authors.join(', ') : 'Unknown Author',
-              description: volumeInfo.description ? 
-                volumeInfo.description.substring(0, 200) + (volumeInfo.description.length > 200 ? '...' : '') :
-                `Book by ${volumeInfo.authors?.join(', ') || 'Unknown Author'}`,
-              image_url: volumeInfo.imageLinks?.thumbnail || volumeInfo.imageLinks?.smallThumbnail,
-              api_source: 'google_books',
-              api_ref: item.id,
-              type: 'book',
-              metadata: {
-                authors: volumeInfo.authors,
-                publisher: volumeInfo.publisher,
-                published_date: volumeInfo.publishedDate,
-                page_count: volumeInfo.pageCount,
-                categories: volumeInfo.categories,
-                average_rating: volumeInfo.averageRating,
-                ratings_count: volumeInfo.ratingsCount,
-                isbn: volumeInfo.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier,
-                language: volumeInfo.language
-              }
-            });
-          }
-          console.log(`✅ Found ${results.length} books from Google Books`);
+      console.log('📚 Calling Google Books API for deep search...')
+      const googleBooksResponse = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/search-google-books`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query, maxResults: maxResults * 2 }) // Get more results for deep search
+      })
+
+      if (googleBooksResponse.ok) {
+        const googleData = await googleBooksResponse.json()
+        if (googleData.results && googleData.results.length > 0) {
+          results = results.concat(googleData.results)
+          console.log(`✅ Found ${googleData.results.length} books from Google Books (deep search)`)
         }
+      } else {
+        console.error('Google Books API error in deep search:', await googleBooksResponse.text())
+        errors.push('Google Books API temporarily unavailable')
       }
     } catch (error) {
-      console.error('Google Books API error:', error);
+      console.error('Error calling Google Books API in deep search:', error)
+      errors.push('Google Books deep search failed')
     }
 
-    // Search Open Library as backup
-    try {
-      if (results.length < 8) {
-        console.log("📚 Searching Open Library...");
-        const openLibResponse = await fetch(
-          `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=10`
-        );
-        
-        if (openLibResponse.ok) {
-          const openLibData = await openLibResponse.json();
-          if (openLibData.docs) {
-            for (const book of openLibData.docs.slice(0, 8 - results.length)) {
-              // Avoid duplicates
-              const alreadyExists = results.some(r => 
-                r.name.toLowerCase() === book.title?.toLowerCase() &&
-                r.venue.toLowerCase().includes(book.author_name?.[0]?.toLowerCase() || '')
-              );
-              
-              if (!alreadyExists && book.title) {
-                const coverUrl = book.cover_i ? 
-                  `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : null;
-                
-                results.push({
-                  name: book.title,
-                  venue: book.author_name ? book.author_name.slice(0, 2).join(', ') : 'Unknown Author',
-                  description: book.first_sentence ? 
-                    book.first_sentence.join(' ').substring(0, 200) + '...' :
-                    `Book published in ${book.first_publish_year || 'Unknown Year'}`,
-                  image_url: coverUrl,
-                  api_source: 'open_library',
-                  api_ref: book.key,
-                  type: 'book',
-                  metadata: {
-                    authors: book.author_name,
-                    first_publish_year: book.first_publish_year,
-                    publisher: book.publisher?.[0],
-                    subject: book.subject?.slice(0, 5),
-                    isbn: book.isbn?.[0],
-                    language: book.language?.[0]
-                  }
-                });
-              }
-            }
-            console.log(`✅ Found ${results.length} total books including Open Library`);
-          }
-        }
+    // For deep search, we could add more book sources here
+    // Examples: Open Library API, Goodreads, etc.
+
+    // Remove duplicates based on ISBN or title
+    const uniqueResults = []
+    const seenBooks = new Set()
+
+    for (const book of results) {
+      const identifier = book.isbn || book.name.toLowerCase()
+      if (!seenBooks.has(identifier)) {
+        seenBooks.add(identifier)
+        uniqueResults.push(book)
       }
-    } catch (error) {
-      console.error('Open Library API error:', error);
     }
+
+    // Limit results to requested amount
+    const finalResults = uniqueResults.slice(0, maxResults)
+
+    console.log(`✅ Deep book search completed. Found ${finalResults.length} unique books`)
 
     return new Response(
-      JSON.stringify({ results: results.slice(0, 10) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      JSON.stringify({ 
+        results: finalResults,
+        total: finalResults.length,
+        errors: errors.length > 0 ? errors : null,
+        source: 'books_deep_search'
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
 
   } catch (error) {
-    console.error("Error in search-books-deep:", error);
+    console.error('Error in deep book search:', error)
     return new Response(
-      JSON.stringify({ error: error.message, results: [] }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      JSON.stringify({ 
+        error: 'Failed to perform deep book search',
+        details: error.message 
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
   }
-});
+})
