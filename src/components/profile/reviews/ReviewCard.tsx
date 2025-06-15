@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share2, Clock, Plus } from 'lucide-react';
+import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share2, Clock, Plus, ChevronRight } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -274,6 +274,67 @@ const ReviewCard = ({
     }
   };
 
+  // Rating Evolution Display Component
+  const RatingEvolutionDisplay = ({ initialRating, latestRating, isCompact = false }: { 
+    initialRating: number; 
+    latestRating: number; 
+    isCompact?: boolean;
+  }) => {
+    const ringSize = isCompact ? "xs" : "badge";
+    const numberSize = isCompact ? "text-sm" : "text-lg";
+    
+    return (
+      <div className={cn(
+        "flex items-center gap-2",
+        isCompact && "flex-wrap sm:flex-nowrap"
+      )}>
+        {/* Initial Rating */}
+        <div className="flex items-center gap-1">
+          <ConnectedRingsRating
+            value={initialRating}
+            size={ringSize}
+            variant="badge"
+            showValue={false}
+            isInteractive={false}
+            showLabel={false}
+            minimal={true}
+          />
+          <span 
+            className={cn("font-bold", numberSize)}
+            style={{ color: getSentimentColor(initialRating) }}
+          >
+            {initialRating.toFixed(1)}
+          </span>
+        </div>
+        
+        {/* Arrow */}
+        <ChevronRight className={cn(
+          "text-muted-foreground",
+          isCompact ? "h-3 w-3" : "h-4 w-4"
+        )} />
+        
+        {/* Latest Rating */}
+        <div className="flex items-center gap-1">
+          <ConnectedRingsRating
+            value={latestRating}
+            size={ringSize}
+            variant="badge"
+            showValue={false}
+            isInteractive={false}
+            showLabel={false}
+            minimal={true}
+          />
+          <span 
+            className={cn("font-bold", numberSize)}
+            style={{ color: getSentimentColor(latestRating) }}
+          >
+            {latestRating.toFixed(1)}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   if (compact) {
     return (
       <>
@@ -285,14 +346,25 @@ const ReviewCard = ({
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-1">
                   <div className="w-fit">
-                    <RatingDisplay rating={review.rating} />
+                    {/* Show rating evolution if timeline exists and has latest rating */}
+                    {review.has_timeline && review.timeline_count && review.timeline_count > 0 && review.latest_rating ? (
+                      <RatingEvolutionDisplay 
+                        initialRating={review.rating} 
+                        latestRating={review.latest_rating}
+                        isCompact={true}
+                      />
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <RatingDisplay rating={review.rating} />
+                        <span 
+                          className="text-lg font-bold"
+                          style={{ color: getSentimentColor(review.rating) }}
+                        >
+                          {review.rating.toFixed(1)}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <span 
-                    className="text-lg font-bold"
-                    style={{ color: getSentimentColor(review.rating) }}
-                  >
-                    {review.rating.toFixed(1)}
-                  </span>
                 </div>
                 {/* Display Review Headline/Title (subtitle) if available */}
                 {review.subtitle && (
@@ -558,7 +630,15 @@ const ReviewCard = ({
                   </div>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <RatingDisplay rating={review.rating} />
+                  {/* Show rating evolution if timeline exists and has latest rating */}
+                  {review.has_timeline && review.timeline_count && review.timeline_count > 0 && review.latest_rating ? (
+                    <RatingEvolutionDisplay 
+                      initialRating={review.rating} 
+                      latestRating={review.latest_rating}
+                    />
+                  ) : (
+                    <RatingDisplay rating={review.rating} />
+                  )}
                   {/* Timeline Badge for Dynamic Reviews */}
                   {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
                     <TimelineBadge 

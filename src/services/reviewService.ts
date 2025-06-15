@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Review {
@@ -27,6 +26,7 @@ export interface Review {
   timeline_count?: number;
   has_timeline?: boolean;
   is_verified?: boolean;
+  latest_rating?: number; // New field for timeline reviews
   // AI summary fields for individual reviews
   ai_summary?: string;
   ai_summary_last_generated_at?: string;
@@ -247,6 +247,36 @@ export const updateReviewStatus = async (reviewId: string, status: string): Prom
   }
 };
 
+// Enhanced function to fetch latest rating for timeline reviews
+const fetchLatestRatings = async (reviewIds: string[]): Promise<Record<string, number>> => {
+  try {
+    const { data: latestUpdates, error } = await supabase
+      .from('review_updates')
+      .select('review_id, rating, created_at')
+      .in('review_id', reviewIds)
+      .not('rating', 'is', null)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching latest ratings:', error);
+      return {};
+    }
+
+    // Get the most recent rating for each review
+    const latestRatings: Record<string, number> = {};
+    latestUpdates?.forEach(update => {
+      if (!latestRatings[update.review_id]) {
+        latestRatings[update.review_id] = update.rating;
+      }
+    });
+
+    return latestRatings;
+  } catch (error) {
+    console.error('Error in fetchLatestRatings:', error);
+    return {};
+  }
+};
+
 // Fetch user reviews with enhanced fields - Using manual joins to avoid foreign key issues
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
@@ -268,6 +298,10 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     const reviewIds = reviews.map(r => r.id);
     const userIds = reviews.map(r => r.user_id);
     const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
+
+    // Get latest ratings for timeline reviews
+    const timelineReviewIds = reviews.filter(r => r.has_timeline && r.timeline_count && r.timeline_count > 0).map(r => r.id);
+    const latestRatings = timelineReviewIds.length > 0 ? await fetchLatestRatings(timelineReviewIds) : {};
 
     // Get user profiles
     const { data: profiles, error: profilesError } = await supabase
@@ -339,7 +373,8 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
         comment_count: 0, // Placeholder for future comment system
         isLiked: likeData.some(like => like.review_id === review.id),
         isSaved: saveData.some(save => save.review_id === review.id),
-        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
+        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0,
+        latest_rating: latestRatings[review.id] // Add latest rating for timeline reviews
       };
     });
 
@@ -372,6 +407,10 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
     const userIds = reviews.map(r => r.user_id);
     const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
 
+    // Get latest ratings for timeline reviews
+    const timelineReviewIds = reviews.filter(r => r.has_timeline && r.timeline_count && r.timeline_count > 0).map(r => r.id);
+    const latestRatings = timelineReviewIds.length > 0 ? await fetchLatestRatings(timelineReviewIds) : {};
+
     // Get user profiles
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
@@ -442,7 +481,8 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
         comment_count: 0, // Placeholder for future comment system
         isLiked: likeData.some(like => like.review_id === review.id),
         isSaved: saveData.some(save => save.review_id === review.id),
-        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
+        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0,
+        latest_rating: latestRatings[review.id] // Add latest rating for timeline reviews
       };
     });
 
