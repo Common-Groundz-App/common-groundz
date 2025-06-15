@@ -71,14 +71,11 @@ export const useEntityTimelineSummary = (entityId: string | null) => {
 
         // Get latest rating for each review (either from updates or original rating)
         const latestRatings = reviews.map(review => {
-          const reviewUpdates = updates?.filter(u => u.review_id === review.id) || [];
+          const reviewUpdates = updates?.filter(u => u.review_id === review.id && u.rating !== null) || [];
           if (reviewUpdates.length === 0) return review.rating;
           
-          // Get the latest update with a rating
-          const latestWithRating = reviewUpdates
-            .filter(u => u.rating !== null)
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-          
+          // Get the latest update with a rating (sorted by created_at ascending, so take the last one)
+          const latestWithRating = reviewUpdates[reviewUpdates.length - 1];
           return latestWithRating?.rating || review.rating;
         });
 
@@ -97,6 +94,14 @@ export const useEntityTimelineSummary = (entityId: string | null) => {
         const averageUpdateDays = updateDelays.length > 0 
           ? updateDelays.reduce((sum, days) => sum + days, 0) / updateDelays.length 
           : 0;
+
+        console.log('Timeline summary calculation:', {
+          initialRatings,
+          latestRatings,
+          averageInitialRating,
+          averageLatestRating,
+          totalUpdates: updates?.length || 0
+        });
 
         setSummary({
           averageInitialRating,

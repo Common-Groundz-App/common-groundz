@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 
@@ -289,6 +290,7 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
 
 /**
  * Calculate average rating for an entity from recommendations and reviews
+ * Now considers latest timeline updates for dynamic reviews
  */
 export const calculateEntityRating = async (entityId: string): Promise<number | null> => {
   // Get all recommendations for this entity with their ratings
@@ -303,10 +305,10 @@ export const calculateEntityRating = async (entityId: string): Promise<number | 
     return null;
   }
 
-  // Get all reviews for this entity with their ratings
+  // Get all reviews for this entity
   const { data: reviews, error: revError } = await supabase
     .from('reviews')
-    .select('rating')
+    .select('id, rating, has_timeline')
     .eq('entity_id', entityId)
     .eq('visibility', 'public');
 
@@ -315,10 +317,53 @@ export const calculateEntityRating = async (entityId: string): Promise<number | 
     return null;
   }
 
+  if (!reviews || reviews.length === 0) {
+    if (!recommendations || recommendations.length === 0) {
+      return null;
+    }
+    // Only recommendations exist
+    const recRatings = recommendations.map(rec => Number(rec.rating)).filter(rating => !isNaN(rating));
+    if (recRatings.length === 0) return null;
+    const sum = recRatings.reduce((total, rating) => total + rating, 0);
+    return parseFloat((sum / recRatings.length).toFixed(1));
+  }
+
+  // Get timeline updates for reviews that have them
+  const reviewsWithTimeline = reviews.filter(r => r.has_timeline);
+  const timelineReviewIds = reviewsWithTimeline.map(r => r.id);
+  
+  let timelineUpdates: any[] = [];
+  if (timelineReviewIds.length > 0) {
+    const { data: updatesData } = await supabase
+      .from('review_updates')
+      .select('review_id, rating, created_at')
+      .in('review_id', timelineReviewIds)
+      .not('rating', 'is', null)
+      .order('created_at', { ascending: false });
+    
+    timelineUpdates = updatesData || [];
+  }
+
+  // Calculate effective ratings for reviews
+  const effectiveReviewRatings = reviews.map(review => {
+    if (!review.has_timeline) {
+      return Number(review.rating);
+    }
+    
+    // Find the latest timeline update with a rating for this review
+    const latestUpdate = timelineUpdates.find(update => update.review_id === review.id);
+    if (latestUpdate && latestUpdate.rating !== null) {
+      return Number(latestUpdate.rating);
+    }
+    
+    // Fallback to original rating if no timeline updates with ratings
+    return Number(review.rating);
+  }).filter(rating => !isNaN(rating));
+
   // Combine all ratings
   const allRatings = [
     ...(recommendations || []).map(rec => Number(rec.rating)),
-    ...(reviews || []).map(rev => Number(rev.rating))
+    ...effectiveReviewRatings
   ].filter(rating => !isNaN(rating));
 
   // If no ratings, return null

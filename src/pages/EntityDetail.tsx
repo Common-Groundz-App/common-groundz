@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,7 +43,7 @@ const EntityDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('recommendations');
+  const [activeTab, setActiveTab] = useState('reviews');
   const { handleImageUpload } = useRecommendationUploads();
   
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
@@ -84,10 +83,10 @@ const EntityDetail = () => {
   // Add timeline summary hook
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
-  // Filter static reviews (reviews without timeline updates)
-  const staticReviews = React.useMemo(() => {
+  // Show all reviews in the Reviews tab (no filtering)
+  const allReviews = React.useMemo(() => {
     if (!reviews) return [];
-    return reviews.filter(review => !review.has_timeline || !review.timeline_count || review.timeline_count === 0);
+    return reviews;
   }, [reviews]);
 
   // Check if current user has reviewed this entity
@@ -129,7 +128,7 @@ const EntityDetail = () => {
       console.log('EntityDetail component received recommendations:', recommendations?.length);
       console.log('EntityDetail component received reviews:', reviews?.length);
       console.log('Dynamic reviews:', dynamicReviews.length);
-      console.log('Static reviews:', staticReviews.length);
+      console.log('Static reviews:', allReviews.length);
       console.log('User review:', userReview);
       if (recommendations?.length > 0) {
         console.log('Sample recommendation:', recommendations[0]);
@@ -138,7 +137,7 @@ const EntityDetail = () => {
         console.log('Sample review:', reviews[0]);
       }
     }
-  }, [isLoading, recommendations, reviews, dynamicReviews, staticReviews, userReview]);
+  }, [isLoading, recommendations, reviews, dynamicReviews, allReviews, userReview]);
 
   // Log contributors when available for debugging
   useEffect(() => {
@@ -688,7 +687,7 @@ const EntityDetail = () => {
                   </Button>
                 </div>
                 
-                {/* Content Tabs - Updated for Dynamic Reviews */}
+                {/* Content Tabs - Updated for All Reviews */}
                 <Tabs 
                   defaultValue="reviews" 
                   value={activeTab}
@@ -697,10 +696,10 @@ const EntityDetail = () => {
                 >
                   <TabsList className="grid w-full grid-cols-2 mb-6">
                     <TabsTrigger value="reviews" className="py-3">
-                      Reviews ({staticReviews.length})
+                      All Reviews ({allReviews.length})
                     </TabsTrigger>
                     <TabsTrigger value="dynamic-reviews" className="py-3 flex items-center gap-2">
-                      Dynamic Reviews ({dynamicReviews.length})
+                      Timeline Reviews ({dynamicReviews.length})
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Info className="h-3 w-3 text-muted-foreground" />
@@ -715,9 +714,9 @@ const EntityDetail = () => {
                     </TabsTrigger>
                   </TabsList>
                   
-                  {/* Static Reviews Tab */}
+                  {/* All Reviews Tab */}
                   <TabsContent value="reviews" className="space-y-4 mt-2">
-                    {!staticReviews || staticReviews.length === 0 ? (
+                    {!allReviews || allReviews.length === 0 ? (
                       <div className="py-12 text-center border rounded-lg bg-amber-50/30 dark:bg-amber-900/5">
                         <MessageSquare className="h-12 w-12 mx-auto text-amber-300 dark:text-amber-700" />
                         <h3 className="font-medium text-lg mt-4">No reviews yet</h3>
@@ -733,7 +732,7 @@ const EntityDetail = () => {
                       <>
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-muted-foreground">
-                            Showing {staticReviews.length} review{staticReviews.length !== 1 ? 's' : ''}
+                            Showing {allReviews.length} review{allReviews.length !== 1 ? 's' : ''}
                           </p>
                           <Button 
                             onClick={sidebarButtonConfig.action}
@@ -746,7 +745,7 @@ const EntityDetail = () => {
                           </Button>
                         </div>
                         <div className="space-y-4">
-                          {staticReviews.map((review) => (
+                          {allReviews.map((review) => (
                             <div key={review.id} className="relative">
                               <ReviewCard
                                 review={review}
@@ -755,7 +754,7 @@ const EntityDetail = () => {
                                 refreshReviews={refreshData}
                                 hideEntityFallbacks={true}
                                 compact={true}
-                                showTimelineFeatures={false}
+                                showTimelineFeatures={review.has_timeline && review.timeline_count && review.timeline_count > 0}
                               />
                               {/* Start Timeline Button for User's Own Static Reviews */}
                               {user && review.user_id === user.id && (!review.has_timeline || !review.timeline_count) && (
@@ -810,7 +809,7 @@ const EntityDetail = () => {
                         
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-muted-foreground">
-                            Showing {dynamicReviews.length} dynamic review{dynamicReviews.length !== 1 ? 's' : ''}
+                            Showing {dynamicReviews.length} timeline review{dynamicReviews.length !== 1 ? 's' : ''}
                           </p>
                           <Button 
                             onClick={sidebarButtonConfig.action}
