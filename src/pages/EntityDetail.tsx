@@ -699,7 +699,7 @@ const EntityDetail = () => {
                       All Reviews ({allReviews.length})
                     </TabsTrigger>
                     <TabsTrigger value="dynamic-reviews" className="py-3 flex items-center gap-2">
-                      Timeline Reviews ({dynamicReviews.length})
+                      Dynamic Reviews ({dynamicReviews.length})
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Info className="h-3 w-3 text-muted-foreground" />
