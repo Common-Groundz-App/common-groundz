@@ -206,7 +206,6 @@ const Search = () => {
                 {loadingStates.books && <Badge variant="outline" className="text-xs">📚 Books</Badge>}
                 {loadingStates.movies && <Badge variant="outline" className="text-xs">🎬 Movies</Badge>}
                 {loadingStates.places && <Badge variant="outline" className="text-xs">📍 Places</Badge>}
-                {loadingStates.food && <Badge variant="outline" className="text-xs">🍽️ Food</Badge>}
               </>
             )}
           </div>
