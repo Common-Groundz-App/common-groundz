@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
+import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
+import { PillTabs } from '@/components/ui/pill-tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Logo from '@/components/Logo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { ReviewResultItem } from '@/components/search/ReviewResultItem';
@@ -21,6 +22,7 @@ import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMes
 
 const Search = () => {
   const isMobile = useIsMobile();
+  const isTablet = useIsMobile(630); // Custom breakpoint for pill tabs
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const query = searchParams.get('q') || '';
@@ -44,6 +46,25 @@ const Search = () => {
     movies: false,
     places: false
   });
+
+  // Tab items configuration matching Explore page
+  const tabItems = [
+    { value: 'all', label: 'All', emoji: '🌟' },
+    { value: 'movies', label: 'Movies', emoji: '🎬' },
+    { value: 'books', label: 'Books', emoji: '📚' },
+    { value: 'places', label: 'Places', emoji: '📍' },
+    { value: 'products', label: 'Products', emoji: '🛍️' },
+    { value: 'users', label: 'People', emoji: '👥' }
+  ];
+
+  const tubelightTabItems = [
+    { value: 'all', label: 'All', icon: Star },
+    { value: 'movies', label: 'Movies', icon: Film },
+    { value: 'books', label: 'Books', icon: Book },
+    { value: 'places', label: 'Places', icon: MapPin },
+    { value: 'products', label: 'Products', icon: ShoppingBag },
+    { value: 'users', label: 'People', icon: Users }
+  ];
 
   // Use the faster enhanced realtime search hook for both main search and dropdown
   const { 
@@ -554,32 +575,40 @@ const Search = () => {
             
             {query ? (
               <>
-                <Tabs 
-                  defaultValue="all" 
-                  value={activeTab}
-                  onValueChange={setActiveTab}
-                  className="mb-6"
-                >
-                  <TabsList>
-                    <TabsTrigger value="all">All</TabsTrigger>
-                    <TabsTrigger value="movies">Movies</TabsTrigger>
-                    <TabsTrigger value="books">Books</TabsTrigger>
-                    <TabsTrigger value="places">Places</TabsTrigger>
-                    <TabsTrigger value="products">Products</TabsTrigger>
-                    <TabsTrigger value="users">People</TabsTrigger>
-                  </TabsList>
-                  
-                  <div className="mt-6">
-                    {isLoading || Object.values(loadingStates).some(Boolean) ? (
-                      renderEnhancedLoadingState()
-                    ) : error ? (
-                      <div className="flex flex-col items-center justify-center py-12">
-                        <AlertCircle className="h-8 w-8 text-destructive mb-4" />
-                        <p className="text-muted-foreground">{error}</p>
-                      </div>
-                    ) : (
-                      <>
-                        <TabsContent value="all">
+                {/* Responsive Navigation - Pills for mobile/tablet, TubelightTabs for desktop */}
+                {isTablet ? (
+                  <div className="mb-6">
+                    <PillTabs
+                      items={tabItems}
+                      activeTab={activeTab}
+                      onTabChange={setActiveTab}
+                    />
+                  </div>
+                ) : (
+                  <TubelightTabs
+                    defaultValue={activeTab}
+                    items={tubelightTabItems}
+                    onValueChange={setActiveTab}
+                    className="mb-6"
+                  >
+                    <TabsContent value={activeTab}>
+                      {/* Content will be rendered below */}
+                    </TabsContent>
+                  </TubelightTabs>
+                )}
+                
+                <div className="mt-6">
+                  {isLoading || Object.values(loadingStates).some(Boolean) ? (
+                    renderEnhancedLoadingState()
+                  ) : error ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <AlertCircle className="h-8 w-8 text-destructive mb-4" />
+                      <p className="text-muted-foreground">{error}</p>
+                    </div>
+                  ) : (
+                    <>
+                      {activeTab === 'all' && (
+                        <>
                           {/* Already on Groundz section - Priority 1 */}
                           {filteredResults.localResults.length > 0 && (
                             <div className="mb-8">
@@ -709,10 +738,12 @@ const Search = () => {
                               )}
                             </div>
                           )}
-                        </TabsContent>
-                        
-                        {/* Category-specific tabs */}
-                        <TabsContent value="movies">
+                        </>
+                      )}
+                      
+                      {/* Category-specific content */}
+                      {activeTab === 'movies' && (
+                        <>
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <Film className="h-5 w-5" /> Movies
                           </h2>
@@ -750,9 +781,11 @@ const Search = () => {
                               <p className="text-muted-foreground">No movies found for "{query}"</p>
                             </div>
                           )}
-                        </TabsContent>
-                        
-                        <TabsContent value="books">
+                        </>
+                      )}
+                      
+                      {activeTab === 'books' && (
+                        <>
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <Book className="h-5 w-5" /> Books
                           </h2>
@@ -790,9 +823,11 @@ const Search = () => {
                               <p className="text-muted-foreground">No books found for "{query}"</p>
                             </div>
                           )}
-                        </TabsContent>
-                        
-                        <TabsContent value="places">
+                        </>
+                      )}
+                      
+                      {activeTab === 'places' && (
+                        <>
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <MapPin className="h-5 w-5" /> Places
                           </h2>
@@ -830,9 +865,11 @@ const Search = () => {
                               <p className="text-muted-foreground">No places found for "{query}"</p>
                             </div>
                           )}
-                        </TabsContent>
-                        
-                        <TabsContent value="products">
+                        </>
+                      )}
+                      
+                      {activeTab === 'products' && (
+                        <>
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <ShoppingBag className="h-5 w-5" /> Products
                           </h2>
@@ -914,9 +951,11 @@ const Search = () => {
                               )}
                             </div>
                           )}
-                        </TabsContent>
-                        
-                        <TabsContent value="users">
+                        </>
+                      )}
+                      
+                      {activeTab === 'users' && (
+                        <>
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <Users className="h-5 w-5" /> People
                           </h2>
@@ -935,11 +974,11 @@ const Search = () => {
                               <p className="text-muted-foreground">No people found for "{query}"</p>
                             </div>
                           )}
-                        </TabsContent>
-                      </>
-                    )}
-                  </div>
-                </Tabs>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
               </>
             ) : (
               <div className="py-12 text-center">
