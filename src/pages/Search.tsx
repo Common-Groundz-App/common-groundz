@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -17,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Badge } from '@/components/ui/badge';
+import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
 
 const Search = () => {
   const isMobile = useIsMobile();
@@ -153,11 +153,22 @@ const Search = () => {
 
   const filteredResults = getFilteredResults();
 
-  // Enhanced loading screen with dynamic messages for all categories
+  // Enhanced loading screen with category-based loading facts
   const renderEnhancedLoadingState = () => {
     const capitalizedQuery = query.charAt(0).toUpperCase() + query.slice(1);
-    // Use a simple loading message instead of calling getRandomLoadingMessage
-    const loadingMessage = 'Searching across multiple sources...';
+    
+    // Determine category for loading facts
+    const getCategoryForFacts = (): EntityCategory => {
+      switch (activeTab) {
+        case 'movies': return 'movie';
+        case 'books': return 'book';
+        case 'places': return 'place';
+        case 'products': return 'product';
+        default: return 'product'; // Default for 'all' tab
+      }
+    };
+
+    const loadingFact = getRandomLoadingMessage(getCategoryForFacts());
 
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -172,35 +183,25 @@ const Search = () => {
         
         <div className="text-center max-w-md">
           <p className="text-muted-foreground mb-4">
-            {searchMode === 'deep' ? 
-              'Searching comprehensive sources across multiple APIs...' : 
-              loadingMessage
-            }
+            {loadingFact}
           </p>
           
-          <div className="flex gap-2 justify-center flex-wrap">
-            {searchMode === 'deep' ? (
-              <>
-                <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
-                  📚 Books {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
-                </Badge>
-                <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
-                  🎬 Movies {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
-                </Badge>
-                <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
-                  📍 Places {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
-                </Badge>
-                <Badge variant="default" className="text-xs">
-                  🛍️ Products <Loader2 className="w-3 h-3 ml-1 animate-spin" />
-                </Badge>
-              </>
-            ) : (
-              <>
-                {loadingStates.local && <Badge variant="outline" className="text-xs">🏠 Local DB</Badge>}
-                {loadingStates.external && <Badge variant="outline" className="text-xs">🌐 External APIs</Badge>}
-              </>
-            )}
-          </div>
+          {searchMode === 'deep' && (
+            <div className="flex gap-2 justify-center flex-wrap">
+              <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
+                📚 Books {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+              </Badge>
+              <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
+                🎬 Movies {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+              </Badge>
+              <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
+                📍 Places {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+              </Badge>
+              <Badge variant="default" className="text-xs">
+                🛍️ Products <Loader2 className="w-3 h-3 ml-1 animate-spin" />
+              </Badge>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -291,9 +292,6 @@ const Search = () => {
               <div className="mb-4 flex items-center gap-2">
                 <Badge variant={searchMode === 'quick' ? 'outline' : 'default'} className="text-xs">
                   {searchMode === 'quick' ? 'Quick Search' : 'Deep Search'}
-                </Badge>
-                <Badge variant="secondary" className="text-xs">
-                  Fast unified search
                 </Badge>
               </div>
             )}
