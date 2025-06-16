@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
@@ -40,24 +39,19 @@ function recordSuccess(service: keyof typeof circuitBreaker) {
   circuitBreaker[service].failures = 0
 }
 
-// Enhanced image URL processor
+// Smart image URL processor with less aggressive blocking
 function processImageUrl(originalUrl: string, entityType: string): string {
   if (!originalUrl) {
     return getEntityTypeFallbackImage(entityType)
   }
   
-  // Skip problematic domains entirely and use fallback
-  const problematicDomains = [
-    'books.google.com',
-    'googleusercontent.com', 
-    'covers.openlibrary.org',
-    'images-amazon.com',
-    'm.media-amazon.com'
-  ];
+  console.log('Processing image URL:', originalUrl, 'for type:', entityType);
   
-  if (problematicDomains.some(domain => originalUrl.includes(domain))) {
-    console.log('Skipping problematic image URL:', originalUrl);
-    return getEntityTypeFallbackImage(entityType);
+  // Convert HTTP to HTTPS for Google Books (they support HTTPS)
+  if (originalUrl.includes('books.google.com') && originalUrl.startsWith('http://')) {
+    const httpsUrl = originalUrl.replace('http://', 'https://');
+    console.log('Converted Google Books URL to HTTPS:', httpsUrl);
+    return httpsUrl;
   }
   
   // For Google Places images, use our proxy
@@ -72,13 +66,24 @@ function processImageUrl(originalUrl: string, entityType: string): string {
     }
   }
   
-  // Ensure HTTPS for other URLs
-  const secureUrl = originalUrl.replace('http:', 'https:');
+  // Only block truly problematic domains that cause CORS issues
+  const definitivelyBlockedDomains = [
+    'googleusercontent.com', // These definitely cause CORS issues
+    'covers.openlibrary.org', // Known to be unreliable
+    'images-amazon.com',      // Amazon blocks external requests
+    'm.media-amazon.com'      // Amazon blocks external requests
+  ];
   
-  // Block HTTP URLs (mixed content)
-  if (originalUrl.startsWith('http://')) {
-    console.log('Blocking HTTP URL (mixed content):', originalUrl);
+  if (definitivelyBlockedDomains.some(domain => originalUrl.includes(domain))) {
+    console.log('Blocking definitely problematic domain:', originalUrl);
     return getEntityTypeFallbackImage(entityType);
+  }
+  
+  // For all other URLs, try to ensure HTTPS
+  let secureUrl = originalUrl;
+  if (originalUrl.startsWith('http://')) {
+    secureUrl = originalUrl.replace('http://', 'https://');
+    console.log('Converted to HTTPS:', secureUrl);
   }
   
   return secureUrl;

@@ -27,35 +27,37 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
 
-  // Check if URL should be immediately blocked
+  // Check if URL should be immediately blocked (only for definitely problematic domains)
   const shouldBlockUrl = (url: string): boolean => {
     if (!url) return true;
     
-    // Block known problematic domains that cause CORS/401 errors
-    const blockedDomains = [
-      'maps.googleapis.com',
-      'books.google.com',
-      'googleusercontent.com',
-      'covers.openlibrary.org',
-      'images-amazon.com',
-      'm.media-amazon.com'
+    // Only block domains that are known to cause CORS issues or are unreliable
+    const definitivelyBlockedDomains = [
+      'googleusercontent.com', // Always causes CORS issues
+      'covers.openlibrary.org', // Known to be unreliable
+      'images-amazon.com',      // Amazon blocks external requests
+      'm.media-amazon.com'      // Amazon blocks external requests
     ];
     
-    // Block HTTP URLs (mixed content)
-    if (url.startsWith('http://')) {
-      if (!suppressConsoleErrors) {
-        console.log('ImageWithFallback: Blocking HTTP URL (mixed content):', url);
-      }
-      return true;
-    }
-    
     // Block problematic domains
-    const isBlocked = blockedDomains.some(domain => url.includes(domain));
+    const isBlocked = definitivelyBlockedDomains.some(domain => url.includes(domain));
     if (isBlocked && !suppressConsoleErrors) {
-      console.log('ImageWithFallback: Blocking problematic domain:', url);
+      console.log('ImageWithFallback: Blocking definitely problematic domain:', url);
     }
     
     return isBlocked;
+  };
+
+  // Convert HTTP Google Books URLs to HTTPS
+  const convertToHttps = (url: string): string => {
+    if (url.includes('books.google.com') && url.startsWith('http://')) {
+      const httpsUrl = url.replace('http://', 'https://');
+      if (!suppressConsoleErrors) {
+        console.log('ImageWithFallback: Converting Google Books URL to HTTPS:', httpsUrl);
+      }
+      return httpsUrl;
+    }
+    return ensureHttps(url) || url;
   };
 
   useEffect(() => {
@@ -86,8 +88,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         }
         setImgSrc(src);
       } else {
-        // For any other URL, validate and use HTTPS
-        if (!isValidImageUrl(src)) {
+        // For any other URL, try to convert to HTTPS and use it
+        const processedUrl = convertToHttps(src);
+        
+        if (!isValidImageUrl(processedUrl)) {
           if (!suppressConsoleErrors) {
             console.log("ImageWithFallback: Invalid image URL, using fallback for entity type:", entityType);
           }
@@ -96,16 +100,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           return;
         }
         
-        const secureUrl = ensureHttps(src);
-        if (!secureUrl) {
-          if (!suppressConsoleErrors) {
-            console.log("ImageWithFallback: Using fallback image for entity type:", entityType);
-          }
-          setImgSrc(actualFallback);
-          setHasError(true);
-        } else {
-          setImgSrc(secureUrl);
+        // Try the processed URL first, let browser handle any failures
+        if (!suppressConsoleErrors) {
+          console.log('ImageWithFallback: Trying processed URL:', processedUrl);
         }
+        setImgSrc(processedUrl);
       }
     } else {
       if (!suppressConsoleErrors) {
@@ -117,7 +116,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     if (!suppressConsoleErrors) {
-      console.log('ImageWithFallback: Image load error, using fallback for type:', entityType);
+      console.log('ImageWithFallback: Image load error, using fallback for type:', entityType, 'Original URL:', src);
     }
     
     setImgSrc(actualFallback);
