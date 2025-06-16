@@ -42,7 +42,7 @@ export function TubelightTabs({
   };
 
   return (
-    <RadixTabs.Root value={activeTab} onValueChange={handleTabChange} className="px-0 py-[96px]">
+    <RadixTabs.Root value={activeTab} onValueChange={handleTabChange} className="px-0 pt-4 pb-[96px]">
       <div className="flex justify-center mb-6">
         <RadixTabs.List className={cn(
           "flex items-center gap-2 py-1 px-1 rounded-full shadow-lg",
