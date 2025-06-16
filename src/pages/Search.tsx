@@ -13,7 +13,7 @@ import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
-import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe } from 'lucide-react';
+import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
@@ -35,7 +35,16 @@ const Search = () => {
     users: false
   });
 
-  // Use the faster enhanced realtime search hook
+  // Dropdown state for search suggestions
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownShowAll, setDropdownShowAll] = useState({
+    localResults: false,
+    books: false,
+    movies: false,
+    places: false
+  });
+
+  // Use the faster enhanced realtime search hook for both main search and dropdown
   const { 
     results, 
     isLoading, 
@@ -46,12 +55,39 @@ const Search = () => {
     searchMode
   } = useEnhancedRealtimeSearch(query, { mode: mode as 'quick' | 'deep' });
 
+  // Separate hook for dropdown search suggestions
+  const { 
+    results: dropdownResults,
+    isLoading: dropdownLoading
+  } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
+
   // Update the URL when search query changes
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim().length >= 2) {
       setSearchParams({ q: searchQuery, mode: 'quick' });
+      setShowDropdown(false);
     }
+  };
+
+  // Handle search input changes
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    // Show dropdown if query is 2+ characters and different from current query
+    if (value.trim().length >= 2 && value !== query) {
+      setShowDropdown(true);
+    } else {
+      setShowDropdown(false);
+    }
+  };
+
+  // Handle dropdown item click
+  const handleDropdownItemClick = (clickedQuery: string) => {
+    setSearchQuery(clickedQuery);
+    setSearchParams({ q: clickedQuery, mode: 'quick' });
+    setShowDropdown(false);
   };
 
   // Handle deep search request
@@ -73,6 +109,27 @@ const Search = () => {
       }));
     }
   };
+
+  // Handle dropdown "See More/Less" clicks
+  const handleDropdownViewAll = (section: keyof typeof dropdownShowAll) => {
+    setDropdownShowAll(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.search-dropdown-container')) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Filter results based on active tab using backend categorization
   const getFilteredResults = () => {
@@ -245,6 +302,196 @@ const Search = () => {
     return null;
   };
 
+  // Render search dropdown
+  const renderSearchDropdown = () => {
+    if (!showDropdown || searchQuery.trim().length < 2) return null;
+
+    const allLocalResults = [
+      ...dropdownResults.entities,
+      ...dropdownResults.reviews,
+      ...dropdownResults.recommendations
+    ];
+
+    const hasResults = allLocalResults.length > 0 || 
+                     dropdownResults.categorized?.books?.length > 0 ||
+                     dropdownResults.categorized?.movies?.length > 0 ||
+                     dropdownResults.categorized?.places?.length > 0;
+
+    return (
+      <div className="absolute top-full left-0 right-0 z-50 bg-background border border-border rounded-lg shadow-lg mt-1 max-h-96 overflow-y-auto">
+        {dropdownLoading ? (
+          <div className="p-4 text-center">
+            <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Searching...</p>
+          </div>
+        ) : hasResults ? (
+          <div className="p-2">
+            {/* Already on Groundz section */}
+            {allLocalResults.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between px-2 py-1">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    Already on Groundz
+                  </h3>
+                  {allLocalResults.length > 3 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDropdownViewAll('localResults')}
+                      className="text-xs h-6"
+                    >
+                      {dropdownShowAll.localResults ? (
+                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+                      ) : (
+                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {(dropdownShowAll.localResults ? allLocalResults : allLocalResults.slice(0, 3)).map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => handleDropdownItemClick(item.name || item.title)}
+                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                    >
+                      {renderLocalResultItem(item)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Books section */}
+            {dropdownResults.categorized?.books?.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between px-2 py-1">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Book className="w-4 h-4" />
+                    Books
+                  </h3>
+                  {dropdownResults.categorized.books.length > 3 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDropdownViewAll('books')}
+                      className="text-xs h-6"
+                    >
+                      {dropdownShowAll.books ? (
+                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+                      ) : (
+                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {(dropdownShowAll.books ? dropdownResults.categorized.books : dropdownResults.categorized.books.slice(0, 3)).map((book, index) => (
+                    <div
+                      key={`${book.api_source}-${book.api_ref || index}`}
+                      onClick={() => handleDropdownItemClick(book.name)}
+                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                    >
+                      <SearchResultHandler
+                        result={book}
+                        query={searchQuery}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Movies section */}
+            {dropdownResults.categorized?.movies?.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between px-2 py-1">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Film className="w-4 h-4" />
+                    Movies
+                  </h3>
+                  {dropdownResults.categorized.movies.length > 3 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDropdownViewAll('movies')}
+                      className="text-xs h-6"
+                    >
+                      {dropdownShowAll.movies ? (
+                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+                      ) : (
+                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {(dropdownShowAll.movies ? dropdownResults.categorized.movies : dropdownResults.categorized.movies.slice(0, 3)).map((movie, index) => (
+                    <div
+                      key={`${movie.api_source}-${movie.api_ref || index}`}
+                      onClick={() => handleDropdownItemClick(movie.name)}
+                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                    >
+                      <SearchResultHandler
+                        result={movie}
+                        query={searchQuery}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Places section */}
+            {dropdownResults.categorized?.places?.length > 0 && (
+              <div className="mb-2">
+                <div className="flex items-center justify-between px-2 py-1">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Places
+                  </h3>
+                  {dropdownResults.categorized.places.length > 3 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDropdownViewAll('places')}
+                      className="text-xs h-6"
+                    >
+                      {dropdownShowAll.places ? (
+                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+                      ) : (
+                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {(dropdownShowAll.places ? dropdownResults.categorized.places : dropdownResults.categorized.places.slice(0, 3)).map((place, index) => (
+                    <div
+                      key={`${place.api_source}-${place.api_ref || index}`}
+                      onClick={() => handleDropdownItemClick(place.name)}
+                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                    >
+                      <SearchResultHandler
+                        result={place}
+                        query={searchQuery}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            No results found for "{searchQuery}"
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       {isMobile && (
@@ -271,7 +518,7 @@ const Search = () => {
             
             <form onSubmit={handleSearch} className="mb-6">
               <div className="flex gap-2">
-                <div className="relative flex-grow">
+                <div className="relative flex-grow search-dropdown-container">
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                     <SearchIcon className="h-4 w-4 text-muted-foreground" />
                   </div>
@@ -279,9 +526,10 @@ const Search = () => {
                     type="text"
                     placeholder="Search for people, places, products..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={handleSearchInputChange}
                     className="pl-10"
                   />
+                  {renderSearchDropdown()}
                 </div>
                 <Button type="submit">Search</Button>
               </div>
