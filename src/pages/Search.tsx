@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -523,24 +522,25 @@ const Search = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
-          <div className="container p-3 mx-auto flex justify-start">
-            <Logo size="sm" />
-          </div>
+      {/* Mobile Header - only show on screens smaller than xl */}
+      <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+        <div className="container p-3 mx-auto flex justify-start">
+          <Logo size="sm" />
         </div>
-      )}
+      </div>
       
       <div className="flex flex-1">
-        {!isMobile && (
+        {/* Desktop Sidebar - only show on xl+ screens */}
+        <div className="hidden xl:block">
           <VerticalTubelightNavbar 
-            initialActiveTab="Explore"
+            initialActiveTab="Search"
             className="fixed left-0 top-0 h-screen pt-4" 
           />
-        )}
+        </div>
         
         <div className={cn(
-          "flex-1 pt-16 md:pl-64",
+          "flex-1",
+          "pt-16 xl:pt-0 xl:pl-64" // Mobile top padding, desktop left padding
         )}>
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <h1 className="text-3xl font-bold mb-6">Search</h1>
@@ -989,7 +989,10 @@ const Search = () => {
         </div>
       </div>
       
-      {isMobile && <BottomNavigation />}
+      {/* Mobile Bottom Navigation - only show on screens smaller than xl */}
+      <div className="xl:hidden">
+        <BottomNavigation />
+      </div>
     </div>
   );
 };
