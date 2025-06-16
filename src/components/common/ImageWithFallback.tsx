@@ -27,11 +27,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
 
-  // Check if URL should be immediately blocked (only for definitely problematic domains)
+  // Only block URLs that are known to definitely cause CORS issues
   const shouldBlockUrl = (url: string): boolean => {
     if (!url) return true;
     
-    // Only block domains that are known to cause CORS issues or are unreliable
+    // Only block domains that are confirmed to cause CORS issues
     const definitivelyBlockedDomains = [
       'googleusercontent.com', // Always causes CORS issues
       'covers.openlibrary.org', // Known to be unreliable
@@ -39,7 +39,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       'm.media-amazon.com'      // Amazon blocks external requests
     ];
     
-    // Block problematic domains
+    // Don't block Google Books since we convert them to HTTPS
     const isBlocked = definitivelyBlockedDomains.some(domain => url.includes(domain));
     if (isBlocked && !suppressConsoleErrors) {
       console.log('ImageWithFallback: Blocking definitely problematic domain:', url);
@@ -48,8 +48,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     return isBlocked;
   };
 
-  // Convert HTTP Google Books URLs to HTTPS
-  const convertToHttps = (url: string): string => {
+  // Convert HTTP to HTTPS and handle special cases
+  const processUrl = (url: string): string => {
+    if (!url) return url;
+    
+    // Convert HTTP Google Books URLs to HTTPS
     if (url.includes('books.google.com') && url.startsWith('http://')) {
       const httpsUrl = url.replace('http://', 'https://');
       if (!suppressConsoleErrors) {
@@ -57,6 +60,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       }
       return httpsUrl;
     }
+    
+    // For other URLs, try to ensure HTTPS
     return ensureHttps(url) || url;
   };
 
@@ -69,7 +74,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         console.log('ImageWithFallback: Processing image URL:', src);
       }
       
-      // Check if URL should be blocked immediately
+      // Check if URL should be blocked immediately (only for truly problematic domains)
       if (shouldBlockUrl(src)) {
         if (!suppressConsoleErrors) {
           console.log("ImageWithFallback: Using fallback for blocked URL, entity type:", entityType);
@@ -79,28 +84,32 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         return;
       }
       
-      // Allow our proxy URLs and other safe URLs
+      // Process the URL (convert to HTTPS if needed)
+      const processedUrl = processUrl(src);
+      
+      // Allow safe URLs directly
       if (src.includes('supabase.co/functions/v1/proxy-google-image') || 
           src.includes('images.unsplash.com') ||
-          src.includes('supabase.co/storage/v1/object/public/')) {
-        if (!suppressConsoleErrors) {
-          console.log('ImageWithFallback: Using safe URL:', src);
-        }
-        setImgSrc(src);
-      } else {
-        // For any other URL, try to convert to HTTPS and use it
-        const processedUrl = convertToHttps(src);
+          src.includes('supabase.co/storage/v1/object/public/') ||
+          processedUrl.startsWith('https://')) {
         
+        if (!suppressConsoleErrors) {
+          console.log('ImageWithFallback: Using processed URL:', processedUrl);
+        }
+        
+        // Basic URL validation
         if (!isValidImageUrl(processedUrl)) {
           if (!suppressConsoleErrors) {
-            console.log("ImageWithFallback: Invalid image URL, using fallback for entity type:", entityType);
+            console.log("ImageWithFallback: Invalid image URL format, using fallback for entity type:", entityType);
           }
           setImgSrc(actualFallback);
           setHasError(true);
           return;
         }
         
-        // Try the processed URL first, let browser handle any failures
+        setImgSrc(processedUrl);
+      } else {
+        // For other URLs, try the processed version and let the browser handle errors
         if (!suppressConsoleErrors) {
           console.log('ImageWithFallback: Trying processed URL:', processedUrl);
         }
