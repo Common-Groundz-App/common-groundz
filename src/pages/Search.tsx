@@ -563,15 +563,6 @@ const Search = () => {
                 <Button type="submit" className="flex-shrink-0">Search</Button>
               </div>
             </form>
-
-            {/* Search Mode Indicator */}
-            {query && (
-              <div className="mb-4 flex items-center gap-2">
-                <Badge variant={searchMode === 'quick' ? 'outline' : 'default'} className="text-xs">
-                  {searchMode === 'quick' ? 'Quick Search' : 'Deep Search'}
-                </Badge>
-              </div>
-            )}
             
             {query ? (
               <>
