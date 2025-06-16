@@ -86,22 +86,22 @@ export const useRealtimeUnifiedSearch = (query: string, options?: { mode?: 'quic
       setLoadingStates(prev => ({ ...prev, local: true }));
 
       try {
-        // Get query classification (non-blocking)
-        setLoadingStates(prev => ({ ...prev, classification: true }));
-        try {
-          const { data: classData, error: classError } = await supabase.functions.invoke('classify-search-query', {
-            body: { query }
-          });
-          
-          if (!classError && classData) {
-            setClassification(classData);
-            console.log('📊 Query classification:', classData);
-          }
-        } catch (classErr) {
-          console.error('Classification error (non-blocking):', classErr);
-        } finally {
-          setLoadingStates(prev => ({ ...prev, classification: false }));
-        }
+        // COMMENTED OUT: Get query classification (non-blocking)
+        // setLoadingStates(prev => ({ ...prev, classification: true }));
+        // try {
+        //   const { data: classData, error: classError } = await supabase.functions.invoke('classify-search-query', {
+        //     body: { query }
+        //   });
+        //   
+        //   if (!classError && classData) {
+        //     setClassification(classData);
+        //     console.log('📊 Query classification:', classData);
+        //   }
+        // } catch (classErr) {
+        //   console.error('Classification error (non-blocking):', classErr);
+        // } finally {
+        //   setLoadingStates(prev => ({ ...prev, classification: false }));
+        // }
 
         // Perform main search with graceful error handling
         try {
