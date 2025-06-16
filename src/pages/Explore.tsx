@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
+import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
@@ -36,7 +37,7 @@ const Explore = () => {
   const [activeTab, setActiveTab] = useState('featured');
   const navigate = useNavigate();
 
-  // Use the working realtime unified search hook
+  // Use the new enhanced realtime search hook
   const { 
     results, 
     isLoading, 
@@ -44,7 +45,7 @@ const Explore = () => {
     error,
     showAllResults,
     toggleShowAll
-  } = useRealtimeUnifiedSearch(searchQuery, { mode: 'quick' });
+  } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
 
   const handleResultClick = () => {
     setSearchQuery('');
@@ -142,7 +143,7 @@ const Explore = () => {
   // Show dropdown when user has typed at least 1 character
   const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1;
 
-  console.log('🔍 Search Debug:', {
+  console.log('🔍 Enhanced Search Debug:', {
     searchQuery,
     shouldShowDropdown,
     isLoading,
@@ -219,7 +220,7 @@ const Explore = () => {
                 )}
               </div>
               
-              {/* Search Results Dropdown - Always show when user types */}
+              {/* Enhanced Search Results Dropdown */}
               {shouldShowDropdown && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
                   
@@ -228,7 +229,7 @@ const Explore = () => {
                     <div className="p-3 text-center border-b">
                       <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Searching...</span>
+                        <span>Searching with enhanced reliability...</span>
                       </div>
                     </div>
                   )}
@@ -238,9 +239,8 @@ const Explore = () => {
                     <div className="p-3 text-center border-b bg-yellow-50">
                       <div className="flex items-center justify-center gap-2 text-sm text-yellow-700">
                         <AlertCircle className="w-4 h-4" />
-                        <span>Some search sources are unavailable</span>
+                        <span>{error}</span>
                       </div>
-                      <p className="text-xs mt-1 text-yellow-600">Showing available results below</p>
                     </div>
                   )}
                   
