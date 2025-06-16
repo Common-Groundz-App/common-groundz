@@ -46,15 +46,42 @@ function processImageUrl(originalUrl: string, entityType: string): string {
     return getEntityTypeFallbackImage(entityType)
   }
   
-  // Use our proxy for external images to avoid CORS issues
-  if (originalUrl.includes('books.google.com') || 
-      originalUrl.includes('googleusercontent.com') ||
-      originalUrl.includes('covers.openlibrary.org')) {
-    // Don't use external CORS proxy - return fallback immediately for problematic sources
-    return getEntityTypeFallbackImage(entityType)
+  // Skip problematic domains entirely and use fallback
+  const problematicDomains = [
+    'books.google.com',
+    'googleusercontent.com', 
+    'covers.openlibrary.org',
+    'images-amazon.com',
+    'm.media-amazon.com'
+  ];
+  
+  if (problematicDomains.some(domain => originalUrl.includes(domain))) {
+    console.log('Skipping problematic image URL:', originalUrl);
+    return getEntityTypeFallbackImage(entityType);
   }
   
-  return originalUrl.replace('http:', 'https:')
+  // For Google Places images, use our proxy
+  if (originalUrl.includes('maps.googleapis.com/maps/api/place/photo')) {
+    const url = new URL(originalUrl);
+    const photoReference = url.searchParams.get('photoreference');
+    const maxWidth = url.searchParams.get('maxwidth') || '400';
+    
+    if (photoReference) {
+      console.log('Using proxy for Google Places image:', photoReference);
+      return `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-image?ref=${photoReference}&maxWidth=${maxWidth}`;
+    }
+  }
+  
+  // Ensure HTTPS for other URLs
+  const secureUrl = originalUrl.replace('http:', 'https:');
+  
+  // Block HTTP URLs (mixed content)
+  if (originalUrl.startsWith('http://')) {
+    console.log('Blocking HTTP URL (mixed content):', originalUrl);
+    return getEntityTypeFallbackImage(entityType);
+  }
+  
+  return secureUrl;
 }
 
 function getEntityTypeFallbackImage(entityType: string): string {

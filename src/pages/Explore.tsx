@@ -194,7 +194,7 @@ const Explore = () => {
               </DropdownMenu>
             </div>
             
-            <div className="relative mb-6 overflow-hidden">
+            <div className="relative mb-6 overflow-visible">
               <div className="flex items-center border rounded-lg overflow-hidden bg-background min-w-0">
                 <div className="pl-3 text-muted-foreground shrink-0">
                   <Search size={18} />
@@ -220,13 +220,13 @@ const Explore = () => {
                 )}
               </div>
               
-              {/* Enhanced Search Results Dropdown */}
+              {/* Enhanced Search Results Dropdown - Fixed positioning and z-index */}
               {shouldShowDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-[70vh] overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto">
                   
                   {/* Loading State */}
                   {isLoading && (
-                    <div className="p-3 text-center border-b">
+                    <div className="p-3 text-center border-b bg-background">
                       <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span>Searching with enhanced reliability...</span>
@@ -236,8 +236,8 @@ const Explore = () => {
 
                   {/* Error State - Show but don't block results */}
                   {error && (
-                    <div className="p-3 text-center border-b bg-yellow-50">
-                      <div className="flex items-center justify-center gap-2 text-sm text-yellow-700">
+                    <div className="p-3 text-center border-b bg-yellow-50 dark:bg-yellow-900/20">
+                      <div className="flex items-center justify-center gap-2 text-sm text-yellow-700 dark:text-yellow-300">
                         <AlertCircle className="w-4 h-4" />
                         <span>{error}</span>
                       </div>
@@ -246,7 +246,7 @@ const Explore = () => {
                   
                   {/* Already on Groundz - Local Results (Priority Section) */}
                   {results.entities.length > 0 && (
-                    <div className="border-b last:border-b-0">
+                    <div className="border-b last:border-b-0 bg-background">
                       {renderSectionHeader('✨ Already on Groundz', results.entities.length, 'entities')}
                       {(showAllResults.entities ? results.entities : results.entities.slice(0, 3)).map((entity) => (
                         <EntityResultItem
@@ -260,7 +260,7 @@ const Explore = () => {
 
                   {/* Books from External APIs */}
                   {results.categorized?.books?.length > 0 && (
-                    <div className="border-b last:border-b-0">
+                    <div className="border-b last:border-b-0 bg-background">
                       {renderSectionHeader('📚 Books', results.categorized.books.length, 'books')}
                       {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
                         <SearchResultHandler
@@ -275,7 +275,7 @@ const Explore = () => {
 
                   {/* Movies from External APIs */}
                   {results.categorized?.movies?.length > 0 && (
-                    <div className="border-b last:border-b-0">
+                    <div className="border-b last:border-b-0 bg-background">
                       {renderSectionHeader('🎬 Movies', results.categorized.movies.length, 'movies')}
                       {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
                         <SearchResultHandler
@@ -290,7 +290,7 @@ const Explore = () => {
 
                   {/* Places from External APIs */}
                   {results.categorized?.places?.length > 0 && (
-                    <div className="border-b last:border-b-0">
+                    <div className="border-b last:border-b-0 bg-background">
                       {renderSectionHeader('📍 Places', results.categorized.places.length, 'places')}
                       {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
                         <SearchResultHandler
@@ -305,7 +305,7 @@ const Explore = () => {
                   
                   {/* People */}
                   {results.users.length > 0 && (
-                    <div className="border-b last:border-b-0">
+                    <div className="border-b last:border-b-0 bg-background">
                       {renderSectionHeader('👥 People', results.users.length, 'users')}
                       {(showAllResults.users ? results.users : results.users.slice(0, 3)).map((user) => (
                         <UserResultItem
@@ -319,7 +319,7 @@ const Explore = () => {
 
                   {/* Complex Product Search Option - Always show */}
                   {searchQuery.length >= 2 && (
-                    <div className="p-3 text-center border-t">
+                    <div className="p-3 text-center border-t bg-background">
                       <button 
                         className="text-sm text-primary hover:underline flex items-center justify-center w-full"
                         onClick={handleComplexProductSearch}
@@ -332,7 +332,7 @@ const Explore = () => {
 
                   {/* No Results State - Only show when not loading and no results */}
                   {!hasLocalResults && !hasExternalResults && !isLoading && (
-                    <div className="p-4 text-center">
+                    <div className="p-4 text-center bg-background">
                       <p className="text-sm text-muted-foreground mb-2">No immediate results found</p>
                       <button 
                         className="text-sm text-primary hover:underline"
