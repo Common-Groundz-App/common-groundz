@@ -30,12 +30,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const shouldBlockUrl = (url: string): boolean => {
     if (!url) return true;
     
-    // Block domains that are confirmed to cause CORS issues (excluding Google Books now that we proxy them)
+    // Block domains that are confirmed to cause CORS issues 
+    // (excluding Google Books and Amazon movies now that we proxy them)
     const definitivelyBlockedDomains = [
       'googleusercontent.com',  // Always causes CORS issues
-      'covers.openlibrary.org', // Known to be unreliable
-      'images-amazon.com',      // Amazon blocks external requests
-      'm.media-amazon.com'      // Amazon blocks external requests
+      'covers.openlibrary.org'  // Known to be unreliable
     ];
     
     const isBlocked = definitivelyBlockedDomains.some(domain => url.includes(domain));
@@ -76,9 +75,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       // Process the URL (convert to HTTPS if needed)
       const processedUrl = processUrl(src);
       
-      // Allow safe URLs directly (including our proxied Google Books URLs)
+      // Allow safe URLs directly (including our proxied URLs)
       if (src.includes('supabase.co/functions/v1/proxy-google-books') ||
           src.includes('supabase.co/functions/v1/proxy-google-image') || 
+          src.includes('supabase.co/functions/v1/proxy-movie-image') ||
           src.includes('images.unsplash.com') ||
           src.includes('supabase.co/storage/v1/object/public/') ||
           processedUrl.startsWith('https://')) {

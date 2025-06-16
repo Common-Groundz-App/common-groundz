@@ -33,3 +33,6 @@ verify_jwt = false
 
 [functions.proxy-google-books]
 verify_jwt = false
+
+[functions.proxy-movie-image]
+verify_jwt = false

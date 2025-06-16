@@ -39,7 +39,7 @@ function recordSuccess(service: keyof typeof circuitBreaker) {
   circuitBreaker[service].failures = 0
 }
 
-// Smart image URL processor with Google Books proxy
+// Smart image URL processor with Google Books and Movie Image proxies
 function processImageUrl(originalUrl: string, entityType: string): string {
   if (!originalUrl) {
     return getEntityTypeFallbackImage(entityType)
@@ -71,12 +71,22 @@ function processImageUrl(originalUrl: string, entityType: string): string {
     return `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-books?url=${encodeURIComponent(httpsUrl)}`;
   }
   
-  // Block domains that cause CORS issues (excluding Google Books now that we proxy them)
+  // For movie images from Amazon (OMDB), use our proxy
+  if (originalUrl.includes('m.media-amazon.com') || originalUrl.includes('images-amazon.com')) {
+    // Convert to HTTPS if needed
+    let httpsUrl = originalUrl;
+    if (originalUrl.startsWith('http://')) {
+      httpsUrl = originalUrl.replace('http://', 'https://');
+    }
+    
+    console.log('Using proxy for movie image:', httpsUrl);
+    return `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-movie-image?url=${encodeURIComponent(httpsUrl)}`;
+  }
+  
+  // Block domains that cause CORS issues (excluding Google Books and Amazon movies now that we proxy them)
   const definitivelyBlockedDomains = [
     'googleusercontent.com',  // These definitely cause CORS issues
-    'covers.openlibrary.org', // Known to be unreliable
-    'images-amazon.com',      // Amazon blocks external requests
-    'm.media-amazon.com'      // Amazon blocks external requests
+    'covers.openlibrary.org'  // Known to be unreliable
   ];
   
   if (definitivelyBlockedDomains.some(domain => originalUrl.includes(domain))) {
