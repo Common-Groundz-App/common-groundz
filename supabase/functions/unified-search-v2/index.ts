@@ -39,7 +39,7 @@ function recordSuccess(service: keyof typeof circuitBreaker) {
   circuitBreaker[service].failures = 0
 }
 
-// Smart image URL processor with less aggressive blocking
+// Smart image URL processor with Google Books proxy
 function processImageUrl(originalUrl: string, entityType: string): string {
   if (!originalUrl) {
     return getEntityTypeFallbackImage(entityType)
@@ -59,9 +59,20 @@ function processImageUrl(originalUrl: string, entityType: string): string {
     }
   }
   
-  // Block domains that cause CORS issues - including Google Books
+  // For Google Books images, use our proxy
+  if (originalUrl.includes('books.google.com/books/content')) {
+    // First convert to HTTPS if needed
+    let httpsUrl = originalUrl;
+    if (originalUrl.startsWith('http://')) {
+      httpsUrl = originalUrl.replace('http://', 'https://');
+    }
+    
+    console.log('Using proxy for Google Books image:', httpsUrl);
+    return `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-books?url=${encodeURIComponent(httpsUrl)}`;
+  }
+  
+  // Block domains that cause CORS issues (excluding Google Books now that we proxy them)
   const definitivelyBlockedDomains = [
-    'books.google.com',       // Google Books API has CORS restrictions
     'googleusercontent.com',  // These definitely cause CORS issues
     'covers.openlibrary.org', // Known to be unreliable
     'images-amazon.com',      // Amazon blocks external requests
