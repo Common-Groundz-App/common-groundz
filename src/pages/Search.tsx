@@ -15,8 +15,9 @@ import { RecommendationResultItem } from '@/components/search/RecommendationResu
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
 import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe } from 'lucide-react';
-import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
+import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
 import { Badge } from '@/components/ui/badge';
+import { getRandomLoadingMessage } from '@/utils/loadingMessages';
 
 const Search = () => {
   const isMobile = useIsMobile();
@@ -35,16 +36,15 @@ const Search = () => {
     users: false
   });
 
-  // Use the faster enhanced realtime search hook
+  // Use the new realtime unified search hook with mode parameter
   const { 
     results, 
     isLoading, 
     loadingStates, 
-    error,
-    showAllResults,
-    toggleShowAll,
+    error, 
+    classification,
     searchMode
-  } = useEnhancedRealtimeSearch(query, { mode: mode as 'quick' | 'deep' });
+  } = useRealtimeUnifiedSearch(query, { mode: mode as 'quick' | 'deep' });
 
   // Update the URL when search query changes
   const handleSearch = (e: React.FormEvent) => {
@@ -87,7 +87,7 @@ const Search = () => {
       movies: results.categorized?.movies || [],
       books: results.categorized?.books || [],
       places: results.categorized?.places || [],
-      // General products that don't fall into specific categories
+      // General products that don't fall into specific categories - fixed filtering logic
       products: results.products.filter(p => {
         const movieRefs = (results.categorized?.movies || []).map(item => item.api_ref);
         const bookRefs = (results.categorized?.books || []).map(item => item.api_ref);
@@ -156,8 +156,8 @@ const Search = () => {
   // Enhanced loading screen with dynamic messages for all categories
   const renderEnhancedLoadingState = () => {
     const capitalizedQuery = query.charAt(0).toUpperCase() + query.slice(1);
-    // Use a simple loading message instead of calling getRandomLoadingMessage
-    const loadingMessage = 'Searching across multiple sources...';
+    const category = classification?.classification || 'general';
+    const loadingMessage = getRandomLoadingMessage(category as any);
 
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -178,17 +178,25 @@ const Search = () => {
             }
           </p>
           
+          {classification && (
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Badge variant="secondary" className="text-xs">
+                {classification.classification} ({Math.round(classification.confidence * 100)}% confidence)
+              </Badge>
+            </div>
+          )}
+          
           <div className="flex gap-2 justify-center flex-wrap">
             {searchMode === 'deep' ? (
               <>
-                <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
-                  📚 Books {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+                <Badge variant={loadingStates.books ? "default" : "outline"} className="text-xs">
+                  📚 Books {loadingStates.books && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
                 </Badge>
-                <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
-                  🎬 Movies {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+                <Badge variant={loadingStates.movies ? "default" : "outline"} className="text-xs">
+                  🎬 Movies {loadingStates.movies && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
                 </Badge>
-                <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
-                  📍 Places {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+                <Badge variant={loadingStates.places ? "default" : "outline"} className="text-xs">
+                  📍 Places {loadingStates.places && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
                 </Badge>
                 <Badge variant="default" className="text-xs">
                   🛍️ Products <Loader2 className="w-3 h-3 ml-1 animate-spin" />
@@ -196,8 +204,9 @@ const Search = () => {
               </>
             ) : (
               <>
-                {loadingStates.local && <Badge variant="outline" className="text-xs">🏠 Local DB</Badge>}
-                {loadingStates.external && <Badge variant="outline" className="text-xs">🌐 External APIs</Badge>}
+                {loadingStates.books && <Badge variant="outline" className="text-xs">📚 Books</Badge>}
+                {loadingStates.movies && <Badge variant="outline" className="text-xs">🎬 Movies</Badge>}
+                {loadingStates.places && <Badge variant="outline" className="text-xs">📍 Places</Badge>}
               </>
             )}
           </div>
@@ -292,9 +301,11 @@ const Search = () => {
                 <Badge variant={searchMode === 'quick' ? 'outline' : 'default'} className="text-xs">
                   {searchMode === 'quick' ? 'Quick Search' : 'Deep Search'}
                 </Badge>
-                <Badge variant="secondary" className="text-xs">
-                  Fast unified search
-                </Badge>
+                {classification && (
+                  <Badge variant="secondary" className="text-xs">
+                    {classification.classification} ({Math.round(classification.confidence * 100)}%)
+                  </Badge>
+                )}
               </div>
             )}
             
