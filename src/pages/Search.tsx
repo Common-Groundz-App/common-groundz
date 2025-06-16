@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -83,11 +84,18 @@ const Search = () => {
     }
   };
 
-  // Handle dropdown item click
+  // Handle dropdown item click with proper type handling
   const handleDropdownItemClick = (clickedQuery: string) => {
     setSearchQuery(clickedQuery);
     setSearchParams({ q: clickedQuery, mode: 'quick' });
     setShowDropdown(false);
+  };
+
+  // Helper function to get the display name from different result types
+  const getResultDisplayName = (item: any): string => {
+    if ('name' in item) return item.name;
+    if ('title' in item) return item.title;
+    return 'Unknown';
   };
 
   // Handle deep search request
@@ -353,7 +361,7 @@ const Search = () => {
                   {(dropdownShowAll.localResults ? allLocalResults : allLocalResults.slice(0, 3)).map((item) => (
                     <div
                       key={item.id}
-                      onClick={() => handleDropdownItemClick(item.name || item.title)}
+                      onClick={() => handleDropdownItemClick(getResultDisplayName(item))}
                       className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
                     >
                       {renderLocalResultItem(item)}
