@@ -47,13 +47,6 @@ function processImageUrl(originalUrl: string, entityType: string): string {
   
   console.log('Processing image URL:', originalUrl, 'for type:', entityType);
   
-  // Convert HTTP to HTTPS for Google Books (they support HTTPS)
-  if (originalUrl.includes('books.google.com') && originalUrl.startsWith('http://')) {
-    const httpsUrl = originalUrl.replace('http://', 'https://');
-    console.log('Converted Google Books URL to HTTPS:', httpsUrl);
-    return httpsUrl;
-  }
-  
   // For Google Places images, use our proxy
   if (originalUrl.includes('maps.googleapis.com/maps/api/place/photo')) {
     const url = new URL(originalUrl);
@@ -66,16 +59,17 @@ function processImageUrl(originalUrl: string, entityType: string): string {
     }
   }
   
-  // Only block truly problematic domains that cause CORS issues
+  // Block domains that cause CORS issues - including Google Books
   const definitivelyBlockedDomains = [
-    'googleusercontent.com', // These definitely cause CORS issues
+    'books.google.com',       // Google Books API has CORS restrictions
+    'googleusercontent.com',  // These definitely cause CORS issues
     'covers.openlibrary.org', // Known to be unreliable
     'images-amazon.com',      // Amazon blocks external requests
     'm.media-amazon.com'      // Amazon blocks external requests
   ];
   
   if (definitivelyBlockedDomains.some(domain => originalUrl.includes(domain))) {
-    console.log('Blocking definitely problematic domain:', originalUrl);
+    console.log('Blocking CORS-problematic domain:', originalUrl);
     return getEntityTypeFallbackImage(entityType);
   }
   

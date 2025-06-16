@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ensureHttps } from '@/utils/urlUtils';
 import { isValidImageUrl, isGooglePlacesImage, getEntityTypeFallbackImage } from '@/utils/imageUtils';
@@ -31,18 +30,18 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const shouldBlockUrl = (url: string): boolean => {
     if (!url) return true;
     
-    // Only block domains that are confirmed to cause CORS issues
+    // Block domains that are confirmed to cause CORS issues
     const definitivelyBlockedDomains = [
-      'googleusercontent.com', // Always causes CORS issues
+      'books.google.com',       // Google Books API has CORS restrictions
+      'googleusercontent.com',  // Always causes CORS issues
       'covers.openlibrary.org', // Known to be unreliable
       'images-amazon.com',      // Amazon blocks external requests
       'm.media-amazon.com'      // Amazon blocks external requests
     ];
     
-    // Don't block Google Books since we convert them to HTTPS
     const isBlocked = definitivelyBlockedDomains.some(domain => url.includes(domain));
     if (isBlocked && !suppressConsoleErrors) {
-      console.log('ImageWithFallback: Blocking definitely problematic domain:', url);
+      console.log('ImageWithFallback: Blocking CORS-problematic domain:', url);
     }
     
     return isBlocked;
@@ -51,15 +50,6 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   // Convert HTTP to HTTPS and handle special cases
   const processUrl = (url: string): string => {
     if (!url) return url;
-    
-    // Convert HTTP Google Books URLs to HTTPS
-    if (url.includes('books.google.com') && url.startsWith('http://')) {
-      const httpsUrl = url.replace('http://', 'https://');
-      if (!suppressConsoleErrors) {
-        console.log('ImageWithFallback: Converting Google Books URL to HTTPS:', httpsUrl);
-      }
-      return httpsUrl;
-    }
     
     // For other URLs, try to ensure HTTPS
     return ensureHttps(url) || url;
