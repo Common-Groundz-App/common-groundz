@@ -35,6 +35,24 @@ interface GoogleBooksResponse {
   totalItems: number;
 }
 
+// Function to process image URLs through our proxy
+const processImageUrl = (originalUrl: string): string => {
+  if (!originalUrl) {
+    return 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=1000';
+  }
+  
+  // Convert to HTTPS first
+  const httpsUrl = originalUrl.replace('http:', 'https:');
+  
+  // Check if it's a Google Books image that needs proxying
+  if (httpsUrl.includes('books.google.com') || httpsUrl.includes('googleusercontent.com')) {
+    // Use our CORS proxy for Google Books images
+    return `https://api.allorigins.win/raw?url=${encodeURIComponent(httpsUrl)}`;
+  }
+  
+  return httpsUrl;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -87,7 +105,7 @@ serve(async (req) => {
       )
     }
 
-    // Transform Google Books data to our format
+    // Transform Google Books data to our format with proper image URL processing
     const transformedResults = data.items.map((item: GoogleBooksItem) => {
       const volumeInfo = item.volumeInfo
       
@@ -99,13 +117,18 @@ serve(async (req) => {
         isbn = isbn13?.identifier || isbn10?.identifier || ''
       }
 
+      // Process image URL through our proxy to avoid CORS issues
+      const originalImageUrl = volumeInfo.imageLinks?.thumbnail || volumeInfo.imageLinks?.smallThumbnail || '';
+      const processedImageUrl = processImageUrl(originalImageUrl);
+      
+      console.log(`📚 Book: ${volumeInfo.title}, Original image: ${originalImageUrl}, Processed: ${processedImageUrl}`);
+
       return {
         id: item.id,
         name: volumeInfo.title,
         authors: volumeInfo.authors || [],
         description: volumeInfo.description || '',
-        image_url: volumeInfo.imageLinks?.thumbnail?.replace('http:', 'https:') || 
-                   volumeInfo.imageLinks?.smallThumbnail?.replace('http:', 'https:') || '',
+        image_url: processedImageUrl,
         publication_year: volumeInfo.publishedDate ? parseInt(volumeInfo.publishedDate.split('-')[0]) : null,
         isbn: isbn,
         api_source: 'google_books',
@@ -130,7 +153,7 @@ serve(async (req) => {
       }
     })
 
-    console.log(`✅ Found ${transformedResults.length} books from Google Books`)
+    console.log(`✅ Found ${transformedResults.length} books from Google Books with processed image URLs`)
 
     return new Response(
       JSON.stringify({ 

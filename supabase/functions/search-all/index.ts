@@ -116,19 +116,21 @@ serve(async (req) => {
 
     // 2. Search external APIs with individual error handling
     if (mode === 'quick') {
-      // Books search
+      // Books search with enhanced error handling
       try {
         console.log('📚 Searching books...')
-        const { data: bookData, error: bookError } = await supabase.functions.invoke('search-books', {
+        const bookStartTime = Date.now();
+        const { data: bookData, error: bookError } = await supabase.functions.invoke('search-google-books', {
           body: { query, maxResults: 8 }
         })
+        const bookDuration = Date.now() - bookStartTime;
         
         if (bookError) {
           console.error('Book search error:', bookError)
           errors.push('Book search temporarily unavailable')
         } else if (bookData?.results) {
           results.categorized.books = bookData.results
-          console.log(`📚 Found ${bookData.results.length} books`)
+          console.log(`📚 Found ${bookData.results.length} books (${bookDuration}ms)`)
         }
       } catch (bookError) {
         console.error('Book search failed:', bookError)
@@ -138,16 +140,18 @@ serve(async (req) => {
       // Movies search
       try {
         console.log('🎬 Searching movies...')
+        const movieStartTime = Date.now();
         const { data: movieData, error: movieError } = await supabase.functions.invoke('search-movies', {
           body: { query, maxResults: 5 }
         })
+        const movieDuration = Date.now() - movieStartTime;
         
         if (movieError) {
           console.error('Movie search error:', movieError)
           errors.push('Movie search temporarily unavailable')
         } else if (movieData?.results) {
           results.categorized.movies = movieData.results
-          console.log(`🎬 Found ${movieData.results.length} movies`)
+          console.log(`🎬 Found ${movieData.results.length} movies (${movieDuration}ms)`)
         }
       } catch (movieError) {
         console.error('Movie search failed:', movieError)
@@ -157,16 +161,18 @@ serve(async (req) => {
       // Places search
       try {
         console.log('📍 Searching places...')
+        const placeStartTime = Date.now();
         const { data: placeData, error: placeError } = await supabase.functions.invoke('search-places', {
           body: { query, maxResults: 20 }
         })
+        const placeDuration = Date.now() - placeStartTime;
         
         if (placeError) {
           console.error('Place search error:', placeError)
           errors.push('Place search temporarily unavailable')
         } else if (placeData?.results) {
           results.categorized.places = placeData.results
-          console.log(`📍 Found ${placeData.results.length} places`)
+          console.log(`📍 Found ${placeData.results.length} places (${placeDuration}ms)`)
         }
       } catch (placeError) {
         console.error('Place search failed:', placeError)
@@ -243,6 +249,11 @@ serve(async (req) => {
     console.log(`🎬 Found ${results.categorized.movies.length} movie results`)
     console.log(`📚 Found ${results.categorized.books.length} book results`)
     console.log(`📍 Found ${results.categorized.places.length} place results`)
+
+    // Log any errors that occurred
+    if (errors.length > 0) {
+      console.log(`⚠️ Search completed with ${errors.length} errors:`, errors);
+    }
 
     const responseData = {
       ...results,
