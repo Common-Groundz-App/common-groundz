@@ -521,15 +521,15 @@ const Search = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       {/* Mobile Header - only show on screens smaller than xl */}
       <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
-        <div className="container p-3 mx-auto flex justify-start">
+        <div className="container p-3 mx-auto flex justify-start min-w-0">
           <Logo size="sm" />
         </div>
       </div>
       
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-w-0">
         {/* Desktop Sidebar - only show on xl+ screens */}
         <div className="hidden xl:block">
           <VerticalTubelightNavbar 
@@ -539,15 +539,15 @@ const Search = () => {
         </div>
         
         <div className={cn(
-          "flex-1",
+          "flex-1 min-w-0",
           "pt-16 xl:pt-0 xl:pl-64" // Mobile top padding, desktop left padding
         )}>
-          <div className="container max-w-4xl mx-auto p-4 md:p-8">
+          <div className="container max-w-4xl mx-auto p-4 md:p-8 min-w-0">
             <h1 className="text-3xl font-bold mb-6">Search</h1>
             
             <form onSubmit={handleSearch} className="mb-6">
-              <div className="flex gap-2">
-                <div className="relative flex-grow search-dropdown-container">
+              <div className="flex gap-2 min-w-0">
+                <div className="relative flex-grow search-dropdown-container min-w-0">
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                     <SearchIcon className="h-4 w-4 text-muted-foreground" />
                   </div>
@@ -556,11 +556,11 @@ const Search = () => {
                     placeholder="Search for people, places, products..."
                     value={searchQuery}
                     onChange={handleSearchInputChange}
-                    className="pl-10"
+                    className="pl-10 min-w-0"
                   />
                   {renderSearchDropdown()}
                 </div>
-                <Button type="submit">Search</Button>
+                <Button type="submit" className="flex-shrink-0">Search</Button>
               </div>
             </form>
 
@@ -577,7 +577,7 @@ const Search = () => {
               <>
                 {/* Responsive Navigation - Pills for mobile/tablet, TubelightTabs for desktop */}
                 {isTablet ? (
-                  <div className="mb-6">
+                  <div className="mb-6 overflow-x-auto">
                     <PillTabs
                       items={tabItems}
                       activeTab={activeTab}
@@ -585,19 +585,21 @@ const Search = () => {
                     />
                   </div>
                 ) : (
-                  <TubelightTabs
-                    defaultValue={activeTab}
-                    items={tubelightTabItems}
-                    onValueChange={setActiveTab}
-                    className="mb-6"
-                  >
-                    <TabsContent value={activeTab}>
-                      {/* Content will be rendered below */}
-                    </TabsContent>
-                  </TubelightTabs>
+                  <div className="mb-6 overflow-x-auto">
+                    <TubelightTabs
+                      defaultValue={activeTab}
+                      items={tubelightTabItems}
+                      onValueChange={setActiveTab}
+                      className="mb-6"
+                    >
+                      <TabsContent value={activeTab}>
+                        {/* Content will be rendered below */}
+                      </TabsContent>
+                    </TubelightTabs>
+                  </div>
                 )}
                 
-                <div className="mt-6">
+                <div className="mt-6 min-w-0">
                   {isLoading || Object.values(loadingStates).some(Boolean) ? (
                     renderEnhancedLoadingState()
                   ) : error ? (
@@ -611,11 +613,11 @@ const Search = () => {
                         <>
                           {/* Already on Groundz section - Priority 1 */}
                           {filteredResults.localResults.length > 0 && (
-                            <div className="mb-8">
+                            <div className="mb-8 min-w-0">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                 <Star className="h-5 w-5 text-yellow-500" /> Already on Groundz
                               </h2>
-                              <div className="border rounded-md overflow-hidden">
+                              <div className="border rounded-md overflow-hidden min-w-0">
                                 {(showAllStates.localResults ? filteredResults.localResults : filteredResults.localResults.slice(0, 5)).map((item) => renderLocalResultItem(item))}
                               </div>
                               {filteredResults.localResults.length > 5 && (
@@ -633,14 +635,14 @@ const Search = () => {
                           
                           {/* All Items section */}
                           {filteredResults.externalResults.length > 0 && (
-                            <div className="mb-8">
+                            <div className="mb-8 min-w-0">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                 <Globe className="h-5 w-5" /> All Items
                               </h2>
                               <p className="text-sm text-muted-foreground mb-4">
                                 Everything we found related to your search.
                               </p>
-                              <div className="space-y-2">
+                              <div className="space-y-2 min-w-0">
                                 {(showAllStates.externalResults ? filteredResults.externalResults : filteredResults.externalResults.slice(0, 8)).map((product, index) => (
                                   <SearchResultHandler
                                     key={`${product.api_source}-${product.api_ref || index}`}
@@ -664,11 +666,11 @@ const Search = () => {
                           
                           {/* People section */}
                           {results.users.length > 0 && (
-                            <div className="mb-8">
+                            <div className="mb-8 min-w-0">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                 <Users className="h-5 w-5" /> People
                               </h2>
-                              <div className="border rounded-md overflow-hidden">
+                              <div className="border rounded-md overflow-hidden min-w-0">
                                 {results.users.slice(0, 5).map((user) => (
                                   <UserResultItem
                                     key={user.id}
@@ -692,7 +694,7 @@ const Search = () => {
                           
                           {/* Enhanced Deep Search CTA for all tabs when no results */}
                           {searchMode === 'quick' && (
-                            <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10">
+                            <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
                               <h3 className="text-lg font-semibold mb-2">🔍 Want more comprehensive results?</h3>
                               <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
                                 Deep Search analyzes multiple sources including specialized APIs for movies, books, places, and products
@@ -748,13 +750,13 @@ const Search = () => {
                             <Film className="h-5 w-5" /> Movies
                           </h2>
                           {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
-                            <div className="space-y-6">
+                            <div className="space-y-6 min-w-0">
                               {filteredResults.localResults.length > 0 && (
                                 <div>
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
-                                  <div className="border rounded-md overflow-hidden">
+                                  <div className="border rounded-md overflow-hidden min-w-0">
                                     {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
                                   </div>
                                 </div>
@@ -764,7 +766,7 @@ const Search = () => {
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                                     <Globe className="h-4 w-4" /> All Movies
                                   </h3>
-                                  <div className="space-y-2">
+                                  <div className="space-y-2 min-w-0">
                                     {filteredResults.externalResults.map((movie, index) => (
                                       <SearchResultHandler
                                         key={`${movie.api_source}-${movie.api_ref || index}`}
@@ -790,13 +792,13 @@ const Search = () => {
                             <Book className="h-5 w-5" /> Books
                           </h2>
                           {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
-                            <div className="space-y-6">
+                            <div className="space-y-6 min-w-0">
                               {filteredResults.localResults.length > 0 && (
                                 <div>
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
-                                  <div className="border rounded-md overflow-hidden">
+                                  <div className="border rounded-md overflow-hidden min-w-0">
                                     {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
                                   </div>
                                 </div>
@@ -806,7 +808,7 @@ const Search = () => {
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                                     <Globe className="h-4 w-4" /> All Books
                                   </h3>
-                                  <div className="space-y-2">
+                                  <div className="space-y-2 min-w-0">
                                     {filteredResults.externalResults.map((book, index) => (
                                       <SearchResultHandler
                                         key={`${book.api_source}-${book.api_ref || index}`}
@@ -832,13 +834,13 @@ const Search = () => {
                             <MapPin className="h-5 w-5" /> Places
                           </h2>
                           {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
-                            <div className="space-y-6">
+                            <div className="space-y-6 min-w-0">
                               {filteredResults.localResults.length > 0 && (
                                 <div>
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
-                                  <div className="border rounded-md overflow-hidden">
+                                  <div className="border rounded-md overflow-hidden min-w-0">
                                     {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
                                   </div>
                                 </div>
@@ -848,7 +850,7 @@ const Search = () => {
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                                     <Globe className="h-4 w-4" /> All Places
                                   </h3>
-                                  <div className="space-y-2">
+                                  <div className="space-y-2 min-w-0">
                                     {filteredResults.externalResults.map((place, index) => (
                                       <SearchResultHandler
                                         key={`${place.api_source}-${place.api_ref || index}`}
@@ -876,7 +878,7 @@ const Search = () => {
                           
                           {/* Deep Search CTA for products tab */}
                           {searchMode === 'quick' && filteredResults.externalResults.length === 0 && (
-                            <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20">
+                            <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20 min-w-0">
                               <h3 className="text-lg font-semibold mb-2">🔍 Didn't find what you're looking for?</h3>
                               <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
                                 Try Deep Search to find comprehensive results from across the web
@@ -905,13 +907,13 @@ const Search = () => {
                           )}
                           
                           {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
-                            <div className="space-y-6">
+                            <div className="space-y-6 min-w-0">
                               {filteredResults.localResults.length > 0 && (
                                 <div>
                                   <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
-                                  <div className="border rounded-md overflow-hidden">
+                                  <div className="border rounded-md overflow-hidden min-w-0">
                                     {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
                                   </div>
                                 </div>
@@ -924,7 +926,7 @@ const Search = () => {
                                   <p className="text-sm text-muted-foreground mb-4">
                                     Click any result to create an entity and start reviewing!
                                   </p>
-                                  <div className="space-y-2">
+                                  <div className="space-y-2 min-w-0">
                                     {filteredResults.externalResults.map((product, index) => (
                                       <SearchResultHandler
                                         key={`${product.api_source}-${product.api_ref || index}`}
@@ -960,7 +962,7 @@ const Search = () => {
                             <Users className="h-5 w-5" /> People
                           </h2>
                           {results.users.length > 0 ? (
-                            <div className="border rounded-md overflow-hidden">
+                            <div className="border rounded-md overflow-hidden min-w-0">
                               {results.users.map((user) => (
                                 <UserResultItem
                                   key={user.id}
