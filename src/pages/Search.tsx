@@ -17,7 +17,6 @@ import { cn } from '@/lib/utils';
 import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Badge } from '@/components/ui/badge';
-import { getRandomLoadingMessage } from '@/utils/loadingMessages';
 
 const Search = () => {
   const isMobile = useIsMobile();
@@ -157,7 +156,8 @@ const Search = () => {
   // Enhanced loading screen with dynamic messages for all categories
   const renderEnhancedLoadingState = () => {
     const capitalizedQuery = query.charAt(0).toUpperCase() + query.slice(1);
-    const loadingMessage = getRandomLoadingMessage('general');
+    // Use a simple loading message instead of calling getRandomLoadingMessage
+    const loadingMessage = 'Searching across multiple sources...';
 
     return (
       <div className="flex flex-col items-center justify-center py-16">
