@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation, setLocationStatus } from '@/contexts/LocationContext';
@@ -99,25 +98,23 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
-          <div className="container p-3 mx-auto flex justify-start">
-            <Logo size="sm" />
-          </div>
+      {/* Mobile Header - Only show on mobile screens */}
+      <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+        <div className="container p-3 mx-auto flex justify-start">
+          <Logo size="sm" />
         </div>
-      )}
+      </div>
       
       <div className="flex flex-1">
-        {!isMobile && (
+        {/* Desktop Sidebar - Only show on xl+ screens */}
+        <div className="hidden xl:block">
           <VerticalTubelightNavbar 
             initialActiveTab={getInitialActiveTab()}
-            className="fixed left-0 top-0 h-screen pt-4" 
+            className="fixed left-0 top-0 h-screen pt-4 pl-4" 
           />
-        )}
+        </div>
         
-        <div className={cn(
-          "flex-1 pt-16 md:pl-64",
-        )}>
+        <div className="flex-1 pt-16 xl:pt-0 xl:ml-64 min-w-0">
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <h1 className="text-3xl font-bold mb-6">Settings</h1>
             
@@ -247,7 +244,7 @@ const Settings = () => {
                     </div>
                     
                     {permissionStatus === 'denied' && (
-                      <div className="rounded-md bg-red-50 dark:bg-red-950 p-4 border border-red-200 dark:border-red-900">
+                      <div className="rounded-md bg-red-50 dark:bg-red-950 p-4 border border-red-200 dark:border-red-800">
                         <div className="flex items-start space-x-3">
                           <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                           <div className="space-y-2">
@@ -324,7 +321,10 @@ const Settings = () => {
         </div>
       </div>
       
-      {isMobile && <BottomNavigation />}
+      {/* Mobile Bottom Navigation */}
+      <div className="xl:hidden">
+        <BottomNavigation />
+      </div>
     </div>
   );
 };
