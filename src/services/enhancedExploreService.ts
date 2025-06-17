@@ -124,11 +124,19 @@ export class EnhancedExploreService {
       }
 
       // Get entities based on user interests with trending boost
-      const entityTypes = interests.map(i => i.entity_type);
+      // Filter valid entity types and cast them properly
+      const validEntityTypes = interests
+        .map(i => i.entity_type)
+        .filter(type => this.isValidEntityType(type)) as ('book' | 'movie' | 'place' | 'product' | 'food')[];
+
+      if (validEntityTypes.length === 0) {
+        return this.getPopularEntities(limit);
+      }
+
       const { data: entities } = await supabase
         .from('entities')
         .select('*')
-        .in('type', entityTypes)
+        .in('type', validEntityTypes)
         .eq('is_deleted', false)
         .order('trending_score', { ascending: false })
         .limit(limit * 2);
@@ -167,7 +175,7 @@ export class EnhancedExploreService {
         .eq('is_deleted', false);
 
       if (category && this.isValidEntityType(category)) {
-        query = query.eq('type', category);
+        query = query.eq('type', category as 'book' | 'movie' | 'place' | 'product' | 'food');
       }
 
       const { data: entities } = await query
@@ -199,7 +207,7 @@ export class EnhancedExploreService {
         .lt('recent_views_24h', 50); // Low views
 
       if (category && this.isValidEntityType(category)) {
-        query = query.eq('type', category);
+        query = query.eq('type', category as 'book' | 'movie' | 'place' | 'product' | 'food');
       }
 
       const { data: entities } = await query.limit(limit * 2);
@@ -284,7 +292,7 @@ export class EnhancedExploreService {
     }
   }
 
-  private isValidEntityType(category: string): boolean {
+  private isValidEntityType(category: string): category is 'book' | 'movie' | 'place' | 'product' | 'food' {
     const validTypes = ['book', 'movie', 'place', 'product', 'food'];
     return validTypes.includes(category);
   }
