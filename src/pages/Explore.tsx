@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -8,7 +9,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { PillTabs } from '@/components/ui/pill-tabs';
-import { MenuItem, MenuContainer } from '@/components/ui/fluid-menu';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
 import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils, Menu as MenuIcon, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,24 +20,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { UserResultItem } from '@/components/search/UserResultItem';
 import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
 import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
+import { enhancedExploreService } from '@/services/enhancedExploreService';
 
 const Explore = () => {
   const { user } = useAuth();
-  // Keep useIsMobile only for search logic, not layout rendering
   const isMobile = useIsMobile();
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('featured');
   const navigate = useNavigate();
 
-  // Use the new enhanced realtime search hook
+  // Use the enhanced realtime search hook
   const { 
     results, 
     isLoading, 
@@ -47,7 +46,17 @@ const Explore = () => {
     toggleShowAll
   } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
 
-  const handleResultClick = () => {
+  const handleResultClick = async (entityId?: string, entityType?: string) => {
+    // Track interaction if we have entity details
+    if (entityId && entityType && user?.id) {
+      await enhancedExploreService.trackUserInteraction(
+        user.id,
+        entityId,
+        entityType,
+        entityType, // Using type as category
+        'click'
+      );
+    }
     setSearchQuery('');
   };
 
@@ -143,17 +152,6 @@ const Explore = () => {
   // Show dropdown when user has typed at least 1 character
   const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1;
 
-  console.log('🔍 Enhanced Search Debug:', {
-    searchQuery,
-    shouldShowDropdown,
-    isLoading,
-    loadingStates,
-    hasLocalResults,
-    hasExternalResults,
-    error,
-    results
-  });
-
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       {/* Mobile Header - Only show on mobile screens */}
@@ -220,7 +218,7 @@ const Explore = () => {
                 )}
               </div>
               
-              {/* Enhanced Search Results Dropdown - Fixed positioning and z-index */}
+              {/* Enhanced Search Results Dropdown */}
               {shouldShowDropdown && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto">
                   
@@ -234,7 +232,7 @@ const Explore = () => {
                     </div>
                   )}
 
-                  {/* Error State - Show but don't block results */}
+                  {/* Error State */}
                   {error && (
                     <div className="p-3 text-center border-b bg-yellow-50 dark:bg-yellow-900/20">
                       <div className="flex items-center justify-center gap-2 text-sm text-yellow-700 dark:text-yellow-300">
@@ -244,7 +242,7 @@ const Explore = () => {
                     </div>
                   )}
                   
-                  {/* Already on Groundz - Local Results (Priority Section) */}
+                  {/* Already on Groundz - Local Results */}
                   {results.entities.length > 0 && (
                     <div className="border-b last:border-b-0 bg-background">
                       {renderSectionHeader('✨ Already on Groundz', results.entities.length, 'entities')}
@@ -252,7 +250,7 @@ const Explore = () => {
                         <EntityResultItem
                           key={entity.id}
                           entity={entity}
-                          onClick={handleResultClick}
+                          onClick={() => handleResultClick(entity.id, entity.type)}
                         />
                       ))}
                     </div>
@@ -267,7 +265,7 @@ const Explore = () => {
                           key={`${book.api_source}-${book.api_ref || index}`}
                           result={book}
                           query={searchQuery}
-                          onClose={handleResultClick}
+                          onClose={() => handleResultClick()}
                         />
                       ))}
                     </div>
@@ -282,7 +280,7 @@ const Explore = () => {
                           key={`${movie.api_source}-${movie.api_ref || index}`}
                           result={movie}
                           query={searchQuery}
-                          onClose={handleResultClick}
+                          onClose={() => handleResultClick()}
                         />
                       ))}
                     </div>
@@ -297,7 +295,7 @@ const Explore = () => {
                           key={`${place.api_source}-${place.api_ref || index}`}
                           result={place}
                           query={searchQuery}
-                          onClose={handleResultClick}
+                          onClose={() => handleResultClick()}
                         />
                       ))}
                     </div>
@@ -311,13 +309,13 @@ const Explore = () => {
                         <UserResultItem
                           key={user.id}
                           user={user}
-                          onClick={handleResultClick}
+                          onClick={() => handleResultClick()}
                         />
                       ))}
                     </div>
                   )}
 
-                  {/* Complex Product Search Option - Always show */}
+                  {/* Complex Product Search Option */}
                   {searchQuery.length >= 2 && (
                     <div className="p-3 text-center border-t bg-background">
                       <button 
@@ -330,7 +328,7 @@ const Explore = () => {
                     </div>
                   )}
 
-                  {/* No Results State - Only show when not loading and no results */}
+                  {/* No Results State */}
                   {!hasLocalResults && !hasExternalResults && !isLoading && (
                     <div className="p-4 text-center bg-background">
                       <p className="text-sm text-muted-foreground mb-2">No immediate results found</p>
@@ -426,7 +424,7 @@ const Explore = () => {
         </div>
       </div>
       
-      {/* Mobile Bottom Navigation - Only show on mobile screens */}
+      {/* Mobile Bottom Navigation */}
       <div className="xl:hidden">
         <BottomNavigation />
       </div>
