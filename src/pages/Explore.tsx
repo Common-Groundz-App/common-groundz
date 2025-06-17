@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -163,14 +162,14 @@ const Explore = () => {
       
       <div className="flex flex-1 overflow-x-hidden">
         {/* Desktop Sidebar - Only show on xl+ screens */}
-        <div className="hidden xl:block fixed left-0 top-0 h-screen">
+        <div className="hidden xl:block">
           <VerticalTubelightNavbar 
             initialActiveTab={getInitialActiveTab()}
-            className="h-full"
+            className="fixed left-0 top-0 h-screen pt-4 pl-4"
           />
         </div>
         
-        <div className="flex-1 pt-16 xl:pt-0 xl:pl-64 min-w-0">
+        <div className="flex-1 pt-16 xl:pt-0 xl:ml-64 min-w-0">
           <div className="container max-w-4xl mx-auto p-4 md:p-8 min-w-0">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-3xl font-bold">Explore</h1>
