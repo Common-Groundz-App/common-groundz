@@ -26,6 +26,14 @@ export interface EntityView {
   metadata?: Record<string, any>;
 }
 
+// Valid entity types from the database schema
+type EntityType = 'book' | 'movie' | 'place' | 'product' | 'food';
+
+// Helper function to check if a string is a valid entity type
+const isValidEntityType = (type: string): type is EntityType => {
+  return ['book', 'movie', 'place', 'product', 'food'].includes(type);
+};
+
 // Track entity views for personalization
 export const trackEntityView = async (entityView: EntityView) => {
   try {
@@ -115,8 +123,8 @@ export const getTrendingEntities = async (category?: string, limit: number = 10)
       .order('trending_score', { ascending: false })
       .limit(limit);
     
-    // Only filter by category if it's provided and not 'all'
-    if (category && category !== 'all') {
+    // Only filter by category if it's provided, not 'all', and is a valid entity type
+    if (category && category !== 'all' && isValidEntityType(category)) {
       query = query.eq('type', category);
     }
     
@@ -203,8 +211,8 @@ export const getHiddenGems = async (category?: string, limit: number = 8) => {
       .order('popularity_score', { ascending: false })
       .limit(limit);
     
-    // Only filter by category if it's provided and not 'all'
-    if (category && category !== 'all') {
+    // Only filter by category if it's provided, not 'all', and is a valid entity type
+    if (category && category !== 'all' && isValidEntityType(category)) {
       query = query.eq('type', category);
     }
     
@@ -236,8 +244,8 @@ export const getNewEntities = async (category?: string, limit: number = 8) => {
       .order('created_at', { ascending: false })
       .limit(limit);
     
-    // Only filter by category if it's provided and not 'all'
-    if (category && category !== 'all') {
+    // Only filter by category if it's provided, not 'all', and is a valid entity type
+    if (category && category !== 'all' && isValidEntityType(category)) {
       query = query.eq('type', category);
     }
     
