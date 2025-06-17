@@ -48,7 +48,7 @@ export const trackEntityView = async (entityView: EntityView) => {
   }
 };
 
-// Update user interests based on interactions
+// Update user interests based on interactions - using direct SQL instead of RPC
 export const updateUserInterests = async (
   userId: string, 
   category: string, 
@@ -56,12 +56,19 @@ export const updateUserInterests = async (
   interactionStrength: number = 1
 ) => {
   try {
-    const { error } = await supabase.rpc('upsert_user_interest', {
-      p_user_id: userId,
-      p_category: category,
-      p_entity_type: entityType,
-      p_interaction_strength: interactionStrength
-    });
+    // Use upsert with ON CONFLICT to update user interests
+    const { error } = await supabase
+      .from('user_interests')
+      .upsert({
+        user_id: userId,
+        category,
+        entity_type: entityType,
+        interest_score: interactionStrength,
+        last_interaction: new Date().toISOString(),
+        interaction_count: 1
+      }, {
+        onConflict: 'user_id,category,entity_type'
+      });
     
     if (error) {
       console.error('Error updating user interests:', error);
@@ -108,6 +115,7 @@ export const getTrendingEntities = async (category?: string, limit: number = 10)
       .order('trending_score', { ascending: false })
       .limit(limit);
     
+    // Only filter by category if it's provided and not 'all'
     if (category && category !== 'all') {
       query = query.eq('type', category);
     }
@@ -195,6 +203,7 @@ export const getHiddenGems = async (category?: string, limit: number = 8) => {
       .order('popularity_score', { ascending: false })
       .limit(limit);
     
+    // Only filter by category if it's provided and not 'all'
     if (category && category !== 'all') {
       query = query.eq('type', category);
     }
@@ -227,6 +236,7 @@ export const getNewEntities = async (category?: string, limit: number = 8) => {
       .order('created_at', { ascending: false })
       .limit(limit);
     
+    // Only filter by category if it's provided and not 'all'
     if (category && category !== 'all') {
       query = query.eq('type', category);
     }
