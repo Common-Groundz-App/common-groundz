@@ -979,6 +979,42 @@ export type Database = {
           },
         ]
       }
+      recommendation_explanations: {
+        Row: {
+          algorithm_used: string
+          confidence_score: number
+          created_at: string
+          entity_id: string
+          expires_at: string
+          explanation_text: string
+          explanation_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          algorithm_used: string
+          confidence_score?: number
+          created_at?: string
+          entity_id: string
+          expires_at?: string
+          explanation_text: string
+          explanation_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          algorithm_used?: string
+          confidence_score?: number
+          created_at?: string
+          entity_id?: string
+          expires_at?: string
+          explanation_text?: string
+          explanation_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       recommendation_likes: {
         Row: {
           created_at: string
@@ -1007,6 +1043,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      recommendation_quality_scores: {
+        Row: {
+          created_at: string
+          entity_id: string | null
+          freshness_score: number
+          id: string
+          last_calculated: string
+          quality_score: number
+          recommendation_id: string | null
+          relevance_score: number
+          social_proof_score: number
+          spam_score: number
+        }
+        Insert: {
+          created_at?: string
+          entity_id?: string | null
+          freshness_score?: number
+          id?: string
+          last_calculated?: string
+          quality_score?: number
+          recommendation_id?: string | null
+          relevance_score?: number
+          social_proof_score?: number
+          spam_score?: number
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string | null
+          freshness_score?: number
+          id?: string
+          last_calculated?: string
+          quality_score?: number
+          recommendation_id?: string | null
+          relevance_score?: number
+          social_proof_score?: number
+          spam_score?: number
+        }
+        Relationships: []
       }
       recommendation_saves: {
         Row: {
@@ -1438,6 +1513,42 @@ export type Database = {
         }
         Relationships: []
       }
+      social_influence_scores: {
+        Row: {
+          category: string
+          created_at: string
+          engagement_rate: number
+          expertise_score: number
+          follower_count: number
+          id: string
+          influence_score: number
+          last_calculated: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          engagement_rate?: number
+          expertise_score?: number
+          follower_count?: number
+          id?: string
+          influence_score?: number
+          last_calculated?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          engagement_rate?: number
+          expertise_score?: number
+          follower_count?: number
+          id?: string
+          influence_score?: number
+          last_calculated?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_activity_patterns: {
         Row: {
           activity_score: number | null
@@ -1480,6 +1591,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_behavior_patterns: {
+        Row: {
+          confidence_score: number
+          created_at: string
+          id: string
+          last_updated: string
+          pattern_data: Json
+          pattern_type: string
+          user_id: string
+        }
+        Insert: {
+          confidence_score?: number
+          created_at?: string
+          id?: string
+          last_updated?: string
+          pattern_data?: Json
+          pattern_type: string
+          user_id: string
+        }
+        Update: {
+          confidence_score?: number
+          created_at?: string
+          id?: string
+          last_updated?: string
+          pattern_data?: Json
+          pattern_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_interests: {
         Row: {
           category: string
@@ -1516,6 +1657,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_similarities: {
+        Row: {
+          created_at: string
+          id: string
+          last_calculated: string
+          similarity_score: number
+          similarity_type: string
+          user_a_id: string
+          user_b_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_calculated?: string
+          similarity_score?: number
+          similarity_type?: string
+          user_a_id: string
+          user_b_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_calculated?: string
+          similarity_score?: number
+          similarity_type?: string
+          user_a_id?: string
+          user_b_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1534,12 +1705,20 @@ export type Database = {
         Args: { p_entity_id: string }
         Returns: number
       }
+      calculate_social_influence_score: {
+        Args: { p_user_id: string; p_category: string }
+        Returns: number
+      }
       calculate_trending_score: {
         Args: { p_entity_id: string }
         Returns: number
       }
       calculate_trust_score: {
         Args: { p_review_id: string }
+        Returns: number
+      }
+      calculate_user_similarity: {
+        Args: { user_a_id: string; user_b_id: string }
         Returns: number
       }
       check_post_like: {
