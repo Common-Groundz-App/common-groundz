@@ -83,6 +83,52 @@ export class EnhancedExploreService {
     return scores[interactionType as keyof typeof scores] || 1;
   }
 
+  // Add the missing updateUserInterests method
+  private async updateUserInterests(
+    userId: string,
+    entityType: string,
+    category: string,
+    scoreIncrement: number
+  ) {
+    try {
+      // Check if user interest already exists
+      const { data: existing } = await supabase
+        .from('user_interests')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('entity_type', entityType)
+        .eq('category', category)
+        .single();
+
+      if (existing) {
+        // Update existing interest
+        await supabase
+          .from('user_interests')
+          .update({
+            interest_score: existing.interest_score + scoreIncrement,
+            interaction_count: existing.interaction_count + 1,
+            last_interaction: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+      } else {
+        // Create new interest
+        await supabase
+          .from('user_interests')
+          .insert({
+            user_id: userId,
+            entity_type: entityType,
+            category: category,
+            interest_score: scoreIncrement,
+            interaction_count: 1,
+            last_interaction: new Date().toISOString()
+          });
+      }
+    } catch (error) {
+      console.error('Error updating user interests:', error);
+    }
+  }
+
   private async updateActivityPatterns(
     userId: string,
     entityType: string,
