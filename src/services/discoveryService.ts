@@ -51,6 +51,18 @@ export class DiscoveryService {
   // Get entities liked by people the user follows
   async getSocialDiscovery(userId: string, limit: number = 6): Promise<PersonalizedEntity[]> {
     try {
+      // First get the list of users the current user follows
+      const { data: followingUsers } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', userId);
+
+      if (!followingUsers || followingUsers.length === 0) {
+        return [];
+      }
+
+      const followingIds = followingUsers.map(f => f.following_id);
+
       const { data: entities } = await supabase
         .from('entities')
         .select(`
@@ -58,12 +70,7 @@ export class DiscoveryService {
           recommendations!inner(user_id, rating, created_at)
         `)
         .eq('is_deleted', false)
-        .in('recommendations.user_id', 
-          supabase
-            .from('follows')
-            .select('following_id')
-            .eq('follower_id', userId)
-        )
+        .in('recommendations.user_id', followingIds)
         .gte('recommendations.created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
         .order('recommendations.created_at', { ascending: false })
         .limit(limit);
@@ -219,8 +226,15 @@ export class DiscoveryService {
         return socialEntities;
       }
 
-      // Get entities matching user interests
-      const entityTypes = userInterests.data.map(i => i.entity_type);
+      // Get entities matching user interests with proper type assertion
+      const entityTypes = userInterests.data
+        .map(i => i.entity_type)
+        .filter(type => ['book', 'movie', 'place', 'product', 'food'].includes(type)) as ('book' | 'movie' | 'place' | 'product' | 'food')[];
+
+      if (entityTypes.length === 0) {
+        return socialEntities;
+      }
+
       const { data: personalizedEntities } = await supabase
         .from('entities')
         .select('*')
