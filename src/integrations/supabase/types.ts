@@ -239,6 +239,7 @@ export type Database = {
           description: string | null
           enrichment_source: string | null
           external_ratings: Json | null
+          geographic_boost: number | null
           id: string
           image_url: string | null
           ingredients: string[] | null
@@ -259,6 +260,7 @@ export type Database = {
           recent_likes_24h: number | null
           recent_recommendations_24h: number | null
           recent_views_24h: number | null
+          seasonal_boost: number | null
           slug: string | null
           specifications: Json | null
           trending_score: number | null
@@ -284,6 +286,7 @@ export type Database = {
           description?: string | null
           enrichment_source?: string | null
           external_ratings?: Json | null
+          geographic_boost?: number | null
           id?: string
           image_url?: string | null
           ingredients?: string[] | null
@@ -304,6 +307,7 @@ export type Database = {
           recent_likes_24h?: number | null
           recent_recommendations_24h?: number | null
           recent_views_24h?: number | null
+          seasonal_boost?: number | null
           slug?: string | null
           specifications?: Json | null
           trending_score?: number | null
@@ -329,6 +333,7 @@ export type Database = {
           description?: string | null
           enrichment_source?: string | null
           external_ratings?: Json | null
+          geographic_boost?: number | null
           id?: string
           image_url?: string | null
           ingredients?: string[] | null
@@ -349,6 +354,7 @@ export type Database = {
           recent_likes_24h?: number | null
           recent_recommendations_24h?: number | null
           recent_views_24h?: number | null
+          seasonal_boost?: number | null
           slug?: string | null
           specifications?: Json | null
           trending_score?: number | null
@@ -1432,6 +1438,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_activity_patterns: {
+        Row: {
+          activity_score: number | null
+          category: string
+          created_at: string | null
+          day_of_week: number | null
+          entity_type: string
+          id: string
+          interaction_velocity: number | null
+          last_interaction: string | null
+          time_of_day: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_score?: number | null
+          category: string
+          created_at?: string | null
+          day_of_week?: number | null
+          entity_type: string
+          id?: string
+          interaction_velocity?: number | null
+          last_interaction?: string | null
+          time_of_day?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_score?: number | null
+          category?: string
+          created_at?: string | null
+          day_of_week?: number | null
+          entity_type?: string
+          id?: string
+          interaction_velocity?: number | null
+          last_interaction?: string | null
+          time_of_day?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_interests: {
         Row: {
           category: string
@@ -1481,6 +1529,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: boolean
+      }
+      calculate_enhanced_trending_score: {
+        Args: { p_entity_id: string }
+        Returns: number
       }
       calculate_trending_score: {
         Args: { p_entity_id: string }
@@ -1720,6 +1772,10 @@ export type Database = {
       toggle_review_save: {
         Args: { p_review_id: string; p_user_id: string }
         Returns: boolean
+      }
+      update_all_trending_scores: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       update_comment: {
         Args: {

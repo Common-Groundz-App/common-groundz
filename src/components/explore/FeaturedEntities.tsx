@@ -5,27 +5,63 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
-import { StarIcon } from 'lucide-react';
+import { StarIcon, TrendingUp, Clock } from 'lucide-react';
 import { useEnhancedExplore } from '@/hooks/use-enhanced-explore';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
 
 export const FeaturedEntities = () => {
   const navigate = useNavigate();
-  const { featuredEntities, isLoading, trackEntityInteraction } = useEnhancedExplore({
+  const { 
+    featuredEntities, 
+    isLoading, 
+    trackEntityInteraction, 
+    lastRefresh 
+  } = useEnhancedExplore({
     limit: 3,
-    trackInteractions: true
+    trackInteractions: true,
+    enableTemporalPersonalization: true
   });
 
   const handleEntityClick = async (entity: PersonalizedEntity) => {
-    // Track the interaction
+    // Enhanced interaction tracking with entity type as category
     await trackEntityInteraction(
       entity.id,
       entity.type,
-      entity.type, // Using type as category for now
+      entity.type,
       'click'
     );
     
     navigate(`/entity/${entity.id}`);
+  };
+
+  const getReasonIcon = (reason?: string) => {
+    if (!reason) return null;
+    
+    if (reason.includes('trending') || reason.includes('Rapidly')) {
+      return <TrendingUp className="h-3 w-3" />;
+    }
+    if (reason.includes('schedule') || reason.includes('season')) {
+      return <Clock className="h-3 w-3" />;
+    }
+    return null;
+  };
+
+  const getReasonColor = (reason?: string) => {
+    if (!reason) return 'bg-brand-orange/90';
+    
+    if (reason.includes('trending') || reason.includes('Rapidly')) {
+      return 'bg-red-500/90';
+    }
+    if (reason.includes('interests')) {
+      return 'bg-blue-500/90';
+    }
+    if (reason.includes('schedule') || reason.includes('season')) {
+      return 'bg-green-500/90';
+    }
+    if (reason.includes('area')) {
+      return 'bg-purple-500/90';
+    }
+    return 'bg-brand-orange/90';
   };
 
   if (isLoading) {
@@ -53,7 +89,14 @@ export const FeaturedEntities = () => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold mb-4">Featured</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold mb-4">Featured</h2>
+        {lastRefresh && (
+          <span className="text-xs text-muted-foreground">
+            Updated {lastRefresh.toLocaleTimeString()}
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {featuredEntities.map((entity) => (
           <Card 
@@ -73,8 +116,15 @@ export const FeaturedEntities = () => {
                 {entity.type.charAt(0).toUpperCase() + entity.type.slice(1)}
               </Badge>
               {entity.reason && (
-                <Badge className="absolute top-2 left-2 bg-brand-orange/90 text-white backdrop-blur-sm text-xs">
+                <Badge className={`absolute top-2 left-2 ${getReasonColor(entity.reason)} text-white backdrop-blur-sm text-xs flex items-center gap-1`}>
+                  {getReasonIcon(entity.reason)}
                   {entity.reason}
+                </Badge>
+              )}
+              {entity.view_velocity && entity.view_velocity > 5 && (
+                <Badge className="absolute bottom-2 left-2 bg-red-500/90 text-white backdrop-blur-sm text-xs flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" />
+                  Hot
                 </Badge>
               )}
             </div>
@@ -92,6 +142,13 @@ export const FeaturedEntities = () => {
                       ({entity.metadata.user_ratings_total})
                     </span>
                   )}
+                </div>
+              )}
+              {entity.personalization_score && entity.personalization_score > 10 && (
+                <div className="mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    Highly Personalized
+                  </Badge>
                 </div>
               )}
             </div>
