@@ -5,15 +5,18 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
-import { StarIcon, TrendingUp, Clock } from 'lucide-react';
+import { StarIcon, TrendingUp, Clock, Users, Sparkles } from 'lucide-react';
 import { useEnhancedExplore } from '@/hooks/use-enhanced-explore';
+import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const FeaturedEntities = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { 
     featuredEntities, 
-    isLoading, 
+    isLoading: exploreLoading, 
     trackEntityInteraction, 
     lastRefresh 
   } = useEnhancedExplore({
@@ -21,6 +24,17 @@ export const FeaturedEntities = () => {
     trackInteractions: true,
     enableTemporalPersonalization: true
   });
+
+  const {
+    forYou,
+    newThisWeek,
+    isLoading: discoveryLoading,
+    lastRefresh: discoveryRefresh
+  } = useDiscovery({
+    autoRefresh: true
+  });
+
+  const isLoading = exploreLoading || discoveryLoading;
 
   const handleEntityClick = async (entity: PersonalizedEntity) => {
     // Enhanced interaction tracking with entity type as category
@@ -40,8 +54,14 @@ export const FeaturedEntities = () => {
     if (reason.includes('trending') || reason.includes('Rapidly')) {
       return <TrendingUp className="h-3 w-3" />;
     }
-    if (reason.includes('schedule') || reason.includes('season')) {
+    if (reason.includes('schedule') || reason.includes('season') || reason.includes('morning') || reason.includes('tonight')) {
       return <Clock className="h-3 w-3" />;
+    }
+    if (reason.includes('Friends') || reason.includes('social') || reason.includes('Curated for you')) {
+      return <Users className="h-3 w-3" />;
+    }
+    if (reason.includes('New')) {
+      return <Sparkles className="h-3 w-3" />;
     }
     return null;
   };
@@ -52,14 +72,20 @@ export const FeaturedEntities = () => {
     if (reason.includes('trending') || reason.includes('Rapidly')) {
       return 'bg-red-500/90';
     }
-    if (reason.includes('interests')) {
+    if (reason.includes('interests') || reason.includes('Curated for you')) {
       return 'bg-blue-500/90';
     }
-    if (reason.includes('schedule') || reason.includes('season')) {
+    if (reason.includes('schedule') || reason.includes('season') || reason.includes('morning') || reason.includes('tonight')) {
       return 'bg-green-500/90';
     }
-    if (reason.includes('area')) {
+    if (reason.includes('area') || reason.includes('nearby')) {
       return 'bg-purple-500/90';
+    }
+    if (reason.includes('New') || reason.includes('Fresh')) {
+      return 'bg-emerald-500/90';
+    }
+    if (reason.includes('Friends') || reason.includes('social')) {
+      return 'bg-indigo-500/90';
     }
     return 'bg-brand-orange/90';
   };
@@ -83,22 +109,35 @@ export const FeaturedEntities = () => {
     );
   }
 
-  if (featuredEntities.length === 0) {
+  // Use enhanced discovery data if available and user is logged in
+  const displayEntities = user && forYou.length > 0 ? forYou.slice(0, 3) : 
+                         featuredEntities.length > 0 ? featuredEntities : 
+                         newThisWeek.slice(0, 3);
+
+  const sectionTitle = user && forYou.length > 0 ? 'For You' : 
+                      featuredEntities.length > 0 ? 'Featured' : 
+                      'New This Week';
+
+  if (displayEntities.length === 0) {
     return null;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold mb-4">Featured</h2>
-        {lastRefresh && (
+        <div className="flex items-center gap-2">
+          {user && forYou.length > 0 && <Users className="h-5 w-5 text-blue-500" />}
+          {!user || forYou.length === 0 && featuredEntities.length === 0 && <Sparkles className="h-5 w-5 text-emerald-500" />}
+          <h2 className="text-xl font-semibold mb-4">{sectionTitle}</h2>
+        </div>
+        {(lastRefresh || discoveryRefresh) && (
           <span className="text-xs text-muted-foreground">
-            Updated {lastRefresh.toLocaleTimeString()}
+            Updated {(discoveryRefresh || lastRefresh)?.toLocaleTimeString()}
           </span>
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {featuredEntities.map((entity) => (
+        {displayEntities.map((entity) => (
           <Card 
             key={entity.id}
             className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"

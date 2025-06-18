@@ -201,7 +201,7 @@ export class EnhancedExploreService {
     }
   }
 
-  // Enhanced personalized featured entities with diversity injection
+  // Enhanced personalized featured entities with discovery integration
   async getPersonalizedFeaturedEntities(userId?: string, limit: number = 3): Promise<PersonalizedEntity[]> {
     try {
       if (!userId) {
@@ -270,18 +270,22 @@ export class EnhancedExploreService {
         const geographicBoost = entity.geographic_boost || 0;
         const seasonalBoost = entity.seasonal_boost || 0;
         
+        // Enhanced personalization with recency bias
+        const recencyBoost = this.calculateRecencyBoost(entity.created_at);
+        
         const personalizationScore = 
-          (interestScore * 0.35) + 
-          (trendingScore * 0.25) + 
+          (interestScore * 0.30) + 
+          (trendingScore * 0.20) + 
           (temporalBoost * 0.15) + 
-          (velocityBoost * 0.1) + 
+          (velocityBoost * 0.10) + 
           (geographicBoost * 0.08) + 
-          (seasonalBoost * 0.07);
+          (seasonalBoost * 0.07) + 
+          (recencyBoost * 0.10);
         
         return {
           ...entity,
           personalization_score: personalizationScore,
-          reason: this.getPersonalizationReason(userInterest, timePattern, entity)
+          reason: this.getEnhancedPersonalizationReason(userInterest, timePattern, entity, recencyBoost)
         };
       });
 
@@ -296,6 +300,34 @@ export class EnhancedExploreService {
       console.error('Error getting personalized entities:', error);
       return this.getPopularEntities(limit);
     }
+  }
+
+  // Calculate recency boost for new entities
+  private calculateRecencyBoost(createdAt: string): number {
+    const entityDate = new Date(createdAt);
+    const now = new Date();
+    const daysDiff = (now.getTime() - entityDate.getTime()) / (1000 * 60 * 60 * 24);
+    
+    if (daysDiff <= 7) return 1.0; // New this week
+    if (daysDiff <= 14) return 0.5; // Recent
+    if (daysDiff <= 30) return 0.2; // This month
+    return 0; // Older
+  }
+
+  // Enhanced personalization reason with more context
+  private getEnhancedPersonalizationReason(userInterest: any, timePattern: any, entity: any, recencyBoost: number): string {
+    if (recencyBoost >= 1.0) return 'New this week';
+    if (entity.seasonal_boost > 0) return 'Perfect for this season';
+    if (entity.geographic_boost > 0) return 'Popular in your area';
+    if (entity.view_velocity > 10) return 'Rapidly trending';
+    if (timePattern?.activity_score > 0) {
+      const hour = new Date().getHours();
+      if (hour >= 6 && hour <= 11) return 'Perfect for morning';
+      if (hour >= 17 && hour <= 22) return 'Great for tonight';
+      return 'Based on your schedule';
+    }
+    if (userInterest?.interest_score > 5) return 'Matches your interests';
+    return 'Trending now';
   }
 
   // Inject diversity to prevent filter bubbles

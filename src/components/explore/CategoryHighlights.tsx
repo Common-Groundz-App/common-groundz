@@ -5,8 +5,9 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
-import { StarIcon, TrendingUp, Gem } from 'lucide-react';
+import { StarIcon, TrendingUp, Gem, Clock, Users, Sparkles } from 'lucide-react';
 import { useEnhancedExplore } from '@/hooks/use-enhanced-explore';
+import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 
@@ -20,13 +21,25 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
     trendingEntities, 
     hiddenGems, 
     curatedCollections, 
-    isLoading, 
+    isLoading: exploreLoading, 
     trackEntityInteraction 
   } = useEnhancedExplore({
     category: entityType,
     limit: 6,
     trackInteractions: true
   });
+
+  const {
+    discoveryCollections,
+    newThisWeek,
+    forYou,
+    isLoading: discoveryLoading
+  } = useDiscovery({
+    autoRefresh: true,
+    refreshInterval: 15 * 60 * 1000 // Refresh every 15 minutes
+  });
+
+  const isLoading = exploreLoading || discoveryLoading;
 
   const handleEntityClick = async (entity: PersonalizedEntity) => {
     // Track the interaction
@@ -40,10 +53,21 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
     navigate(`/entity/${entity.id}`);
   };
 
+  const getIconForCollectionType = (type: string) => {
+    switch (type) {
+      case 'new': return Clock;
+      case 'social': return Users;
+      case 'contextual': return Clock;
+      case 'location': return TrendingUp;
+      case 'mood': return Sparkles;
+      default: return TrendingUp;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {!entityType && <h2 className="text-xl font-semibold mb-4">Popular Places & Things</h2>}
+        {!entityType && <h2 className="text-xl font-semibold mb-4">Discover</h2>}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="overflow-hidden">
@@ -161,14 +185,24 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
     );
   }
 
-  // For the main view, show mixed content with smart sections
+  // For the main view, show enhanced discovery sections
   const allSections = [
-    { title: 'Trending This Week', entities: trendingEntities.slice(0, 3), icon: TrendingUp },
-    { title: 'Hidden Gems', entities: hiddenGems.slice(0, 3), icon: Gem },
+    // Discovery collections first
+    ...discoveryCollections.map(collection => ({
+      title: collection.title,
+      entities: collection.entities.slice(0, 3),
+      icon: getIconForCollectionType(collection.type),
+      reason: collection.reason
+    })),
+    // Then traditional sections
+    { title: 'Trending This Week', entities: trendingEntities.slice(0, 3), icon: TrendingUp, reason: 'Most popular right now' },
+    { title: 'Hidden Gems', entities: hiddenGems.slice(0, 3), icon: Gem, reason: 'Highly rated discoveries' },
+    // Curated collections last
     ...Object.entries(curatedCollections).map(([name, entities]) => ({
       title: name,
       entities: entities.slice(0, 3),
-      icon: null
+      icon: null,
+      reason: 'Curated collection'
     }))
   ].filter(section => section.entities.length > 0);
 
@@ -209,6 +243,16 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                       Hidden Gem
                     </Badge>
                   )}
+                  {entity.reason && entity.reason.includes('New') && (
+                    <Badge className="absolute top-1 left-1 bg-green-500/90 text-white text-xs">
+                      New
+                    </Badge>
+                  )}
+                  {entity.reason && entity.reason.includes('Friends') && (
+                    <Badge className="absolute top-1 left-1 bg-blue-500/90 text-white text-xs">
+                      Social
+                    </Badge>
+                  )}
                 </div>
                 <div className="p-3">
                   <h3 className="font-medium text-sm truncate">{entity.name}</h3>
@@ -220,6 +264,11 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                       <StarIcon className="h-3 w-3 text-yellow-400 mr-1" />
                       <span className="text-xs font-medium">{entity.metadata.rating}</span>
                     </div>
+                  )}
+                  {entity.reason && (
+                    <p className="text-xs text-muted-foreground/80 mt-1 truncate">
+                      {entity.reason}
+                    </p>
                   )}
                 </div>
               </Card>
