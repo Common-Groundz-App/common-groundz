@@ -114,12 +114,19 @@ export class AdvancedPersonalizationService {
 
       if (preferredTypes.length === 0) return [];
 
+      // Filter to valid entity types and cast properly
+      const validTypes = preferredTypes.filter(type => 
+        ['book', 'movie', 'place', 'product', 'food'].includes(type)
+      ) as ('book' | 'movie' | 'place' | 'product' | 'food')[];
+
+      if (validTypes.length === 0) return [];
+
       // Get entities matching contextual preferences
       const { data: entities } = await supabase
         .from('entities')
         .select('*')
         .eq('is_deleted', false)
-        .in('type', preferredTypes)
+        .in('type', validTypes)
         .order('trending_score', { ascending: false })
         .limit(limit * 2);
 
@@ -156,13 +163,17 @@ export class AdvancedPersonalizationService {
 
       // Get entities matching temporal patterns
       const preferredTypes = timePatterns.map(p => p.entity_type);
-      const preferredCategories = timePatterns.map(p => p.category);
+      const validTypes = preferredTypes.filter(type => 
+        ['book', 'movie', 'place', 'product', 'food'].includes(type)
+      ) as ('book' | 'movie' | 'place' | 'product' | 'food')[];
+
+      if (validTypes.length === 0) return [];
 
       const { data: entities } = await supabase
         .from('entities')
         .select('*')
         .eq('is_deleted', false)
-        .in('type', preferredTypes)
+        .in('type', validTypes)
         .order('trending_score', { ascending: false })
         .limit(limit);
 

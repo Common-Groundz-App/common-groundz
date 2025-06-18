@@ -20,17 +20,22 @@ export class CollaborativeFilteringService {
   // Find similar users based on rating patterns
   async findSimilarUsers(userId: string, limit: number = 10): Promise<UserSimilarity[]> {
     try {
+      // Get entity IDs that the user has rated
+      const { data: userEntityIds } = await supabase
+        .from('recommendations')
+        .select('entity_id')
+        .eq('user_id', userId);
+
+      if (!userEntityIds || userEntityIds.length === 0) return [];
+
+      const entityIds = userEntityIds.map(r => r.entity_id);
+
       // Get users who have rated similar entities
       const { data: candidateUsers } = await supabase
         .from('recommendations')
         .select('user_id')
         .neq('user_id', userId)
-        .in('entity_id', 
-          supabase
-            .from('recommendations')
-            .select('entity_id')
-            .eq('user_id', userId)
-        );
+        .in('entity_id', entityIds);
 
       if (!candidateUsers) return [];
 
@@ -81,6 +86,14 @@ export class CollaborativeFilteringService {
 
       const similarUserIds = similarUsers.map(u => u.userId);
 
+      // Get user's already rated entities to exclude them
+      const { data: userRatedEntities } = await supabase
+        .from('recommendations')
+        .select('entity_id')
+        .eq('user_id', userId);
+
+      const userRatedEntityIds = userRatedEntities?.map(r => r.entity_id) || [];
+
       // Get entities liked by similar users that current user hasn't rated
       const { data: entities } = await supabase
         .from('entities')
@@ -91,12 +104,7 @@ export class CollaborativeFilteringService {
         .eq('is_deleted', false)
         .in('recommendations.user_id', similarUserIds)
         .gte('recommendations.rating', 4) // Only high-rated recommendations
-        .not('id', 'in', 
-          supabase
-            .from('recommendations')
-            .select('entity_id')
-            .eq('user_id', userId)
-        )
+        .not('id', 'in', `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})`)
         .order('recommendations.rating', { ascending: false })
         .limit(limit * 2);
 
@@ -160,6 +168,17 @@ export class CollaborativeFilteringService {
 
       const likedEntityIds = userLikedEntities.map(e => e.entity_id);
 
+      // Get users who liked similar items
+      const { data: similarItemUsers } = await supabase
+        .from('recommendations')
+        .select('user_id')
+        .in('entity_id', likedEntityIds)
+        .gte('rating', 4);
+
+      if (!similarItemUsers) return [];
+
+      const similarUserIds = [...new Set(similarItemUsers.map(u => u.user_id))];
+
       // Find entities that users who liked similar items also liked
       const { data: similarEntities } = await supabase
         .from('entities')
@@ -168,14 +187,8 @@ export class CollaborativeFilteringService {
           recommendations!inner(user_id, rating, entity_id)
         `)
         .eq('is_deleted', false)
-        .in('recommendations.user_id',
-          supabase
-            .from('recommendations')
-            .select('user_id')
-            .in('entity_id', likedEntityIds)
-            .gte('rating', 4)
-        )
-        .not('id', 'in', likedEntityIds) // Exclude already rated entities
+        .in('recommendations.user_id', similarUserIds)
+        .not('id', 'in', `(${likedEntityIds.map(id => `'${id}'`).join(',')})`) // Exclude already rated entities
         .gte('recommendations.rating', 4)
         .order('recommendations.rating', { ascending: false })
         .limit(limit * 2);

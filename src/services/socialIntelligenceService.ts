@@ -90,6 +90,14 @@ export class SocialIntelligenceService {
 
       const influencerIds = influentialUsers.map(u => u.user_id);
 
+      // Get user's already rated entities to exclude them
+      const { data: userRatedEntities } = await supabase
+        .from('recommendations')
+        .select('entity_id')
+        .eq('user_id', userId);
+
+      const userRatedEntityIds = userRatedEntities?.map(r => r.entity_id) || [];
+
       // Get recommendations from influential users
       const { data: recommendations } = await supabase
         .from('entities')
@@ -100,12 +108,7 @@ export class SocialIntelligenceService {
         .eq('is_deleted', false)
         .in('recommendations.user_id', influencerIds)
         .gte('recommendations.rating', 4)
-        .not('id', 'in',
-          supabase
-            .from('recommendations')
-            .select('entity_id')
-            .eq('user_id', userId)
-        )
+        .not('id', 'in', `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})`)
         .order('recommendations.created_at', { ascending: false })
         .limit(limit * 2);
 
@@ -148,16 +151,23 @@ export class SocialIntelligenceService {
     limit: number = 6
   ): Promise<SocialRecommendation[]> {
     try {
+      // Get first-degree connections (direct follows)
+      const { data: firstDegreeUsers } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', userId);
+
+      if (!firstDegreeUsers || firstDegreeUsers.length === 0) {
+        return [];
+      }
+
+      const firstDegreeIds = firstDegreeUsers.map(u => u.following_id);
+
       // Get second-degree connections (friends of friends)
       const { data: secondDegreeUsers } = await supabase
         .from('follows')
         .select('following_id')
-        .in('follower_id',
-          supabase
-            .from('follows')
-            .select('following_id')
-            .eq('follower_id', userId)
-        )
+        .in('follower_id', firstDegreeIds)
         .neq('following_id', userId); // Exclude self
 
       if (!secondDegreeUsers || secondDegreeUsers.length === 0) {
@@ -165,6 +175,14 @@ export class SocialIntelligenceService {
       }
 
       const secondDegreeIds = [...new Set(secondDegreeUsers.map(u => u.following_id))];
+
+      // Get user's already rated entities to exclude them
+      const { data: userRatedEntities } = await supabase
+        .from('recommendations')
+        .select('entity_id')
+        .eq('user_id', userId);
+
+      const userRatedEntityIds = userRatedEntities?.map(r => r.entity_id) || [];
 
       // Get recommendations from second-degree connections
       const { data: entities } = await supabase
@@ -176,12 +194,7 @@ export class SocialIntelligenceService {
         .eq('is_deleted', false)
         .in('recommendations.user_id', secondDegreeIds)
         .gte('recommendations.rating', 4.5) // Higher threshold for extended network
-        .not('id', 'in',
-          supabase
-            .from('recommendations')
-            .select('entity_id')
-            .eq('user_id', userId)
-        )
+        .not('id', 'in', `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})`)
         .limit(limit * 2);
 
       if (!entities) return [];
@@ -254,6 +267,14 @@ export class SocialIntelligenceService {
 
       if (communityMembers.length === 0) return [];
 
+      // Get user's already rated entities to exclude them
+      const { data: userRatedEntities } = await supabase
+        .from('recommendations')
+        .select('entity_id')
+        .eq('user_id', userId);
+
+      const userRatedEntityIds = userRatedEntities?.map(r => r.entity_id) || [];
+
       // Get recommendations from community
       const { data: entities } = await supabase
         .from('entities')
@@ -264,12 +285,7 @@ export class SocialIntelligenceService {
         .eq('is_deleted', false)
         .in('recommendations.user_id', communityMembers)
         .gte('recommendations.rating', 4)
-        .not('id', 'in',
-          supabase
-            .from('recommendations')
-            .select('entity_id')
-            .eq('user_id', userId)
-        )
+        .not('id', 'in', `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})`)
         .limit(limit * 2);
 
       if (!entities) return [];
