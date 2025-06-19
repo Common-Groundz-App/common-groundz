@@ -7,7 +7,7 @@ import Logo from '@/components/Logo';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedFollowing from '@/components/feed/FeedFollowing';
-import EnhancedFeedForYou from '@/components/feed/EnhancedFeedForYou';
+import FeedForYou from '@/components/feed/FeedForYou';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
 import { Bell, Search, ChevronDown, ArrowUp } from 'lucide-react';
