@@ -134,20 +134,16 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
             animate={{ opacity: refreshing ? 0.7 : 1 }}
             transition={{ duration: 0.2 }}
           >
-            {items.map((item, index) => (
-              <React.memo(FeedItem, (prevProps, nextProps) => {
-                return prevProps.item.id === nextProps.item.id &&
-                       prevProps.item.is_liked === nextProps.item.is_liked &&
-                       prevProps.item.is_saved === nextProps.item.is_saved;
-              })({ 
-                key: item.id,
-                item: item, 
-                onLike: handleLike,
-                onSave: handleSave,
-                onComment: (id) => console.log('Comment on', id),
-                onDelete: handleDelete,
-                refreshFeed: refreshFeed
-              })
+            {items.map((item) => (
+              <FeedItem
+                key={item.id}
+                item={item}
+                onLike={handleLike}
+                onSave={handleSave}
+                onComment={(id) => console.log('Comment on', id)}
+                onDelete={handleDelete}
+                refreshFeed={refreshFeed}
+              />
             ))}
           </motion.div>
           
