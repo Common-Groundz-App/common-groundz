@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -7,7 +6,7 @@ import Logo from '@/components/Logo';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedFollowing from '@/components/feed/FeedFollowing';
-import FeedForYou from '@/components/feed/FeedForYou';
+import EnhancedFeedForYou from '@/components/feed/EnhancedFeedForYou';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
 import { Bell, Search, ChevronDown, ArrowUp } from 'lucide-react';
@@ -19,11 +18,26 @@ import { Toaster } from '@/components/ui/toaster';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { checkForNewContent, getLastRefreshTime, setLastRefreshTime, NewContentCheckResult } from '@/services/feedContentService';
 import { feedbackActions } from '@/services/feedbackService';
+import { smartPrefetchService } from '@/services/smartPrefetchService';
+import { performanceAnalyticsService } from '@/services/performanceAnalyticsService';
 
 const Feed = React.memo(() => {
   const { user, isLoading } = useAuth();
+  const { startRender, endRender } = usePerformanceMonitor('Feed');
+  
+  // Performance optimization
+  useMemoryOptimization({
+    componentName: 'Feed',
+    cleanupInterval: 60000, // 1 minute
+    maxMemoryUsage: 150 // 150MB
+  });
 
   console.log('🍽️ [Feed] Rendering - isLoading:', isLoading, 'user:', user ? 'authenticated' : 'not authenticated');
+
+  useEffect(() => {
+    startRender();
+    return () => endRender();
+  }, [startRender, endRender]);
 
   // CRITICAL: Don't render complex feed logic until auth is ready
   if (isLoading) {
@@ -79,6 +93,42 @@ const Feed = React.memo(() => {
   const pullThreshold = 80;
   const startThreshold = 10;
   const contentCheckIntervalMs = 3 * 60 * 1000; // 3 minutes
+
+  // Performance Analytics
+  useEffect(() => {
+    if (user) {
+      performanceAnalyticsService.trackPageView('/home', user.id);
+      
+      // Track user interaction patterns
+      const handleUserInteraction = (event: Event) => {
+        performanceAnalyticsService.trackUserInteraction(event.type, {
+          timestamp: Date.now(),
+          userId: user.id,
+          activeTab
+        });
+      };
+
+      document.addEventListener('click', handleUserInteraction);
+      document.addEventListener('scroll', handleUserInteraction);
+      
+      return () => {
+        document.removeEventListener('click', handleUserInteraction);
+        document.removeEventListener('scroll', handleUserInteraction);
+      };
+    }
+  }, [user, activeTab]);
+
+  // Smart Prefetching
+  useEffect(() => {
+    if (user) {
+      // Start prefetching based on user behavior
+      smartPrefetchService.initializePrefetching(user.id, activeTab);
+      
+      // Prefetch opposite tab content
+      const prefetchTab = activeTab === 'for-you' ? 'following' : 'for-you';
+      smartPrefetchService.prefetchFeedData(prefetchTab, user.id);
+    }
+  }, [user, activeTab]);
   
   const getInitialActiveTab = () => {
     if (location.pathname === '/home' || location.pathname === '/feed') {
@@ -146,13 +196,18 @@ const Feed = React.memo(() => {
       }
       
       lastScrollTop.current = st <= 0 ? 0 : st;
+
+      // Smart prefetching based on scroll position
+      if (user) {
+        smartPrefetchService.handleScrollBehavior(st, activeTab, user.id);
+      }
     };
     
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [newContentAvailable, hasScrolledDown]);
+  }, [newContentAvailable, hasScrolledDown, user, activeTab]);
 
   const handleRefresh = useCallback(() => {
     if (refreshing) return; // Prevent multiple refreshes
@@ -172,6 +227,13 @@ const Feed = React.memo(() => {
     // Update last refresh time
     if (user) {
       setLastRefreshTime(activeTab, user.id);
+      
+      // Track refresh analytics
+      performanceAnalyticsService.trackUserInteraction('refresh', {
+        timestamp: Date.now(),
+        userId: user.id,
+        activeTab
+      });
     }
     
     // Provide enhanced feedback (haptic + sound)
@@ -311,7 +373,20 @@ const Feed = React.memo(() => {
     setShowNewPosts(false);
     setNewPostCount(0);
     setHasScrolledDown(false);
-  }, []);
+    
+    // Smart prefetching on tab change
+    if (user) {
+      smartPrefetchService.prefetchFeedData(tab as 'for-you' | 'following', user.id);
+      
+      // Track tab change analytics
+      performanceAnalyticsService.trackUserInteraction('tab_change', {
+        timestamp: Date.now(),
+        userId: user.id,
+        fromTab: activeTab,
+        toTab: tab
+      });
+    }
+  }, [activeTab, user]);
 
   // Attach pull-to-refresh handlers at document level
   useEffect(() => {
@@ -529,7 +604,7 @@ const Feed = React.memo(() => {
                 {/* Feed Content - No overflow or height constraints */}
                 <div className="px-4">
                   {activeTab === "for-you" ? (
-                    <FeedForYou refreshing={refreshing} />
+                    <EnhancedFeedForYou refreshing={refreshing} />
                   ) : (
                     <FeedFollowing refreshing={refreshing} />
                   )}
