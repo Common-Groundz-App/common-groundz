@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
@@ -5,13 +6,15 @@ import { cn } from "@/lib/utils";
 import Logo from '@/components/Logo';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import FeedForYou from '@/components/feed/FeedForYou';
 import FeedFollowing from '@/components/feed/FeedFollowing';
+import EnhancedFeedForYou from '@/components/feed/EnhancedFeedForYou';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
 import { Bell, Search, ChevronDown, ArrowUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
+import { useMemoryOptimization } from '@/hooks/useMemoryOptimization';
 import { Toaster } from '@/components/ui/toaster';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { checkForNewContent, getLastRefreshTime, setLastRefreshTime, NewContentCheckResult } from '@/services/feedContentService';
