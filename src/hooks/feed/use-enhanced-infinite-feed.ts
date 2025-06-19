@@ -1,4 +1,3 @@
-
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -118,7 +117,9 @@ export const useEnhancedInfiniteFeed = (feedType: FeedVisibility) => {
       {
         onInsert: (newRec) => {
           console.log('New recommendation received via realtime:', newRec);
-          queryClient.invali QueryContinue[](#)
+          queryClient.invalidateQueries({
+            queryKey: ['enhanced-infinite-feed', feedType, user.id]
+          });
           cacheService.delete(cacheKey);
         },
         onUpdate: (updatedRec) => {
