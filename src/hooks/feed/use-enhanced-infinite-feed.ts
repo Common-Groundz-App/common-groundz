@@ -1,3 +1,4 @@
+
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -10,6 +11,11 @@ import { cacheService } from '@/services/cacheService';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 
 const ITEMS_PER_PAGE = 10;
+
+interface FeedPage {
+  items: CombinedFeedItem[];
+  hasMore: boolean;
+}
 
 export const useEnhancedInfiniteFeed = (feedType: FeedVisibility) => {
   const { user } = useAuth();
@@ -27,14 +33,14 @@ export const useEnhancedInfiniteFeed = (feedType: FeedVisibility) => {
     hasNextPage,
     fetchNextPage,
     refetch
-  } = useInfiniteQuery({
+  } = useInfiniteQuery<FeedPage>({
     queryKey: ['enhanced-infinite-feed', feedType, user?.id],
     queryFn: async ({ pageParam = 0 }) => {
       startRender();
       
       // Try cache first for initial load
       if (pageParam === 0) {
-        const cachedData = cacheService.get(cacheKey);
+        const cachedData = cacheService.get<FeedPage>(cacheKey);
         if (cachedData) {
           console.log('Using cached feed data');
           endRender();
@@ -78,7 +84,7 @@ export const useEnhancedInfiniteFeed = (feedType: FeedVisibility) => {
     const postsChannel = realtimeService.subscribeToTable(
       'posts',
       {
-        onInsert: (newPost) => {
+        onInsert: (newPost: any) => {
           console.log('New post received via realtime:', newPost);
           // Invalidate and refresh feed
           queryClient.invalidateQueries({
@@ -87,7 +93,7 @@ export const useEnhancedInfiniteFeed = (feedType: FeedVisibility) => {
           // Clear cache to force fresh data
           cacheService.delete(cacheKey);
         },
-        onUpdate: (updatedPost) => {
+        onUpdate: (updatedPost: any) => {
           console.log('Post updated via realtime:', updatedPost);
           // Update specific item in cache
           queryClient.setQueryData(['enhanced-infinite-feed', feedType, user.id], (oldData: any) => {
@@ -115,14 +121,14 @@ export const useEnhancedInfiniteFeed = (feedType: FeedVisibility) => {
     const recsChannel = realtimeService.subscribeToTable(
       'recommendations',
       {
-        onInsert: (newRec) => {
+        onInsert: (newRec: any) => {
           console.log('New recommendation received via realtime:', newRec);
           queryClient.invalidateQueries({
             queryKey: ['enhanced-infinite-feed', feedType, user.id]
           });
           cacheService.delete(cacheKey);
         },
-        onUpdate: (updatedRec) => {
+        onUpdate: (updatedRec: any) => {
           console.log('Recommendation updated via realtime:', updatedRec);
           queryClient.setQueryData(['enhanced-infinite-feed', feedType, user.id], (oldData: any) => {
             if (!oldData) return oldData;
@@ -150,7 +156,7 @@ export const useEnhancedInfiniteFeed = (feedType: FeedVisibility) => {
       const followsChannel = realtimeService.subscribeToTable(
         'follows',
         {
-          onInsert: (newFollow) => {
+          onInsert: (newFollow: any) => {
             if (newFollow.follower_id === user.id) {
               console.log('New follow detected, refreshing following feed');
               queryClient.invalidateQueries({

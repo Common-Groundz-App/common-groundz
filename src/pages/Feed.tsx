@@ -54,18 +54,26 @@ const Feed = () => {
     setTimeout(() => setRefreshing(false), 2000);
   };
 
-  const tabs = [
+  const tabItems = [
     { 
-      id: 'for-you', 
+      value: 'for-you', 
       label: 'For You',
-      content: <InfiniteFeedForYou refreshing={refreshing} />
+      emoji: '🔥'
     },
     { 
-      id: 'following', 
+      value: 'following', 
       label: 'Following',
-      content: <InfiniteFeedFollowing refreshing={refreshing} />
+      emoji: '👥'
     }
   ];
+
+  const renderTabContent = () => {
+    if (activeTab === 'for-you') {
+      return <InfiniteFeedForYou refreshing={refreshing} />;
+    } else {
+      return <InfiniteFeedFollowing refreshing={refreshing} />;
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -87,10 +95,14 @@ const Feed = () => {
         </div>
         
         <PillTabs
-          tabs={tabs}
+          items={tabItems}
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
+        
+        <div className="mt-6">
+          {renderTabContent()}
+        </div>
       </div>
       
       <Footer />
