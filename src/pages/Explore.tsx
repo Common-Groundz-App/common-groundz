@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -33,6 +34,7 @@ const Explore = () => {
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('featured');
+  const [isDropdownClosing, setIsDropdownClosing] = useState(false);
   const navigate = useNavigate();
 
   // Use the enhanced realtime search hook
@@ -46,6 +48,9 @@ const Explore = () => {
   } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
 
   const handleResultClick = async (entityId?: string, entityType?: string) => {
+    // Start dropdown closing animation
+    setIsDropdownClosing(true);
+    
     // Track interaction if we have entity details
     if (entityId && entityType && user?.id) {
       await enhancedExploreService.trackUserInteraction(
@@ -56,7 +61,12 @@ const Explore = () => {
         'click'
       );
     }
-    setSearchQuery('');
+    
+    // Clear search and close dropdown after animation
+    setTimeout(() => {
+      setSearchQuery('');
+      setIsDropdownClosing(false);
+    }, 300);
   };
 
   const handleComplexProductSearch = () => {
@@ -148,8 +158,8 @@ const Explore = () => {
     </div>
   );
 
-  // Show dropdown when user has typed at least 1 character
-  const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1;
+  // Show dropdown when user has typed at least 1 character and not closing
+  const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1 && !isDropdownClosing;
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
@@ -217,9 +227,11 @@ const Explore = () => {
                 )}
               </div>
               
-              {/* Enhanced Search Results Dropdown */}
+              {/* Enhanced Search Results Dropdown with smooth closing animation */}
               {shouldShowDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto">
+                <div className={`absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto transition-all duration-300 ${
+                  isDropdownClosing ? 'opacity-0 transform scale-95 translate-y-2' : 'opacity-100 transform scale-100 translate-y-0'
+                }`}>
                   
                   {/* Loading State */}
                   {isLoading && (

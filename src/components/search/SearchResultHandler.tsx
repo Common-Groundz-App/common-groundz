@@ -7,9 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 import { createEnhancedEntity } from '@/services/enhancedEntityService';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
-import { LoadingSpinner, EntityCreationLoader } from '@/components/ui/loading-spinner';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { EntityCategory } from '@/utils/loadingMessages';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface SearchResultHandlerProps {
@@ -77,7 +76,6 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         type: entityType,
         metadata: {
           ...result.metadata,
-          // ... keep existing code (enhanced metadata handling)
           ...(result.api_source === 'openlibrary' && {
             authors: result.metadata?.authors,
             publication_year: result.metadata?.publication_year || result.metadata?.first_publish_year,
@@ -171,7 +169,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
     <>
       <div 
         className={`flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer rounded-lg transition-all duration-200 ${
-          isProcessing ? 'opacity-50 pointer-events-none' : 'hover:scale-[1.02]'
+          isProcessing ? 'opacity-50 bg-muted/30' : 'hover:scale-[1.02]'
         }`}
         onClick={handleResultClick}
       >
@@ -189,7 +187,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
             </div>
           )}
           {isProcessing && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
               <LoadingSpinner size="sm" />
             </div>
           )}
@@ -220,43 +218,36 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         )}
       </div>
 
-      {/* Enhanced Loading Modal with Custom Messages */}
-      <Dialog open={isProcessing} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md">
-          <CustomEntityLoader 
-            entityName={result.name} 
-            category={getEntityCategory(entityType)}
-            customMessage={loadingMessage}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Lightweight Loading Toast - Bottom Centered */}
+      {isProcessing && (
+        <div className="fixed inset-0 z-[70] pointer-events-none">
+          {/* Subtle dimmed background */}
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" />
+          
+          {/* Bottom-centered toast */}
+          <div className="flex items-end justify-center h-full pb-24">
+            <div className="bg-background/95 backdrop-blur-md border rounded-xl shadow-2xl p-6 mx-4 max-w-sm animate-fade-in pointer-events-auto">
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="h-12 w-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                  <div className="absolute inset-0 h-12 w-12 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
+                </div>
+                <div className="text-center space-y-2">
+                  <h3 className="font-medium text-base">{result.name}</h3>
+                  <div className="flex items-center justify-center">
+                    <span className="text-center leading-relaxed animate-fade-in text-sm text-muted-foreground">
+                      {loadingMessage || '✨ Processing your selection...'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
-
-// Custom loader component with custom messages
-const CustomEntityLoader = ({ entityName, category, customMessage }: { 
-  entityName: string; 
-  category?: EntityCategory;
-  customMessage?: string;
-}) => {
-  return (
-    <div className="flex flex-col items-center gap-6 p-6">
-      <div className="relative">
-        <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-        <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
-      </div>
-      <div className="text-center space-y-3">
-        <h3 className="font-medium text-lg">{entityName}</h3>
-        <div className="flex items-center justify-center">
-          <span className="max-w-xs text-center leading-relaxed animate-fade-in text-sm text-muted-foreground px-4">
-            {customMessage || '✨ Processing your selection...'}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // Helper functions for engaging messages
 function getEngagingLoadingMessage(type: EntityTypeString, name: string): string {
