@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -226,7 +227,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
           
           {/* Bottom-centered toast */}
           <div className="flex items-end justify-center h-full pb-24">
-            <div className="bg-background/95 backdrop-blur-md border rounded-xl shadow-2xl p-6 mx-4 max-w-sm animate-fade-in pointer-events-auto">
+            <div className="bg-background/95 border rounded-xl shadow-2xl p-6 mx-4 max-w-sm animate-fade-in pointer-events-auto">
               <div className="flex flex-col items-center gap-4">
                 <div className="relative">
                   <div className="h-12 w-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
