@@ -222,7 +222,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
       {isProcessing && (
         <div className="fixed inset-0 z-[70] pointer-events-none">
           {/* Subtle dimmed background */}
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" />
+          <div className="absolute inset-0 bg-black/20" />
           
           {/* Bottom-centered toast */}
           <div className="flex items-end justify-center h-full pb-24">
