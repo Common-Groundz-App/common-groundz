@@ -1,4 +1,3 @@
-
 interface PerformanceMetric {
   timestamp: number;
   userId: string;
@@ -64,11 +63,14 @@ class PerformanceAnalyticsService {
     const navigationEntry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
     
     if (navigationEntry) {
+      // Use fetchStart as the reference point instead of deprecated navigationStart
+      const startTime = navigationEntry.fetchStart;
+      
       this.addMetric({
         timestamp: Date.now(),
         userId,
         metricType: 'page_load_time',
-        value: navigationEntry.loadEventEnd - navigationEntry.navigationStart,
+        value: navigationEntry.loadEventEnd - startTime,
         metadata: { route }
       });
 
@@ -76,7 +78,7 @@ class PerformanceAnalyticsService {
         timestamp: Date.now(),
         userId,
         metricType: 'dom_content_loaded',
-        value: navigationEntry.domContentLoadedEventEnd - navigationEntry.navigationStart,
+        value: navigationEntry.domContentLoadedEventEnd - startTime,
         metadata: { route }
       });
     }
@@ -227,14 +229,17 @@ class PerformanceAnalyticsService {
     try {
       const lcpObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
-        const lastEntry = entries[entries.length - 1];
+        const lastEntry = entries[entries.length - 1] as any;
         
         this.addMetric({
           timestamp: Date.now(),
           userId: 'system',
           metricType: 'largest_contentful_paint',
           value: lastEntry.startTime,
-          metadata: { element: lastEntry.element?.tagName }
+          metadata: { 
+            element: lastEntry.element?.tagName || 'unknown',
+            size: lastEntry.size || 0
+          }
         });
       });
 
