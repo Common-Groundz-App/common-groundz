@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -10,6 +11,8 @@ import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { EntityCategory } from '@/utils/loadingMessages';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface SearchResultHandlerProps {
   result: ProductSearchResult;
@@ -26,7 +29,20 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
   // Determine entity type based on result data or use 'product' as default
   const entityType: EntityTypeString = determineEntityType(result);
 
+  const handleCancel = () => {
+    setIsProcessing(false);
+    setLoadingMessage('');
+    if (onClose) {
+      onClose();
+    }
+    // Navigate back to explore page
+    navigate('/explore');
+  };
+
   const handleResultClick = async () => {
+    // Prevent multiple clicks during processing
+    if (isProcessing) return;
+    
     try {
       setIsProcessing(true);
       
@@ -169,7 +185,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
     <>
       <div 
         className={`flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer rounded-lg transition-all duration-200 ${
-          isProcessing ? 'opacity-50 bg-muted/30' : 'hover:scale-[1.02]'
+          isProcessing ? 'opacity-50 bg-muted/30 pointer-events-none' : 'hover:scale-[1.02]'
         }`}
         onClick={handleResultClick}
       >
@@ -218,24 +234,40 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         )}
       </div>
 
-      {/* Lightweight Loading Toast - Bottom Centered */}
+      {/* Full-Screen Loading Overlay with Professional UI */}
       {isProcessing && (
-        <div className="fixed inset-0 z-[70] pointer-events-none">
-          {/* Bottom-centered toast */}
-          <div className="flex items-end justify-center h-full pb-24">
-            <div className="bg-background/95 border rounded-xl shadow-2xl p-6 mx-4 max-w-sm animate-fade-in pointer-events-auto">
-              <div className="flex flex-col items-center gap-4">
+        <div className="fixed inset-0 z-[100] pointer-events-auto">
+          {/* Full-screen white background */}
+          <div className="absolute inset-0 bg-white" />
+          
+          {/* Centered loading toast */}
+          <div className="flex items-center justify-center h-full">
+            <div className="bg-white border rounded-2xl shadow-2xl p-8 mx-4 max-w-md w-full animate-fade-in relative">
+              {/* Cancel button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-3 right-3 h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                onClick={handleCancel}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              
+              <div className="flex flex-col items-center gap-6 pt-4">
                 <div className="relative">
-                  <div className="h-12 w-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-                  <div className="absolute inset-0 h-12 w-12 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
+                  <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                  <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
                 </div>
-                <div className="text-center space-y-2">
-                  <h3 className="font-medium text-base">{result.name}</h3>
+                <div className="text-center space-y-3">
+                  <h3 className="font-semibold text-lg text-foreground">{result.name}</h3>
                   <div className="flex items-center justify-center">
-                    <span className="text-center leading-relaxed animate-fade-in text-sm text-muted-foreground">
+                    <span className="text-center leading-relaxed animate-fade-in text-sm text-muted-foreground px-4">
                       {loadingMessage || '✨ Processing your selection...'}
                     </span>
                   </div>
+                  <p className="text-xs text-muted-foreground/80">
+                    Click X to cancel
+                  </p>
                 </div>
               </div>
             </div>
