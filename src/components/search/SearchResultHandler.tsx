@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -18,20 +17,42 @@ interface SearchResultHandlerProps {
   result: ProductSearchResult;
   query: string;
   onClose?: () => void;
+  isProcessing?: boolean;
+  onProcessingStart?: (entityName: string, message: string) => void;
+  onProcessingUpdate?: (message: string) => void;
+  onProcessingEnd?: () => void;
+  useExternalOverlay?: boolean; // Flag to use external overlay instead of internal
 }
 
-export function SearchResultHandler({ result, query, onClose }: SearchResultHandlerProps) {
+export function SearchResultHandler({ 
+  result, 
+  query, 
+  onClose,
+  isProcessing = false,
+  onProcessingStart,
+  onProcessingUpdate,
+  onProcessingEnd,
+  useExternalOverlay = false
+}: SearchResultHandlerProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [internalIsProcessing, setInternalIsProcessing] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   
   // Determine entity type based on result data or use 'product' as default
   const entityType: EntityTypeString = determineEntityType(result);
 
+  // Use external processing state if available, otherwise use internal
+  const currentIsProcessing = useExternalOverlay ? isProcessing : internalIsProcessing;
+
   const handleCancel = () => {
-    setIsProcessing(false);
-    setLoadingMessage('');
+    if (useExternalOverlay && onProcessingEnd) {
+      onProcessingEnd();
+    } else {
+      setInternalIsProcessing(false);
+      setLoadingMessage('');
+    }
+    
     if (onClose) {
       onClose();
     }
@@ -41,14 +62,16 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
 
   const handleResultClick = async () => {
     // Prevent multiple clicks during processing
-    if (isProcessing) return;
+    if (currentIsProcessing) return;
     
     try {
-      setIsProcessing(true);
-      
-      // Set engaging loading message based on entity type
-      const initialMessage = getEngagingLoadingMessage(entityType, result.name);
-      setLoadingMessage(initialMessage);
+      // Set processing state
+      if (useExternalOverlay && onProcessingStart) {
+        onProcessingStart(result.name, getEngagingLoadingMessage(entityType, result.name));
+      } else {
+        setInternalIsProcessing(true);
+        setLoadingMessage(getEngagingLoadingMessage(entityType, result.name));
+      }
       
       console.log(`🔍 Processing search result:`, result);
       
@@ -62,7 +85,12 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         console.log(`✅ Found existing entity: ${existingEntity.name} (${existingEntity.id})`);
         
         // Update loading message for existing entity
-        setLoadingMessage(getNavigationMessage(entityType, result.name));
+        const navMessage = getNavigationMessage(entityType, result.name);
+        if (useExternalOverlay && onProcessingUpdate) {
+          onProcessingUpdate(navMessage);
+        } else {
+          setLoadingMessage(navMessage);
+        }
         
         // Keep the loading state active for smooth transition
         setTimeout(() => {
@@ -76,7 +104,11 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
             onClose();
           }
           
-          setIsProcessing(false);
+          if (useExternalOverlay && onProcessingEnd) {
+            onProcessingEnd();
+          } else {
+            setInternalIsProcessing(false);
+          }
         }, 1200); // Slightly longer delay for better UX
         
         return;
@@ -84,7 +116,12 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
       
       // If no existing entity, create new one
       console.log(`🆕 Creating new entity from search result`);
-      setLoadingMessage(getCreationMessage(entityType, result.name));
+      const creationMessage = getCreationMessage(entityType, result.name);
+      if (useExternalOverlay && onProcessingUpdate) {
+        onProcessingUpdate(creationMessage);
+      } else {
+        setLoadingMessage(creationMessage);
+      }
       
       // Prepare enhanced data for entity creation
       const enhancedResultData = {
@@ -139,7 +176,11 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
             onClose();
           }
           
-          setIsProcessing(false);
+          if (useExternalOverlay && onProcessingEnd) {
+            onProcessingEnd();
+          } else {
+            setInternalIsProcessing(false);
+          }
         }, 800);
         
       } else {
@@ -149,7 +190,12 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
           description: 'Could not process this item. Please try again.',
           variant: 'destructive'
         });
-        setIsProcessing(false);
+        
+        if (useExternalOverlay && onProcessingEnd) {
+          onProcessingEnd();
+        } else {
+          setInternalIsProcessing(false);
+        }
       }
     } catch (error) {
       console.error('❌ Error handling search result:', error);
@@ -158,7 +204,12 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
         description: 'Something went wrong. Please try again.',
         variant: 'destructive'
       });
-      setIsProcessing(false);
+      
+      if (useExternalOverlay && onProcessingEnd) {
+        onProcessingEnd();
+      } else {
+        setInternalIsProcessing(false);
+      }
     }
   };
 
@@ -185,7 +236,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
     <>
       <div 
         className={`flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer rounded-lg transition-all duration-200 ${
-          isProcessing ? 'opacity-50 bg-muted/30 pointer-events-none' : 'hover:scale-[1.02]'
+          currentIsProcessing ? 'opacity-50 bg-muted/30 pointer-events-none' : 'hover:scale-[1.02]'
         }`}
         onClick={handleResultClick}
       >
@@ -202,7 +253,7 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
               No Image
             </div>
           )}
-          {isProcessing && (
+          {currentIsProcessing && (
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
               <LoadingSpinner size="sm" />
             </div>
@@ -227,15 +278,15 @@ export function SearchResultHandler({ result, query, onClose }: SearchResultHand
             </span>
           </div>
         </div>
-        {isProcessing && (
+        {currentIsProcessing && (
           <div className="flex-shrink-0">
             <LoadingSpinner size="sm" />
           </div>
         )}
       </div>
 
-      {/* Full-Screen Loading Overlay with Professional UI */}
-      {isProcessing && (
+      {/* Internal Full-Screen Loading Overlay - Only show if not using external overlay */}
+      {!useExternalOverlay && internalIsProcessing && (
         <div className="fixed inset-0 z-[100] pointer-events-auto">
           {/* Full-screen white background */}
           <div className="absolute inset-0 bg-white" />

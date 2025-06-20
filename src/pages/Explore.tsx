@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -37,6 +36,11 @@ const Explore = () => {
   const [isDropdownClosing, setIsDropdownClosing] = useState(false);
   const navigate = useNavigate();
 
+  // Page-level loading state for entities
+  const [isProcessingEntity, setIsProcessingEntity] = useState(false);
+  const [processingEntityName, setProcessingEntityName] = useState('');
+  const [processingMessage, setProcessingMessage] = useState('');
+
   // Use the enhanced realtime search hook
   const { 
     results, 
@@ -69,6 +73,33 @@ const Explore = () => {
     }, 300);
   };
 
+  const handleProcessingStart = (entityName: string, message: string) => {
+    setIsProcessingEntity(true);
+    setProcessingEntityName(entityName);
+    setProcessingMessage(message);
+  };
+
+  const handleProcessingUpdate = (message: string) => {
+    setProcessingMessage(message);
+  };
+
+  const handleProcessingEnd = () => {
+    setIsProcessingEntity(false);
+    setProcessingEntityName('');
+    setProcessingMessage('');
+  };
+
+  const handleCancelProcessing = () => {
+    setIsProcessingEntity(false);
+    setProcessingEntityName('');
+    setProcessingMessage('');
+    // Clear search and close dropdown
+    setSearchQuery('');
+    setIsDropdownClosing(false);
+    // Navigate back to explore page
+    navigate('/explore');
+  };
+
   const handleComplexProductSearch = () => {
     if (searchQuery.trim().length >= 2) {
       const encodedQuery = encodeURIComponent(searchQuery.trim());
@@ -86,6 +117,7 @@ const Explore = () => {
     return 'Explore';
   };
   
+  // ... keep existing code (tabItems definition)
   const tabItems = [
     {
       value: "featured",
@@ -277,6 +309,11 @@ const Explore = () => {
                           result={book}
                           query={searchQuery}
                           onClose={() => handleResultClick()}
+                          isProcessing={isProcessingEntity}
+                          onProcessingStart={handleProcessingStart}
+                          onProcessingUpdate={handleProcessingUpdate}
+                          onProcessingEnd={handleProcessingEnd}
+                          useExternalOverlay={true}
                         />
                       ))}
                     </div>
@@ -292,6 +329,11 @@ const Explore = () => {
                           result={movie}
                           query={searchQuery}
                           onClose={() => handleResultClick()}
+                          isProcessing={isProcessingEntity}
+                          onProcessingStart={handleProcessingStart}
+                          onProcessingUpdate={handleProcessingUpdate}
+                          onProcessingEnd={handleProcessingEnd}
+                          useExternalOverlay={true}
                         />
                       ))}
                     </div>
@@ -307,6 +349,11 @@ const Explore = () => {
                           result={place}
                           query={searchQuery}
                           onClose={() => handleResultClick()}
+                          isProcessing={isProcessingEntity}
+                          onProcessingStart={handleProcessingStart}
+                          onProcessingUpdate={handleProcessingUpdate}
+                          onProcessingEnd={handleProcessingEnd}
+                          useExternalOverlay={true}
                         />
                       ))}
                     </div>
@@ -356,6 +403,7 @@ const Explore = () => {
             </div>
             
             {/* Navigation - Responsive */}
+            {/* ... keep existing code (navigation tabs) */}
             <div className="overflow-x-hidden mb-6">
               {/* Pill Navigation for screens < 630px */}
               <div className="max-[629px]:block min-[630px]:hidden">
@@ -439,6 +487,47 @@ const Explore = () => {
       <div className="xl:hidden">
         <BottomNavigation />
       </div>
+
+      {/* Full-Screen Loading Overlay - Rendered at Page Level */}
+      {isProcessingEntity && (
+        <div className="fixed inset-0 z-[100] pointer-events-auto">
+          {/* Full-screen white background */}
+          <div className="absolute inset-0 bg-white" />
+          
+          {/* Centered loading toast */}
+          <div className="flex items-center justify-center h-full">
+            <div className="bg-white border rounded-2xl shadow-2xl p-8 mx-4 max-w-md w-full animate-fade-in relative">
+              {/* Cancel button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-3 right-3 h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                onClick={handleCancelProcessing}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              
+              <div className="flex flex-col items-center gap-6 pt-4">
+                <div className="relative">
+                  <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                  <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
+                </div>
+                <div className="text-center space-y-3">
+                  <h3 className="font-semibold text-lg text-foreground">{processingEntityName}</h3>
+                  <div className="flex items-center justify-center">
+                    <span className="text-center leading-relaxed animate-fade-in text-sm text-muted-foreground px-4">
+                      {processingMessage || '✨ Processing your selection...'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground/80">
+                    Click X to cancel
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
