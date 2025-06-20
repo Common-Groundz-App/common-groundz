@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -35,6 +34,11 @@ const Explore = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('featured');
   const [isDropdownClosing, setIsDropdownClosing] = useState(false);
+  
+  // Entity processing state
+  const [isProcessingEntity, setIsProcessingEntity] = useState(false);
+  const [processingEntityName, setProcessingEntityName] = useState('');
+  const [processingMessage, setProcessingMessage] = useState('');
   const navigate = useNavigate();
 
   // Use the enhanced realtime search hook
@@ -67,6 +71,31 @@ const Explore = () => {
       setSearchQuery('');
       setIsDropdownClosing(false);
     }, 300);
+  };
+
+  const handleEntityProcessingStart = (entityName: string, message: string) => {
+    setIsProcessingEntity(true);
+    setProcessingEntityName(entityName);
+    setProcessingMessage(message);
+  };
+
+  const handleEntityProcessingUpdate = (message: string) => {
+    setProcessingMessage(message);
+  };
+
+  const handleEntityProcessingEnd = () => {
+    setIsProcessingEntity(false);
+    setProcessingEntityName('');
+    setProcessingMessage('');
+  };
+
+  const handleCancelProcessing = () => {
+    setIsProcessingEntity(false);
+    setProcessingEntityName('');
+    setProcessingMessage('');
+    setSearchQuery('');
+    // Navigate back to explore page
+    navigate('/explore');
   };
 
   const handleComplexProductSearch = () => {
@@ -277,6 +306,10 @@ const Explore = () => {
                           result={book}
                           query={searchQuery}
                           onClose={() => handleResultClick()}
+                          isProcessing={isProcessingEntity}
+                          onProcessingStart={handleEntityProcessingStart}
+                          onProcessingUpdate={handleEntityProcessingUpdate}
+                          onProcessingEnd={handleEntityProcessingEnd}
                         />
                       ))}
                     </div>
@@ -292,6 +325,10 @@ const Explore = () => {
                           result={movie}
                           query={searchQuery}
                           onClose={() => handleResultClick()}
+                          isProcessing={isProcessingEntity}
+                          onProcessingStart={handleEntityProcessingStart}
+                          onProcessingUpdate={handleEntityProcessingUpdate}
+                          onProcessingEnd={handleEntityProcessingEnd}
                         />
                       ))}
                     </div>
@@ -307,6 +344,10 @@ const Explore = () => {
                           result={place}
                           query={searchQuery}
                           onClose={() => handleResultClick()}
+                          isProcessing={isProcessingEntity}
+                          onProcessingStart={handleEntityProcessingStart}
+                          onProcessingUpdate={handleEntityProcessingUpdate}
+                          onProcessingEnd={handleEntityProcessingEnd}
                         />
                       ))}
                     </div>
@@ -439,6 +480,47 @@ const Explore = () => {
       <div className="xl:hidden">
         <BottomNavigation />
       </div>
+      
+      {/* Full-Screen Entity Processing Overlay */}
+      {isProcessingEntity && (
+        <div className="fixed inset-0 z-[100] pointer-events-auto">
+          {/* Full-screen white background */}
+          <div className="absolute inset-0 bg-white" />
+          
+          {/* Centered loading toast */}
+          <div className="flex items-center justify-center h-full">
+            <div className="bg-white border rounded-2xl shadow-2xl p-8 mx-4 max-w-md w-full animate-fade-in relative">
+              {/* Cancel button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-3 right-3 h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                onClick={handleCancelProcessing}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              
+              <div className="flex flex-col items-center gap-6 pt-4">
+                <div className="relative">
+                  <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                  <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
+                </div>
+                <div className="text-center space-y-3">
+                  <h3 className="font-semibold text-lg text-foreground">{processingEntityName}</h3>
+                  <div className="flex items-center justify-center">
+                    <span className="text-center leading-relaxed animate-fade-in text-sm text-muted-foreground px-4">
+                      {processingMessage || '✨ Processing your selection...'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground/80">
+                    Click X to cancel
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
