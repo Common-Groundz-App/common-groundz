@@ -12,23 +12,9 @@ export default function ProductSearch() {
   const { query } = useParams<{ query: string }>();
   const navigate = useNavigate();
   const decodedQuery = decodeURIComponent(query || '');
-  const [isProcessingEntity, setIsProcessingEntity] = useState(false);
   
   // Use unified search to get product results
   const { results, isLoading, error } = useUnifiedSearch(decodedQuery, { skipProductSearch: false });
-
-  // Simple processing handlers for SearchResultHandler
-  const handleEntityProcessingStart = (entityName: string, message: string) => {
-    setIsProcessingEntity(true);
-  };
-
-  const handleEntityProcessingUpdate = (message: string) => {
-    // No-op for this page
-  };
-
-  const handleEntityProcessingEnd = () => {
-    setIsProcessingEntity(false);
-  };
 
   if (!query) {
     return (
@@ -168,10 +154,6 @@ export default function ProductSearch() {
                       key={`${product.api_source}-${product.api_ref}-${index}`}
                       result={product}
                       query={decodedQuery}
-                      isProcessing={isProcessingEntity}
-                      onProcessingStart={handleEntityProcessingStart}
-                      onProcessingUpdate={handleEntityProcessingUpdate}
-                      onProcessingEnd={handleEntityProcessingEnd}
                     />
                   ))}
                 </CardContent>

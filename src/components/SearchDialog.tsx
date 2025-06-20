@@ -20,7 +20,6 @@ interface SearchDialogProps {
 
 export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState('');
-  const [isProcessingEntity, setIsProcessingEntity] = useState(false);
   const navigate = useNavigate();
   
   // Use the working realtime unified search hook
@@ -44,20 +43,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       navigate(`/search?q=${encodeURIComponent(query)}&mode=quick`);
       onOpenChange(false);
     }
-  };
-
-  // Simple processing handlers for SearchResultHandler
-  const handleEntityProcessingStart = (entityName: string, message: string) => {
-    setIsProcessingEntity(true);
-  };
-
-  const handleEntityProcessingUpdate = (message: string) => {
-    // No-op for dialog
-  };
-
-  const handleEntityProcessingEnd = () => {
-    setIsProcessingEntity(false);
-    handleResultClick(); // Close dialog when processing ends
   };
 
   const renderSectionHeader = (title: string, count: number, isLoading?: boolean, categoryKey?: keyof typeof showAllResults) => (
@@ -183,10 +168,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                         result={book}
                         query={query}
                         onClose={handleResultClick}
-                        isProcessing={isProcessingEntity}
-                        onProcessingStart={handleEntityProcessingStart}
-                        onProcessingUpdate={handleEntityProcessingUpdate}
-                        onProcessingEnd={handleEntityProcessingEnd}
                       />
                     ))}
                   </div>
@@ -202,10 +183,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                         result={movie}
                         query={query}
                         onClose={handleResultClick}
-                        isProcessing={isProcessingEntity}
-                        onProcessingStart={handleEntityProcessingStart}
-                        onProcessingUpdate={handleEntityProcessingUpdate}
-                        onProcessingEnd={handleEntityProcessingEnd}
                       />
                     ))}
                   </div>
@@ -221,10 +198,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                         result={place}
                         query={query}
                         onClose={handleResultClick}
-                        isProcessing={isProcessingEntity}
-                        onProcessingStart={handleEntityProcessingStart}
-                        onProcessingUpdate={handleEntityProcessingUpdate}
-                        onProcessingEnd={handleEntityProcessingEnd}
                       />
                     ))}
                   </div>
