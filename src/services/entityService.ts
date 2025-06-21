@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Entity, RecommendationCategory } from '@/services/recommendation/types';
 import { attachProfilesToEntities } from './unifiedProfileService';
 import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
+import { MediaItem } from '@/types/media';
 
 /**
  * Fetch an entity by its slug or ID
@@ -67,10 +68,10 @@ export const fetchEntityRecommendations = async (
   console.log('Fetching entity recommendations for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Fetch recommendations without JOIN to avoid complexity
+    // Fetch recommendations with all required fields including media
     const { data: recommendationsData, error } = await supabase
       .from('recommendations')
-      .select('*')
+      .select('*, media')
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
     
@@ -148,7 +149,7 @@ export const fetchEntityRecommendations = async (
         comment_count: rec.comment_count || 0,
         view_count: rec.view_count || 0,
         visibility: rec.visibility as any,
-        media: rec.media || [],
+        media: Array.isArray(rec.media) ? rec.media as MediaItem[] : [],
         created_at: rec.created_at,
         updated_at: rec.updated_at
       };
@@ -172,10 +173,10 @@ export const fetchEntityReviews = async (
   console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Fetch reviews without JOIN to avoid complexity
+    // Fetch reviews with all required fields including media, comment_count, view_count
     const { data: reviewsData, error } = await supabase
       .from('reviews')
-      .select('*')
+      .select('*, media, comment_count, view_count')
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
     
@@ -263,10 +264,10 @@ export const fetchEntityReviews = async (
         likes: likeCountMap.get(rev.id) || 0,
         isLiked: likedIds.has(rev.id),
         isSaved: savedIds.has(rev.id),
-        comment_count: rev.comment_count || 0,
-        view_count: rev.view_count || 0,
+        comment_count: (rev as any).comment_count ?? 0,
+        view_count: (rev as any).view_count ?? 0,
         visibility: rev.visibility as any,
-        media: rev.media || [],
+        media: Array.isArray(rev.media) ? rev.media as MediaItem[] : [],
         created_at: rev.created_at,
         updated_at: rev.updated_at
       };
