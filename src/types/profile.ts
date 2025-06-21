@@ -33,6 +33,7 @@ export interface SafeUserProfile {
   last_name: string | null;
   bio: string | null;
   location: string | null;
+  created_at?: string; // Added for compatibility with existing code
 }
 
 // Profile data as it comes from JOIN queries (nested structure)
@@ -61,3 +62,53 @@ export const PROFILE_FALLBACKS = {
   initials: 'AU',
   avatar_url: null,
 } as const;
+
+/**
+ * Transform raw profile data to safe profile data with fallbacks
+ */
+export const transformToSafeProfile = (profile: BaseUserProfile | null): SafeUserProfile => {
+  if (!profile) {
+    return {
+      id: '',
+      username: PROFILE_FALLBACKS.username,
+      avatar_url: PROFILE_FALLBACKS.avatar_url,
+      displayName: PROFILE_FALLBACKS.displayName,
+      initials: PROFILE_FALLBACKS.initials,
+      fullName: null,
+      first_name: null,
+      last_name: null,
+      bio: null,
+      location: null,
+    };
+  }
+
+  const displayName = profile.username || 
+    (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : '') ||
+    profile.first_name || 
+    PROFILE_FALLBACKS.username;
+
+  const initials = profile.username 
+    ? profile.username.substring(0, 2).toUpperCase()
+    : (profile.first_name && profile.last_name)
+      ? `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
+      : profile.first_name
+        ? profile.first_name.substring(0, 2).toUpperCase()
+        : PROFILE_FALLBACKS.initials;
+
+  const fullName = profile.first_name && profile.last_name 
+    ? `${profile.first_name} ${profile.last_name}`
+    : profile.first_name || null;
+
+  return {
+    id: profile.id,
+    username: displayName,
+    avatar_url: profile.avatar_url,
+    displayName,
+    initials,
+    fullName,
+    first_name: profile.first_name,
+    last_name: profile.last_name,
+    bio: profile.bio,
+    location: profile.location,
+  };
+};

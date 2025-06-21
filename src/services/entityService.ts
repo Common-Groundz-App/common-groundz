@@ -1,5 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { Entity } from '@/services/recommendation/types';
+import { Entity, RecommendationCategory } from '@/services/recommendation/types';
 import { attachProfilesToEntities } from './unifiedProfileService';
 import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
 
@@ -122,18 +123,36 @@ export const fetchEntityRecommendations = async (
     }
     
     // Transform to final format with interaction data
-    const finalRecommendations: RecommendationWithUser[] = recommendationsWithProfiles.map(rec => ({
-      ...rec,
-      likes: likeCountMap.get(rec.id) || 0,
-      isLiked: likedIds.has(rec.id),
-      isSaved: savedIds.has(rec.id),
-      comment_count: rec.comment_count || 0,
-      view_count: rec.view_count || 0,
-      visibility: rec.visibility as any,
-      media: rec.media || [],
-      created_at: rec.created_at,
-      updated_at: rec.updated_at
-    }));
+    const finalRecommendations: RecommendationWithUser[] = recommendationsWithProfiles.map(rec => {
+      // Map string category to RecommendationCategory enum
+      const categoryMap: Record<string, RecommendationCategory> = {
+        'food': RecommendationCategory.Food,
+        'drink': RecommendationCategory.Drink,
+        'movie': RecommendationCategory.Movie,
+        'book': RecommendationCategory.Book,
+        'place': RecommendationCategory.Place,
+        'product': RecommendationCategory.Product,
+        'activity': RecommendationCategory.Activity,
+        'music': RecommendationCategory.Music,
+        'art': RecommendationCategory.Art,
+        'tv': RecommendationCategory.TV,
+        'travel': RecommendationCategory.Travel,
+      };
+      
+      return {
+        ...rec,
+        category: categoryMap[rec.category as string] || RecommendationCategory.Product,
+        likes: likeCountMap.get(rec.id) || 0,
+        isLiked: likedIds.has(rec.id),
+        isSaved: savedIds.has(rec.id),
+        comment_count: rec.comment_count || 0,
+        view_count: rec.view_count || 0,
+        visibility: rec.visibility as any,
+        media: rec.media || [],
+        created_at: rec.created_at,
+        updated_at: rec.updated_at
+      };
+    });
     
     console.log('Processed recommendations with profiles:', finalRecommendations.length);
     return finalRecommendations;
@@ -231,19 +250,27 @@ export const fetchEntityReviews = async (
     }
     
     // Transform to final format with interaction data
-    const finalReviews: ReviewWithUser[] = reviewsWithProfiles.map(rev => ({
-      ...rev,
-      latest_rating: latestRatingsMap.get(rev.id),
-      likes: likeCountMap.get(rev.id) || 0,
-      isLiked: likedIds.has(rev.id),
-      isSaved: savedIds.has(rev.id),
-      comment_count: rev.comment_count || 0,
-      view_count: rev.view_count || 0,
-      visibility: rev.visibility as any,
-      media: rev.media || [],
-      created_at: rev.created_at,
-      updated_at: rev.updated_at
-    }));
+    const finalReviews: ReviewWithUser[] = reviewsWithProfiles.map(rev => {
+      // Ensure proper status type
+      const validStatus = rev.status as 'published' | 'draft' | 'deleted';
+      
+      return {
+        ...rev,
+        status: validStatus === 'published' || validStatus === 'draft' || validStatus === 'deleted' 
+          ? validStatus 
+          : 'published',
+        latest_rating: latestRatingsMap.get(rev.id),
+        likes: likeCountMap.get(rev.id) || 0,
+        isLiked: likedIds.has(rev.id),
+        isSaved: savedIds.has(rev.id),
+        comment_count: rev.comment_count || 0,
+        view_count: rev.view_count || 0,
+        visibility: rev.visibility as any,
+        media: rev.media || [],
+        created_at: rev.created_at,
+        updated_at: rev.updated_at
+      };
+    });
     
     console.log('Processed reviews with profiles:', finalReviews.length);
     return finalReviews;

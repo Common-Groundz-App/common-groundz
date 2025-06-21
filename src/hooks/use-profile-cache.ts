@@ -1,5 +1,5 @@
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchSingleProfile, fetchProfilesBatch } from '@/services/unifiedProfileService';
 import { SafeUserProfile } from '@/types/profile';
 
@@ -37,5 +37,21 @@ export const useProfileFetcher = () => {
   return {
     fetchProfile: fetchSingleProfile,
     fetchProfiles: fetchProfilesBatch,
+  };
+};
+
+/**
+ * Hook for cache actions
+ */
+export const useProfileCacheActions = () => {
+  const queryClient = useQueryClient();
+
+  return {
+    invalidateProfile: (userId: string) => {
+      queryClient.invalidateQueries({ queryKey: ['profile', userId] });
+    },
+    updateProfileCache: (userId: string, profile: SafeUserProfile) => {
+      queryClient.setQueryData(['profile', userId], profile);
+    },
   };
 };
