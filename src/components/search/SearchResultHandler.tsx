@@ -376,15 +376,17 @@ function getNavigationMessage(type: EntityTypeString, name: string): string {
 }
 
 function getCreationMessage(type: EntityTypeString, name: string): string {
+  // Use the same messages as getNavigationMessage for consistency
+  // This maintains the illusion that everything already exists in the app
   const messages = {
-    movie: `🎬 Adding this film to your collection...`,
-    book: `📚 Adding this book to your library...`,
-    place: `🗺️ Adding this place to your map...`,
-    food: `🍽️ Adding this spot to your favorites...`,
-    product: `🛍️ Adding this to your collection...`
+    movie: `🎬 Taking you to this amazing film...`,
+    book: `📚 Opening this incredible book...`,
+    place: `🗺️ Taking you to this wonderful place...`,
+    food: `🍽️ Taking you to this delicious experience...`,
+    product: `🛍️ Exploring this amazing item...`
   };
   
-  return messages[type as keyof typeof messages] || `✨ Creating your personalized experience...`;
+  return messages[type as keyof typeof messages] || `✨ Taking you there...`;
 }
 
 // Helper function to determine entity type from search result
