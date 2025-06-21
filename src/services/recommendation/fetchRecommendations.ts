@@ -2,8 +2,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Recommendation, RecommendationCategory } from '../recommendation/types';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
+import { attachProfilesToEntities } from '../unifiedProfileService';
 
-// Function to fetch user recommendations with optimized queries
+// Function to fetch user recommendations with optimized queries and unified profile service
 export const fetchUserRecommendations = async (
   userId: string | null,
   profileUserId: string,
@@ -21,13 +22,12 @@ export const fetchUserRecommendations = async (
       userId, profileUserId, category, sortBy, page, limit
     });
     
-    // Build query with JOIN to get entity and profile data in one call
+    // Build query without JOIN to avoid complexity
     let query = supabase
       .from('recommendations')
       .select(`
         *,
-        entity:entities(*),
-        profiles:profiles!recommendations_user_id_fkey(id, username, avatar_url)
+        entity:entities(*)
       `, { count: 'exact' })
       .eq('user_id', profileUserId);
     
@@ -62,8 +62,8 @@ export const fetchUserRecommendations = async (
     const to = from + limit - 1;
     query = query.range(from, to);
 
-    // Execute the optimized query
-    console.log('Executing optimized recommendations query with JOINs');
+    // Execute the query
+    console.log('Executing recommendations query');
     const { data: recommendations, error, count } = await query;
 
     if (error) {
@@ -74,10 +74,12 @@ export const fetchUserRecommendations = async (
     console.log(`Found ${recommendations?.length || 0} recommendations`);
 
     if (recommendations && recommendations.length > 0) {
-      // Get recommendation IDs for batch like operations
+      // Attach profiles using unified service
+      const recommendationsWithProfiles = await attachProfilesToEntities(recommendations);
+      
+      // Get recommendation IDs for batch operations
       const recommendationIds = recommendations.map(rec => rec.id);
       
-      // Separate the batch operations to avoid complex type issues
       let likeCountsData: any = null;
       let userLikesData: any = null;
       let userSavesData: any = null;
@@ -112,7 +114,6 @@ export const fetchUserRecommendations = async (
         }
       } catch (batchError) {
         console.error('Error in batch operations:', batchError);
-        // Continue with empty data rather than failing completely
       }
       
       // Process results with proper error handling
@@ -132,12 +133,7 @@ export const fetchUserRecommendations = async (
       );
 
       // Process recommendations with all fetched data
-      const processedRecommendations = recommendations.map(rec => {
-        // Extract profile data with proper null checks
-        const profile = rec.profiles as any || {};
-        const username = profile?.username || null;
-        const avatar_url = profile?.avatar_url || null;
-        
+      const processedRecommendations = recommendationsWithProfiles.map(rec => {
         // Get entity data (already fetched via JOIN)
         const entity = rec.entity || null;
         
@@ -146,23 +142,22 @@ export const fetchUserRecommendations = async (
         const isLiked = userId ? likedIds.has(rec.id) : false;
         const isSaved = userId ? savedIds.has(rec.id) : false;
         
+        // Transform to legacy format for backward compatibility
         const processed = {
           ...rec,
           entity,
           likes,
           isLiked,
           isSaved,
-          username,
-          avatar_url,
+          // Legacy properties for backward compatibility
+          username: rec.user.displayName,
+          avatar_url: rec.user.avatar_url,
         };
-        
-        // Clean up nested data
-        delete processed.profiles;
         
         return processed as unknown as Recommendation;
       });
 
-      console.log(`Processed ${processedRecommendations.length} recommendations with optimized queries`);
+      console.log(`Processed ${processedRecommendations.length} recommendations with unified profile service`);
 
       return {
         recommendations: processedRecommendations,

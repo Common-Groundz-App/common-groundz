@@ -1,6 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
+import { attachProfilesToEntities } from './unifiedProfileService';
+import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
 
 /**
  * Fetch an entity by its slug or ID
@@ -56,19 +57,19 @@ const isValidUUID = (str: string): boolean => {
 };
 
 /**
- * Fetch all recommendations related to an entity with optimized JOIN query
+ * Fetch all recommendations related to an entity with unified profile service
  */
-export const fetchEntityRecommendations = async (entityId: string, userId: string | null = null) => {
+export const fetchEntityRecommendations = async (
+  entityId: string, 
+  userId: string | null = null
+): Promise<RecommendationWithUser[]> => {
   console.log('Fetching entity recommendations for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Use a single query with JOIN to get recommendations with profile data
+    // Fetch recommendations without JOIN to avoid complexity
     const { data: recommendationsData, error } = await supabase
       .from('recommendations')
-      .select(`
-        *,
-        profiles:profiles!recommendations_user_id_fkey(id, username, avatar_url)
-      `)
+      .select('*')
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
     
@@ -77,71 +78,65 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
       return [];
     }
 
-    console.log('Raw recommendations data with profiles:', recommendationsData);
-    
     if (!recommendationsData || recommendationsData.length === 0) {
       return [];
     }
     
-    // Get recommendation IDs for batch operations
+    console.log('Found recommendations:', recommendationsData.length);
+    
+    // Attach profiles using unified service
+    const recommendationsWithProfiles = await attachProfilesToEntities(recommendationsData);
+    
+    // Get recommendation IDs for interaction data
     const recommendationIds = recommendationsData.map(rec => rec.id);
     
-    let recommendations = recommendationsData.map(rec => {
-      // Extract profile data safely with proper null checks
-      const profile = rec.profiles as any || {};
-      return {
-        ...rec,
-        username: profile?.username || null,
-        avatar_url: profile?.avatar_url || null,
-        likes: 0, // Will be updated below if user is logged in
-        isLiked: false,
-        isSaved: false
-      };
-    });
+    // Fetch interaction data if user is logged in
+    let likedIds = new Set<string>();
+    let savedIds = new Set<string>();
+    let likeCountMap = new Map<string, number>();
     
-    // If we have a logged-in user, fetch interaction data in batch
     if (userId && recommendationIds.length > 0) {
       const [likesData, savesData, likeCountsData] = await Promise.all([
-        // Get user likes for these recommendations
         supabase
           .from('recommendation_likes')
           .select('recommendation_id')
           .eq('user_id', userId)
           .in('recommendation_id', recommendationIds),
         
-        // Get user saves for these recommendations
         supabase
           .from('recommendation_saves')
           .select('recommendation_id')
           .eq('user_id', userId)
           .in('recommendation_id', recommendationIds),
         
-        // Get like counts using RPC function
         supabase.rpc('get_recommendation_likes_by_ids', {
           p_recommendation_ids: recommendationIds
         })
       ]);
       
-      const likedIds = new Set((likesData.data || []).map(like => like.recommendation_id));
-      const savedIds = new Set((savesData.data || []).map(save => save.recommendation_id));
-      const likeCountMap = new Map(
+      likedIds = new Set((likesData.data || []).map(like => like.recommendation_id));
+      savedIds = new Set((savesData.data || []).map(save => save.recommendation_id));
+      likeCountMap = new Map(
         (likeCountsData.data || []).map(item => [item.recommendation_id, item.like_count])
       );
-      
-      // Update recommendations with user interaction data
-      recommendations = recommendations.map(rec => ({
-        ...rec,
-        isLiked: likedIds.has(rec.id),
-        isSaved: savedIds.has(rec.id),
-        likes: likeCountMap.get(rec.id) || 0
-      }));
-      
-      console.log('Processed recommendations with user data:', recommendations.length);
-    } else {
-      console.log('Processed recommendations without user data:', recommendations.length);
     }
     
-    return recommendations;
+    // Transform to final format with interaction data
+    const finalRecommendations: RecommendationWithUser[] = recommendationsWithProfiles.map(rec => ({
+      ...rec,
+      likes: likeCountMap.get(rec.id) || 0,
+      isLiked: likedIds.has(rec.id),
+      isSaved: savedIds.has(rec.id),
+      comment_count: rec.comment_count || 0,
+      view_count: rec.view_count || 0,
+      visibility: rec.visibility as any,
+      media: rec.media || [],
+      created_at: rec.created_at,
+      updated_at: rec.updated_at
+    }));
+    
+    console.log('Processed recommendations with profiles:', finalRecommendations.length);
+    return finalRecommendations;
   } catch (err) {
     console.error('Exception in fetchEntityRecommendations:', err);
     return [];
@@ -149,19 +144,19 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
 };
 
 /**
- * Fetch all reviews related to an entity with optimized JOIN query
+ * Fetch all reviews related to an entity with unified profile service
  */
-export const fetchEntityReviews = async (entityId: string, userId: string | null = null) => {
+export const fetchEntityReviews = async (
+  entityId: string, 
+  userId: string | null = null
+): Promise<ReviewWithUser[]> => {
   console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Use a single query with JOIN to get reviews with profile data
+    // Fetch reviews without JOIN to avoid complexity
     const { data: reviewsData, error } = await supabase
       .from('reviews')
-      .select(`
-        *,
-        profiles:profiles!reviews_user_id_fkey(id, username, avatar_url)
-      `)
+      .select('*')
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
     
@@ -170,11 +165,14 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
       return [];
     }
     
-    console.log('Raw reviews data with profiles:', reviewsData);
-
     if (!reviewsData || reviewsData.length === 0) {
       return [];
     }
+
+    console.log('Found reviews:', reviewsData.length);
+    
+    // Attach profiles using unified service
+    const reviewsWithProfiles = await attachProfilesToEntities(reviewsData);
     
     // Get reviews with timeline for latest ratings
     const reviewsWithTimeline = reviewsData.filter(r => r.has_timeline);
@@ -190,7 +188,6 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
         .order('created_at', { ascending: false });
       
       if (timelineUpdates) {
-        // Get the latest rating for each review
         timelineUpdates.forEach(update => {
           if (!latestRatingsMap.has(update.review_id)) {
             latestRatingsMap.set(update.review_id, update.rating);
@@ -199,76 +196,57 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
       }
     }
     
-    // Get review IDs for batch operations
+    // Get review IDs for interaction data
     const reviewIds = reviewsData.map(rev => rev.id);
     
-    let reviews = reviewsData.map(rev => {
-      // Extract profile data safely with proper null checks
-      const profile = rev.profiles as any || {};
-      const latestRating = latestRatingsMap.get(rev.id);
-      
-      return {
-        ...rev,
-        // Add both direct properties for backward compatibility
-        username: profile?.username || null,
-        avatar_url: profile?.avatar_url || null,
-        // AND add a nested user object to match what ReviewCard expects
-        user: {
-          id: rev.user_id,
-          username: profile?.username || null,
-          avatar_url: profile?.avatar_url || null
-        },
-        // Add latest rating for timeline reviews
-        latest_rating: latestRating,
-        likes: 0, // Will be updated below if user is logged in
-        isLiked: false,
-        isSaved: false
-      };
-    });
-
-    // If we have a logged-in user, fetch interaction data in batch
+    // Fetch interaction data if user is logged in
+    let likedIds = new Set<string>();
+    let savedIds = new Set<string>();
+    let likeCountMap = new Map<string, number>();
+    
     if (userId && reviewIds.length > 0) {
       const [likesData, savesData, likeCountsData] = await Promise.all([
-        // Get user likes for these reviews
         supabase
           .from('review_likes')
           .select('review_id')
           .eq('user_id', userId)
           .in('review_id', reviewIds),
         
-        // Get user saves for these reviews
         supabase
           .from('review_saves')
           .select('review_id')
           .eq('user_id', userId)
           .in('review_id', reviewIds),
         
-        // Get like counts using RPC function
         supabase.rpc('get_review_likes_batch', {
           p_review_ids: reviewIds
         })
       ]);
       
-      const likedIds = new Set((likesData.data || []).map(like => like.review_id));
-      const savedIds = new Set((savesData.data || []).map(save => save.review_id));
-      const likeCountMap = new Map(
+      likedIds = new Set((likesData.data || []).map(like => like.review_id));
+      savedIds = new Set((savesData.data || []).map(save => save.review_id));
+      likeCountMap = new Map(
         (likeCountsData.data || []).map(item => [item.review_id, item.like_count])
       );
-      
-      // Update reviews with user interaction data
-      reviews = reviews.map(rev => ({
-        ...rev,
-        isLiked: likedIds.has(rev.id),
-        isSaved: savedIds.has(rev.id),
-        likes: likeCountMap.get(rev.id) || 0
-      }));
-      
-      console.log('Processed reviews with user data:', reviews.length);
-    } else {
-      console.log('Processed reviews without user data:', reviews.length);
     }
     
-    return reviews;
+    // Transform to final format with interaction data
+    const finalReviews: ReviewWithUser[] = reviewsWithProfiles.map(rev => ({
+      ...rev,
+      latest_rating: latestRatingsMap.get(rev.id),
+      likes: likeCountMap.get(rev.id) || 0,
+      isLiked: likedIds.has(rev.id),
+      isSaved: savedIds.has(rev.id),
+      comment_count: rev.comment_count || 0,
+      view_count: rev.view_count || 0,
+      visibility: rev.visibility as any,
+      media: rev.media || [],
+      created_at: rev.created_at,
+      updated_at: rev.updated_at
+    }));
+    
+    console.log('Processed reviews with profiles:', finalReviews.length);
+    return finalReviews;
   } catch (err) {
     console.error('Exception in fetchEntityReviews:', err);
     return [];

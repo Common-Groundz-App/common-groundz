@@ -1,16 +1,16 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { Recommendation } from '../recommendation/types';
+import { fetchSingleProfile } from '../unifiedProfileService';
 
 export const fetchRecommendationById = async (id: string, userId?: string | null): Promise<Recommendation | null> => {
   try {
-    // Use a single query with JOINs to get all data at once
+    // Use a single query to get recommendation and entity data
     const { data, error } = await supabase
       .from('recommendations')
       .select(`
         *,
-        entity:entities(*),
-        profiles:profiles!recommendations_user_id_fkey(username, avatar_url)
+        entity:entities(*)
       `)
       .eq('id', id)
       .single();
@@ -23,6 +23,9 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
     if (!data) {
       return null;
     }
+    
+    // Fetch profile using unified service
+    const profile = await fetchSingleProfile(data.user_id);
     
     // Batch fetch user interaction data and like counts
     let isLiked = false;
@@ -65,22 +68,16 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
       likes = likeCountData?.[0]?.like_count || 0;
     }
     
-    // Extract profile information safely with proper null checks
-    const profileData = data.profiles as any || {};
-    const username = profileData?.username || null;
-    const avatar_url = profileData?.avatar_url || null;
-    
-    // Return the processed recommendation with added data
+    // Return the processed recommendation with unified profile data
     const processedData = {
       ...data,
       likes,
       isLiked,
       isSaved,
-      username,
-      avatar_url
+      // Legacy properties for backward compatibility
+      username: profile.displayName,
+      avatar_url: profile.avatar_url
     };
-    
-    delete processedData.profiles;  // Clean up the nested profiles data
     
     // Type cast to ensure compatibility
     return processedData as unknown as Recommendation;
