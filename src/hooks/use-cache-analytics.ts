@@ -26,7 +26,7 @@ export const useCacheAnalytics = () => {
     
     const totalQueries = queries.length;
     const staleQueries = queries.filter(q => q.isStale()).length;
-    const fetchingQueries = queries.filter(q => q.isFetching()).length;
+    const fetchingQueries = queries.filter(q => q.state.isFetching).length;
     
     // Estimate cache hit rate based on successful cached queries
     const cachedQueries = queries.filter(q => q.state.data && !q.isStale()).length;
@@ -80,7 +80,7 @@ export const useCacheAnalytics = () => {
       }
       acc[key].count++;
       if (query.isStale()) acc[key].stale++;
-      if (query.isFetching()) acc[key].fetching++;
+      if (query.state.isFetching) acc[key].fetching++;
       return acc;
     }, {} as Record<string, { count: number; stale: number; fetching: number }>);
 
@@ -112,7 +112,7 @@ export const useCacheDebugger = () => {
         key: query.queryKey,
         state: query.state.status,
         isStale: query.isStale(),
-        isFetching: query.isFetching(),
+        isFetching: query.state.isFetching,
         dataUpdatedAt: new Date(query.state.dataUpdatedAt),
         hasData: !!query.state.data
       });
