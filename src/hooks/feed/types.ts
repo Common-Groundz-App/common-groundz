@@ -6,9 +6,11 @@ import {
   Entity
 } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
+import { RecommendationWithUser, PostWithUser } from '@/types/entities';
 
 export type FeedVisibility = 'for_you' | 'following';
 
+// Legacy types for backward compatibility - will be replaced in Phase 4
 export interface FeedItem extends Recommendation {
   likes: number;
   is_liked: boolean;
@@ -18,7 +20,6 @@ export interface FeedItem extends Recommendation {
   comment_count: number;
 }
 
-// Export this explicitly to fix the import error
 export type RecommendationFeedItem = FeedItem;
 
 export interface PostFeedItem {
@@ -40,10 +41,14 @@ export interface PostFeedItem {
   tagged_entities?: Entity[];
   media?: MediaItem[];
   status?: 'draft' | 'published' | 'failed';
-  tags?: string[]; // Adding the tags property which was missing
+  tags?: string[];
 }
 
+// Current combined feed item type (legacy)
 export type CombinedFeedItem = FeedItem | PostFeedItem;
+
+// New unified feed item type (will replace CombinedFeedItem in Phase 4)
+export type UnifiedFeedItem = RecommendationWithUser | PostWithUser;
 
 export interface FeedState {
   items: CombinedFeedItem[];

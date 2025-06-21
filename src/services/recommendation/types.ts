@@ -67,11 +67,13 @@ export enum RecommendationVisibility {
   FriendsOnly = 'friends_only'
 }
 
+// Legacy recommendation interface for backward compatibility
+// This will be replaced by RecommendationWithUser in Phase 4
 export interface Recommendation {
   id: string;
   user_id: string;
   title: string;
-  subtitle?: string; // Added subtitle field for review headlines/titles
+  subtitle?: string;
   description?: string;
   image_url?: string;
   category: RecommendationCategory;
@@ -86,7 +88,7 @@ export interface Recommendation {
   updated_at: string;
   comment_count?: number;
   
-  // Additional fields that can be populated
+  // Profile fields - these will be removed in Phase 4
   likes?: number;
   isLiked?: boolean;
   isSaved?: boolean;
