@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { Recommendation } from '../recommendation/types';
-import { fetchSingleProfile } from '../unifiedProfileService';
+import { fetchSingleProfile } from '@/services/enhancedUnifiedProfileService';
 
 export const fetchRecommendationById = async (id: string, userId?: string | null): Promise<Recommendation | null> => {
   try {
@@ -24,7 +24,7 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
       return null;
     }
     
-    // Fetch profile using unified service
+    // Fetch profile using enhanced unified service
     const profile = await fetchSingleProfile(data.user_id);
     
     // Batch fetch user interaction data and like counts
@@ -68,7 +68,7 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
       likes = likeCountData?.[0]?.like_count || 0;
     }
     
-    // Return the processed recommendation with unified profile data
+    // Return the processed recommendation with enhanced unified profile data
     const processedData = {
       ...data,
       likes,

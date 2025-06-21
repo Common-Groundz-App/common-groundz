@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, RecommendationCategory } from '@/services/recommendation/types';
-import { attachProfilesToEntities } from './unifiedProfileService';
+import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
 import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
 import { MediaItem } from '@/types/common';
 
@@ -58,7 +58,7 @@ const isValidUUID = (str: string): boolean => {
 };
 
 /**
- * Fetch all recommendations related to an entity with unified profile service
+ * Fetch all recommendations related to an entity with enhanced unified profile service
  */
 export const fetchEntityRecommendations = async (
   entityId: string, 
@@ -85,7 +85,7 @@ export const fetchEntityRecommendations = async (
     
     console.log('Found recommendations:', recommendationsData.length);
     
-    // Attach profiles using unified service
+    // Attach profiles using enhanced unified service
     const recommendationsWithProfiles = await attachProfilesToEntities(recommendationsData);
     
     // Get recommendation IDs for interaction data
@@ -165,7 +165,7 @@ export const fetchEntityRecommendations = async (
       };
     });
     
-    console.log('Processed recommendations with profiles:', finalRecommendations.length);
+    console.log('Processed recommendations with enhanced unified profiles:', finalRecommendations.length);
     return finalRecommendations;
   } catch (err) {
     console.error('Exception in fetchEntityRecommendations:', err);
@@ -174,7 +174,7 @@ export const fetchEntityRecommendations = async (
 };
 
 /**
- * Fetch all reviews related to an entity with unified profile service
+ * Fetch all reviews related to an entity with enhanced unified profile service
  */
 export const fetchEntityReviews = async (
   entityId: string, 
@@ -201,7 +201,7 @@ export const fetchEntityReviews = async (
 
     console.log('Found reviews:', reviewsData.length);
     
-    // Attach profiles using unified service
+    // Attach profiles using enhanced unified service
     const reviewsWithProfiles = await attachProfilesToEntities(reviewsData);
     
     // Get reviews with timeline for latest ratings
@@ -300,7 +300,7 @@ export const fetchEntityReviews = async (
       };
     });
     
-    console.log('Processed reviews with profiles:', finalReviews.length);
+    console.log('Processed reviews with enhanced unified profiles:', finalReviews.length);
     return finalReviews;
   } catch (err) {
     console.error('Exception in fetchEntityReviews:', err);

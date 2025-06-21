@@ -2,9 +2,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Recommendation, RecommendationCategory } from '../recommendation/types';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
-import { attachProfilesToEntities } from '../unifiedProfileService';
+import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
 
-// Function to fetch user recommendations with optimized queries and unified profile service
+// Function to fetch user recommendations with optimized queries and enhanced unified profile service
 export const fetchUserRecommendations = async (
   userId: string | null,
   profileUserId: string,
@@ -74,7 +74,7 @@ export const fetchUserRecommendations = async (
     console.log(`Found ${recommendations?.length || 0} recommendations`);
 
     if (recommendations && recommendations.length > 0) {
-      // Attach profiles using unified service
+      // Attach profiles using enhanced unified service
       const recommendationsWithProfiles = await attachProfilesToEntities(recommendations);
       
       // Get recommendation IDs for batch operations
@@ -157,7 +157,7 @@ export const fetchUserRecommendations = async (
         return processed as unknown as Recommendation;
       });
 
-      console.log(`Processed ${processedRecommendations.length} recommendations with unified profile service`);
+      console.log(`Processed ${processedRecommendations.length} recommendations with enhanced unified profile service`);
 
       return {
         recommendations: processedRecommendations,

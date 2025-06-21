@@ -1,6 +1,6 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchSingleProfile, fetchProfilesBatch } from '@/services/unifiedProfileService';
+import { fetchSingleProfile, fetchProfilesBatch } from '@/services/enhancedUnifiedProfileService';
 import { SafeUserProfile } from '@/types/profile';
 
 /**
