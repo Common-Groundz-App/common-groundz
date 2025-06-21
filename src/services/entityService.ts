@@ -68,10 +68,10 @@ export const fetchEntityRecommendations = async (
   console.log('Fetching entity recommendations for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Fetch recommendations with all required fields including media
+    // Fetch recommendations with only existing fields
     const { data: recommendationsData, error } = await supabase
       .from('recommendations')
-      .select('*, media')
+      .select('*')
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
     
@@ -141,7 +141,18 @@ export const fetchEntityRecommendations = async (
       };
       
       return {
-        ...rec,
+        id: rec.id,
+        title: rec.title,
+        subtitle: rec.subtitle,
+        description: rec.description,
+        image_url: rec.image_url,
+        rating: rec.rating,
+        venue: rec.venue,
+        entity_id: rec.entity_id,
+        entity: rec.entity,
+        is_certified: rec.is_certified,
+        user_id: rec.user_id,
+        user: rec.user,
         category: categoryMap[rec.category as string] || RecommendationCategory.Product,
         likes: likeCountMap.get(rec.id) || 0,
         isLiked: likedIds.has(rec.id),
@@ -149,7 +160,7 @@ export const fetchEntityRecommendations = async (
         comment_count: rec.comment_count || 0,
         view_count: rec.view_count || 0,
         visibility: rec.visibility as any,
-        media: Array.isArray(rec.media) ? rec.media as MediaItem[] : [],
+        media: [] as MediaItem[], // Recommendations don't have media field in DB
         created_at: rec.created_at,
         updated_at: rec.updated_at
       };
@@ -173,10 +184,10 @@ export const fetchEntityReviews = async (
   console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Fetch reviews with all required fields including media, comment_count, view_count
+    // Fetch reviews with only existing fields
     const { data: reviewsData, error } = await supabase
       .from('reviews')
-      .select('*, media, comment_count, view_count')
+      .select('*')
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
     
@@ -256,7 +267,23 @@ export const fetchEntityReviews = async (
       const validStatus = rev.status as 'published' | 'draft' | 'deleted';
       
       return {
-        ...rev,
+        id: rev.id,
+        title: rev.title,
+        subtitle: rev.subtitle,
+        description: rev.description,
+        image_url: rev.image_url,
+        category: rev.category,
+        rating: rev.rating,
+        venue: rev.venue,
+        entity_id: rev.entity_id,
+        entity: rev.entity,
+        experience_date: rev.experience_date,
+        has_timeline: rev.has_timeline,
+        timeline_count: rev.timeline_count,
+        trust_score: rev.trust_score,
+        is_recommended: rev.is_recommended,
+        user_id: rev.user_id,
+        user: rev.user,
         status: validStatus === 'published' || validStatus === 'draft' || validStatus === 'deleted' 
           ? validStatus 
           : 'published',
@@ -264,10 +291,11 @@ export const fetchEntityReviews = async (
         likes: likeCountMap.get(rev.id) || 0,
         isLiked: likedIds.has(rev.id),
         isSaved: savedIds.has(rev.id),
-        comment_count: (rev as any).comment_count ?? 0,
-        view_count: (rev as any).view_count ?? 0,
+        comment_count: 0, // Default value since field doesn't exist in DB
+        view_count: 0, // Default value since field doesn't exist in DB
         visibility: rev.visibility as any,
         media: Array.isArray(rev.media) ? rev.media as MediaItem[] : [],
+        ai_summary: rev.ai_summary,
         created_at: rev.created_at,
         updated_at: rev.updated_at
       };
