@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
 
 export interface Review {
   id: string;
@@ -145,37 +146,18 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
       }
     }
 
-    console.log('✅ Review data fetched:', {
-      id: reviewData.id,
-      title: reviewData.title,
-      rating: reviewData.rating,
-      latest_rating: latestRating,
-      ai_summary: reviewData.ai_summary ? `${reviewData.ai_summary.substring(0, 50)}...` : 'No AI summary',
-      ai_summary_length: reviewData.ai_summary?.length || 0,
-      timeline_count: reviewData.timeline_count,
-      has_timeline: reviewData.has_timeline,
-      ai_summary_last_generated_at: reviewData.ai_summary_last_generated_at
-    });
-
-    // Then get the profile data separately
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .eq('id', reviewData.user_id)
-      .maybeSingle();
-
-    if (profileError) {
-      console.error('Error fetching profile:', profileError);
-    }
+    // Attach profile using enhanced unified service
+    const reviewsWithProfiles = await attachProfilesToEntities([reviewData]);
+    const reviewWithProfile = reviewsWithProfiles[0];
 
     // Combine the data
     const combinedData = {
-      ...reviewData,
+      ...reviewWithProfile,
       latest_rating: latestRating,
-      user: profileData ? {
-        username: profileData.username,
-        avatar_url: profileData.avatar_url
-      } : undefined
+      user: {
+        username: reviewWithProfile.user.displayName,
+        avatar_url: reviewWithProfile.user.avatar_url
+      }
     };
 
     console.log('🔄 Combined review data for timeline:', {
@@ -270,7 +252,7 @@ export const updateReviewStatus = async (reviewId: string, status: string): Prom
   }
 };
 
-// Fetch user reviews with enhanced fields - Using manual joins to avoid foreign key issues
+// Fetch user reviews with enhanced unified profile service
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
     // First, get the reviews
@@ -288,19 +270,11 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
 
     if (!reviews?.length) return [];
 
+    // Attach profiles using enhanced unified service
+    const reviewsWithProfiles = await attachProfilesToEntities(reviews);
+
     const reviewIds = reviews.map(r => r.id);
-    const userIds = reviews.map(r => r.user_id);
     const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
-
-    // Get user profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-    }
 
     // Get entities if any exist
     let entities = [];
@@ -343,16 +317,15 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     }
 
     // Map reviews with interaction data and proper typing
-    return reviews.map(review => {
-      const userProfile = profiles?.find(p => p.id === review.user_id);
+    return reviewsWithProfiles.map(review => {
       const entity = entities.find(e => e.id === review.entity_id);
 
       return {
         ...review,
-        user: userProfile ? {
-          username: userProfile.username,
-          avatar_url: userProfile.avatar_url
-        } : undefined,
+        user: {
+          username: review.user.displayName,
+          avatar_url: review.user.avatar_url
+        },
         entity: entity ? {
           id: entity.id,
           name: entity.name,
@@ -372,7 +345,7 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
   }
 };
 
-// Fetch reviews that are marked as recommendations (4+ stars) - Using manual joins
+// Fetch reviews that are marked as recommendations (4+ stars) - Using enhanced unified service
 export const fetchUserRecommendations = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
     // First, get the reviews
@@ -391,19 +364,11 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
 
     if (!reviews?.length) return [];
 
+    // Attach profiles using enhanced unified service
+    const reviewsWithProfiles = await attachProfilesToEntities(reviews);
+
     const reviewIds = reviews.map(r => r.id);
-    const userIds = reviews.map(r => r.user_id);
     const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
-
-    // Get user profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-    }
 
     // Get entities if any exist
     let entities = [];
@@ -446,16 +411,15 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
     }
 
     // Map reviews with interaction data and proper typing
-    return reviews.map(review => {
-      const userProfile = profiles?.find(p => p.id === review.user_id);
+    return reviewsWithProfiles.map(review => {
       const entity = entities.find(e => e.id === review.entity_id);
 
       return {
         ...review,
-        user: userProfile ? {
-          username: userProfile.username,
-          avatar_url: userProfile.avatar_url
-        } : undefined,
+        user: {
+          username: review.user.displayName,
+          avatar_url: review.user.avatar_url
+        },
         entity: entity ? {
           id: entity.id,
           name: entity.name,
@@ -492,26 +456,16 @@ export const fetchReviewUpdates = async (reviewId: string): Promise<ReviewUpdate
 
     if (!updates?.length) return [];
 
-    // Get unique user IDs from the updates
-    const userIds = [...new Set(updates.map(update => update.user_id))];
-
-    // Fetch profiles for these users
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-    }
+    // Attach profiles using enhanced unified service
+    const updatesWithProfiles = await attachProfilesToEntities(updates);
 
     // Map updates with their corresponding profiles
-    return updates.map(update => ({
+    return updatesWithProfiles.map(update => ({
       ...update,
-      profiles: profiles?.find(profile => profile.id === update.user_id) ? {
-        username: profiles.find(profile => profile.id === update.user_id)?.username,
-        avatar_url: profiles.find(profile => profile.id === update.user_id)?.avatar_url
-      } : undefined
+      profiles: {
+        username: update.user.displayName,
+        avatar_url: update.user.avatar_url
+      }
     }));
 
   } catch (error) {
