@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 
@@ -86,12 +87,12 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
     const recommendationIds = recommendationsData.map(rec => rec.id);
     
     let recommendations = recommendationsData.map(rec => {
-      // Extract profile data safely
-      const profile = rec.profiles || {};
+      // Extract profile data safely with proper null checks
+      const profile = rec.profiles as any || {};
       return {
         ...rec,
-        username: profile.username || null,
-        avatar_url: profile.avatar_url || null,
+        username: profile?.username || null,
+        avatar_url: profile?.avatar_url || null,
         likes: 0, // Will be updated below if user is logged in
         isLiked: false,
         isSaved: false
@@ -202,20 +203,20 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
     const reviewIds = reviewsData.map(rev => rev.id);
     
     let reviews = reviewsData.map(rev => {
-      // Extract profile data safely
-      const profile = rev.profiles || {};
+      // Extract profile data safely with proper null checks
+      const profile = rev.profiles as any || {};
       const latestRating = latestRatingsMap.get(rev.id);
       
       return {
         ...rev,
         // Add both direct properties for backward compatibility
-        username: profile.username || null,
-        avatar_url: profile.avatar_url || null,
+        username: profile?.username || null,
+        avatar_url: profile?.avatar_url || null,
         // AND add a nested user object to match what ReviewCard expects
         user: {
           id: rev.user_id,
-          username: profile.username || null,
-          avatar_url: profile.avatar_url || null
+          username: profile?.username || null,
+          avatar_url: profile?.avatar_url || null
         },
         // Add latest rating for timeline reviews
         latest_rating: latestRating,

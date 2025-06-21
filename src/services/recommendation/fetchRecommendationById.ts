@@ -65,10 +65,10 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
       likes = likeCountData?.[0]?.like_count || 0;
     }
     
-    // Extract profile information safely
-    const profileData = data.profiles || {};
-    const username = profileData.username || null;
-    const avatar_url = profileData.avatar_url || null;
+    // Extract profile information safely with proper null checks
+    const profileData = data.profiles as any || {};
+    const username = profileData?.username || null;
+    const avatar_url = profileData?.avatar_url || null;
     
     // Return the processed recommendation with added data
     const processedData = {

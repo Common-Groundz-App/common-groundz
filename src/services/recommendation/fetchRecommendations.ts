@@ -125,8 +125,8 @@ export const fetchUserRecommendations = async (
 
       // Process recommendations with all fetched data
       const processedRecommendations = recommendations.map(rec => {
-        // Extract profile data
-        const profile = rec.profiles || {};
+        // Extract profile data with proper null checks
+        const profile = rec.profiles as any || {};
         const username = profile?.username || null;
         const avatar_url = profile?.avatar_url || null;
         
