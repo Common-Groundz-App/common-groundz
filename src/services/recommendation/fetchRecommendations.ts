@@ -77,50 +77,58 @@ export const fetchUserRecommendations = async (
       // Get recommendation IDs for batch like operations
       const recommendationIds = recommendations.map(rec => rec.id);
       
-      // Batch fetch like counts and user interactions
-      const batchPromises = [
-        // Get like counts for all recommendations
-        supabase.rpc('get_recommendation_likes_by_ids', {
-          p_recommendation_ids: recommendationIds
-        })
-      ];
+      // Separate the batch operations to avoid complex type issues
+      let likeCountsData: any = null;
+      let userLikesData: any = null;
+      let userSavesData: any = null;
       
-      // Add user-specific queries if user is logged in
-      if (userId) {
-        batchPromises.push(
-          // Get user likes
-          supabase
-            .from('recommendation_likes')
-            .select('recommendation_id')
-            .eq('user_id', userId)
-            .in('recommendation_id', recommendationIds),
+      try {
+        // Get like counts for all recommendations
+        const likeCountsResult = await supabase.rpc('get_recommendation_likes_by_ids', {
+          p_recommendation_ids: recommendationIds
+        });
+        likeCountsData = likeCountsResult;
+        
+        // Add user-specific queries if user is logged in
+        if (userId) {
+          const [likesResult, savesResult] = await Promise.all([
+            // Get user likes
+            supabase
+              .from('recommendation_likes')
+              .select('recommendation_id')
+              .eq('user_id', userId)
+              .in('recommendation_id', recommendationIds),
+            
+            // Get user saves
+            supabase
+              .from('recommendation_saves')
+              .select('recommendation_id')
+              .eq('user_id', userId)
+              .in('recommendation_id', recommendationIds)
+          ]);
           
-          // Get user saves
-          supabase
-            .from('recommendation_saves')
-            .select('recommendation_id')
-            .eq('user_id', userId)
-            .in('recommendation_id', recommendationIds)
-        );
+          userLikesData = likesResult;
+          userSavesData = savesResult;
+        }
+      } catch (batchError) {
+        console.error('Error in batch operations:', batchError);
+        // Continue with empty data rather than failing completely
       }
       
-      const batchResults = await Promise.all(batchPromises);
-      
-      // Process results
-      const likeCountsData = batchResults[0];
-      const userLikesData = userId ? batchResults[1] : null;
-      const userSavesData = userId ? batchResults[2] : null;
-      
-      const likeCountMap = new Map(
-        (likeCountsData.data || []).map(item => [item.recommendation_id, item.like_count])
-      );
+      // Process results with proper error handling
+      const likeCountMap = new Map();
+      if (likeCountsData?.data) {
+        likeCountsData.data.forEach((item: any) => {
+          likeCountMap.set(item.recommendation_id, item.like_count || 0);
+        });
+      }
       
       const likedIds = new Set(
-        userLikesData?.data?.map(like => like.recommendation_id) || []
+        userLikesData?.data?.map((like: any) => like.recommendation_id) || []
       );
       
       const savedIds = new Set(
-        userSavesData?.data?.map(save => save.recommendation_id) || []
+        userSavesData?.data?.map((save: any) => save.recommendation_id) || []
       );
 
       // Process recommendations with all fetched data
