@@ -13,6 +13,7 @@ import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +58,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(!!highlightCommentId);
   const [localLikes, setLocalLikes] = useState(post.likes || 0);
@@ -262,6 +264,11 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }
   };
 
+  // Navigation handler for tagged entities
+  const handleEntityClick = (entity: Entity) => {
+    navigate(`/entity/${entity.slug || entity.id}`);
+  };
+
   const renderTaggedEntities = (entities: Entity[]) => {
     if (!entities || entities.length === 0) return null;
     
@@ -274,10 +281,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               type="entity"
               label={entity.name}
               entityType={entity.type as any}
-              onClick={() => {
-                // Optional: Navigate to entity view
-                // history.push(`/entities/${entity.id}`);
-              }}
+              onClick={() => handleEntityClick(entity)}
             />
           ))}
         </div>
@@ -298,7 +302,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               label={tag}
               onClick={() => {
                 // Optional: Navigate to location view or search
-                // history.push(`/search?location=${encodeURIComponent(tag)}`);
+                // navigate(`/search?location=${encodeURIComponent(tag)}`);
               }}
             />
           ))}
