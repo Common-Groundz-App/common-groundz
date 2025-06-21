@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Edit, CheckCircle } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ProfileUserInfoProps {
   username: string;
@@ -11,6 +12,7 @@ interface ProfileUserInfoProps {
   onEditClick?: () => void;
   isVerified?: boolean;
   displayName?: string;
+  isLoading?: boolean; // New loading state prop
 }
 
 const ProfileUserInfo = ({ 
@@ -20,8 +22,21 @@ const ProfileUserInfo = ({
   formattedUsername,
   onEditClick,
   isVerified = false,
-  displayName
+  displayName,
+  isLoading = false
 }: ProfileUserInfoProps) => {
+  if (isLoading) {
+    return (
+      <div className="w-full text-center mb-6">
+        <div className="flex items-center justify-center mb-2">
+          <Skeleton className="h-8 w-32" />
+        </div>
+        {formattedUsername && <Skeleton className="h-4 w-24 mx-auto mb-2" />}
+        <Skeleton className="h-16 w-full max-w-sm mx-auto mt-4" />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full text-center mb-6">
       <div className="flex items-center justify-center">

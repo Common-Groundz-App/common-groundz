@@ -5,6 +5,7 @@ import { useProfile } from '@/hooks/use-profile-cache';
 import UsernameLink from './UsernameLink';
 import { cn } from '@/lib/utils';
 import { ProfileErrorBoundary } from './ProfileErrorBoundary';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ProfileDisplayProps {
   userId: string | null | undefined;
@@ -44,21 +45,19 @@ const ProfileDisplayContent: React.FC<ProfileDisplayProps> = ({
     className
   );
 
-  // Handle loading state
+  // Handle loading state with enhanced skeleton
   if (isLoading) {
     return (
       <div className={containerClasses}>
-        <ProfileAvatar userId={null} size={size} className={cn('animate-pulse', avatarClassName)} />
+        <ProfileAvatar userId={null} size={size} className={cn('animate-pulse', avatarClassName)} showSkeleton={true} />
         {showUsername && (
-          <span className={cn('text-muted-foreground animate-pulse', usernameClassName)}>
-            Loading...
-          </span>
+          <Skeleton className={cn('h-4 w-20', usernameClassName)} />
         )}
       </div>
     );
   }
 
-  // Handle error state
+  // Handle error state with safe fallbacks
   if (error) {
     return (
       <div className={containerClasses}>
@@ -92,10 +91,11 @@ const ProfileDisplayContent: React.FC<ProfileDisplayProps> = ({
         <div className={cn('min-w-0 flex-1', usernameClassName)}>
           {showLink ? (
             <UsernameLink
-              username={profile?.displayName}
+              username={profile?.displayName} // Use displayName consistently
               userId={userId}
               className="truncate"
               fallback="Unknown User"
+              isLoading={isLoading}
             />
           ) : (
             <span className="text-sm font-medium truncate">

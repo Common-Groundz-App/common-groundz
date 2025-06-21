@@ -3,6 +3,7 @@ import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useProfile } from '@/hooks/use-profile-cache';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ProfileAvatarProps {
   userId: string | null | undefined;
@@ -10,6 +11,7 @@ interface ProfileAvatarProps {
   className?: string;
   fallbackClassName?: string;
   showTooltip?: boolean;
+  showSkeleton?: boolean; // New prop to control skeleton display
 }
 
 const sizeClasses = {
@@ -25,7 +27,8 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
   size = 'md',
   className,
   fallbackClassName,
-  showTooltip = false
+  showTooltip = false,
+  showSkeleton = true
 }) => {
   const { data: profile, isLoading } = useProfile(userId);
 
@@ -39,7 +42,13 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
     );
   }
 
-  if (isLoading) {
+  if (isLoading && showSkeleton) {
+    return (
+      <Skeleton className={cn('rounded-full bg-muted', sizeClasses[size], className)} />
+    );
+  }
+
+  if (isLoading && !showSkeleton) {
     return (
       <Avatar className={cn(sizeClasses[size], className)}>
         <AvatarFallback className={cn('bg-muted animate-pulse', fallbackClassName)}>
