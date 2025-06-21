@@ -1,9 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, RecommendationCategory } from '@/services/recommendation/types';
 import { attachProfilesToEntities } from './unifiedProfileService';
 import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
-import { MediaItem } from '@/types/media';
+import { MediaItem } from '@/types/common';
 
 /**
  * Fetch an entity by its slug or ID
@@ -143,13 +142,13 @@ export const fetchEntityRecommendations = async (
       return {
         id: rec.id,
         title: rec.title,
-        subtitle: rec.subtitle,
+        subtitle: rec.subtitle || undefined,
         description: rec.description,
         image_url: rec.image_url,
         rating: rec.rating,
         venue: rec.venue,
         entity_id: rec.entity_id,
-        entity: rec.entity,
+        entity: undefined, // Entity not included in select
         is_certified: rec.is_certified,
         user_id: rec.user_id,
         user: rec.user,
@@ -276,7 +275,7 @@ export const fetchEntityReviews = async (
         rating: rev.rating,
         venue: rev.venue,
         entity_id: rev.entity_id,
-        entity: rev.entity,
+        entity: undefined, // Entity not included in select
         experience_date: rev.experience_date,
         has_timeline: rev.has_timeline,
         timeline_count: rev.timeline_count,
@@ -294,7 +293,7 @@ export const fetchEntityReviews = async (
         comment_count: 0, // Default value since field doesn't exist in DB
         view_count: 0, // Default value since field doesn't exist in DB
         visibility: rev.visibility as any,
-        media: Array.isArray(rev.media) ? rev.media as MediaItem[] : [],
+        media: rev.media ? (rev.media as unknown as MediaItem[]) : [],
         ai_summary: rev.ai_summary,
         created_at: rev.created_at,
         updated_at: rev.updated_at
