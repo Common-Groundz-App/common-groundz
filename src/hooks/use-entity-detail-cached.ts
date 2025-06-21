@@ -5,20 +5,27 @@ import { useEntityDataCache } from './use-entity-data-cache';
 import { useUserInteractionsCache } from './use-user-interactions-cache';
 import { Entity } from '@/services/recommendation/types';
 
-export const useEntityDetailCached = (slugOrId: string) => {
+export const useEntityDetailCached = (slugOrId: string, optimisticEntity?: any) => {
   const [error, setError] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isOptimisticCreation, setIsOptimisticCreation] = useState(false);
 
-  // Use cached entity data
+  // Check if this is an optimistic entity (temporary ID or optimistic flag)
+  const isOptimistic = slugOrId.startsWith('temp-') || optimisticEntity?.isOptimistic;
+
+  // Use cached entity data (skip for optimistic entities)
   const { 
     entity, 
     isLoading: entityLoading, 
     error: entityError,
     prefetchEntity 
-  } = useEntityCache({ slugOrId });
+  } = useEntityCache({ 
+    slugOrId, 
+    enabled: !isOptimistic // Disable for optimistic entities
+  });
 
-  // Use cached entity content (recommendations, reviews, stats)
+  // Use cached entity content (skip for optimistic entities initially)
   const {
     recommendations,
     reviews,
@@ -28,17 +35,42 @@ export const useEntityDetailCached = (slugOrId: string) => {
     prefetchEntityData
   } = useEntityDataCache({ 
     entityId: entity?.id || '', 
-    enabled: !!entity?.id 
+    enabled: !!entity?.id && !isOptimistic
   });
 
   // Use cached user interactions
   const { interactions, isLoading: interactionsLoading } = useUserInteractionsCache();
 
-  // Calculate overall loading state with progress tracking
-  const isLoading = entityLoading || (entity && dataLoading) || interactionsLoading;
+  // For optimistic entities, use optimistic data initially
+  const displayEntity = isOptimistic ? optimisticEntity : entity;
 
-  // Enhanced progress tracking
+  // Calculate overall loading state with progress tracking
+  const isLoading = isOptimistic ? false : (entityLoading || (entity && dataLoading) || interactionsLoading);
+
+  // Enhanced progress tracking with optimistic creation support
   useEffect(() => {
+    if (isOptimistic) {
+      setIsOptimisticCreation(true);
+      setLoadingStep(1);
+      setLoadingProgress(25);
+      
+      // Simulate progressive completion for optimistic entities
+      const progressTimer = setTimeout(() => {
+        setLoadingProgress(50);
+      }, 1000);
+      
+      const completionTimer = setTimeout(() => {
+        setLoadingProgress(100);
+        setIsOptimisticCreation(false);
+      }, 3000);
+      
+      return () => {
+        clearTimeout(progressTimer);
+        clearTimeout(completionTimer);
+      };
+    }
+    
+    // Regular progress tracking for existing entities
     let currentProgress = 0;
     let currentStep = 0;
 
@@ -61,14 +93,13 @@ export const useEntityDetailCached = (slugOrId: string) => {
     // Animate progress smoothly
     const animateProgress = (target: number) => {
       const startProgress = loadingProgress;
-      const duration = 500; // 500ms animation
+      const duration = 500;
       const startTime = Date.now();
       
       const animate = () => {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
         
-        // Easing function for smooth animation
         const easeOutQuart = 1 - Math.pow(1 - progress, 4);
         const currentValue = startProgress + (target - startProgress) * easeOutQuart;
         
@@ -83,10 +114,12 @@ export const useEntityDetailCached = (slugOrId: string) => {
     };
     
     animateProgress(currentProgress);
-  }, [entityLoading, entity, dataLoading, interactionsLoading, isLoading, loadingProgress]);
+  }, [entityLoading, entity, dataLoading, interactionsLoading, isLoading, isOptimistic, loadingProgress]);
 
-  // Handle errors
+  // Handle errors (skip for optimistic entities)
   useEffect(() => {
+    if (isOptimistic) return;
+    
     if (entityError) {
       console.error('Entity error:', entityError);
       setError('Entity not found');
@@ -100,18 +133,17 @@ export const useEntityDetailCached = (slugOrId: string) => {
     }
 
     setError(null);
-  }, [entityError, dataError]);
+  }, [entityError, dataError, isOptimistic]);
 
   // Optimistic refresh function with progress feedback
   const refreshData = async () => {
-    if (!entity) return;
+    if (!displayEntity || isOptimistic) return;
     
-    console.log('Refreshing cached entity data for:', entity.name);
+    console.log('Refreshing cached entity data for:', displayEntity.name);
     setLoadingStep(0);
     setLoadingProgress(0);
     
     try {
-      // Animate through refresh steps
       const refreshSteps = [
         { step: 1, progress: 30 },
         { step: 2, progress: 70 },
@@ -136,18 +168,21 @@ export const useEntityDetailCached = (slugOrId: string) => {
 
   // Prefetch related entities for performance
   const prefetchRelatedEntities = (relatedEntitySlugs: string[]) => {
+    if (isOptimistic) return; // Skip for optimistic entities
+    
     relatedEntitySlugs.forEach(slug => {
       prefetchEntity(slug);
     });
   };
 
   return {
-    entity,
-    recommendations,
-    reviews,
-    stats,
+    entity: displayEntity,
+    recommendations: isOptimistic ? [] : recommendations,
+    reviews: isOptimistic ? [] : reviews,
+    stats: isOptimistic ? null : stats,
     interactions,
     isLoading,
+    isOptimisticCreation,
     loadingStep,
     loadingProgress: Math.round(loadingProgress),
     error,
