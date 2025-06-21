@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { FeedQueryParams, RecommendationFeedItem } from '../types';
-import { fetchMultipleProfiles } from '@/services/enhancedProfileService';
+import { fetchProfilesBatch } from '@/services/enhancedUnifiedProfileService';
 import { RecommendationCategory, RecommendationVisibility } from '@/services/recommendation/types';
 
 // Helper function to map database category strings to RecommendationCategory enum
@@ -63,8 +63,8 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
     // Get unique user IDs
     const userIds = [...new Set(recommendations.map(rec => rec.user_id))];
     
-    // Fetch all profiles at once using enhanced service
-    const profilesMap = await fetchMultipleProfiles(userIds);
+    // Fetch all profiles at once using enhanced unified service
+    const { profiles: profilesMap } = await fetchProfilesBatch(userIds);
 
     // Get recommendation IDs for fetching interactions
     const recommendationIds = recommendations.map(rec => rec.id);
@@ -164,8 +164,8 @@ export const processRecommendations = async (
     // Get unique user IDs
     const userIds = [...new Set(recsData.map(rec => rec.user_id))];
     
-    // Fetch all profiles at once using enhanced service
-    const profilesMap = await fetchMultipleProfiles(userIds);
+    // Fetch all profiles at once using enhanced unified service
+    const { profiles: profilesMap } = await fetchProfilesBatch(userIds);
 
     // Get recommendation IDs for fetching interactions
     const recommendationIds = recsData.map(rec => rec.id);

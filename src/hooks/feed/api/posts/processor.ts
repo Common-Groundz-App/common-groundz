@@ -1,6 +1,6 @@
 
 import { PostFeedItem } from '../../types';
-import { fetchMultipleProfiles } from '@/services/enhancedProfileService';
+import { fetchProfilesBatch } from '@/services/enhancedUnifiedProfileService';
 import { createMap, processMediaItems } from '../../api/utils';
 import { fetchPostEntities } from './entities';
 import { getPostLikeCounts, getUserPostLikes, getUserPostSaves } from './interactions';
@@ -16,9 +16,9 @@ export const processPosts = async (
     // Get post IDs for fetching related data
     const postIds = postsData.map(post => post.id);
     
-    // Fetch user profiles using enhanced service
+    // Fetch user profiles using enhanced unified service
     const userIds = [...new Set(postsData.map(post => post.user_id))];
-    const profilesMap = await fetchMultipleProfiles(userIds);
+    const { profiles: profilesMap } = await fetchProfilesBatch(userIds);
     
     // Get entities for posts
     const entitiesByPostId = await fetchPostEntities(postIds);

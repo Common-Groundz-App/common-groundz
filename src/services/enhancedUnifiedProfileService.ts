@@ -82,7 +82,7 @@ class ProfileCache {
   }
 
   // Process all pending batch requests
-  private async processBatch(): void {
+  private async processBatch(): Promise<void> {
     if (this.pendingBatches.length === 0) return;
 
     // Collect all unique user IDs from pending batches
@@ -182,6 +182,16 @@ class ProfileCache {
         this.cache.delete(userId);
       }
     }
+  }
+
+  // Public method to invalidate specific user cache
+  invalidateCache(userId: string): void {
+    this.cache.delete(userId);
+  }
+
+  // Public method to clear all cache
+  clearCache(): void {
+    this.cache.clear();
   }
 
   // Get cache stats for debugging
@@ -354,7 +364,7 @@ export const extractProfileFromJoinData = (joinData: any): SafeUserProfile => {
  * Invalidate cache for a specific user (useful for profile updates)
  */
 export const invalidateProfileCache = (userId: string): void => {
-  profileCache.cache.delete(userId);
+  profileCache.invalidateCache(userId);
 };
 
 /**
@@ -368,5 +378,5 @@ export const getProfileCacheStats = () => {
  * Clear all cached profiles (use with caution)
  */
 export const clearAllProfileCache = (): void => {
-  profileCache.cache.clear();
+  profileCache.clearCache();
 };
