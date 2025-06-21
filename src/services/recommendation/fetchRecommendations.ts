@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Recommendation, RecommendationCategory } from '../recommendation/types';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
 
-// Function to fetch user recommendations
+// Function to fetch user recommendations with optimized queries
 export const fetchUserRecommendations = async (
   userId: string | null,
   profileUserId: string,
@@ -21,24 +21,24 @@ export const fetchUserRecommendations = async (
       userId, profileUserId, category, sortBy, page, limit
     });
     
-    // Build query without nested select - this avoids the relationship error
+    // Build query with JOIN to get entity and profile data in one call
     let query = supabase
       .from('recommendations')
-      .select('*, recommendation_likes(count)', { count: 'exact' })
+      .select(`
+        *,
+        entity:entities(*),
+        profiles:profiles!recommendations_user_id_fkey(id, username, avatar_url)
+      `, { count: 'exact' })
       .eq('user_id', profileUserId);
     
     // Add category filter if specified
     if (category) {
-      // Handle both enum and string categories
       let categoryValue: string;
       if (typeof category === 'string') {
         categoryValue = category.toLowerCase();
       } else {
-        // This is a fallback for any value that might be passed
         categoryValue = String(category).toLowerCase();
       }
-      
-      // Use 'eq' with the string value
       query = query.eq('category', categoryValue as any);
     }
 
@@ -62,8 +62,8 @@ export const fetchUserRecommendations = async (
     const to = from + limit - 1;
     query = query.range(from, to);
 
-    // Execute the query for recommendations
-    console.log('Executing recommendations query');
+    // Execute the optimized query
+    console.log('Executing optimized recommendations query with JOINs');
     const { data: recommendations, error, count } = await query;
 
     if (error) {
@@ -73,83 +73,88 @@ export const fetchUserRecommendations = async (
     
     console.log(`Found ${recommendations?.length || 0} recommendations`);
 
-    // If we have recommendations, fetch related entity data and profile data separately
     if (recommendations && recommendations.length > 0) {
-      // Get list of entity IDs we need to fetch (filtering out nulls)
-      const entityIds = recommendations
-        .map(rec => rec.entity_id)
-        .filter(id => id !== null) as string[];
-
-      // Get list of user IDs to fetch profiles
-      const userIds = [...new Set(recommendations.map(rec => rec.user_id))];
+      // Get recommendation IDs for batch like operations
+      const recommendationIds = recommendations.map(rec => rec.id);
       
-      // Fetch entities if we have any entity IDs
-      let entities: Record<string, any> = {};
-      if (entityIds.length > 0) {
-        const { data: entitiesData, error: entitiesError } = await supabase
-          .from('entities')
-          .select('*')
-          .in('id', entityIds);
+      // Batch fetch like counts and user interactions
+      const batchPromises = [
+        // Get like counts for all recommendations
+        supabase.rpc('get_recommendation_likes_by_ids', {
+          p_recommendation_ids: recommendationIds
+        })
+      ];
+      
+      // Add user-specific queries if user is logged in
+      if (userId) {
+        batchPromises.push(
+          // Get user likes
+          supabase
+            .from('recommendation_likes')
+            .select('recommendation_id')
+            .eq('user_id', userId)
+            .in('recommendation_id', recommendationIds),
           
-        if (entitiesError) {
-          console.error('Error fetching entities:', entitiesError);
-        } else if (entitiesData) {
-          // Create a lookup map of entities by ID
-          entities = entitiesData.reduce((acc, entity) => {
-            acc[entity.id] = entity;
-            return acc;
-          }, {} as Record<string, any>);
-          
-          console.log(`Fetched ${entitiesData.length} entities`);
-        }
+          // Get user saves
+          supabase
+            .from('recommendation_saves')
+            .select('recommendation_id')
+            .eq('user_id', userId)
+            .in('recommendation_id', recommendationIds)
+        );
       }
       
-      // Fetch user profiles
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .in('id', userIds);
+      const batchResults = await Promise.all(batchPromises);
       
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-      }
+      // Process results
+      const likeCountsData = batchResults[0];
+      const userLikesData = userId ? batchResults[1] : null;
+      const userSavesData = userId ? batchResults[2] : null;
       
-      // Create a lookup map of profiles by user ID
-      const profiles = profilesData?.reduce((acc, profile) => {
-        acc[profile.id] = profile;
-        return acc;
-      }, {} as Record<string, any>) || {};
+      const likeCountMap = new Map(
+        (likeCountsData.data || []).map(item => [item.recommendation_id, item.like_count])
+      );
       
-      console.log(`Fetched ${profilesData?.length || 0} profiles`);
+      const likedIds = new Set(
+        userLikesData?.data?.map(like => like.recommendation_id) || []
+      );
+      
+      const savedIds = new Set(
+        userSavesData?.data?.map(save => save.recommendation_id) || []
+      );
 
-      // Process recommendations to integrate entity and profile data
+      // Process recommendations with all fetched data
       const processedRecommendations = recommendations.map(rec => {
-        // Extract like count
-        const likes = rec.recommendation_likes?.[0]?.count || 0;
-        
-        // Get profile data for this recommendation's user_id
-        const profile = profiles[rec.user_id] || {};
+        // Extract profile data
+        const profile = rec.profiles || {};
         const username = profile?.username || null;
         const avatar_url = profile?.avatar_url || null;
         
-        // Get entity data if available
-        const entity = rec.entity_id ? entities[rec.entity_id] || null : null;
+        // Get entity data (already fetched via JOIN)
+        const entity = rec.entity || null;
         
-        // Add isLiked as false by default (will be updated on client)
+        // Get interaction data
+        const likes = likeCountMap.get(rec.id) || 0;
+        const isLiked = userId ? likedIds.has(rec.id) : false;
+        const isSaved = userId ? savedIds.has(rec.id) : false;
+        
         const processed = {
           ...rec,
           entity,
           likes,
-          isLiked: false,
+          isLiked,
+          isSaved,
           username,
           avatar_url,
         };
         
-        // Clean up nested data that's already been extracted
-        delete processed.recommendation_likes;
+        // Clean up nested data
+        delete processed.profiles;
         
         return processed as unknown as Recommendation;
       });
+
+      console.log(`Processed ${processedRecommendations.length} recommendations with optimized queries`);
 
       return {
         recommendations: processedRecommendations,

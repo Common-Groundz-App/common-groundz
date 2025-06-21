@@ -55,16 +55,19 @@ const isValidUUID = (str: string): boolean => {
 };
 
 /**
- * Fetch all recommendations related to an entity
+ * Fetch all recommendations related to an entity with optimized JOIN query
  */
 export const fetchEntityRecommendations = async (entityId: string, userId: string | null = null) => {
   console.log('Fetching entity recommendations for entityId:', entityId, 'userId:', userId);
   
   try {
-    // First fetch recommendations
+    // Use a single query with JOIN to get recommendations with profile data
     const { data: recommendationsData, error } = await supabase
       .from('recommendations')
-      .select('*')
+      .select(`
+        *,
+        profiles:profiles!recommendations_user_id_fkey(id, username, avatar_url)
+      `)
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
     
@@ -73,75 +76,58 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
       return [];
     }
 
-    console.log('Raw recommendations data:', recommendationsData);
+    console.log('Raw recommendations data with profiles:', recommendationsData);
     
     if (!recommendationsData || recommendationsData.length === 0) {
       return [];
     }
     
-    // Get user IDs from recommendations to fetch profiles
-    const userIds = recommendationsData.map(rec => rec.user_id);
+    // Get recommendation IDs for batch operations
+    const recommendationIds = recommendationsData.map(rec => rec.id);
     
-    // Fetch profile data separately
-    const { data: profilesData, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
-    
-    if (profilesError) {
-      console.error('Error fetching profiles for recommendations:', profilesError);
-    }
-    
-    // Create a map of user profiles for easy lookup
-    const profilesMap = new Map();
-    if (profilesData) {
-      profilesData.forEach(profile => {
-        profilesMap.set(profile.id, profile);
-      });
-    }
-    
-    // Combine recommendation data with profile data
     let recommendations = recommendationsData.map(rec => {
-      const profile = profilesMap.get(rec.user_id);
+      // Extract profile data safely
+      const profile = rec.profiles || {};
       return {
         ...rec,
-        username: profile ? profile.username : null,
-        avatar_url: profile ? profile.avatar_url : null,
+        username: profile.username || null,
+        avatar_url: profile.avatar_url || null,
+        likes: 0, // Will be updated below if user is logged in
+        isLiked: false,
+        isSaved: false
       };
     });
     
-    // If we have a logged-in user, fetch likes and saves
-    if (userId && recommendations.length > 0) {
-      const recommendationIds = recommendations.map(rec => rec.id);
+    // If we have a logged-in user, fetch interaction data in batch
+    if (userId && recommendationIds.length > 0) {
+      const [likesData, savesData, likeCountsData] = await Promise.all([
+        // Get user likes for these recommendations
+        supabase
+          .from('recommendation_likes')
+          .select('recommendation_id')
+          .eq('user_id', userId)
+          .in('recommendation_id', recommendationIds),
+        
+        // Get user saves for these recommendations
+        supabase
+          .from('recommendation_saves')
+          .select('recommendation_id')
+          .eq('user_id', userId)
+          .in('recommendation_id', recommendationIds),
+        
+        // Get like counts using RPC function
+        supabase.rpc('get_recommendation_likes_by_ids', {
+          p_recommendation_ids: recommendationIds
+        })
+      ]);
       
-      // Get user likes for these recommendations
-      const { data: likesData } = await supabase
-        .from('recommendation_likes')
-        .select('recommendation_id')
-        .eq('user_id', userId)
-        .in('recommendation_id', recommendationIds);
-      
-      const likedIds = new Set(((likesData || []) as any[]).map(like => like.recommendation_id));
-      
-      // Get user saves for these recommendations
-      const { data: savesData } = await supabase
-        .from('recommendation_saves')
-        .select('recommendation_id')
-        .eq('user_id', userId)
-        .in('recommendation_id', recommendationIds);
-      
-      const savedIds = new Set(((savesData || []) as any[]).map(save => save.recommendation_id));
-      
-      // Get like counts
-      const { data: likeCounts } = await supabase.rpc('get_recommendation_likes_by_ids', {
-        p_recommendation_ids: recommendationIds
-      });
-      
+      const likedIds = new Set((likesData.data || []).map(like => like.recommendation_id));
+      const savedIds = new Set((savesData.data || []).map(save => save.recommendation_id));
       const likeCountMap = new Map(
-        ((likeCounts || []) as any[]).map(item => [item.recommendation_id, item.like_count])
+        (likeCountsData.data || []).map(item => [item.recommendation_id, item.like_count])
       );
       
-      // Process the recommendations with user interaction data
+      // Update recommendations with user interaction data
       recommendations = recommendations.map(rec => ({
         ...rec,
         isLiked: likedIds.has(rec.id),
@@ -149,17 +135,11 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
         likes: likeCountMap.get(rec.id) || 0
       }));
       
-      console.log('Processed recommendations with user data:', recommendations);
-      return recommendations;
+      console.log('Processed recommendations with user data:', recommendations.length);
+    } else {
+      console.log('Processed recommendations without user data:', recommendations.length);
     }
     
-    // Format the results (no user data)
-    recommendations = recommendations.map(rec => ({
-      ...rec,
-      likes: 0
-    }));
-    
-    console.log('Processed recommendations without user data:', recommendations);
     return recommendations;
   } catch (err) {
     console.error('Exception in fetchEntityRecommendations:', err);
@@ -168,16 +148,19 @@ export const fetchEntityRecommendations = async (entityId: string, userId: strin
 };
 
 /**
- * Fetch all reviews related to an entity
+ * Fetch all reviews related to an entity with optimized JOIN query
  */
 export const fetchEntityReviews = async (entityId: string, userId: string | null = null) => {
   console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
   
   try {
-    // First fetch reviews 
+    // Use a single query with JOIN to get reviews with profile data
     const { data: reviewsData, error } = await supabase
       .from('reviews')
-      .select('*')
+      .select(`
+        *,
+        profiles:profiles!reviews_user_id_fkey(id, username, avatar_url)
+      `)
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
     
@@ -186,34 +169,13 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
       return [];
     }
     
-    console.log('Raw reviews data:', reviewsData);
+    console.log('Raw reviews data with profiles:', reviewsData);
 
     if (!reviewsData || reviewsData.length === 0) {
       return [];
     }
     
-    // Get user IDs from reviews to fetch profiles
-    const userIds = reviewsData.map(rev => rev.user_id);
-    
-    // Fetch profile data separately
-    const { data: profilesData, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
-    
-    if (profilesError) {
-      console.error('Error fetching profiles for reviews:', profilesError);
-    }
-    
-    // Create a map of user profiles for easy lookup
-    const profilesMap = new Map();
-    if (profilesData) {
-      profilesData.forEach(profile => {
-        profilesMap.set(profile.id, profile);
-      });
-    }
-
-    // Get latest ratings for reviews with timelines
+    // Get reviews with timeline for latest ratings
     const reviewsWithTimeline = reviewsData.filter(r => r.has_timeline);
     const timelineReviewIds = reviewsWithTimeline.map(r => r.id);
     
@@ -236,59 +198,63 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
       }
     }
     
-    // Combine review data with profile data and latest ratings
+    // Get review IDs for batch operations
+    const reviewIds = reviewsData.map(rev => rev.id);
+    
     let reviews = reviewsData.map(rev => {
-      const profile = profilesMap.get(rev.user_id);
+      // Extract profile data safely
+      const profile = rev.profiles || {};
       const latestRating = latestRatingsMap.get(rev.id);
       
       return {
         ...rev,
         // Add both direct properties for backward compatibility
-        username: profile ? profile.username : null,
-        avatar_url: profile ? profile.avatar_url : null,
+        username: profile.username || null,
+        avatar_url: profile.avatar_url || null,
         // AND add a nested user object to match what ReviewCard expects
         user: {
           id: rev.user_id,
-          username: profile ? profile.username : null,
-          avatar_url: profile ? profile.avatar_url : null
+          username: profile.username || null,
+          avatar_url: profile.avatar_url || null
         },
         // Add latest rating for timeline reviews
-        latest_rating: latestRating
+        latest_rating: latestRating,
+        likes: 0, // Will be updated below if user is logged in
+        isLiked: false,
+        isSaved: false
       };
     });
 
-    // If we have a logged-in user, fetch likes and saves
-    if (userId && reviews.length > 0) {
-      const reviewIds = reviews.map(rev => rev.id);
+    // If we have a logged-in user, fetch interaction data in batch
+    if (userId && reviewIds.length > 0) {
+      const [likesData, savesData, likeCountsData] = await Promise.all([
+        // Get user likes for these reviews
+        supabase
+          .from('review_likes')
+          .select('review_id')
+          .eq('user_id', userId)
+          .in('review_id', reviewIds),
+        
+        // Get user saves for these reviews
+        supabase
+          .from('review_saves')
+          .select('review_id')
+          .eq('user_id', userId)
+          .in('review_id', reviewIds),
+        
+        // Get like counts using RPC function
+        supabase.rpc('get_review_likes_batch', {
+          p_review_ids: reviewIds
+        })
+      ]);
       
-      // Get user likes for these reviews
-      const { data: likesData } = await supabase
-        .from('review_likes')
-        .select('review_id')
-        .eq('user_id', userId)
-        .in('review_id', reviewIds);
-      
-      const likedIds = new Set(((likesData || []) as any[]).map(like => like.review_id));
-      
-      // Get user saves for these reviews
-      const { data: savesData } = await supabase
-        .from('review_saves')
-        .select('review_id')
-        .eq('user_id', userId)
-        .in('review_id', reviewIds);
-      
-      const savedIds = new Set(((savesData || []) as any[]).map(save => save.review_id));
-      
-      // Get like counts
-      const { data: likeCounts } = await supabase.rpc('get_review_likes_batch', {
-        p_review_ids: reviewIds
-      });
-      
+      const likedIds = new Set((likesData.data || []).map(like => like.review_id));
+      const savedIds = new Set((savesData.data || []).map(save => save.review_id));
       const likeCountMap = new Map(
-        ((likeCounts || []) as any[]).map(item => [item.review_id, item.like_count])
+        (likeCountsData.data || []).map(item => [item.review_id, item.like_count])
       );
       
-      // Process the reviews with user interaction data
+      // Update reviews with user interaction data
       reviews = reviews.map(rev => ({
         ...rev,
         isLiked: likedIds.has(rev.id),
@@ -296,17 +262,11 @@ export const fetchEntityReviews = async (entityId: string, userId: string | null
         likes: likeCountMap.get(rev.id) || 0
       }));
       
-      console.log('Processed reviews with user data:', reviews);
-      return reviews;
+      console.log('Processed reviews with user data:', reviews.length);
+    } else {
+      console.log('Processed reviews without user data:', reviews.length);
     }
-
-    // Format the results (no user data)
-    reviews = reviews.map(rev => ({
-      ...rev,
-      likes: 0
-    }));
     
-    console.log('Processed reviews without user data:', reviews);
     return reviews;
   } catch (err) {
     console.error('Exception in fetchEntityReviews:', err);
