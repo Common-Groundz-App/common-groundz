@@ -142,7 +142,7 @@ export const fetchEntityRecommendations = async (
       return {
         id: rec.id,
         title: rec.title,
-        subtitle: rec.subtitle || undefined,
+        subtitle: undefined,
         description: rec.description,
         image_url: rec.image_url,
         rating: rec.rating,
