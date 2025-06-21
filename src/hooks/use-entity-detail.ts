@@ -35,7 +35,7 @@ export const useEntityDetail = (slugOrId: string) => {
       setError(null);
 
       try {
-        // Step 1: Fetch entity data
+        // Step 1: Fetch entity data first (required for entity ID)
         setLoadingStep(1);
         const entityData = await fetchEntityBySlug(slugOrId);
         if (!entityData) {
@@ -48,29 +48,29 @@ export const useEntityDetail = (slugOrId: string) => {
         console.log('✅ Found entity data:', entityData);
         setEntity(entityData);
 
-        // Step 2: Fetch recommendations
+        // Steps 2-4: Fetch recommendations, reviews, and stats in parallel
         setLoadingStep(2);
-        const entityRecommendations = await fetchEntityRecommendations(entityData.id, user?.id || null);
-        console.log('Entity recommendations fetched:', entityRecommendations);
-        setRecommendations(entityRecommendations);
+        console.log('🚀 Starting parallel data fetch for entity:', entityData.id);
         
-        // Step 3: Fetch reviews
-        setLoadingStep(3);
-        const entityReviews = await fetchEntityReviews(entityData.id, user?.id || null);
-        console.log('Entity reviews fetched:', entityReviews);
+        const [entityRecommendations, entityReviews, entityStats] = await Promise.all([
+          fetchEntityRecommendations(entityData.id, user?.id || null),
+          fetchEntityReviews(entityData.id, user?.id || null),
+          getEntityStats(entityData.id)
+        ]);
+
+        console.log('✅ Parallel fetch completed');
+        console.log('Entity recommendations fetched:', entityRecommendations.length);
+        console.log('Entity reviews fetched:', entityReviews.length);
+        console.log('Entity stats fetched:', entityStats);
+        
         if (entityReviews && entityReviews.length > 0) {
           console.log('Sample review structure:', JSON.stringify(entityReviews[0], null, 2));
         }
-        setReviews(entityReviews);
-        
-        // Step 4: Fetch statistics
-        setLoadingStep(4);
-        const entityStats = await getEntityStats(entityData.id);
-        console.log('Entity stats fetched:', entityStats);
-        setStats(entityStats);
 
-        console.log('Entity detail hook received recommendations:', entityRecommendations.length);
-        console.log('Entity detail hook received reviews:', entityReviews.length);
+        // Update all state at once after parallel fetch
+        setRecommendations(entityRecommendations);
+        setReviews(entityReviews);
+        setStats(entityStats);
         
       } catch (err) {
         console.error('Error fetching entity data:', err);
@@ -86,7 +86,7 @@ export const useEntityDetail = (slugOrId: string) => {
     }
   }, [slugOrId, user?.id]);
 
-  // Function to refresh data
+  // Function to refresh data - also use parallel loading
   const refreshData = async () => {
     if (!entity) return;
     
@@ -96,14 +96,15 @@ export const useEntityDetail = (slugOrId: string) => {
     
     try {
       setLoadingStep(2);
-      const refreshedRecommendations = await fetchEntityRecommendations(entity.id, user?.id || null);
+      console.log('🚀 Starting parallel refresh for entity:', entity.id);
       
-      setLoadingStep(3);
-      const refreshedReviews = await fetchEntityReviews(entity.id, user?.id || null);
-      
-      setLoadingStep(4);
-      const refreshedStats = await getEntityStats(entity.id);
+      const [refreshedRecommendations, refreshedReviews, refreshedStats] = await Promise.all([
+        fetchEntityRecommendations(entity.id, user?.id || null),
+        fetchEntityReviews(entity.id, user?.id || null),
+        getEntityStats(entity.id)
+      ]);
 
+      console.log('✅ Parallel refresh completed');
       console.log('Refresh received recommendations:', refreshedRecommendations.length);
       console.log('Refresh received reviews:', refreshedReviews.length);
       
@@ -111,6 +112,7 @@ export const useEntityDetail = (slugOrId: string) => {
         console.log('Sample refreshed review structure:', JSON.stringify(refreshedReviews[0], null, 2));
       }
 
+      // Update all state at once after parallel refresh  
       setRecommendations(refreshedRecommendations);
       setReviews(refreshedReviews);
       setStats(refreshedStats);
