@@ -134,7 +134,7 @@ class CacheInvalidationService {
     const queries = cache.getAll();
     
     queries.forEach(query => {
-      if (query.isStale() && !query.state.isFetching) {
+      if (query.isStale() && query.state.fetchStatus !== 'fetching') {
         cache.remove(query);
       }
     });
