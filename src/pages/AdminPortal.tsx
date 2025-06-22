@@ -9,6 +9,7 @@ import NavBarComponent from '@/components/NavBarComponent';
 import { AdminReviewsPanel } from '@/components/admin/AdminReviewsPanel';
 import { AdminEntitiesPanel } from '@/components/admin/AdminEntitiesPanel';
 import { AdminDashboardSummary } from '@/components/admin/AdminDashboardSummary';
+import { AdminImageHealthPanel } from '@/components/admin/AdminImageHealthPanel';
 
 const AdminPortal = () => {
   const { user } = useAuth();
@@ -59,8 +60,9 @@ const AdminPortal = () => {
               
               <div className="text-sm text-muted-foreground">
                 <p>
-                  This is Phase 4.5 of the admin system implementation. 
-                  You can now manage dynamic reviews, their AI summaries, entity-level AI summaries, and perform bulk operations.
+                  This is Phase 4 of the admin system implementation. 
+                  You can now manage dynamic reviews, their AI summaries, entity-level AI summaries, 
+                  perform bulk operations, and monitor image health across all entities.
                 </p>
               </div>
               
@@ -80,6 +82,9 @@ const AdminPortal = () => {
 
           {/* Dashboard Summary Section */}
           <AdminDashboardSummary />
+
+          {/* Image Health Monitoring Section */}
+          <AdminImageHealthPanel />
 
           {/* Review Management Section */}
           <AdminReviewsPanel />

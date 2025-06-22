@@ -21,6 +21,8 @@ interface RefreshResponse {
   succeeded: number;
   failed: number;
   skipped: number;
+  healthChecked: number;
+  brokenImagesFound: number;
   errors: Array<{id: string, name: string, error: string}>;
 }
 
@@ -32,6 +34,42 @@ function validateApiKey(apiKey: string, expectedApiKey: string): boolean {
   
   // Use constant time comparison to prevent timing attacks
   return apiKey === expectedApiKey;
+}
+
+// Helper function to check image health via HEAD request
+async function checkImageHealth(imageUrl: string): Promise<{ isHealthy: boolean; errorType?: string }> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    
+    const response = await fetch(imageUrl, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Supabase-HealthChecker/1.0)',
+        'Accept': 'image/*,*/*;q=0.8',
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      return { isHealthy: true };
+    } else {
+      let errorType = 'unknown';
+      if (response.status === 404) errorType = '404';
+      else if (response.status === 403) errorType = '403';
+      else if (response.status >= 500) errorType = '500';
+      
+      return { isHealthy: false, errorType };
+    }
+  } catch (error) {
+    let errorType = 'unknown';
+    if (error.name === 'AbortError') errorType = 'timeout';
+    else if (error.message?.includes('network')) errorType = 'network';
+    
+    return { isHealthy: false, errorType };
+  }
 }
 
 // Helper to extract photo reference from metadata or URL
@@ -58,22 +96,47 @@ function extractPhotoReference(entity: EntityToRefresh): string | null {
   return null;
 }
 
-// Process a batch of entities
+// Process a batch of entities with health checking
 async function processBatch(
   supabase: any, 
   entities: EntityToRefresh[], 
   refreshResponse: RefreshResponse,
+  includeHealthCheck: boolean = true,
   maxRetries: number = 2
 ): Promise<void> {
-  console.log(`Processing batch of ${entities.length} entities`);
+  console.log(`Processing batch of ${entities.length} entities (health check: ${includeHealthCheck})`);
   
   for (const entity of entities) {
     refreshResponse.processed++;
     
+    let needsRefresh = false;
+    let refreshReason = 'scheduled';
+    
+    // First, check image health if enabled
+    if (includeHealthCheck && entity.image_url) {
+      refreshResponse.healthChecked++;
+      
+      const healthCheck = await checkImageHealth(entity.image_url);
+      
+      if (!healthCheck.isHealthy) {
+        refreshResponse.brokenImagesFound++;
+        needsRefresh = true;
+        refreshReason = `broken_image_${healthCheck.errorType}`;
+        console.log(`Entity ${entity.id} (${entity.name}) has broken image: ${healthCheck.errorType}`);
+      } else {
+        console.log(`Entity ${entity.id} (${entity.name}) has healthy image, skipping refresh`);
+        // Skip refresh for healthy images unless explicitly requested
+        if (includeHealthCheck) {
+          refreshResponse.skipped++;
+          continue;
+        }
+      }
+    }
+    
     // Extract photo reference from metadata or URL
     const photoReference = extractPhotoReference(entity);
     
-    if (!photoReference) {
+    if (!photoReference && !needsRefresh) {
       console.log(`No photo reference found for entity ${entity.id} (${entity.name}), skipping`);
       refreshResponse.skipped++;
       refreshResponse.errors.push({
@@ -95,7 +158,7 @@ async function processBatch(
           console.log(`Retry attempt ${attempt} for entity ${entity.id} (${entity.name})`);
         }
         
-        console.log(`Refreshing image for entity ${entity.id} (${entity.name}), attempt ${attempt + 1}`);
+        console.log(`Refreshing image for entity ${entity.id} (${entity.name}) - reason: ${refreshReason}, attempt ${attempt + 1}`);
         
         // Call the existing refresh-entity-image edge function
         const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
@@ -176,21 +239,34 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
     // Get parameters from request body
-    const { batchSize = 10, maxRetries = 2, dryRun = false } = await req.json();
+    const { 
+      batchSize = 10, 
+      maxRetries = 2, 
+      dryRun = false,
+      enableHealthCheck = true,
+      forceRefresh = false 
+    } = await req.json();
     
-    console.log(`Starting daily entity image refresh (batchSize: ${batchSize}, maxRetries: ${maxRetries}, dryRun: ${dryRun})`);
+    console.log(`Starting daily entity image refresh (batchSize: ${batchSize}, maxRetries: ${maxRetries}, dryRun: ${dryRun}, healthCheck: ${enableHealthCheck}, forceRefresh: ${forceRefresh})`);
     
     // Find entities that need image refresh
-    // - Google Places entities
-    // - With image URLs from Google API
+    // - Google Places entities (or all if forceRefresh is true)
+    // - With image URLs from external sources (or all if forceRefresh is true)
     // - Not deleted
-    const { data: entitiesToRefresh, error } = await supabase
+    let query = supabase
       .from("entities")
       .select("id, name, api_ref, image_url, metadata")
-      .eq("api_source", "google_places")
-      .eq("is_deleted", false)
-      .like("image_url", "https://maps.googleapis.com%")
-      .order("id");
+      .eq("is_deleted", false);
+    
+    if (!forceRefresh) {
+      query = query
+        .eq("api_source", "google_places")
+        .like("image_url", "https://maps.googleapis.com%");
+    }
+    
+    query = query.order("updated_at"); // Oldest first for fair rotation
+    
+    const { data: entitiesToRefresh, error } = await query;
     
     if (error) {
       throw new Error(`Error fetching entities: ${error.message}`);
@@ -202,17 +278,19 @@ Deno.serve(async (req) => {
       succeeded: 0,
       failed: 0,
       skipped: 0,
+      healthChecked: 0,
+      brokenImagesFound: 0,
       errors: []
     };
     
-    console.log(`Found ${refreshResponse.total} entities to refresh`);
+    console.log(`Found ${refreshResponse.total} entities to potentially refresh`);
     
     // Skip processing in dry run mode
     if (!dryRun && entitiesToRefresh && entitiesToRefresh.length > 0) {
       // Process entities in batches
       for (let i = 0; i < entitiesToRefresh.length; i += batchSize) {
         const batch = entitiesToRefresh.slice(i, i + batchSize);
-        await processBatch(supabase, batch, refreshResponse, maxRetries);
+        await processBatch(supabase, batch, refreshResponse, enableHealthCheck, maxRetries);
       }
     }
     
@@ -223,6 +301,8 @@ Deno.serve(async (req) => {
       Succeeded: ${refreshResponse.succeeded}
       Failed: ${refreshResponse.failed}
       Skipped: ${refreshResponse.skipped}
+      Health Checked: ${refreshResponse.healthChecked}
+      Broken Images Found: ${refreshResponse.brokenImagesFound}
     `);
     
     return new Response(

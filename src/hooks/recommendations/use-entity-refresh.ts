@@ -1,10 +1,10 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
 import { ensureBucketPolicies } from '@/services/storageService';
 import { triggerBatchEntityImageRefresh } from '@/utils/imageRefresh';
+import { imagePerformanceService } from '@/services/imagePerformanceService';
 
 export const useEntityImageRefresh = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -26,9 +26,21 @@ export const useEntityImageRefresh = () => {
     }
 
     setIsRefreshing(true);
+    const startTime = Date.now();
     
     try {
       console.log(`Starting image refresh for entity ${entityId}`, { placeId, photoReference });
+      
+      // Track the refresh attempt
+      imagePerformanceService.trackImageStorage(
+        'manual_refresh_start',
+        entityId,
+        '',
+        startTime,
+        true,
+        undefined,
+        { placeId, photoReference }
+      );
       
       // First, ensure the entity-images bucket has correct policies
       await ensureBucketPolicies('entity-images');
@@ -92,10 +104,19 @@ export const useEntityImageRefresh = () => {
           }
         }
         
-        toast({
-          title: 'Google Places image refreshed',
-          description: 'The entity image has been successfully updated from Google Places.'
-        });
+        // Track successful refresh
+        imagePerformanceService.trackImageStorage(
+          'manual_refresh_success',
+          entityId,
+          imageUrl,
+          startTime,
+          true,
+          undefined,
+          { placeId, newPhotoRef }
+        );
+
+        // Only show toast for critical failures, keep successful refreshes silent
+        console.log('Google Places image refreshed successfully for entity:', entityId);
 
         return imageUrl;
       } 
@@ -116,21 +137,24 @@ export const useEntityImageRefresh = () => {
 
         if (!entity?.image_url) {
           console.warn('No image URL found for entity:', entityId);
-          toast({
-            title: 'No image to refresh',
-            description: 'This entity does not have an image to refresh.',
-            variant: 'destructive'
-          });
           return null;
         }
 
         // Check if the image is already stored in our storage
         if (isEntityImageMigrated(entity.image_url)) {
           console.log('Image already saved in storage:', entity.image_url);
-          toast({
-            title: 'Image already saved',
-            description: 'This image is already stored securely in our system.',
-          });
+          
+          // Track as already migrated
+          imagePerformanceService.trackImageStorage(
+            'already_migrated',
+            entityId,
+            entity.image_url,
+            startTime,
+            true,
+            undefined,
+            { entityName: entity.name }
+          );
+          
           return entity.image_url;
         }
 
@@ -157,21 +181,43 @@ export const useEntityImageRefresh = () => {
           throw new Error(`Error updating entity: ${updateError.message}`);
         }
 
-        toast({
-          title: 'Image saved locally',
-          description: `The image for "${entity.name}" has been saved to our secure storage.`
-        });
+        // Track successful migration
+        imagePerformanceService.trackImageStorage(
+          'migration_success',
+          entityId,
+          newImageUrl,
+          startTime,
+          true,
+          undefined,
+          { originalUrl: entity.image_url, entityName: entity.name }
+        );
+
+        console.log(`Image migrated successfully for "${entity.name}"`);
         
         return newImageUrl;
       }
     } catch (error: any) {
       console.error('Error refreshing entity image:', error);
       
-      toast({
-        title: 'Error refreshing image',
-        description: error.message || 'An unexpected error occurred',
-        variant: 'destructive'
-      });
+      // Track failed refresh
+      imagePerformanceService.trackImageStorage(
+        'manual_refresh_failed',
+        entityId,
+        '',
+        startTime,
+        false,
+        error.message,
+        { placeId, photoReference }
+      );
+      
+      // Only show toast for critical failures in admin context
+      if (error.message?.includes('Authentication') || error.message?.includes('Unauthorized')) {
+        toast({
+          title: 'Authentication Error',
+          description: 'Please sign in again to refresh images.',
+          variant: 'destructive'
+        });
+      }
       
       return null;
     } finally {
@@ -193,6 +239,8 @@ export const useEntityImageRefresh = () => {
       batchSize?: number;
       maxRetries?: number;
       dryRun?: boolean;
+      enableHealthCheck?: boolean;
+      forceRefresh?: boolean;
     } = {}
   ) => {
     setIsRefreshing(true);
@@ -202,7 +250,7 @@ export const useEntityImageRefresh = () => {
       
       toast({
         title: 'Batch refresh completed',
-        description: `Processed ${result.processed} entities: ${result.succeeded} succeeded, ${result.failed} failed, ${result.skipped} skipped.`
+        description: `Processed ${result.processed} entities: ${result.succeeded} succeeded, ${result.failed} failed, ${result.skipped} skipped. Health checked: ${result.healthChecked}, broken found: ${result.brokenImagesFound}.`
       });
       
       return result;
