@@ -1,12 +1,12 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { AlertTriangle, CheckCircle, RefreshCw, Activity, Image, Clock } from 'lucide-react';
+import { AlertTriangle, CheckCircle, RefreshCw, Activity, Image, Clock, Download, Zap } from 'lucide-react';
 import { imageHealthService } from '@/services/imageHealthService';
+import { imageMigrationService } from '@/services/imageMigrationService';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -23,7 +23,9 @@ interface EntityWithImageIssue {
 export const AdminImageHealthPanel = () => {
   const [healthStats, setHealthStats] = useState<any>(null);
   const [brokenEntities, setBrokenEntities] = useState<EntityWithImageIssue[]>([]);
+  const [migrationStats, setMigrationStats] = useState<any>(null);
   const [isRunningHealthCheck, setIsRunningHealthCheck] = useState(false);
+  const [isRunningMigration, setIsRunningMigration] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState<string | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const { refreshEntityImage } = useEntityImageRefresh();
@@ -64,10 +66,20 @@ export const AdminImageHealthPanel = () => {
     }
   };
 
-  // Load health statistics and recent failures from database
+  // Load health statistics and migration data
   useEffect(() => {
     loadHealthData();
+    loadMigrationData();
   }, []);
+
+  const loadMigrationData = async () => {
+    try {
+      const latestSession = await imageMigrationService.getLatestMigrationSession();
+      setMigrationStats(latestSession);
+    } catch (error) {
+      console.error('Error loading migration data:', error);
+    }
+  };
 
   const loadHealthData = async () => {
     setIsLoadingData(true);
@@ -141,6 +153,56 @@ export const AdminImageHealthPanel = () => {
     }
   };
 
+  const runHealthCheckWithMigration = async () => {
+    setIsRunningHealthCheck(true);
+    try {
+      const result = await imageHealthService.runHealthCheckCycle(true);
+      
+      toast({
+        title: 'Health check with migration completed',
+        description: `Checked ${result.checked} images, found ${result.broken} broken images, attempted ${result.migrated || 0} migrations.`
+      });
+      
+      // Reload data to show updated results
+      await loadHealthData();
+      await loadMigrationData();
+    } catch (error) {
+      console.error('Health check with migration failed:', error);
+      toast({
+        title: 'Health check with migration failed',
+        description: 'An error occurred during the health check with migration.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRunningHealthCheck(false);
+    }
+  };
+
+  const runFullMigration = async () => {
+    setIsRunningMigration(true);
+    try {
+      const result = await imageMigrationService.runAutomatedMigration();
+      
+      toast({
+        title: 'Image migration completed',
+        description: `Processed ${result.totalEntities} entities: ${result.migrated} migrated, ${result.failed} failed, ${result.skipped} skipped.`
+      });
+      
+      // Reload data to show updated results
+      await loadHealthData();
+      await loadMigrationData();
+    } catch (error) {
+      console.error('Migration failed:', error);
+      toast({
+        title: 'Migration failed',
+        description: 'An error occurred during the migration process.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRunningMigration(false);
+    }
+  };
+
   const refreshEntityImageManually = async (entityId: string, entityName: string) => {
     setIsRefreshing(entityId);
     try {
@@ -186,13 +248,49 @@ export const AdminImageHealthPanel = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Image className="h-5 w-5" />
-          Image Health Monitoring
+          Image Health & Migration System
         </CardTitle>
         <CardDescription>
-          Monitor and manage image health across all entities
+          Monitor image health and migrate external images to local storage
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Migration Statistics */}
+        {migrationStats && (
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Latest Migration Session
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{migrationStats.total_entities}</div>
+                <div className="text-sm text-muted-foreground">Total Processed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{migrationStats.migrated_count}</div>
+                <div className="text-sm text-muted-foreground">Migrated</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">{migrationStats.failed_count}</div>
+                <div className="text-sm text-muted-foreground">Failed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-600">{migrationStats.skipped_count}</div>
+                <div className="text-sm text-muted-foreground">Skipped</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="h-4 w-4" />
+              <span className="font-medium">Started:</span>
+              <span>{formatSessionDate(new Date(migrationStats.started_at))}</span>
+              <Badge variant={migrationStats.status === 'completed' ? 'default' : migrationStats.status === 'running' ? 'secondary' : 'destructive'}>
+                {migrationStats.status}
+              </Badge>
+            </div>
+          </div>
+        )}
+
         {/* Last Health Check Info */}
         {healthStats && healthStats.lastSessionDate && (
           <div className="bg-muted p-3 rounded-lg">
@@ -229,22 +327,55 @@ export const AdminImageHealthPanel = () => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button 
             onClick={runHealthCheck}
-            disabled={isRunningHealthCheck}
+            disabled={isRunningHealthCheck || isRunningMigration}
             className="flex items-center gap-2"
           >
             <Activity className={`h-4 w-4 ${isRunningHealthCheck ? 'animate-spin' : ''}`} />
-            {isRunningHealthCheck ? 'Checking...' : 'Run New Health Check'}
+            {isRunningHealthCheck ? 'Checking...' : 'Run Health Check'}
           </Button>
-          <Button variant="outline" onClick={loadHealthData} disabled={isLoadingData}>
+          
+          <Button 
+            onClick={runHealthCheckWithMigration}
+            disabled={isRunningHealthCheck || isRunningMigration}
+            variant="secondary"
+            className="flex items-center gap-2"
+          >
+            <Zap className={`h-4 w-4 ${isRunningHealthCheck ? 'animate-spin' : ''}`} />
+            {isRunningHealthCheck ? 'Checking & Migrating...' : 'Health Check + Auto-Migrate'}
+          </Button>
+          
+          <Button 
+            onClick={runFullMigration}
+            disabled={isRunningHealthCheck || isRunningMigration}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Download className={`h-4 w-4 ${isRunningMigration ? 'animate-spin' : ''}`} />
+            {isRunningMigration ? 'Migrating All...' : 'Migrate All External Images'}
+          </Button>
+          
+          <Button variant="outline" onClick={() => { loadHealthData(); loadMigrationData(); }} disabled={isLoadingData}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingData ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
         </div>
 
         <Separator />
+
+        {/* Migration Alert */}
+        {healthStats && healthStats.brokenImages > 0 && (
+          <Alert>
+            <Download className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Automated Migration Available:</strong> You have {healthStats.brokenImages} broken external images. 
+              Use "Migrate All External Images" to automatically download and store them locally, 
+              eliminating dependency on external APIs.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Show loading state */}
         {isLoadingData && (
@@ -340,8 +471,8 @@ export const AdminImageHealthPanel = () => {
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              These entities have broken or inaccessible images. The daily refresh job will automatically 
-              attempt to fix these issues, or you can manually refresh individual entities above.
+              These entities have broken or inaccessible images. Use the migration system above to automatically 
+              download and store these images locally, or manually refresh individual entities.
             </AlertDescription>
           </Alert>
         )}

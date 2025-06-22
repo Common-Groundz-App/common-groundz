@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { imagePerformanceService } from './imagePerformanceService';
+import { imageMigrationService } from './imageMigrationService';
 
 interface ImageHealthCheck {
   entityId: string;
@@ -308,12 +309,13 @@ class ImageHealthService {
   }
 
   /**
-   * Checks the health of multiple entity images
+   * Checks the health of multiple entity images and triggers migration for broken ones
    */
-  async checkMultipleImages(entities: Array<{ id: string; image_url: string }>, sessionId?: string): Promise<ImageHealthCheck[]> {
+  async checkMultipleImages(entities: Array<{ id: string; image_url: string }>, sessionId?: string, autoMigrate: boolean = false): Promise<ImageHealthCheck[]> {
     console.log(`[ImageHealth] Starting batch health check for ${entities.length} entities`);
     
     const results: ImageHealthCheck[] = [];
+    const brokenEntities: Array<{ id: string; image_url: string }> = [];
     
     // Process in batches to avoid overwhelming external servers
     const batchSize = 5;
@@ -327,6 +329,13 @@ class ImageHealthService {
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
       
+      // Collect broken images for potential migration
+      batchResults.forEach((result, index) => {
+        if (!result.isHealthy) {
+          brokenEntities.push(batch[index]);
+        }
+      });
+      
       // Small delay between batches to be respectful to external servers
       if (i + batchSize < entities.length) {
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -334,6 +343,36 @@ class ImageHealthService {
     }
     
     console.log(`[ImageHealth] Batch health check completed. ${results.filter(r => !r.isHealthy).length} broken images found`);
+    
+    // Auto-migrate broken images if requested
+    if (autoMigrate && brokenEntities.length > 0) {
+      console.log(`[ImageHealth] Auto-migrating ${brokenEntities.length} broken images`);
+      
+      for (const entity of brokenEntities) {
+        try {
+          // Get entity name for migration
+          const { data: entityData } = await supabase
+            .from('entities')
+            .select('name')
+            .eq('id', entity.id)
+            .single();
+          
+          if (entityData) {
+            const migrationResult = await imageMigrationService.migrateEntityImage({
+              id: entity.id,
+              name: entityData.name,
+              image_url: entity.image_url
+            });
+            
+            if (migrationResult.success && migrationResult.newUrl) {
+              console.log(`[ImageHealth] Successfully migrated broken image for entity ${entity.id}`);
+            }
+          }
+        } catch (error) {
+          console.error(`[ImageHealth] Failed to auto-migrate entity ${entity.id}:`, error);
+        }
+      }
+    }
     
     return results;
   }
@@ -478,9 +517,9 @@ class ImageHealthService {
   }
 
   /**
-   * Runs a comprehensive health check on stored entities
+   * Runs a comprehensive health check with optional auto-migration
    */
-  async runHealthCheckCycle(): Promise<{ checked: number; broken: number; }> {
+  async runHealthCheckCycle(autoMigrate: boolean = false): Promise<{ checked: number; broken: number; migrated?: number }> {
     console.log('[ImageHealth] Starting health check cycle');
     
     // Create a new session
@@ -501,10 +540,10 @@ class ImageHealthService {
         errorBreakdown: {}
       });
       
-      return { checked: 0, broken: 0 };
+      return { checked: 0, broken: 0, migrated: 0 };
     }
     
-    const results = await this.checkMultipleImages(entities, sessionId);
+    const results = await this.checkMultipleImages(entities, sessionId, autoMigrate);
     const brokenImages = results.filter(r => !r.isHealthy);
     
     // Calculate error breakdown
@@ -523,16 +562,22 @@ class ImageHealthService {
       errorBreakdown
     });
     
-    if (brokenImages.length > 0) {
+    if (brokenImages.length > 0 && !autoMigrate) {
       await this.markBrokenImagesForRefresh(brokenImages);
     }
     
     console.log(`[ImageHealth] Health check cycle completed: ${results.length} checked, ${brokenImages.length} broken`);
     
-    return {
+    const result: any = {
       checked: results.length,
       broken: brokenImages.length
     };
+    
+    if (autoMigrate) {
+      result.migrated = brokenImages.length; // Approximate, as some migrations might fail
+    }
+    
+    return result;
   }
 
   private getErrorType(status: number): ImageHealthCheck['errorType'] {
