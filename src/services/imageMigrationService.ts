@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
 import { imagePerformanceService } from './imagePerformanceService';
@@ -67,7 +66,7 @@ class ImageMigrationService {
   async createMigrationSession(totalEntities: number): Promise<string | null> {
     try {
       const response = await supabase
-        .from('image_migration_sessions' as any)
+        .from('image_migration_sessions')
         .insert({
           total_entities: totalEntities,
           migrated_count: 0,
@@ -115,7 +114,7 @@ class ImageMigrationService {
       }
 
       const { error } = await supabase
-        .from('image_migration_sessions' as any)
+        .from('image_migration_sessions')
         .update(updateData)
         .eq('id', sessionId);
 
@@ -133,7 +132,7 @@ class ImageMigrationService {
   async saveMigrationResult(sessionId: string, result: MigrationResult): Promise<void> {
     try {
       const { error } = await supabase
-        .from('image_migration_results' as any)
+        .from('image_migration_results')
         .insert({
           session_id: sessionId,
           entity_id: result.entityId,
@@ -368,19 +367,19 @@ class ImageMigrationService {
   async getLatestMigrationSession(): Promise<MigrationSession | null> {
     try {
       const response = await supabase
-        .from('image_migration_sessions' as any)
+        .from('image_migration_sessions')
         .select('*')
         .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
 
-      if (response.error || !response.data) {
+      if (response.error || !response.data || response.data.length === 0) {
         console.error('[ImageMigration] Error fetching latest migration session:', response.error);
         return null;
       }
 
+      const sessionData = response.data[0];
+      
       // Validate that the data has the expected structure
-      const sessionData = response.data;
       if (!sessionData.id || typeof sessionData.total_entities !== 'number') {
         console.error('[ImageMigration] Invalid migration session data structure');
         return null;
@@ -399,7 +398,7 @@ class ImageMigrationService {
   async getSessionMigrationResults(sessionId: string): Promise<MigrationResult[]> {
     try {
       const { data, error } = await supabase
-        .from('image_migration_results' as any)
+        .from('image_migration_results')
         .select('*')
         .eq('session_id', sessionId)
         .order('migrated_at', { ascending: false });
