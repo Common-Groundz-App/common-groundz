@@ -100,7 +100,7 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
   }
 };
 
-// Create a new entity - now using enhanced service
+// Create a new entity - now using enhanced service with proper image handling
 export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>): Promise<Entity | null> => {
   // Convert EntityType enum to string for database compatibility
   let typeAsString: string;
@@ -113,7 +113,7 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
   
   console.log(`🏗️ Creating entity using enhanced service: ${entity.name}`);
   
-  // Use enhanced entity service for rich metadata extraction
+  // Use enhanced entity service for rich metadata extraction and proper image handling
   const enhancedEntity = await createEnhancedEntity({
     name: entity.name,
     type: typeAsString,
@@ -188,6 +188,26 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
   }
 
   console.log(`✅ Basic entity created successfully with slug: ${data?.slug}`, data);
+  
+  // For basic entities, also try to save the image locally if provided
+  if (data && entity.image_url && !entity.image_url.includes('entity-images')) {
+    console.log('🖼️ Attempting to save image locally for basic entity:', data.id);
+    const savedImageUrl = await saveExternalImageToStorage(entity.image_url, data.id);
+    
+    if (savedImageUrl && savedImageUrl !== entity.image_url) {
+      // Update entity with local image URL
+      const { error: updateError } = await supabase
+        .from('entities')
+        .update({ image_url: savedImageUrl })
+        .eq('id', data.id);
+      
+      if (!updateError) {
+        data.image_url = savedImageUrl;
+        console.log('✅ Basic entity image updated to local storage');
+      }
+    }
+  }
+  
   return data as Entity;
 };
 

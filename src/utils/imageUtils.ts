@@ -118,6 +118,12 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
   try {
     console.log('Starting image save process for entity:', entityId);
     
+    // Validate entity ID
+    if (!entityId || entityId === 'temp-id') {
+      console.error('Invalid entity ID provided for image storage:', entityId);
+      return null;
+    }
+    
     // Convert any non-HTTPS URLs to HTTPS
     const secureUrl = ensureHttps(imageUrl);
     
@@ -143,18 +149,19 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
     // Ensure bucket exists and has proper policies
     await ensureBucketForImage();
     
-    // Fetch the image with improved error handling
-    const imageBlob = await fetchImageWithRetries(secureUrl);
+    // Fetch the image with improved error handling and retries
+    const imageBlob = await fetchImageWithRetries(secureUrl, 3);
     if (!imageBlob) {
-      return null;
+      console.warn('Failed to fetch image after retries, keeping external URL:', secureUrl);
+      return secureUrl; // Return original URL as fallback
     }
     
-    // Upload to storage
-    return await uploadImageToStorage(imageBlob, entityId, secureUrl);
+    // Upload to storage with retries
+    return await uploadImageToStorageWithRetries(imageBlob, entityId, secureUrl, 2);
     
   } catch (error) {
     console.error('Error saving image to storage:', error);
-    return null;
+    return imageUrl; // Return original URL as fallback
   }
 };
 
@@ -207,20 +214,23 @@ async function handleGooglePlacesImage(imageUrl: string, entityId: string): Prom
 /**
  * Fetch image with retry logic and proper error handling
  */
-async function fetchImageWithRetries(imageUrl: string, maxRetries: number = 2): Promise<Blob | null> {
+async function fetchImageWithRetries(imageUrl: string, maxRetries: number = 3): Promise<Blob | null> {
   let retryCount = 0;
   
   while (retryCount <= maxRetries) {
     try {
+      console.log(`Fetching image attempt ${retryCount + 1}/${maxRetries + 1}:`, imageUrl);
+      
       // Using AbortController to set a timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
       const response = await fetch(imageUrl, { 
         signal: controller.signal,
         headers: {
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'User-Agent': 'Mozilla/5.0 (compatible; EntityApp/1.0)'
         }
       });
       
@@ -229,86 +239,137 @@ async function fetchImageWithRetries(imageUrl: string, maxRetries: number = 2): 
       if (response.ok) {
         const blob = await response.blob();
         
-        // Validate blob size
+        // Validate blob size and type
         if (blob.size <= 0) {
           console.error('Received empty image blob from', imageUrl);
-          return null;
+          throw new Error('Empty image blob');
         }
         
-        console.log(`Successfully fetched image: ${blob.size} bytes`);
+        if (blob.size > 10 * 1024 * 1024) { // 10MB limit
+          console.error('Image too large:', blob.size, 'bytes');
+          throw new Error('Image too large');
+        }
+        
+        console.log(`Successfully fetched image: ${blob.size} bytes, type: ${blob.type}`);
         return blob;
       }
       
       console.warn(`Fetch attempt ${retryCount + 1} failed with status: ${response.status}`);
       
-      // If status is 429 (Too Many Requests) wait longer
-      if (response.status === 429) {
-        await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
-      }
-    } catch (fetchError) {
-      console.warn(`Fetch attempt ${retryCount + 1} failed:`, fetchError);
-      
-      // If it's the last retry, return null
-      if (retryCount >= maxRetries) {
+      if (response.status === 404) {
+        console.error('Image not found (404), stopping retries');
         return null;
       }
+      
+    } catch (fetchError) {
+      console.warn(`Fetch attempt ${retryCount + 1} failed:`, fetchError);
     }
     
     retryCount++;
-    await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+    if (retryCount <= maxRetries) {
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
+      console.log(`Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
   
+  console.error('All fetch attempts failed for:', imageUrl);
   return null;
 }
 
 /**
- * Upload image blob to Supabase storage
+ * Upload image blob to Supabase storage with retry logic
  */
-async function uploadImageToStorage(blob: Blob, entityId: string, originalUrl: string): Promise<string | null> {
-  try {
-    const contentType = blob.type || 'image/jpeg';
-    const fileExt = contentType.split('/')[1] || 'jpg';
-    const fileName = `${entityId}_${Date.now()}.${fileExt}`;
-    const filePath = `${entityId}/${fileName}`;
-    
-    console.log(`Uploading image to storage: ${filePath} (${contentType}, size: ${blob.size} bytes)`);
-    
-    // Upload to Supabase storage
-    const { data, error } = await supabase.storage
-      .from('entity-images')
-      .upload(filePath, blob, {
-        contentType,
-        upsert: false
-      });
+async function uploadImageToStorageWithRetries(blob: Blob, entityId: string, originalUrl: string, maxRetries: number = 2): Promise<string | null> {
+  let retryCount = 0;
+  
+  while (retryCount <= maxRetries) {
+    try {
+      const contentType = blob.type || 'image/jpeg';
+      const fileExt = getFileExtensionFromContentType(contentType);
+      const fileName = `${Date.now()}_${generateSafeFileName(originalUrl)}.${fileExt}`;
+      const filePath = `${entityId}/${fileName}`;
       
-    if (error) {
-      console.error('Failed to upload image to storage:', error);
+      console.log(`Upload attempt ${retryCount + 1}/${maxRetries + 1}: ${filePath} (${contentType}, size: ${blob.size} bytes)`);
       
-      if (error.message.includes('storage/duplicate_file')) {
-        console.log('Duplicate file detected, getting public URL');
-        const { data: { publicUrl } } = supabase.storage
-          .from('entity-images')
-          .getPublicUrl(filePath);
-        return publicUrl;
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('entity-images')
+        .upload(filePath, blob, {
+          contentType,
+          upsert: false
+        });
+        
+      if (error) {
+        if (error.message.includes('storage/duplicate_file')) {
+          console.log('Duplicate file detected, getting public URL');
+          const { data: { publicUrl } } = supabase.storage
+            .from('entity-images')
+            .getPublicUrl(filePath);
+          return publicUrl;
+        }
+        
+        console.error(`Upload attempt ${retryCount + 1} failed:`, error);
+        throw error;
       }
       
-      return null;
-    }
-    
-    // Get the public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('entity-images')
-      .getPublicUrl(filePath);
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('entity-images')
+        .getPublicUrl(filePath);
+        
+      console.log('Image saved to storage successfully:', publicUrl);
+      return publicUrl;
       
-    console.log('Image saved to storage successfully:', publicUrl);
-    return publicUrl;
-  } catch (error) {
-    console.error('Error uploading image to storage:', error);
-    return null;
+    } catch (error) {
+      console.error(`Upload attempt ${retryCount + 1} error:`, error);
+      retryCount++;
+      
+      if (retryCount <= maxRetries) {
+        const delay = 1000 * retryCount;
+        console.log(`Waiting ${delay}ms before upload retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  console.error('All upload attempts failed, returning original URL as fallback');
+  return originalUrl; // Return original URL as final fallback
+}
+
+/**
+ * Generate a safe filename from URL
+ */
+function generateSafeFileName(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/');
+    const fileName = pathParts[pathParts.length - 1] || 'image';
+    return fileName.replace(/[^a-zA-Z0-9.-]/g, '_').substring(0, 50);
+  } catch {
+    return 'image';
   }
 }
 
-// Helper function to ensure the entity-images bucket exists with proper policies
+/**
+ * Get file extension from content type
+ */
+function getFileExtensionFromContentType(contentType: string): string {
+  const typeMap: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg'
+  };
+  
+  return typeMap[contentType.toLowerCase()] || 'jpg';
+}
+
+/**
+ * Ensures a bucket exists and has proper policies
+ */
 async function ensureBucketForImage() {
   try {
     // Ensure the bucket has proper policies

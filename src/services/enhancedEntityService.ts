@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
@@ -36,16 +37,7 @@ export const createEnhancedEntity = async (rawData: any, entityType: string): Pr
     // Extract enhanced metadata based on entity type
     const enhancedData = await extractEnhancedMetadata(rawData, entityType);
     
-    // Save image locally if available
-    let localImageUrl = enhancedData.image_url;
-    if (enhancedData.image_url) {
-      const savedImageUrl = await saveExternalImageToStorage(enhancedData.image_url, 'temp-id');
-      if (savedImageUrl) {
-        localImageUrl = savedImageUrl;
-      }
-    }
-    
-    // Create entity with enhanced data
+    // Create entity first WITHOUT the image to get the actual entity ID
     const { data: entity, error } = await supabase
       .from('entities')
       .insert({
@@ -53,7 +45,7 @@ export const createEnhancedEntity = async (rawData: any, entityType: string): Pr
         type: entityType as any,
         venue: enhancedData.venue,
         description: enhancedData.description,
-        image_url: localImageUrl,
+        image_url: enhancedData.image_url, // Keep original external URL temporarily
         api_source: enhancedData.api_source,
         api_ref: enhancedData.api_ref,
         website_url: enhancedData.website_url,
@@ -79,6 +71,29 @@ export const createEnhancedEntity = async (rawData: any, entityType: string): Pr
     if (error) {
       console.error('❌ Error creating enhanced entity:', error);
       return null;
+    }
+    
+    console.log('✅ Entity created with ID:', entity.id);
+    
+    // Now save image locally using the actual entity ID
+    if (enhancedData.image_url) {
+      console.log('🖼️ Saving image to local storage for entity:', entity.id);
+      const savedImageUrl = await saveExternalImageToStorage(enhancedData.image_url, entity.id);
+      
+      if (savedImageUrl && savedImageUrl !== enhancedData.image_url) {
+        // Update entity with local image URL
+        const { error: updateError } = await supabase
+          .from('entities')
+          .update({ image_url: savedImageUrl })
+          .eq('id', entity.id);
+        
+        if (updateError) {
+          console.error('⚠️ Failed to update entity with local image URL:', updateError);
+        } else {
+          console.log('✅ Entity image updated to local storage:', savedImageUrl);
+          entity.image_url = savedImageUrl;
+        }
+      }
     }
     
     console.log('✅ Enhanced entity created successfully:', entity);
