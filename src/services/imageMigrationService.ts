@@ -394,16 +394,21 @@ class ImageMigrationService {
     try {
       const response = await supabase
         .from('image_migration_sessions')
-        .select('*')
+        .select('id, total_entities, migrated_count, failed_count, skipped_count, already_processed_count, started_at, completed_at, status')
         .order('started_at', { ascending: false })
-        .limit(1);
+        .limit(1)
+        .single();
 
-      if (response.error || !response.data || response.data.length === 0) {
+      if (response.error) {
         console.error('[ImageMigration] Error fetching latest migration session:', response.error);
         return null;
       }
 
-      const sessionData = response.data[0];
+      if (!response.data) {
+        return null;
+      }
+
+      const sessionData = response.data;
       
       // Validate that the data has the expected structure
       if (!sessionData.id || typeof sessionData.total_entities !== 'number') {

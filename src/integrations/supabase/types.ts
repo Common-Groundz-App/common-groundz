@@ -722,6 +722,7 @@ export type Database = {
       }
       image_migration_sessions: {
         Row: {
+          already_processed_count: number
           completed_at: string | null
           created_at: string
           failed_count: number
@@ -733,6 +734,7 @@ export type Database = {
           total_entities: number
         }
         Insert: {
+          already_processed_count?: number
           completed_at?: string | null
           created_at?: string
           failed_count?: number
@@ -744,6 +746,7 @@ export type Database = {
           total_entities?: number
         }
         Update: {
+          already_processed_count?: number
           completed_at?: string | null
           created_at?: string
           failed_count?: number
