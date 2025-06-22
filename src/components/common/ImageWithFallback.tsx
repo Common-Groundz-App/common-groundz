@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { ensureHttps } from '@/utils/urlUtils';
-import { isValidImageUrl, isGooglePlacesImage, getEntityTypeFallbackImage } from '@/utils/imageUtils';
+import { isValidImageUrl, isGooglePlacesImage, isOpenLibraryImage, createOpenLibraryProxyUrl, getEntityTypeFallbackImage } from '@/utils/imageUtils';
 
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackSrc?: string;
@@ -26,15 +27,14 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
 
-  // Only block URLs that are known to definitely cause CORS issues
+  // Only block URLs that are known to definitely cause CORS issues (excluding OpenLibrary now)
   const shouldBlockUrl = (url: string): boolean => {
     if (!url) return true;
     
     // Block domains that are confirmed to cause CORS issues 
-    // (excluding Google Books and Amazon movies now that we proxy them)
+    // (excluding OpenLibrary since we now proxy it)
     const definitivelyBlockedDomains = [
-      'googleusercontent.com',  // Always causes CORS issues
-      'covers.openlibrary.org'  // Known to be unreliable
+      'googleusercontent.com'  // Always causes CORS issues
     ];
     
     const isBlocked = definitivelyBlockedDomains.some(domain => url.includes(domain));
@@ -48,6 +48,15 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   // Convert HTTP to HTTPS and handle special cases
   const processUrl = (url: string): string => {
     if (!url) return url;
+    
+    // Handle OpenLibrary images by proxying them
+    if (isOpenLibraryImage(url)) {
+      const proxyUrl = createOpenLibraryProxyUrl(url);
+      if (!suppressConsoleErrors) {
+        console.log('ImageWithFallback: Using OpenLibrary proxy for:', url, '-> proxy URL:', proxyUrl);
+      }
+      return proxyUrl;
+    }
     
     // For other URLs, try to ensure HTTPS
     return ensureHttps(url) || url;
@@ -72,13 +81,14 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         return;
       }
       
-      // Process the URL (convert to HTTPS if needed)
+      // Process the URL (convert to HTTPS if needed, or proxy if OpenLibrary)
       const processedUrl = processUrl(src);
       
       // Allow safe URLs directly (including our proxied URLs)
       if (src.includes('supabase.co/functions/v1/proxy-google-books') ||
           src.includes('supabase.co/functions/v1/proxy-google-image') || 
           src.includes('supabase.co/functions/v1/proxy-movie-image') ||
+          src.includes('supabase.co/functions/v1/proxy-openlibrary') ||
           src.includes('images.unsplash.com') ||
           src.includes('supabase.co/storage/v1/object/public/') ||
           processedUrl.startsWith('https://')) {

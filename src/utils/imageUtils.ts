@@ -57,17 +57,31 @@ export const isGooglePlacesImage = (url: string): boolean => {
 };
 
 /**
+ * Checks if a URL is an OpenLibrary image URL.
+ */
+export const isOpenLibraryImage = (url: string): boolean => {
+  return url?.includes('covers.openlibrary.org');
+};
+
+/**
+ * Creates a proxy URL for OpenLibrary images
+ */
+export const createOpenLibraryProxyUrl = (originalUrl: string): string => {
+  return `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-openlibrary?url=${encodeURIComponent(originalUrl)}`;
+};
+
+/**
  * Checks if a URL is from a CORS-problematic domain
  */
 export const isCorsProblematic = (url: string): boolean => {
   if (!url) return false;
   
   const problematicDomains = [
-    'covers.openlibrary.org',
     'books.google.com',
     'images-amazon.com',
     'm.media-amazon.com',
     'images-static.nykaa.com'
+    // Removed covers.openlibrary.org since we now proxy it
   ];
   
   return problematicDomains.some(domain => url.includes(domain));

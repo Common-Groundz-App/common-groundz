@@ -1,3 +1,4 @@
+
 /**
  * Ensures a URL uses HTTPS instead of HTTP
  */
@@ -83,11 +84,11 @@ export const needsCorsProxy = (url: string): boolean => {
   if (!url) return false;
   
   const corsProblematicDomains = [
-    'covers.openlibrary.org',
     'books.google.com',
     'images-amazon.com',
     'm.media-amazon.com',
     'images-static.nykaa.com'
+    // Removed covers.openlibrary.org since we now have a dedicated proxy
   ];
   
   return corsProblematicDomains.some(domain => url.includes(domain));
