@@ -596,6 +596,83 @@ export type Database = {
         }
         Relationships: []
       }
+      image_health_results: {
+        Row: {
+          checked_at: string
+          consecutive_failures: number
+          created_at: string
+          entity_id: string
+          error_type: string | null
+          id: string
+          image_url: string
+          is_healthy: boolean
+          session_id: string | null
+        }
+        Insert: {
+          checked_at?: string
+          consecutive_failures?: number
+          created_at?: string
+          entity_id: string
+          error_type?: string | null
+          id?: string
+          image_url: string
+          is_healthy: boolean
+          session_id?: string | null
+        }
+        Update: {
+          checked_at?: string
+          consecutive_failures?: number
+          created_at?: string
+          entity_id?: string
+          error_type?: string | null
+          id?: string
+          image_url?: string
+          is_healthy?: boolean
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_health_results_session"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "image_health_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      image_health_sessions: {
+        Row: {
+          broken_count: number
+          completed_at: string | null
+          created_at: string
+          error_breakdown: Json
+          healthy_count: number
+          id: string
+          started_at: string
+          total_checked: number
+        }
+        Insert: {
+          broken_count?: number
+          completed_at?: string | null
+          created_at?: string
+          error_breakdown?: Json
+          healthy_count?: number
+          id?: string
+          started_at?: string
+          total_checked?: number
+        }
+        Update: {
+          broken_count?: number
+          completed_at?: string | null
+          created_at?: string
+          error_breakdown?: Json
+          healthy_count?: number
+          id?: string
+          started_at?: string
+          total_checked?: number
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_url: string | null

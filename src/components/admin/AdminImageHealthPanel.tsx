@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { AlertTriangle, CheckCircle, RefreshCw, Activity, Image } from 'lucide-react';
+import { AlertTriangle, CheckCircle, RefreshCw, Activity, Image, Clock } from 'lucide-react';
 import { imageHealthService } from '@/services/imageHealthService';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +25,7 @@ export const AdminImageHealthPanel = () => {
   const [brokenEntities, setBrokenEntities] = useState<EntityWithImageIssue[]>([]);
   const [isRunningHealthCheck, setIsRunningHealthCheck] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState<string | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   const { refreshEntityImage } = useEntityImageRefresh();
   const { toast } = useToast();
 
@@ -33,25 +35,49 @@ export const AdminImageHealthPanel = () => {
       return 'Never';
     }
     try {
-      return lastChecked.toLocaleDateString();
+      return lastChecked.toLocaleDateString() + ' ' + lastChecked.toLocaleTimeString();
     } catch (error) {
       return 'Invalid date';
     }
   };
 
-  // Load health statistics and recent failures
+  // Helper function to format the session date
+  const formatSessionDate = (date?: Date): string => {
+    if (!date) {
+      return 'Never';
+    }
+    try {
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      
+      if (diffHours === 0) {
+        return `${diffMinutes} minutes ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours} hours ago`;
+      } else {
+        return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString();
+      }
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
+  // Load health statistics and recent failures from database
   useEffect(() => {
     loadHealthData();
   }, []);
 
   const loadHealthData = async () => {
+    setIsLoadingData(true);
     try {
-      // Get stats from health service
-      const stats = imageHealthService.getHealthStats();
+      // Get stats from persistent storage
+      const stats = await imageHealthService.getHealthStats();
       setHealthStats(stats);
 
-      // Get recent failures with entity details
-      const recentFailures = imageHealthService.getRecentHealthChecks(20);
+      // Get recent failures with entity details from database
+      const recentFailures = await imageHealthService.getRecentHealthChecks(20);
       const brokenImageData: EntityWithImageIssue[] = [];
 
       for (const failure of recentFailures.filter(f => !f.isHealthy)) {
@@ -77,6 +103,17 @@ export const AdminImageHealthPanel = () => {
       setBrokenEntities(brokenImageData);
     } catch (error) {
       console.error('Error loading health data:', error);
+      // Set empty state if there's an error
+      setHealthStats({
+        totalChecked: 0,
+        healthyImages: 0,
+        brokenImages: 0,
+        recentFailures: [],
+        errorBreakdown: {}
+      });
+      setBrokenEntities([]);
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
@@ -156,6 +193,17 @@ export const AdminImageHealthPanel = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Last Health Check Info */}
+        {healthStats && healthStats.lastSessionDate && (
+          <div className="bg-muted p-3 rounded-lg">
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="h-4 w-4" />
+              <span className="font-medium">Last health check:</span>
+              <span>{formatSessionDate(healthStats.lastSessionDate)}</span>
+            </div>
+          </div>
+        )}
+
         {/* Health Statistics */}
         {healthStats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -188,18 +236,36 @@ export const AdminImageHealthPanel = () => {
             className="flex items-center gap-2"
           >
             <Activity className={`h-4 w-4 ${isRunningHealthCheck ? 'animate-spin' : ''}`} />
-            {isRunningHealthCheck ? 'Checking...' : 'Run Health Check'}
+            {isRunningHealthCheck ? 'Checking...' : 'Run New Health Check'}
           </Button>
-          <Button variant="outline" onClick={loadHealthData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" onClick={loadHealthData} disabled={isLoadingData}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingData ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
         </div>
 
         <Separator />
 
+        {/* Show loading state */}
+        {isLoadingData && (
+          <div className="text-center p-4">
+            <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Loading health data...</p>
+          </div>
+        )}
+
+        {/* Show no data state only when not loading and no health stats */}
+        {!isLoadingData && (!healthStats || healthStats.totalChecked === 0) && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              No health check data available. Click "Run New Health Check" to scan all entity images.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Error Breakdown */}
-        {healthStats && Object.keys(healthStats.errorBreakdown).length > 0 && (
+        {!isLoadingData && healthStats && Object.keys(healthStats.errorBreakdown).length > 0 && (
           <div>
             <h4 className="font-medium mb-3">Error Breakdown</h4>
             <div className="flex gap-2 flex-wrap">
@@ -213,60 +279,62 @@ export const AdminImageHealthPanel = () => {
         )}
 
         {/* Broken Images List */}
-        <div>
-          <h4 className="font-medium mb-3">Entities with Image Issues ({brokenEntities.length})</h4>
-          
-          {brokenEntities.length === 0 ? (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                No entities with image issues found. All images appear to be healthy!
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {brokenEntities.map((entity) => (
-                <div key={entity.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{entity.name}</div>
-                    <div className="text-sm text-muted-foreground truncate">
-                      ID: {entity.id}
+        {!isLoadingData && healthStats && healthStats.totalChecked > 0 && (
+          <div>
+            <h4 className="font-medium mb-3">Entities with Image Issues ({brokenEntities.length})</h4>
+            
+            {brokenEntities.length === 0 ? (
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  No entities with image issues found. All images appear to be healthy!
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {brokenEntities.map((entity) => (
+                  <div key={entity.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{entity.name}</div>
+                      <div className="text-sm text-muted-foreground truncate">
+                        ID: {entity.id}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        <span>Failures: {entity.consecutive_failures}</span>
+                        <span className="ml-3">
+                          Last checked: {formatLastChecked(entity.last_checked)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      <span>Failures: {entity.consecutive_failures}</span>
-                      <span className="ml-3">
-                        Last checked: {formatLastChecked(entity.last_checked)}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 ml-4">
-                    {entity.error_type && (
-                      <Badge variant={getErrorBadgeVariant(entity.error_type)}>
-                        {entity.error_type}
-                      </Badge>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => refreshEntityImageManually(entity.id, entity.name)}
-                      disabled={isRefreshing === entity.id}
-                    >
-                      {isRefreshing === entity.id ? (
-                        <RefreshCw className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <>
-                          <RefreshCw className="h-3 w-3 mr-1" />
-                          Refresh
-                        </>
+                    
+                    <div className="flex items-center gap-2 ml-4">
+                      {entity.error_type && (
+                        <Badge variant={getErrorBadgeVariant(entity.error_type)}>
+                          {entity.error_type}
+                        </Badge>
                       )}
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => refreshEntityImageManually(entity.id, entity.name)}
+                        disabled={isRefreshing === entity.id}
+                      >
+                        {isRefreshing === entity.id ? (
+                          <RefreshCw className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <>
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Refresh
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {brokenEntities.length > 0 && (
           <Alert>
