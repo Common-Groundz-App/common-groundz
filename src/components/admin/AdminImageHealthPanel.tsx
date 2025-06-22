@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -206,7 +205,7 @@ export const AdminImageHealthPanel = () => {
             <div className="flex gap-2 flex-wrap">
               {Object.entries(healthStats.errorBreakdown).map(([errorType, count]) => (
                 <Badge key={errorType} variant="outline">
-                  {errorType}: {count}
+                  {errorType}: {String(count)}
                 </Badge>
               ))}
             </div>
