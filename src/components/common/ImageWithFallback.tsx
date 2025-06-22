@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ensureHttps } from '@/utils/urlUtils';
-import { isValidImageUrl, isGooglePlacesImage, isOpenLibraryImage, createOpenLibraryProxyUrl, getEntityTypeFallbackImage } from '@/utils/imageUtils';
+import { isValidImageUrl, getProxyUrlForImage, getEntityTypeFallbackImage } from '@/utils/imageUtils';
 
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackSrc?: string;
@@ -28,39 +28,22 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [hasError, setHasError] = useState(false);
   const [proxyAttempted, setProxyAttempted] = useState(false);
 
-  // Only block URLs that are known to definitely cause CORS issues (excluding OpenLibrary now)
-  const shouldBlockUrl = (url: string): boolean => {
-    if (!url) return true;
-    
-    // Block domains that are confirmed to cause CORS issues 
-    // (excluding OpenLibrary since we now proxy it)
-    const definitivelyBlockedDomains = [
-      'googleusercontent.com'  // Always causes CORS issues
-    ];
-    
-    const isBlocked = definitivelyBlockedDomains.some(domain => url.includes(domain));
-    if (isBlocked && !suppressConsoleErrors) {
-      console.log('ImageWithFallback: Blocking CORS-problematic domain:', url);
-    }
-    
-    return isBlocked;
-  };
-
-  // Convert HTTP to HTTPS and handle special cases
+  // Process URL using smart proxy routing
   const processUrl = (url: string): string => {
     if (!url) return url;
     
-    // Handle OpenLibrary images by proxying them
-    if (isOpenLibraryImage(url)) {
-      const proxyUrl = createOpenLibraryProxyUrl(url);
-      if (!suppressConsoleErrors) {
-        console.log('ImageWithFallback: Using OpenLibrary proxy for:', url, '-> proxy URL:', proxyUrl);
-      }
-      return proxyUrl;
+    // First ensure HTTPS
+    const secureUrl = ensureHttps(url);
+    if (!secureUrl) return url;
+    
+    // Then apply appropriate proxy if needed
+    const proxyUrl = getProxyUrlForImage(secureUrl);
+    
+    if (proxyUrl !== secureUrl && !suppressConsoleErrors) {
+      console.log('ImageWithFallback: Using proxy for:', secureUrl, '-> proxy URL:', proxyUrl);
     }
     
-    // For other URLs, try to ensure HTTPS
-    return ensureHttps(url) || url;
+    return proxyUrl;
   };
 
   useEffect(() => {
@@ -73,50 +56,24 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         console.log('ImageWithFallback: Processing image URL:', src);
       }
       
-      // Check if URL should be blocked immediately (only for truly problematic domains)
-      if (shouldBlockUrl(src)) {
+      // Process the URL (convert to HTTPS and apply proxy if needed)
+      const processedUrl = processUrl(src);
+      
+      // Basic URL validation
+      if (!isValidImageUrl(processedUrl)) {
         if (!suppressConsoleErrors) {
-          console.log("ImageWithFallback: Using fallback for blocked URL, entity type:", entityType);
+          console.log("ImageWithFallback: Invalid image URL format, using fallback for entity type:", entityType);
         }
         setImgSrc(actualFallback);
         setHasError(true);
         return;
       }
       
-      // Process the URL (convert to HTTPS if needed, or proxy if OpenLibrary)
-      const processedUrl = processUrl(src);
-      
-      // Allow safe URLs directly (including our proxied URLs)
-      if (src.includes('supabase.co/functions/v1/proxy-google-books') ||
-          src.includes('supabase.co/functions/v1/proxy-google-image') || 
-          src.includes('supabase.co/functions/v1/proxy-movie-image') ||
-          src.includes('supabase.co/functions/v1/proxy-openlibrary') ||
-          src.includes('images.unsplash.com') ||
-          src.includes('supabase.co/storage/v1/object/public/') ||
-          processedUrl.startsWith('https://')) {
-        
-        if (!suppressConsoleErrors) {
-          console.log('ImageWithFallback: Using processed URL:', processedUrl);
-        }
-        
-        // Basic URL validation
-        if (!isValidImageUrl(processedUrl)) {
-          if (!suppressConsoleErrors) {
-            console.log("ImageWithFallback: Invalid image URL format, using fallback for entity type:", entityType);
-          }
-          setImgSrc(actualFallback);
-          setHasError(true);
-          return;
-        }
-        
-        setImgSrc(processedUrl);
-      } else {
-        // For other URLs, try the processed version and let the browser handle errors
-        if (!suppressConsoleErrors) {
-          console.log('ImageWithFallback: Trying processed URL:', processedUrl);
-        }
-        setImgSrc(processedUrl);
+      if (!suppressConsoleErrors) {
+        console.log('ImageWithFallback: Using processed URL:', processedUrl);
       }
+      
+      setImgSrc(processedUrl);
     } else {
       if (!suppressConsoleErrors) {
         console.log("ImageWithFallback: No source URL provided, using fallback for type:", entityType);
@@ -130,12 +87,12 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       console.log('ImageWithFallback: Image load error, using fallback for type:', entityType, 'Original URL:', src);
     }
     
-    // If this was an OpenLibrary proxy attempt and it failed, try direct URL once
-    if (src && isOpenLibraryImage(src) && !proxyAttempted) {
+    // If we haven't tried a direct fetch yet and the current URL was proxied, try direct
+    if (src && !proxyAttempted && getProxyUrlForImage(src) !== src) {
       setProxyAttempted(true);
       const directUrl = ensureHttps(src);
       if (directUrl && !suppressConsoleErrors) {
-        console.log('ImageWithFallback: Proxy failed, trying direct OpenLibrary URL:', directUrl);
+        console.log('ImageWithFallback: Proxy failed, trying direct URL:', directUrl);
       }
       setImgSrc(directUrl || actualFallback);
       return;

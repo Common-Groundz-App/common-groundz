@@ -64,6 +64,20 @@ export const isOpenLibraryImage = (url: string): boolean => {
 };
 
 /**
+ * Checks if a URL is a Google Books image URL.
+ */
+export const isGoogleBooksImage = (url: string): boolean => {
+  return url?.includes('books.google.com/books/content');
+};
+
+/**
+ * Checks if a URL is a movie image URL that needs proxying.
+ */
+export const isMovieImage = (url: string): boolean => {
+  return url?.includes('image.tmdb.org') || url?.includes('imdb.com');
+};
+
+/**
  * Creates a proxy URL for OpenLibrary images
  */
 export const createOpenLibraryProxyUrl = (originalUrl: string): string => {
@@ -71,20 +85,95 @@ export const createOpenLibraryProxyUrl = (originalUrl: string): string => {
 };
 
 /**
- * Checks if a URL is from a CORS-problematic domain
+ * Creates a proxy URL for Google Books images
+ */
+export const createGoogleBooksProxyUrl = (originalUrl: string): string => {
+  return `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-books?url=${encodeURIComponent(originalUrl)}`;
+};
+
+/**
+ * Creates a proxy URL for movie images
+ */
+export const createMovieProxyUrl = (originalUrl: string): string => {
+  return `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-movie-image?url=${encodeURIComponent(originalUrl)}`;
+};
+
+/**
+ * Creates a proxy URL for generic external images
+ */
+export const createGenericProxyUrl = (originalUrl: string): string => {
+  return `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-external-image?url=${encodeURIComponent(originalUrl)}`;
+};
+
+/**
+ * Checks if a URL is from a CORS-problematic domain (expanded coverage)
  */
 export const isCorsProblematic = (url: string): boolean => {
   if (!url) return false;
   
   const problematicDomains = [
-    'books.google.com',
-    'images-amazon.com',
-    'm.media-amazon.com',
+    // Social media
+    'instagram.com', 'cdninstagram.com', 'fbcdn.net',
+    'pinterest.com', 'pinimg.com',
+    'twitter.com', 'twimg.com',
+    'facebook.com',
+    
+    // E-commerce
+    'amazon.com', 'images-amazon.com', 'm.media-amazon.com',
+    'ebay.com', 'ebayimg.com',
+    'walmart.com', 'walmartimages.com',
+    'target.com', 'target.scene7.com',
+    'shopify.com', 'shopifycdn.com',
+    
+    // News sites
+    'cnn.com', 'cdn.cnn.com',
+    'bbc.com', 'bbci.co.uk',
+    'reuters.com', 'reuters.tv',
+    'nytimes.com', 'nyt.com',
+    
+    // Image hosts with CORS issues
+    'imgur.com', 'i.imgur.com',
+    'flickr.com', 'staticflickr.com', 'live.staticflickr.com',
+    
+    // Other problematic domains
+    'googleusercontent.com',
     'images-static.nykaa.com'
-    // Removed covers.openlibrary.org since we now proxy it
   ];
   
   return problematicDomains.some(domain => url.includes(domain));
+};
+
+/**
+ * Gets the appropriate proxy URL for an external image based on its source
+ */
+export const getProxyUrlForImage = (originalUrl: string): string => {
+  if (!originalUrl) return originalUrl;
+  
+  // Specific proxy functions for known sources
+  if (isGooglePlacesImage(originalUrl)) {
+    // Google Places images are handled differently via refresh-entity-image function
+    return originalUrl;
+  }
+  
+  if (isOpenLibraryImage(originalUrl)) {
+    return createOpenLibraryProxyUrl(originalUrl);
+  }
+  
+  if (isGoogleBooksImage(originalUrl)) {
+    return createGoogleBooksProxyUrl(originalUrl);
+  }
+  
+  if (isMovieImage(originalUrl)) {
+    return createMovieProxyUrl(originalUrl);
+  }
+  
+  // Generic proxy for other CORS-problematic domains
+  if (isCorsProblematic(originalUrl)) {
+    return createGenericProxyUrl(originalUrl);
+  }
+  
+  // Return original URL if no proxy needed
+  return originalUrl;
 };
 
 /**
@@ -109,7 +198,7 @@ export const getEntityTypeFallbackImage = (entityType: string): string => {
 };
 
 /**
- * Save an external image to Supabase storage with improved error handling and retries
+ * Save an external image to Supabase storage with improved error handling and smart proxy routing
  * @param imageUrl URL of the external image
  * @param entityId ID of the entity to associate with the image
  * @returns Public URL of the stored image or null if failed
@@ -149,8 +238,12 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
     // Ensure bucket exists and has proper policies
     await ensureBucketForImage();
     
+    // Get the appropriate URL (proxy if needed)
+    const fetchUrl = getProxyUrlForImage(secureUrl);
+    console.log('Using fetch URL (may be proxied):', fetchUrl);
+    
     // Fetch the image with improved error handling and retries
-    const imageBlob = await fetchImageWithRetries(secureUrl, 3);
+    const imageBlob = await fetchImageWithRetries(fetchUrl, 3);
     if (!imageBlob) {
       console.warn('Failed to fetch image after retries, keeping external URL:', secureUrl);
       return secureUrl; // Return original URL as fallback
