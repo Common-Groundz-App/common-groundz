@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
 import { imagePerformanceService } from './imagePerformanceService';
@@ -16,6 +17,7 @@ interface MigrationStats {
   migrated: number;
   failed: number;
   skipped: number;
+  alreadyProcessed: number;
   results: MigrationResult[];
 }
 
@@ -25,6 +27,7 @@ interface MigrationSession {
   migrated_count: number;
   failed_count: number;
   skipped_count: number;
+  already_processed_count: number;
   started_at: string;
   completed_at?: string;
   status: 'running' | 'completed' | 'failed';
@@ -35,6 +38,16 @@ class ImageMigrationService {
   private readonly DELAY_BETWEEN_BATCHES = 2000; // 2 seconds between batches
 
   /**
+   * Checks if a URL is a proxy URL that shouldn't be migrated
+   */
+  private isProxyUrl(url: string): boolean {
+    return url.includes('supabase.co/functions/v1/proxy-') || 
+           url.includes('/functions/v1/proxy-') ||
+           url.includes('entity-images') ||
+           url.includes('storage.googleapis.com');
+  }
+
+  /**
    * Gets entities with external images that need migration
    */
   async getEntitiesNeedingMigration(): Promise<Array<{ id: string; name: string; image_url: string }>> {
@@ -43,17 +56,21 @@ class ImageMigrationService {
         .from('entities')
         .select('id, name, image_url')
         .eq('is_deleted', false)
-        .not('image_url', 'is', null)
-        .not('image_url', 'like', '%entity-images%') // Skip already migrated images
-        .not('image_url', 'like', '%storage.googleapis.com%') // Skip stored images
-        .order('created_at', { ascending: true }); // Migrate oldest first
+        .not('image_url', 'is', null);
       
       if (error) {
         console.error('[ImageMigration] Error fetching entities for migration:', error);
         return [];
       }
       
-      return entities || [];
+      // Filter out entities that already have proxy URLs or stored images
+      const filteredEntities = (entities || []).filter(entity => {
+        return !this.isProxyUrl(entity.image_url);
+      });
+
+      console.log(`[ImageMigration] Found ${entities?.length || 0} total entities, ${filteredEntities.length} need migration`);
+      
+      return filteredEntities;
     } catch (error) {
       console.error('[ImageMigration] Error in getEntitiesNeedingMigration:', error);
       return [];
@@ -72,6 +89,7 @@ class ImageMigrationService {
           migrated_count: 0,
           failed_count: 0,
           skipped_count: 0,
+          already_processed_count: 0,
           started_at: new Date().toISOString(),
           status: 'running'
         })
@@ -97,13 +115,15 @@ class ImageMigrationService {
     migrated: number;
     failed: number;
     skipped: number;
+    alreadyProcessed: number;
     status?: 'running' | 'completed' | 'failed';
   }): Promise<void> {
     try {
       const updateData: any = {
         migrated_count: stats.migrated,
         failed_count: stats.failed,
-        skipped_count: stats.skipped
+        skipped_count: stats.skipped,
+        already_processed_count: stats.alreadyProcessed
       };
 
       if (stats.status) {
@@ -159,17 +179,18 @@ class ImageMigrationService {
     const startTime = Date.now();
     
     try {
-      console.log(`[ImageMigration] Migrating image for entity "${entity.name}": ${entity.image_url}`);
+      console.log(`[ImageMigration] Processing entity "${entity.name}": ${entity.image_url}`);
       
-      // Check if image is already migrated
-      if (entity.image_url.includes('entity-images') || entity.image_url.includes('storage.googleapis.com')) {
+      // Check if image is already a proxy URL or stored image
+      if (this.isProxyUrl(entity.image_url)) {
+        console.log(`[ImageMigration] Entity "${entity.name}" already has processed URL, skipping`);
         return {
           entityId: entity.id,
           entityName: entity.name,
           originalUrl: entity.image_url,
           newUrl: entity.image_url,
           success: true,
-          error: 'Already migrated'
+          error: 'Already processed (proxy/stored URL)'
         };
       }
 
@@ -279,6 +300,7 @@ class ImageMigrationService {
         migrated: 0,
         failed: 0,
         skipped: 0,
+        alreadyProcessed: 0,
         results: []
       };
     }
@@ -295,6 +317,7 @@ class ImageMigrationService {
     let migrated = 0;
     let failed = 0;
     let skipped = 0;
+    let alreadyProcessed = 0;
 
     // Process entities in batches
     for (let i = 0; i < entities.length; i += this.BATCH_SIZE) {
@@ -310,8 +333,8 @@ class ImageMigrationService {
         results.push(result);
         
         if (result.success) {
-          if (result.error === 'Already migrated') {
-            skipped++;
+          if (result.error === 'Already processed (proxy/stored URL)') {
+            alreadyProcessed++;
           } else {
             migrated++;
           }
@@ -330,6 +353,7 @@ class ImageMigrationService {
         migrated,
         failed,
         skipped,
+        alreadyProcessed,
         status: 'running'
       });
       
@@ -345,6 +369,7 @@ class ImageMigrationService {
       migrated,
       failed,
       skipped,
+      alreadyProcessed,
       status: 'completed'
     });
 
@@ -353,10 +378,11 @@ class ImageMigrationService {
       migrated,
       failed,
       skipped,
+      alreadyProcessed,
       results
     };
 
-    console.log(`[ImageMigration] Migration completed: ${migrated} migrated, ${failed} failed, ${skipped} skipped`);
+    console.log(`[ImageMigration] Migration completed: ${migrated} migrated, ${failed} failed, ${skipped} skipped, ${alreadyProcessed} already processed`);
     
     return stats;
   }

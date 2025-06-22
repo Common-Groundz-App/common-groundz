@@ -185,7 +185,7 @@ export const AdminImageHealthPanel = () => {
       
       toast({
         title: 'Image migration completed',
-        description: `Processed ${result.totalEntities} entities: ${result.migrated} migrated, ${result.failed} failed, ${result.skipped} skipped.`
+        description: `Processed ${result.totalEntities} entities: ${result.migrated} migrated, ${result.failed} failed, ${result.skipped} skipped, ${result.alreadyProcessed} already processed.`
       });
       
       // Reload data to show updated results
@@ -262,7 +262,7 @@ export const AdminImageHealthPanel = () => {
               <Download className="h-4 w-4" />
               Latest Migration Session
             </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-3">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">{migrationStats.total_entities}</div>
                 <div className="text-sm text-muted-foreground">Total Processed</div>
@@ -278,6 +278,10 @@ export const AdminImageHealthPanel = () => {
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-600">{migrationStats.skipped_count}</div>
                 <div className="text-sm text-muted-foreground">Skipped</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{migrationStats.already_processed_count || 0}</div>
+                <div className="text-sm text-muted-foreground">Already Processed</div>
               </div>
             </div>
             <div className="flex items-center gap-2 text-sm">
