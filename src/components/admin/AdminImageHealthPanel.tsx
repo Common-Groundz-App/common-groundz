@@ -28,6 +28,18 @@ export const AdminImageHealthPanel = () => {
   const { refreshEntityImage } = useEntityImageRefresh();
   const { toast } = useToast();
 
+  // Helper function to safely format the last checked date
+  const formatLastChecked = (lastChecked?: Date): string => {
+    if (!lastChecked) {
+      return 'Never';
+    }
+    try {
+      return lastChecked.toLocaleDateString();
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
   // Load health statistics and recent failures
   useEffect(() => {
     loadHealthData();
@@ -223,11 +235,9 @@ export const AdminImageHealthPanel = () => {
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       <span>Failures: {entity.consecutive_failures}</span>
-                      {entity.last_checked && (
-                        <span className="ml-3">
-                          Last checked: {entity.last_checked.toLocaleDateString()}
-                        </span>
-                      )}
+                      <span className="ml-3">
+                        Last checked: {formatLastChecked(entity.last_checked)}
+                      </span>
                     </div>
                   </div>
                   
