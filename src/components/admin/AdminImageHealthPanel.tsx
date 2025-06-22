@@ -112,7 +112,7 @@ export const AdminImageHealthPanel = () => {
           variant: 'destructive'
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Manual refresh error:', error);
       toast({
         title: 'Refresh error',
@@ -130,19 +130,6 @@ export const AdminImageHealthPanel = () => {
       case '403': return 'secondary';
       case 'timeout': return 'outline';
       default: return 'default';
-    }
-  };
-
-  const formatLastChecked = (lastChecked?: Date): string => {
-    if (!lastChecked) return 'Never';
-    
-    try {
-      // Ensure it's a Date object
-      const date = lastChecked instanceof Date ? lastChecked : new Date(lastChecked);
-      return date.toLocaleDateString();
-    } catch (error) {
-      console.warn('Error formatting date:', error);
-      return 'Unknown';
     }
   };
 
@@ -236,9 +223,11 @@ export const AdminImageHealthPanel = () => {
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       <span>Failures: {entity.consecutive_failures}</span>
-                      <span className="ml-3">
-                        Last checked: {formatLastChecked(entity.last_checked)}
-                      </span>
+                      {entity.last_checked && (
+                        <span className="ml-3">
+                          Last checked: {entity.last_checked.toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                   </div>
                   
