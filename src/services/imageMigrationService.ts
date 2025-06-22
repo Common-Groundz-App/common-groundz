@@ -66,7 +66,7 @@ class ImageMigrationService {
    */
   async createMigrationSession(totalEntities: number): Promise<string | null> {
     try {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('image_migration_sessions' as any)
         .insert({
           total_entities: totalEntities,
@@ -79,12 +79,12 @@ class ImageMigrationService {
         .select('id')
         .single();
 
-      if (error) {
-        console.error('[ImageMigration] Error creating migration session:', error);
+      if (response.error || !response.data) {
+        console.error('[ImageMigration] Error creating migration session:', response.error);
         return null;
       }
 
-      return data.id;
+      return response.data.id;
     } catch (error) {
       console.error('[ImageMigration] Error in createMigrationSession:', error);
       return null;
@@ -367,19 +367,26 @@ class ImageMigrationService {
    */
   async getLatestMigrationSession(): Promise<MigrationSession | null> {
     try {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('image_migration_sessions' as any)
         .select('*')
         .order('started_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (error) {
-        console.error('[ImageMigration] Error fetching latest migration session:', error);
+      if (response.error || !response.data) {
+        console.error('[ImageMigration] Error fetching latest migration session:', response.error);
         return null;
       }
 
-      return data as MigrationSession;
+      // Validate that the data has the expected structure
+      const sessionData = response.data;
+      if (!sessionData.id || typeof sessionData.total_entities !== 'number') {
+        console.error('[ImageMigration] Invalid migration session data structure');
+        return null;
+      }
+
+      return sessionData as MigrationSession;
     } catch (error) {
       console.error('[ImageMigration] Error in getLatestMigrationSession:', error);
       return null;
