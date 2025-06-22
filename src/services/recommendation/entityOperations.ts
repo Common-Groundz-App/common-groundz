@@ -1,7 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
-import { getEntityTypeFallbackImage } from '@/utils/imageUtils';
+import { getEntityTypeFallbackImage, saveExternalImageToStorage } from '@/utils/imageUtils';
 import { deferEntityImageRefresh } from '@/utils/imageRefresh';
 import { createEnhancedEntity, queueEntityForEnrichment } from '@/services/enhancedEntityService';
 
