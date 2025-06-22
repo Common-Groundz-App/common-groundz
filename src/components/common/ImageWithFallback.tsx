@@ -26,6 +26,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
+  const [proxyAttempted, setProxyAttempted] = useState(false);
 
   // Only block URLs that are known to definitely cause CORS issues (excluding OpenLibrary now)
   const shouldBlockUrl = (url: string): boolean => {
@@ -66,6 +67,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     // Reset error state when src changes
     if (src) {
       setHasError(false);
+      setProxyAttempted(false);
       
       if (!suppressConsoleErrors) {
         console.log('ImageWithFallback: Processing image URL:', src);
@@ -126,6 +128,17 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     if (!suppressConsoleErrors) {
       console.log('ImageWithFallback: Image load error, using fallback for type:', entityType, 'Original URL:', src);
+    }
+    
+    // If this was an OpenLibrary proxy attempt and it failed, try direct URL once
+    if (src && isOpenLibraryImage(src) && !proxyAttempted) {
+      setProxyAttempted(true);
+      const directUrl = ensureHttps(src);
+      if (directUrl && !suppressConsoleErrors) {
+        console.log('ImageWithFallback: Proxy failed, trying direct OpenLibrary URL:', directUrl);
+      }
+      setImgSrc(directUrl || actualFallback);
+      return;
     }
     
     setImgSrc(actualFallback);
