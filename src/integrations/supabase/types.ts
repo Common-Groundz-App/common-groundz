@@ -673,6 +673,89 @@ export type Database = {
         }
         Relationships: []
       }
+      image_migration_results: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_name: string
+          error_message: string | null
+          id: string
+          migrated_at: string
+          new_url: string | null
+          original_url: string
+          session_id: string
+          success: boolean
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_name: string
+          error_message?: string | null
+          id?: string
+          migrated_at?: string
+          new_url?: string | null
+          original_url: string
+          session_id: string
+          success: boolean
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_name?: string
+          error_message?: string | null
+          id?: string
+          migrated_at?: string
+          new_url?: string | null
+          original_url?: string
+          session_id?: string
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_migration_results_session"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "image_migration_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      image_migration_sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          failed_count: number
+          id: string
+          migrated_count: number
+          skipped_count: number
+          started_at: string
+          status: string
+          total_entities: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          failed_count?: number
+          id?: string
+          migrated_count?: number
+          skipped_count?: number
+          started_at?: string
+          status?: string
+          total_entities?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          failed_count?: number
+          id?: string
+          migrated_count?: number
+          skipped_count?: number
+          started_at?: string
+          status?: string
+          total_entities?: number
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_url: string | null

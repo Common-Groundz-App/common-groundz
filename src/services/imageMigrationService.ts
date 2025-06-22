@@ -67,7 +67,7 @@ class ImageMigrationService {
   async createMigrationSession(totalEntities: number): Promise<string | null> {
     try {
       const { data, error } = await supabase
-        .from('image_migration_sessions')
+        .from('image_migration_sessions' as any)
         .insert({
           total_entities: totalEntities,
           migrated_count: 0,
@@ -115,7 +115,7 @@ class ImageMigrationService {
       }
 
       const { error } = await supabase
-        .from('image_migration_sessions')
+        .from('image_migration_sessions' as any)
         .update(updateData)
         .eq('id', sessionId);
 
@@ -133,7 +133,7 @@ class ImageMigrationService {
   async saveMigrationResult(sessionId: string, result: MigrationResult): Promise<void> {
     try {
       const { error } = await supabase
-        .from('image_migration_results')
+        .from('image_migration_results' as any)
         .insert({
           session_id: sessionId,
           entity_id: result.entityId,
@@ -368,7 +368,7 @@ class ImageMigrationService {
   async getLatestMigrationSession(): Promise<MigrationSession | null> {
     try {
       const { data, error } = await supabase
-        .from('image_migration_sessions')
+        .from('image_migration_sessions' as any)
         .select('*')
         .order('started_at', { ascending: false })
         .limit(1)
@@ -379,7 +379,7 @@ class ImageMigrationService {
         return null;
       }
 
-      return data;
+      return data as MigrationSession;
     } catch (error) {
       console.error('[ImageMigration] Error in getLatestMigrationSession:', error);
       return null;
@@ -392,7 +392,7 @@ class ImageMigrationService {
   async getSessionMigrationResults(sessionId: string): Promise<MigrationResult[]> {
     try {
       const { data, error } = await supabase
-        .from('image_migration_results')
+        .from('image_migration_results' as any)
         .select('*')
         .eq('session_id', sessionId)
         .order('migrated_at', { ascending: false });
@@ -402,7 +402,7 @@ class ImageMigrationService {
         return [];
       }
 
-      return (data || []).map(result => ({
+      return (data || []).map((result: any) => ({
         entityId: result.entity_id,
         entityName: result.entity_name,
         originalUrl: result.original_url,
