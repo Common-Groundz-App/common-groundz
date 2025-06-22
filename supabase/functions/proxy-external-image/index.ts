@@ -1,8 +1,29 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Enhanced cache with performance tracking
+const imageCache = new Map<string, { 
+  data: Uint8Array; 
+  contentType: string; 
+  timestamp: number;
+  etag?: string;
+  lastModified?: string;
+  hitCount: number;
+}>()
+const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
+
+// Performance metrics
+interface RequestMetric {
+  startTime: number;
+  cacheHit: boolean;
+  success: boolean;
+  responseSize: number;
+  duration: number;
 }
 
 // Whitelist of allowed domains for security
@@ -49,7 +70,28 @@ function isAllowedDomain(url: string): boolean {
   }
 }
 
+function logPerformanceMetric(url: string, metric: RequestMetric) {
+  const status = metric.success ? '✓' : '✗'
+  const cache = metric.cacheHit ? '[CACHED]' : '[FRESH]'
+  const sizeMB = (metric.responseSize / (1024 * 1024)).toFixed(2)
+  
+  console.log(`🖼️  ${status} ${cache} ${metric.duration}ms ${sizeMB}MB - ${url}`)
+  
+  if (!metric.success) {
+    console.error(`❌ Proxy failed for: ${url}`)
+  }
+}
+
 serve(async (req) => {
+  const startTime = Date.now()
+  let metric: RequestMetric = {
+    startTime,
+    cacheHit: false,
+    success: false,
+    responseSize: 0,
+    duration: 0
+  }
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -60,6 +102,8 @@ serve(async (req) => {
     const imageUrl = url.searchParams.get('url')
     
     if (!imageUrl) {
+      metric.duration = Date.now() - startTime
+      logPerformanceMetric('', metric)
       return new Response(
         JSON.stringify({ error: 'Missing url parameter' }), 
         { 
@@ -72,6 +116,8 @@ serve(async (req) => {
     // Security check: only allow whitelisted domains
     if (!isAllowedDomain(imageUrl)) {
       console.warn('Blocked non-whitelisted domain:', imageUrl)
+      metric.duration = Date.now() - startTime
+      logPerformanceMetric(imageUrl, metric)
       return new Response(
         JSON.stringify({ error: 'Domain not allowed' }), 
         { 
@@ -81,7 +127,32 @@ serve(async (req) => {
       )
     }
 
-    console.log('Proxying external image:', imageUrl)
+    console.log('🔍 Proxying external image:', imageUrl)
+
+    // Check cache first with enhanced tracking
+    const cacheKey = imageUrl
+    const cached = imageCache.get(cacheKey)
+    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+      cached.hitCount++
+      metric.cacheHit = true
+      metric.success = true
+      metric.responseSize = cached.data.length
+      metric.duration = Date.now() - startTime
+      
+      logPerformanceMetric(imageUrl, metric)
+      
+      return new Response(cached.data, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': cached.contentType,
+          'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600',
+          'ETag': cached.etag || `"${cached.timestamp}"`,
+          'Last-Modified': cached.lastModified || new Date(cached.timestamp).toUTCString(),
+          'X-Cache': 'HIT',
+          'X-Cache-Hits': cached.hitCount.toString()
+        }
+      })
+    }
 
     // Fetch the image with timeout and proper headers
     const controller = new AbortController()
@@ -101,6 +172,8 @@ serve(async (req) => {
 
     if (!response.ok) {
       console.error('External image fetch failed:', response.status, response.statusText)
+      metric.duration = Date.now() - startTime
+      logPerformanceMetric(imageUrl, metric)
       return new Response(
         JSON.stringify({ error: `Failed to fetch image: ${response.status}` }), 
         { 
@@ -111,11 +184,14 @@ serve(async (req) => {
     }
 
     const imageData = await response.arrayBuffer()
+    const uint8Array = new Uint8Array(imageData)
     const contentType = response.headers.get('content-type') || 'image/jpeg'
 
     // Validate it's actually an image
     if (!contentType.startsWith('image/')) {
       console.error('Invalid content type:', contentType)
+      metric.duration = Date.now() - startTime
+      logPerformanceMetric(imageUrl, metric)
       return new Response(
         JSON.stringify({ error: 'Invalid image content type' }), 
         { 
@@ -125,18 +201,52 @@ serve(async (req) => {
       )
     }
 
-    // Return the image with proper headers including caching
-    return new Response(imageData, {
+    // Cache the image with enhanced metadata
+    const etag = response.headers.get('etag')
+    const lastModified = response.headers.get('last-modified')
+    
+    imageCache.set(cacheKey, {
+      data: uint8Array,
+      contentType,
+      timestamp: Date.now(),
+      etag: etag || undefined,
+      lastModified: lastModified || undefined,
+      hitCount: 0
+    })
+
+    // Clean up old cache entries (basic cleanup)
+    if (imageCache.size > 100) {
+      const now = Date.now()
+      for (const [key, value] of imageCache.entries()) {
+        if (now - value.timestamp > CACHE_TTL) {
+          imageCache.delete(key)
+        }
+      }
+    }
+
+    metric.success = true
+    metric.responseSize = uint8Array.length
+    metric.duration = Date.now() - startTime
+    logPerformanceMetric(imageUrl, metric)
+
+    // Return the image with enhanced cache headers
+    return new Response(uint8Array, {
       headers: {
         ...corsHeaders,
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
-        'Content-Length': imageData.byteLength.toString(),
+        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600',
+        'Content-Length': uint8Array.byteLength.toString(),
+        'ETag': etag || `"${Date.now()}"`,
+        'Last-Modified': lastModified || new Date().toUTCString(),
+        'X-Cache': 'MISS',
+        'X-Proxy-Performance': `${metric.duration}ms`
       }
     })
 
   } catch (error) {
     console.error('Error proxying external image:', error)
+    metric.duration = Date.now() - startTime
+    logPerformanceMetric(imageUrl || 'unknown', metric)
     
     if (error.name === 'AbortError') {
       return new Response(
