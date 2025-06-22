@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { imagePerformanceService } from './imagePerformanceService';
 
@@ -37,6 +36,29 @@ class ImageHealthService {
   private healthCheckResults: Map<string, ImageHealthCheck> = new Map();
 
   /**
+   * Type guard to safely convert Json to Record<string, number>
+   */
+  private isValidErrorBreakdown(value: any): value is Record<string, number> {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+    
+    return Object.entries(value).every(([key, val]) => 
+      typeof key === 'string' && typeof val === 'number'
+    );
+  }
+
+  /**
+   * Safely converts Json to Record<string, number>
+   */
+  private convertErrorBreakdown(value: any): Record<string, number> {
+    if (this.isValidErrorBreakdown(value)) {
+      return value;
+    }
+    return {};
+  }
+
+  /**
    * Gets the latest health session from the database
    */
   async getLatestHealthSession(): Promise<ImageHealthSession | null> {
@@ -53,7 +75,19 @@ class ImageHealthService {
         return null;
       }
 
-      return data;
+      if (!data) {
+        return null;
+      }
+
+      return {
+        id: data.id,
+        total_checked: data.total_checked,
+        healthy_count: data.healthy_count,
+        broken_count: data.broken_count,
+        error_breakdown: this.convertErrorBreakdown(data.error_breakdown),
+        started_at: data.started_at,
+        completed_at: data.completed_at
+      };
     } catch (error) {
       console.error('[ImageHealth] Error in getLatestHealthSession:', error);
       return null;
