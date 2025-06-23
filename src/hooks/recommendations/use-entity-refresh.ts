@@ -12,35 +12,12 @@ export const useEntityImageRefresh = () => {
 
   /**
    * Determines if an entity should use the edge function for image refresh
-   * based on its API source and metadata
+   * Now routes ALL entities through the edge function to avoid CORS issues
    */
   const shouldUseEdgeFunction = (entity: any): boolean => {
-    // Google Places entities
-    if (entity.api_source === 'google_places' && entity.api_ref) {
-      return true;
-    }
-    
-    // Google Books entities
-    if (entity.api_source === 'google_books' && entity.metadata?.google_books_id) {
-      return true;
-    }
-    
-    // OpenLibrary entities
-    if (entity.api_source === 'openlibrary' && entity.metadata?.openlibrary_id) {
-      return true;
-    }
-    
-    // Movie entities (TMDB)
-    if (entity.api_source === 'tmdb' && entity.metadata?.tmdb_id) {
-      return true;
-    }
-    
-    // Movie entities (OMDb)
-    if (entity.api_source === 'omdb' && entity.metadata?.imdb_id) {
-      return true;
-    }
-    
-    return false;
+    // Route all entities through the edge function for consistent behavior
+    // and to avoid CORS issues with external URLs
+    return true;
   };
 
   /**
@@ -54,7 +31,8 @@ export const useEntityImageRefresh = () => {
       return {
         ...baseRequest,
         placeId: entity.api_ref,
-        photoReference: entity.metadata?.photo_reference
+        photoReference: entity.metadata?.photo_reference,
+        apiSource: 'google_places'
       };
     }
     
@@ -85,17 +63,17 @@ export const useEntityImageRefresh = () => {
       };
     }
     
-    // For other API sources or fallback, use external image URL
+    // For all other entities (including products), use external image URL
     return {
       ...baseRequest,
       externalImageUrl: entity.image_url,
-      apiSource: entity.api_source
+      apiSource: entity.api_source || 'external'
     };
   };
 
   /**
    * Refreshes an entity's image using the unified edge function approach
-   * for API-sourced entities or direct storage migration for external URLs
+   * All entities now go through the edge function to avoid CORS issues
    */
   const refreshEntityImage = async (entityId: string, placeId?: string, photoReference?: string): Promise<string | null> => {
     if (!entityId) {
@@ -141,128 +119,63 @@ export const useEntityImageRefresh = () => {
         throw new Error('Entity not found');
       }
 
-      // Check if this entity should use the edge function
-      if (shouldUseEdgeFunction(entity)) {
-        console.log(`Using edge function for API-sourced entity: ${entity.api_source}`);
-        
-        // Get current session for edge function authorization
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          console.error('No active session found for edge function authorization');
-          throw new Error('Authentication required to refresh image');
-        }
-        
-        // Prepare request data based on entity type
-        const requestData = prepareEdgeFunctionRequest(entity);
-        
-        console.log(`Calling edge function with data:`, requestData);
-        
-        const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify(requestData)
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Error response from refresh-entity-image:', errorText);
-          let errorData;
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText || 'Failed to refresh entity image' };
-          }
-          throw new Error(errorData.error || 'Failed to refresh entity image');
-        }
-
-        const responseData = await response.json();
-        console.log('Successful edge function response:', responseData);
-        
-        const { imageUrl } = responseData;
-        
-        // Track successful refresh
-        imagePerformanceService.trackImageStorage(
-          'manual_refresh_success',
-          entityId,
-          imageUrl,
-          startTime,
-          true,
-          undefined,
-          { apiSource: entity.api_source, method: 'edge_function' }
-        );
-
-        console.log('API entity image refreshed successfully:', entityId);
-        return imageUrl;
-      } 
-      // For non-API entities, use direct storage migration
-      else {
-        console.log(`Using direct storage migration for non-API entity: ${entityId}`);
-        
-        if (!entity.image_url) {
-          console.warn('No image URL found for entity:', entityId);
-          throw new Error('No image URL found for this entity');
-        }
-
-        // Check if the image is already stored in our storage
-        if (isEntityImageMigrated(entity.image_url)) {
-          console.log('Image already saved in storage:', entity.image_url);
-          
-          // Track as already migrated
-          imagePerformanceService.trackImageStorage(
-            'already_migrated',
-            entityId,
-            entity.image_url,
-            startTime,
-            true,
-            undefined,
-            { entityName: entity.name }
-          );
-          
-          throw new Error('Image is already stored in local storage');
-        }
-
-        console.log(`Migrating external image to storage for entity ${entityId}`);
-
-        // Migrate the image to our storage
-        const newImageUrl = await saveExternalImageToStorage(entity.image_url, entityId);
-        
-        if (!newImageUrl) {
-          console.error('Failed to save entity image to storage');
-          throw new Error('Failed to save entity image to storage');
-        }
-        
-        console.log('Image saved successfully, updating entity record with new URL:', newImageUrl);
-        
-        // Update the entity record with the new image URL
-        const { error: updateError } = await supabase
-          .from('entities')
-          .update({ image_url: newImageUrl })
-          .eq('id', entityId);
-          
-        if (updateError) {
-          console.error(`Error updating entity: ${updateError.message}`);
-          throw new Error(`Error updating entity: ${updateError.message}`);
-        }
-
-        // Track successful migration
-        imagePerformanceService.trackImageStorage(
-          'migration_success',
-          entityId,
-          newImageUrl,
-          startTime,
-          true,
-          undefined,
-          { originalUrl: entity.image_url, entityName: entity.name }
-        );
-
-        console.log(`Image migrated successfully for "${entity.name}"`);
-        return newImageUrl;
+      // All entities now use the edge function for consistent behavior
+      console.log(`Using edge function for entity: ${entity.api_source || 'external'}`);
+      
+      // Get current session for edge function authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.error('No active session found for edge function authorization');
+        throw new Error('Authentication required to refresh image');
       }
+      
+      // Prepare request data based on entity type
+      const requestData = prepareEdgeFunctionRequest(entity);
+      
+      console.log(`Calling edge function with data:`, requestData);
+      
+      const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response from refresh-entity-image:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Failed to refresh entity image' };
+        }
+        throw new Error(errorData.error || 'Failed to refresh entity image');
+      }
+
+      const responseData = await response.json();
+      console.log('Successful edge function response:', responseData);
+      
+      const { imageUrl } = responseData;
+      
+      // Track successful refresh
+      imagePerformanceService.trackImageStorage(
+        'manual_refresh_success',
+        entityId,
+        imageUrl,
+        startTime,
+        true,
+        undefined,
+        { apiSource: entity.api_source, method: 'edge_function' }
+      );
+
+      console.log('Entity image refreshed successfully:', entityId);
+      return imageUrl;
+      
     } catch (error: any) {
       console.error('Error refreshing entity image:', error);
       

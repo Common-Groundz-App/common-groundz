@@ -36,6 +36,7 @@ async function saveImageToStorage(imageUrl: string, entityId: string, supabase: 
     const imageResponse = await fetch(imageUrl, {
       headers: {
         'Accept': 'image/*',
+        'User-Agent': 'Mozilla/5.0 (compatible; EntityApp/1.0)'
       }
     });
     
@@ -227,16 +228,36 @@ async function handleOmdbMovieEntity(entityId: string, imdbId: string, apiKey: s
   }
 }
 
-// Handle external image URLs (for non-API entities)
+// Handle external image URLs (improved for better compatibility)
 async function handleExternalImageUrl(entityId: string, imageUrl: string, supabase: any) {
   try {
     console.log(`Processing external image URL: ${imageUrl}`);
     
-    // For proxy URLs, use them directly for downloading
-    const downloadUrl = imageUrl;
+    // Clean the URL - remove any proxy wrapper if present
+    let cleanUrl = imageUrl;
     
-    // Save image to our storage
-    const storedImageUrl = await saveImageToStorage(downloadUrl, entityId, supabase);
+    // If it's a proxy URL, extract the original URL
+    if (imageUrl.includes('/functions/v1/proxy-')) {
+      try {
+        const urlObj = new URL(imageUrl);
+        const originalUrl = urlObj.searchParams.get('url');
+        if (originalUrl) {
+          cleanUrl = decodeURIComponent(originalUrl);
+          console.log(`Extracted original URL from proxy: ${cleanUrl}`);
+        }
+      } catch (e) {
+        console.warn('Failed to extract original URL from proxy, using as-is');
+      }
+    }
+    
+    // Ensure HTTPS for better compatibility
+    if (cleanUrl.startsWith('http://')) {
+      cleanUrl = cleanUrl.replace('http://', 'https://');
+      console.log(`Converted to HTTPS: ${cleanUrl}`);
+    }
+    
+    // Save image to our storage using the server-side fetch (no CORS issues)
+    const storedImageUrl = await saveImageToStorage(cleanUrl, entityId, supabase);
     
     if (!storedImageUrl) {
       throw new Error("Failed to save external image to storage");
@@ -479,7 +500,7 @@ serve(async (req) => {
       
       result = await handleOmdbMovieEntity(entityId, omdbId, OMDB_API_KEY, supabase);
     }
-    // Handle external image URLs (for non-API entities or proxy URLs)
+    // Handle external image URLs (including products and other non-API entities)
     else if (externalImageUrl) {
       result = await handleExternalImageUrl(entityId, externalImageUrl, supabase);
     }
