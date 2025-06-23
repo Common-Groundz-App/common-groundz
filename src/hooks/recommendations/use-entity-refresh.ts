@@ -35,6 +35,11 @@ export const useEntityImageRefresh = () => {
       return true;
     }
     
+    // Movie entities (OMDb)
+    if (entity.api_source === 'omdb' && entity.metadata?.imdb_id) {
+      return true;
+    }
+    
     return false;
   };
 
@@ -68,6 +73,15 @@ export const useEntityImageRefresh = () => {
         ...baseRequest,
         tmdbId: entity.metadata?.tmdb_id,
         apiSource: 'tmdb'
+      };
+    }
+    
+    // OMDb Movies
+    if (entity.api_source === 'omdb') {
+      return {
+        ...baseRequest,
+        omdbId: entity.metadata?.imdb_id,
+        apiSource: 'omdb'
       };
     }
     
