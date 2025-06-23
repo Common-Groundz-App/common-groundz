@@ -52,12 +52,16 @@ interface EntityStats {
 const getImageStatus = (imageUrl?: string) => {
   if (!imageUrl) return { status: 'none', color: 'bg-gray-500', label: 'No Image' };
   
-  if (imageUrl.includes('entity-images') || imageUrl.includes('storage.googleapis.com')) {
+  // Check for actual local storage URLs (not proxy URLs)
+  if (imageUrl.includes('entity-images') && 
+      (imageUrl.includes('storage.googleapis.com') || imageUrl.includes('supabase.co/storage')) &&
+      !imageUrl.includes('/functions/v1/proxy-')) {
     return { status: 'local', color: 'bg-green-500', label: 'Local Storage' };
   }
   
-  if (imageUrl.includes('/functions/v1/proxy-')) {
-    return { status: 'proxy', color: 'bg-yellow-500', label: 'Proxy URL' };
+  // Check for proxy URLs
+  if (imageUrl.includes('/functions/v1/proxy-') || imageUrl.includes('supabase.co/functions/v1/proxy-')) {
+    return { status: 'proxy', color: 'bg-yellow-500', label: 'Proxy URL (Needs Migration)' };
   }
   
   return { status: 'external', color: 'bg-red-500', label: 'External URL' };
@@ -170,19 +174,11 @@ export const AdminEntityManagementPanel = () => {
           e.id === entity.id ? { ...e, image_url: newImageUrl } : e
         );
         calculateStats(updatedEntities);
-      } else {
-        toast({
-          title: 'No Change',
-          description: `Image for ${entity.name} is already up to date`,
-        });
       }
+      // If newImageUrl is null, the error was already shown by the hook
     } catch (error) {
       console.error('Error refreshing image:', error);
-      toast({
-        title: 'Error',
-        description: `Failed to refresh image for ${entity.name}`,
-        variant: 'destructive'
-      });
+      // Error toast is already shown by the hook
     } finally {
       setRefreshingEntities(prev => {
         const newSet = new Set(prev);
@@ -464,7 +460,11 @@ export const AdminEntityManagementPanel = () => {
                       <Badge variant="outline">{entity.type}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`${imageStatus.color} text-white`}>
+                      <Badge 
+                        variant="outline" 
+                        className={`${imageStatus.color} text-white`}
+                        title={imageStatus.status === 'proxy' ? 'This is a proxy URL that needs to be migrated to local storage' : ''}
+                      >
                         {imageStatus.label}
                       </Badge>
                     </TableCell>
@@ -480,6 +480,13 @@ export const AdminEntityManagementPanel = () => {
                           variant="outline"
                           onClick={() => handleRefreshImage(entity)}
                           disabled={isRefreshing}
+                          title={
+                            imageStatus.status === 'local' 
+                              ? 'Image already in local storage' 
+                              : imageStatus.status === 'proxy'
+                              ? 'Migrate proxy URL to local storage'
+                              : 'Download external image to local storage'
+                          }
                         >
                           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                         </Button>
@@ -514,6 +521,14 @@ export const AdminEntityManagementPanel = () => {
                                   <label className="text-sm font-medium">Image URL</label>
                                   <div className="text-sm text-muted-foreground break-all bg-muted p-2 rounded">
                                     {entity.image_url}
+                                  </div>
+                                  <div className="mt-1">
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`${imageStatus.color} text-white`}
+                                    >
+                                      {imageStatus.label}
+                                    </Badge>
                                   </div>
                                 </div>
                               )}

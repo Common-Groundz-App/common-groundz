@@ -11,6 +11,19 @@ export const useEntityImageRefresh = () => {
   const { toast } = useToast();
 
   /**
+   * Extracts the original URL from a proxy URL
+   */
+  const extractOriginalUrl = (proxyUrl: string): string => {
+    try {
+      const url = new URL(proxyUrl);
+      const originalUrl = url.searchParams.get('url');
+      return originalUrl ? decodeURIComponent(originalUrl) : proxyUrl;
+    } catch {
+      return proxyUrl;
+    }
+  };
+
+  /**
    * Refreshes an entity's image by either fetching a new Google Places image
    * or downloading the existing external URL to our storage.
    * 
@@ -115,9 +128,7 @@ export const useEntityImageRefresh = () => {
           { placeId, newPhotoRef }
         );
 
-        // Only show toast for critical failures, keep successful refreshes silent
         console.log('Google Places image refreshed successfully for entity:', entityId);
-
         return imageUrl;
       } 
       // For non-Google Places entities, retrieve current image and migrate it
@@ -137,10 +148,10 @@ export const useEntityImageRefresh = () => {
 
         if (!entity?.image_url) {
           console.warn('No image URL found for entity:', entityId);
-          return null;
+          throw new Error('No image URL found for this entity');
         }
 
-        // Check if the image is already stored in our storage
+        // Check if the image is already stored in our storage (only true storage URLs)
         if (isEntityImageMigrated(entity.image_url)) {
           console.log('Image already saved in storage:', entity.image_url);
           
@@ -155,15 +166,17 @@ export const useEntityImageRefresh = () => {
             { entityName: entity.name }
           );
           
-          return entity.image_url;
+          throw new Error('Image is already stored in local storage');
         }
 
-        console.log(`Migrating external image to storage for entity ${entityId}: ${entity.image_url}`);
+        // Extract original URL if it's a proxy URL
+        const originalUrl = extractOriginalUrl(entity.image_url);
+        console.log(`Migrating image to storage for entity ${entityId}. Original URL: ${originalUrl}`);
 
-        // Migrate the external image to our storage
-        const newImageUrl = await saveExternalImageToStorage(entity.image_url, entityId);
+        // Migrate the image to our storage using the original URL
+        const newImageUrl = await saveExternalImageToStorage(originalUrl, entityId);
         
-        if (!newImageUrl) {
+        if (!newImageUrl || newImageUrl === originalUrl) {
           console.error('Failed to save entity image to storage');
           throw new Error('Failed to save entity image to storage');
         }
@@ -193,7 +206,6 @@ export const useEntityImageRefresh = () => {
         );
 
         console.log(`Image migrated successfully for "${entity.name}"`);
-        
         return newImageUrl;
       }
     } catch (error: any) {
@@ -210,14 +222,12 @@ export const useEntityImageRefresh = () => {
         { placeId, photoReference }
       );
       
-      // Only show toast for critical failures in admin context
-      if (error.message?.includes('Authentication') || error.message?.includes('Unauthorized')) {
-        toast({
-          title: 'Authentication Error',
-          description: 'Please sign in again to refresh images.',
-          variant: 'destructive'
-        });
-      }
+      // Show appropriate error message to user
+      toast({
+        title: 'Image Refresh Failed',
+        description: error.message || 'An unexpected error occurred while refreshing the image.',
+        variant: 'destructive'
+      });
       
       return null;
     } finally {
@@ -271,13 +281,23 @@ export const useEntityImageRefresh = () => {
 
   /**
    * Checks if an entity image is stored in our storage system
+   * Only returns true for actual storage URLs, not proxy URLs
    * 
    * @param imageUrl The image URL to check
    * @returns True if the image is stored in our system, false otherwise
    */
   const isEntityImageMigrated = (imageUrl?: string): boolean => {
     if (!imageUrl) return false;
-    return imageUrl.includes('entity-images') || imageUrl.includes('storage.googleapis.com');
+    
+    // Check for actual storage URLs (not proxy URLs)
+    const isStorageUrl = imageUrl.includes('entity-images') && 
+                        (imageUrl.includes('storage.googleapis.com') || imageUrl.includes('supabase.co/storage'));
+    
+    // Proxy URLs should be considered "not migrated"
+    const isProxyUrl = imageUrl.includes('/functions/v1/proxy-') || 
+                      imageUrl.includes('supabase.co/functions/v1/proxy-');
+    
+    return isStorageUrl && !isProxyUrl;
   };
 
   return { 
