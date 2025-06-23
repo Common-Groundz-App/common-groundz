@@ -11,34 +11,68 @@ export const useEntityImageRefresh = () => {
   const { toast } = useToast();
 
   /**
-   * Extracts the original URL from a proxy URL, but keeps Google Books proxy URLs intact
-   * since we need to use the proxy for downloading due to CORS restrictions
+   * Determines if an entity should use the edge function for image refresh
+   * based on its API source and metadata
    */
-  const extractOriginalUrl = (proxyUrl: string): string => {
-    try {
-      const url = new URL(proxyUrl);
-      
-      // For Google Books proxy URLs, keep using the proxy URL for downloading
-      if (proxyUrl.includes('/functions/v1/proxy-google-books')) {
-        return proxyUrl;
-      }
-      
-      // For other proxy URLs, extract the original URL
-      const originalUrl = url.searchParams.get('url');
-      return originalUrl ? decodeURIComponent(originalUrl) : proxyUrl;
-    } catch {
-      return proxyUrl;
+  const shouldUseEdgeFunction = (entity: any): boolean => {
+    // Google Places entities
+    if (entity.api_source === 'google_places' && entity.api_ref) {
+      return true;
     }
+    
+    // Google Books entities
+    if (entity.api_source === 'google_books' && entity.metadata?.google_books_id) {
+      return true;
+    }
+    
+    // OpenLibrary entities
+    if (entity.api_source === 'openlibrary' && entity.metadata?.openlibrary_id) {
+      return true;
+    }
+    
+    // Movie entities
+    if (entity.api_source === 'tmdb' && entity.metadata?.tmdb_id) {
+      return true;
+    }
+    
+    return false;
   };
 
   /**
-   * Refreshes an entity's image by either fetching a new Google Places image
-   * or downloading the existing external URL to our storage.
-   * 
-   * @param entityId The ID of the entity
-   * @param placeId Optional Google Places ID for Google Places entities
-   * @param photoReference Optional photo reference for Google Places images
-   * @returns The URL of the refreshed image or null if the refresh failed
+   * Prepares the request data for the edge function based on entity type and metadata
+   */
+  const prepareEdgeFunctionRequest = (entity: any) => {
+    const baseRequest = { entityId: entity.id };
+    
+    // Google Places
+    if (entity.api_source === 'google_places') {
+      return {
+        ...baseRequest,
+        placeId: entity.api_ref,
+        photoReference: entity.metadata?.photo_reference
+      };
+    }
+    
+    // Google Books
+    if (entity.api_source === 'google_books') {
+      return {
+        ...baseRequest,
+        googleBooksId: entity.metadata?.google_books_id,
+        apiSource: 'google_books'
+      };
+    }
+    
+    // For other API sources or fallback, use external image URL
+    return {
+      ...baseRequest,
+      externalImageUrl: entity.image_url,
+      apiSource: entity.api_source
+    };
+  };
+
+  /**
+   * Refreshes an entity's image using the unified edge function approach
+   * for API-sourced entities or direct storage migration for external URLs
    */
   const refreshEntityImage = async (entityId: string, placeId?: string, photoReference?: string): Promise<string | null> => {
     if (!entityId) {
@@ -50,7 +84,7 @@ export const useEntityImageRefresh = () => {
     const startTime = Date.now();
     
     try {
-      console.log(`Starting image refresh for entity ${entityId}`, { placeId, photoReference });
+      console.log(`Starting image refresh for entity ${entityId}`);
       
       // Track the refresh attempt
       imagePerformanceService.trackImageStorage(
@@ -66,17 +100,40 @@ export const useEntityImageRefresh = () => {
       // First, ensure the entity-images bucket has correct policies
       await ensureBucketPolicies('entity-images');
       
-      // For Google Places entities, use the edge function
-      if (placeId) {
-        console.log(`Refreshing Google Places image for entity ${entityId} with place ID ${placeId}`);
+      // Get entity data to determine refresh strategy
+      const { data: entity, error } = await supabase
+        .from('entities')
+        .select('*')
+        .eq('id', entityId)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error(`Error fetching entity: ${error.message}`);
+        throw new Error(`Error fetching entity: ${error.message}`);
+      }
+
+      if (!entity) {
+        console.warn('Entity not found:', entityId);
+        throw new Error('Entity not found');
+      }
+
+      // Check if this entity should use the edge function
+      if (shouldUseEdgeFunction(entity)) {
+        console.log(`Using edge function for API-sourced entity: ${entity.api_source}`);
         
-        // Get current session
+        // Get current session for edge function authorization
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
           console.error('No active session found for edge function authorization');
           throw new Error('Authentication required to refresh image');
         }
+        
+        // Prepare request data based on entity type
+        const requestData = prepareEdgeFunctionRequest(entity);
+        
+        console.log(`Calling edge function with data:`, requestData);
         
         const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
           method: 'POST',
@@ -85,11 +142,7 @@ export const useEntityImageRefresh = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
           },
-          body: JSON.stringify({
-            entityId,
-            placeId,
-            photoReference
-          })
+          body: JSON.stringify(requestData)
         });
 
         if (!response.ok) {
@@ -105,25 +158,9 @@ export const useEntityImageRefresh = () => {
         }
 
         const responseData = await response.json();
-        console.log('Successful image refresh response:', responseData);
+        console.log('Successful edge function response:', responseData);
         
-        const { imageUrl, photoReference: newPhotoRef } = responseData;
-        
-        // Update the photo_reference in the entity record
-        if (newPhotoRef && newPhotoRef !== photoReference) {
-          const { error: updateError } = await supabase
-            .from('entities')
-            .update({ 
-              metadata: {
-                photo_reference: newPhotoRef
-              }
-            })
-            .eq('id', entityId);
-            
-          if (updateError) {
-            console.warn(`Error updating photo reference: ${updateError.message}`);
-          }
-        }
+        const { imageUrl } = responseData;
         
         // Track successful refresh
         imagePerformanceService.trackImageStorage(
@@ -133,33 +170,22 @@ export const useEntityImageRefresh = () => {
           startTime,
           true,
           undefined,
-          { placeId, newPhotoRef }
+          { apiSource: entity.api_source, method: 'edge_function' }
         );
 
-        console.log('Google Places image refreshed successfully for entity:', entityId);
+        console.log('API entity image refreshed successfully:', entityId);
         return imageUrl;
       } 
-      // For non-Google Places entities, retrieve current image and migrate it
+      // For non-API entities, use direct storage migration
       else {
-        // Get current entity data
-        const { data: entity, error } = await supabase
-          .from('entities')
-          .select('image_url, name')
-          .eq('id', entityId)
-          .limit(1)
-          .maybeSingle();
-
-        if (error) {
-          console.error(`Error fetching entity: ${error.message}`);
-          throw new Error(`Error fetching entity: ${error.message}`);
-        }
-
-        if (!entity?.image_url) {
+        console.log(`Using direct storage migration for non-API entity: ${entityId}`);
+        
+        if (!entity.image_url) {
           console.warn('No image URL found for entity:', entityId);
           throw new Error('No image URL found for this entity');
         }
 
-        // Check if the image is already stored in our storage (only true storage URLs)
+        // Check if the image is already stored in our storage
         if (isEntityImageMigrated(entity.image_url)) {
           console.log('Image already saved in storage:', entity.image_url);
           
@@ -177,15 +203,12 @@ export const useEntityImageRefresh = () => {
           throw new Error('Image is already stored in local storage');
         }
 
-        // For Google Books proxy URLs, use the proxy URL directly for downloading
-        // For other proxy URLs, extract the original URL
-        const urlToUse = extractOriginalUrl(entity.image_url);
-        console.log(`Migrating image to storage for entity ${entityId}. URL to use: ${urlToUse}`);
+        console.log(`Migrating external image to storage for entity ${entityId}`);
 
         // Migrate the image to our storage
-        const newImageUrl = await saveExternalImageToStorage(urlToUse, entityId);
+        const newImageUrl = await saveExternalImageToStorage(entity.image_url, entityId);
         
-        if (!newImageUrl || newImageUrl === entity.image_url) {
+        if (!newImageUrl) {
           console.error('Failed to save entity image to storage');
           throw new Error('Failed to save entity image to storage');
         }
