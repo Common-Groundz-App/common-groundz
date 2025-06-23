@@ -10,6 +10,7 @@ import { AdminReviewsPanel } from '@/components/admin/AdminReviewsPanel';
 import { AdminEntitiesPanel } from '@/components/admin/AdminEntitiesPanel';
 import { AdminDashboardSummary } from '@/components/admin/AdminDashboardSummary';
 import { AdminImageHealthPanel } from '@/components/admin/AdminImageHealthPanel';
+import { AdminEntityManagementPanel } from '@/components/admin/AdminEntityManagementPanel';
 
 const AdminPortal = () => {
   const { user } = useAuth();
@@ -18,7 +19,7 @@ const AdminPortal = () => {
     <div className="min-h-screen bg-background">
       <NavBarComponent />
       
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-6">
           <Button asChild variant="ghost" className="mb-4">
             <Link to="/home" className="flex items-center gap-2">
@@ -60,9 +61,9 @@ const AdminPortal = () => {
               
               <div className="text-sm text-muted-foreground">
                 <p>
-                  This is Phase 4 of the admin system implementation. 
+                  This is Phase 5 of the admin system implementation. 
                   You can now manage dynamic reviews, their AI summaries, entity-level AI summaries, 
-                  perform bulk operations, and monitor image health across all entities.
+                  perform bulk operations, monitor image health, and manage entity image storage across all entities.
                 </p>
               </div>
               
@@ -82,6 +83,9 @@ const AdminPortal = () => {
 
           {/* Dashboard Summary Section */}
           <AdminDashboardSummary />
+
+          {/* Entity Management Section - NEW */}
+          <AdminEntityManagementPanel />
 
           {/* Image Health Monitoring Section */}
           <AdminImageHealthPanel />
