@@ -200,8 +200,8 @@ export const getEntityTypeFallbackImage = (entityType: string): string => {
 
 /**
  * Save an external image to Supabase storage with improved error handling and smart proxy routing
- * Enhanced with performance monitoring
- * @param imageUrl URL of the external image
+ * Enhanced with performance monitoring and proper Google Books handling
+ * @param imageUrl URL of the external image (can be original or proxy URL)
  * @param entityId ID of the entity to associate with the image
  * @returns Public URL of the stored image or null if failed
  */
@@ -242,7 +242,7 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
     }
     
     // Skip URLs that are already in our storage
-    if (secureUrl.includes('entity-images') || secureUrl.includes('storage.googleapis.com')) {
+    if (secureUrl.includes('entity-images') && secureUrl.includes('storage')) {
       console.log('🎯 Image already in storage, skipping:', secureUrl);
       imagePerformanceService.trackImageStorage(
         'save_external_image',
@@ -277,15 +277,18 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
     // Ensure bucket exists and has proper policies
     await ensureBucketForImage();
     
-    // Get the appropriate URL (proxy if needed)
-    const fetchUrl = getProxyUrlForImage(secureUrl);
+    // For Google Books proxy URLs, use the proxy URL directly
+    // For other images, get the appropriate URL (proxy if needed)
+    const fetchUrl = secureUrl.includes('/functions/v1/proxy-google-books') 
+      ? secureUrl 
+      : getProxyUrlForImage(secureUrl);
     const isProxied = fetchUrl !== secureUrl;
     console.log(`🌐 Using ${isProxied ? 'proxied' : 'direct'} URL:`, fetchUrl);
     
     // Fetch the image with improved error handling and retries
     const imageBlob = await fetchImageWithRetries(fetchUrl, 3);
     if (!imageBlob) {
-      console.warn('⚠️  Failed to fetch image after retries, keeping external URL:', secureUrl);
+      console.warn('⚠️  Failed to fetch image after retries:', secureUrl);
       imagePerformanceService.trackImageStorage(
         'save_external_image',
         entityId,
@@ -295,12 +298,12 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
         'Failed to fetch after retries',
         { fetchUrl, isProxied }
       );
-      return secureUrl; // Return original URL as fallback
+      return null; // Return null instead of original URL to properly indicate failure
     }
     
     // Upload to storage with retries
     const result = await uploadImageToStorageWithRetries(imageBlob, entityId, secureUrl, 2);
-    const success = result !== null && result !== secureUrl;
+    const success = result !== null && !result.includes('/functions/v1/proxy-');
     
     imagePerformanceService.trackImageStorage(
       'save_external_image',
@@ -329,7 +332,7 @@ export const saveExternalImageToStorage = async (imageUrl: string, entityId: str
       false,
       error instanceof Error ? error.message : 'Unknown error'
     );
-    return imageUrl; // Return original URL as fallback
+    return null; // Return null instead of original URL to properly indicate failure
   }
 };
 
@@ -561,8 +564,8 @@ async function uploadImageToStorageWithRetries(blob: Blob, entityId: string, ori
     }
   }
   
-  console.error('❌ All upload attempts failed, returning original URL as fallback');
-  return originalUrl; // Return original URL as final fallback
+  console.error('❌ All upload attempts failed');
+  return null; // Return null instead of original URL to properly indicate failure
 }
 
 /**

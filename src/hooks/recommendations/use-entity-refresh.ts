@@ -11,11 +11,19 @@ export const useEntityImageRefresh = () => {
   const { toast } = useToast();
 
   /**
-   * Extracts the original URL from a proxy URL
+   * Extracts the original URL from a proxy URL, but keeps Google Books proxy URLs intact
+   * since we need to use the proxy for downloading due to CORS restrictions
    */
   const extractOriginalUrl = (proxyUrl: string): string => {
     try {
       const url = new URL(proxyUrl);
+      
+      // For Google Books proxy URLs, keep using the proxy URL for downloading
+      if (proxyUrl.includes('/functions/v1/proxy-google-books')) {
+        return proxyUrl;
+      }
+      
+      // For other proxy URLs, extract the original URL
       const originalUrl = url.searchParams.get('url');
       return originalUrl ? decodeURIComponent(originalUrl) : proxyUrl;
     } catch {
@@ -169,14 +177,15 @@ export const useEntityImageRefresh = () => {
           throw new Error('Image is already stored in local storage');
         }
 
-        // Extract original URL if it's a proxy URL
-        const originalUrl = extractOriginalUrl(entity.image_url);
-        console.log(`Migrating image to storage for entity ${entityId}. Original URL: ${originalUrl}`);
+        // For Google Books proxy URLs, use the proxy URL directly for downloading
+        // For other proxy URLs, extract the original URL
+        const urlToUse = extractOriginalUrl(entity.image_url);
+        console.log(`Migrating image to storage for entity ${entityId}. URL to use: ${urlToUse}`);
 
-        // Migrate the image to our storage using the original URL
-        const newImageUrl = await saveExternalImageToStorage(originalUrl, entityId);
+        // Migrate the image to our storage
+        const newImageUrl = await saveExternalImageToStorage(urlToUse, entityId);
         
-        if (!newImageUrl || newImageUrl === originalUrl) {
+        if (!newImageUrl || newImageUrl === entity.image_url) {
           console.error('Failed to save entity image to storage');
           throw new Error('Failed to save entity image to storage');
         }
