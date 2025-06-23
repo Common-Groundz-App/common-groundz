@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.33.2";
 
@@ -16,6 +17,11 @@ function buildGooglePhotoUrl(photoReference: string, apiKey: string): string {
 // Build a Google Books image URL from book ID
 function buildGoogleBooksUrl(bookId: string, apiKey: string): string {
   return `https://www.googleapis.com/books/v1/volumes/${bookId}?key=${apiKey}&fields=volumeInfo/imageLinks`;
+}
+
+// Build a TMDB movie details URL from movie ID
+function buildTmdbMovieUrl(movieId: string, apiKey: string): string {
+  return `https://api.themoviedb.org/3/movie/${movieId}?api_key=${apiKey}`;
 }
 
 // Function to save an image from URL to our storage bucket
@@ -133,6 +139,46 @@ async function handleGoogleBooksEntity(entityId: string, googleBooksId: string, 
     return { imageUrl: storedImageUrl, metadata: { google_books_id: googleBooksId } };
   } catch (error) {
     console.error("Error handling Google Books entity:", error);
+    throw error;
+  }
+}
+
+// Handle TMDB movie entities
+async function handleTmdbMovieEntity(entityId: string, tmdbId: string, apiKey: string, supabase: any) {
+  try {
+    console.log(`Processing TMDB movie entity with ID: ${tmdbId}`);
+    
+    const movieUrl = buildTmdbMovieUrl(tmdbId, apiKey);
+    console.log(`Fetching movie details from: ${movieUrl}`);
+    
+    const response = await fetch(movieUrl);
+    
+    if (!response.ok) {
+      throw new Error(`TMDB API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.poster_path) {
+      throw new Error("No poster image found for this movie");
+    }
+    
+    // TMDB provides relative poster paths, we need to construct the full URL
+    // Using w500 size for good quality
+    const imageUrl = `https://image.tmdb.org/t/p/w500${data.poster_path}`;
+    
+    console.log(`Found movie poster URL: ${imageUrl}`);
+    
+    // Save image to our storage
+    const storedImageUrl = await saveImageToStorage(imageUrl, entityId, supabase);
+    
+    if (!storedImageUrl) {
+      throw new Error("Failed to save TMDB movie image to storage");
+    }
+    
+    return { imageUrl: storedImageUrl, metadata: { tmdb_id: tmdbId } };
+  } catch (error) {
+    console.error("Error handling TMDB movie entity:", error);
     throw error;
   }
 }
@@ -262,6 +308,7 @@ serve(async (req) => {
   try {
     const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
     const GOOGLE_BOOKS_API_KEY = Deno.env.get("GOOGLE_BOOKS_API_KEY");
+    const TMDB_API_KEY = Deno.env.get("TMDB_API_KEY");
     
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -275,9 +322,9 @@ serve(async (req) => {
 
     // Get request data
     const requestData = await req.json();
-    const { placeId, photoReference, entityId, googleBooksId, externalImageUrl, apiSource } = requestData;
+    const { placeId, photoReference, entityId, googleBooksId, tmdbId, externalImageUrl, apiSource } = requestData;
     
-    console.log("Request received:", { placeId, photoReference, entityId, googleBooksId, externalImageUrl, apiSource });
+    console.log("Request received:", { placeId, photoReference, entityId, googleBooksId, tmdbId, externalImageUrl, apiSource });
     
     if (!entityId) {
       return new Response(
@@ -371,13 +418,21 @@ serve(async (req) => {
       
       result = await handleGoogleBooksEntity(entityId, googleBooksId, GOOGLE_BOOKS_API_KEY, supabase);
     }
+    // Handle TMDB movie entities
+    else if (tmdbId) {
+      if (!TMDB_API_KEY) {
+        throw new Error("TMDB_API_KEY is not set");
+      }
+      
+      result = await handleTmdbMovieEntity(entityId, tmdbId, TMDB_API_KEY, supabase);
+    }
     // Handle external image URLs (for non-API entities or proxy URLs)
     else if (externalImageUrl) {
       result = await handleExternalImageUrl(entityId, externalImageUrl, supabase);
     }
     else {
       return new Response(
-        JSON.stringify({ error: "Either placeId/photoReference, googleBooksId, or externalImageUrl is required" }),
+        JSON.stringify({ error: "Either placeId/photoReference, googleBooksId, tmdbId, or externalImageUrl is required" }),
         { 
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" }

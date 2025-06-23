@@ -30,7 +30,7 @@ export const useEntityImageRefresh = () => {
       return true;
     }
     
-    // Movie entities
+    // Movie entities (TMDB)
     if (entity.api_source === 'tmdb' && entity.metadata?.tmdb_id) {
       return true;
     }
@@ -59,6 +59,15 @@ export const useEntityImageRefresh = () => {
         ...baseRequest,
         googleBooksId: entity.metadata?.google_books_id,
         apiSource: 'google_books'
+      };
+    }
+    
+    // TMDB Movies
+    if (entity.api_source === 'tmdb') {
+      return {
+        ...baseRequest,
+        tmdbId: entity.metadata?.tmdb_id,
+        apiSource: 'tmdb'
       };
     }
     
