@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -18,7 +17,8 @@ import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDial
 import NavBarComponent from '@/components/NavBarComponent';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { Entity, EntityType } from '@/services/recommendation/types';
-import { convertToEntity, stringToEntityType, entityTypeToString } from '@/utils/entityTypeUtils';
+import { convertToEntity, stringToEntityType, entityTypeToString, getSupportedEntityTypes } from '@/utils/entityTypeUtils';
+import type { Database } from '@/integrations/supabase/types';
 
 interface EntityFormData {
   name: string;
@@ -129,7 +129,7 @@ const AdminEntityEdit = () => {
       const updateData = {
         name: data.name,
         description: data.description,
-        type: entityTypeToString(data.type), // Convert EntityType to string
+        type: entityTypeToString(data.type) as Database["public"]["Enums"]["entity_type"],
         slug: data.slug,
         api_source: data.api_source || null,
         api_ref: data.api_ref || null,
@@ -275,6 +275,9 @@ const AdminEntityEdit = () => {
     );
   }
 
+  // Get only the supported entity types for the dropdown
+  const supportedEntityTypes = getSupportedEntityTypes();
+
   return (
     <div className="min-h-screen bg-background">
       <NavBarComponent />
@@ -345,7 +348,7 @@ const AdminEntityEdit = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.values(EntityType).map((type) => (
+                      {supportedEntityTypes.map((type) => (
                         <SelectItem key={type} value={type}>
                           {type.charAt(0).toUpperCase() + type.slice(1)}
                         </SelectItem>

@@ -62,23 +62,41 @@ export const stringToEntityType = (type: string): EntityType => {
   return typeMap[type.toLowerCase()] || EntityType.Product;
 };
 
+// Valid database entity types (matches Supabase entity_type enum)
+type DatabaseEntityType = "movie" | "book" | "food" | "product" | "place";
+
 /**
- * Converts EntityType enum back to database string format
+ * Converts EntityType enum to database string format
+ * Only returns the 5 types supported by the database schema
  */
-export const entityTypeToString = (type: EntityType): string => {
-  const typeMap: Record<EntityType, string> = {
+export const entityTypeToString = (type: EntityType): DatabaseEntityType => {
+  const typeMap: Record<EntityType, DatabaseEntityType> = {
     [EntityType.Movie]: 'movie',
     [EntityType.Book]: 'book',
     [EntityType.Food]: 'food',
     [EntityType.Product]: 'product',
     [EntityType.Place]: 'place',
-    [EntityType.Activity]: 'activity',
-    [EntityType.Music]: 'music',
-    [EntityType.Art]: 'art',
-    [EntityType.TV]: 'tv',
-    [EntityType.Drink]: 'drink',
-    [EntityType.Travel]: 'travel',
+    // Map unsupported types to 'product' as fallback
+    [EntityType.Activity]: 'product',
+    [EntityType.Music]: 'product',
+    [EntityType.Art]: 'product',
+    [EntityType.TV]: 'movie', // TV shows map to movie category
+    [EntityType.Drink]: 'food', // Drinks map to food category
+    [EntityType.Travel]: 'place', // Travel maps to place category
   };
   
   return typeMap[type] || 'product';
+};
+
+/**
+ * Gets the list of EntityTypes that are directly supported by the database
+ */
+export const getSupportedEntityTypes = (): EntityType[] => {
+  return [
+    EntityType.Movie,
+    EntityType.Book,
+    EntityType.Food,
+    EntityType.Product,
+    EntityType.Place
+  ];
 };
