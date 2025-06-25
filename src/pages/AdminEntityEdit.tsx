@@ -18,7 +18,7 @@ import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDial
 import NavBarComponent from '@/components/NavBarComponent';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { Entity, EntityType } from '@/services/recommendation/types';
-import { convertToEntity, stringToEntityType } from '@/utils/entityTypeUtils';
+import { convertToEntity, stringToEntityType, entityTypeToString } from '@/utils/entityTypeUtils';
 
 interface EntityFormData {
   name: string;
@@ -129,7 +129,7 @@ const AdminEntityEdit = () => {
       const updateData = {
         name: data.name,
         description: data.description,
-        type: data.type,
+        type: entityTypeToString(data.type), // Convert EntityType to string
         slug: data.slug,
         api_source: data.api_source || null,
         api_ref: data.api_ref || null,

@@ -61,3 +61,24 @@ export const stringToEntityType = (type: string): EntityType => {
   
   return typeMap[type.toLowerCase()] || EntityType.Product;
 };
+
+/**
+ * Converts EntityType enum back to database string format
+ */
+export const entityTypeToString = (type: EntityType): string => {
+  const typeMap: Record<EntityType, string> = {
+    [EntityType.Movie]: 'movie',
+    [EntityType.Book]: 'book',
+    [EntityType.Food]: 'food',
+    [EntityType.Product]: 'product',
+    [EntityType.Place]: 'place',
+    [EntityType.Activity]: 'activity',
+    [EntityType.Music]: 'music',
+    [EntityType.Art]: 'art',
+    [EntityType.TV]: 'tv',
+    [EntityType.Drink]: 'drink',
+    [EntityType.Travel]: 'travel',
+  };
+  
+  return typeMap[type] || 'product';
+};
