@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
+import { convertToEntities, convertToEntity } from '@/utils/entityTypeUtils';
 
 export const AdminEntityManagementPanel = () => {
   const [entities, setEntities] = useState<Entity[]>([]);
@@ -52,7 +53,7 @@ export const AdminEntityManagementPanel = () => {
 
       if (error) throw error;
 
-      setEntities(data || []);
+      setEntities(convertToEntities(data || []));
       
       if (data?.length === 0) {
         toast({
@@ -109,7 +110,7 @@ export const AdminEntityManagementPanel = () => {
 
       if (updatedEntity) {
         setEntities(prev => prev.map(entity => 
-          entity.id === entityId ? updatedEntity : entity
+          entity.id === entityId ? convertToEntity(updatedEntity) : entity
         ));
       }
     } catch (error) {
@@ -131,7 +132,7 @@ export const AdminEntityManagementPanel = () => {
 
       if (error) throw error;
 
-      setEntities(data || []);
+      setEntities(convertToEntities(data || []));
       
       toast({
         title: 'Loaded Entities',

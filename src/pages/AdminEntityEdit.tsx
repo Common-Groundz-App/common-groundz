@@ -18,6 +18,7 @@ import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDial
 import NavBarComponent from '@/components/NavBarComponent';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { Entity, EntityType } from '@/services/recommendation/types';
+import { convertToEntity, stringToEntityType } from '@/utils/entityTypeUtils';
 
 interface EntityFormData {
   name: string;
@@ -70,19 +71,20 @@ const AdminEntityEdit = () => {
 
         if (error) throw error;
 
-        setEntity(data);
+        const convertedEntity = convertToEntity(data);
+        setEntity(convertedEntity);
         
         // Populate form with entity data
-        setValue('name', data.name || '');
-        setValue('description', data.description || '');
-        setValue('type', data.type || EntityType.Product);
-        setValue('slug', data.slug || '');
-        setValue('api_source', data.api_source || '');
-        setValue('api_ref', data.api_ref || '');
-        setValue('website_url', data.website_url || '');
-        setValue('venue', data.venue || '');
-        setValue('metadata', JSON.stringify(data.metadata || {}, null, 2));
-        setValue('popularity_score', data.popularity_score || 0);
+        setValue('name', convertedEntity.name || '');
+        setValue('description', convertedEntity.description || '');
+        setValue('type', convertedEntity.type || EntityType.Product);
+        setValue('slug', convertedEntity.slug || '');
+        setValue('api_source', convertedEntity.api_source || '');
+        setValue('api_ref', convertedEntity.api_ref || '');
+        setValue('website_url', convertedEntity.website_url || '');
+        setValue('venue', convertedEntity.venue || '');
+        setValue('metadata', JSON.stringify(convertedEntity.metadata || {}, null, 2));
+        setValue('popularity_score', convertedEntity.popularity_score || 0);
         
       } catch (error) {
         console.error('Error loading entity:', error);
@@ -158,7 +160,7 @@ const AdminEntityEdit = () => {
         .single();
 
       if (updatedEntity) {
-        setEntity(updatedEntity);
+        setEntity(convertToEntity(updatedEntity));
       }
 
     } catch (error: any) {
@@ -223,7 +225,7 @@ const AdminEntityEdit = () => {
         .single();
 
       if (updatedEntity) {
-        setEntity(updatedEntity);
+        setEntity(convertToEntity(updatedEntity));
       }
     } catch (error) {
       console.error('Error refreshing image:', error);
