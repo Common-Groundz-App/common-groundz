@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Newspaper, Crown, Star, UsersRound } from 'lucide-react';
@@ -153,4 +151,3 @@ const ProfileContent = React.memo(({ profileUserId, defaultActiveTab = 'posts' }
 ProfileContent.displayName = 'ProfileContent';
 
 export default ProfileContent;
-
