@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Newspaper, Crown, Star, UsersRound } from 'lucide-react';
@@ -104,40 +105,42 @@ const ProfileContent = React.memo(({ profileUserId, defaultActiveTab = 'posts' }
           
           <div className="w-full md:flex-1 min-w-0">
             <ScrollArea className="w-full">
-              <TubelightTabs 
-                defaultValue={activeTab} 
-                onValueChange={handleTabChange}
-                items={tabItems}
-                className="mb-6"
-              >
-                <TabsContent value="posts">
-                  <ProfilePosts 
-                    profileUserId={profileUserIdToUse} 
-                    isOwnProfile={isOwnProfile} 
-                  />
-                </TabsContent>
-                
-                <TabsContent value="recommendations">
-                  <ProfileRecommendations 
-                    profileUserId={profileUserIdToUse}
-                    isOwnProfile={isOwnProfile}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="reviews">
-                  <ProfileReviews 
-                    profileUserId={profileUserIdToUse} 
-                    isOwnProfile={isOwnProfile}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="circles">
-                  <ProfileCircles 
-                    profileUserId={profileUserIdToUse} 
-                    isOwnProfile={isOwnProfile}
-                  />
-                </TabsContent>
-              </TubelightTabs>
+              <div className="mt-8">
+                <TubelightTabs 
+                  defaultValue={activeTab} 
+                  onValueChange={handleTabChange}
+                  items={tabItems}
+                  className="mb-6"
+                >
+                  <TabsContent value="posts">
+                    <ProfilePosts 
+                      profileUserId={profileUserIdToUse} 
+                      isOwnProfile={isOwnProfile} 
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="recommendations">
+                    <ProfileRecommendations 
+                      profileUserId={profileUserIdToUse}
+                      isOwnProfile={isOwnProfile}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="reviews">
+                    <ProfileReviews 
+                      profileUserId={profileUserIdToUse} 
+                      isOwnProfile={isOwnProfile}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="circles">
+                    <ProfileCircles 
+                      profileUserId={profileUserIdToUse} 
+                      isOwnProfile={isOwnProfile}
+                    />
+                  </TabsContent>
+                </TubelightTabs>
+              </div>
             </ScrollArea>
           </div>
         </div>
