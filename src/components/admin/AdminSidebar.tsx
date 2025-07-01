@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Shield, BarChart3, Database, FileText } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 
@@ -9,26 +9,56 @@ interface AdminSidebarProps {
 }
 
 const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
+  const [currentActiveTab, setCurrentActiveTab] = useState(activeTab);
+
+  // Sync with parent activeTab changes
+  useEffect(() => {
+    setCurrentActiveTab(activeTab);
+  }, [activeTab]);
+
   const navigationItems = [
     {
       name: 'Overview',
       url: '#overview',
       icon: BarChart3,
-      onClick: () => onTabChange('overview')
+      onClick: () => {
+        setCurrentActiveTab('Overview');
+        onTabChange('overview');
+      }
     },
     {
       name: 'Entity Management',
       url: '#entity-management',
       icon: Database,
-      onClick: () => onTabChange('entity-management')
+      onClick: () => {
+        setCurrentActiveTab('Entity Management');
+        onTabChange('entity-management');
+      }
     },
     {
       name: 'Content Management',
       url: '#content-management',
       icon: FileText,
-      onClick: () => onTabChange('content-management')
+      onClick: () => {
+        setCurrentActiveTab('Content Management');
+        onTabChange('content-management');
+      }
     }
   ];
+
+  // Map internal tab names to display names
+  const getDisplayTabName = (tabName: string) => {
+    switch (tabName) {
+      case 'overview':
+        return 'Overview';
+      case 'entity-management':
+        return 'Entity Management';
+      case 'content-management':
+        return 'Content Management';
+      default:
+        return 'Overview';
+    }
+  };
 
   return (
     <div className="relative">
@@ -40,7 +70,7 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       
       <VerticalTubelightNavbar
         items={navigationItems}
-        initialActiveTab={activeTab}
+        initialActiveTab={getDisplayTabName(activeTab)}
         className="fixed left-0 top-0 h-screen pt-4 pl-4"
       />
     </div>

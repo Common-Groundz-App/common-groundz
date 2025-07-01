@@ -25,6 +25,9 @@ export function NavBarComponent() {
     );
   }
 
+  // Check if we're on admin page to hide logo
+  const isAdminPage = location.pathname === '/admin';
+
   // Memoize the navigation items
   const navItems = React.useMemo(() => [
     { name: 'Home', url: '/home', icon: Home },
@@ -72,6 +75,7 @@ export function NavBarComponent() {
         initialActiveTab={activeTab}
         className="relative z-50 sticky top-0"
         hideHamburgerMenu={isProfilePage}
+        hideLogo={isAdminPage}
       />
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
     </>

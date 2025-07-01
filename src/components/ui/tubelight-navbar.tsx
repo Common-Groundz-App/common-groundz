@@ -24,13 +24,15 @@ interface NavBarProps {
   rightSection?: React.ReactNode;
   initialActiveTab?: string;
   hideHamburgerMenu?: boolean;
+  hideLogo?: boolean;
 }
 export function NavBar({
   items,
   className,
   rightSection,
   initialActiveTab,
-  hideHamburgerMenu = false
+  hideHamburgerMenu = false,
+  hideLogo = false
 }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const [scrolled, setScrolled] = useState(false);
@@ -86,17 +88,22 @@ export function NavBar({
     className
   )}>
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Logo Section */}
-        <div className="flex-shrink-0">
-          <Link to="/" className="flex items-center">
-            <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
-              <Logo size="md" />
-            </div>
-          </Link>
-        </div>
+        {/* Logo Section - conditionally rendered */}
+        {!hideLogo && (
+          <div className="flex-shrink-0">
+            <Link to="/" className="flex items-center">
+              <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
+                <Logo size="md" />
+              </div>
+            </Link>
+          </div>
+        )}
 
         {/* Navigation Items - Centered for Desktop */}
-        {!isSmallMobile ? <div className="flex-grow flex justify-center">
+        {!isSmallMobile ? <div className={cn(
+          "flex-grow flex", 
+          hideLogo ? "justify-start" : "justify-center"
+        )}>
             <div className={cn(
               "flex items-center gap-2 py-1 px-1 rounded-full shadow-lg transition-all duration-300",
               scrolled ? "bg-background/5 border border-border backdrop-blur-lg" : "bg-background/30 border border-white/10 backdrop-blur-md"
@@ -187,7 +194,7 @@ export function NavBar({
           </div>}
         
         {/* Right section for user menu */}
-        {!isSmallMobile && <div className="flex-shrink-0 w-[150px] flex justify-end">
+        {!isSmallMobile && !hideLogo && <div className="flex-shrink-0 w-[150px] flex justify-end">
           {rightSection}
         </div>}
       </div>
