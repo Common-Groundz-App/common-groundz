@@ -13,14 +13,11 @@ const Profile = () => {
   const [searchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'posts';
 
-  // Use the ID from params if provided, otherwise use current user's ID
-  const profileUserId = id || user?.id;
-
   return (
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
       <div className="flex-1">
-        <ProfileContent profileUserId={profileUserId} defaultActiveTab={activeTab} />
+        <ProfileContent profileUserId={id} defaultActiveTab={activeTab} />
       </div>
       <Footer />
       

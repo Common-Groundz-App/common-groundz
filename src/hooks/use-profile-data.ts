@@ -16,8 +16,7 @@ export const useProfileData = (userId?: string) => {
   const [error, setError] = useState<Error | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState<boolean>(false);
 
-  // Don't use fallback to current user - if no userId provided, this should error
-  const viewingUserId = userId;
+  const viewingUserId = userId || user?.id;
   
   // Use the enhanced profile service instead of direct fetching
   const { data: profile, isLoading } = useProfile(viewingUserId);
@@ -50,7 +49,7 @@ export const useProfileData = (userId?: string) => {
     setProfileMetadata
   } = useProfileMetadata();
 
-  // Fetch raw profile data to get cover_url - only for the specific user
+  // Fetch raw profile data to get cover_url
   const { data: rawProfile } = useQuery({
     queryKey: ['rawProfile', viewingUserId],
     queryFn: async () => {
@@ -93,14 +92,14 @@ export const useProfileData = (userId?: string) => {
   });
 
   useEffect(() => {
-    if (!user || !viewingUserId) return;
+    if (!user) return;
     
     try {
-      // Check if viewing own profile
-      setIsOwnProfile(viewingUserId === user.id);
+      const currentViewingUserId = userId || user.id;
+      setIsOwnProfile(!userId || userId === user.id);
       
       if (profile && rawProfile) {
-        console.log("Enhanced profile data loaded for user:", viewingUserId, profile);
+        console.log("Enhanced profile data loaded:", profile);
         console.log("Raw profile data loaded:", rawProfile);
         
         // Use displayName which now prioritizes first_name + last_name
@@ -111,9 +110,7 @@ export const useProfileData = (userId?: string) => {
           location: profile.location 
         });
         
-        // Set images for the specific user being viewed
         setInitialImages({ 
-          id: viewingUserId,
           avatar_url: rawProfile.avatar_url,
           cover_url: rawProfile.cover_url 
         });
@@ -122,7 +119,7 @@ export const useProfileData = (userId?: string) => {
       console.error('Error:', err);
       setError(err instanceof Error ? err : new Error('Failed to load profile data'));
     }
-  }, [user, viewingUserId, profile, rawProfile, setUsername, setProfileMetadata, setInitialImages]);
+  }, [user, userId, profile, rawProfile, setUsername, setProfileMetadata, setInitialImages]);
   
   // Update follower and following counts when data changes
   useEffect(() => {
@@ -154,6 +151,6 @@ export const useProfileData = (userId?: string) => {
     handleProfileImageChange,
     handleCoverImageChange,
     handleCoverImageUpdated,
-    handleSaveChanges: () => handleSaveChanges(viewingUserId || '')
+    handleSaveChanges: () => handleSaveChanges(user?.id || '')
   };
 };

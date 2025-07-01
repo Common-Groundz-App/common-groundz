@@ -80,7 +80,6 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
       <Card className="relative shadow-lg rounded-lg overflow-hidden">
         <div className="p-6 flex flex-col items-center">
           <ProfileAvatar 
-            userId={profileUserId}
             username={displayName}
             profileImage={avatarUrl || ''}
             isLoading={isLoading}

@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { LucideIcon, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -37,7 +37,6 @@ export function NavBar({
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const isSmallMobile = useIsMobile(650);
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (initialActiveTab) {
@@ -62,21 +61,8 @@ export function NavBar({
 
   const handleNavItemClick = (item: NavItem) => {
     setActiveTab(item.name);
-    
-    // Check if user is authenticated for protected routes
-    const protectedRoutes = ['/explore', '/profile', '/home'];
-    const isProtectedRoute = protectedRoutes.includes(item.url);
-    
-    if (isProtectedRoute && !user) {
-      // Redirect unauthenticated users to auth page
-      navigate('/auth');
-      return;
-    }
-    
     if (item.onClick) {
       item.onClick();
-    } else if (!item.url.startsWith('#')) {
-      navigate(item.url);
     }
   };
 
@@ -111,12 +97,21 @@ export function NavBar({
                       "text-foreground/80 hover:text-primary", 
                       isActive && "bg-muted text-primary")}
                     >
-                      <button className="flex items-center space-x-2">
-                        <span className="hidden md:inline">{item.name}</span>
-                        <span className="md:hidden">
-                          <Icon size={18} strokeWidth={2.5} />
-                        </span>
-                      </button>
+                      {item.url.startsWith('#') || item.onClick ? (
+                        <button className="flex items-center space-x-2" onClick={item.onClick}>
+                          <span className="hidden md:inline">{item.name}</span>
+                          <span className="md:hidden">
+                            <Icon size={18} strokeWidth={2.5} />
+                          </span>
+                        </button>
+                      ) : (
+                        <Link to={item.url} className="flex items-center space-x-2">
+                          <span className="hidden md:inline">{item.name}</span>
+                          <span className="md:hidden">
+                            <Icon size={18} strokeWidth={2.5} />
+                          </span>
+                        </Link>
+                      )}
                       {isActive && <motion.div layoutId="lamp" className="absolute inset-0 w-full bg-primary/10 rounded-full -z-10" initial={false} transition={{
                 type: "spring",
                 stiffness: 300,

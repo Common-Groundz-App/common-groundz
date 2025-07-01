@@ -1,64 +1,49 @@
 
-import React, { useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Toaster } from '@/components/ui/toaster';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { ContentViewerProvider } from '@/contexts/ContentViewerContext';
-import AuthErrorBoundary from '@/components/AuthErrorBoundary';
-import AuthInitializer from '@/components/AuthInitializer';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import AdminRoute from '@/components/AdminRoute';
-import Index from '@/pages/Index';
-import Feed from '@/pages/Feed';
-import Auth from '@/pages/Auth';
-import Profile from '@/pages/Profile';
-import Explore from '@/pages/Explore';
-import Settings from '@/pages/Settings';
-import Search from '@/pages/Search';
-import EntityDetail from '@/pages/EntityDetail';
-import PostView from '@/pages/PostView';
-import RecommendationView from '@/pages/RecommendationView';
-import ProductSearch from '@/pages/ProductSearch';
-import AdminPortal from '@/pages/AdminPortal';
-import NotFound from '@/pages/NotFound';
-import { preloadSounds } from '@/services/feedbackService';
-import { Howl } from 'howler';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ContentViewerProvider } from "@/contexts/ContentViewerContext";
+import AuthContextBoundary from "./components/AuthContextBoundary";
+import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
+import RenderProtection from "./components/RenderProtection";
+import Index from "./pages/Index";
+import Auth from "./pages/Auth";
+import Feed from "./pages/Feed";
+import Profile from "./pages/Profile";
+import EntityDetail from "./pages/EntityDetail";
+import RecommendationView from "./pages/RecommendationView";
+import PostView from "./pages/PostView";
+import Search from "./pages/Search";
+import ProductSearch from "./pages/ProductSearch";
+import Explore from "./pages/Explore";
+import Settings from "./pages/Settings";
+import AdminPortal from "./pages/AdminPortal";
+import AdminEntityEdit from "./pages/AdminEntityEdit";
+import NotFound from "./pages/NotFound";
 
-// Create a client
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+});
 
-function App() {
-  useEffect(() => {
-    // Preload sounds on mount
-    preloadSounds();
-
-    // Unlock audio context on first user interaction
-    const unlockAudio = () => {
-      try {
-        const silent = new Howl({ src: ['/sounds/like.mp3'], volume: 0 });
-        silent.play();
-        document.removeEventListener('click', unlockAudio);
-      } catch (error) {
-        console.error('Audio unlock failed:', error);
-      }
-    };
-
-    document.addEventListener('click', unlockAudio);
-
-    // Cleanup function to remove listener if component unmounts
-    return () => {
-      document.removeEventListener('click', unlockAudio);
-    };
-  }, []);
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ContentViewerProvider>
-          <AuthErrorBoundary>
-            <Router>
-              <AuthInitializer>
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
+      <ContentViewerProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <RenderProtection>
+              <AuthContextBoundary>
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
@@ -67,14 +52,34 @@ function App() {
                       <Feed />
                     </ProtectedRoute>
                   } />
-                  <Route path="/profile" element={
+                  <Route path="/profile/:username" element={
                     <ProtectedRoute>
                       <Profile />
                     </ProtectedRoute>
                   } />
-                  <Route path="/profile/:id" element={
+                  <Route path="/entity/:slugOrId" element={
                     <ProtectedRoute>
-                      <Profile />
+                      <EntityDetail />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/recommendations/:id" element={
+                    <ProtectedRoute>
+                      <RecommendationView />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/post/:id" element={
+                    <ProtectedRoute>
+                      <PostView />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/search" element={
+                    <ProtectedRoute>
+                      <Search />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/products" element={
+                    <ProtectedRoute>
+                      <ProductSearch />
                     </ProtectedRoute>
                   } />
                   <Route path="/explore" element={
@@ -87,51 +92,25 @@ function App() {
                       <Settings />
                     </ProtectedRoute>
                   } />
-                  <Route path="/search" element={
-                    <ProtectedRoute>
-                      <Search />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/search/:query" element={
-                    <ProtectedRoute>
-                      <Search />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/entity/:slug" element={
-                    <ProtectedRoute>
-                      <EntityDetail />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/post/:postId" element={
-                    <ProtectedRoute>
-                      <PostView />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/recommendations/:recommendationId" element={
-                    <ProtectedRoute>
-                      <RecommendationView />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/product-search/:query" element={
-                    <ProtectedRoute>
-                      <ProductSearch />
-                    </ProtectedRoute>
-                  } />
                   <Route path="/admin" element={
                     <AdminRoute>
                       <AdminPortal />
                     </AdminRoute>
                   } />
+                  <Route path="/admin/entities/:id/edit" element={
+                    <AdminRoute>
+                      <AdminEntityEdit />
+                    </AdminRoute>
+                  } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
-              </AuthInitializer>
-            </Router>
-            <Toaster />
-          </AuthErrorBoundary>
-        </ContentViewerProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  );
-}
+              </AuthContextBoundary>
+            </RenderProtection>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ContentViewerProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
+);
 
 export default App;
