@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -87,7 +86,10 @@ export function NavBar({
     scrolled ? "bg-background/90 backdrop-blur-md shadow-sm" : "bg-transparent", 
     className
   )}>
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className={cn(
+        "max-w-7xl mx-auto flex items-center",
+        hideLogo ? "justify-center" : "justify-between"
+      )}>
         {/* Logo Section - conditionally rendered */}
         {!hideLogo && (
           <div className="flex-shrink-0">
@@ -99,10 +101,10 @@ export function NavBar({
           </div>
         )}
 
-        {/* Navigation Items - Centered for Desktop */}
+        {/* Navigation Items - Centered */}
         {!isSmallMobile ? <div className={cn(
-          "flex-grow flex", 
-          hideLogo ? "justify-start" : "justify-center"
+          "flex items-center",
+          hideLogo ? "" : "flex-grow justify-center"
         )}>
             <div className={cn(
               "flex items-center gap-2 py-1 px-1 rounded-full shadow-lg transition-all duration-300",
@@ -193,10 +195,17 @@ export function NavBar({
             </Sheet>
           </div>}
         
-        {/* Right section for user menu */}
+        {/* Right section for user menu - positioned absolutely when logo is hidden */}
         {!isSmallMobile && !hideLogo && <div className="flex-shrink-0 w-[150px] flex justify-end">
           {rightSection}
         </div>}
+        
+        {/* Right section positioned absolutely when logo is hidden */}
+        {!isSmallMobile && hideLogo && rightSection && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2">
+            {rightSection}
+          </div>
+        )}
       </div>
     </div>;
 }
