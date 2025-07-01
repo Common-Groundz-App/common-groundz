@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,14 +28,27 @@ const ProfileAvatar = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
-  const { data: profile } = useProfile(userId || user?.id);
+  
+  // Use the specific userId passed in - don't fallback to current user
+  const targetUserId = userId;
+  const { data: profile } = useProfile(targetUserId);
   const { updateProfileCache } = useProfileCacheActions();
   
-  console.log("ProfileAvatar rendering with profileImage:", propProfileImage);
+  console.log("ProfileAvatar rendering for userId:", targetUserId, "with profileImage:", propProfileImage);
 
   const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user || !onProfileImageChange) return;
+    if (!file || !user || !onProfileImageChange || !targetUserId) return;
+    
+    // Only allow editing if this is the current user's profile
+    if (targetUserId !== user.id) {
+      toast({
+        title: 'Permission denied',
+        description: 'You can only edit your own profile picture.',
+        variant: 'destructive'
+      });
+      return;
+    }
     
     try {
       setUploading(true);
@@ -94,16 +108,19 @@ const ProfileAvatar = ({
     }
   };
 
+  // Only show edit controls if this is the current user's profile
+  const canEdit = isEditable && onProfileImageChange && user && targetUserId === user.id;
+
   return (
     <div className="relative mb-4">
       <div className="relative">
         <CommonProfileAvatar 
-          userId={userId || user?.id}
+          userId={targetUserId}
           size="xl"
           className="w-24 h-24 md:w-32 md:h-32 border-4 border-white"
         />
         
-        {isEditable && onProfileImageChange && (
+        {canEdit && (
           <>
             <label 
               htmlFor="profile-upload" 
