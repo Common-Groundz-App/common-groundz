@@ -31,17 +31,19 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
   ];
 
   return (
-    <VerticalTubelightNavbar
-      items={navigationItems}
-      initialActiveTab={activeTab}
-      className="fixed left-0 top-0 h-screen pt-4 pl-4"
-      rightSection={
-        <div className="flex items-center gap-2 text-primary">
-          <Shield className="h-4 w-4" />
-          <span className="text-sm font-medium">Admin</span>
-        </div>
-      }
-    />
+    <div className="relative">
+      {/* Admin Badge - positioned above the navbar */}
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2 text-primary bg-background/90 backdrop-blur-sm px-3 py-1 rounded-full border border-border">
+        <Shield className="h-4 w-4" />
+        <span className="text-sm font-medium">Admin</span>
+      </div>
+      
+      <VerticalTubelightNavbar
+        items={navigationItems}
+        initialActiveTab={activeTab}
+        className="fixed left-0 top-0 h-screen pt-4 pl-4"
+      />
+    </div>
   );
 };
 
