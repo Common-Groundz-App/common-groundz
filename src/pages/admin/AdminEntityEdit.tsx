@@ -16,26 +16,10 @@ import { supabase } from '@/integrations/supabase/client';
 import NavBarComponent from '@/components/NavBarComponent';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { Database } from '@/integrations/supabase/types';
 
-interface Entity {
-  id: string;
-  name: string;
-  type: string;
-  slug?: string;
-  description?: string;
-  image_url?: string;
-  website_url?: string;
-  venue?: string;
-  api_source?: string;
-  api_ref?: string;
-  metadata?: Record<string, any>;
-  is_deleted: boolean;
-  category_id?: string;
-  popularity_score?: number;
-  photo_reference?: string;
-  created_at: string;
-  updated_at: string;
-}
+// Use the exact type from Supabase
+type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
 
 const entityTypes = [
   'movie', 'book', 'food', 'product', 'place', 'activity', 'music', 'art', 'tv', 'drink', 'travel'
@@ -47,7 +31,7 @@ const AdminEntityEdit = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const [entity, setEntity] = useState<Entity | null>(null);
+  const [entity, setEntity] = useState<DatabaseEntity | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
@@ -86,7 +70,7 @@ const AdminEntityEdit = () => {
     }
   };
 
-  const handleInputChange = (field: keyof Entity, value: any) => {
+  const handleInputChange = (field: keyof DatabaseEntity, value: any) => {
     if (!entity) return;
     
     setEntity({

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,53 +29,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Link } from 'react-router-dom';
+import { Database } from '@/integrations/supabase/types';
 
-interface Entity {
-  id: string;
-  name: string;
-  type: string;
-  image_url?: string;
-  description?: string;
-  created_at: string;
-  updated_at: string;
-  api_source?: string;
-  api_ref?: string;
-  metadata?: Record<string, any>;
-  slug?: string;
-  is_deleted: boolean;
-  category_id?: string;
-  popularity_score?: number;
-  venue?: string;
-  website_url?: string;
-  photo_reference?: string;
-  // Enhanced metadata fields
-  authors?: string[];
-  publication_year?: number;
-  isbn?: string;
-  languages?: string[];
-  external_ratings?: Record<string, any>;
-  price_info?: Record<string, any>;
-  specifications?: Record<string, any>;
-  cast_crew?: Record<string, any>;
-  ingredients?: string[];
-  nutritional_info?: Record<string, any>;
-  last_enriched_at?: string;
-  enrichment_source?: string;
-  data_quality_score?: number;
-  // AI summary fields
-  ai_dynamic_review_summary?: string;
-  ai_dynamic_review_summary_last_generated_at?: string;
-  ai_dynamic_review_summary_model_used?: string;
-  // Trending fields
-  trending_score?: number;
-  last_trending_update?: string;
-  view_velocity?: number;
-  recent_views_24h?: number;
-  recent_likes_24h?: number;
-  recent_recommendations_24h?: number;
-  geographic_boost?: number;
-  seasonal_boost?: number;
-}
+// Use the exact type from Supabase
+type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
 
 interface EntityStats {
   totalEntities: number;
@@ -84,7 +42,7 @@ interface EntityStats {
   recentRefreshes: number;
 }
 
-const getImageStatus = (imageUrl?: string) => {
+const getImageStatus = (imageUrl?: string | null) => {
   if (!imageUrl) return { status: 'none', color: 'bg-gray-500', label: 'No Image' };
   
   // Check for actual local storage URLs (not proxy URLs)
@@ -103,7 +61,7 @@ const getImageStatus = (imageUrl?: string) => {
 };
 
 export const AdminEntityManagementPanel = () => {
-  const [entities, setEntities] = useState<Entity[]>([]);
+  const [entities, setEntities] = useState<DatabaseEntity[]>([]);
   const [stats, setStats] = useState<EntityStats>({
     totalEntities: 0,
     localStorageImages: 0,
@@ -119,7 +77,7 @@ export const AdminEntityManagementPanel = () => {
   const [refreshingEntities, setRefreshingEntities] = useState<Set<string>>(new Set());
   const [bulkRefreshProgress, setBulkRefreshProgress] = useState(0);
   const [showBulkProgress, setShowBulkProgress] = useState(false);
-  const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
+  const [editingEntity, setEditingEntity] = useState<DatabaseEntity | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
   
@@ -155,7 +113,7 @@ export const AdminEntityManagementPanel = () => {
     }
   };
 
-  const calculateStats = (entitiesList: Entity[]) => {
+  const calculateStats = (entitiesList: DatabaseEntity[]) => {
     const stats = entitiesList.reduce((acc, entity) => {
       acc.totalEntities++;
       
@@ -184,12 +142,12 @@ export const AdminEntityManagementPanel = () => {
     setStats(stats);
   };
 
-  const handleRefreshImage = async (entity: Entity) => {
+  const handleRefreshImage = async (entity: DatabaseEntity) => {
     setRefreshingEntities(prev => new Set(prev).add(entity.id));
     
     try {
-      const placeId = entity.metadata?.place_id;
-      const photoReference = entity.metadata?.photo_reference;
+      const placeId = entity.metadata && typeof entity.metadata === 'object' ? (entity.metadata as any)?.place_id : null;
+      const photoReference = entity.metadata && typeof entity.metadata === 'object' ? (entity.metadata as any)?.photo_reference : null;
       
       const newImageUrl = await refreshEntityImage(entity.id, placeId, photoReference);
       
