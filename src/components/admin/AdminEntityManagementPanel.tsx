@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { Link } from 'react-router-dom';
 
 interface Entity {
   id: string;
@@ -38,7 +39,41 @@ interface Entity {
   updated_at: string;
   api_source?: string;
   api_ref?: string;
-  metadata?: any;
+  metadata?: Record<string, any>;
+  slug?: string;
+  is_deleted: boolean;
+  category_id?: string;
+  popularity_score?: number;
+  venue?: string;
+  website_url?: string;
+  photo_reference?: string;
+  // Enhanced metadata fields
+  authors?: string[];
+  publication_year?: number;
+  isbn?: string;
+  languages?: string[];
+  external_ratings?: Record<string, any>;
+  price_info?: Record<string, any>;
+  specifications?: Record<string, any>;
+  cast_crew?: Record<string, any>;
+  ingredients?: string[];
+  nutritional_info?: Record<string, any>;
+  last_enriched_at?: string;
+  enrichment_source?: string;
+  data_quality_score?: number;
+  // AI summary fields
+  ai_dynamic_review_summary?: string;
+  ai_dynamic_review_summary_last_generated_at?: string;
+  ai_dynamic_review_summary_model_used?: string;
+  // Trending fields
+  trending_score?: number;
+  last_trending_update?: string;
+  view_velocity?: number;
+  recent_views_24h?: number;
+  recent_likes_24h?: number;
+  recent_recommendations_24h?: number;
+  geographic_boost?: number;
+  seasonal_boost?: number;
 }
 
 interface EntityStats {
@@ -489,6 +524,12 @@ export const AdminEntityManagementPanel = () => {
                           }
                         >
                           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        </Button>
+                        
+                        <Button size="sm" variant="outline" asChild>
+                          <Link to={`/admin/entities/${entity.id}/edit`}>
+                            <Edit className="h-4 w-4" />
+                          </Link>
                         </Button>
                         
                         <Dialog>

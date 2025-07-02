@@ -21,6 +21,7 @@ import PostView from '@/pages/PostView';
 import RecommendationView from '@/pages/RecommendationView';
 import ProductSearch from '@/pages/ProductSearch';
 import AdminPortal from '@/pages/AdminPortal';
+import AdminEntityEdit from '@/pages/admin/AdminEntityEdit';
 import NotFound from '@/pages/NotFound';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
@@ -120,6 +121,11 @@ function App() {
                   <Route path="/admin" element={
                     <AdminRoute>
                       <AdminPortal />
+                    </AdminRoute>
+                  } />
+                  <Route path="/admin/entities/:id/edit" element={
+                    <AdminRoute>
+                      <AdminEntityEdit />
                     </AdminRoute>
                   } />
                   <Route path="*" element={<NotFound />} />
