@@ -122,8 +122,8 @@ export function VerticalTubelightNavbar({
         "h-full w-16 xl:w-64 bg-background border-r flex flex-col",
         className
       )}>
-        {/* Logo Section */}
-        <div className="p-4 flex justify-center xl:justify-start flex-shrink-0">
+        {/* Logo Section - Made sticky to stay visible on scroll */}
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50 p-4 flex justify-center xl:justify-start flex-shrink-0">
           <Logo size={logoSize} />
         </div>
 
