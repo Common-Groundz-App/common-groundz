@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -103,7 +102,10 @@ const AdminPortal = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <NavBarComponent />
+      {/* Horizontal Navbar - Offset by sidebar width on xl+ screens */}
+      <div className="xl:ml-64">
+        <NavBarComponent />
+      </div>
       
       <div className="flex">
         {/* Admin Sidebar - Only show on xl+ screens */}
