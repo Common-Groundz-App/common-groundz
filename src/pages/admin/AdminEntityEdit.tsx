@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Trash2, Shield, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Shield, AlertTriangle, RotateCcw, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NavBarComponent from '@/components/NavBarComponent';
@@ -34,13 +34,17 @@ const AdminEntityEdit = () => {
   const [entity, setEntity] = useState<DatabaseEntity | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [processingDelete, setProcessingDelete] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [metadataText, setMetadataText] = useState('');
+  const [adminActions, setAdminActions] = useState<any[]>([]);
 
   useEffect(() => {
     if (id) {
       fetchEntity();
+      fetchAdminActions();
     }
   }, [id]);
 
@@ -67,6 +71,34 @@ const AdminEntityEdit = () => {
       navigate('/admin');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAdminActions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_actions')
+        .select('*')
+        .eq('target_id', id)
+        .eq('target_type', 'entity')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setAdminActions(data || []);
+    } catch (error) {
+      console.error('Error fetching admin actions:', error);
+    }
+  };
+
+  const checkAdminPermission = async () => {
+    try {
+      const { data, error } = await supabase.rpc('check_admin_permission');
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error checking admin permission:', error);
+      return false;
     }
   };
 
@@ -126,6 +158,16 @@ const AdminEntityEdit = () => {
   const handleSave = async () => {
     if (!entity || !validateForm()) return;
 
+    const hasAdminPermission = await checkAdminPermission();
+    if (!hasAdminPermission) {
+      toast({
+        title: 'Permission Denied',
+        description: 'You do not have admin permissions to edit entities',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase
@@ -141,7 +183,6 @@ const AdminEntityEdit = () => {
           api_source: entity.api_source?.trim() || null,
           api_ref: entity.api_ref?.trim() || null,
           metadata: entity.metadata,
-          is_deleted: entity.is_deleted,
           category_id: entity.category_id || null,
           popularity_score: entity.popularity_score || null,
           photo_reference: entity.photo_reference?.trim() || null,
@@ -157,11 +198,12 @@ const AdminEntityEdit = () => {
       });
 
       setShowSaveConfirm(false);
+      fetchAdminActions(); // Refresh audit trail
     } catch (error) {
       console.error('Error updating entity:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update entity',
+        description: 'Failed to update entity. Please check your permissions.',
         variant: 'destructive'
       });
     } finally {
@@ -172,7 +214,17 @@ const AdminEntityEdit = () => {
   const handleSoftDelete = async () => {
     if (!entity) return;
 
-    setSaving(true);
+    const hasAdminPermission = await checkAdminPermission();
+    if (!hasAdminPermission) {
+      toast({
+        title: 'Permission Denied',
+        description: 'You do not have admin permissions to delete entities',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setProcessingDelete(true);
     try {
       const { error } = await supabase
         .from('entities')
@@ -190,16 +242,62 @@ const AdminEntityEdit = () => {
       });
 
       setShowDeleteConfirm(false);
-      navigate('/admin');
+      setEntity({ ...entity, is_deleted: true });
+      fetchAdminActions(); // Refresh audit trail
     } catch (error) {
       console.error('Error soft deleting entity:', error);
       toast({
         title: 'Error',
-        description: 'Failed to soft delete entity',
+        description: 'Failed to soft delete entity. Please check your permissions.',
         variant: 'destructive'
       });
     } finally {
-      setSaving(false);
+      setProcessingDelete(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!entity) return;
+
+    const hasAdminPermission = await checkAdminPermission();
+    if (!hasAdminPermission) {
+      toast({
+        title: 'Permission Denied',
+        description: 'You do not have admin permissions to restore entities',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setProcessingDelete(true);
+    try {
+      const { error } = await supabase
+        .from('entities')
+        .update({
+          is_deleted: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', entity.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Entity restored successfully',
+      });
+
+      setShowRestoreConfirm(false);
+      setEntity({ ...entity, is_deleted: false });
+      fetchAdminActions(); // Refresh audit trail
+    } catch (error) {
+      console.error('Error restoring entity:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to restore entity. Please check your permissions.',
+        variant: 'destructive'
+      });
+    } finally {
+      setProcessingDelete(false);
     }
   };
 
@@ -282,7 +380,15 @@ const AdminEntityEdit = () => {
               
               <div className="flex items-center gap-3 mb-2">
                 <Shield className="h-8 w-8 text-primary" />
-                <h1 className="text-3xl font-bold">Edit Entity</h1>
+                <div className="flex-1">
+                  <h1 className="text-3xl font-bold">Edit Entity</h1>
+                  {entity.is_deleted && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                      <span className="text-sm text-destructive font-medium">This entity is soft deleted</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <p className="text-muted-foreground">
                 Update entity information and settings
@@ -307,12 +413,17 @@ const AdminEntityEdit = () => {
                         value={entity.name}
                         onChange={(e) => handleInputChange('name', e.target.value)}
                         placeholder="Entity name"
+                        disabled={entity.is_deleted}
                       />
                     </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="type">Type *</Label>
-                      <Select value={entity.type} onValueChange={(value) => handleInputChange('type', value)}>
+                      <Select 
+                        value={entity.type} 
+                        onValueChange={(value) => handleInputChange('type', value)}
+                        disabled={entity.is_deleted}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
@@ -334,6 +445,7 @@ const AdminEntityEdit = () => {
                       value={entity.slug || ''}
                       onChange={(e) => handleInputChange('slug', e.target.value)}
                       placeholder="URL-friendly identifier"
+                      disabled={entity.is_deleted}
                     />
                   </div>
 
@@ -345,6 +457,7 @@ const AdminEntityEdit = () => {
                       onChange={(e) => handleInputChange('description', e.target.value)}
                       placeholder="Entity description"
                       rows={3}
+                      disabled={entity.is_deleted}
                     />
                   </div>
                 </CardContent>
@@ -366,6 +479,7 @@ const AdminEntityEdit = () => {
                       value={entity.image_url || ''}
                       onChange={(e) => handleInputChange('image_url', e.target.value)}
                       placeholder="https://example.com/image.jpg"
+                      disabled={entity.is_deleted}
                     />
                     {entity.image_url && (
                       <div className="mt-2">
@@ -389,6 +503,7 @@ const AdminEntityEdit = () => {
                         value={entity.website_url || ''}
                         onChange={(e) => handleInputChange('website_url', e.target.value)}
                         placeholder="https://example.com"
+                        disabled={entity.is_deleted}
                       />
                     </div>
                     
@@ -399,6 +514,7 @@ const AdminEntityEdit = () => {
                         value={entity.venue || ''}
                         onChange={(e) => handleInputChange('venue', e.target.value)}
                         placeholder="Physical location or venue"
+                        disabled={entity.is_deleted}
                       />
                     </div>
                   </div>
@@ -422,6 +538,7 @@ const AdminEntityEdit = () => {
                         value={entity.api_source || ''}
                         onChange={(e) => handleInputChange('api_source', e.target.value)}
                         placeholder="google_places, omdb, etc."
+                        disabled={entity.is_deleted}
                       />
                     </div>
                     
@@ -432,6 +549,7 @@ const AdminEntityEdit = () => {
                         value={entity.api_ref || ''}
                         onChange={(e) => handleInputChange('api_ref', e.target.value)}
                         placeholder="External API ID or reference"
+                        disabled={entity.is_deleted}
                       />
                     </div>
                   </div>
@@ -443,6 +561,7 @@ const AdminEntityEdit = () => {
                       value={entity.photo_reference || ''}
                       onChange={(e) => handleInputChange('photo_reference', e.target.value)}
                       placeholder="Google Places photo reference"
+                      disabled={entity.is_deleted}
                     />
                   </div>
 
@@ -455,6 +574,7 @@ const AdminEntityEdit = () => {
                       placeholder='{"key": "value"}'
                       rows={8}
                       className="font-mono text-sm"
+                      disabled={entity.is_deleted}
                     />
                     <p className="text-xs text-muted-foreground">
                       Must be valid JSON format
@@ -463,30 +583,69 @@ const AdminEntityEdit = () => {
                 </CardContent>
               </Card>
 
-              {/* Settings */}
+              {/* Entity Status */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Settings</CardTitle>
+                  <CardTitle>Entity Status</CardTitle>
                   <CardDescription>
-                    Entity status and configuration
+                    Current entity status and lifecycle management
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
                     <div className="space-y-0.5">
-                      <Label htmlFor="is_deleted">Soft Delete</Label>
+                      <Label className="text-base font-medium">Current Status</Label>
                       <p className="text-sm text-muted-foreground">
-                        Mark this entity as deleted (hidden from public view)
+                        This entity is currently {entity.is_deleted ? 'soft deleted' : 'active'}
                       </p>
                     </div>
-                    <Switch
-                      id="is_deleted"
-                      checked={entity.is_deleted}
-                      onCheckedChange={(checked) => handleInputChange('is_deleted', checked)}
-                    />
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={entity.is_deleted}
+                        disabled={true}
+                        className="data-[state=checked]:bg-destructive"
+                      />
+                      <span className={`text-sm font-medium ${entity.is_deleted ? 'text-destructive' : 'text-green-600'}`}>
+                        {entity.is_deleted ? 'Deleted' : 'Active'}
+                      </span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Audit Trail */}
+              {adminActions.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <History className="h-5 w-5" />
+                      Admin Actions History
+                    </CardTitle>
+                    <CardDescription>
+                      Recent administrative actions performed on this entity
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {adminActions.map((action) => (
+                        <div key={action.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{action.action_type.replace('_', ' ').toUpperCase()}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(action.created_at).toLocaleString()}
+                            </p>
+                            {action.details && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Previous state: {action.details.previous_state}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center justify-between pt-6 border-t">
@@ -495,58 +654,90 @@ const AdminEntityEdit = () => {
                 </Button>
                 
                 <div className="flex gap-2">
-                  <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-                    <DialogTrigger asChild>
-                      <Button variant="destructive" disabled={saving}>
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Soft Delete
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <AlertTriangle className="h-5 w-5 text-destructive" />
-                          Confirm Soft Delete
-                        </DialogTitle>
-                        <DialogDescription>
-                          This will mark the entity "{entity.name}" as deleted. It will be hidden from public view but can be restored later.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
-                          Cancel
+                  {entity.is_deleted ? (
+                    <Dialog open={showRestoreConfirm} onOpenChange={setShowRestoreConfirm}>
+                      <DialogTrigger asChild>
+                        <Button variant="default" disabled={processingDelete}>
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Restore Entity
                         </Button>
-                        <Button variant="destructive" onClick={handleSoftDelete} disabled={saving}>
-                          {saving ? 'Deleting...' : 'Soft Delete'}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <RotateCcw className="h-5 w-5 text-green-600" />
+                            Confirm Entity Restore
+                          </DialogTitle>
+                          <DialogDescription>
+                            This will restore the entity "{entity.name}" and make it visible again. The entity will be active and accessible to users.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex justify-end gap-2 pt-4">
+                          <Button variant="outline" onClick={() => setShowRestoreConfirm(false)}>
+                            Cancel
+                          </Button>
+                          <Button onClick={handleRestore} disabled={processingDelete}>
+                            {processingDelete ? 'Restoring...' : 'Restore Entity'}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  ) : (
+                    <>
+                      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                        <DialogTrigger asChild>
+                          <Button variant="destructive" disabled={processingDelete}>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Soft Delete
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                              <AlertTriangle className="h-5 w-5 text-destructive" />
+                              Confirm Soft Delete
+                            </DialogTitle>
+                            <DialogDescription>
+                              This will mark the entity "{entity.name}" as deleted. It will be hidden from public view but can be restored later. This action is logged in the audit trail.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                              Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={handleSoftDelete} disabled={processingDelete}>
+                              {processingDelete ? 'Deleting...' : 'Soft Delete'}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
 
-                  <Dialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
-                    <DialogTrigger asChild>
-                      <Button disabled={saving}>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Confirm Changes</DialogTitle>
-                        <DialogDescription>
-                          Are you sure you want to save the changes to "{entity.name}"?
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="outline" onClick={() => setShowSaveConfirm(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleSave} disabled={saving}>
-                          {saving ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                      <Dialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
+                        <DialogTrigger asChild>
+                          <Button disabled={saving}>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Confirm Changes</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to save the changes to "{entity.name}"?
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="outline" onClick={() => setShowSaveConfirm(false)}>
+                              Cancel
+                            </Button>
+                            <Button onClick={handleSave} disabled={saving}>
+                              {saving ? 'Saving...' : 'Save Changes'}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

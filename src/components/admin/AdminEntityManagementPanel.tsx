@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import { 
   RefreshCw, 
   Search, 
@@ -22,7 +21,9 @@ import {
   AlertCircle, 
   ExternalLink,
   Upload,
-  MoreHorizontal
+  MoreHorizontal,
+  RotateCcw,
+  EyeOff
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +37,7 @@ type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
 
 interface EntityStats {
   totalEntities: number;
+  deletedEntities: number;
   localStorageImages: number;
   proxyImages: number;
   externalImages: number;
@@ -64,6 +66,7 @@ export const AdminEntityManagementPanel = () => {
   const [entities, setEntities] = useState<DatabaseEntity[]>([]);
   const [stats, setStats] = useState<EntityStats>({
     totalEntities: 0,
+    deletedEntities: 0,
     localStorageImages: 0,
     proxyImages: 0,
     externalImages: 0,
@@ -73,6 +76,7 @@ export const AdminEntityManagementPanel = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [showDeleted, setShowDeleted] = useState(false);
   const [selectedEntities, setSelectedEntities] = useState<Set<string>>(new Set());
   const [refreshingEntities, setRefreshingEntities] = useState<Set<string>>(new Set());
   const [bulkRefreshProgress, setBulkRefreshProgress] = useState(0);
@@ -86,7 +90,7 @@ export const AdminEntityManagementPanel = () => {
 
   useEffect(() => {
     fetchEntities();
-  }, []);
+  }, [showDeleted]);
 
   const fetchEntities = async () => {
     try {
@@ -94,7 +98,7 @@ export const AdminEntityManagementPanel = () => {
       const { data, error } = await supabase
         .from('entities')
         .select('*')
-        .eq('is_deleted', false)
+        .eq('is_deleted', showDeleted)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -113,8 +117,11 @@ export const AdminEntityManagementPanel = () => {
     }
   };
 
-  const calculateStats = (entitiesList: DatabaseEntity[]) => {
-    const stats = entitiesList.reduce((acc, entity) => {
+  const calculateStats = async (entitiesList: DatabaseEntity[]) => {
+    const activeEntities = entitiesList.filter(e => !e.is_deleted);
+    const deletedEntities = entitiesList.filter(e => e.is_deleted);
+    
+    const stats = activeEntities.reduce((acc, entity) => {
       acc.totalEntities++;
       
       const imageStatus = getImageStatus(entity.image_url);
@@ -133,6 +140,7 @@ export const AdminEntityManagementPanel = () => {
       return acc;
     }, {
       totalEntities: 0,
+      deletedEntities: deletedEntities.length,
       localStorageImages: 0,
       proxyImages: 0,
       externalImages: 0,
@@ -140,6 +148,35 @@ export const AdminEntityManagementPanel = () => {
     });
 
     setStats(stats);
+  };
+
+  const handleRestoreEntity = async (entity: DatabaseEntity) => {
+    try {
+      const { error } = await supabase
+        .from('entities')
+        .update({
+          is_deleted: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', entity.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: `Entity "${entity.name}" restored successfully`,
+      });
+
+      // Remove from local state
+      setEntities(prev => prev.filter(e => e.id !== entity.id));
+    } catch (error) {
+      console.error('Error restoring entity:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to restore entity. Please check your permissions.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleRefreshImage = async (entity: DatabaseEntity) => {
@@ -278,11 +315,18 @@ export const AdminEntityManagementPanel = () => {
       </Card>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{stats.totalEntities}</div>
-            <div className="text-sm text-muted-foreground">Total Entities</div>
+            <div className="text-sm text-muted-foreground">Active Entities</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-destructive">{stats.deletedEntities}</div>
+            <div className="text-sm text-muted-foreground">Deleted Entities</div>
           </CardContent>
         </Card>
         
@@ -320,6 +364,18 @@ export const AdminEntityManagementPanel = () => {
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center justify-between">
             <div className="flex flex-wrap gap-4 items-center">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="show-deleted"
+                  checked={showDeleted}
+                  onCheckedChange={setShowDeleted}
+                />
+                <Label htmlFor="show-deleted" className="flex items-center gap-2">
+                  <EyeOff className="h-4 w-4" />
+                  Show Deleted Entities
+                </Label>
+              </div>
+
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -357,14 +413,16 @@ export const AdminEntityManagementPanel = () => {
             </div>
             
             <div className="flex gap-2">
-              <Button
-                onClick={handleBulkRefresh}
-                disabled={selectedEntities.size === 0 || isRefreshing}
-                variant="outline"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                Refresh Selected ({selectedEntities.size})
-              </Button>
+              {!showDeleted && (
+                <Button
+                  onClick={handleBulkRefresh}
+                  disabled={selectedEntities.size === 0 || isRefreshing}
+                  variant="outline"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh Selected ({selectedEntities.size})
+                </Button>
+              )}
               
               <Button onClick={fetchEntities} variant="outline">
                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -396,12 +454,14 @@ export const AdminEntityManagementPanel = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={selectedEntities.size === filteredEntities.length && filteredEntities.length > 0}
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
+                {!showDeleted && (
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedEntities.size === filteredEntities.length && filteredEntities.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="w-16">Image</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
@@ -416,13 +476,15 @@ export const AdminEntityManagementPanel = () => {
                 const isRefreshing = refreshingEntities.has(entity.id);
                 
                 return (
-                  <TableRow key={entity.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedEntities.has(entity.id)}
-                        onCheckedChange={(checked) => handleSelectEntity(entity.id, checked as boolean)}
-                      />
-                    </TableCell>
+                  <TableRow key={entity.id} className={entity.is_deleted ? 'opacity-60' : ''}>
+                    {!showDeleted && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedEntities.has(entity.id)}
+                          onCheckedChange={(checked) => handleSelectEntity(entity.id, checked as boolean)}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="w-12 h-12 rounded-md overflow-hidden bg-muted">
                         {entity.image_url ? (
@@ -441,7 +503,14 @@ export const AdminEntityManagementPanel = () => {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{entity.name}</div>
+                        <div className="font-medium flex items-center gap-2">
+                          {entity.name}
+                          {entity.is_deleted && (
+                            <Badge variant="destructive" className="text-xs">
+                              Deleted
+                            </Badge>
+                          )}
+                        </div>
                         {entity.description && (
                           <div className="text-sm text-muted-foreground truncate max-w-48">
                             {entity.description}
@@ -468,21 +537,32 @@ export const AdminEntityManagementPanel = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleRefreshImage(entity)}
-                          disabled={isRefreshing}
-                          title={
-                            imageStatus.status === 'local' 
-                              ? 'Image already in local storage' 
-                              : imageStatus.status === 'proxy'
-                              ? 'Migrate proxy URL to local storage'
-                              : 'Download external image to local storage'
-                          }
-                        >
-                          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        </Button>
+                        {showDeleted ? (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => handleRestoreEntity(entity)}
+                            title="Restore this entity"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRefreshImage(entity)}
+                            disabled={isRefreshing}
+                            title={
+                              imageStatus.status === 'local' 
+                                ? 'Image already in local storage' 
+                                : imageStatus.status === 'proxy'
+                                ? 'Migrate proxy URL to local storage'
+                                : 'Download external image to local storage'
+                            }
+                          >
+                            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                          </Button>
+                        )}
                         
                         <Button size="sm" variant="outline" asChild>
                           <Link to={`/admin/entities/${entity.id}/edit`}>
@@ -508,9 +588,21 @@ export const AdminEntityManagementPanel = () => {
                                   <div className="text-sm text-muted-foreground">{entity.type}</div>
                                 </div>
                                 <div>
+                                  <label className="text-sm font-medium">Status</label>
+                                  <div className="text-sm text-muted-foreground">
+                                    {entity.is_deleted ? 'Soft Deleted' : 'Active'}
+                                  </div>
+                                </div>
+                                <div>
                                   <label className="text-sm font-medium">Created</label>
                                   <div className="text-sm text-muted-foreground">
                                     {new Date(entity.created_at).toLocaleString()}
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium">Updated</label>
+                                  <div className="text-sm text-muted-foreground">
+                                    {new Date(entity.updated_at).toLocaleString()}
                                   </div>
                                 </div>
                               </div>

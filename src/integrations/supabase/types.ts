@@ -1884,6 +1884,10 @@ export type Database = {
         Args: { user_a_id: string; user_b_id: string }
         Returns: number
       }
+      check_admin_permission: {
+        Args: { required_permission?: string }
+        Returns: boolean
+      }
       check_post_like: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: boolean
@@ -2087,9 +2091,22 @@ export type Database = {
         Args: { user_email: string }
         Returns: boolean
       }
+      is_current_user_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_query_fresh: {
         Args: { query_text: string; ttl_hours?: number }
         Returns: boolean
+      }
+      log_admin_action: {
+        Args: {
+          p_action_type: string
+          p_target_type: string
+          p_target_id: string
+          p_details?: Json
+        }
+        Returns: undefined
       }
       mark_notifications_as_read: {
         Args: { notification_ids: string[] }
