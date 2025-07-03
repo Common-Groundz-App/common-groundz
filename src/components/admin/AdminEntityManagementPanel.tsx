@@ -33,6 +33,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Link } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -90,6 +91,7 @@ export const AdminEntityManagementPanel = () => {
   
   const { toast } = useToast();
   const { refreshEntityImage, isRefreshing } = useEntityImageRefresh();
+  const { softDeleteEntity, restoreEntity, isProcessing } = useAdminEntityOperations();
 
   // Add authentication check
   useEffect(() => {
@@ -221,43 +223,29 @@ export const AdminEntityManagementPanel = () => {
     setStats(stats);
   };
 
+  const handleSoftDeleteEntity = async (entity: DatabaseEntity) => {
+    console.log('handleSoftDeleteEntity: Attempting to soft delete entity:', entity.id);
+    
+    const result = await softDeleteEntity(entity.id, entity.name);
+    
+    if (result.success) {
+      // Remove from local state since we're showing active entities
+      setEntities(prev => prev.filter(e => e.id !== entity.id));
+      
+      // Recalculate stats
+      const updatedEntities = entities.filter(e => e.id !== entity.id);
+      calculateStats(updatedEntities);
+    }
+  };
+
   const handleRestoreEntity = async (entity: DatabaseEntity) => {
     console.log('handleRestoreEntity: Attempting to restore entity:', entity.id);
     
-    const hasPermission = await checkAdminPermission();
-    if (!hasPermission) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('entities')
-        .update({
-          is_deleted: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', entity.id);
-
-      if (error) {
-        console.error('handleRestoreEntity error:', error);
-        throw error;
-      }
-
-      console.log('handleRestoreEntity: Successfully restored entity');
-      toast({
-        title: 'Success',
-        description: `Entity "${entity.name}" restored successfully`,
-      });
-
-      // Remove from local state
+    const result = await restoreEntity(entity.id, entity.name);
+    
+    if (result.success) {
+      // Remove from local state since we're showing deleted entities
       setEntities(prev => prev.filter(e => e.id !== entity.id));
-    } catch (error) {
-      console.error('Error restoring entity:', error);
-      toast({
-        title: 'Error',
-        description: `Failed to restore entity: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: 'destructive'
-      });
     }
   };
 
@@ -585,7 +573,8 @@ export const AdminEntityManagementPanel = () => {
             <TableBody>
               {paginatedEntities.map((entity) => {
                 const imageStatus = getImageStatus(entity.image_url);
-                const isRefreshing = refreshingEntities.has(entity.id);
+                const isRefreshingImage = refreshingEntities.has(entity.id);
+                const isProcessingEntity = isProcessing[entity.id];
                 
                 return (
                   <TableRow key={entity.id} className={entity.is_deleted ? 'opacity-60' : ''}>
@@ -654,26 +643,47 @@ export const AdminEntityManagementPanel = () => {
                             size="sm"
                             variant="default"
                             onClick={() => handleRestoreEntity(entity)}
+                            disabled={isProcessingEntity}
                             title="Restore this entity"
                           >
-                            <RotateCcw className="h-4 w-4" />
+                            {isProcessingEntity ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-4 w-4" />
+                            )}
                           </Button>
                         ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRefreshImage(entity)}
-                            disabled={isRefreshing}
-                            title={
-                              imageStatus.status === 'local' 
-                                ? 'Image already in local storage' 
-                                : imageStatus.status === 'proxy'
-                                ? 'Migrate proxy URL to local storage'
-                                : 'Download external image to local storage'
-                            }
-                          >
-                            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRefreshImage(entity)}
+                              disabled={isRefreshingImage}
+                              title={
+                                imageStatus.status === 'local' 
+                                  ? 'Image already in local storage' 
+                                  : imageStatus.status === 'proxy'
+                                  ? 'Migrate proxy URL to local storage'
+                                  : 'Download external image to local storage'
+                              }
+                            >
+                              <RefreshCw className={`h-4 w-4 ${isRefreshingImage ? 'animate-spin' : ''}`} />
+                            </Button>
+                            
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleSoftDeleteEntity(entity)}
+                              disabled={isProcessingEntity}
+                              title="Soft delete this entity"
+                            >
+                              {isProcessingEntity ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </>
                         )}
                         
                         <Button size="sm" variant="outline" asChild>
