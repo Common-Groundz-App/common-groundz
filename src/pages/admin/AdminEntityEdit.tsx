@@ -16,6 +16,7 @@ import NavBarComponent from '@/components/NavBarComponent';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Database } from '@/integrations/supabase/types';
+import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -29,11 +30,11 @@ const AdminEntityEdit = () => {
   const navigate = useNavigate();
   const { user, session } = useAuth();
   const { toast } = useToast();
+  const { softDeleteEntity, restoreEntity, isProcessing } = useAdminEntityOperations();
   
   const [entity, setEntity] = useState<DatabaseEntity | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [processingDelete, setProcessingDelete] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
@@ -243,92 +244,28 @@ const AdminEntityEdit = () => {
   const handleSoftDelete = async () => {
     if (!entity) return;
 
-    const hasAdminPermission = await checkAdminPermission();
-    if (!hasAdminPermission) {
-      return;
-    }
-
-    setProcessingDelete(true);
-    try {
-      console.log('handleSoftDelete: Attempting to soft delete entity:', entity.id);
-      
-      const { error } = await supabase
-        .from('entities')
-        .update({
-          is_deleted: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', entity.id);
-
-      if (error) {
-        console.error('handleSoftDelete error:', error);
-        throw error;
-      }
-
-      console.log('handleSoftDelete: Successfully soft deleted entity');
-      toast({
-        title: 'Success',
-        description: 'Entity soft deleted successfully',
-      });
-
+    console.log('handleSoftDelete: Using admin edge function for entity:', entity.id);
+    
+    const result = await softDeleteEntity(entity.id, entity.name);
+    
+    if (result.success) {
       setShowDeleteConfirm(false);
       setEntity({ ...entity, is_deleted: true });
       fetchAdminActions(); // Refresh audit trail
-    } catch (error) {
-      console.error('Error soft deleting entity:', error);
-      toast({
-        title: 'Error',
-        description: `Failed to soft delete entity: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: 'destructive'
-      });
-    } finally {
-      setProcessingDelete(false);
     }
   };
 
   const handleRestore = async () => {
     if (!entity) return;
 
-    const hasAdminPermission = await checkAdminPermission();
-    if (!hasAdminPermission) {
-      return;
-    }
-
-    setProcessingDelete(true);
-    try {
-      console.log('handleRestore: Attempting to restore entity:', entity.id);
-      
-      const { error } = await supabase
-        .from('entities')
-        .update({
-          is_deleted: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', entity.id);
-
-      if (error) {
-        console.error('handleRestore error:', error);
-        throw error;
-      }
-
-      console.log('handleRestore: Successfully restored entity');
-      toast({
-        title: 'Success',
-        description: 'Entity restored successfully',
-      });
-
+    console.log('handleRestore: Using admin edge function for entity:', entity.id);
+    
+    const result = await restoreEntity(entity.id, entity.name);
+    
+    if (result.success) {
       setShowRestoreConfirm(false);
       setEntity({ ...entity, is_deleted: false });
       fetchAdminActions(); // Refresh audit trail
-    } catch (error) {
-      console.error('Error restoring entity:', error);
-      toast({
-        title: 'Error',
-        description: `Failed to restore entity: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: 'destructive'
-      });
-    } finally {
-      setProcessingDelete(false);
     }
   };
 
@@ -728,7 +665,7 @@ const AdminEntityEdit = () => {
                   {entity.is_deleted ? (
                     <Dialog open={showRestoreConfirm} onOpenChange={setShowRestoreConfirm}>
                       <DialogTrigger asChild>
-                        <Button variant="default" disabled={processingDelete}>
+                        <Button variant="default" disabled={isProcessing[entity.id]}>
                           <RotateCcw className="h-4 w-4 mr-2" />
                           Restore Entity
                         </Button>
@@ -747,8 +684,8 @@ const AdminEntityEdit = () => {
                           <Button variant="outline" onClick={() => setShowRestoreConfirm(false)}>
                             Cancel
                           </Button>
-                          <Button onClick={handleRestore} disabled={processingDelete}>
-                            {processingDelete ? 'Restoring...' : 'Restore Entity'}
+                          <Button onClick={handleRestore} disabled={isProcessing[entity.id]}>
+                            {isProcessing[entity.id] ? 'Restoring...' : 'Restore Entity'}
                           </Button>
                         </div>
                       </DialogContent>
@@ -757,7 +694,7 @@ const AdminEntityEdit = () => {
                     <>
                       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
                         <DialogTrigger asChild>
-                          <Button variant="destructive" disabled={processingDelete}>
+                          <Button variant="destructive" disabled={isProcessing[entity.id]}>
                             <Trash2 className="h-4 w-4 mr-2" />
                             Soft Delete
                           </Button>
@@ -776,8 +713,8 @@ const AdminEntityEdit = () => {
                             <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
                               Cancel
                             </Button>
-                            <Button variant="destructive" onClick={handleSoftDelete} disabled={processingDelete}>
-                              {processingDelete ? 'Deleting...' : 'Soft Delete'}
+                            <Button variant="destructive" onClick={handleSoftDelete} disabled={isProcessing[entity.id]}>
+                              {isProcessing[entity.id] ? 'Deleting...' : 'Soft Delete'}
                             </Button>
                           </div>
                         </DialogContent>
