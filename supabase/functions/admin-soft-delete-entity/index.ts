@@ -19,9 +19,21 @@ Deno.serve(async (req) => {
 
   try {
     // Initialize Supabase client with service role key for elevated privileges
-    const supabase = createClient(
+    const supabaseServiceRole = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+
+    // Create a separate client for user validation to avoid context contamination
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         auth: {
           autoRefreshToken: false,
@@ -43,9 +55,9 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Verify the user's JWT token
+    // Verify the user's JWT token using the auth client
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
     
     if (authError || !user) {
       console.error('Authentication failed:', authError)
@@ -58,8 +70,10 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check if user is admin using the existing function
-    const { data: isAdmin, error: adminCheckError } = await supabase.rpc('is_current_user_admin')
+    // Check if user is admin using service role client with RPC call
+    const { data: isAdmin, error: adminCheckError } = await supabaseServiceRole.rpc('is_admin_user', {
+      user_email: user.email
+    })
     
     if (adminCheckError) {
       console.error('Admin check failed:', adminCheckError)
@@ -97,8 +111,8 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get entity details before updating
-    const { data: entity, error: fetchError } = await supabase
+    // Get entity details before updating using service role client
+    const { data: entity, error: fetchError } = await supabaseServiceRole
       .from('entities')
       .select('id, name, type, is_deleted')
       .eq('id', entityId)
@@ -136,9 +150,9 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Perform the soft delete/restore operation using service role
+    // Perform the soft delete/restore operation using service role client
     const newDeletedState = action === 'delete'
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseServiceRole
       .from('entities')
       .update({
         is_deleted: newDeletedState,
@@ -157,9 +171,9 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Log the admin action
+    // Log the admin action using service role client
     const actionType = action === 'delete' ? 'soft_delete_entity' : 'restore_entity'
-    const { error: logError } = await supabase
+    const { error: logError } = await supabaseServiceRole
       .from('admin_actions')
       .insert({
         admin_user_id: user.id,
