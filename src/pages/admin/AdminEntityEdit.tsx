@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Trash2, Shield, AlertTriangle, RotateCcw, History } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Shield, AlertCircle, AlertTriangle, RotateCcw, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NavBarComponent from '@/components/NavBarComponent';
@@ -28,7 +27,7 @@ const entityTypes = [
 const AdminEntityEdit = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { toast } = useToast();
   
   const [entity, setEntity] = useState<DatabaseEntity | null>(null);
@@ -42,11 +41,17 @@ const AdminEntityEdit = () => {
   const [adminActions, setAdminActions] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!user || !session) {
+      console.log('AdminEntityEdit: No authenticated user, redirecting to admin');
+      navigate('/admin');
+      return;
+    }
+
     if (id) {
       fetchEntity();
       fetchAdminActions();
     }
-  }, [id]);
+  }, [id, user, session]);
 
   const fetchEntity = async () => {
     try {
@@ -92,12 +97,35 @@ const AdminEntityEdit = () => {
   };
 
   const checkAdminPermission = async () => {
+    if (!user || !session) {
+      console.log('checkAdminPermission: No user or session available');
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in as an admin to perform this action.',
+        variant: 'destructive'
+      });
+      return false;
+    }
+
     try {
       const { data, error } = await supabase.rpc('check_admin_permission');
-      if (error) throw error;
+      if (error) {
+        console.error('Admin permission check error:', error);
+        toast({
+          title: 'Permission Check Failed',
+          description: `Error checking admin permissions: ${error.message}`,
+          variant: 'destructive'
+        });
+        return false;
+      }
       return data;
     } catch (error) {
       console.error('Error checking admin permission:', error);
+      toast({
+        title: 'Permission Error',
+        description: 'Failed to verify admin permissions. Please try again.',
+        variant: 'destructive'
+      });
       return false;
     }
   };
@@ -160,16 +188,13 @@ const AdminEntityEdit = () => {
 
     const hasAdminPermission = await checkAdminPermission();
     if (!hasAdminPermission) {
-      toast({
-        title: 'Permission Denied',
-        description: 'You do not have admin permissions to edit entities',
-        variant: 'destructive'
-      });
       return;
     }
 
     setSaving(true);
     try {
+      console.log('handleSave: Attempting to save entity:', entity.id);
+      
       const { error } = await supabase
         .from('entities')
         .update({
@@ -190,8 +215,12 @@ const AdminEntityEdit = () => {
         })
         .eq('id', entity.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('handleSave error:', error);
+        throw error;
+      }
 
+      console.log('handleSave: Successfully saved entity');
       toast({
         title: 'Success',
         description: 'Entity updated successfully',
@@ -203,7 +232,7 @@ const AdminEntityEdit = () => {
       console.error('Error updating entity:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update entity. Please check your permissions.',
+        description: `Failed to update entity: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: 'destructive'
       });
     } finally {
@@ -216,16 +245,13 @@ const AdminEntityEdit = () => {
 
     const hasAdminPermission = await checkAdminPermission();
     if (!hasAdminPermission) {
-      toast({
-        title: 'Permission Denied',
-        description: 'You do not have admin permissions to delete entities',
-        variant: 'destructive'
-      });
       return;
     }
 
     setProcessingDelete(true);
     try {
+      console.log('handleSoftDelete: Attempting to soft delete entity:', entity.id);
+      
       const { error } = await supabase
         .from('entities')
         .update({
@@ -234,8 +260,12 @@ const AdminEntityEdit = () => {
         })
         .eq('id', entity.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('handleSoftDelete error:', error);
+        throw error;
+      }
 
+      console.log('handleSoftDelete: Successfully soft deleted entity');
       toast({
         title: 'Success',
         description: 'Entity soft deleted successfully',
@@ -248,7 +278,7 @@ const AdminEntityEdit = () => {
       console.error('Error soft deleting entity:', error);
       toast({
         title: 'Error',
-        description: 'Failed to soft delete entity. Please check your permissions.',
+        description: `Failed to soft delete entity: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: 'destructive'
       });
     } finally {
@@ -261,16 +291,13 @@ const AdminEntityEdit = () => {
 
     const hasAdminPermission = await checkAdminPermission();
     if (!hasAdminPermission) {
-      toast({
-        title: 'Permission Denied',
-        description: 'You do not have admin permissions to restore entities',
-        variant: 'destructive'
-      });
       return;
     }
 
     setProcessingDelete(true);
     try {
+      console.log('handleRestore: Attempting to restore entity:', entity.id);
+      
       const { error } = await supabase
         .from('entities')
         .update({
@@ -279,8 +306,12 @@ const AdminEntityEdit = () => {
         })
         .eq('id', entity.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('handleRestore error:', error);
+        throw error;
+      }
 
+      console.log('handleRestore: Successfully restored entity');
       toast({
         title: 'Success',
         description: 'Entity restored successfully',
@@ -293,7 +324,7 @@ const AdminEntityEdit = () => {
       console.error('Error restoring entity:', error);
       toast({
         title: 'Error',
-        description: 'Failed to restore entity. Please check your permissions.',
+        description: `Failed to restore entity: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: 'destructive'
       });
     } finally {
@@ -321,6 +352,46 @@ const AdminEntityEdit = () => {
                   <p className="text-muted-foreground">Loading entity...</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || !session) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="xl:ml-64">
+          <NavBarComponent />
+        </div>
+        
+        <div className="flex">
+          <div className="hidden xl:block">
+            <AdminSidebar activeTab="entity-management" onTabChange={() => {}} />
+          </div>
+          
+          <div className="flex-1 xl:ml-64 min-w-0">
+            <div className="container mx-auto px-4 py-8 max-w-4xl">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                    Authentication Required
+                  </CardTitle>
+                  <CardDescription>
+                    You must be logged in as an admin to edit entities.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 text-center">
+                  <p className="text-muted-foreground mb-4">
+                    Please ensure you are properly authenticated before accessing admin features.
+                  </p>
+                  <Button asChild>
+                    <Link to="/admin">Return to Admin</Link>
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>

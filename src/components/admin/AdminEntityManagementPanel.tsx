@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +32,7 @@ import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refres
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Link } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -65,6 +65,7 @@ const getImageStatus = (imageUrl?: string | null) => {
 };
 
 export const AdminEntityManagementPanel = () => {
+  const { user, session } = useAuth();
   const [entities, setEntities] = useState<DatabaseEntity[]>([]);
   const [stats, setStats] = useState<EntityStats>({
     totalEntities: 0,
@@ -90,28 +91,96 @@ export const AdminEntityManagementPanel = () => {
   const { toast } = useToast();
   const { refreshEntityImage, isRefreshing } = useEntityImageRefresh();
 
+  // Add authentication check
   useEffect(() => {
+    if (!user || !session) {
+      console.log('AdminEntityManagementPanel: No authenticated user or session found');
+      toast({
+        title: 'Authentication Required',
+        description: 'Please ensure you are logged in as an admin user.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    console.log('AdminEntityManagementPanel: Authenticated user:', user.email);
     fetchEntities();
-  }, [showDeleted]);
+  }, [showDeleted, user, session]);
+
+  const checkAdminPermission = async () => {
+    if (!user || !session) {
+      console.log('checkAdminPermission: No user or session available');
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in as an admin to perform this action.',
+        variant: 'destructive'
+      });
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('check_admin_permission');
+      if (error) {
+        console.error('Admin permission check error:', error);
+        toast({
+          title: 'Permission Check Failed',
+          description: `Error checking admin permissions: ${error.message}`,
+          variant: 'destructive'
+        });
+        return false;
+      }
+      
+      if (!data) {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have admin permissions to perform this action.',
+          variant: 'destructive'
+        });
+        return false;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error checking admin permission:', error);
+      toast({
+        title: 'Permission Error',
+        description: 'Failed to verify admin permissions. Please try again.',
+        variant: 'destructive'
+      });
+      return false;
+    }
+  };
 
   const fetchEntities = async () => {
+    if (!user || !session) {
+      console.log('fetchEntities: No authenticated user, skipping fetch');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
+      console.log('fetchEntities: Fetching entities with showDeleted:', showDeleted);
+      
       const { data, error } = await supabase
         .from('entities')
         .select('*')
         .eq('is_deleted', showDeleted)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('fetchEntities error:', error);
+        throw error;
+      }
 
+      console.log('fetchEntities: Successfully fetched', data?.length || 0, 'entities');
       setEntities(data || []);
       calculateStats(data || []);
     } catch (error) {
       console.error('Error fetching entities:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch entities',
+        description: `Failed to fetch entities: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: 'destructive'
       });
     } finally {
@@ -153,6 +222,13 @@ export const AdminEntityManagementPanel = () => {
   };
 
   const handleRestoreEntity = async (entity: DatabaseEntity) => {
+    console.log('handleRestoreEntity: Attempting to restore entity:', entity.id);
+    
+    const hasPermission = await checkAdminPermission();
+    if (!hasPermission) {
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('entities')
@@ -162,8 +238,12 @@ export const AdminEntityManagementPanel = () => {
         })
         .eq('id', entity.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('handleRestoreEntity error:', error);
+        throw error;
+      }
 
+      console.log('handleRestoreEntity: Successfully restored entity');
       toast({
         title: 'Success',
         description: `Entity "${entity.name}" restored successfully`,
@@ -175,7 +255,7 @@ export const AdminEntityManagementPanel = () => {
       console.error('Error restoring entity:', error);
       toast({
         title: 'Error',
-        description: 'Failed to restore entity. Please check your permissions.',
+        description: `Failed to restore entity: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: 'destructive'
       });
     }
@@ -302,6 +382,33 @@ export const AdminEntityManagementPanel = () => {
     );
   }
 
+  // Show authentication warning if not properly authenticated
+  if (!user || !session) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            Authentication Required
+          </CardTitle>
+          <CardDescription>
+            You must be logged in as an admin to access this panel.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="text-center">
+            <p className="text-muted-foreground mb-4">
+              Please ensure you are properly authenticated before accessing admin features.
+            </p>
+            <Button onClick={() => window.location.reload()} variant="outline">
+              Refresh Page
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -309,6 +416,9 @@ export const AdminEntityManagementPanel = () => {
           <CardTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5" />
             Entity Management Dashboard
+            <Badge variant="outline" className="ml-2">
+              {user.email}
+            </Badge>
           </CardTitle>
           <CardDescription>
             Manage all entities and their image storage status
