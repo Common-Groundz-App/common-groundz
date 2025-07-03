@@ -11,6 +11,7 @@ import { AdminEntitiesPanel } from '@/components/admin/AdminEntitiesPanel';
 import { AdminDashboardSummary } from '@/components/admin/AdminDashboardSummary';
 import { AdminImageHealthPanel } from '@/components/admin/AdminImageHealthPanel';
 import { AdminEntityManagementPanel } from '@/components/admin/AdminEntityManagementPanel';
+import { AdminDebugPanel } from '@/components/admin/AdminDebugPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -61,6 +62,9 @@ const AdminPortal = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Debug Panel */}
+      <AdminDebugPanel />
 
       {/* Dashboard Summary Section */}
       <AdminDashboardSummary />
