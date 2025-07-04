@@ -24,7 +24,8 @@ import {
   Upload,
   MoreHorizontal,
   RotateCcw,
-  EyeOff
+  EyeOff,
+  Plus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +35,7 @@ import { Link } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations';
+import { CreateEntityDialog } from './CreateEntityDialog';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -88,6 +90,7 @@ export const AdminEntityManagementPanel = () => {
   const [editingEntity, setEditingEntity] = useState<DatabaseEntity | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   
   const { toast } = useToast();
   const { refreshEntityImage, isRefreshing } = useEntityImageRefresh();
@@ -397,22 +400,45 @@ export const AdminEntityManagementPanel = () => {
     );
   }
 
+  const handleEntityCreated = () => {
+    // Refresh the entities list
+    fetchEntities();
+  };
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            Entity Management Dashboard
-            <Badge variant="outline" className="ml-2">
-              {user.email}
-            </Badge>
-          </CardTitle>
-          <CardDescription>
-            Manage all entities and their image storage status
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Entity Management Dashboard
+                <Badge variant="outline" className="ml-2">
+                  {user.email}
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                Manage all entities and their image storage status
+              </CardDescription>
+            </div>
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              New Entity
+            </Button>
+          </div>
         </CardHeader>
       </Card>
+
+      {/* Create Entity Dialog */}
+      <CreateEntityDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onEntityCreated={handleEntityCreated}
+      />
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
