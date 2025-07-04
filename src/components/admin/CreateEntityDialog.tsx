@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import { Database } from '@/integrations/supabase/types';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -50,18 +51,25 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
     setIsLoading(true);
     
     try {
+      const currentUser = await supabase.auth.getUser();
+      
+      if (!currentUser.data.user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Create the entity object with proper typing
+      const entityData: Database['public']['Tables']['entities']['Insert'] = {
+        name: formData.name,
+        type: formData.type as Database['public']['Enums']['entity_type'],
+        description: formData.description || null,
+        venue: formData.venue || null,
+        image_url: formData.image_url || null,
+        created_by: currentUser.data.user.id
+      };
+
       const { data, error } = await supabase
         .from('entities')
-        .insert([
-          {
-            name: formData.name,
-            type: formData.type,
-            description: formData.description || null,
-            venue: formData.venue || null,
-            image_url: formData.image_url || null,
-            created_by: (await supabase.auth.getUser()).data.user?.id
-          }
-        ])
+        .insert(entityData)
         .select()
         .single();
 
