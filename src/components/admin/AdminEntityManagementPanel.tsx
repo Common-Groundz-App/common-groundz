@@ -60,10 +60,12 @@ export const AdminEntityManagementPanel = () => {
     'movie', 'book', 'food', 'product', 'place', 'activity', 'music', 'art', 'tv', 'drink', 'travel'
   ];
 
+  // Filter entities based on search query, type, and deleted status
   const filteredEntities = entities.filter(entity => {
     const matchesSearch = !searchQuery || 
       entity.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      entity.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      entity.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      false;
     
     const matchesType = filterType === 'all' || entity.type === filterType;
     const matchesDeleted = showDeleted ? entity.is_deleted : !entity.is_deleted;

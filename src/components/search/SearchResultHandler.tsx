@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntitySearch } from '@/hooks/use-entity-search';
@@ -22,6 +23,7 @@ interface SearchResultHandlerProps {
   onProcessingUpdate?: (message: string) => void;
   onProcessingEnd?: () => void;
   useExternalOverlay?: boolean; // Flag to use external overlay instead of internal
+  onEntityCreated?: () => void; // Callback for when entity is successfully created
 }
 
 export function SearchResultHandler({ 
@@ -32,7 +34,8 @@ export function SearchResultHandler({
   onProcessingStart,
   onProcessingUpdate,
   onProcessingEnd,
-  useExternalOverlay = false
+  useExternalOverlay = false,
+  onEntityCreated
 }: SearchResultHandlerProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -98,7 +101,13 @@ export function SearchResultHandler({
           const entityPath = `/entity/${identifier}`;
           
           console.log(`🔗 Navigating to existing entity: ${entityPath}`);
-          navigate(entityPath);
+          
+          // Call the entity created callback if provided (for admin creation dialog)
+          if (onEntityCreated) {
+            onEntityCreated();
+          } else {
+            navigate(entityPath);
+          }
           
           if (onClose) {
             onClose();
@@ -170,7 +179,13 @@ export function SearchResultHandler({
           const entityPath = `/entity/${identifier}`;
           
           console.log(`🔗 Navigating to new entity page: ${entityPath}`);
-          navigate(entityPath);
+          
+          // Call the entity created callback if provided (for admin creation dialog)
+          if (onEntityCreated) {
+            onEntityCreated();
+          } else {
+            navigate(entityPath);
+          }
           
           if (onClose) {
             onClose();
