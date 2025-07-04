@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Entity } from '@/services/recommendation/types';
+import { AdminEntity, UseAdminEntitiesReturn } from '@/types/admin';
 
 interface UseAdminEntitiesOptions {
   searchQuery?: string;
@@ -10,8 +10,8 @@ interface UseAdminEntitiesOptions {
   includeDeleted?: boolean;
 }
 
-export const useAdminEntities = (options: UseAdminEntitiesOptions = {}) => {
-  const [entities, setEntities] = useState<Entity[]>([]);
+export const useAdminEntities = (options: UseAdminEntitiesOptions = {}): UseAdminEntitiesReturn => {
+  const [entities, setEntities] = useState<AdminEntity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -32,7 +32,8 @@ export const useAdminEntities = (options: UseAdminEntitiesOptions = {}) => {
       }
 
       if (options.filterType && options.filterType !== 'all') {
-        query = query.eq('type', options.filterType);
+        // Cast to string to handle the enum type issue
+        query = query.eq('type', options.filterType as string);
       }
 
       const { data, error } = await query;
@@ -48,8 +49,9 @@ export const useAdminEntities = (options: UseAdminEntitiesOptions = {}) => {
         return;
       }
 
-      // Convert database entities to Entity type
-      const formattedEntities: Entity[] = data.map(entity => ({
+      // Convert database entities to AdminEntity type with proper type handling
+      const formattedEntities: AdminEntity[] = data.map(entity => ({
+        // Base Entity fields
         id: entity.id,
         name: entity.name,
         type: entity.type,
@@ -57,19 +59,35 @@ export const useAdminEntities = (options: UseAdminEntitiesOptions = {}) => {
         image_url: entity.image_url || undefined,
         venue: entity.venue || undefined,
         slug: entity.slug || undefined,
-        created_at: entity.created_at,
-        updated_at: entity.updated_at,
-        is_deleted: entity.is_deleted,
-        is_verified: entity.is_verified || false,
-        api_source: entity.api_source || undefined,
-        api_ref: entity.api_ref || undefined,
-        metadata: entity.metadata || {},
-        created_by: entity.created_by || undefined,
         category_id: entity.category_id || undefined,
         popularity_score: entity.popularity_score || undefined,
         website_url: entity.website_url || undefined,
-        open_graph_data: entity.open_graph_data || undefined,
+        
+        // Admin-specific fields
+        is_deleted: entity.is_deleted || false,
+        is_verified: entity.is_verified || false,
         verification_date: entity.verification_date || undefined,
+        created_by: entity.created_by || undefined,
+        created_at: entity.created_at,
+        updated_at: entity.updated_at,
+        
+        // AI summary fields
+        ai_dynamic_review_summary: entity.ai_dynamic_review_summary || undefined,
+        ai_dynamic_review_summary_last_generated_at: entity.ai_dynamic_review_summary_last_generated_at || undefined,
+        ai_dynamic_review_summary_model_used: entity.ai_dynamic_review_summary_model_used || undefined,
+        
+        // Compute dynamic review count (placeholder - would need actual query)
+        dynamic_review_count: 0,
+        
+        // Handle metadata properly - ensure it's always an object
+        metadata: typeof entity.metadata === 'object' && entity.metadata !== null ? 
+          entity.metadata as Record<string, any> : {},
+        
+        // API and external data
+        api_source: entity.api_source || undefined,
+        api_ref: entity.api_ref || undefined,
+        
+        // Enhanced metadata fields
         authors: entity.authors || undefined,
         publication_year: entity.publication_year || undefined,
         isbn: entity.isbn || undefined,
@@ -83,6 +101,8 @@ export const useAdminEntities = (options: UseAdminEntitiesOptions = {}) => {
         enrichment_source: entity.enrichment_source || undefined,
         last_enriched_at: entity.last_enriched_at || undefined,
         data_quality_score: entity.data_quality_score || undefined,
+        
+        // Trending and analytics
         trending_score: entity.trending_score || undefined,
         last_trending_update: entity.last_trending_update || undefined,
         view_velocity: entity.view_velocity || undefined,
@@ -92,9 +112,7 @@ export const useAdminEntities = (options: UseAdminEntitiesOptions = {}) => {
         geographic_boost: entity.geographic_boost || undefined,
         seasonal_boost: entity.seasonal_boost || undefined,
         photo_reference: entity.photo_reference || undefined,
-        ai_dynamic_review_summary: entity.ai_dynamic_review_summary || undefined,
-        ai_dynamic_review_summary_last_generated_at: entity.ai_dynamic_review_summary_last_generated_at || undefined,
-        ai_dynamic_review_summary_model_used: entity.ai_dynamic_review_summary_model_used || undefined
+        open_graph_data: entity.open_graph_data || undefined
       }));
 
       // Apply client-side search filter if provided

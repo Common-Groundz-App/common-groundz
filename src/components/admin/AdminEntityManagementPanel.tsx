@@ -24,6 +24,7 @@ import { formatRelativeDate } from '@/utils/dateUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Link } from 'react-router-dom';
 import { AdminEntityCreationDialog } from './AdminEntityCreationDialog';
+import { AdminEntity } from '@/types/admin';
 
 export const AdminEntityManagementPanel = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,7 +62,7 @@ export const AdminEntityManagementPanel = () => {
   ];
 
   // Filter entities based on search query, type, and deleted status
-  const filteredEntities = entities.filter(entity => {
+  const filteredEntities = entities.filter((entity: AdminEntity) => {
     const matchesSearch = !searchQuery || 
       entity.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entity.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -162,7 +163,7 @@ export const AdminEntityManagementPanel = () => {
                 <p>No entities found matching your criteria</p>
               </div>
             ) : (
-              filteredEntities.map((entity) => (
+              filteredEntities.map((entity: AdminEntity) => (
                 <div
                   key={entity.id}
                   className={`flex items-center justify-between p-4 border rounded-lg bg-card ${
@@ -201,9 +202,9 @@ export const AdminEntityManagementPanel = () => {
                       </div>
                       
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>Created {formatRelativeDate(entity.created_at)}</span>
+                        <span>Created {formatRelativeDate(entity.created_at!)}</span>
                         {entity.updated_at !== entity.created_at && (
-                          <span>Updated {formatRelativeDate(entity.updated_at)}</span>
+                          <span>Updated {formatRelativeDate(entity.updated_at!)}</span>
                         )}
                         {entity.api_source && (
                           <Badge variant="outline" className="text-xs">

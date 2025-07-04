@@ -4,12 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, MapPin, Calendar, Loader2 } from 'lucide-react';
-import { useAdminEntities } from '@/hooks/admin/useAdminEntities';
+import { useAdminEntitiesPanel } from '@/hooks/admin/useAdminEntitiesPanel';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { AdminEntity } from '@/types/admin';
 
 export const AdminEntitiesPanel = () => {
-  const { entities, isLoading, isGenerating, isBulkGenerating, generateEntitySummary, generateBulkEntitySummaries } = useAdminEntities();
+  const { entities, isLoading, isGenerating, isBulkGenerating, generateEntitySummary, generateBulkEntitySummaries } = useAdminEntitiesPanel();
 
   if (isLoading) {
     return (
@@ -89,7 +90,7 @@ export const AdminEntitiesPanel = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {entities.map((entity) => {
+          {entities.map((entity: AdminEntity) => {
             const hasGeneratedSummary = !!entity.ai_dynamic_review_summary;
             const isCurrentlyGenerating = isGenerating[entity.id];
             
