@@ -1,8 +1,36 @@
 
 import { Entity } from '@/services/recommendation/types';
 
+// Database entity types (what actually exists in the database)
+export type DatabaseEntityType = 'book' | 'movie' | 'place' | 'product' | 'food';
+
+// All possible entity types from the application
+export type EntityType = 'movie' | 'book' | 'food' | 'product' | 'place' | 'activity' | 'music' | 'art' | 'tv' | 'drink' | 'travel';
+
+// Conversion utility to map database types to application types
+export const mapDatabaseToEntityType = (dbType: DatabaseEntityType): EntityType => {
+  // Direct mapping for types that exist in both
+  const typeMap: Record<DatabaseEntityType, EntityType> = {
+    'book': 'book',
+    'movie': 'movie', 
+    'place': 'place',
+    'product': 'product',
+    'food': 'food'
+  };
+  
+  return typeMap[dbType];
+};
+
+// Check if a string is a valid database entity type
+export const isDatabaseEntityType = (type: string): type is DatabaseEntityType => {
+  return ['book', 'movie', 'place', 'product', 'food'].includes(type);
+};
+
 // Admin-specific entity type that extends the base Entity with all admin fields
-export interface AdminEntity extends Entity {
+export interface AdminEntity extends Omit<Entity, 'type'> {
+  // Use the broader EntityType for compatibility
+  type: EntityType;
+  
   // Admin lifecycle fields
   is_deleted: boolean;
   is_verified: boolean;

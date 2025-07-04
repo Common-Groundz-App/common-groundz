@@ -24,7 +24,7 @@ import { formatRelativeDate } from '@/utils/dateUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Link } from 'react-router-dom';
 import { AdminEntityCreationDialog } from './AdminEntityCreationDialog';
-import { AdminEntity } from '@/types/admin';
+import { AdminEntity, DatabaseEntityType } from '@/types/admin';
 
 export const AdminEntityManagementPanel = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,9 +57,8 @@ export const AdminEntityManagementPanel = () => {
     refetch(); // Refresh the entities list after creation
   };
 
-  const entityTypes = [
-    'movie', 'book', 'food', 'product', 'place', 'activity', 'music', 'art', 'tv', 'drink', 'travel'
-  ];
+  // Use database entity types for filtering
+  const entityTypes: DatabaseEntityType[] = ['movie', 'book', 'food', 'product', 'place'];
 
   // Filter entities based on search query, type, and deleted status
   const filteredEntities = entities.filter((entity: AdminEntity) => {
