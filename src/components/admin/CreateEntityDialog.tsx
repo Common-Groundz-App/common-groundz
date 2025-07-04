@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { usePersistedForm } from '@/hooks/usePersistedForm';
+import { EntityImageUploader } from './EntityImageUploader';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -25,16 +27,25 @@ const entityTypes = [
   { value: 'food', label: 'Food' }
 ];
 
+const initialFormData = {
+  name: '',
+  type: '',
+  description: '',
+  venue: '',
+  image_url: ''
+};
+
 export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: CreateEntityDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    type: '',
-    description: '',
-    venue: '',
-    image_url: ''
-  });
   const { toast } = useToast();
+  
+  // Use persisted form hook
+  const {
+    formData,
+    updateField,
+    resetForm,
+    clearPersistedData
+  } = usePersistedForm('admin-create-entity-form', initialFormData);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,14 +91,9 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
         description: `Entity "${formData.name}" created successfully`
       });
 
-      // Reset form
-      setFormData({
-        name: '',
-        type: '',
-        description: '',
-        venue: '',
-        image_url: ''
-      });
+      // Clear form and persisted data on successful creation
+      resetForm();
+      clearPersistedData();
 
       onEntityCreated();
       onOpenChange(false);
@@ -104,11 +110,15 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
     }
   };
 
+  const handleCancel = () => {
+    // Clear form and persisted data on explicit cancel
+    resetForm();
+    clearPersistedData();
+    onOpenChange(false);
+  };
+
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    updateField(field, value);
   };
 
   return (
@@ -171,13 +181,9 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="image_url">Image URL</Label>
-            <Input
-              id="image_url"
+            <EntityImageUploader
               value={formData.image_url}
-              onChange={(e) => handleInputChange('image_url', e.target.value)}
-              placeholder="Enter image URL (optional)"
-              type="url"
+              onChange={(url) => handleInputChange('image_url', url || '')}
             />
           </div>
 
@@ -185,7 +191,7 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={handleCancel}
               disabled={isLoading}
             >
               Cancel
