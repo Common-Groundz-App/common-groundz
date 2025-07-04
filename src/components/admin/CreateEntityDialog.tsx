@@ -117,7 +117,7 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
     onOpenChange(false);
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: keyof typeof initialFormData, value: string) => {
     updateField(field, value);
   };
 
