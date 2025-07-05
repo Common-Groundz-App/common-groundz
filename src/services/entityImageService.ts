@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { ensureBucketExists } from '@/utils/bucketUtils';
 
 export interface EntityImageUploadResult {
   success: boolean;
@@ -13,12 +12,6 @@ export const uploadEntityImage = async (
   userId: string
 ): Promise<EntityImageUploadResult> => {
   try {
-    // Ensure the entity-images bucket exists
-    const bucketExists = await ensureBucketExists('entity-images', true);
-    if (!bucketExists) {
-      return { success: false, error: 'Failed to initialize storage bucket' };
-    }
-
     // Generate unique filename
     const timestamp = Date.now();
     const fileExtension = file.name.split('.').pop();
