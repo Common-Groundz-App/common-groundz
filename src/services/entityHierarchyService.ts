@@ -1,10 +1,65 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Entity } from '@/services/recommendation/types';
+import { Entity, EntityType } from '@/services/recommendation/types';
 
-export interface EntityWithChildren extends Entity {
+export interface EntityWithChildren extends Omit<Entity, 'metadata'> {
   children?: Entity[];
+  metadata?: Record<string, any> | null;
 }
+
+// Type mapping from database enum to EntityType
+const mapDatabaseTypeToEntityType = (dbType: string): EntityType => {
+  const typeMap: Record<string, EntityType> = {
+    'book': EntityType.Book,
+    'movie': EntityType.Movie,
+    'place': EntityType.Place,
+    'product': EntityType.Product,
+    'food': EntityType.Food,
+    'drink': EntityType.Drink,
+    'music': EntityType.Music,
+    'art': EntityType.Art,
+    'tv': EntityType.TV,
+    'travel': EntityType.Travel,
+    'activity': EntityType.Activity
+  };
+  
+  return typeMap[dbType] || EntityType.Product;
+};
+
+// Convert database entity to application Entity type
+const convertDatabaseEntityToEntity = (dbEntity: any): Entity => {
+  return {
+    id: dbEntity.id,
+    name: dbEntity.name,
+    description: dbEntity.description,
+    image_url: dbEntity.image_url,
+    api_ref: dbEntity.api_ref,
+    api_source: dbEntity.api_source,
+    metadata: dbEntity.metadata ? (typeof dbEntity.metadata === 'string' ? JSON.parse(dbEntity.metadata) : dbEntity.metadata) : {},
+    venue: dbEntity.venue,
+    website_url: dbEntity.website_url,
+    type: mapDatabaseTypeToEntityType(dbEntity.type),
+    slug: dbEntity.slug,
+    category_id: dbEntity.category_id,
+    popularity_score: dbEntity.popularity_score,
+    photo_reference: dbEntity.photo_reference,
+    created_at: dbEntity.created_at,
+    updated_at: dbEntity.updated_at,
+    authors: dbEntity.authors,
+    publication_year: dbEntity.publication_year,
+    isbn: dbEntity.isbn,
+    languages: dbEntity.languages,
+    external_ratings: dbEntity.external_ratings,
+    price_info: dbEntity.price_info,
+    specifications: dbEntity.specifications,
+    cast_crew: dbEntity.cast_crew,
+    ingredients: dbEntity.ingredients,
+    nutritional_info: dbEntity.nutritional_info,
+    last_enriched_at: dbEntity.last_enriched_at,
+    enrichment_source: dbEntity.enrichment_source,
+    data_quality_score: dbEntity.data_quality_score
+  };
+};
 
 export const getChildEntities = async (parentId: string): Promise<Entity[]> => {
   const { data, error } = await supabase.rpc('get_child_entities', {
@@ -16,7 +71,38 @@ export const getChildEntities = async (parentId: string): Promise<Entity[]> => {
     throw error;
   }
 
-  return data || [];
+  // Convert the simplified child data to full Entity objects
+  return (data || []).map((child: any) => ({
+    id: child.id,
+    name: child.name,
+    type: mapDatabaseTypeToEntityType(child.type),
+    image_url: child.image_url,
+    description: child.description,
+    api_ref: null,
+    api_source: null,
+    metadata: {},
+    venue: null,
+    website_url: null,
+    slug: null,
+    category_id: null,
+    popularity_score: null,
+    photo_reference: null,
+    created_at: null,
+    updated_at: null,
+    authors: null,
+    publication_year: null,
+    isbn: null,
+    languages: null,
+    external_ratings: null,
+    price_info: null,
+    specifications: null,
+    cast_crew: null,
+    ingredients: null,
+    nutritional_info: null,
+    last_enriched_at: null,
+    enrichment_source: null,
+    data_quality_score: null
+  }));
 };
 
 export const getEntityWithChildren = async (entityId: string): Promise<EntityWithChildren | null> => {
@@ -36,14 +122,21 @@ export const getEntityWithChildren = async (entityId: string): Promise<EntityWit
   // Get its children
   try {
     const children = await getChildEntities(entityId);
+    const convertedEntity = convertDatabaseEntityToEntity(entity);
+    
     return {
-      ...entity,
-      children
+      ...convertedEntity,
+      children,
+      metadata: convertedEntity.metadata
     };
   } catch (error) {
     console.error('Error fetching children for entity:', error);
     // Return entity without children if child fetch fails
-    return entity;
+    const convertedEntity = convertDatabaseEntityToEntity(entity);
+    return {
+      ...convertedEntity,
+      metadata: convertedEntity.metadata
+    };
   }
 };
 
@@ -82,7 +175,7 @@ export const getParentEntity = async (childId: string): Promise<Entity | null> =
     return null;
   }
 
-  return parent;
+  return convertDatabaseEntityToEntity(parent);
 };
 
 export const canDeleteEntity = async (entityId: string): Promise<{ canDelete: boolean; reason?: string }> => {
