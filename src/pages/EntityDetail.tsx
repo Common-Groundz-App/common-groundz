@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, MessageSquare, MessageSquareHeart, Plus, Share2, Flag, RefreshCw, Image, Info } from 'lucide-react';
+import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
@@ -20,43 +20,42 @@ import { useRecommendationUploads } from '@/hooks/recommendations/use-recommenda
 import NavBarComponent from '@/components/NavBarComponent';
 import Footer from '@/components/Footer';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import { DynamicReviewsSummary } from '@/components/profile/reviews/DynamicReviewsSummary';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatRelativeDate } from '@/utils/dateUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
-import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
-import { useCircleRating } from '@/hooks/use-circle-rating';
-import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
-import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
-import { LightboxPreview } from '@/components/media/LightboxPreview';
-import { MediaItem } from '@/types/media';
-import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
 import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
 import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
-import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
-import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
-import { Eye, ArrowRight } from 'lucide-react';
+import { LightboxPreview } from '@/components/media/LightboxPreview';
+import { MediaItem } from '@/types/media';
+import { useCircleRating } from '@/hooks/use-circle-rating';
+import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
+import { TimelinePreview } from '@/components/profile/reviews/TimelinePreview';
+import { TimelineBadge } from '@/components/profile/reviews/TimelineBadge';
+import { DynamicReviewsSummary } from '@/components/profile/reviews/DynamicReviewsSummary';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
+import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 
-import EntityDetailV2 from './EntityDetailV2';
-
-const EntityDetailOriginal = () => {
+const EntityDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('reviews');
   const { handleImageUpload } = useRecommendationUploads();
-
+  
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isRefreshingImage, setIsRefreshingImage] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
-
+  
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
-
+  
   const {
     entity,
     recommendations,
@@ -67,31 +66,37 @@ const EntityDetailOriginal = () => {
     error,
     refreshData
   } = useEntityDetail(slug || '');
-
+  
+  // Add circle rating hook with destructured new structure
   const {
     circleRating,
     circleRatingCount,
     circleContributors,
     isLoading: isCircleRatingLoading
   } = useCircleRating(entity?.id || '');
-
+  
+  // Filter dynamic reviews (reviews with timeline updates)
   const dynamicReviews = React.useMemo(() => {
     if (!reviews) return [];
     return reviews.filter(review => review.has_timeline && review.timeline_count && review.timeline_count > 0);
   }, [reviews]);
 
+  // Add timeline summary hook
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
+  // Show all reviews in the Reviews tab (no filtering)
   const allReviews = React.useMemo(() => {
     if (!reviews) return [];
     return reviews;
   }, [reviews]);
 
+  // Check if current user has reviewed this entity
   const userReview = React.useMemo(() => {
     if (!user || !reviews) return null;
     return reviews.find(review => review.user_id === user.id);
   }, [user, reviews]);
 
+  // Determine sidebar button text and action
   const getSidebarButtonConfig = () => {
     if (!userReview) {
       return {
@@ -101,7 +106,7 @@ const EntityDetailOriginal = () => {
         tooltip: null
       };
     }
-
+    
     if (userReview.has_timeline && userReview.timeline_count && userReview.timeline_count > 0) {
       return {
         text: 'Add Timeline Update',
@@ -110,7 +115,7 @@ const EntityDetailOriginal = () => {
         tooltip: 'Continue tracking how your experience evolves'
       };
     }
-
+    
     return {
       text: 'Update Your Review',
       icon: MessageSquare,
@@ -118,7 +123,7 @@ const EntityDetailOriginal = () => {
       tooltip: 'Already reviewed this? Add how it\'s going now.'
     };
   };
-
+  
   useEffect(() => {
     if (!isLoading) {
       console.log('EntityDetail component received recommendations:', recommendations?.length);
@@ -135,6 +140,7 @@ const EntityDetailOriginal = () => {
     }
   }, [isLoading, recommendations, reviews, dynamicReviews, allReviews, userReview]);
 
+  // Log contributors when available for debugging
   useEffect(() => {
     if (circleContributors.length > 0) {
       console.log('Contributors ready for display:', circleContributors);
@@ -190,13 +196,13 @@ const EntityDetailOriginal = () => {
       'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
       'travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
     };
-
+    
     return fallbacks[type] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
   };
 
   const getContextualFieldInfo = () => {
     if (!entity) return null;
-
+    
     switch (entity.type) {
       case 'book':
         return {
@@ -253,7 +259,7 @@ const EntityDetailOriginal = () => {
       });
       return;
     }
-
+    
     setIsRecommendationFormOpen(true);
   };
 
@@ -266,7 +272,7 @@ const EntityDetailOriginal = () => {
       });
       return;
     }
-
+    
     setIsReviewFormOpen(true);
   };
 
@@ -279,7 +285,7 @@ const EntityDetailOriginal = () => {
       });
       return;
     }
-
+    
     setTimelineReviewId(reviewId);
     setIsTimelineViewerOpen(true);
   };
@@ -293,17 +299,17 @@ const EntityDetailOriginal = () => {
     console.log(`Review ${action} action for ${id}`);
     refreshData();
   };
-
+  
   const handleRecommendationSubmit = async (values: any) => {
     try {
       toast({
         title: "Recommendation added",
         description: "Your recommendation has been added successfully"
       });
-
+      
       setIsRecommendationFormOpen(false);
       refreshData();
-
+      
       return Promise.resolve();
     } catch (error) {
       console.error('Error adding recommendation:', error);
@@ -312,16 +318,16 @@ const EntityDetailOriginal = () => {
         description: "Failed to add recommendation",
         variant: "destructive"
       });
-
+      
       return Promise.reject(error);
     }
   };
-
+  
   const handleReviewSubmit = async () => {
     try {
       setIsReviewFormOpen(false);
       refreshData();
-
+      
       return Promise.resolve();
     } catch (error) {
       console.error('Error adding review:', error);
@@ -340,22 +346,22 @@ const EntityDetailOriginal = () => {
 
   const handleImageRefresh = async () => {
     if (!entity) return;
-
+    
     setIsRefreshingImage(true);
-
+    
     try {
       const newImageUrl = await refreshEntityImage(
         entity.id, 
         entity.api_source === 'google_places' ? entity.api_ref : undefined, 
         entity.photo_reference
       );
-
+      
       if (newImageUrl) {
         toast({
           title: 'Image refreshed',
           description: 'The image has been successfully updated.',
         });
-
+        
         refreshData();
       } else {
         toast({
@@ -377,6 +383,7 @@ const EntityDetailOriginal = () => {
   };
 
   const handleImageClick = (e: React.MouseEvent) => {
+    // Prevent lightbox from opening if clicking on overlay buttons
     const target = e.target as HTMLElement;
     if (target.closest('button')) {
       return;
@@ -388,6 +395,7 @@ const EntityDetailOriginal = () => {
     setIsLightboxOpen(false);
   };
 
+  // Create media item for lightbox
   const createMediaItem = (): MediaItem => {
     const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entity?.type || 'place');
     return {
@@ -405,28 +413,7 @@ const EntityDetailOriginal = () => {
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
       <NavBarComponent />
-      
-      {/* Add the floating toggle */}
-      <EntityPreviewToggle />
-      
-      {/* Preview Toggle Banner */}
-      <div className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 text-center text-sm font-medium mt-16">
-        <div className="flex items-center justify-center gap-2">
-          <span>Try the new layout!</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(`/entity/${slug}?preview=true`)}
-            className="text-white hover:bg-white/20 text-xs h-6 px-2"
-          >
-            <Eye className="h-3 w-3 mr-1" />
-            Preview V2
-            <ArrowRight className="h-3 w-3 ml-1" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex-1 pt-0">
+      <div className="flex-1 pt-16">
         {/* Hero Entity Header Section */}
         <div className="relative bg-gradient-to-b from-violet-100/30 to-transparent dark:from-violet-900/10">
           <div className="container max-w-6xl mx-auto py-8 px-4">
@@ -434,6 +421,7 @@ const EntityDetailOriginal = () => {
               {/* Entity Image */}
               <div className="w-full md:w-1/3 lg:w-1/4">
                 <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
+                  {/* Clickable image container */}
                   <div 
                     className="w-full h-full cursor-pointer transition-transform hover:scale-105"
                     onClick={handleImageClick}
@@ -445,9 +433,11 @@ const EntityDetailOriginal = () => {
                       fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
                     />
                   </div>
-
+                  
+                  {/* Image source indicator and refresh button */}
                   {entity?.image_url && (
                     <div className="absolute top-2 right-2 flex gap-1">
+                      {/* Image source indicator */}
                       <Badge 
                         variant="outline" 
                         className={`${
@@ -459,7 +449,8 @@ const EntityDetailOriginal = () => {
                         <Image className="h-3 w-3 mr-1" />
                         {isEntityImageMigrated(entity.image_url) ? 'Local' : 'External'}
                       </Badge>
-
+                      
+                      {/* Refresh button - only show for users */}
                       {user && (
                         <Button
                           variant="outline"
@@ -476,7 +467,7 @@ const EntityDetailOriginal = () => {
                   )}
                 </AspectRatio>
               </div>
-
+              
               {/* Entity Details */}
               <div className="flex-1 space-y-4">
                 <div className="flex flex-col gap-2">
@@ -504,7 +495,8 @@ const EntityDetailOriginal = () => {
                       <span>{contextualField.value}</span>
                     </div>
                   )}
-
+                  
+                  {/* Description */}
                   {entity?.description && (
                     <p className="text-muted-foreground mt-2">{entity.description}</p>
                   )}
@@ -513,14 +505,17 @@ const EntityDetailOriginal = () => {
             </div>
           </div>
         </div>
-
+        
         {/* Rating Summary Bar */}
         <div className="bg-card border-y dark:bg-card/50 py-4">
           <div className="container max-w-6xl mx-auto px-4">
             <div className="flex flex-wrap items-center gap-6 justify-between">
-              <div className="flex items-center gap-8 ml-4">            
+              {/* Rating Display */}
+              <div className="flex items-center gap-8 ml-4">
+                {/* Overall Rating */}
                 {stats.averageRating !== null ? (
                   <div className="flex items-center gap-4">
+                    {/* Rings and rating number together */}
                     <div className="flex items-center gap-2">
                       <div className="w-fit">
                         <ConnectedRingsRating
@@ -538,7 +533,8 @@ const EntityDetailOriginal = () => {
                         {stats.averageRating.toFixed(1)}
                       </span>
                     </div>
-
+                    
+                    {/* Text labels */}
                     <div className="leading-tight min-w-[140px]">
                       <div className="font-semibold text-sm whitespace-nowrap">Overall Rating</div>
                       <div className="text-xs text-muted-foreground">
@@ -548,6 +544,7 @@ const EntityDetailOriginal = () => {
                   </div>
                 ) : (
                   <div className="flex items-center gap-4">
+                    {/* Rings and rating number together */}
                     <div className="flex items-center gap-2">
                       <div className="w-fit">
                         <ConnectedRingsRating
@@ -562,7 +559,8 @@ const EntityDetailOriginal = () => {
                         0
                       </span>
                     </div>
-
+                    
+                    {/* Text labels */}
                     <div className="leading-tight min-w-[140px]">
                       <div className="font-semibold text-sm whitespace-nowrap">Overall Rating</div>
                       <div className="text-xs text-muted-foreground">
@@ -572,13 +570,16 @@ const EntityDetailOriginal = () => {
                   </div>
                 )}
 
+                {/* Vertical Divider */}
                 {user && (
                   <div className="h-12 w-px bg-border"></div>
                 )}
 
+                {/* Circle Rating */}
                 {user && (
                   circleRating !== null ? (
                     <div className="flex items-center gap-4">
+                      {/* Rings and rating number together */}
                       <div className="flex items-center gap-2">
                         <div className="w-fit">
                           <ConnectedRingsRating
@@ -596,7 +597,8 @@ const EntityDetailOriginal = () => {
                           {circleRating.toFixed(1)}
                         </span>
                       </div>
-
+                      
+                      {/* Text labels and contributors */}
                       <div className="leading-tight min-w-[140px]">
                         <div className="font-semibold text-sm whitespace-nowrap">Circle Rating</div>
                         <div className="text-xs text-muted-foreground">
@@ -612,6 +614,7 @@ const EntityDetailOriginal = () => {
                     </div>
                   ) : (
                     <div className="flex items-center gap-4">
+                      {/* Rings and rating number together */}
                       <div className="flex items-center gap-2">
                         <div className="w-fit">
                           <ConnectedRingsRating
@@ -626,7 +629,8 @@ const EntityDetailOriginal = () => {
                           0
                         </span>
                       </div>
-
+                      
+                      {/* Text labels */}
                       <div className="leading-tight min-w-[140px]">
                         <div className="font-semibold text-sm whitespace-nowrap">Circle Rating</div>
                         <div className="text-xs text-muted-foreground">
@@ -637,7 +641,8 @@ const EntityDetailOriginal = () => {
                   )
                 )}
               </div>
-
+              
+              {/* Stats */}
               <div className="flex flex-wrap gap-6">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/20">
@@ -648,7 +653,7 @@ const EntityDetailOriginal = () => {
                     <div className="text-sm text-muted-foreground">Recommendations</div>
                   </div>
                 </div>
-
+                
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-full bg-amber-50 dark:bg-amber-900/20">
                     <MessageSquare className="h-5 w-5 text-amber-500 dark:text-amber-400" />
@@ -662,12 +667,14 @@ const EntityDetailOriginal = () => {
             </div>
           </div>
         </div>
-
+        
         {/* Main Content Area */}
         <div className="container max-w-6xl mx-auto py-6 px-4">
           <TooltipProvider>
             <div className="flex flex-col md:flex-row gap-6">
+              {/* Main Content */}
               <div className="flex-1">
+                {/* Action Buttons - Mobile Only */}
                 <div className="flex gap-3 mb-6 md:hidden">
                   <Button 
                     onClick={handleAddRecommendation}
@@ -676,7 +683,7 @@ const EntityDetailOriginal = () => {
                     <MessageSquareHeart className="h-4 w-4" />
                     Recommend
                   </Button>
-
+                  
                   <Button 
                     onClick={sidebarButtonConfig.action}
                     variant="outline" 
@@ -686,7 +693,8 @@ const EntityDetailOriginal = () => {
                     {sidebarButtonConfig.text}
                   </Button>
                 </div>
-
+                
+                {/* Content Tabs - Updated for All Reviews */}
                 <Tabs 
                   defaultValue="reviews" 
                   value={activeTab}
@@ -712,7 +720,8 @@ const EntityDetailOriginal = () => {
                       </Tooltip>
                     </TabsTrigger>
                   </TabsList>
-
+                  
+                  {/* All Reviews Tab */}
                   <TabsContent value="reviews" className="space-y-4 mt-2">
                     {!allReviews || allReviews.length === 0 ? (
                       <div className="py-12 text-center border rounded-lg bg-amber-50/30 dark:bg-amber-900/5">
@@ -754,6 +763,7 @@ const EntityDetailOriginal = () => {
                                 compact={true}
                                 showTimelineFeatures={review.has_timeline && review.timeline_count && review.timeline_count > 0}
                               />
+                              {/* Start Timeline Button for User's Own Static Reviews */}
                               {user && review.user_id === user.id && (!review.has_timeline || !review.timeline_count) && (
                                 <div className="mt-2 pl-4">
                                   <Button
@@ -773,7 +783,8 @@ const EntityDetailOriginal = () => {
                       </>
                     )}
                   </TabsContent>
-
+                  
+                  {/* Dynamic Reviews Tab */}
                   <TabsContent value="dynamic-reviews" className="space-y-4 mt-2">
                     {!dynamicReviews || dynamicReviews.length === 0 ? (
                       <div className="py-12 text-center border rounded-lg bg-violet-50/30 dark:bg-violet-900/5">
@@ -802,7 +813,7 @@ const EntityDetailOriginal = () => {
                           dynamicReviews={dynamicReviews}
                           timelineData={timelineData}
                         />
-
+                        
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-muted-foreground">
                             Showing {dynamicReviews.length} timeline review{dynamicReviews.length !== 1 ? 's' : ''}
@@ -817,7 +828,7 @@ const EntityDetailOriginal = () => {
                             Add
                           </Button>
                         </div>
-
+                        
                         <div className="space-y-4">
                           {dynamicReviews.map((review) => (
                             <ReviewCard
@@ -837,8 +848,10 @@ const EntityDetailOriginal = () => {
                   </TabsContent>
                 </Tabs>
               </div>
-
+              
+              {/* Enhanced Right Sidebar with new metadata components */}
               <div className="w-full md:w-72 lg:w-80 space-y-5 order-first md:order-last">
+                {/* Share Your Experience Card */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg font-medium">Share Your Experience</CardTitle>
@@ -868,18 +881,24 @@ const EntityDetailOriginal = () => {
                         {sidebarButtonConfig.text}
                       </Button>
                     )}
-
+                    
                     <Button variant="outline" className="w-full gap-2">
                       <Share2 className="h-4 w-4" />
                       Share
                     </Button>
                   </CardContent>
                 </Card>
-
+                
+                {/* Enhanced Entity Metadata Card */}
                 {entity && <EntityMetadataCard entity={entity} />}
+                
+                {/* Entity Specifications Card */}
                 {entity && <EntitySpecsCard entity={entity} />}
+                
+                {/* Related Entities Card */}
                 {entity && <EntityRelatedCard entity={entity} />}
-
+                
+                {/* Simplified Basic Info Card - only essential fields */}
                 {entity && (
                   <Card>
                     <CardHeader className="pb-3">
@@ -890,7 +909,7 @@ const EntityDetailOriginal = () => {
                         <div className="font-medium">Type</div>
                         <div className="text-muted-foreground capitalize">{entity.type}</div>
                       </div>
-
+                      
                       {contextualField?.value && (
                         <div className="text-sm">
                           <div className="font-medium">{contextualField.label}</div>
@@ -905,7 +924,8 @@ const EntityDetailOriginal = () => {
           </TooltipProvider>
         </div>
       </div>
-
+      
+      {/* Add Recommendation Form */}
       {user && entity && (
         <RecommendationForm
           isOpen={isRecommendationFormOpen}
@@ -923,7 +943,8 @@ const EntityDetailOriginal = () => {
           }}
         />
       )}
-
+      
+      {/* Add Review Form */}
       {user && entity && (
         <ReviewForm
           isOpen={isReviewFormOpen}
@@ -941,6 +962,7 @@ const EntityDetailOriginal = () => {
         />
       )}
 
+      {/* Timeline Viewer Modal */}
       {timelineReviewId && userReview && (
         <ReviewTimelineViewer
           isOpen={isTimelineViewerOpen}
@@ -953,6 +975,7 @@ const EntityDetailOriginal = () => {
         />
       )}
 
+      {/* Lightbox Preview */}
       {isLightboxOpen && entity && (
         <LightboxPreview
           media={[createMediaItem()]}
@@ -960,19 +983,11 @@ const EntityDetailOriginal = () => {
           onClose={handleLightboxClose}
         />
       )}
-
+      
       <Footer />
       <BottomNavigation />
     </div>
   );
-};
-
-const EntityDetail = () => {
-  const [searchParams] = useSearchParams();
-  const isPreviewMode = searchParams.get('preview') === 'true' || searchParams.get('v') === '2';
-
-  // Return V2 if preview mode is enabled, otherwise return original
-  return isPreviewMode ? <EntityDetailV2 /> : <EntityDetailOriginal />;
 };
 
 export default EntityDetail;
