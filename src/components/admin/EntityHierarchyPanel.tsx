@@ -50,7 +50,8 @@ export const EntityHierarchyPanel: React.FC = () => {
           type,
           image_url,
           description,
-          created_at
+          created_at,
+          parent_id
         `)
         .eq('is_deleted', false)
         .not('parent_id', 'is', null);

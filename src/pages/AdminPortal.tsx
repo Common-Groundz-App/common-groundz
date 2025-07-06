@@ -1,13 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import NavBarComponent from '@/components/NavBarComponent';
 import AdminSidebar from '@/components/admin/AdminSidebar';
-import AdminDashboardSummary from '@/components/admin/AdminDashboardSummary';
-import AdminEntityManagementPanel from '@/components/admin/AdminEntityManagementPanel';
-import AdminReviewsPanel from '@/components/admin/AdminReviewsPanel';
-import AdminImageHealthPanel from '@/components/admin/AdminImageHealthPanel';
-import AdminDebugPanel from '@/components/admin/AdminDebugPanel';
+import { AdminDashboardSummary } from '@/components/admin/AdminDashboardSummary';
+import { AdminEntityManagementPanel } from '@/components/admin/AdminEntityManagementPanel';
+import { AdminReviewsPanel } from '@/components/admin/AdminReviewsPanel';
+import { AdminImageHealthPanel } from '@/components/admin/AdminImageHealthPanel';
+import { AdminDebugPanel } from '@/components/admin/AdminDebugPanel';
 import { EntityHierarchyPanel } from '@/components/admin/EntityHierarchyPanel';
 
 const AdminPortal = () => {
