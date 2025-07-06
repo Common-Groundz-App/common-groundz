@@ -39,6 +39,10 @@ import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelin
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
+import { EntityProductsCard } from '@/components/entity/EntityProductsCard';
+import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
+import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
+import { getEntityWithChildren, EntityWithChildren } from '@/services/entityHierarchyService';
 
 const EntityDetailV2 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -54,6 +58,7 @@ const EntityDetailV2 = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
+  const [entityWithChildren, setEntityWithChildren] = useState<EntityWithChildren | null>(null);
   
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
   
@@ -91,6 +96,21 @@ const EntityDetailV2 = () => {
   }, [user, reviews]);
 
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
+
+  useEffect(() => {
+    const fetchEntityWithChildren = async () => {
+      if (!entity?.id) return;
+      
+      try {
+        const entityData = await getEntityWithChildren(entity.id);
+        setEntityWithChildren(entityData);
+      } catch (error) {
+        console.error('Error fetching entity with children:', error);
+      }
+    };
+
+    fetchEntityWithChildren();
+  }, [entity?.id]);
 
   const getSidebarButtonConfig = () => {
     if (!userReview) {
@@ -406,10 +426,8 @@ const EntityDetailV2 = () => {
     <div className="min-h-screen flex flex-col animate-fade-in">
       <NavBarComponent />
       
-      {/* Add the floating toggle */}
       <EntityPreviewToggle />
       
-      {/* Preview Mode Banner */}
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 text-center text-sm font-medium mt-16">
         <div className="flex items-center justify-center gap-2">
           <span>🔥 Preview Mode: New Entity Layout</span>
@@ -426,11 +444,9 @@ const EntityDetailV2 = () => {
       </div>
       
       <div className="flex-1">
-        {/* Hero Entity Header Section - Enhanced for V2 */}
         <div className="relative bg-gradient-to-b from-violet-100/30 to-transparent dark:from-violet-900/10">
           <div className="container max-w-6xl mx-auto py-8 px-4">
             <div className="flex flex-col md:flex-row gap-8">
-              {/* Entity Image */}
               <div className="w-full md:w-1/3 lg:w-1/4">
                 <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
                   <div 
@@ -476,7 +492,6 @@ const EntityDetailV2 = () => {
                 </AspectRatio>
               </div>
               
-              {/* Entity Details */}
               <div className="flex-1 space-y-4">
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
@@ -505,11 +520,9 @@ const EntityDetailV2 = () => {
           </div>
         </div>
         
-        {/* Rating Summary Bar - Same as original */}
         <div className="bg-card border-y dark:bg-card/50 py-4">
           <div className="container max-w-6xl mx-auto px-4">
             <div className="flex flex-wrap items-center gap-6 justify-between">
-              {/* Rating Display */}
               <div className="flex items-center gap-8 ml-4">
                 {stats.averageRating !== null ? (
                   <div className="flex items-center gap-4">
@@ -629,13 +642,10 @@ const EntityDetailV2 = () => {
           </div>
         </div>
         
-        {/* Main Content Area - NEW V2 LAYOUT */}
         <div className="container max-w-6xl mx-auto py-6 px-4">
           <TooltipProvider>
             <div className="flex flex-col md:flex-row gap-6">
-              {/* Main Content */}
               <div className="flex-1">
-                {/* Action Buttons - Mobile Only */}
                 <div className="flex gap-3 mb-6 md:hidden">
                   <Button 
                     onClick={handleAddRecommendation}
@@ -655,7 +665,6 @@ const EntityDetailV2 = () => {
                   </Button>
                 </div>
                 
-                {/* NEW V2 TABS STRUCTURE */}
                 <Tabs 
                   defaultValue="overview" 
                   value={activeTab}
@@ -667,7 +676,7 @@ const EntityDetailV2 = () => {
                       Overview
                     </TabsTrigger>
                     <TabsTrigger value="products" className="py-3">
-                      Products (0)
+                      Products ({entityWithChildren?.children?.length || 0})
                     </TabsTrigger>
                     <TabsTrigger value="reviews" className="py-3">
                       Reviews ({allReviews.length})
@@ -677,7 +686,6 @@ const EntityDetailV2 = () => {
                     </TabsTrigger>
                   </TabsList>
                   
-                  {/* Overview Tab */}
                   <TabsContent value="overview" className="space-y-6 mt-2">
                     <Card>
                       <CardHeader>
@@ -690,7 +698,6 @@ const EntityDetailV2 = () => {
                           <p className="text-muted-foreground italic">No description available.</p>
                         )}
                         
-                        {/* Key Information */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                           <div>
                             <h4 className="font-medium mb-2">Type</h4>
@@ -707,7 +714,6 @@ const EntityDetailV2 = () => {
                       </CardContent>
                     </Card>
 
-                    {/* Quick Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Card>
                         <CardContent className="pt-6">
@@ -732,22 +738,58 @@ const EntityDetailV2 = () => {
                     </div>
                   </TabsContent>
                   
-                  {/* Products Tab - Placeholder for Future */}
                   <TabsContent value="products" className="space-y-4 mt-2">
-                    <div className="py-12 text-center border rounded-lg bg-blue-50/30 dark:bg-blue-900/5">
-                      <Plus className="h-12 w-12 mx-auto text-blue-300 dark:text-blue-700" />
-                      <h3 className="font-medium text-lg mt-4">No products yet</h3>
-                      <p className="text-muted-foreground mt-2">
-                        This feature will show child products for brand entities.
-                      </p>
-                      <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                        <p>🔄 Coming in Phase 2: Parent-Child Entity Relationships</p>
-                        <p>📦 Will show: Cosmix → Whey Protein, Pre-Workout, etc.</p>
+                    {!entityWithChildren?.children || entityWithChildren.children.length === 0 ? (
+                      <div className="py-12 text-center border rounded-lg bg-blue-50/30 dark:bg-blue-900/5">
+                        <Plus className="h-12 w-12 mx-auto text-blue-300 dark:text-blue-700" />
+                        <h3 className="font-medium text-lg mt-4">No products yet</h3>
+                        <p className="text-muted-foreground mt-2">
+                          This entity doesn't have any child products or related items.
+                        </p>
+                        <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                          <p>🔄 Coming Soon: Product management interface</p>
+                          <p>📦 Examples: Cosmix → Whey Protein, Pre-Workout, etc.</p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            Showing {entityWithChildren.children.length} product{entityWithChildren.children.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {entityWithChildren.children.map((child) => (
+                            <Card key={child.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                              <CardContent className="p-4">
+                                {child.image_url && (
+                                  <div className="w-full h-32 rounded-md overflow-hidden bg-muted mb-3">
+                                    <ImageWithFallback
+                                      src={child.image_url}
+                                      alt={child.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                                <div className="space-y-2">
+                                  <h4 className="font-medium">{child.name}</h4>
+                                  {child.description && (
+                                    <p className="text-sm text-muted-foreground line-clamp-2">
+                                      {child.description}
+                                    </p>
+                                  )}
+                                  <Badge variant="outline" className="text-xs">
+                                    {child.type}
+                                  </Badge>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </TabsContent>
                   
-                  {/* Reviews Tab - Enhanced */}
                   <TabsContent value="reviews" className="space-y-4 mt-2">
                     {!allReviews || allReviews.length === 0 ? (
                       <div className="py-12 text-center border rounded-lg bg-amber-50/30 dark:bg-amber-900/5">
@@ -795,7 +837,6 @@ const EntityDetailV2 = () => {
                     )}
                   </TabsContent>
                   
-                  {/* Posts Tab - Placeholder for Future */}
                   <TabsContent value="posts" className="space-y-4 mt-2">
                     <div className="py-12 text-center border rounded-lg bg-green-50/30 dark:bg-green-900/5">
                       <MessageSquare className="h-12 w-12 mx-auto text-green-300 dark:text-green-700" />
@@ -812,9 +853,7 @@ const EntityDetailV2 = () => {
                 </Tabs>
               </div>
               
-              {/* Right Sidebar - Enhanced */}
               <div className="w-full md:w-72 lg:w-80 space-y-5 order-first md:order-last">
-                {/* Share Your Experience Card */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg font-medium">Share Your Experience</CardTitle>
@@ -828,20 +867,35 @@ const EntityDetailV2 = () => {
                       Write Review
                     </Button>
                     
-                    <Button variant="outline" className="w-full gap-2">
-                      <Share2 className="h-4 w-4" />
-                      Share
-                    </Button>
+                    {entity && (
+                      <EntityFollowButton
+                        entityId={entity.id}
+                        entityName={entity.name}
+                        variant="outline"
+                        size="default"
+                        showCount={true}
+                      />
+                    )}
                   </CardContent>
                 </Card>
                 
-                {/* Enhanced Entity Metadata Card */}
+                <EntityProductsCard
+                  entityId={entity.id}
+                  entityName={entity.name}
+                />
+                
+                {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
+                  <EntityChildrenCard
+                    children={entityWithChildren.children}
+                    parentName={entity?.name || ''}
+                    onViewChild={(child) => navigate(`/entity/${child.slug || child.id}`)}
+                  />
+                )}
+                
                 {entity && <EntityMetadataCard entity={entity} />}
                 
-                {/* Entity Specifications Card */}
                 {entity && <EntitySpecsCard entity={entity} />}
                 
-                {/* Related Entities Card */}
                 {entity && <EntityRelatedCard entity={entity} />}
               </div>
             </div>
@@ -849,7 +903,6 @@ const EntityDetailV2 = () => {
         </div>
       </div>
       
-      {/* Keep all existing modals and forms */}
       {user && entity && (
         <RecommendationForm
           isOpen={isRecommendationFormOpen}

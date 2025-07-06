@@ -253,6 +253,7 @@ export type Database = {
           name: string
           nutritional_info: Json | null
           open_graph_data: Json | null
+          parent_id: string | null
           photo_reference: string | null
           popularity_score: number | null
           price_info: Json | null
@@ -300,6 +301,7 @@ export type Database = {
           name: string
           nutritional_info?: Json | null
           open_graph_data?: Json | null
+          parent_id?: string | null
           photo_reference?: string | null
           popularity_score?: number | null
           price_info?: Json | null
@@ -347,6 +349,7 @@ export type Database = {
           name?: string
           nutritional_info?: Json | null
           open_graph_data?: Json | null
+          parent_id?: string | null
           photo_reference?: string | null
           popularity_score?: number | null
           price_info?: Json | null
@@ -378,6 +381,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entities_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
             referencedColumns: ["id"]
           },
         ]
@@ -529,6 +539,86 @@ export type Database = {
             foreignKeyName: "entity_enrichment_queue_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: true
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entity_follows: {
+        Row: {
+          created_at: string | null
+          entity_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          entity_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          entity_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_follows_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entity_products: {
+        Row: {
+          buy_link: string | null
+          created_at: string | null
+          description: string | null
+          entity_id: string
+          id: string
+          image_url: string | null
+          name: string
+          price: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          buy_link?: string | null
+          created_at?: string | null
+          description?: string | null
+          entity_id: string
+          id?: string
+          image_url?: string | null
+          name: string
+          price?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          buy_link?: string | null
+          created_at?: string | null
+          description?: string | null
+          entity_id?: string
+          id?: string
+          image_url?: string | null
+          name?: string
+          price?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_products_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
           },
@@ -1013,6 +1103,7 @@ export type Database = {
           comment_count: number
           content: string | null
           created_at: string
+          entity_id: string | null
           id: string
           is_deleted: boolean
           media: Json | null
@@ -1029,6 +1120,7 @@ export type Database = {
           comment_count?: number
           content?: string | null
           created_at?: string
+          entity_id?: string | null
           id?: string
           is_deleted?: boolean
           media?: Json | null
@@ -1045,6 +1137,7 @@ export type Database = {
           comment_count?: number
           content?: string | null
           created_at?: string
+          entity_id?: string | null
           id?: string
           is_deleted?: boolean
           media?: Json | null
@@ -1057,7 +1150,15 @@ export type Database = {
           view_count?: number
           visibility?: Database["public"]["Enums"]["recommendation_visibility"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "posts_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1948,6 +2049,16 @@ export type Database = {
           query_id: string
           updated_at: string
           venue: string | null
+        }[]
+      }
+      get_child_entities: {
+        Args: { parent_uuid: string }
+        Returns: {
+          id: string
+          name: string
+          type: Database["public"]["Enums"]["entity_type"]
+          image_url: string
+          description: string
         }[]
       }
       get_circle_rating: {
