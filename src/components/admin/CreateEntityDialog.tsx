@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X, Search } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 import { usePersistedForm } from '@/hooks/usePersistedForm';
 import { EntityImageUploader } from './EntityImageUploader';
@@ -32,11 +32,24 @@ const initialFormData = {
   type: '',
   description: '',
   venue: '',
-  image_url: ''
+  image_url: '',
+  parent_id: ''
 };
+
+interface ParentEntity {
+  id: string;
+  name: string;
+  type: string;
+  image_url?: string;
+}
 
 export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: CreateEntityDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [parentSearchQuery, setParentSearchQuery] = useState('');
+  const [parentSearchResults, setParentSearchResults] = useState<ParentEntity[]>([]);
+  const [selectedParent, setSelectedParent] = useState<ParentEntity | null>(null);
+  const [showParentResults, setShowParentResults] = useState(false);
+  const [isSearchingParents, setIsSearchingParents] = useState(false);
   const { toast } = useToast();
   
   // Use persisted form hook
@@ -46,6 +59,55 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
     resetForm,
     clearPersistedData
   } = usePersistedForm('admin-create-entity-form', initialFormData);
+
+  // Search for potential parent entities
+  const searchParentEntities = async (query: string) => {
+    if (query.length < 2) {
+      setParentSearchResults([]);
+      setShowParentResults(false);
+      return;
+    }
+
+    setIsSearchingParents(true);
+    try {
+      const { data, error } = await supabase
+        .from('entities')
+        .select('id, name, type, image_url')
+        .eq('is_deleted', false)
+        .ilike('name', `%${query}%`)
+        .limit(10);
+
+      if (error) throw error;
+
+      setParentSearchResults(data || []);
+      setShowParentResults(true);
+    } catch (error) {
+      console.error('Error searching parent entities:', error);
+      setParentSearchResults([]);
+    } finally {
+      setIsSearchingParents(false);
+    }
+  };
+
+  const handleParentSearch = (query: string) => {
+    setParentSearchQuery(query);
+    searchParentEntities(query);
+  };
+
+  const selectParentEntity = (parent: ParentEntity) => {
+    setSelectedParent(parent);
+    updateField('parent_id', parent.id);
+    setParentSearchQuery('');
+    setShowParentResults(false);
+    setParentSearchResults([]);
+  };
+
+  const clearSelectedParent = () => {
+    setSelectedParent(null);
+    updateField('parent_id', '');
+    setParentSearchQuery('');
+    setShowParentResults(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +137,7 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
         description: formData.description || null,
         venue: formData.venue || null,
         image_url: formData.image_url || null,
+        parent_id: formData.parent_id || null,
         created_by: currentUser.data.user.id
       };
 
@@ -88,12 +151,13 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
 
       toast({
         title: 'Success',
-        description: `Entity "${formData.name}" created successfully`
+        description: `Entity "${formData.name}" created successfully${selectedParent ? ` as child of "${selectedParent.name}"` : ''}`
       });
 
       // Clear form and persisted data on successful creation
       resetForm();
       clearPersistedData();
+      clearSelectedParent();
 
       onEntityCreated();
       onOpenChange(false);
@@ -114,6 +178,7 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
     // Clear form and persisted data on explicit cancel
     resetForm();
     clearPersistedData();
+    clearSelectedParent();
     onOpenChange(false);
   };
 
@@ -157,6 +222,79 @@ export const CreateEntityDialog = ({ open, onOpenChange, onEntityCreated }: Crea
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Parent Entity Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="parent-entity">Parent Entity (Optional)</Label>
+            
+            {selectedParent ? (
+              <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
+                {selectedParent.image_url && (
+                  <img 
+                    src={selectedParent.image_url} 
+                    alt={selectedParent.name}
+                    className="w-8 h-8 object-cover rounded"
+                  />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{selectedParent.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{selectedParent.type}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelectedParent}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="parent-entity"
+                    value={parentSearchQuery}
+                    onChange={(e) => handleParentSearch(e.target.value)}
+                    placeholder="Search for parent entity..."
+                    className="pl-10"
+                  />
+                  {isSearchingParents && (
+                    <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin" />
+                  )}
+                </div>
+                
+                {showParentResults && parentSearchResults.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {parentSearchResults.map((parent) => (
+                      <button
+                        key={parent.id}
+                        type="button"
+                        onClick={() => selectParentEntity(parent)}
+                        className="w-full flex items-center gap-2 p-2 hover:bg-muted text-left"
+                      >
+                        {parent.image_url && (
+                          <img 
+                            src={parent.image_url} 
+                            alt={parent.name}
+                            className="w-8 h-8 object-cover rounded"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{parent.name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{parent.type}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Select a parent entity to create a hierarchical relationship
+            </p>
           </div>
 
           <div className="space-y-2">
