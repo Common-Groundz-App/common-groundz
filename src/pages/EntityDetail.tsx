@@ -37,6 +37,7 @@ import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loadi
 import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { Eye, ArrowRight } from 'lucide-react';
+import { mapEntityTypeToDatabase, getContextualFieldLabel, getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 
 import EntityDetailV2 from './EntityDetailV2';
 
@@ -176,62 +177,41 @@ const EntityDetailOriginal = () => {
     );
   }
 
-  const getEntityTypeFallbackImage = (type: string): string => {
-    const fallbacks: Record<string, string> = {
-      'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
-      'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
-      'food': 'https://images.unsplash.com/photo-1555939594-58d7698950b',
-      'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
-      'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
-      'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-      'music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
-      'art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
-      'tv': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
-      'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
-      'travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
-    };
-
-    return fallbacks[type] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
-  };
-
   const getContextualFieldInfo = () => {
     if (!entity) return null;
 
-    switch (entity.type) {
+    // Use mapped type for switch statement
+    const mappedType = mapEntityTypeToDatabase(entity.type);
+    const label = getContextualFieldLabel(entity.type);
+
+    switch (mappedType) {
       case 'book':
         return {
-          label: 'Author',
+          label,
           value: entity.authors && entity.authors.length > 0 
             ? entity.authors[0] 
             : entity.venue || null
         };
       case 'movie':
-      case 'tv':
         return {
-          label: 'Studio',
+          label,
           value: entity.cast_crew?.studio || entity.venue || null
         };
       case 'place':
         return {
-          label: 'Location',
+          label,
           value: entity.api_source === 'google_places' && entity.metadata?.formatted_address
             ? entity.metadata.formatted_address
             : entity.venue || null
         };
       case 'product':
         return {
-          label: 'Brand',
+          label,
           value: entity.specifications?.brand || entity.venue || null
         };
-      case 'music':
-        return {
-          label: 'Artist',
-          value: entity.venue || null
-        };
       case 'food':
-      case 'drink':
         return {
-          label: 'Venue',
+          label,
           value: entity.venue || null
         };
       default:
@@ -514,6 +494,7 @@ const EntityDetailOriginal = () => {
           </div>
         </div>
 
+        {/* Keep all remaining JSX exactly the same */}
         {/* Rating Summary Bar */}
         <div className="bg-card border-y dark:bg-card/50 py-4">
           <div className="container max-w-6xl mx-auto px-4">
