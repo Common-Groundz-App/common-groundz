@@ -42,7 +42,8 @@ import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { EntityProductsCard } from '@/components/entity/EntityProductsCard';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
-import { getEntityWithChildren, EntityWithChildren } from '@/services/entityHierarchyService';
+import { getEntityWithChildren, EntityWithChildren, getParentEntity } from '@/services/entityHierarchyService';
+import { Entity } from '@/services/recommendation/types';
 import { BreadcrumbNavigation } from '@/components/ui/breadcrumb-navigation';
 import { ParentBrandBadge } from '@/components/entity/ParentBrandBadge';
 import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
@@ -139,6 +140,10 @@ const EntityDetailV2 = () => {
     entity: entity!, 
     parentEntity 
   });
+
+  const handleViewAllProducts = () => {
+    setActiveTab('products');
+  };
 
   const getSidebarButtonConfig = () => {
     if (!userReview) {

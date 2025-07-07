@@ -16,6 +16,7 @@ export interface Entity {
   photo_reference?: string;
   created_at?: string;
   updated_at?: string;
+  parent_id?: string; // Add this missing field
   
   // Enhanced metadata fields
   authors?: string[];
