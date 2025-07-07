@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info, ArrowLeft } from 'lucide-react';
+import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info, ArrowLeft, ArrowRight } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
@@ -43,9 +43,9 @@ import { EntityProductsCard } from '@/components/entity/EntityProductsCard';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
-import { getEntityWithChildren, getParentEntity, EntityWithChildren } from '@/services/entityHierarchyService';
+import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
-import { EntityType } from '@/services/recommendation/types';
+import { Entity, EntityType } from '@/services/recommendation/types';
 
 const EntityDetailV2 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -61,9 +61,6 @@ const EntityDetailV2 = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
-  const [entityWithChildren, setEntityWithChildren] = useState<EntityWithChildren | null>(null);
-  const [parentEntity, setParentEntity] = useState<Entity | null>(null);
-  const [isLoadingHierarchy, setIsLoadingHierarchy] = useState(false);
   
   const {
     entity,
@@ -75,6 +72,21 @@ const EntityDetailV2 = () => {
     error,
     refreshData
   } = useEntityDetail(slug || '');
+
+  const {
+    entityWithChildren,
+    parentEntity,
+    isLoading: isLoadingHierarchy,
+    error: hierarchyError,
+    hasChildren,
+    hasParent
+  } = useEntityHierarchy(entity?.id || null);
+
+  const {
+    refreshEntityImage,
+    isRefreshing,
+    isEntityImageMigrated
+  } = useEntityImageRefresh();
   
   const {
     circleRating,
@@ -99,29 +111,6 @@ const EntityDetailV2 = () => {
   }, [user, reviews]);
 
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
-
-  useEffect(() => {
-    const fetchHierarchyData = async () => {
-      if (!entity?.id) return;
-      
-      setIsLoadingHierarchy(true);
-      try {
-        // Fetch entity with children
-        const entityData = await getEntityWithChildren(entity.id);
-        setEntityWithChildren(entityData);
-        
-        // Fetch parent entity if exists
-        const parent = await getParentEntity(entity.id);
-        setParentEntity(parent);
-      } catch (error) {
-        console.error('Error fetching hierarchy data:', error);
-      } finally {
-        setIsLoadingHierarchy(false);
-      }
-    };
-
-    fetchHierarchyData();
-  }, [entity?.id]);
 
   const getSidebarButtonConfig = () => {
     if (!userReview) {
@@ -206,24 +195,6 @@ const EntityDetailV2 = () => {
       </div>
     );
   }
-
-  const getEntityTypeFallbackImage = (type: string): string => {
-    const fallbacks: Record<string, string> = {
-      'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
-      'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
-      'food': 'https://images.unsplash.com/photo-1555939594-58d7698950b',
-      'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
-      'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
-      'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-      'music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
-      'art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
-      'tv': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
-      'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
-      'travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
-    };
-    
-    return fallbacks[type] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
-  };
 
   const getContextualFieldInfo = () => {
     if (!entity) return null;
