@@ -56,9 +56,9 @@ const EntityDetailV2 = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('overview');
-  const { handleImageUpload } = useRecommendationUploads();
   
+  // State declarations
+  const [activeTab, setActiveTab] = useState('overview');
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isRefreshingImage, setIsRefreshingImage] = useState(false);
@@ -66,6 +66,9 @@ const EntityDetailV2 = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [reviewTypeFilter, setReviewTypeFilter] = useState<'product' | 'brand'>('product');
+  
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL LOGIC OR EARLY RETURNS
+  // This is critical to prevent React Hook order violations
   
   const {
     entity,
@@ -85,7 +88,7 @@ const EntityDetailV2 = () => {
     error: hierarchyError,
     hasChildren,
     hasParent
-  } = useEntityHierarchy(entity?.id || null);
+  } = useEntityHierarchy(entity?.id || '');
 
   const {
     refreshEntityImage,
@@ -100,6 +103,11 @@ const EntityDetailV2 = () => {
     isLoading: isCircleRatingLoading
   } = useCircleRating(entity?.id || '');
   
+  const { handleImageUpload } = useRecommendationUploads();
+  
+  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || '');
+  
+  // Memoized values
   const dynamicReviews = React.useMemo(() => {
     if (!reviews) return [];
     return reviews.filter(review => review.has_timeline && review.timeline_count && review.timeline_count > 0);
@@ -114,8 +122,6 @@ const EntityDetailV2 = () => {
     if (!user || !reviews) return null;
     return reviews.find(review => review.user_id === user.id);
   }, [user, reviews]);
-
-  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
   const getSidebarButtonConfig = () => {
     if (!userReview) {
@@ -144,6 +150,7 @@ const EntityDetailV2 = () => {
     };
   };
   
+  // Effects
   useEffect(() => {
     if (!isLoading) {
       console.log('EntityDetail component received recommendations:', recommendations?.length);
@@ -166,6 +173,8 @@ const EntityDetailV2 = () => {
     }
   }, [circleContributors]);
 
+  // NOW ALL CONDITIONAL LOGIC AND EARLY RETURNS COME AFTER ALL HOOKS
+  
   if (!isLoading && (error || !entity)) {
     return <NotFound />;
   }
@@ -414,7 +423,6 @@ const EntityDetailV2 = () => {
   };
 
   const handleAddChild = () => {
-    // TODO: Implement add child functionality
     toast({
       title: "Coming Soon",
       description: "Add child entity functionality will be available soon.",
@@ -428,8 +436,6 @@ const EntityDetailV2 = () => {
     if (reviewTypeFilter === 'product') {
       return reviews;
     } else if (reviewTypeFilter === 'brand' && parentEntity) {
-      // In a real implementation, you'd fetch parent entity reviews
-      // For now, return empty array as placeholder
       return [];
     }
     
