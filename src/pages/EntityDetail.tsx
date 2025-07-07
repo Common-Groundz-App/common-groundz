@@ -38,6 +38,7 @@ import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { Eye, ArrowRight } from 'lucide-react';
 import { mapEntityTypeToDatabase, getContextualFieldLabel, getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { EntityType } from '@/services/recommendation/types';
 
 import EntityDetailV2 from './EntityDetailV2';
 
@@ -185,31 +186,31 @@ const EntityDetailOriginal = () => {
     const label = getContextualFieldLabel(entity.type);
 
     switch (mappedType) {
-      case 'book':
+      case EntityType.Book:
         return {
           label,
           value: entity.authors && entity.authors.length > 0 
             ? entity.authors[0] 
             : entity.venue || null
         };
-      case 'movie':
+      case EntityType.Movie:
         return {
           label,
           value: entity.cast_crew?.studio || entity.venue || null
         };
-      case 'place':
+      case EntityType.Place:
         return {
           label,
           value: entity.api_source === 'google_places' && entity.metadata?.formatted_address
             ? entity.metadata.formatted_address
             : entity.venue || null
         };
-      case 'product':
+      case EntityType.Product:
         return {
           label,
           value: entity.specifications?.brand || entity.venue || null
         };
-      case 'food':
+      case EntityType.Food:
         return {
           label,
           value: entity.venue || null
@@ -369,7 +370,7 @@ const EntityDetailOriginal = () => {
   };
 
   const createMediaItem = (): MediaItem => {
-    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entity?.type || 'place');
+    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entity?.type || EntityType.Place);
     return {
       url: imageUrl,
       type: 'image',
@@ -422,7 +423,7 @@ const EntityDetailOriginal = () => {
                       src={entity?.image_url || ''}
                       alt={entity?.name || 'Entity image'}
                       className="w-full h-full object-cover"
-                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
+                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || EntityType.Place)}
                     />
                   </div>
 
