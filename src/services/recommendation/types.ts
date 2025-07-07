@@ -5,6 +5,21 @@ import { Database } from '@/integrations/supabase/types';
 export type EntityType = Database["public"]["Enums"]["entity_type"];
 export type RecommendationCategory = Database["public"]["Enums"]["recommendation_category"];
 
+// Create const enum for value usage
+export const RecommendationCategoryValues = {
+  Food: 'food' as const,
+  Drink: 'drink' as const,
+  Movie: 'movie' as const,
+  Book: 'book' as const,
+  Place: 'place' as const,
+  Product: 'product' as const,
+  Activity: 'activity' as const,
+  Music: 'music' as const,
+  Art: 'art' as const,
+  TV: 'tv' as const,
+  Travel: 'travel' as const,
+} as const;
+
 export interface Entity {
   id: string;
   name: string;

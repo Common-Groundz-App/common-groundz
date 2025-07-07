@@ -1,18 +1,14 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { FeedQueryParams } from '../../types';
-import { PostsQueryResult } from './types';
 
-// Fetch posts with pagination
-export const fetchPosts = async (
-  { page, itemsPerPage }: FeedQueryParams,
-  followingIds?: string[] // Optional parameter to filter by following users
-): Promise<PostsQueryResult> => {
+export interface PostsQueryResult {
+  posts: any[];
+}
+
+export const fetchPosts = async ({ userId, page, itemsPerPage }: FeedQueryParams): Promise<PostsQueryResult> => {
   try {
-    const postsFrom = page * itemsPerPage;
-    const postsTo = postsFrom + itemsPerPage - 1;
-    
-    let query = supabase
+    const { data: posts, error } = await supabase
       .from('posts')
       .select(`
         id,
@@ -20,34 +16,25 @@ export const fetchPosts = async (
         content,
         post_type,
         visibility,
+        view_count,
+        comment_count,
+        tags,
+        media,
+        status,
         user_id,
         created_at,
-        updated_at,
-        media,
-        view_count,
-        status,
-        is_deleted,
-        tags
+        updated_at
       `)
       .eq('visibility', 'public')
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
-      .range(postsFrom, postsTo);
-      
-    // Filter by following users if provided
-    if (followingIds && followingIds.length > 0) {
-      query = query.in('user_id', followingIds);
-    }
-    
-    const { data: postsData, error: postsError } = await query;
-      
-    if (postsError) throw postsError;
-    if (!postsData || postsData.length === 0) return { posts: [], userIds: [] };
-    
-    // Extract user IDs for profile fetching
-    const userIds = postsData.map(post => post.user_id);
-    
-    return { posts: postsData, userIds };
+      .range(page * itemsPerPage, (page + 1) * itemsPerPage - 1);
+
+    if (error) throw error;
+
+    return {
+      posts: posts || []
+    };
   } catch (error) {
     console.error('Error fetching posts:', error);
     throw error;

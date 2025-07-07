@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Entity } from './types';
+import { Entity, EntityType } from './types';
 import { Database } from '@/integrations/supabase/types';
 
 export const findOrCreateEntity = async (
@@ -94,15 +94,15 @@ export const findOrCreateEntity = async (
           category_id: categoryId,
           photo_reference: photoReference,
           authors,
-          publication_year,
+          publication_year: publicationYear,
           isbn,
           languages,
-          external_ratings,
-          price_info,
+          external_ratings: externalRatings,
+          price_info: priceInfo,
           specifications,
-          cast_crew,
+          cast_crew: castCrew,
           ingredients,
-          nutritional_info
+          nutritional_info: nutritionalInfo
         }
       ])
       .select('*')
@@ -208,6 +208,68 @@ export const getEntitiesByType = async (type: Database["public"]["Enums"]["entit
     }));
   } catch (error) {
     console.error('Error in getEntitiesByType:', error);
+    throw error;
+  }
+};
+
+export const findEntityByApiRef = async (apiRef: string, apiSource: string): Promise<Entity | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('entities')
+      .select('*')
+      .eq('api_ref', apiRef)
+      .eq('api_source', apiSource)
+      .eq('is_deleted', false)
+      .limit(1)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No results found
+        return null;
+      }
+      console.error('Error finding entity by API ref:', error);
+      throw error;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      image_url: data.image_url,
+      api_ref: data.api_ref,
+      api_source: data.api_source,
+      metadata: data.metadata ? (typeof data.metadata === 'string' ? JSON.parse(data.metadata) : data.metadata) : {},
+      venue: data.venue,
+      website_url: data.website_url,
+      type: data.type as Database["public"]["Enums"]["entity_type"],
+      slug: data.slug,
+      category_id: data.category_id,
+      popularity_score: data.popularity_score,
+      photo_reference: data.photo_reference,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      authors: data.authors,
+      publication_year: data.publication_year,
+      isbn: data.isbn,
+      languages: data.languages,
+      external_ratings: data.external_ratings,
+      price_info: data.price_info,
+      specifications: data.specifications,
+      cast_crew: data.cast_crew,
+      ingredients: data.ingredients,
+      nutritional_info: data.nutritional_info,
+      last_enriched_at: data.last_enriched_at,
+      enrichment_source: data.enrichment_source,
+      data_quality_score: data.data_quality_score,
+      parent_id: data.parent_id
+    };
+  } catch (error) {
+    console.error('Error in findEntityByApiRef:', error);
     throw error;
   }
 };

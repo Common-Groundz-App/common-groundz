@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { EntitySearch } from '@/components/recommendations/EntitySearch';
 import { Entity } from '@/services/recommendation/types';

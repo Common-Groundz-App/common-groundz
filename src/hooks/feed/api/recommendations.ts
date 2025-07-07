@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { RecommendationWithUser } from '@/types/entities';
@@ -8,23 +9,23 @@ type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
 
 import { FeedQueryParams, RecommendationFeedItem } from '../types';
 import { fetchProfilesBatch } from '@/services/enhancedUnifiedProfileService';
-import { RecommendationCategory, RecommendationVisibility } from '@/services/recommendation/types';
+import { RecommendationCategory, RecommendationVisibility, RecommendationCategoryValues } from '@/services/recommendation/types';
 
 // Helper function to map database category strings to RecommendationCategory enum
 const mapDatabaseCategoryToEnum = (dbCategory: string): RecommendationCategory => {
   switch (dbCategory.toLowerCase()) {
-    case 'food': return RecommendationCategory.Food;
-    case 'drink': return RecommendationCategory.Drink;
-    case 'movie': return RecommendationCategory.Movie;
-    case 'book': return RecommendationCategory.Book;
-    case 'place': return RecommendationCategory.Place;
-    case 'product': return RecommendationCategory.Product;
-    case 'activity': return RecommendationCategory.Activity;
-    case 'music': return RecommendationCategory.Music;
-    case 'art': return RecommendationCategory.Art;
-    case 'tv': return RecommendationCategory.TV;
-    case 'travel': return RecommendationCategory.Travel;
-    default: return RecommendationCategory.Place; // fallback
+    case 'food': return 'food';
+    case 'drink': return 'drink';
+    case 'movie': return 'movie';
+    case 'book': return 'book';
+    case 'place': return 'place';
+    case 'product': return 'product';
+    case 'activity': return 'activity';
+    case 'music': return 'music';
+    case 'art': return 'art';
+    case 'tv': return 'tv';
+    case 'travel': return 'travel';
+    default: return 'place'; // fallback
   }
 };
 
@@ -140,6 +141,7 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
       
       return {
         ...rec,
+        type: 'recommendation' as const,
         category: mapDatabaseCategoryToEnum(rec.category), // Convert database category to enum
         visibility: mapDatabaseVisibilityToEnum(rec.visibility), // Convert database visibility to enum
         is_post: false,
@@ -149,7 +151,9 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
         comment_count: commentsCount.get(rec.id) || 0,
         is_liked: userLikes.has(rec.id),
         is_saved: userSaves.has(rec.id),
-        entity: processedEntity
+        entity: processedEntity,
+        isLiked: userLikes.has(rec.id),
+        isSaved: userSaves.has(rec.id)
       };
     });
 
@@ -241,6 +245,7 @@ export const processRecommendations = async (
       
       return {
         ...rec, // This spreads all original recommendation properties including category, is_certified, view_count
+        type: 'recommendation' as const,
         category: mapDatabaseCategoryToEnum(rec.category), // Convert database category to enum
         visibility: mapDatabaseVisibilityToEnum(rec.visibility), // Convert database visibility to enum
         is_post: false,
@@ -250,7 +255,9 @@ export const processRecommendations = async (
         comment_count: commentsCount.get(rec.id) || 0,
         is_liked: userLikes.has(rec.id),
         is_saved: userSaves.has(rec.id),
-        entity: processedEntity
+        entity: processedEntity,
+        isLiked: userLikes.has(rec.id),
+        isSaved: userSaves.has(rec.id)
       };
     });
 

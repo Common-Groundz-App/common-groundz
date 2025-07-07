@@ -36,7 +36,7 @@ const resetBodyPointerEvents = () => {
 };
 
 interface PostFeedItemProps {
-  post: PostItem;
+  post: import('@/hooks/feed/types').PostFeedItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
   onComment?: (id: string) => void;
@@ -90,7 +90,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     if (!user || !post) return;
     
     try {
-      if (localIsLiked) {
+      if (post.is_liked) {
         await supabase
           .from('post_likes')
           .delete()
@@ -123,7 +123,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     if (!user || !post) return;
     
     try {
-      if (localIsSaved) {
+      if (post.is_saved) {
         await supabase
           .from('post_saves')
           .delete()
