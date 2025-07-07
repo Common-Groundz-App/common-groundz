@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,15 +42,7 @@ import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { EntityProductsCard } from '@/components/entity/EntityProductsCard';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
-import { getEntityWithChildren, getParentEntity, EntityWithChildren } from '@/services/entityHierarchyService';
-import { Entity } from '@/services/recommendation/types';
-import { 
-  mapDatabaseEntityType, 
-  getEntityTypeDisplayName, 
-  getEntityTypeFallbackImage 
-} from '@/services/entityTypeMapping';
-import { EntityBreadcrumb } from '@/components/entity/EntityBreadcrumb';
-import { SiblingProducts } from '@/components/entity/SiblingProducts';
+import { getEntityWithChildren, EntityWithChildren } from '@/services/entityHierarchyService';
 
 const EntityDetailV2 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -68,8 +59,6 @@ const EntityDetailV2 = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [entityWithChildren, setEntityWithChildren] = useState<EntityWithChildren | null>(null);
-  const [parentEntity, setParentEntity] = useState<Entity | null>(null);
-  const [siblingEntities, setSiblingEntities] = useState<Entity[]>([]);
   
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
   
@@ -109,29 +98,18 @@ const EntityDetailV2 = () => {
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
   useEffect(() => {
-    const fetchEntityRelationships = async () => {
+    const fetchEntityWithChildren = async () => {
       if (!entity?.id) return;
       
       try {
-        // Get entity with children
         const entityData = await getEntityWithChildren(entity.id);
         setEntityWithChildren(entityData);
-
-        // Get parent entity
-        const parent = await getParentEntity(entity.id);
-        setParentEntity(parent);
-
-        // If has parent, get siblings
-        if (parent) {
-          const siblings = await getEntityWithChildren(parent.id);
-          setSiblingEntities(siblings?.children || []);
-        }
       } catch (error) {
-        console.error('Error fetching entity relationships:', error);
+        console.error('Error fetching entity with children:', error);
       }
     };
 
-    fetchEntityRelationships();
+    fetchEntityWithChildren();
   }, [entity?.id]);
 
   const getSidebarButtonConfig = () => {
@@ -183,52 +161,95 @@ const EntityDetailV2 = () => {
     }
   }, [circleContributors]);
 
-  const getEntityTypeFallbackImageSafe = (type: string): string => {
-    const mappedType = mapDatabaseEntityType(type);
-    return getEntityTypeFallbackImage(mappedType);
+  if (!isLoading && (error || !entity)) {
+    return <NotFound />;
+  }
+
+  if (isLoading && loadingStep > 0) {
+    return (
+      <div className="min-h-screen flex flex-col animate-fade-in">
+        <NavBarComponent />
+        <div className="flex-1 pt-16">
+          <div className="container max-w-6xl mx-auto py-8 px-4">
+            <EntityDetailLoadingProgress 
+              entityName={slug || 'Entity'}
+              entityType="product"
+            />
+          </div>
+        </div>
+        <Footer />
+        <BottomNavigation />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col animate-fade-in">
+        <NavBarComponent />
+        <div className="flex-1 pt-16">
+          <EntityDetailSkeleton />
+        </div>
+        <Footer />
+        <BottomNavigation />
+      </div>
+    );
+  }
+
+  const getEntityTypeFallbackImage = (type: string): string => {
+    const fallbacks: Record<string, string> = {
+      'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
+      'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
+      'food': 'https://images.unsplash.com/photo-1555939594-58d7698950b',
+      'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
+      'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
+      'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
+      'music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
+      'art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
+      'tv': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
+      'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
+      'travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
+    };
+    
+    return fallbacks[type] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
   };
 
   const getContextualFieldInfo = () => {
     if (!entity) return null;
     
-    const mappedType = mapDatabaseEntityType(entity.type as string);
-    
-    // Add parent context if it's a child entity
-    if (parentEntity) {
-      return {
-        label: 'Part of',
-        value: parentEntity.name
-      };
-    }
-    
-    switch (mappedType) {
-      case mapDatabaseEntityType('book'):
+    switch (entity.type) {
+      case 'book':
         return {
           label: 'Author',
           value: entity.authors && entity.authors.length > 0 
             ? entity.authors[0] 
             : entity.venue || null
         };
-      case mapDatabaseEntityType('movie'):
-      case mapDatabaseEntityType('tv'):
+      case 'movie':
+      case 'tv':
         return {
           label: 'Studio',
           value: entity.cast_crew?.studio || entity.venue || null
         };
-      case mapDatabaseEntityType('place'):
+      case 'place':
         return {
           label: 'Location',
           value: entity.api_source === 'google_places' && entity.metadata?.formatted_address
             ? entity.metadata.formatted_address
             : entity.venue || null
         };
-      case mapDatabaseEntityType('product'):
+      case 'product':
         return {
           label: 'Brand',
           value: entity.specifications?.brand || entity.venue || null
         };
-      case mapDatabaseEntityType('food'):
-      case mapDatabaseEntityType('drink'):
+      case 'music':
+        return {
+          label: 'Artist',
+          value: entity.venue || null
+        };
+      case 'food':
+      case 'drink':
         return {
           label: 'Venue',
           value: entity.venue || null
@@ -388,7 +409,7 @@ const EntityDetailV2 = () => {
   };
 
   const createMediaItem = (): MediaItem => {
-    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(mapDatabaseEntityType(entity?.type || 'place'));
+    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entity?.type || 'place');
     return {
       url: imageUrl,
       type: 'image',
@@ -409,7 +430,7 @@ const EntityDetailV2 = () => {
       
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 text-center text-sm font-medium mt-16">
         <div className="flex items-center justify-center gap-2">
-          <span>🔥 Preview Mode: Enhanced Entity Layout</span>
+          <span>🔥 Preview Mode: New Entity Layout</span>
           <Button
             variant="ghost"
             size="sm"
@@ -425,9 +446,6 @@ const EntityDetailV2 = () => {
       <div className="flex-1">
         <div className="relative bg-gradient-to-b from-violet-100/30 to-transparent dark:from-violet-900/10">
           <div className="container max-w-6xl mx-auto py-8 px-4">
-            {/* Breadcrumb Navigation */}
-            <EntityBreadcrumb entity={entity} parentEntity={parentEntity} />
-            
             <div className="flex flex-col md:flex-row gap-8">
               <div className="w-full md:w-1/3 lg:w-1/4">
                 <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
@@ -439,7 +457,7 @@ const EntityDetailV2 = () => {
                       src={entity?.image_url || ''}
                       alt={entity?.name || 'Entity image'}
                       className="w-full h-full object-cover"
-                      fallbackSrc={getEntityTypeFallbackImage(mapDatabaseEntityType(entity?.type || 'place'))}
+                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
                     />
                   </div>
                   
@@ -479,7 +497,7 @@ const EntityDetailV2 = () => {
                   <div className="flex items-center gap-2">
                     <h1 className="text-3xl font-bold">{entity?.name}</h1>
                     <Badge variant="outline" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 gap-1">
-                      <Flag className="h-3 w-3" /> V2 Enhanced
+                      <Flag className="h-3 w-3" /> V2 Preview
                     </Badge>
                     {entity?.metadata?.verified && (
                       <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 gap-1">
@@ -489,26 +507,12 @@ const EntityDetailV2 = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
-                      {getEntityTypeDisplayName(mapDatabaseEntityType(entity?.type as string || 'product'))}
+                      {entity?.type}
                     </Badge>
-                    {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
-                      <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        {entityWithChildren.children.length} Products
-                      </Badge>
-                    )}
                   </div>
                   
                   {entity?.description && (
                     <p className="text-muted-foreground mt-2">{entity.description}</p>
-                  )}
-
-                  {contextualField?.value && (
-                    <div className="mt-2">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {contextualField.label}:
-                      </span>
-                      <span className="ml-2 text-sm">{contextualField.value}</span>
-                    </div>
                   )}
                 </div>
               </div>
@@ -697,62 +701,18 @@ const EntityDetailV2 = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                           <div>
                             <h4 className="font-medium mb-2">Type</h4>
-                            <Badge variant="outline">
-                              {getEntityTypeDisplayName(mapDatabaseEntityType(entity?.type as string || 'product'))}
-                            </Badge>
+                            <Badge variant="outline">{entity?.type}</Badge>
                           </div>
                           
-                          {contextualField?.value && (
+                          {entity?.venue && (
                             <div>
-                              <h4 className="font-medium mb-2">{contextualField.label}</h4>
-                              <p className="text-sm text-muted-foreground">{contextualField.value}</p>
+                              <h4 className="font-medium mb-2">Source</h4>
+                              <p className="text-sm text-muted-foreground">{entity.venue}</p>
                             </div>
                           )}
                         </div>
                       </CardContent>
                     </Card>
-
-                    {/* Featured Products Preview for Parent Entities */}
-                    {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Featured Products</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {entityWithChildren.children.slice(0, 6).map((child) => (
-                              <Link 
-                                key={child.id} 
-                                to={`/entity/${child.slug || child.id}`}
-                              >
-                                <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                                  <CardContent className="p-3">
-                                    <div className="aspect-square rounded-md overflow-hidden bg-muted mb-2">
-                                      <ImageWithFallback
-                                        src={child.image_url || ''}
-                                        alt={child.name}
-                                        className="w-full h-full object-cover"
-                                        fallbackSrc={getEntityTypeFallbackImageSafe(child.type as string)}
-                                      />
-                                    </div>
-                                    <h4 className="font-medium text-sm line-clamp-2">{child.name}</h4>
-                                  </CardContent>
-                                </Card>
-                              </Link>
-                            ))}
-                          </div>
-                          {entityWithChildren.children.length > 6 && (
-                            <Button 
-                              variant="outline" 
-                              className="w-full mt-4"
-                              onClick={() => setActiveTab('products')}
-                            >
-                              View All {entityWithChildren.children.length} Products
-                            </Button>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Card>
@@ -891,15 +851,6 @@ const EntityDetailV2 = () => {
                     </div>
                   </TabsContent>
                 </Tabs>
-
-                {/* Sibling Products for Child Entities */}
-                {parentEntity && siblingEntities.length > 0 && (
-                  <SiblingProducts 
-                    siblings={siblingEntities}
-                    currentEntityId={entity?.id || ''}
-                    parentName={parentEntity.name}
-                  />
-                )}
               </div>
               
               <div className="w-full md:w-72 lg:w-80 space-y-5 order-first md:order-last">
@@ -929,8 +880,8 @@ const EntityDetailV2 = () => {
                 </Card>
                 
                 <EntityProductsCard
-                  entityId={entity?.id || ''}
-                  entityName={entity?.name || ''}
+                  entityId={entity.id}
+                  entityName={entity.name}
                 />
                 
                 {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
@@ -1002,7 +953,7 @@ const EntityDetailV2 = () => {
       {isLightboxOpen && entity && (
         <LightboxPreview
           media={[{
-            url: entity.image_url || getEntityTypeFallbackImage(mapDatabaseEntityType(entity.type || 'place')),
+            url: entity.image_url || getEntityTypeFallbackImage(entity.type || 'place'),
             type: 'image',
             alt: entity.name || 'Entity image',
             caption: entity.name,
