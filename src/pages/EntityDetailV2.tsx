@@ -391,7 +391,7 @@ const EntityDetailV2 = () => {
   };
 
   const createMediaItem = (): MediaItem => {
-    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entity?.type || 'place');
+    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entity?.type || EntityType.Place);
     return {
       url: imageUrl,
       type: 'image',
@@ -1029,7 +1029,7 @@ const EntityDetailV2 = () => {
       {isLightboxOpen && entity && (
         <LightboxPreview
           media={[{
-            url: entity.image_url || getEntityTypeFallbackImage(entity.type || 'place'),
+            url: entity.image_url || getEntityTypeFallbackImage(entity.type || EntityType.Place),
             type: 'image',
             alt: entity.name || 'Entity image',
             caption: entity.name,
