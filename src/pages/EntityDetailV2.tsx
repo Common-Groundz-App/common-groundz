@@ -46,6 +46,10 @@ import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcru
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { Entity, EntityType } from '@/services/recommendation/types';
+import { FeaturedProductsCard } from '@/components/entity/FeaturedProductsCard';
+import { EntitySiblingsCarousel } from '@/components/entity/EntitySiblingsCarousel';
+import { EntityExternalLinks } from '@/components/entity/EntityExternalLinks';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const EntityDetailV2 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -61,6 +65,7 @@ const EntityDetailV2 = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
+  const [reviewTypeFilter, setReviewTypeFilter] = useState<'product' | 'brand'>('product');
   
   const {
     entity,
@@ -416,6 +421,24 @@ const EntityDetailV2 = () => {
     });
   };
 
+  // Filter reviews based on selected type
+  const filteredReviews = React.useMemo(() => {
+    if (!reviews) return [];
+    
+    if (reviewTypeFilter === 'product') {
+      return reviews;
+    } else if (reviewTypeFilter === 'brand' && parentEntity) {
+      // In a real implementation, you'd fetch parent entity reviews
+      // For now, return empty array as placeholder
+      return [];
+    }
+    
+    return reviews;
+  }, [reviews, reviewTypeFilter, parentEntity]);
+
+  // Show review type toggle only if we have both product and potential brand reviews
+  const showReviewTypeToggle = reviews && reviews.length > 0 && parentEntity;
+
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
       <NavBarComponent />
@@ -689,6 +712,16 @@ const EntityDetailV2 = () => {
                   </TabsList>
                   
                   <TabsContent value="overview" className="space-y-6 mt-2">
+                    {/* Featured Products Section */}
+                    {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
+                      <FeaturedProductsCard
+                        children={entityWithChildren.children}
+                        parentEntity={entity!}
+                        onViewChild={handleViewChild}
+                        onViewAllProducts={() => setActiveTab('products')}
+                      />
+                    )}
+
                     <Card>
                       <CardHeader>
                         <CardTitle>About {entity?.name}</CardTitle>
@@ -845,9 +878,24 @@ const EntityDetailV2 = () => {
                     ) : (
                       <>
                         <div className="flex items-center justify-between">
-                          <p className="text-sm text-muted-foreground">
-                            Showing {allReviews.length} review{allReviews.length !== 1 ? 's' : ''}
-                          </p>
+                          <div className="flex items-center gap-4">
+                            <p className="text-sm text-muted-foreground">
+                              Showing {filteredReviews.length} review{filteredReviews.length !== 1 ? 's' : ''}
+                            </p>
+                            
+                            {showReviewTypeToggle && (
+                              <Select value={reviewTypeFilter} onValueChange={(value) => setReviewTypeFilter(value as 'product' | 'brand')}>
+                                <SelectTrigger className="w-40">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="product">Product Reviews</SelectItem>
+                                  <SelectItem value="brand">Brand Reviews</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                          
                           <Button 
                             onClick={handleAddReview}
                             size="sm"
@@ -859,7 +907,7 @@ const EntityDetailV2 = () => {
                           </Button>
                         </div>
                         <div className="space-y-4">
-                          {allReviews.map((review) => (
+                          {filteredReviews.map((review) => (
                             <ReviewCard
                               key={review.id}
                               review={review}
@@ -890,6 +938,18 @@ const EntityDetailV2 = () => {
                     </div>
                   </TabsContent>
                 </Tabs>
+
+                {/* Sibling Carousel - Show at bottom if current entity has siblings */}
+                {parentEntity && entityWithChildren?.children && entityWithChildren.children.length > 1 && (
+                  <div className="mt-8">
+                    <EntitySiblingsCarousel
+                      siblings={entityWithChildren.children}
+                      parentEntity={parentEntity}
+                      currentEntityId={entity?.id || ''}
+                      onViewSibling={handleViewChild}
+                    />
+                  </div>
+                )}
               </div>
               
               <div className="w-full md:w-72 lg:w-80 space-y-5 order-first md:order-last">
@@ -915,6 +975,11 @@ const EntityDetailV2 = () => {
                         showCount={true}
                       />
                     )}
+
+                    {/* External Links */}
+                    {entity && (
+                      <EntityExternalLinks entity={entity} />
+                    )}
                   </CardContent>
                 </Card>
                 
@@ -927,6 +992,7 @@ const EntityDetailV2 = () => {
                   <EntityChildrenCard
                     children={entityWithChildren.children}
                     parentName={entity?.name || ''}
+                    parentEntity={entity}
                     onViewChild={handleViewChild}
                     onAddChild={handleAddChild}
                     canAddChildren={user !== null}
