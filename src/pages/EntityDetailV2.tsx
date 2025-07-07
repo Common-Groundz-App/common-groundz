@@ -42,7 +42,10 @@ import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { EntityProductsCard } from '@/components/entity/EntityProductsCard';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
-import { getEntityWithChildren, EntityWithChildren } from '@/services/entityHierarchyService';
+import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
+import { getEntityWithChildren, getParentEntity, EntityWithChildren } from '@/services/entityHierarchyService';
+import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { EntityType } from '@/services/recommendation/types';
 
 const EntityDetailV2 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -59,8 +62,8 @@ const EntityDetailV2 = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [entityWithChildren, setEntityWithChildren] = useState<EntityWithChildren | null>(null);
-  
-  const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
+  const [parentEntity, setParentEntity] = useState<Entity | null>(null);
+  const [isLoadingHierarchy, setIsLoadingHierarchy] = useState(false);
   
   const {
     entity,
@@ -98,18 +101,26 @@ const EntityDetailV2 = () => {
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
   useEffect(() => {
-    const fetchEntityWithChildren = async () => {
+    const fetchHierarchyData = async () => {
       if (!entity?.id) return;
       
+      setIsLoadingHierarchy(true);
       try {
+        // Fetch entity with children
         const entityData = await getEntityWithChildren(entity.id);
         setEntityWithChildren(entityData);
+        
+        // Fetch parent entity if exists
+        const parent = await getParentEntity(entity.id);
+        setParentEntity(parent);
       } catch (error) {
-        console.error('Error fetching entity with children:', error);
+        console.error('Error fetching hierarchy data:', error);
+      } finally {
+        setIsLoadingHierarchy(false);
       }
     };
 
-    fetchEntityWithChildren();
+    fetchHierarchyData();
   }, [entity?.id]);
 
   const getSidebarButtonConfig = () => {
@@ -422,6 +433,18 @@ const EntityDetailV2 = () => {
 
   const sidebarButtonConfig = getSidebarButtonConfig();
 
+  const handleViewChild = (child: Entity) => {
+    navigate(`/entity/${child.slug || child.id}?preview=true`);
+  };
+
+  const handleAddChild = () => {
+    // TODO: Implement add child functionality
+    toast({
+      title: "Coming Soon",
+      description: "Add child entity functionality will be available soon.",
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
       <NavBarComponent />
@@ -446,6 +469,14 @@ const EntityDetailV2 = () => {
       <div className="flex-1">
         <div className="relative bg-gradient-to-b from-violet-100/30 to-transparent dark:from-violet-900/10">
           <div className="container max-w-6xl mx-auto py-8 px-4">
+            {entity && (
+              <EntityParentBreadcrumb
+                currentEntity={entity}
+                parentEntity={parentEntity}
+                isLoading={isLoadingHierarchy}
+              />
+            )}
+            
             <div className="flex flex-col md:flex-row gap-8">
               <div className="w-full md:w-1/3 lg:w-1/4">
                 <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
@@ -457,7 +488,7 @@ const EntityDetailV2 = () => {
                       src={entity?.image_url || ''}
                       alt={entity?.name || 'Entity image'}
                       className="w-full h-full object-cover"
-                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
+                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || EntityType.Place)}
                     />
                   </div>
                   
@@ -746,6 +777,20 @@ const EntityDetailV2 = () => {
                         <p className="text-muted-foreground mt-2">
                           This entity doesn't have any child products or related items.
                         </p>
+                        {parentEntity && (
+                          <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                            <p className="text-sm text-muted-foreground">
+                              This is a child product of{' '}
+                              <Button
+                                variant="link"
+                                className="p-0 h-auto text-sm font-medium"
+                                onClick={() => navigate(`/entity/${parentEntity.slug || parentEntity.id}?preview=true`)}
+                              >
+                                {parentEntity.name}
+                              </Button>
+                            </p>
+                          </div>
+                        )}
                         <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                           <p>🔄 Coming Soon: Product management interface</p>
                           <p>📦 Examples: Cosmix → Whey Protein, Pre-Workout, etc.</p>
@@ -757,10 +802,25 @@ const EntityDetailV2 = () => {
                           <p className="text-sm text-muted-foreground">
                             Showing {entityWithChildren.children.length} product{entityWithChildren.children.length !== 1 ? 's' : ''}
                           </p>
+                          {user && (
+                            <Button
+                              onClick={handleAddChild}
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Add Product
+                            </Button>
+                          )}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {entityWithChildren.children.map((child) => (
-                            <Card key={child.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                            <Card 
+                              key={child.id} 
+                              className="hover:shadow-md transition-shadow cursor-pointer"
+                              onClick={() => handleViewChild(child)}
+                            >
                               <CardContent className="p-4">
                                 {child.image_url && (
                                   <div className="w-full h-32 rounded-md overflow-hidden bg-muted mb-3">
@@ -768,6 +828,7 @@ const EntityDetailV2 = () => {
                                       src={child.image_url}
                                       alt={child.name}
                                       className="w-full h-full object-cover"
+                                      fallbackSrc={getEntityTypeFallbackImage(child.type)}
                                     />
                                   </div>
                                 )}
@@ -778,9 +839,16 @@ const EntityDetailV2 = () => {
                                       {child.description}
                                     </p>
                                   )}
-                                  <Badge variant="outline" className="text-xs">
-                                    {child.type}
-                                  </Badge>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs capitalize">
+                                      {child.type}
+                                    </Badge>
+                                    {child.venue && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {child.venue}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </CardContent>
                             </Card>
@@ -888,8 +956,45 @@ const EntityDetailV2 = () => {
                   <EntityChildrenCard
                     children={entityWithChildren.children}
                     parentName={entity?.name || ''}
-                    onViewChild={(child) => navigate(`/entity/${child.slug || child.id}`)}
+                    onViewChild={handleViewChild}
+                    onAddChild={handleAddChild}
+                    canAddChildren={user !== null}
+                    isLoading={isLoadingHierarchy}
                   />
+                )}
+                
+                {parentEntity && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium">Part of</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div 
+                        className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => navigate(`/entity/${parentEntity.slug || parentEntity.id}?preview=true`)}
+                      >
+                        {parentEntity.image_url && (
+                          <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                            <ImageWithFallback
+                              src={parentEntity.image_url}
+                              alt={parentEntity.name}
+                              className="w-full h-full object-cover"
+                              fallbackSrc={getEntityTypeFallbackImage(parentEntity.type)}
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">
+                            {parentEntity.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Parent entity
+                          </div>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
                 
                 {entity && <EntityMetadataCard entity={entity} />}
