@@ -1,3 +1,4 @@
+import { Database } from '@/integrations/supabase/types';
 
 export interface Entity {
   id: string;
@@ -9,15 +10,15 @@ export interface Entity {
   metadata?: Record<string, any>;
   venue?: string;
   website_url?: string;
-  type: EntityType;
+  type: Database["public"]["Enums"]["entity_type"];
   slug?: string;
   category_id?: string;
   popularity_score?: number;
   photo_reference?: string;
   created_at?: string;
   updated_at?: string;
-  parent_id?: string; // Add this missing field
-  
+  parent_id?: string;
+
   // Enhanced metadata fields
   authors?: string[];
   publication_year?: number;
@@ -88,7 +89,7 @@ export interface Recommendation {
   created_at: string;
   updated_at: string;
   comment_count?: number;
-  
+
   // Profile fields - these will be removed in Phase 4
   likes?: number;
   isLiked?: boolean;

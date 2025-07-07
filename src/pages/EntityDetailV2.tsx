@@ -83,11 +83,11 @@ const EntityDetailV2 = () => {
     refreshData
   } = useEntityDetail(slug || '');
 
-  // Create stable entity default to prevent hook violations
+  // Create stable entity default to prevent hook violations - using database enum type
   const stableEntityDefault = useMemo(() => ({
     id: '',
     name: '',
-    type: 'product' as const,
+    type: 'product' as const, // This will match the database enum type
     description: '',
     image_url: '',
     api_ref: null,
@@ -286,7 +286,6 @@ const EntityDetailV2 = () => {
             : displayEntity.venue || null
         };
       case 'movie':
-      case 'tv':
         return {
           label: 'Studio',
           value: displayEntity.cast_crew?.studio || displayEntity.venue || null
@@ -303,13 +302,7 @@ const EntityDetailV2 = () => {
           label: 'Brand',
           value: displayEntity.specifications?.brand || displayEntity.venue || null
         };
-      case 'music':
-        return {
-          label: 'Artist',
-          value: displayEntity.venue || null
-        };
       case 'food':
-      case 'drink':
         return {
           label: 'Venue',
           value: displayEntity.venue || null
