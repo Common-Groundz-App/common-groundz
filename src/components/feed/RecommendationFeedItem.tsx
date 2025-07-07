@@ -37,7 +37,7 @@ const resetBodyPointerEvents = () => {
 };
 
 interface RecommendationFeedItemProps {
-  recommendation: import('@/hooks/feed/types').RecommendationFeedItem;
+  recommendation: FeedItem;
   onLike?: (id: string) => void;
   onSave?: (id: string) => void;
   onComment?: (id: string) => void;

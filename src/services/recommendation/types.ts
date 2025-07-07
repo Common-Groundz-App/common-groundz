@@ -1,25 +1,4 @@
 
-import { Database } from '@/integrations/supabase/types';
-
-// Re-export database enum types with familiar names for backward compatibility
-export type EntityType = Database["public"]["Enums"]["entity_type"];
-export type RecommendationCategory = Database["public"]["Enums"]["recommendation_category"];
-
-// Create const enum for value usage
-export const RecommendationCategoryValues = {
-  Food: 'food' as const,
-  Drink: 'drink' as const,
-  Movie: 'movie' as const,
-  Book: 'book' as const,
-  Place: 'place' as const,
-  Product: 'product' as const,
-  Activity: 'activity' as const,
-  Music: 'music' as const,
-  Art: 'art' as const,
-  TV: 'tv' as const,
-  Travel: 'travel' as const,
-} as const;
-
 export interface Entity {
   id: string;
   name: string;
@@ -30,15 +9,14 @@ export interface Entity {
   metadata?: Record<string, any>;
   venue?: string;
   website_url?: string;
-  type: Database["public"]["Enums"]["entity_type"];
+  type: EntityType;
   slug?: string;
   category_id?: string;
   popularity_score?: number;
   photo_reference?: string;
   created_at?: string;
   updated_at?: string;
-  parent_id?: string;
-
+  
   // Enhanced metadata fields
   authors?: string[];
   publication_year?: number;
@@ -53,6 +31,34 @@ export interface Entity {
   last_enriched_at?: string;
   enrichment_source?: string;
   data_quality_score?: number;
+}
+
+export enum EntityType {
+  Movie = 'movie',
+  Book = 'book',
+  Food = 'food',
+  Product = 'product',
+  Place = 'place',
+  Activity = 'activity',
+  Music = 'music',
+  Art = 'art',
+  TV = 'tv',
+  Drink = 'drink',
+  Travel = 'travel'
+}
+
+export enum RecommendationCategory {
+  Food = 'Food',
+  Drink = 'Drink',
+  Movie = 'Movie',
+  Book = 'Book',
+  Place = 'Place',
+  Product = 'Product',
+  Activity = 'Activity',
+  Music = 'Music',
+  Art = 'Art',
+  TV = 'TV',
+  Travel = 'Travel'
 }
 
 export enum RecommendationVisibility {
@@ -70,7 +76,7 @@ export interface Recommendation {
   subtitle?: string;
   description?: string;
   image_url?: string;
-  category: Database["public"]["Enums"]["recommendation_category"];
+  category: RecommendationCategory;
   rating: number;
   venue?: string;
   entity_id?: string;
@@ -81,7 +87,7 @@ export interface Recommendation {
   created_at: string;
   updated_at: string;
   comment_count?: number;
-
+  
   // Profile fields - these will be removed in Phase 4
   likes?: number;
   isLiked?: boolean;

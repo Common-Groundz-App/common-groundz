@@ -1,275 +1,317 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from './types';
-import { Database } from '@/integrations/supabase/types';
+import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
+import { getEntityTypeFallbackImage, saveExternalImageToStorage } from '@/utils/imageUtils';
+import { deferEntityImageRefresh } from '@/utils/imageRefresh';
+import { createEnhancedEntity, queueEntityForEnrichment } from '@/services/enhancedEntityService';
 
+// Generate a slug from a name
+const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .trim()
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+};
+
+// Fetch an entity by its ID
+export const fetchEntityById = async (entityId: string): Promise<Entity | null> => {
+  const { data, error } = await supabase
+    .from('entities')
+    .select('*')
+    .eq('id', entityId)
+    .eq('is_deleted', false)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching entity:', error);
+    return null;
+  }
+
+  return data as Entity;
+};
+
+// Find an entity by api_source and api_ref
+export const findEntityByApiRef = async (apiSource: string, apiRef: string): Promise<Entity | null> => {
+  const { data, error } = await supabase
+    .from('entities')
+    .select('*')
+    .eq('api_source', apiSource)
+    .eq('api_ref', apiRef)
+    .eq('is_deleted', false)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error finding entity by api ref:', error);
+    return null;
+  }
+
+  return data as Entity;
+};
+
+// Update entity image using the original API source
+export const refreshEntityImage = async (entityId: string): Promise<boolean> => {
+  try {
+    // First, fetch the entity
+    const entity = await fetchEntityById(entityId);
+    if (!entity) {
+      console.error('Entity not found for refreshing image:', entityId);
+      return false;
+    }
+
+    // For Google Places entities, fetch fresh photo from the API
+    if (entity.api_source === 'google_places' && entity.api_ref && entity.metadata?.photo_reference) {
+      // We need to call our Edge Function to get the fresh photo URL
+      const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
+        body: {
+          entityId,
+          placeId: entity.api_ref,
+          photoReference: entity.metadata.photo_reference
+        }
+      });
+
+      if (error || !data?.imageUrl) {
+        console.error('Error refreshing entity image:', error);
+        return false;
+      }
+
+      // Update the entity with the new image URL
+      const { error: updateError } = await supabase
+        .from('entities')
+        .update({ image_url: data.imageUrl })
+        .eq('id', entityId);
+
+      if (updateError) {
+        console.error('Error updating entity image URL:', updateError);
+        return false;
+      }
+
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error in refreshEntityImage:', error);
+    return false;
+  }
+};
+
+// Create a new entity - now using enhanced service with proper image handling
+export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>): Promise<Entity | null> => {
+  // Convert EntityType enum to string for database compatibility
+  let typeAsString: string;
+  
+  if (typeof entity.type === 'string') {
+    typeAsString = entity.type;
+  } else {
+    typeAsString = mapEntityTypeToString(entity.type as EntityType);
+  }
+  
+  console.log(`🏗️ Creating entity using enhanced service: ${entity.name}`);
+  
+  // Use enhanced entity service for rich metadata extraction and proper image handling
+  const enhancedEntity = await createEnhancedEntity({
+    name: entity.name,
+    type: typeAsString,
+    venue: entity.venue,
+    description: entity.description,
+    image_url: entity.image_url,
+    api_source: entity.api_source,
+    api_ref: entity.api_ref,
+    website_url: entity.website_url,
+    metadata: entity.metadata || {}
+  }, typeAsString);
+  
+  if (enhancedEntity) {
+    console.log(`✅ Enhanced entity created successfully: ${enhancedEntity.name}`);
+    return enhancedEntity;
+  }
+  
+  // Fallback to basic entity creation if enhanced service fails
+  console.log(`⚠️ Enhanced service failed, falling back to basic entity creation`);
+  
+  // Ensure we have a valid image URL or use fallback based on type
+  const imageUrl = entity.image_url || getEntityTypeFallbackImage(typeAsString);
+  
+  // Generate a unique slug
+  let baseSlug = entity.slug || generateSlug(entity.name);
+  let finalSlug = baseSlug;
+  let counter = 0;
+  
+  // Check for slug uniqueness and generate a unique one if needed
+  while (true) {
+    const { data: existingEntity } = await supabase
+      .from('entities')
+      .select('id')
+      .eq('slug', finalSlug)
+      .eq('is_deleted', false)
+      .maybeSingle();
+    
+    if (!existingEntity) {
+      break; // Slug is unique
+    }
+    
+    counter++;
+    finalSlug = `${baseSlug}-${counter}`;
+  }
+  
+  // For database insertion, prepare the entity data with only the fields that exist in the database
+  const entityForDb = {
+    name: entity.name,
+    type: typeAsString as "movie" | "book" | "food" | "product" | "place", // Cast to allowed type literals
+    venue: entity.venue || null,
+    description: entity.description || null,
+    image_url: imageUrl,
+    api_source: entity.api_source || null,
+    api_ref: entity.api_ref || null,
+    metadata: entity.metadata || null,
+    website_url: entity.website_url || null,
+    slug: finalSlug
+  };
+  
+  console.log(`🏗️ Creating basic entity in database with slug: ${finalSlug}`, entityForDb);
+  
+  const { data, error } = await supabase
+    .from('entities')
+    .insert(entityForDb)
+    .select()
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('❌ Error creating entity:', error);
+    return null;
+  }
+
+  console.log(`✅ Basic entity created successfully with slug: ${data?.slug}`, data);
+  
+  // For basic entities, also try to save the image locally if provided
+  if (data && entity.image_url && !entity.image_url.includes('entity-images')) {
+    console.log('🖼️ Attempting to save image locally for basic entity:', data.id);
+    const savedImageUrl = await saveExternalImageToStorage(entity.image_url, data.id);
+    
+    if (savedImageUrl && savedImageUrl !== entity.image_url) {
+      // Update entity with local image URL
+      const { error: updateError } = await supabase
+        .from('entities')
+        .update({ image_url: savedImageUrl })
+        .eq('id', data.id);
+      
+      if (!updateError) {
+        data.image_url = savedImageUrl;
+        console.log('✅ Basic entity image updated to local storage');
+      }
+    }
+  }
+  
+  return data as Entity;
+};
+
+// Find or create an entity based on external API data - now with enhanced processing
 export const findOrCreateEntity = async (
   name: string,
-  type: Database["public"]["Enums"]["entity_type"],
-  venue?: string,
-  imageUrl?: string,
-  apiRef?: string,
-  apiSource?: string,
-  metadata?: Record<string, any>,
-  description?: string,
-  websiteUrl?: string,
-  categoryId?: string,
-  photoReference?: string,
-  authors?: string[],
-  publicationYear?: number,
-  isbn?: string,
-  languages?: string[],
-  externalRatings?: Record<string, any>,
-  priceInfo?: Record<string, any>,
-  specifications?: Record<string, any>,
-  castCrew?: Record<string, any>,
-  ingredients?: string[],
-  nutritionalInfo?: Record<string, any>
-): Promise<Entity> => {
-  try {
-    // Check if an entity with the same name and type already exists
-    let { data: existingEntity, error: selectError } = await supabase
-      .from('entities')
-      .select('*')
-      .eq('name', name)
-      .eq('type', type)
-      .eq('is_deleted', false)
-      .limit(1)
-      .single();
-
-    if (selectError) {
-      console.error('Error checking for existing entity:', selectError);
-      throw selectError;
-    }
-
+  type: EntityType | EntityTypeString,
+  apiSource: string | null,
+  apiRef: string | null,
+  venue: string | null = null,
+  description: string | null = null,
+  imageUrl: string | null = null,
+  metadata: any | null = null,
+  userId: string | null = null,
+  websiteUrl: string | null = null
+): Promise<Entity | null> => {
+  // If we have API reference information, try to find the entity first
+  if (apiSource && apiRef) {
+    const existingEntity = await findEntityByApiRef(apiSource, apiRef);
     if (existingEntity) {
-      console.log('Entity already exists:', existingEntity);
-      return {
-        id: existingEntity.id,
-        name: existingEntity.name,
-        description: existingEntity.description,
-        image_url: existingEntity.image_url,
-        api_ref: existingEntity.api_ref,
-        api_source: existingEntity.api_source,
-        metadata: existingEntity.metadata ? (typeof existingEntity.metadata === 'string' ? JSON.parse(existingEntity.metadata) : existingEntity.metadata) : {},
-        venue: existingEntity.venue,
-        website_url: existingEntity.website_url,
-        type: existingEntity.type as Database["public"]["Enums"]["entity_type"],
-        slug: existingEntity.slug,
-        category_id: existingEntity.category_id,
-        popularity_score: existingEntity.popularity_score,
-        photo_reference: existingEntity.photo_reference,
-        created_at: existingEntity.created_at,
-        updated_at: existingEntity.updated_at,
-        authors: existingEntity.authors,
-        publication_year: existingEntity.publication_year,
-        isbn: existingEntity.isbn,
-        languages: existingEntity.languages,
-        external_ratings: existingEntity.external_ratings,
-        price_info: existingEntity.price_info,
-        specifications: existingEntity.specifications,
-        cast_crew: existingEntity.cast_crew,
-        ingredients: existingEntity.ingredients,
-        nutritional_info: existingEntity.nutritional_info,
-        last_enriched_at: existingEntity.last_enriched_at,
-        enrichment_source: existingEntity.enrichment_source,
-        data_quality_score: existingEntity.data_quality_score,
-        parent_id: existingEntity.parent_id
-      };
-    }
-
-    // If the entity doesn't exist, create a new one
-    const { data: newEntity, error: insertError } = await supabase
-      .from('entities')
-      .insert([
-        {
-          name,
-          type,
-          venue,
-          image_url: imageUrl,
-          api_ref: apiRef,
-          api_source: apiSource,
-          metadata,
-          description,
-          website_url: websiteUrl,
-          category_id: categoryId,
-          photo_reference: photoReference,
-          authors,
-          publication_year: publicationYear,
-          isbn,
-          languages,
-          external_ratings: externalRatings,
-          price_info: priceInfo,
-          specifications,
-          cast_crew: castCrew,
-          ingredients,
-          nutritional_info: nutritionalInfo
-        }
-      ])
-      .select('*')
-      .limit(1)
-      .single();
-
-    if (insertError) {
-      console.error('Error creating entity:', insertError);
-      throw insertError;
-    }
-
-    if (!newEntity) {
-      throw new Error('Failed to create new entity');
-    }
-
-    console.log('Entity created:', newEntity);
-    return {
-      id: newEntity.id,
-      name: newEntity.name,
-      description: newEntity.description,
-      image_url: newEntity.image_url,
-      api_ref: newEntity.api_ref,
-      api_source: newEntity.api_source,
-      metadata: newEntity.metadata ? (typeof newEntity.metadata === 'string' ? JSON.parse(newEntity.metadata) : newEntity.metadata) : {},
-      venue: newEntity.venue,
-      website_url: newEntity.website_url,
-      type: newEntity.type as Database["public"]["Enums"]["entity_type"],
-      slug: newEntity.slug,
-      category_id: newEntity.category_id,
-      popularity_score: newEntity.popularity_score,
-      photo_reference: newEntity.photo_reference,
-      created_at: newEntity.created_at,
-      updated_at: newEntity.updated_at,
-      authors: newEntity.authors,
-      publication_year: newEntity.publication_year,
-      isbn: newEntity.isbn,
-      languages: newEntity.languages,
-      external_ratings: newEntity.external_ratings,
-      price_info: newEntity.price_info,
-      specifications: newEntity.specifications,
-      cast_crew: newEntity.cast_crew,
-      ingredients: newEntity.ingredients,
-      nutritional_info: newEntity.nutritional_info,
-      last_enriched_at: newEntity.last_enriched_at,
-      enrichment_source: newEntity.enrichment_source,
-      data_quality_score: newEntity.data_quality_score,
-      parent_id: newEntity.parent_id
-    };
-  } catch (error: any) {
-    console.error('Error in findOrCreateEntity:', error);
-    throw error;
-  }
-};
-
-export const getEntitiesByType = async (type: Database["public"]["Enums"]["entity_type"]): Promise<Entity[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('entities')
-      .select('*')
-      .eq('type', type)
-      .eq('is_deleted', false);
-
-    if (error) {
-      console.error('Error fetching entities by type:', error);
-      throw error;
-    }
-
-    if (!data) {
-      return [];
-    }
-
-    return data.map(entity => ({
-      id: entity.id,
-      name: entity.name,
-      description: entity.description,
-      image_url: entity.image_url,
-      api_ref: entity.api_ref,
-      api_source: entity.api_source,
-      metadata: entity.metadata ? (typeof entity.metadata === 'string' ? JSON.parse(entity.metadata) : entity.metadata) : {},
-      venue: entity.venue,
-      website_url: entity.website_url,
-      type: entity.type as Database["public"]["Enums"]["entity_type"],
-      slug: entity.slug,
-      category_id: entity.category_id,
-      popularity_score: entity.popularity_score,
-      photo_reference: entity.photo_reference,
-      created_at: entity.created_at,
-      updated_at: entity.updated_at,
-      authors: entity.authors,
-      publication_year: entity.publication_year,
-      isbn: entity.isbn,
-      languages: entity.languages,
-      external_ratings: entity.external_ratings,
-      price_info: entity.price_info,
-      specifications: entity.specifications,
-      cast_crew: entity.cast_crew,
-      ingredients: entity.ingredients,
-      nutritional_info: entity.nutritional_info,
-      last_enriched_at: entity.last_enriched_at,
-      enrichment_source: entity.enrichment_source,
-      data_quality_score: entity.data_quality_score,
-      parent_id: entity.parent_id
-    }));
-  } catch (error) {
-    console.error('Error in getEntitiesByType:', error);
-    throw error;
-  }
-};
-
-export const findEntityByApiRef = async (apiRef: string, apiSource: string): Promise<Entity | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('entities')
-      .select('*')
-      .eq('api_ref', apiRef)
-      .eq('api_source', apiSource)
-      .eq('is_deleted', false)
-      .limit(1)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // No results found
-        return null;
+      console.log(`🔍 Found existing entity: ${existingEntity.id} (${existingEntity.name}) with api_ref: ${apiRef}`);
+      
+      // Check if entity needs enrichment (older than 7 days or low quality score)
+      const needsEnrichment = !existingEntity.last_enriched_at || 
+                             new Date(existingEntity.last_enriched_at) < new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) ||
+                             (existingEntity.data_quality_score || 0) < 50;
+      
+      if (needsEnrichment) {
+        console.log(`⏰ Queuing existing entity for enrichment: ${existingEntity.id}`);
+        await queueEntityForEnrichment(existingEntity.id, 3); // Higher priority for existing entities
       }
-      console.error('Error finding entity by API ref:', error);
-      throw error;
+      
+      return existingEntity;
     }
-
-    if (!data) {
-      return null;
-    }
-
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      image_url: data.image_url,
-      api_ref: data.api_ref,
-      api_source: data.api_source,
-      metadata: data.metadata ? (typeof data.metadata === 'string' ? JSON.parse(data.metadata) : data.metadata) : {},
-      venue: data.venue,
-      website_url: data.website_url,
-      type: data.type as Database["public"]["Enums"]["entity_type"],
-      slug: data.slug,
-      category_id: data.category_id,
-      popularity_score: data.popularity_score,
-      photo_reference: data.photo_reference,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-      authors: data.authors,
-      publication_year: data.publication_year,
-      isbn: data.isbn,
-      languages: data.languages,
-      external_ratings: data.external_ratings,
-      price_info: data.price_info,
-      specifications: data.specifications,
-      cast_crew: data.cast_crew,
-      ingredients: data.ingredients,
-      nutritional_info: data.nutritional_info,
-      last_enriched_at: data.last_enriched_at,
-      enrichment_source: data.enrichment_source,
-      data_quality_score: data.data_quality_score,
-      parent_id: data.parent_id
-    };
-  } catch (error) {
-    console.error('Error in findEntityByApiRef:', error);
-    throw error;
   }
+  
+  // Convert type to string if it's an enum
+  const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
+
+  console.log(`🆕 Creating new enhanced entity: ${name} (${typeAsString}) with api_ref: ${apiRef}`);
+  
+  // Create a new entity using enhanced service
+  const entity = await createEnhancedEntity({
+    name,
+    type: typeAsString,
+    venue,
+    description,
+    image_url: imageUrl,
+    api_source: apiSource,
+    api_ref: apiRef,
+    metadata: metadata || {},
+    website_url: websiteUrl
+  }, typeAsString);
+  
+  if (!entity) {
+    // Fallback to basic entity creation
+    console.log(`⚠️ Enhanced entity creation failed, using basic creation`);
+    return await createEntity({
+      name,
+      type: typeAsString as any,
+      venue,
+      description,
+      image_url: imageUrl,
+      api_source: apiSource,
+      api_ref: apiRef,
+      metadata,
+      website_url: websiteUrl,
+      slug: generateSlug(name)
+    });
+  }
+  
+  // Queue for additional background enrichment if it's from an API source
+  if (apiSource && apiRef) {
+    console.log(`⏰ Queuing newly created entity for background enrichment: ${entity.id}`);
+    await queueEntityForEnrichment(entity.id, 2); // High priority for new entities
+  }
+  
+  return entity;
+};
+
+// Get entities by type (for searching/filtering)
+export const getEntitiesByType = async (type: EntityType | EntityTypeString, searchTerm: string = ''): Promise<Entity[]> => {
+  // Convert type to string if it's an enum
+  const typeAsString = typeof type === 'string' 
+    ? type as string 
+    : mapEntityTypeToString(type as EntityType);
+  
+  let query = supabase
+    .from('entities')
+    .select('*')
+    .eq('type', typeAsString as "movie" | "book" | "food" | "product" | "place")
+    .eq('is_deleted', false);
+    
+  if (searchTerm) {
+    query = query.ilike('name', `%${searchTerm}%`);
+  }
+  
+  const { data, error } = await query.order('name');
+
+  if (error) {
+    console.error('Error fetching entities by type:', error);
+    return [];
+  }
+
+  return data as Entity[];
 };

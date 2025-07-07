@@ -56,7 +56,6 @@ export const processPosts = async (
       
       return {
         ...post,
-        type: 'post' as const,
         username,
         avatar_url,
         is_post: true,
@@ -66,9 +65,7 @@ export const processPosts = async (
         comment_count,
         tagged_entities: entitiesByPostId[post.id] || [],
         media: mediaItems,
-        status: postStatus,
-        isLiked: isLiked,
-        isSaved: isSaved
+        status: postStatus
       } as PostFeedItem;
     });
     

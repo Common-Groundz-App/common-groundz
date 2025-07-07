@@ -1,14 +1,18 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { FeedQueryParams } from '../../types';
+import { PostsQueryResult } from './types';
 
-export interface PostsQueryResult {
-  posts: any[];
-}
-
-export const fetchPosts = async ({ userId, page, itemsPerPage }: FeedQueryParams): Promise<PostsQueryResult> => {
+// Fetch posts with pagination
+export const fetchPosts = async (
+  { page, itemsPerPage }: FeedQueryParams,
+  followingIds?: string[] // Optional parameter to filter by following users
+): Promise<PostsQueryResult> => {
   try {
-    const { data: posts, error } = await supabase
+    const postsFrom = page * itemsPerPage;
+    const postsTo = postsFrom + itemsPerPage - 1;
+    
+    let query = supabase
       .from('posts')
       .select(`
         id,
@@ -16,25 +20,34 @@ export const fetchPosts = async ({ userId, page, itemsPerPage }: FeedQueryParams
         content,
         post_type,
         visibility,
-        view_count,
-        comment_count,
-        tags,
-        media,
-        status,
         user_id,
         created_at,
-        updated_at
+        updated_at,
+        media,
+        view_count,
+        status,
+        is_deleted,
+        tags
       `)
       .eq('visibility', 'public')
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
-      .range(page * itemsPerPage, (page + 1) * itemsPerPage - 1);
-
-    if (error) throw error;
-
-    return {
-      posts: posts || []
-    };
+      .range(postsFrom, postsTo);
+      
+    // Filter by following users if provided
+    if (followingIds && followingIds.length > 0) {
+      query = query.in('user_id', followingIds);
+    }
+    
+    const { data: postsData, error: postsError } = await query;
+      
+    if (postsError) throw postsError;
+    if (!postsData || postsData.length === 0) return { posts: [], userIds: [] };
+    
+    // Extract user IDs for profile fetching
+    const userIds = postsData.map(post => post.user_id);
+    
+    return { posts: postsData, userIds };
   } catch (error) {
     console.error('Error fetching posts:', error);
     throw error;

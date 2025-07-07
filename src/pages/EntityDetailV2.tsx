@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info, ArrowLeft, Building2 } from 'lucide-react';
+import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info, ArrowLeft } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
@@ -42,14 +42,7 @@ import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { EntityProductsCard } from '@/components/entity/EntityProductsCard';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
-import { getEntityWithChildren, EntityWithChildren, getParentEntity } from '@/services/entityHierarchyService';
-import { Entity } from '@/services/recommendation/types';
-import { BreadcrumbNavigation } from '@/components/ui/breadcrumb-navigation';
-import { ParentBrandBadge } from '@/components/entity/ParentBrandBadge';
-import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
-import { SiblingProductsSection } from '@/components/entity/SiblingProductsSection';
-import { ReviewTypeFilter } from '@/components/entity/ReviewTypeFilter';
-import { useEntityMetadataFallback } from '@/hooks/use-entity-metadata-fallback';
+import { getEntityWithChildren, EntityWithChildren } from '@/services/entityHierarchyService';
 
 const EntityDetailV2 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -57,7 +50,6 @@ const EntityDetailV2 = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
-  const [reviewTypeFilter, setReviewTypeFilter] = useState<'all' | 'product' | 'brand'>('all');
   const { handleImageUpload } = useRecommendationUploads();
   
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
@@ -67,11 +59,9 @@ const EntityDetailV2 = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [entityWithChildren, setEntityWithChildren] = useState<EntityWithChildren | null>(null);
-  const [parentEntity, setParentEntity] = useState<Entity | null>(null);
   
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
   
-  // Main entity data hook - call this first and consistently
   const {
     entity,
     recommendations,
@@ -82,46 +72,6 @@ const EntityDetailV2 = () => {
     error,
     refreshData
   } = useEntityDetail(slug || '');
-
-  // Create stable entity default to prevent hook violations - using database enum type
-  const stableEntityDefault = useMemo(() => ({
-    id: '',
-    name: '',
-    type: 'product' as const, // This will match the database enum type
-    description: '',
-    image_url: '',
-    api_ref: null,
-    api_source: null,
-    metadata: {},
-    venue: null,
-    website_url: null,
-    slug: null,
-    category_id: null,
-    popularity_score: null,
-    photo_reference: null,
-    created_at: null,
-    updated_at: null,
-    authors: null,
-    publication_year: null,
-    isbn: null,
-    languages: null,
-    external_ratings: null,
-    price_info: null,
-    specifications: null,
-    cast_crew: null,
-    ingredients: null,
-    nutritional_info: null,
-    last_enriched_at: null,
-    enrichment_source: null,
-    data_quality_score: null,
-    parent_id: null
-  }), []);
-
-  // Always call hooks with stable parameters - this prevents hook violations
-  const enhancedEntity = useEntityMetadataFallback({ 
-    entity: entity || stableEntityDefault, 
-    parentEntity: parentEntity || null
-  });
   
   const {
     circleRating,
@@ -129,63 +79,24 @@ const EntityDetailV2 = () => {
     circleContributors,
     isLoading: isCircleRatingLoading
   } = useCircleRating(entity?.id || '');
-
-  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
-
-  // Use actual entity if available, otherwise use enhanced fallback
-  const displayEntity = entity || enhancedEntity;
-
-  // Memoized derived data to prevent unnecessary re-renders
-  const dynamicReviews = useMemo(() => {
+  
+  const dynamicReviews = React.useMemo(() => {
     if (!reviews) return [];
     return reviews.filter(review => review.has_timeline && review.timeline_count && review.timeline_count > 0);
   }, [reviews]);
 
-  const allReviews = useMemo(() => {
-    return reviews || [];
+  const allReviews = React.useMemo(() => {
+    if (!reviews) return [];
+    return reviews;
   }, [reviews]);
 
-  const userReview = useMemo(() => {
+  const userReview = React.useMemo(() => {
     if (!user || !reviews) return null;
     return reviews.find(review => review.user_id === user.id);
   }, [user, reviews]);
 
-  const filteredReviews = useMemo(() => {
-    if (!allReviews || reviewTypeFilter === 'all') {
-      return allReviews;
-    }
-    return allReviews;
-  }, [allReviews, reviewTypeFilter]);
+  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
-  const reviewTypeCounts = useMemo(() => {
-    return {
-      product: allReviews?.length || 0,
-      brand: 0,
-    };
-  }, [allReviews]);
-
-  const breadcrumbItems = useMemo(() => {
-    const items = [];
-    
-    if (parentEntity) {
-      items.push({
-        label: parentEntity.name,
-        href: `/entity-v2/${parentEntity.slug || parentEntity.id}`,
-      });
-    }
-    
-    if (displayEntity && displayEntity.id) {
-      items.push({
-        label: displayEntity.name,
-        href: `/entity-v2/${displayEntity.slug || displayEntity.id}`,
-        isActive: true,
-      });
-    }
-    
-    return items;
-  }, [displayEntity, parentEntity]);
-
-  // Entity hierarchy fetching - only when entity is available
   useEffect(() => {
     const fetchEntityWithChildren = async () => {
       if (!entity?.id) return;
@@ -201,22 +112,55 @@ const EntityDetailV2 = () => {
     fetchEntityWithChildren();
   }, [entity?.id]);
 
-  useEffect(() => {
-    const fetchParentEntity = async () => {
-      if (!entity?.parent_id) return;
-      
-      try {
-        const parentData = await getParentEntity(entity.id);
-        setParentEntity(parentData);
-      } catch (error) {
-        console.error('Error fetching parent entity:', error);
-      }
+  const getSidebarButtonConfig = () => {
+    if (!userReview) {
+      return {
+        text: 'Write Review',
+        icon: MessageSquare,
+        action: handleAddReview,
+        tooltip: null
+      };
+    }
+    
+    if (userReview.has_timeline && userReview.timeline_count && userReview.timeline_count > 0) {
+      return {
+        text: 'Add Timeline Update',
+        icon: MessageSquare,
+        action: () => handleStartTimeline(userReview.id),
+        tooltip: 'Continue tracking how your experience evolves'
+      };
+    }
+    
+    return {
+      text: 'Update Your Review',
+      icon: MessageSquare,
+      action: () => handleStartTimeline(userReview.id),
+      tooltip: 'Already reviewed this? Add how it\'s going now.'
     };
+  };
+  
+  useEffect(() => {
+    if (!isLoading) {
+      console.log('EntityDetail component received recommendations:', recommendations?.length);
+      console.log('EntityDetail component received reviews:', reviews?.length);
+      console.log('Dynamic reviews:', dynamicReviews.length);
+      console.log('Static reviews:', allReviews.length);
+      console.log('User review:', userReview);
+      if (recommendations?.length > 0) {
+        console.log('Sample recommendation:', recommendations[0]);
+      }
+      if (reviews?.length > 0) {
+        console.log('Sample review:', reviews[0]);
+      }
+    }
+  }, [isLoading, recommendations, reviews, dynamicReviews, allReviews, userReview]);
 
-    fetchParentEntity();
-  }, [entity?.id, entity?.parent_id]);
+  useEffect(() => {
+    if (circleContributors.length > 0) {
+      console.log('Contributors ready for display:', circleContributors);
+    }
+  }, [circleContributors]);
 
-  // Early return for loading and error states - after all hooks are called
   if (!isLoading && (error || !entity)) {
     return <NotFound />;
   }
@@ -252,10 +196,6 @@ const EntityDetailV2 = () => {
     );
   }
 
-  const handleViewAllProducts = () => {
-    setActiveTab('products');
-  };
-
   const getEntityTypeFallbackImage = (type: string): string => {
     const fallbacks: Record<string, string> = {
       'movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
@@ -275,42 +215,49 @@ const EntityDetailV2 = () => {
   };
 
   const getContextualFieldInfo = () => {
-    if (!displayEntity) return null;
+    if (!entity) return null;
     
-    switch (displayEntity.type) {
+    switch (entity.type) {
       case 'book':
         return {
           label: 'Author',
-          value: displayEntity.authors && displayEntity.authors.length > 0 
-            ? displayEntity.authors[0] 
-            : displayEntity.venue || null
+          value: entity.authors && entity.authors.length > 0 
+            ? entity.authors[0] 
+            : entity.venue || null
         };
       case 'movie':
+      case 'tv':
         return {
           label: 'Studio',
-          value: displayEntity.cast_crew?.studio || displayEntity.venue || null
+          value: entity.cast_crew?.studio || entity.venue || null
         };
       case 'place':
         return {
           label: 'Location',
-          value: displayEntity.api_source === 'google_places' && displayEntity.metadata?.formatted_address
-            ? displayEntity.metadata.formatted_address
-            : displayEntity.venue || null
+          value: entity.api_source === 'google_places' && entity.metadata?.formatted_address
+            ? entity.metadata.formatted_address
+            : entity.venue || null
         };
       case 'product':
         return {
           label: 'Brand',
-          value: displayEntity.specifications?.brand || displayEntity.venue || null
+          value: entity.specifications?.brand || entity.venue || null
+        };
+      case 'music':
+        return {
+          label: 'Artist',
+          value: entity.venue || null
         };
       case 'food':
+      case 'drink':
         return {
           label: 'Venue',
-          value: displayEntity.venue || null
+          value: entity.venue || null
         };
       default:
         return {
           label: 'Source',
-          value: displayEntity.venue || null
+          value: entity.venue || null
         };
     }
   };
@@ -412,15 +359,15 @@ const EntityDetailV2 = () => {
   };
 
   const handleImageRefresh = async () => {
-    if (!displayEntity) return;
+    if (!entity) return;
     
     setIsRefreshingImage(true);
     
     try {
       const newImageUrl = await refreshEntityImage(
-        displayEntity.id, 
-        displayEntity.api_source === 'google_places' ? displayEntity.api_ref : undefined, 
-        displayEntity.photo_reference
+        entity.id, 
+        entity.api_source === 'google_places' ? entity.api_ref : undefined, 
+        entity.photo_reference
       );
       
       if (newImageUrl) {
@@ -462,44 +409,17 @@ const EntityDetailV2 = () => {
   };
 
   const createMediaItem = (): MediaItem => {
-    const imageUrl = displayEntity?.image_url || getEntityTypeFallbackImage(displayEntity?.type || 'place');
+    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entity?.type || 'place');
     return {
       url: imageUrl,
       type: 'image',
-      alt: displayEntity?.name || 'Entity image',
-      caption: displayEntity?.name,
+      alt: entity?.name || 'Entity image',
+      caption: entity?.name,
       order: 0,
-      id: displayEntity?.id || 'entity-image'
+      id: entity?.id || 'entity-image'
     };
   };
 
-  const getSidebarButtonConfig = () => {
-    if (!userReview) {
-      return {
-        text: 'Write Review',
-        icon: MessageSquare,
-        action: handleAddReview,
-        tooltip: null
-      };
-    }
-    
-    if (userReview.has_timeline && userReview.timeline_count && userReview.timeline_count > 0) {
-      return {
-        text: 'Add Timeline Update',
-        icon: MessageSquare,
-        action: () => handleStartTimeline(userReview.id),
-        tooltip: 'Continue tracking how your experience evolves'
-      };
-    }
-    
-    return {
-      text: 'Update Your Review',
-      icon: MessageSquare,
-      action: () => handleStartTimeline(userReview.id),
-      tooltip: 'Already reviewed this? Add how it\'s going now.'
-    };
-  };
-  
   const sidebarButtonConfig = getSidebarButtonConfig();
 
   return (
@@ -526,10 +446,6 @@ const EntityDetailV2 = () => {
       <div className="flex-1">
         <div className="relative bg-gradient-to-b from-violet-100/30 to-transparent dark:from-violet-900/10">
           <div className="container max-w-6xl mx-auto py-8 px-4">
-            {breadcrumbItems.length > 0 && (
-              <BreadcrumbNavigation items={breadcrumbItems} />
-            )}
-
             <div className="flex flex-col md:flex-row gap-8">
               <div className="w-full md:w-1/3 lg:w-1/4">
                 <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
@@ -538,25 +454,25 @@ const EntityDetailV2 = () => {
                     onClick={handleImageClick}
                   >
                     <ImageWithFallback
-                      src={displayEntity?.image_url || ''}
-                      alt={displayEntity?.name || 'Entity image'}
+                      src={entity?.image_url || ''}
+                      alt={entity?.name || 'Entity image'}
                       className="w-full h-full object-cover"
-                      fallbackSrc={getEntityTypeFallbackImage(displayEntity?.type || 'place')}
+                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
                     />
                   </div>
                   
-                  {displayEntity?.image_url && (
+                  {entity?.image_url && (
                     <div className="absolute top-2 right-2 flex gap-1">
                       <Badge 
                         variant="outline" 
                         className={`${
-                          isEntityImageMigrated(displayEntity.image_url) 
+                          isEntityImageMigrated(entity.image_url) 
                             ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' 
                             : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
                         } opacity-80 group-hover:opacity-100`}
                       >
                         <Image className="h-3 w-3 mr-1" />
-                        {isEntityImageMigrated(displayEntity.image_url) ? 'Local' : 'External'}
+                        {isEntityImageMigrated(entity.image_url) ? 'Local' : 'External'}
                       </Badge>
                       
                       {user && (
@@ -578,24 +494,12 @@ const EntityDetailV2 = () => {
               
               <div className="flex-1 space-y-4">
                 <div className="flex flex-col gap-2">
-                  {parentEntity && (
-                    <ParentBrandBadge 
-                      parentEntity={parentEntity}
-                      currentEntityName={displayEntity?.name}
-                    />
-                  )}
-
                   <div className="flex items-center gap-2">
-                    <h1 className="text-3xl font-bold">{displayEntity?.name}</h1>
+                    <h1 className="text-3xl font-bold">{entity?.name}</h1>
                     <Badge variant="outline" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 gap-1">
                       <Flag className="h-3 w-3" /> V2 Preview
                     </Badge>
-                    {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
-                      <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 gap-1">
-                        <Building2 className="h-3 w-3" /> Brand ({entityWithChildren.children.length} Products)
-                      </Badge>
-                    )}
-                    {displayEntity?.metadata?.verified && (
+                    {entity?.metadata?.verified && (
                       <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 gap-1">
                         <Flag className="h-3 w-3" /> Verified
                       </Badge>
@@ -603,12 +507,12 @@ const EntityDetailV2 = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
-                      {displayEntity?.type}
+                      {entity?.type}
                     </Badge>
                   </div>
                   
-                  {displayEntity?.description && (
-                    <p className="text-muted-foreground mt-2">{displayEntity.description}</p>
+                  {entity?.description && (
+                    <p className="text-muted-foreground mt-2">{entity.description}</p>
                   )}
                 </div>
               </div>
@@ -706,7 +610,7 @@ const EntityDetailV2 = () => {
                         contributors={circleContributors}
                         totalCount={circleRatingCount}
                         maxDisplay={4}
-                        entityName={displayEntity?.name}
+                        entityName={entity?.name}
                       />
                     </div>
                   </div>
@@ -783,19 +687,13 @@ const EntityDetailV2 = () => {
                   </TabsList>
                   
                   <TabsContent value="overview" className="space-y-6 mt-2">
-                    <FeaturedProductsSection
-                      children={entityWithChildren?.children}
-                      parentName={displayEntity?.name || ''}
-                      onViewAll={handleViewAllProducts}
-                    />
-                    
                     <Card>
                       <CardHeader>
-                        <CardTitle>About {displayEntity?.name}</CardTitle>
+                        <CardTitle>About {entity?.name}</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        {displayEntity?.description ? (
-                          <p className="text-muted-foreground">{displayEntity.description}</p>
+                        {entity?.description ? (
+                          <p className="text-muted-foreground">{entity.description}</p>
                         ) : (
                           <p className="text-muted-foreground italic">No description available.</p>
                         )}
@@ -803,13 +701,13 @@ const EntityDetailV2 = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                           <div>
                             <h4 className="font-medium mb-2">Type</h4>
-                            <Badge variant="outline">{displayEntity?.type}</Badge>
+                            <Badge variant="outline">{entity?.type}</Badge>
                           </div>
                           
-                          {displayEntity?.venue && (
+                          {entity?.venue && (
                             <div>
                               <h4 className="font-medium mb-2">Source</h4>
-                              <p className="text-sm text-muted-foreground">{displayEntity.venue}</p>
+                              <p className="text-sm text-muted-foreground">{entity.venue}</p>
                             </div>
                           )}
                         </div>
@@ -898,7 +796,7 @@ const EntityDetailV2 = () => {
                         <MessageSquare className="h-12 w-12 mx-auto text-amber-300 dark:text-amber-700" />
                         <h3 className="font-medium text-lg mt-4">No reviews yet</h3>
                         <p className="text-muted-foreground mt-2">
-                          Be the first to review {displayEntity?.name}!
+                          Be the first to review {entity?.name}!
                         </p>
                         <Button onClick={handleAddReview} className="mt-4 gap-2" variant="outline">
                           <Plus className="h-4 w-4" />
@@ -907,16 +805,9 @@ const EntityDetailV2 = () => {
                       </div>
                     ) : (
                       <>
-                        <ReviewTypeFilter
-                          reviewTypes={reviewTypeCounts}
-                          selectedType={reviewTypeFilter}
-                          onTypeChange={setReviewTypeFilter}
-                          entityName={displayEntity?.name || ''}
-                        />
-
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-muted-foreground">
-                            Showing {filteredReviews.length} review{filteredReviews.length !== 1 ? 's' : ''}
+                            Showing {allReviews.length} review{allReviews.length !== 1 ? 's' : ''}
                           </p>
                           <Button 
                             onClick={handleAddReview}
@@ -929,7 +820,7 @@ const EntityDetailV2 = () => {
                           </Button>
                         </div>
                         <div className="space-y-4">
-                          {filteredReviews.map((review) => (
+                          {allReviews.map((review) => (
                             <ReviewCard
                               key={review.id}
                               review={review}
@@ -955,7 +846,7 @@ const EntityDetailV2 = () => {
                       </p>
                       <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                         <p>🔄 Coming in Phase 4: Social Posts Integration</p>
-                        <p>📱 Will show: Posts where users tag {displayEntity?.name}</p>
+                        <p>📱 Will show: Posts where users tag {entity?.name}</p>
                       </div>
                     </div>
                   </TabsContent>
@@ -976,10 +867,10 @@ const EntityDetailV2 = () => {
                       Write Review
                     </Button>
                     
-                    {displayEntity && displayEntity.id && (
+                    {entity && (
                       <EntityFollowButton
-                        entityId={displayEntity.id}
-                        entityName={displayEntity.name}
+                        entityId={entity.id}
+                        entityName={entity.name}
                         variant="outline"
                         size="default"
                         showCount={true}
@@ -988,73 +879,61 @@ const EntityDetailV2 = () => {
                   </CardContent>
                 </Card>
                 
-                {displayEntity && displayEntity.id && (
-                  <EntityProductsCard
-                    entityId={displayEntity.id}
-                    entityName={displayEntity.name}
-                  />
-                )}
+                <EntityProductsCard
+                  entityId={entity.id}
+                  entityName={entity.name}
+                />
                 
                 {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
                   <EntityChildrenCard
                     children={entityWithChildren.children}
-                    parentName={displayEntity?.name || ''}
+                    parentName={entity?.name || ''}
                     onViewChild={(child) => navigate(`/entity/${child.slug || child.id}`)}
                   />
                 )}
                 
-                {displayEntity && <EntityMetadataCard entity={displayEntity} />}
+                {entity && <EntityMetadataCard entity={entity} />}
                 
-                {displayEntity && <EntitySpecsCard entity={displayEntity} />}
+                {entity && <EntitySpecsCard entity={entity} />}
                 
-                {displayEntity && <EntityRelatedCard entity={displayEntity} />}
+                {entity && <EntityRelatedCard entity={entity} />}
               </div>
             </div>
           </TooltipProvider>
         </div>
-
-        {parentEntity && entityWithChildren?.children && entityWithChildren.children.length > 1 && (
-          <div className="container max-w-6xl mx-auto px-4 pb-6">
-            <SiblingProductsSection
-              siblings={entityWithChildren.children}
-              parentName={parentEntity.name}
-              currentEntityId={displayEntity?.id || ''}
-            />
-          </div>
-        )}
       </div>
       
-      {user && displayEntity && displayEntity.id && (
+      {user && entity && (
         <RecommendationForm
           isOpen={isRecommendationFormOpen}
           onClose={() => setIsRecommendationFormOpen(false)}
           onSubmit={handleRecommendationSubmit}
           onImageUpload={handleImageUpload}
           entity={{
-            id: displayEntity.id,
-            name: displayEntity.name,
-            type: displayEntity.type,
-            venue: displayEntity.venue || '',
-            image_url: displayEntity.image_url || '',
-            description: displayEntity.description || '',
-            metadata: displayEntity.metadata
+            id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            venue: entity.venue || '',
+            image_url: entity.image_url || '',
+            description: entity.description || '',
+            metadata: entity.metadata
           }}
         />
       )}
       
-      {user && displayEntity && displayEntity.id && (
+      {user && entity && (
         <ReviewForm
           isOpen={isReviewFormOpen}
           onClose={() => setIsReviewFormOpen(false)}
           onSubmit={handleReviewSubmit}
           entity={{
-            id: displayEntity.id,
-            name: displayEntity.name,
-            type: displayEntity.type,
-            venue: displayEntity.venue || '',
-            image_url: displayEntity.image_url || '',
-            description: displayEntity.description || '',
-            metadata: displayEntity.metadata
+            id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            venue: entity.venue || '',
+            image_url: entity.image_url || '',
+            description: entity.description || '',
+            metadata: entity.metadata
           }}
         />
       )}
@@ -1071,15 +950,15 @@ const EntityDetailV2 = () => {
         />
       )}
 
-      {isLightboxOpen && displayEntity && (
+      {isLightboxOpen && entity && (
         <LightboxPreview
           media={[{
-            url: displayEntity.image_url || getEntityTypeFallbackImage(displayEntity.type || 'place'),
+            url: entity.image_url || getEntityTypeFallbackImage(entity.type || 'place'),
             type: 'image',
-            alt: displayEntity.name || 'Entity image',
-            caption: displayEntity.name,
+            alt: entity.name || 'Entity image',
+            caption: entity.name,
             order: 0,
-            id: displayEntity.id || 'entity-image'
+            id: entity.id || 'entity-image'
           }]}
           initialIndex={0}
           onClose={handleLightboxClose}

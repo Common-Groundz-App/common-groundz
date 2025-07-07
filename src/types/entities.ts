@@ -4,8 +4,7 @@
  */
 
 import { WithUserProfile, InteractionData, EntityReference, CommentMetadata, Timestamps, Visibility, MediaItem } from './common';
-import { Entity } from '@/services/recommendation/types';
-import { Database } from '@/integrations/supabase/types';
+import { Entity, RecommendationCategory } from '@/services/recommendation/types';
 
 // Base recommendation with user profile
 export interface RecommendationWithUser extends WithUserProfile, InteractionData, Timestamps {
@@ -14,7 +13,7 @@ export interface RecommendationWithUser extends WithUserProfile, InteractionData
   subtitle?: string;
   description?: string;
   image_url?: string;
-  category: Database["public"]["Enums"]["recommendation_category"];
+  category: RecommendationCategory;
   rating: number;
   venue?: string;
   entity_id?: string;

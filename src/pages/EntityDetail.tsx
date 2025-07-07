@@ -182,7 +182,13 @@ const EntityDetailOriginal = () => {
       'book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
       'food': 'https://images.unsplash.com/photo-1555939594-58d7698950b',
       'place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
-      'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86'
+      'product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
+      'activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
+      'music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
+      'art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
+      'tv': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
+      'drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
+      'travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
     };
 
     return fallbacks[type] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
@@ -200,6 +206,7 @@ const EntityDetailOriginal = () => {
             : entity.venue || null
         };
       case 'movie':
+      case 'tv':
         return {
           label: 'Studio',
           value: entity.cast_crew?.studio || entity.venue || null
@@ -216,7 +223,13 @@ const EntityDetailOriginal = () => {
           label: 'Brand',
           value: entity.specifications?.brand || entity.venue || null
         };
+      case 'music':
+        return {
+          label: 'Artist',
+          value: entity.venue || null
+        };
       case 'food':
+      case 'drink':
         return {
           label: 'Venue',
           value: entity.venue || null

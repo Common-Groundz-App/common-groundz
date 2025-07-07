@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { createReview, updateReview, Review } from '@/services/reviewService';
-import { Entity as RecommendationEntity } from '@/services/recommendation/types'; 
+import { EntityType, Entity as RecommendationEntity } from '@/services/recommendation/types'; 
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
@@ -138,12 +138,19 @@ const ReviewForm = ({
         processedEntity.image_url = ensureHttps(processedEntity.image_url);
       }
       
+      // Convert the string type to EntityType enum if possible
+      if (typeof processedEntity.type === 'string') {
+        // Map from string to EntityType enum
+        const mappedType = mapStringToEntityType(processedEntity.type);
+        processedEntity.type = mappedType;
+      }
+      
       setSelectedEntity(processedEntity as RecommendationEntity);
     } else if (entity && !selectedEntity) {
       // Convert provided entity to expected format
       const entityToUse: any = {
         ...entity,
-        type: entity.type
+        type: mapStringToEntityType(entity.type)
       };
       
       setSelectedEntity(entityToUse);
@@ -151,20 +158,20 @@ const ReviewForm = ({
   }, [review, isEditMode, entity, selectedEntity]);
 
   // Helper function to map string type to EntityType enum
-  const mapStringToEntityType = (type: string): any => {
+  const mapStringToEntityType = (type: string): EntityType => {
     switch (type.toLowerCase()) {
-      case 'movie': return 'movie';
-      case 'book': return 'book';
-      case 'food': return 'food';
-      case 'product': return 'product';
-      case 'place': return 'place';
-      case 'activity': return 'activity';
-      case 'music': return 'music';
-      case 'art': return 'art';
-      case 'tv': return 'tv';
-      case 'drink': return 'drink';
-      case 'travel': return 'travel';
-      default: return 'place'; // Default fallback
+      case 'movie': return EntityType.Movie;
+      case 'book': return EntityType.Book;
+      case 'food': return EntityType.Food;
+      case 'product': return EntityType.Product;
+      case 'place': return EntityType.Place;
+      case 'activity': return EntityType.Activity;
+      case 'music': return EntityType.Music;
+      case 'art': return EntityType.Art;
+      case 'tv': return EntityType.TV;
+      case 'drink': return EntityType.Drink;
+      case 'travel': return EntityType.Travel;
+      default: return EntityType.Place; // Default fallback
     }
   };
   
