@@ -1,6 +1,10 @@
 
 import { Database } from '@/integrations/supabase/types';
 
+// Re-export database enum types with familiar names for backward compatibility
+export type EntityType = Database["public"]["Enums"]["entity_type"];
+export type RecommendationCategory = Database["public"]["Enums"]["recommendation_category"];
+
 export interface Entity {
   id: string;
   name: string;

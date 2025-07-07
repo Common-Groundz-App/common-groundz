@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Entity, EntityType } from '@/services/recommendation/types';
+import { Entity } from '@/services/recommendation/types';
 import { Search, Book, Film, MapPin, ShoppingBag, Coffee, Globe, Navigation, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -1,4 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+import { RecommendationWithUser } from '@/types/entities';
+
+type DatabaseRecommendation = Database['public']['Tables']['recommendations']['Row'];
+type DatabaseProfile = Database['public']['Tables']['profiles']['Row'];
+type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
+
 import { FeedQueryParams, RecommendationFeedItem } from '../types';
 import { fetchProfilesBatch } from '@/services/enhancedUnifiedProfileService';
 import { RecommendationCategory, RecommendationVisibility } from '@/services/recommendation/types';
