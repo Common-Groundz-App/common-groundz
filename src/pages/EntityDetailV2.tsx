@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info, ArrowLeft } from 'lucide-react';
+import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info, ArrowLeft, Building2 } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
@@ -43,6 +43,12 @@ import { EntityProductsCard } from '@/components/entity/EntityProductsCard';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
 import { getEntityWithChildren, EntityWithChildren } from '@/services/entityHierarchyService';
+import { BreadcrumbNavigation } from '@/components/ui/breadcrumb-navigation';
+import { ParentBrandBadge } from '@/components/entity/ParentBrandBadge';
+import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
+import { SiblingProductsSection } from '@/components/entity/SiblingProductsSection';
+import { ReviewTypeFilter } from '@/components/entity/ReviewTypeFilter';
+import { useEntityMetadataFallback } from '@/hooks/use-entity-metadata-fallback';
 
 const EntityDetailV2 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -50,6 +56,7 @@ const EntityDetailV2 = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
+  const [reviewTypeFilter, setReviewTypeFilter] = useState<'all' | 'product' | 'brand'>('all');
   const { handleImageUpload } = useRecommendationUploads();
   
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
@@ -59,6 +66,7 @@ const EntityDetailV2 = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [entityWithChildren, setEntityWithChildren] = useState<EntityWithChildren | null>(null);
+  const [parentEntity, setParentEntity] = useState<Entity | null>(null);
   
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
   
@@ -111,6 +119,26 @@ const EntityDetailV2 = () => {
 
     fetchEntityWithChildren();
   }, [entity?.id]);
+
+  useEffect(() => {
+    const fetchParentEntity = async () => {
+      if (!entity?.parent_id) return;
+      
+      try {
+        const parentData = await getParentEntity(entity.id);
+        setParentEntity(parentData);
+      } catch (error) {
+        console.error('Error fetching parent entity:', error);
+      }
+    };
+
+    fetchParentEntity();
+  }, [entity?.id, entity?.parent_id]);
+
+  const enhancedEntity = useEntityMetadataFallback({ 
+    entity: entity!, 
+    parentEntity 
+  });
 
   const getSidebarButtonConfig = () => {
     if (!userReview) {
@@ -422,6 +450,44 @@ const EntityDetailV2 = () => {
 
   const sidebarButtonConfig = getSidebarButtonConfig();
 
+  const breadcrumbItems = useMemo(() => {
+    const items = [];
+    
+    if (parentEntity) {
+      items.push({
+        label: parentEntity.name,
+        href: `/entity-v2/${parentEntity.slug || parentEntity.id}`,
+      });
+    }
+    
+    if (entity) {
+      items.push({
+        label: entity.name,
+        href: `/entity-v2/${entity.slug || entity.id}`,
+        isActive: true,
+      });
+    }
+    
+    return items;
+  }, [entity, parentEntity]);
+
+  const filteredReviews = useMemo(() => {
+    if (!allReviews || reviewTypeFilter === 'all') {
+      return allReviews;
+    }
+    
+    // For now, we'll assume all reviews are product reviews
+    // In the future, this would filter based on review.review_type or similar
+    return allReviews;
+  }, [allReviews, reviewTypeFilter]);
+
+  const reviewTypeCounts = useMemo(() => {
+    return {
+      product: allReviews?.length || 0,
+      brand: 0, // Placeholder - would be calculated from actual brand reviews
+    };
+  }, [allReviews]);
+
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
       <NavBarComponent />
@@ -446,6 +512,10 @@ const EntityDetailV2 = () => {
       <div className="flex-1">
         <div className="relative bg-gradient-to-b from-violet-100/30 to-transparent dark:from-violet-900/10">
           <div className="container max-w-6xl mx-auto py-8 px-4">
+            {breadcrumbItems.length > 0 && (
+              <BreadcrumbNavigation items={breadcrumbItems} />
+            )}
+
             <div className="flex flex-col md:flex-row gap-8">
               <div className="w-full md:w-1/3 lg:w-1/4">
                 <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg border shadow-md bg-muted/20 relative group">
@@ -454,10 +524,10 @@ const EntityDetailV2 = () => {
                     onClick={handleImageClick}
                   >
                     <ImageWithFallback
-                      src={entity?.image_url || ''}
-                      alt={entity?.name || 'Entity image'}
+                      src={enhancedEntity?.image_url || ''}
+                      alt={enhancedEntity?.name || 'Entity image'}
                       className="w-full h-full object-cover"
-                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
+                      fallbackSrc={getEntityTypeFallbackImage(enhancedEntity?.type || 'place')}
                     />
                   </div>
                   
@@ -494,12 +564,24 @@ const EntityDetailV2 = () => {
               
               <div className="flex-1 space-y-4">
                 <div className="flex flex-col gap-2">
+                  {parentEntity && (
+                    <ParentBrandBadge 
+                      parentEntity={parentEntity}
+                      currentEntityName={entity?.name}
+                    />
+                  )}
+
                   <div className="flex items-center gap-2">
-                    <h1 className="text-3xl font-bold">{entity?.name}</h1>
+                    <h1 className="text-3xl font-bold">{enhancedEntity?.name}</h1>
                     <Badge variant="outline" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 gap-1">
                       <Flag className="h-3 w-3" /> V2 Preview
                     </Badge>
-                    {entity?.metadata?.verified && (
+                    {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
+                      <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 gap-1">
+                        <Building2 className="h-3 w-3" /> Brand ({entityWithChildren.children.length} Products)
+                      </Badge>
+                    )}
+                    {enhancedEntity?.metadata?.verified && (
                       <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 gap-1">
                         <Flag className="h-3 w-3" /> Verified
                       </Badge>
@@ -507,12 +589,12 @@ const EntityDetailV2 = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
-                      {entity?.type}
+                      {enhancedEntity?.type}
                     </Badge>
                   </div>
                   
-                  {entity?.description && (
-                    <p className="text-muted-foreground mt-2">{entity.description}</p>
+                  {enhancedEntity?.description && (
+                    <p className="text-muted-foreground mt-2">{enhancedEntity.description}</p>
                   )}
                 </div>
               </div>
@@ -687,6 +769,12 @@ const EntityDetailV2 = () => {
                   </TabsList>
                   
                   <TabsContent value="overview" className="space-y-6 mt-2">
+                    <FeaturedProductsSection
+                      children={entityWithChildren?.children}
+                      parentName={entity?.name || ''}
+                      onViewAll={handleViewAllProducts}
+                    />
+                    
                     <Card>
                       <CardHeader>
                         <CardTitle>About {entity?.name}</CardTitle>
@@ -805,9 +893,16 @@ const EntityDetailV2 = () => {
                       </div>
                     ) : (
                       <>
+                        <ReviewTypeFilter
+                          reviewTypes={reviewTypeCounts}
+                          selectedType={reviewTypeFilter}
+                          onTypeChange={setReviewTypeFilter}
+                          entityName={entity?.name || ''}
+                        />
+
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-muted-foreground">
-                            Showing {allReviews.length} review{allReviews.length !== 1 ? 's' : ''}
+                            Showing {filteredReviews.length} review{filteredReviews.length !== 1 ? 's' : ''}
                           </p>
                           <Button 
                             onClick={handleAddReview}
@@ -820,7 +915,7 @@ const EntityDetailV2 = () => {
                           </Button>
                         </div>
                         <div className="space-y-4">
-                          {allReviews.map((review) => (
+                          {filteredReviews.map((review) => (
                             <ReviewCard
                               key={review.id}
                               review={review}
@@ -901,6 +996,16 @@ const EntityDetailV2 = () => {
             </div>
           </TooltipProvider>
         </div>
+
+        {parentEntity && entityWithChildren?.children && entityWithChildren.children.length > 1 && (
+          <div className="container max-w-6xl mx-auto px-4 pb-6">
+            <SiblingProductsSection
+              siblings={entityWithChildren.children}
+              parentName={parentEntity.name}
+              currentEntityId={entity?.id || ''}
+            />
+          </div>
+        )}
       </div>
       
       {user && entity && (
