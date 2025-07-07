@@ -1,30 +1,12 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Entity, EntityType } from '@/services/recommendation/types';
+import { Entity } from '@/services/recommendation/types';
+import { Database } from '@/integrations/supabase/types';
 
 export interface EntityWithChildren extends Omit<Entity, 'metadata'> {
   children?: Entity[];
   metadata?: Record<string, any> | null;
 }
-
-// Type mapping from database enum to EntityType
-const mapDatabaseTypeToEntityType = (dbType: string): EntityType => {
-  const typeMap: Record<string, EntityType> = {
-    'book': EntityType.Book,
-    'movie': EntityType.Movie,
-    'place': EntityType.Place,
-    'product': EntityType.Product,
-    'food': EntityType.Food,
-    'drink': EntityType.Drink,
-    'music': EntityType.Music,
-    'art': EntityType.Art,
-    'tv': EntityType.TV,
-    'travel': EntityType.Travel,
-    'activity': EntityType.Activity
-  };
-  
-  return typeMap[dbType] || EntityType.Product;
-};
 
 // Convert database entity to application Entity type
 const convertDatabaseEntityToEntity = (dbEntity: any): Entity => {
@@ -38,7 +20,7 @@ const convertDatabaseEntityToEntity = (dbEntity: any): Entity => {
     metadata: dbEntity.metadata ? (typeof dbEntity.metadata === 'string' ? JSON.parse(dbEntity.metadata) : dbEntity.metadata) : {},
     venue: dbEntity.venue,
     website_url: dbEntity.website_url,
-    type: mapDatabaseTypeToEntityType(dbEntity.type),
+    type: dbEntity.type, // Use database type directly
     slug: dbEntity.slug,
     category_id: dbEntity.category_id,
     popularity_score: dbEntity.popularity_score,
@@ -57,7 +39,8 @@ const convertDatabaseEntityToEntity = (dbEntity: any): Entity => {
     nutritional_info: dbEntity.nutritional_info,
     last_enriched_at: dbEntity.last_enriched_at,
     enrichment_source: dbEntity.enrichment_source,
-    data_quality_score: dbEntity.data_quality_score
+    data_quality_score: dbEntity.data_quality_score,
+    parent_id: dbEntity.parent_id
   };
 };
 
@@ -71,11 +54,11 @@ export const getChildEntities = async (parentId: string): Promise<Entity[]> => {
     throw error;
   }
 
-  // Convert the simplified child data to full Entity objects
+  // Convert the simplified child data to full Entity objects using database types
   return (data || []).map((child: any) => ({
     id: child.id,
     name: child.name,
-    type: mapDatabaseTypeToEntityType(child.type),
+    type: child.type, // Use database type directly
     image_url: child.image_url,
     description: child.description,
     api_ref: null,
@@ -101,7 +84,8 @@ export const getChildEntities = async (parentId: string): Promise<Entity[]> => {
     nutritional_info: null,
     last_enriched_at: null,
     enrichment_source: null,
-    data_quality_score: null
+    data_quality_score: null,
+    parent_id: null
   }));
 };
 

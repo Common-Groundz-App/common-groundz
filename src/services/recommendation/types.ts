@@ -1,3 +1,4 @@
+
 import { Database } from '@/integrations/supabase/types';
 
 export interface Entity {
@@ -35,34 +36,6 @@ export interface Entity {
   data_quality_score?: number;
 }
 
-export enum EntityType {
-  Movie = 'movie',
-  Book = 'book',
-  Food = 'food',
-  Product = 'product',
-  Place = 'place',
-  Activity = 'activity',
-  Music = 'music',
-  Art = 'art',
-  TV = 'tv',
-  Drink = 'drink',
-  Travel = 'travel'
-}
-
-export enum RecommendationCategory {
-  Food = 'Food',
-  Drink = 'Drink',
-  Movie = 'Movie',
-  Book = 'Book',
-  Place = 'Place',
-  Product = 'Product',
-  Activity = 'Activity',
-  Music = 'Music',
-  Art = 'Art',
-  TV = 'TV',
-  Travel = 'Travel'
-}
-
 export enum RecommendationVisibility {
   Public = 'public',
   Private = 'private',
@@ -78,7 +51,7 @@ export interface Recommendation {
   subtitle?: string;
   description?: string;
   image_url?: string;
-  category: RecommendationCategory;
+  category: Database["public"]["Enums"]["recommendation_category"];
   rating: number;
   venue?: string;
   entity_id?: string;
