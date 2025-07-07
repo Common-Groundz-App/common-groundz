@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -496,7 +497,6 @@ const EntityDetail = () => {
                             recommendation={recommendation}
                             onLike={() => handleRecommendationAction('like', recommendation.id)}
                             onSave={() => handleRecommendationAction('save', recommendation.id)}
-                            refreshRecommendations={refreshData}
                             hideEntityFallbacks={true}
                           />
                         ))}

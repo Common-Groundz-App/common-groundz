@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ import { EntityProductsCard } from '@/components/entity/EntityProductsCard';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
 import { getEntityWithChildren, getParentEntity, EntityWithChildren } from '@/services/entityHierarchyService';
+import { Entity } from '@/services/recommendation/types';
 import { 
   mapDatabaseEntityType, 
   getEntityTypeDisplayName, 
@@ -200,33 +202,33 @@ const EntityDetailV2 = () => {
     }
     
     switch (mappedType) {
-      case 'book':
+      case mapDatabaseEntityType('book'):
         return {
           label: 'Author',
           value: entity.authors && entity.authors.length > 0 
             ? entity.authors[0] 
             : entity.venue || null
         };
-      case 'movie':
-      case 'tv':
+      case mapDatabaseEntityType('movie'):
+      case mapDatabaseEntityType('tv'):
         return {
           label: 'Studio',
           value: entity.cast_crew?.studio || entity.venue || null
         };
-      case 'place':
+      case mapDatabaseEntityType('place'):
         return {
           label: 'Location',
           value: entity.api_source === 'google_places' && entity.metadata?.formatted_address
             ? entity.metadata.formatted_address
             : entity.venue || null
         };
-      case 'product':
+      case mapDatabaseEntityType('product'):
         return {
           label: 'Brand',
           value: entity.specifications?.brand || entity.venue || null
         };
-      case 'food':
-      case 'drink':
+      case mapDatabaseEntityType('food'):
+      case mapDatabaseEntityType('drink'):
         return {
           label: 'Venue',
           value: entity.venue || null
@@ -386,7 +388,7 @@ const EntityDetailV2 = () => {
   };
 
   const createMediaItem = (): MediaItem => {
-    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entity?.type || 'place');
+    const imageUrl = entity?.image_url || getEntityTypeFallbackImage(mapDatabaseEntityType(entity?.type || 'place'));
     return {
       url: imageUrl,
       type: 'image',
@@ -437,7 +439,7 @@ const EntityDetailV2 = () => {
                       src={entity?.image_url || ''}
                       alt={entity?.name || 'Entity image'}
                       className="w-full h-full object-cover"
-                      fallbackSrc={getEntityTypeFallbackImage(entity?.type || 'place')}
+                      fallbackSrc={getEntityTypeFallbackImage(mapDatabaseEntityType(entity?.type || 'place'))}
                     />
                   </div>
                   
@@ -894,7 +896,7 @@ const EntityDetailV2 = () => {
                 {parentEntity && siblingEntities.length > 0 && (
                   <SiblingProducts 
                     siblings={siblingEntities}
-                    currentEntityId={entity.id}
+                    currentEntityId={entity?.id || ''}
                     parentName={parentEntity.name}
                   />
                 )}
@@ -927,8 +929,8 @@ const EntityDetailV2 = () => {
                 </Card>
                 
                 <EntityProductsCard
-                  entityId={entity.id}
-                  entityName={entity.name}
+                  entityId={entity?.id || ''}
+                  entityName={entity?.name || ''}
                 />
                 
                 {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
@@ -1000,7 +1002,7 @@ const EntityDetailV2 = () => {
       {isLightboxOpen && entity && (
         <LightboxPreview
           media={[{
-            url: entity.image_url || getEntityTypeFallbackImage(entity.type || 'place'),
+            url: entity.image_url || getEntityTypeFallbackImage(mapDatabaseEntityType(entity.type || 'place')),
             type: 'image',
             alt: entity.name || 'Entity image',
             caption: entity.name,
