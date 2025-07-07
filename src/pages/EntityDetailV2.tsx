@@ -71,6 +71,7 @@ const EntityDetailV2 = () => {
   
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
   
+  // Main entity data hook - call this first and consistently
   const {
     entity,
     recommendations,
@@ -81,6 +82,46 @@ const EntityDetailV2 = () => {
     error,
     refreshData
   } = useEntityDetail(slug || '');
+
+  // Create stable entity default to prevent hook violations
+  const stableEntityDefault = useMemo(() => ({
+    id: '',
+    name: '',
+    type: 'product' as const,
+    description: '',
+    image_url: '',
+    api_ref: null,
+    api_source: null,
+    metadata: {},
+    venue: null,
+    website_url: null,
+    slug: null,
+    category_id: null,
+    popularity_score: null,
+    photo_reference: null,
+    created_at: null,
+    updated_at: null,
+    authors: null,
+    publication_year: null,
+    isbn: null,
+    languages: null,
+    external_ratings: null,
+    price_info: null,
+    specifications: null,
+    cast_crew: null,
+    ingredients: null,
+    nutritional_info: null,
+    last_enriched_at: null,
+    enrichment_source: null,
+    data_quality_score: null,
+    parent_id: null
+  }), []);
+
+  // Always call hooks with stable parameters - this prevents hook violations
+  const enhancedEntity = useEntityMetadataFallback({ 
+    entity: entity || stableEntityDefault, 
+    parentEntity: parentEntity || null
+  });
   
   const {
     circleRating,
@@ -88,33 +129,63 @@ const EntityDetailV2 = () => {
     circleContributors,
     isLoading: isCircleRatingLoading
   } = useCircleRating(entity?.id || '');
-  
-  // Always call the hook with safe default values to avoid hook violations
-  const enhancedEntity = useEntityMetadataFallback({ 
-    entity: entity || { id: '', name: '', type: 'product' } as Entity, 
-    parentEntity 
-  });
-  
-  // Use the actual entity if it exists, otherwise use the enhanced fallback
+
+  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
+
+  // Use actual entity if available, otherwise use enhanced fallback
   const displayEntity = entity || enhancedEntity;
 
-  const dynamicReviews = React.useMemo(() => {
+  // Memoized derived data to prevent unnecessary re-renders
+  const dynamicReviews = useMemo(() => {
     if (!reviews) return [];
     return reviews.filter(review => review.has_timeline && review.timeline_count && review.timeline_count > 0);
   }, [reviews]);
 
-  const allReviews = React.useMemo(() => {
-    if (!reviews) return [];
-    return reviews;
+  const allReviews = useMemo(() => {
+    return reviews || [];
   }, [reviews]);
 
-  const userReview = React.useMemo(() => {
+  const userReview = useMemo(() => {
     if (!user || !reviews) return null;
     return reviews.find(review => review.user_id === user.id);
   }, [user, reviews]);
 
-  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
+  const filteredReviews = useMemo(() => {
+    if (!allReviews || reviewTypeFilter === 'all') {
+      return allReviews;
+    }
+    return allReviews;
+  }, [allReviews, reviewTypeFilter]);
 
+  const reviewTypeCounts = useMemo(() => {
+    return {
+      product: allReviews?.length || 0,
+      brand: 0,
+    };
+  }, [allReviews]);
+
+  const breadcrumbItems = useMemo(() => {
+    const items = [];
+    
+    if (parentEntity) {
+      items.push({
+        label: parentEntity.name,
+        href: `/entity-v2/${parentEntity.slug || parentEntity.id}`,
+      });
+    }
+    
+    if (displayEntity && displayEntity.id) {
+      items.push({
+        label: displayEntity.name,
+        href: `/entity-v2/${displayEntity.slug || displayEntity.id}`,
+        isActive: true,
+      });
+    }
+    
+    return items;
+  }, [displayEntity, parentEntity]);
+
+  // Entity hierarchy fetching - only when entity is available
   useEffect(() => {
     const fetchEntityWithChildren = async () => {
       if (!entity?.id) return;
@@ -145,32 +216,7 @@ const EntityDetailV2 = () => {
     fetchParentEntity();
   }, [entity?.id, entity?.parent_id]);
 
-  const handleViewAllProducts = () => {
-    setActiveTab('products');
-  };
-
-  useEffect(() => {
-    if (!isLoading) {
-      console.log('EntityDetail component received recommendations:', recommendations?.length);
-      console.log('EntityDetail component received reviews:', reviews?.length);
-      console.log('Dynamic reviews:', dynamicReviews.length);
-      console.log('Static reviews:', allReviews.length);
-      console.log('User review:', userReview);
-      if (recommendations?.length > 0) {
-        console.log('Sample recommendation:', recommendations[0]);
-      }
-      if (reviews?.length > 0) {
-        console.log('Sample review:', reviews[0]);
-      }
-    }
-  }, [isLoading, recommendations, reviews, dynamicReviews, allReviews, userReview]);
-
-  useEffect(() => {
-    if (circleContributors.length > 0) {
-      console.log('Contributors ready for display:', circleContributors);
-    }
-  }, [circleContributors]);
-
+  // Early return for loading and error states - after all hooks are called
   if (!isLoading && (error || !entity)) {
     return <NotFound />;
   }
@@ -205,6 +251,10 @@ const EntityDetailV2 = () => {
       </div>
     );
   }
+
+  const handleViewAllProducts = () => {
+    setActiveTab('products');
+  };
 
   const getEntityTypeFallbackImage = (type: string): string => {
     const fallbacks: Record<string, string> = {
@@ -458,44 +508,6 @@ const EntityDetailV2 = () => {
   };
   
   const sidebarButtonConfig = getSidebarButtonConfig();
-
-  const breadcrumbItems = useMemo(() => {
-    const items = [];
-    
-    if (parentEntity) {
-      items.push({
-        label: parentEntity.name,
-        href: `/entity-v2/${parentEntity.slug || parentEntity.id}`,
-      });
-    }
-    
-    if (displayEntity) {
-      items.push({
-        label: displayEntity.name,
-        href: `/entity-v2/${displayEntity.slug || displayEntity.id}`,
-        isActive: true,
-      });
-    }
-    
-    return items;
-  }, [displayEntity, parentEntity]);
-
-  const filteredReviews = useMemo(() => {
-    if (!allReviews || reviewTypeFilter === 'all') {
-      return allReviews;
-    }
-    
-    // For now, we'll assume all reviews are product reviews
-    // In the future, this would filter based on review.review_type or similar
-    return allReviews;
-  }, [allReviews, reviewTypeFilter]);
-
-  const reviewTypeCounts = useMemo(() => {
-    return {
-      product: allReviews?.length || 0,
-      brand: 0, // Placeholder - would be calculated from actual brand reviews
-    };
-  }, [allReviews]);
 
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
@@ -971,7 +983,7 @@ const EntityDetailV2 = () => {
                       Write Review
                     </Button>
                     
-                    {displayEntity && (
+                    {displayEntity && displayEntity.id && (
                       <EntityFollowButton
                         entityId={displayEntity.id}
                         entityName={displayEntity.name}
@@ -983,10 +995,12 @@ const EntityDetailV2 = () => {
                   </CardContent>
                 </Card>
                 
-                <EntityProductsCard
-                  entityId={displayEntity.id}
-                  entityName={displayEntity.name}
-                />
+                {displayEntity && displayEntity.id && (
+                  <EntityProductsCard
+                    entityId={displayEntity.id}
+                    entityName={displayEntity.name}
+                  />
+                )}
                 
                 {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
                   <EntityChildrenCard
@@ -1017,7 +1031,7 @@ const EntityDetailV2 = () => {
         )}
       </div>
       
-      {user && displayEntity && (
+      {user && displayEntity && displayEntity.id && (
         <RecommendationForm
           isOpen={isRecommendationFormOpen}
           onClose={() => setIsRecommendationFormOpen(false)}
@@ -1035,7 +1049,7 @@ const EntityDetailV2 = () => {
         />
       )}
       
-      {user && displayEntity && (
+      {user && displayEntity && displayEntity.id && (
         <ReviewForm
           isOpen={isReviewFormOpen}
           onClose={() => setIsReviewFormOpen(false)}
