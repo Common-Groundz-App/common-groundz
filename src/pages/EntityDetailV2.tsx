@@ -69,6 +69,7 @@ const EntityDetailV2 = () => {
   
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL LOGIC OR EARLY RETURNS
   // This is critical to prevent React Hook order violations
+  // Using the same null-fallback pattern as V1 for consistency
   
   const {
     entity,
@@ -88,7 +89,7 @@ const EntityDetailV2 = () => {
     error: hierarchyError,
     hasChildren,
     hasParent
-  } = useEntityHierarchy(entity?.id || '');
+  } = useEntityHierarchy(entity?.id || null);
 
   const {
     refreshEntityImage,
@@ -101,11 +102,11 @@ const EntityDetailV2 = () => {
     circleRatingCount,
     circleContributors,
     isLoading: isCircleRatingLoading
-  } = useCircleRating(entity?.id || '');
+  } = useCircleRating(entity?.id || null);
   
   const { handleImageUpload } = useRecommendationUploads();
   
-  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || '');
+  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
   
   // Memoized values
   const dynamicReviews = React.useMemo(() => {
