@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowRight, Package } from 'lucide-react';
+import { Plus, ArrowRight, Package, Star, Award } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Entity } from '@/services/recommendation/types';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
@@ -11,6 +11,7 @@ import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 interface EntityChildrenCardProps {
   children: Entity[];
   parentName: string;
+  parentEntity?: Entity;
   isLoading?: boolean;
   onViewChild?: (child: Entity) => void;
   onAddChild?: () => void;
@@ -20,11 +21,49 @@ interface EntityChildrenCardProps {
 export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
   children,
   parentName,
+  parentEntity,
   isLoading = false,
   onViewChild,
   onAddChild,
   canAddChildren = false
 }) => {
+  // Helper function to get fallback image using parent if needed
+  const getChildImage = (child: Entity) => {
+    if (child.image_url) return child.image_url;
+    if (parentEntity?.image_url) return parentEntity.image_url;
+    return getEntityTypeFallbackImage(child.type);
+  };
+
+  // Helper function to get fallback description using parent if needed
+  const getChildDescription = (child: Entity) => {
+    if (child.description) return child.description;
+    if (parentEntity?.description) return `${parentEntity.description} - ${child.name}`;
+    return null;
+  };
+
+  // Helper function to create spec summary
+  const getSpecSummary = (child: Entity) => {
+    const specs = child.specifications || {};
+    const price = child.price_info;
+    const parts = [];
+    
+    if (specs.brand) parts.push(specs.brand);
+    if (specs.size) parts.push(specs.size);
+    if (specs.weight) parts.push(specs.weight);
+    if (price?.amount && price?.currency) parts.push(`${price.currency}${price.amount}`);
+    
+    return parts.length > 0 ? parts.slice(0, 3).join(', ') : null;
+  };
+
+  // Helper function to get badges for child
+  const getChildBadges = (child: Entity, index: number) => {
+    const badges = [];
+    
+    if (index === 0) badges.push({ text: "Popular", variant: "default" as const });
+    if (index === 1) badges.push({ text: "Editor's Pick", variant: "secondary" as const });
+    
+    return badges;
+  };
   if (isLoading) {
     return (
       <Card>
@@ -100,7 +139,7 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {children.slice(0, 8).map((child: Entity) => (
+        {children.slice(0, 8).map((child: Entity, index: number) => (
           <div 
             key={child.id} 
             className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
@@ -108,7 +147,7 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
           >
             <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
               <ImageWithFallback
-                src={child.image_url || ''}
+                src={getChildImage(child)}
                 alt={child.name}
                 className="w-full h-full object-cover"
                 fallbackSrc={getEntityTypeFallbackImage(child.type)}
@@ -116,10 +155,23 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
             </div>
             
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm truncate group-hover:text-foreground transition-colors">
-                {child.name}
+              <div className="flex items-center gap-2 mb-1">
+                <div className="font-medium text-sm truncate group-hover:text-foreground transition-colors">
+                  {child.name}
+                </div>
+                {getChildBadges(child, index).map((badge, badgeIndex) => (
+                  <Badge key={badgeIndex} variant={badge.variant} className="text-xs">
+                    {badge.text === "Editor's Pick" && <Award className="h-3 w-3 mr-1" />}
+                    {badge.text}
+                  </Badge>
+                ))}
               </div>
+              
               <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-1">
+                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                  <span className="text-xs text-muted-foreground">4.2</span>
+                </div>
                 <Badge variant="outline" className="text-xs capitalize">
                   {child.type}
                 </Badge>
@@ -129,9 +181,16 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
                   </span>
                 )}
               </div>
-              {child.description && (
+              
+              {getSpecSummary(child) && (
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                  {child.description}
+                  {getSpecSummary(child)}
+                </p>
+              )}
+              
+              {getChildDescription(child) && (
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                  {getChildDescription(child)}
                 </p>
               )}
             </div>

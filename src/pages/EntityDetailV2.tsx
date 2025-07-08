@@ -44,8 +44,13 @@ import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
+import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { Entity, EntityType } from '@/services/recommendation/types';
+import { ExternalLinksSection } from '@/components/entity/ExternalLinksSection';
+import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
+import { SiblingCarousel } from '@/components/entity/SiblingCarousel';
+import { ReviewTypeToggle } from '@/components/entity/ReviewTypeToggle';
 
 const EntityDetailV2 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -53,6 +58,7 @@ const EntityDetailV2 = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
+  const [reviewType, setReviewType] = useState<'product' | 'brand'>('product');
   const { handleImageUpload } = useRecommendationUploads();
   
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
@@ -94,6 +100,12 @@ const EntityDetailV2 = () => {
     circleContributors,
     isLoading: isCircleRatingLoading
   } = useCircleRating(entity?.id || '');
+
+  const {
+    siblings,
+    isLoading: isSiblingsLoading,
+    error: siblingsError
+  } = useEntitySiblings(entity?.id || null, parentEntity?.id || null);
   
   const dynamicReviews = React.useMemo(() => {
     if (!reviews) return [];
@@ -408,12 +420,20 @@ const EntityDetailV2 = () => {
     navigate(`/entity/${child.slug || child.id}?preview=true`);
   };
 
+  const handleViewSibling = (sibling: Entity) => {
+    navigate(`/entity/${sibling.slug || sibling.id}?preview=true`);
+  };
+
   const handleAddChild = () => {
     // TODO: Implement add child functionality
     toast({
       title: "Coming Soon",
       description: "Add child entity functionality will be available soon.",
     });
+  };
+
+  const handleViewAllProducts = () => {
+    setActiveTab('products');
   };
 
   return (
@@ -689,6 +709,15 @@ const EntityDetailV2 = () => {
                   </TabsList>
                   
                   <TabsContent value="overview" className="space-y-6 mt-2">
+                    {/* Featured Products Section */}
+                    {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
+                      <FeaturedProductsSection
+                        children={entityWithChildren.children}
+                        onViewChild={handleViewChild}
+                        onViewAllProducts={handleViewAllProducts}
+                      />
+                    )}
+
                     <Card>
                       <CardHeader>
                         <CardTitle>About {entity?.name}</CardTitle>
@@ -830,6 +859,18 @@ const EntityDetailV2 = () => {
                   </TabsContent>
                   
                   <TabsContent value="reviews" className="space-y-4 mt-2">
+                    {/* Review Type Toggle - only show if both types exist or might exist */}
+                    {parentEntity && (
+                      <ReviewTypeToggle
+                        activeType={reviewType}
+                        onTypeChange={setReviewType}
+                        productReviewCount={allReviews.length}
+                        brandReviewCount={0} // TODO: Fetch parent reviews
+                        productName={entity?.name}
+                        brandName={parentEntity?.name}
+                      />
+                    )}
+
                     {!allReviews || allReviews.length === 0 ? (
                       <div className="py-12 text-center border rounded-lg bg-amber-50/30 dark:bg-amber-900/5">
                         <MessageSquare className="h-12 w-12 mx-auto text-amber-300 dark:text-amber-700" />
@@ -915,6 +956,11 @@ const EntityDetailV2 = () => {
                         showCount={true}
                       />
                     )}
+
+                    {/* External Links Section */}
+                    {entity && (
+                      <ExternalLinksSection entity={entity} />
+                    )}
                   </CardContent>
                 </Card>
                 
@@ -927,6 +973,7 @@ const EntityDetailV2 = () => {
                   <EntityChildrenCard
                     children={entityWithChildren.children}
                     parentName={entity?.name || ''}
+                    parentEntity={entity}
                     onViewChild={handleViewChild}
                     onAddChild={handleAddChild}
                     canAddChildren={user !== null}
@@ -977,6 +1024,17 @@ const EntityDetailV2 = () => {
             </div>
           </TooltipProvider>
         </div>
+
+        {/* Sibling Carousel - only show for child entities */}
+        {parentEntity && siblings.length > 0 && (
+          <div className="container max-w-6xl mx-auto px-4">
+            <SiblingCarousel
+              siblings={siblings}
+              parentName={parentEntity.name}
+              onViewSibling={handleViewSibling}
+            />
+          </div>
+        )}
       </div>
       
       {user && entity && (
