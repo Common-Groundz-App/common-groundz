@@ -3,16 +3,14 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowRight, Package, Star } from 'lucide-react';
+import { Plus, ArrowRight, Package } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { Entity } from '@/services/recommendation/types';
-import { getEntityImageWithFallback, getEntityDescriptionWithFallback, getEntitySpecSummary, isEntityPopular } from '@/utils/entityFallbacks';
+import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 
 interface EntityChildrenCardProps {
   children: Entity[];
   parentName: string;
-  parentEntity?: Entity;
   isLoading?: boolean;
   onViewChild?: (child: Entity) => void;
   onAddChild?: () => void;
@@ -22,7 +20,6 @@ interface EntityChildrenCardProps {
 export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
   children,
   parentName,
-  parentEntity,
   isLoading = false,
   onViewChild,
   onAddChild,
@@ -40,7 +37,7 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
         <CardContent>
           <div className="animate-pulse space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-20 bg-muted rounded-md"></div>
+              <div key={i} className="h-16 bg-muted rounded-md"></div>
             ))}
           </div>
         </CardContent>
@@ -103,87 +100,52 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {children.slice(0, 8).map((child: Entity) => {
-          const imageUrl = getEntityImageWithFallback(child, parentEntity);
-          const description = getEntityDescriptionWithFallback(child, parentEntity);
-          const specSummary = getEntitySpecSummary(child);
-          const isPopular = isEntityPopular(child);
-          
-          return (
-            <div 
-              key={child.id} 
-              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
-              onClick={() => onViewChild?.(child)}
-            >
-              <div className="w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0">
-                <ImageWithFallback
-                  src={imageUrl}
-                  alt={child.name}
-                  className="w-full h-full object-cover"
-                  fallbackSrc={imageUrl}
-                />
-              </div>
-              
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="font-medium text-sm truncate group-hover:text-foreground transition-colors">
-                    {child.name}
-                  </div>
-                  {isPopular && (
-                    <Badge variant="secondary" className="text-xs gap-1">
-                      <Star className="h-3 w-3" />
-                      Popular
-                    </Badge>
-                  )}
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1">
-                    <ConnectedRingsRating
-                      value={4.3} // Mock rating - replace with actual data
-                      variant="badge"
-                      showValue={false}
-                      size="sm"
-                      minimal={true}
-                    />
-                    <span className="text-xs text-muted-foreground">4.3</span>
-                  </div>
-                  
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {child.type}
-                  </Badge>
-                  
-                  {child.venue && (
-                    <span className="text-xs text-muted-foreground truncate">
-                      {child.venue}
-                    </span>
-                  )}
-                </div>
-                
-                {specSummary && (
-                  <p className="text-xs text-muted-foreground line-clamp-1">
-                    {specSummary}
-                  </p>
-                )}
-                
-                {description && !specSummary && (
-                  <p className="text-xs text-muted-foreground line-clamp-1">
-                    {description}
-                  </p>
-                )}
-              </div>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <ArrowRight className="h-3 w-3" />
-                <span className="sr-only">View {child.name}</span>
-              </Button>
+        {children.slice(0, 8).map((child: Entity) => (
+          <div 
+            key={child.id} 
+            className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+            onClick={() => onViewChild?.(child)}
+          >
+            <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
+              <ImageWithFallback
+                src={child.image_url || ''}
+                alt={child.name}
+                className="w-full h-full object-cover"
+                fallbackSrc={getEntityTypeFallbackImage(child.type)}
+              />
             </div>
-          );
-        })}
+            
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm truncate group-hover:text-foreground transition-colors">
+                {child.name}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline" className="text-xs capitalize">
+                  {child.type}
+                </Badge>
+                {child.venue && (
+                  <span className="text-xs text-muted-foreground truncate">
+                    {child.venue}
+                  </span>
+                )}
+              </div>
+              {child.description && (
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                  {child.description}
+                </p>
+              )}
+            </div>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ArrowRight className="h-3 w-3" />
+              <span className="sr-only">View {child.name}</span>
+            </Button>
+          </div>
+        ))}
         
         {children.length > 8 && (
           <div className="text-center pt-2 border-t">

@@ -39,7 +39,6 @@ import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { Eye, ArrowRight } from 'lucide-react';
 import { mapEntityTypeToDatabase, getContextualFieldLabel, getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { EntityType } from '@/services/recommendation/types';
-import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 
 import EntityDetailV2 from './EntityDetailV2';
 
@@ -49,6 +48,8 @@ const EntityDetailOriginal = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('reviews');
+  const { handleImageUpload } = useRecommendationUploads();
+
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isRefreshingImage, setIsRefreshingImage] = useState(false);
@@ -56,9 +57,8 @@ const EntityDetailOriginal = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
 
-  // ALL HOOKS MUST BE CALLED IN THE SAME ORDER AS V2 FOR CONSISTENCY
-  // This prevents React Hook order violations when switching between versions
-  
+  const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
+
   const {
     entity,
     recommendations,
@@ -70,34 +70,19 @@ const EntityDetailOriginal = () => {
     refreshData
   } = useEntityDetail(slug || '');
 
-  // Add the same hooks as V2 to maintain consistent hook order
-  const {
-    entityWithChildren,
-    parentEntity,
-    isLoading: isLoadingHierarchy,
-    error: hierarchyError,
-    hasChildren,
-    hasParent
-  } = useEntityHierarchy(entity?.id || null);
-
-  const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
-  
   const {
     circleRating,
     circleRatingCount,
     circleContributors,
     isLoading: isCircleRatingLoading
-  } = useCircleRating(entity?.id || null);
+  } = useCircleRating(entity?.id || '');
 
-  const { handleImageUpload } = useRecommendationUploads();
-  
-  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
-
-  // Memoized values
   const dynamicReviews = React.useMemo(() => {
     if (!reviews) return [];
     return reviews.filter(review => review.has_timeline && review.timeline_count && review.timeline_count > 0);
   }, [reviews]);
+
+  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
   const allReviews = React.useMemo(() => {
     if (!reviews) return [];
@@ -510,6 +495,7 @@ const EntityDetailOriginal = () => {
           </div>
         </div>
 
+        {/* Keep all remaining JSX exactly the same */}
         {/* Rating Summary Bar */}
         <div className="bg-card border-y dark:bg-card/50 py-4">
           <div className="container max-w-6xl mx-auto px-4">
