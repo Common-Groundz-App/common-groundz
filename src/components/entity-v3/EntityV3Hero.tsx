@@ -2,8 +2,11 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Star, MapPin, Globe } from 'lucide-react';
+import { MapPin, Globe } from 'lucide-react';
 import { Entity } from '@/services/recommendation/types';
+import { EntityV3ImageGallery } from './EntityV3ImageGallery';
+import { EntityV3HeroStats } from './EntityV3HeroStats';
+import { EntityV3ActionButtons } from './EntityV3ActionButtons';
 
 interface EntityV3HeroProps {
   entity: Entity;
@@ -15,104 +18,86 @@ interface EntityV3HeroProps {
 }
 
 export const EntityV3Hero: React.FC<EntityV3HeroProps> = ({ entity, stats }) => {
-  const averageRating = stats?.averageRating || 0;
-  
   return (
     <Card className="lg:col-span-2 p-6">
-      <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
-        {/* Image Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8">
+        {/* Image Gallery Section */}
         <div className="relative">
-          <div className="aspect-square rounded-lg overflow-hidden bg-muted">
-            {entity.image_url ? (
-              <img
-                src={entity.image_url}
-                alt={entity.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                No image available
-              </div>
-            )}
-          </div>
+          <EntityV3ImageGallery
+            primaryImage={entity.image_url || ''}
+            entityType={entity.type}
+            entityName={entity.name}
+            media={entity.metadata?.media}
+          />
         </div>
         
         {/* Content Section */}
-        <div className="flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
+        <div className="flex flex-col justify-between space-y-6">
+          {/* Header Info */}
+          <div className="space-y-4">
+            {/* Badges */}
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="secondary" className="capitalize">
                 {entity.type}
               </Badge>
               {entity.is_verified && (
                 <Badge variant="default">Verified</Badge>
               )}
+              {entity.trending_score && entity.trending_score > 0.7 && (
+                <Badge variant="outline" className="border-orange-200 text-orange-700">
+                  Trending
+                </Badge>
+              )}
             </div>
             
-            <h1 className="text-3xl font-bold mb-2">{entity.name}</h1>
-            
-            {/* Rating Section */}
-            {averageRating > 0 && (
-              <div className="flex items-center gap-2 mb-3">
-                <div className="flex items-center gap-1">
-                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">{averageRating.toFixed(1)}</span>
-                </div>
-                <span className="text-muted-foreground">
-                  ({stats?.reviewCount || 0} reviews)
-                </span>
-              </div>
-            )}
-            
-            {/* Location & Website */}
-            <div className="space-y-2 mb-4">
-              {entity.venue && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4" />
-                  {entity.venue}
-                </div>
-              )}
+            {/* Title */}
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold leading-tight mb-2">
+                {entity.name}
+              </h1>
               
-              {entity.website_url && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Globe className="h-4 w-4" />
-                  <a 
-                    href={entity.website_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="hover:text-primary hover:underline"
-                  >
-                    Visit Website
-                  </a>
-                </div>
-              )}
+              {/* Location & Website */}
+              <div className="flex flex-col gap-2">
+                {entity.venue && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm">{entity.venue}</span>
+                  </div>
+                )}
+                
+                {entity.website_url && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Globe className="h-4 w-4 flex-shrink-0" />
+                    <a 
+                      href={entity.website_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm hover:text-primary hover:underline transition-colors"
+                    >
+                      Visit Website
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* Description */}
             {entity.description && (
-              <p className="text-muted-foreground leading-relaxed">
+              <p className="text-muted-foreground leading-relaxed text-sm lg:text-base">
                 {entity.description}
               </p>
             )}
           </div>
-          
-          {/* Stats Row */}
-          <div className="flex items-center gap-6 mt-4 pt-4 border-t">
-            <div className="text-center">
-              <div className="font-semibold text-lg">{stats?.recommendationCount || 0}</div>
-              <div className="text-sm text-muted-foreground">Recommendations</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-lg">{stats?.reviewCount || 0}</div>
-              <div className="text-sm text-muted-foreground">Reviews</div>
-            </div>
-            {averageRating > 0 && (
-              <div className="text-center">
-                <div className="font-semibold text-lg">{averageRating.toFixed(1)}</div>
-                <div className="text-sm text-muted-foreground">Average Rating</div>
-              </div>
-            )}
-          </div>
+
+          {/* Stats Section */}
+          <EntityV3HeroStats stats={stats} />
+
+          {/* Action Buttons */}
+          <EntityV3ActionButtons
+            entityId={entity.id}
+            entityName={entity.name}
+            websiteUrl={entity.website_url}
+          />
         </div>
       </div>
     </Card>
