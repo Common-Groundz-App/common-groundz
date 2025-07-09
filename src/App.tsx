@@ -17,6 +17,7 @@ import Explore from '@/pages/Explore';
 import Settings from '@/pages/Settings';
 import Search from '@/pages/Search';
 import EntityDetail from '@/pages/EntityDetail';
+import EntityDetailV3 from '@/pages/EntityDetailV3';
 import PostView from '@/pages/PostView';
 import RecommendationView from '@/pages/RecommendationView';
 import ProductSearch from '@/pages/ProductSearch';
@@ -101,6 +102,11 @@ function App() {
                   <Route path="/entity/:slug" element={
                     <ProtectedRoute>
                       <EntityDetail />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/entity/:slug/v3" element={
+                    <ProtectedRoute>
+                      <EntityDetailV3 />
                     </ProtectedRoute>
                   } />
                   <Route path="/post/:postId" element={
