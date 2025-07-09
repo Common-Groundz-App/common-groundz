@@ -20,7 +20,7 @@ export const EntityV3LayoutContainer: React.FC<EntityV3LayoutContainerProps> = (
         {children}
       </div>
       
-      <style jsx>{`
+      <style>{`
         .entity-v3-container {
           min-height: 100vh;
         }

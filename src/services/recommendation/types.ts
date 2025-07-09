@@ -1,4 +1,3 @@
-
 export interface Entity {
   id: string;
   name: string;
@@ -31,6 +30,10 @@ export interface Entity {
   last_enriched_at?: string;
   enrichment_source?: string;
   data_quality_score?: number;
+  
+  // V3 specific properties
+  is_verified?: boolean;
+  trending_score?: number;
 }
 
 export enum EntityType {
