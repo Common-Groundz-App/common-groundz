@@ -41,7 +41,7 @@ export const EntityPreviewToggle = () => {
     });
   };
   
-  const currentVersion = isV3 ? 'V3' : (isPreviewMode ? 'V2' Preview' : 'Original');
+  const currentVersion = isV3 ? 'V3' : (isPreviewMode ? 'V2 Preview' : 'Original');
   
   return (
     <div className="fixed top-20 right-4 z-50 flex flex-col gap-2">
