@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import NavBarComponent from '@/components/NavBarComponent';
+import { EntityV3 } from '@/components/entity-v3/EntityV3';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +19,6 @@ import { useToast } from '@/hooks/use-toast';
 import RecommendationForm from '@/components/recommendations/RecommendationForm';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
-import NavBarComponent from '@/components/NavBarComponent';
 import Footer from '@/components/Footer';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { DynamicReviewsSummary } from '@/components/profile/reviews/DynamicReviewsSummary';
@@ -949,12 +950,68 @@ const EntityDetailOriginal = () => {
   );
 };
 
-const EntityDetail = () => {
-  const [searchParams] = useSearchParams();
-  const isPreviewMode = searchParams.get('preview') === 'true' || searchParams.get('v') === '2';
+export default function EntityDetail() {
+  const { slugOrId } = useParams<{ slugOrId: string }>();
+  const [activeVersion, setActiveVersion] = useState<'v1' | 'v2' | 'v3'>('v1');
+  
+  return (
+    <div className="min-h-screen bg-background">
+      <NavBarComponent />
+      
+      {/* Version Switcher */}
+      <div className="border-b bg-muted/30">
+        <div className="container mx-auto px-4 py-2">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveVersion('v1')}
+              className={`px-3 py-1 rounded text-sm ${
+                activeVersion === 'v1' 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-background hover:bg-muted'
+              }`}
+            >
+              Version 1
+            </button>
+            <button
+              onClick={() => setActiveVersion('v2')}
+              className={`px-3 py-1 rounded text-sm ${
+                activeVersion === 'v2' 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-background hover:bg-muted'
+              }`}
+            >
+              Version 2
+            </button>
+            <button
+              onClick={() => setActiveVersion('v3')}
+              className={`px-3 py-1 rounded text-sm ${
+                activeVersion === 'v3' 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-background hover:bg-muted'
+              }`}
+            >
+              Version 3
+            </button>
+          </div>
+        </div>
+      </div>
 
-  // Return V2 if preview mode is enabled, otherwise return original
-  return isPreviewMode ? <EntityDetailV2 /> : <EntityDetailOriginal />;
-};
-
-export default EntityDetail;
+      {/* Render Selected Version */}
+      {activeVersion === 'v1' && (
+        <div className="container mx-auto px-4 py-8">
+          {/* Version 1 content */}
+        </div>
+      )}
+      
+      {activeVersion === 'v2' && (
+        <div className="container mx-auto px-4 py-8">
+          {/* Version 2 content */}
+        </div>
+      )}
+      
+      {activeVersion === 'v3' && (
+        <EntityV3 />
+      )}
+    </div>
+  );
+}
