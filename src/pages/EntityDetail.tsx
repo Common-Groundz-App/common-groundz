@@ -951,10 +951,23 @@ const EntityDetailOriginal = () => {
 
 const EntityDetail = () => {
   const [searchParams] = useSearchParams();
-  const isPreviewMode = searchParams.get('preview') === 'true' || searchParams.get('v') === '2';
+  const version = searchParams.get('v') || (searchParams.get('preview') === 'true' ? '2' : '1');
 
-  // Return V2 if preview mode is enabled, otherwise return original
-  return isPreviewMode ? <EntityDetailV2 /> : <EntityDetailOriginal />;
+  // Import EntityV3 dynamically
+  const EntityV3 = React.lazy(() => import('@/components/entity-v3/EntityV3'));
+
+  // Return appropriate version based on URL parameters
+  if (version === '3') {
+    return (
+      <React.Suspense fallback={<div>Loading V3...</div>}>
+        <EntityV3 />
+      </React.Suspense>
+    );
+  } else if (version === '2') {
+    return <EntityDetailV2 />;
+  } else {
+    return <EntityDetailOriginal />;
+  }
 };
 
 export default EntityDetail;

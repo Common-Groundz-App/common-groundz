@@ -12,15 +12,21 @@ export const EntityPreviewToggle = () => {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   
-  const isPreviewMode = searchParams.get('preview') === 'true' || searchParams.get('v') === '2';
+  const currentVersion = searchParams.get('v') || (searchParams.get('preview') === 'true' ? '2' : '1');
   
-  const togglePreview = () => {
-    if (isPreviewMode) {
-      // Go back to original
-      navigate(`/entity/${slug}`);
-    } else {
-      // Go to preview
-      navigate(`/entity/${slug}?preview=true`);
+  const cycleVersion = () => {
+    switch (currentVersion) {
+      case '1':
+        navigate(`/entity/${slug}?v=2`);
+        break;
+      case '2':
+        navigate(`/entity/${slug}?v=3`);
+        break;
+      case '3':
+        navigate(`/entity/${slug}`);
+        break;
+      default:
+        navigate(`/entity/${slug}?v=2`);
     }
   };
   
@@ -37,24 +43,31 @@ export const EntityPreviewToggle = () => {
     <div className="fixed top-20 right-4 z-50 flex flex-col gap-2">
       {/* Main Toggle Button */}
       <Button
-        onClick={togglePreview}
-        variant={isPreviewMode ? "default" : "outline"}
+        onClick={cycleVersion}
+        variant={currentVersion !== '1' ? "default" : "outline"}
         size="sm"
         className={`${
-          isPreviewMode 
-            ? 'bg-purple-500 hover:bg-purple-600 text-white' 
-            : 'bg-white/90 hover:bg-white border-2 border-blue-200'
+          currentVersion === '1'
+            ? 'bg-white/90 hover:bg-white border-2 border-blue-200'
+            : currentVersion === '2'
+            ? 'bg-purple-500 hover:bg-purple-600 text-white'
+            : 'bg-green-500 hover:bg-green-600 text-white'
         } backdrop-blur-sm shadow-lg`}
       >
-        {isPreviewMode ? (
-          <>
-            <EyeOff className="h-4 w-4 mr-2" />
-            Exit V2
-          </>
-        ) : (
+        {currentVersion === '1' ? (
           <>
             <Eye className="h-4 w-4 mr-2" />
             Try V2
+          </>
+        ) : currentVersion === '2' ? (
+          <>
+            <ArrowRight className="h-4 w-4 mr-2" />
+            Try V3
+          </>
+        ) : (
+          <>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to V1
           </>
         )}
       </Button>
@@ -74,12 +87,14 @@ export const EntityPreviewToggle = () => {
       <Badge 
         variant="outline" 
         className={`${
-          isPreviewMode 
-            ? 'bg-purple-100/90 text-purple-800 border-purple-300' 
-            : 'bg-blue-100/90 text-blue-800 border-blue-300'
+          currentVersion === '1'
+            ? 'bg-blue-100/90 text-blue-800 border-blue-300'
+            : currentVersion === '2'
+            ? 'bg-purple-100/90 text-purple-800 border-purple-300'
+            : 'bg-green-100/90 text-green-800 border-green-300'
         } backdrop-blur-sm text-xs px-2 py-1 justify-center`}
       >
-        {isPreviewMode ? 'V2 Preview' : 'Original'}
+        {currentVersion === '1' ? 'V1 Original' : currentVersion === '2' ? 'V2 Preview' : 'V3 Beta'}
       </Badge>
     </div>
   );
