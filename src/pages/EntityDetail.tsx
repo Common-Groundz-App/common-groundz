@@ -953,11 +953,18 @@ const EntityDetail = () => {
   const [searchParams] = useSearchParams();
   const version = searchParams.get('v') || (searchParams.get('preview') === 'true' ? '2' : '1');
 
-  // Import EntityV3 dynamically
+  // Import EntityV3 and EntityV4 dynamically
   const EntityV3 = React.lazy(() => import('@/components/entity-v3/EntityV3'));
+  const EntityV4 = React.lazy(() => import('@/components/entity-v4/EntityV4'));
 
   // Return appropriate version based on URL parameters
-  if (version === '3') {
+  if (version === '4') {
+    return (
+      <React.Suspense fallback={<div>Loading V4...</div>}>
+        <EntityV4 />
+      </React.Suspense>
+    );
+  } else if (version === '3') {
     return (
       <React.Suspense fallback={<div>Loading V3...</div>}>
         <EntityV3 />

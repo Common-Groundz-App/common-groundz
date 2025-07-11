@@ -23,6 +23,9 @@ export const EntityPreviewToggle = () => {
         navigate(`/entity/${slug}?v=3`);
         break;
       case '3':
+        navigate(`/entity/${slug}?v=4`);
+        break;
+      case '4':
         navigate(`/entity/${slug}`);
         break;
       default:
@@ -51,7 +54,9 @@ export const EntityPreviewToggle = () => {
             ? 'bg-white/90 hover:bg-white border-2 border-blue-200'
             : currentVersion === '2'
             ? 'bg-purple-500 hover:bg-purple-600 text-white'
-            : 'bg-green-500 hover:bg-green-600 text-white'
+            : currentVersion === '3'
+            ? 'bg-green-500 hover:bg-green-600 text-white'
+            : 'bg-orange-500 hover:bg-orange-600 text-white'
         } backdrop-blur-sm shadow-lg`}
       >
         {currentVersion === '1' ? (
@@ -63,6 +68,11 @@ export const EntityPreviewToggle = () => {
           <>
             <ArrowRight className="h-4 w-4 mr-2" />
             Try V3
+          </>
+        ) : currentVersion === '3' ? (
+          <>
+            <ArrowRight className="h-4 w-4 mr-2" />
+            Try V4
           </>
         ) : (
           <>
@@ -91,10 +101,14 @@ export const EntityPreviewToggle = () => {
             ? 'bg-blue-100/90 text-blue-800 border-blue-300'
             : currentVersion === '2'
             ? 'bg-purple-100/90 text-purple-800 border-purple-300'
-            : 'bg-green-100/90 text-green-800 border-green-300'
+            : currentVersion === '3'
+            ? 'bg-green-100/90 text-green-800 border-green-300'
+            : 'bg-orange-100/90 text-orange-800 border-orange-300'
         } backdrop-blur-sm text-xs px-2 py-1 justify-center`}
       >
-        {currentVersion === '1' ? 'V1 Original' : currentVersion === '2' ? 'V2 Preview' : 'V3 Beta'}
+        {currentVersion === '1' ? 'V1 Original' : 
+         currentVersion === '2' ? 'V2 Preview' : 
+         currentVersion === '3' ? 'V3 Beta' : 'V4 Navigation'}
       </Badge>
     </div>
   );
