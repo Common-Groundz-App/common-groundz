@@ -65,7 +65,7 @@ export const EntityHeader = () => {
             {/* Ratings */}
             <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-center gap-2">
-                <ConnectedRingsRating rating={4.3} size="sm" />
+                <ConnectedRingsRating value={4.3} size="sm" />
                 <span className="text-sm text-muted-foreground">4.3 from 2,847 reviews</span>
               </div>
               <div className="flex items-center gap-2">

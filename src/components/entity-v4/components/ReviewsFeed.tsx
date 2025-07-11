@@ -53,7 +53,7 @@ export const ReviewsFeed = () => {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
                 <span className="font-medium">Sarah Johnson</span>
-                <ConnectedRingsRating rating={5} size="sm" />
+                <ConnectedRingsRating value={5} size="sm" />
                 <span className="text-sm text-muted-foreground">2 days ago</span>
               </div>
               <p className="text-sm mb-3">
@@ -89,7 +89,7 @@ export const ReviewsFeed = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="font-medium">User {index}</span>
-                    <ConnectedRingsRating rating={4 + index * 0.2} size="sm" />
+                    <ConnectedRingsRating value={4 + index * 0.2} size="sm" />
                     <span className="text-sm text-muted-foreground">{index + 2} weeks ago</span>
                   </div>
                   <p className="text-sm mb-3">
