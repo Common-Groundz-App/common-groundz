@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { 
-  ChevronRight, Star, Share, Edit3, Heart, Camera, MapPin, Globe, 
+  ChevronRight, Share, Edit3, Heart, Camera, MapPin, Globe, 
   Navigation, UserPlus, TrendingUp, MessageCircle, Users, Clock,
   Phone, Mail, ExternalLink, Image, ThumbsUp, Calendar, Search,
   Filter, MoreHorizontal, Award
@@ -14,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 export const EntityV3 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -63,29 +65,6 @@ export const EntityV3 = () => {
     }
   ];
 
-  const renderStars = (rating: number, size: 'sm' | 'md' = 'md') => {
-    const sizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-    
-    return (
-      <div className="flex items-center gap-1">
-        {[...Array(5)].map((_, index) => (
-          <Star
-            key={index}
-            className={`${sizeClass} ${
-              index < fullStars
-                ? 'fill-yellow-400 text-yellow-400'
-                : index === fullStars && hasHalfStar
-                ? 'fill-yellow-400/50 text-yellow-400'
-                : 'fill-gray-200 text-gray-200'
-            }`}
-          />
-        ))}
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-white">
       {/* Top Navigation */}
@@ -132,7 +111,13 @@ export const EntityV3 = () => {
 
                 <div className="flex items-center gap-4 mb-3">
                   <div className="flex items-center gap-2">
-                    {renderStars(mockEntity.rating)}
+                    <ConnectedRingsRating 
+                      value={mockEntity.rating} 
+                      size="md" 
+                      isInteractive={false}
+                      showValue={false}
+                      minimal={false}
+                    />
                     <span className="font-semibold text-lg">{mockEntity.rating}</span>
                   </div>
                   <span className="text-muted-foreground">
@@ -161,7 +146,13 @@ export const EntityV3 = () => {
                     <Users className="w-4 h-4 text-blue-600" />
                     <span className="text-sm font-medium text-blue-800">Circle Rating:</span>
                     <div className="flex items-center gap-1">
-                      {renderStars(mockEntity.circleRating, 'sm')}
+                      <ConnectedRingsRating 
+                        value={mockEntity.circleRating} 
+                        size="sm" 
+                        isInteractive={false}
+                        showValue={false}
+                        minimal={false}
+                      />
                       <span className="font-semibold text-blue-800">{mockEntity.circleRating}</span>
                     </div>
                     <span className="text-xs text-blue-600">({mockEntity.circleReviewCount} reviews)</span>
@@ -258,7 +249,14 @@ export const EntityV3 = () => {
                     {[5, 4, 3, 2, 1].map((stars) => (
                       <div key={stars} className="flex items-center gap-3">
                         <span className="text-sm w-2">{stars}</span>
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        <ConnectedRingsRating 
+                          value={1} 
+                          size="badge" 
+                          variant="badge"
+                          isInteractive={false}
+                          showValue={false}
+                          minimal={true}
+                        />
                         <Progress value={stars === 5 ? 68 : stars === 4 ? 22 : stars === 3 ? 7 : stars === 2 ? 2 : 1} className="flex-1" />
                         <span className="text-sm text-muted-foreground w-8">
                           {stars === 5 ? '68%' : stars === 4 ? '22%' : stars === 3 ? '7%' : stars === 2 ? '2%' : '1%'}
@@ -381,7 +379,13 @@ export const EntityV3 = () => {
                               <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">From your Circle</Badge>
                             </div>
                             <div className="text-right">
-                              {renderStars(5, 'sm')}
+                              <ConnectedRingsRating 
+                                value={5} 
+                                size="sm" 
+                                isInteractive={false}
+                                showValue={false}
+                                minimal={false}
+                              />
                               <p className="text-sm text-muted-foreground">2 days ago</p>
                             </div>
                           </div>
@@ -410,7 +414,13 @@ export const EntityV3 = () => {
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold">Sarah Miller</h4>
                             <div className="text-right">
-                              {renderStars(4, 'sm')}
+                              <ConnectedRingsRating 
+                                value={4} 
+                                size="sm" 
+                                isInteractive={false}
+                                showValue={false}
+                                minimal={false}
+                              />
                               <p className="text-sm text-muted-foreground">1 week ago</p>
                             </div>
                           </div>
@@ -448,7 +458,13 @@ export const EntityV3 = () => {
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold">Raj Kumar</h4>
                             <div className="text-right">
-                              {renderStars(5, 'sm')}
+                              <ConnectedRingsRating 
+                                value={5} 
+                                size="sm" 
+                                isInteractive={false}
+                                showValue={false}
+                                minimal={false}
+                              />
                               <p className="text-sm text-muted-foreground">2 weeks ago</p>
                             </div>
                           </div>
@@ -515,7 +531,14 @@ export const EntityV3 = () => {
                           <div className="flex-1">
                             <h4 className="font-medium text-sm">{restaurant.name}</h4>
                             <div className="flex items-center gap-1">
-                              {renderStars(restaurant.rating, 'sm')}
+                              <ConnectedRingsRating 
+                                value={restaurant.rating} 
+                                size="badge" 
+                                variant="badge"
+                                isInteractive={false}
+                                showValue={false}
+                                minimal={true}
+                              />
                               <span className="text-xs text-muted-foreground">{restaurant.rating}</span>
                             </div>
                           </div>
