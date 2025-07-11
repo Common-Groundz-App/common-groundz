@@ -1,29 +1,37 @@
 import React from 'react';
+import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
-import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye } from "lucide-react";
+import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
+import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
+import { Star, Info, Globe, Edit3, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, MapPin, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ReviewCard from "@/components/ReviewCard";
+
 const EntityV4 = () => {
-  // Mock data
-  const entityData = {
-    name: "Cosmix",
-    description: "Premium health and wellness brand focused on science-backed supplements and nutrition products. Trusted by fitness enthusiasts and health professionals worldwide.",
-    rating: 4.3,
-    totalReviews: 2847,
-    circleScore: 4.6,
-    claimed: true,
-    image: "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=200&h=200&fit=crop",
-    website: "www.cosmix.com",
-    location: "Indiranagar, Bangalore",
-    email: "hello@cosmix.com",
-    phone: "+91-9876543210"
-  };
+  const { slugOrId } = useParams();
+  
+  const {
+    entity,
+    recommendations,
+    reviews,
+    stats,
+    interactions,
+    isLoading,
+    isOptimisticCreation,
+    loadingStep,
+    loadingProgress,
+    error,
+    refreshData,
+    prefetchRelatedEntities
+  } = useEntityDetailCached(slugOrId || '');
+
+  // Mock data for sections not yet implemented
   const trustMetrics = {
     circleCertified: 78,
     repurchaseRate: 63,
@@ -35,6 +43,7 @@ const EntityV4 = () => {
       1: 3
     }
   };
+
   const mockReviews = [{
     id: 1,
     name: "Priya Sharma",
@@ -66,6 +75,7 @@ const EntityV4 = () => {
     verified: true,
     helpful: 31
   }];
+
   const relatedEntities = [{
     name: "HealthifyMe",
     rating: 4.2,
@@ -82,7 +92,76 @@ const EntityV4 = () => {
     category: "Supplements",
     image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
   }];
-  return <div className="min-h-screen flex flex-col bg-background">
+
+  const renderStars = (rating: number) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+    
+    return (
+      <div className="flex items-center gap-1">
+        {[...Array(5)].map((_, index) => (
+          <Star
+            key={index}
+            className={`w-5 h-5 ${
+              index < fullStars
+                ? 'fill-yellow-400 text-yellow-400'
+                : index === fullStars && hasHalfStar
+                ? 'fill-yellow-400/50 text-yellow-400'
+                : 'fill-gray-200 text-gray-200'
+            }`}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <NavBarComponent />
+        <EntityPreviewToggle />
+        <div className="flex-1 pt-16 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-foreground mb-2">Entity not found</h1>
+            <p className="text-muted-foreground">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading || !entity) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <NavBarComponent />
+        <EntityPreviewToggle />
+        <div className="flex-1 pt-16">
+          <div className="bg-white border-b">
+            <div className="max-w-7xl mx-auto px-4 py-6">
+              <div className="animate-pulse">
+                <div className="h-4 bg-muted rounded w-48 mb-4"></div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2">
+                    <div className="flex gap-6">
+                      <div className="w-24 h-24 bg-muted rounded-lg"></div>
+                      <div className="flex-1">
+                        <div className="h-8 bg-muted rounded w-64 mb-2"></div>
+                        <div className="h-4 bg-muted rounded w-full mb-4"></div>
+                        <div className="h-6 bg-muted rounded w-48"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
       <NavBarComponent />
       
       {/* Version Toggle */}
@@ -95,37 +174,51 @@ const EntityV4 = () => {
           <div className="bg-white border-b">
             <div className="max-w-7xl mx-auto px-4 py-6">
               {/* Breadcrumb */}
-              <nav className="text-sm text-gray-500 mb-4">
-                <span>Home</span> / <span>Brands</span> / <span className="text-gray-900">Cosmix</span>
-              </nav>
+              <EntityParentBreadcrumb 
+                currentEntity={entity}
+                parentEntity={null}
+                isLoading={false}
+              />
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left: Brand Info */}
                 <div className="lg:col-span-2">
                   <div className="flex gap-6">
-                    <img src={entityData.image} alt={entityData.name} className="w-24 h-24 rounded-lg object-cover" />
+                    <img 
+                      src={entity.image_url || "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=120&h=120&fit=crop"} 
+                      alt={entity.name} 
+                      className="w-24 h-24 rounded-lg object-cover" 
+                    />
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
-                        {entityData.claimed && <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        <h1 className="text-3xl font-bold text-gray-900">{entity.name}</h1>
+                        {entity.is_verified && (
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             Claimed
-                          </Badge>}
+                          </Badge>
+                        )}
                       </div>
-                      <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
+                      <p className="text-gray-600 mb-4 leading-relaxed">
+                        {entity.description || "No description available"}
+                      </p>
                       
                       {/* Ratings */}
                       <div className="flex items-center gap-6 mb-4">
                         <div className="flex items-center gap-2">
                           <div className="flex">
-                            {[...Array(5)].map((_, i) => <Star key={i} className={`w-5 h-5 ${i < Math.floor(entityData.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />)}
+                            {stats?.averageRating && renderStars(stats.averageRating)}
                           </div>
-                          <span className="font-semibold">{entityData.rating}</span>
-                          <span className="text-gray-500">({entityData.totalReviews.toLocaleString()} reviews)</span>
+                          <span className="font-semibold">
+                            {stats?.averageRating ? stats.averageRating.toFixed(1) : 'No rating'}
+                          </span>
+                          <span className="text-gray-500">
+                            ({(stats?.reviewCount || 0).toLocaleString()} reviews)
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-blue-600">
                           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold">
-                            {entityData.circleScore}
+                            {stats?.averageRating ? stats.averageRating.toFixed(1) : 'N/A'}
                           </div>
                           <span className="font-medium">Circle Score</span>
                         </div>
@@ -136,10 +229,16 @@ const EntityV4 = () => {
                         <Button className="bg-blue-600 hover:bg-blue-700">
                           Write Review
                         </Button>
-                        <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
-                          <Globe className="w-4 h-4 mr-2" />
-                          Visit Website
-                        </Button>
+                        {entity.website_url && (
+                          <Button 
+                            variant="outline" 
+                            className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                            onClick={() => window.open(entity.website_url, '_blank')}
+                          >
+                            <Globe className="w-4 h-4 mr-2" />
+                            Visit Website
+                          </Button>
+                        )}
                         <Button variant="outline">
                           <MapPin className="w-4 h-4 mr-2" />
                           Get Directions
@@ -194,11 +293,13 @@ const EntityV4 = () => {
 
                       <div>
                         <h4 className="font-medium mb-3">Rating Breakdown</h4>
-                        {Object.entries(trustMetrics.ratingBreakdown).reverse().map(([stars, percentage]) => <div key={stars} className="flex items-center gap-3 mb-2">
+                        {Object.entries(trustMetrics.ratingBreakdown).reverse().map(([stars, percentage]) => (
+                          <div key={stars} className="flex items-center gap-3 mb-2">
                             <span className="text-sm w-8">{stars}★</span>
                             <Progress value={percentage} className="flex-1" />
                             <span className="text-sm w-8 text-right">{percentage}%</span>
-                          </div>)}
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -221,7 +322,7 @@ const EntityV4 = () => {
                       <MessageCircle className="w-8 h-8 text-blue-600" />
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900 mb-1">Ask the Community</h3>
-                        <p className="text-sm text-gray-600">Get answers from people who have used Cosmix products</p>
+                        <p className="text-sm text-gray-600">Get answers from people who have used {entity.name} products</p>
                       </div>
                       <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50">
                         Ask Question
@@ -454,22 +555,26 @@ const EntityV4 = () => {
                       <CardTitle className="text-lg">Contact Information</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <MapPin className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm">{entityData.location}</span>
-                      </div>
+                      {entity.venue && (
+                        <div className="flex items-center gap-3">
+                          <MapPin className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm">{entity.venue}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-3">
                         <Mail className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm">{entityData.email}</span>
+                        <span className="text-sm">contact@{entity.name.toLowerCase().replace(/\s+/g, '')}.com</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <Phone className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm">{entityData.phone}</span>
+                        <span className="text-sm">+91-9876543210</span>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Globe className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm">{entityData.website}</span>
-                      </div>
+                      {entity.website_url && (
+                        <div className="flex items-center gap-3">
+                          <Globe className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm">{entity.website_url}</span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -480,9 +585,7 @@ const EntityV4 = () => {
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                        Cosmix is committed to delivering the highest quality health and wellness products. 
-                        Our team of experts ensures that every product meets rigorous quality standards 
-                        and is backed by scientific research.
+                        {entity.description || `${entity.name} is committed to delivering the highest quality products and services. Our team of experts ensures that every offering meets rigorous quality standards.`}
                       </p>
                       <Button variant="outline" size="sm" className="w-full">
                         Suggest an Edit
@@ -497,16 +600,18 @@ const EntityV4 = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {relatedEntities.map((entity, index) => <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                            <img src={entity.image} alt={entity.name} className="w-8 h-8 rounded object-cover" />
+                        {relatedEntities.map((relatedEntity, index) => (
+                          <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                            <img src={relatedEntity.image} alt={relatedEntity.name} className="w-8 h-8 rounded object-cover" />
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-sm truncate">{entity.name}</h4>
+                              <h4 className="font-medium text-sm truncate">{relatedEntity.name}</h4>
                               <div className="flex items-center gap-1">
                                 <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                <span className="text-xs">{entity.rating}</span>
+                                <span className="text-xs">{relatedEntity.rating}</span>
                               </div>
                             </div>
-                          </div>)}
+                          </div>
+                        ))}
                       </div>
                     </CardContent>
                   </Card>
@@ -516,7 +621,7 @@ const EntityV4 = () => {
                     <CardContent className="p-4 text-center">
                       <Users className="w-8 h-8 text-purple-600 mx-auto mb-2" />
                       <h3 className="font-semibold text-gray-900 mb-2">Talk to Someone in Your Circle</h3>
-                      <p className="text-sm text-gray-600 mb-3">Connect with people who have experience with Cosmix</p>
+                      <p className="text-sm text-gray-600 mb-3">Connect with people who have experience with {entity.name}</p>
                       <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
                         Find Connections
                       </Button>
@@ -528,6 +633,8 @@ const EntityV4 = () => {
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default EntityV4;
