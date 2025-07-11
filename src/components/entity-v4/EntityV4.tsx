@@ -56,8 +56,8 @@ const EntityV4 = () => {
     );
   }
 
-  // Handle error state
-  if (error || !entity) {
+  // Handle error state - only after loading is complete
+  if (!isLoading && (error || !entity)) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <NavBarComponent />
