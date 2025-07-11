@@ -1,4 +1,3 @@
-
 import React from 'react';
 import NavBarComponent from '@/components/NavBarComponent';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
@@ -10,7 +9,6 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ReviewCard from "@/components/ReviewCard";
-
 const EntityV4 = () => {
   // Mock data
   const entityData = {
@@ -26,57 +24,65 @@ const EntityV4 = () => {
     email: "hello@cosmix.com",
     phone: "+91-9876543210"
   };
-
   const trustMetrics = {
     circleCertified: 78,
     repurchaseRate: 63,
-    ratingBreakdown: { 5: 45, 4: 30, 3: 15, 2: 7, 1: 3 }
-  };
-
-  const mockReviews = [
-    {
-      id: 1,
-      name: "Priya Sharma",
-      avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b515?w=50&h=50&fit=crop",
-      rating: 5,
-      date: "2024-01-15",
-      title: "Excellent protein powder quality!",
-      content: "I've been using Cosmix whey protein for 6 months now and the results are amazing. The taste is great and it mixes well without clumps.",
-      verified: true,
-      helpful: 23
-    },
-    {
-      id: 2,
-      name: "Rahul Kumar",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop",
-      rating: 4,
-      date: "2024-01-10",
-      title: "Good value for money",
-      content: "The supplements are effective and reasonably priced compared to other premium brands. Delivery was quick too.",
-      verified: true,
-      helpful: 15
-    },
-    {
-      id: 3,
-      name: "Sneha Patel",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=50&h=50&fit=crop",
-      rating: 5,
-      date: "2024-01-08",
-      title: "Circle recommended - Worth it!",
-      content: "Found this through Circle recommendations and so glad I tried it. The multivitamins have really improved my energy levels.",
-      verified: true,
-      helpful: 31
+    ratingBreakdown: {
+      5: 45,
+      4: 30,
+      3: 15,
+      2: 7,
+      1: 3
     }
-  ];
-
-  const relatedEntities = [
-    { name: "HealthifyMe", rating: 4.2, category: "Health Apps", image: "https://images.unsplash.com/photo-1500673922987-e212871fec22?w=100&h=100&fit=crop" },
-    { name: "MyFitnessPal", rating: 4.0, category: "Fitness Apps", image: "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=100&h=100&fit=crop" },
-    { name: "Optimum Nutrition", rating: 4.5, category: "Supplements", image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop" }
-  ];
-
-  return (
-    <div className="min-h-screen flex flex-col bg-background">
+  };
+  const mockReviews = [{
+    id: 1,
+    name: "Priya Sharma",
+    avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b515?w=50&h=50&fit=crop",
+    rating: 5,
+    date: "2024-01-15",
+    title: "Excellent protein powder quality!",
+    content: "I've been using Cosmix whey protein for 6 months now and the results are amazing. The taste is great and it mixes well without clumps.",
+    verified: true,
+    helpful: 23
+  }, {
+    id: 2,
+    name: "Rahul Kumar",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop",
+    rating: 4,
+    date: "2024-01-10",
+    title: "Good value for money",
+    content: "The supplements are effective and reasonably priced compared to other premium brands. Delivery was quick too.",
+    verified: true,
+    helpful: 15
+  }, {
+    id: 3,
+    name: "Sneha Patel",
+    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=50&h=50&fit=crop",
+    rating: 5,
+    date: "2024-01-08",
+    title: "Circle recommended - Worth it!",
+    content: "Found this through Circle recommendations and so glad I tried it. The multivitamins have really improved my energy levels.",
+    verified: true,
+    helpful: 31
+  }];
+  const relatedEntities = [{
+    name: "HealthifyMe",
+    rating: 4.2,
+    category: "Health Apps",
+    image: "https://images.unsplash.com/photo-1500673922987-e212871fec22?w=100&h=100&fit=crop"
+  }, {
+    name: "MyFitnessPal",
+    rating: 4.0,
+    category: "Fitness Apps",
+    image: "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=100&h=100&fit=crop"
+  }, {
+    name: "Optimum Nutrition",
+    rating: 4.5,
+    category: "Supplements",
+    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
+  }];
+  return <div className="min-h-screen flex flex-col bg-background">
       <NavBarComponent />
       
       {/* Version Toggle */}
@@ -97,20 +103,14 @@ const EntityV4 = () => {
                 {/* Left: Brand Info */}
                 <div className="lg:col-span-2">
                   <div className="flex gap-6">
-                    <img 
-                      src={entityData.image} 
-                      alt={entityData.name}
-                      className="w-24 h-24 rounded-lg object-cover"
-                    />
+                    <img src={entityData.image} alt={entityData.name} className="w-24 h-24 rounded-lg object-cover" />
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
-                        {entityData.claimed && (
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        {entityData.claimed && <Badge variant="secondary" className="bg-green-100 text-green-800">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             Claimed
-                          </Badge>
-                        )}
+                          </Badge>}
                       </div>
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                       
@@ -118,9 +118,7 @@ const EntityV4 = () => {
                       <div className="flex items-center gap-6 mb-4">
                         <div className="flex items-center gap-2">
                           <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`w-5 h-5 ${i < Math.floor(entityData.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
-                            ))}
+                            {[...Array(5)].map((_, i) => <Star key={i} className={`w-5 h-5 ${i < Math.floor(entityData.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />)}
                           </div>
                           <span className="font-semibold">{entityData.rating}</span>
                           <span className="text-gray-500">({entityData.totalReviews.toLocaleString()} reviews)</span>
@@ -161,15 +159,7 @@ const EntityV4 = () => {
                 </div>
 
                 {/* Right: Map */}
-                <div>
-                  <div className="bg-gray-200 rounded-lg h-48 flex items-center justify-center">
-                    <div className="text-center text-gray-500">
-                      <MapPin className="w-8 h-8 mx-auto mb-2" />
-                      <p>Static Map Placeholder</p>
-                      <p className="text-sm">{entityData.location}</p>
-                    </div>
-                  </div>
-                </div>
+                
               </div>
             </div>
           </div>
@@ -204,13 +194,11 @@ const EntityV4 = () => {
 
                       <div>
                         <h4 className="font-medium mb-3">Rating Breakdown</h4>
-                        {Object.entries(trustMetrics.ratingBreakdown).reverse().map(([stars, percentage]) => (
-                          <div key={stars} className="flex items-center gap-3 mb-2">
+                        {Object.entries(trustMetrics.ratingBreakdown).reverse().map(([stars, percentage]) => <div key={stars} className="flex items-center gap-3 mb-2">
                             <span className="text-sm w-8">{stars}★</span>
                             <Progress value={percentage} className="flex-1" />
                             <span className="text-sm w-8 text-right">{percentage}%</span>
-                          </div>
-                        ))}
+                          </div>)}
                       </div>
                     </div>
 
@@ -255,28 +243,18 @@ const EntityV4 = () => {
 
                   {/* Search Bar */}
                   <div className="relative mb-6">
-                    <input 
-                      type="text" 
-                      placeholder="Search reviews..."
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    <input type="text" placeholder="Search reviews..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                   </div>
 
                   {/* Review Cards */}
                   <div className="space-y-6">
-                    {mockReviews.map((review) => (
-                      <ReviewCard key={review.id} review={review} />
-                    ))}
+                    {mockReviews.map(review => <ReviewCard key={review.id} review={review} />)}
 
                     {/* Timeline Review */}
                     <Card className="border-l-4 border-l-blue-500">
                       <CardContent className="p-6">
                         <div className="flex items-start gap-4">
-                          <img 
-                            src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop"
-                            alt="Timeline reviewer"
-                            className="w-12 h-12 rounded-full"
-                          />
+                          <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop" alt="Timeline reviewer" className="w-12 h-12 rounded-full" />
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <h4 className="font-semibold">Arjun Mehta</h4>
@@ -330,11 +308,9 @@ const EntityV4 = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                        {[1, 2, 3, 4, 5, 6].map((i) => (
-                          <div key={i} className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
+                        {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
                             <Camera className="w-6 h-6 text-gray-400" />
-                          </div>
-                        ))}
+                          </div>)}
                       </div>
                     </CardContent>
                   </Card>
@@ -346,8 +322,7 @@ const EntityV4 = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {relatedEntities.map((entity, index) => (
-                          <div key={index} className="flex items-center gap-3 p-3 border rounded-lg hover:shadow-md transition-shadow cursor-pointer">
+                        {relatedEntities.map((entity, index) => <div key={index} className="flex items-center gap-3 p-3 border rounded-lg hover:shadow-md transition-shadow cursor-pointer">
                             <img src={entity.image} alt={entity.name} className="w-12 h-12 rounded-lg object-cover" />
                             <div className="flex-1">
                               <h4 className="font-medium">{entity.name}</h4>
@@ -357,8 +332,7 @@ const EntityV4 = () => {
                                 <span className="text-sm">{entity.rating}</span>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          </div>)}
                       </div>
                     </CardContent>
                   </Card>
@@ -367,11 +341,7 @@ const EntityV4 = () => {
                   <Card className="mt-8">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-4">
-                        <img 
-                          src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop"
-                          alt="Founder"
-                          className="w-16 h-16 rounded-full object-cover"
-                        />
+                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop" alt="Founder" className="w-16 h-16 rounded-full object-cover" />
                         <div>
                           <h3 className="font-semibold text-gray-900">Meet the Founder</h3>
                           <p className="text-blue-600 font-medium">Rohit Sharma</p>
@@ -527,8 +497,7 @@ const EntityV4 = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {relatedEntities.map((entity, index) => (
-                          <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        {relatedEntities.map((entity, index) => <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                             <img src={entity.image} alt={entity.name} className="w-8 h-8 rounded object-cover" />
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-sm truncate">{entity.name}</h4>
@@ -537,8 +506,7 @@ const EntityV4 = () => {
                                 <span className="text-xs">{entity.rating}</span>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          </div>)}
                       </div>
                     </CardContent>
                   </Card>
@@ -560,8 +528,6 @@ const EntityV4 = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default EntityV4;
