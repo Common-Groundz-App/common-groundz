@@ -31,6 +31,10 @@ const EntityV4 = () => {
     prefetchRelatedEntities
   } = useEntityDetailCached(slugOrId || '');
 
+  console.log('EntityV4 - Current entity:', entity);
+  console.log('EntityV4 - Loading:', isLoading);
+  console.log('EntityV4 - Error:', error);
+
   // Mock data for sections not yet implemented
   const trustMetrics = {
     circleCertified: 78,
@@ -140,16 +144,12 @@ const EntityV4 = () => {
             <div className="max-w-7xl mx-auto px-4 py-6">
               <div className="animate-pulse">
                 <div className="h-4 bg-muted rounded w-48 mb-4"></div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2">
-                    <div className="flex gap-6">
-                      <div className="w-24 h-24 bg-muted rounded-lg"></div>
-                      <div className="flex-1">
-                        <div className="h-8 bg-muted rounded w-64 mb-2"></div>
-                        <div className="h-4 bg-muted rounded w-full mb-4"></div>
-                        <div className="h-6 bg-muted rounded w-48"></div>
-                      </div>
-                    </div>
+                <div className="flex gap-6">
+                  <div className="w-24 h-24 bg-muted rounded-lg"></div>
+                  <div className="flex-1">
+                    <div className="h-8 bg-muted rounded w-64 mb-2"></div>
+                    <div className="h-4 bg-muted rounded w-full mb-4"></div>
+                    <div className="h-6 bg-muted rounded w-48"></div>
                   </div>
                 </div>
               </div>
@@ -180,85 +180,78 @@ const EntityV4 = () => {
                 isLoading={false}
               />
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left: Brand Info */}
-                <div className="lg:col-span-2">
-                  <div className="flex gap-6">
-                    <img 
-                      src={entity.image_url || "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=120&h=120&fit=crop"} 
-                      alt={entity.name} 
-                      className="w-24 h-24 rounded-lg object-cover" 
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h1 className="text-3xl font-bold text-gray-900">{entity.name}</h1>
-                        {entity.is_verified && (
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Claimed
-                          </Badge>
-                        )}
+              {/* Brand Info - Full Width */}
+              <div className="flex gap-6">
+                <img 
+                  src={entity.image_url || "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=120&h=120&fit=crop"} 
+                  alt={entity.name} 
+                  className="w-24 h-24 rounded-lg object-cover" 
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-3xl font-bold text-gray-900">{entity.name}</h1>
+                    {entity.is_verified && (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Claimed
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-gray-600 mb-4 leading-relaxed">
+                    {entity.description || "No description available"}
+                  </p>
+                  
+                  {/* Ratings */}
+                  <div className="flex items-center gap-6 mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex">
+                        {stats?.averageRating && renderStars(stats.averageRating)}
                       </div>
-                      <p className="text-gray-600 mb-4 leading-relaxed">
-                        {entity.description || "No description available"}
-                      </p>
-                      
-                      {/* Ratings */}
-                      <div className="flex items-center gap-6 mb-4">
-                        <div className="flex items-center gap-2">
-                          <div className="flex">
-                            {stats?.averageRating && renderStars(stats.averageRating)}
-                          </div>
-                          <span className="font-semibold">
-                            {stats?.averageRating ? stats.averageRating.toFixed(1) : 'No rating'}
-                          </span>
-                          <span className="text-gray-500">
-                            ({(stats?.reviewCount || 0).toLocaleString()} reviews)
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-blue-600">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold">
-                            {stats?.averageRating ? stats.averageRating.toFixed(1) : 'N/A'}
-                          </div>
-                          <span className="font-medium">Circle Score</span>
-                        </div>
+                      <span className="font-semibold">
+                        {stats?.averageRating ? stats.averageRating.toFixed(1) : 'No rating'}
+                      </span>
+                      <span className="text-gray-500">
+                        ({(stats?.reviewCount || 0).toLocaleString()} reviews)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold">
+                        {stats?.averageRating ? stats.averageRating.toFixed(1) : 'N/A'}
                       </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap gap-3">
-                        <Button className="bg-blue-600 hover:bg-blue-700">
-                          Write Review
-                        </Button>
-                        {entity.website_url && (
-                          <Button 
-                            variant="outline" 
-                            className="border-blue-600 text-blue-600 hover:bg-blue-50"
-                            onClick={() => window.open(entity.website_url, '_blank')}
-                          >
-                            <Globe className="w-4 h-4 mr-2" />
-                            Visit Website
-                          </Button>
-                        )}
-                        <Button variant="outline">
-                          <MapPin className="w-4 h-4 mr-2" />
-                          Get Directions
-                        </Button>
-                        <Button variant="outline" size="icon">
-                          <Share2 className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="icon">
-                          <Heart className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="icon">
-                          <Bookmark className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <span className="font-medium">Circle Score</span>
                     </div>
                   </div>
-                </div>
 
-                {/* Right: Map */}
-                
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap gap-3">
+                    <Button className="bg-blue-600 hover:bg-blue-700">
+                      Write Review
+                    </Button>
+                    {entity.website_url && (
+                      <Button 
+                        variant="outline" 
+                        className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                        onClick={() => window.open(entity.website_url, '_blank')}
+                      >
+                        <Globe className="w-4 h-4 mr-2" />
+                        Visit Website
+                      </Button>
+                    )}
+                    <Button variant="outline">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      Get Directions
+                    </Button>
+                    <Button variant="outline" size="icon">
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="icon">
+                      <Heart className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="icon">
+                      <Bookmark className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
