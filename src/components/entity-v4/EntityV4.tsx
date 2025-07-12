@@ -208,10 +208,10 @@ const EntityV4 = () => {
                          <div className="flex items-center gap-2">
                            <ConnectedRingsRating
                              value={entityData.rating}
+                             variant="badge"
                              showValue={false}
-                             size="sm"
+                             size="md"
                              minimal={true}
-                             className="flex-shrink-0"
                            />
                            <span className="font-semibold">{entityData.rating}</span>
                            <span className="text-gray-500">({entityData.totalReviews.toLocaleString()} reviews)</span>
