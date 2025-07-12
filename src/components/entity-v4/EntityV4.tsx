@@ -84,11 +84,6 @@ const EntityV4 = () => {
     phone: ''  // TODO: Extract from metadata when available
   };
 
-  // Debug function to test tooltip interactions
-  const handleTooltipDebug = (type: string, action: string) => {
-    console.log(`Tooltip Debug - ${type} badge ${action}`);
-  };
-
   // Trust Metrics
   const trustMetrics = {
     circleCertified: 78,
@@ -153,6 +148,11 @@ const EntityV4 = () => {
     image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
   }];
 
+  // Debug function to test tooltip interactions
+  const handleTooltipDebug = (type: string, action: string) => {
+    console.log(`Tooltip Debug - ${type} badge ${action}`);
+  };
+
   return <TooltipProvider delayDuration={0}>
     <div className="min-h-screen flex flex-col bg-background">
       <NavBarComponent />
@@ -211,25 +211,15 @@ const EntityV4 = () => {
                          <Tooltip>
                            <TooltipTrigger asChild>
                              {entityData.claimed ? (
-                               <Badge 
-                                 variant="secondary" 
-                                 className="bg-green-100 text-green-800 hover:bg-green-200 cursor-help"
-                                 onMouseEnter={() => handleTooltipDebug('claimed', 'hover entered')}
-                                 onMouseLeave={() => handleTooltipDebug('claimed', 'hover left')}
-                               >
+                               <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-green-100 text-green-800 hover:bg-green-200 cursor-help">
                                  <CheckCircle className="w-3 h-3 mr-1" />
                                  Claimed
-                               </Badge>
+                               </div>
                              ) : (
-                               <Badge 
-                                 variant="secondary" 
-                                 className="bg-muted text-muted-foreground hover:bg-muted/80 cursor-help"
-                                 onMouseEnter={() => handleTooltipDebug('unclaimed', 'hover entered')}
-                                 onMouseLeave={() => handleTooltipDebug('unclaimed', 'hover left')}
-                               >
+                               <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-muted text-muted-foreground hover:bg-muted/80 cursor-help">
                                  <X className="w-3 h-3 mr-1" />
                                  Unclaimed
-                               </Badge>
+                               </div>
                              )}
                            </TooltipTrigger>
                            <TooltipContent
