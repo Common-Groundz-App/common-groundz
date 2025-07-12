@@ -167,31 +167,29 @@ const EntityV4 = () => {
                     <div className="flex-1">
                        <div className="flex items-center gap-3 mb-2">
                          <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
-                         <TooltipProvider>
-                           <Tooltip>
-                             <TooltipTrigger asChild>
-                               {entityData.claimed ? (
-                                 <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 cursor-help">
-                                   <CheckCircle className="w-3 h-3 mr-1" />
-                                   Claimed
-                                 </Badge>
-                               ) : (
-                                 <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted/80 cursor-help">
-                                   <X className="w-3 h-3 mr-1" />
-                                   Unclaimed
-                                 </Badge>
-                               )}
-                             </TooltipTrigger>
-                             <TooltipContent>
-                               <p className="text-sm">
-                                 {entityData.claimed 
-                                   ? "This entity has been verified by the brand owner." 
-                                   : "This entity hasn't been claimed yet."
-                                 }
-                               </p>
-                             </TooltipContent>
-                           </Tooltip>
-                         </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                {entityData.claimed ? (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-help text-xs font-medium px-2 py-1">
+                                    Claimed
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 cursor-help text-xs font-medium px-2 py-1">
+                                    Unclaimed
+                                  </Badge>
+                                )}
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-sm">
+                                <p className="text-sm">
+                                  {entityData.claimed 
+                                    ? "Someone from this business manages this listing." 
+                                    : "This business is unclaimed. Owners who claim their business can update listing details, add photos, respond to reviews, and more."
+                                  }
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                        </div>
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                       
