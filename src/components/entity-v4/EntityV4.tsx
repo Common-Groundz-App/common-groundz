@@ -140,16 +140,14 @@ const EntityV4 = () => {
     category: "Supplements",
     image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
   }];
-  return (
-    <TooltipProvider delayDuration={0}>
-      <div className="min-h-screen flex flex-col bg-background">
-        <NavBarComponent />
-        
-        {/* Version Toggle */}
-        <EntityPreviewToggle />
-        
-        {/* Main Content */}
-        <div className="flex-1 pt-16">
+  return <div className="min-h-screen flex flex-col bg-background">
+      <NavBarComponent />
+      
+      {/* Version Toggle */}
+      <EntityPreviewToggle />
+      
+      {/* Main Content */}
+      <div className="flex-1 pt-16">
         <div className="min-h-screen bg-gray-50">
           {/* SECTION 1: Header & Primary Actions */}
           <div className="bg-white border-b">
@@ -167,30 +165,34 @@ const EntityV4 = () => {
                   <div className="flex gap-6">
                     <img src={entityData.image} alt={entityData.name} className="w-24 h-24 rounded-lg object-cover" />
                     <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              {entityData.claimed ? (
-                                <Badge variant="secondary" className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200 text-sm px-2 py-1">
-                                  Claimed
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="bg-gray-50 text-gray-600 hover:bg-gray-100 border-gray-200 text-sm px-2 py-1">
-                                  Unclaimed
-                                </Badge>
-                              )}
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="z-50 max-w-xs">
-                              <p className="text-sm">
-                                {entityData.claimed 
-                                  ? "Someone from this business manages this listing."
-                                  : "This business is unclaimed. Owners who claim their business can update listing details, add photos, respond to reviews, and more."
-                                }
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
+                       <div className="flex items-center gap-3 mb-2">
+                         <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
+                         <TooltipProvider>
+                           <Tooltip>
+                             <TooltipTrigger asChild>
+                               {entityData.claimed ? (
+                                 <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 cursor-help">
+                                   <CheckCircle className="w-3 h-3 mr-1" />
+                                   Claimed
+                                 </Badge>
+                               ) : (
+                                 <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted/80 cursor-help">
+                                   <X className="w-3 h-3 mr-1" />
+                                   Unclaimed
+                                 </Badge>
+                               )}
+                             </TooltipTrigger>
+                             <TooltipContent>
+                               <p className="text-sm">
+                                 {entityData.claimed 
+                                   ? "This entity has been verified by the brand owner." 
+                                   : "This entity hasn't been claimed yet."
+                                 }
+                               </p>
+                             </TooltipContent>
+                           </Tooltip>
+                         </TooltipProvider>
+                       </div>
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                       
                       {/* Ratings */}
@@ -611,10 +613,7 @@ const EntityV4 = () => {
             </div>
           </div>
         </div>
-        </div>
       </div>
-    </TooltipProvider>
-  );
+    </div>;
 };
-
 export default EntityV4;
