@@ -212,6 +212,7 @@ const EntityV4 = () => {
                              showValue={false}
                              size="md"
                              minimal={true}
+                             className="flex-shrink-0"
                            />
                            <span className="font-semibold">{entityData.rating}</span>
                            <span className="text-gray-500">({entityData.totalReviews.toLocaleString()} reviews)</span>
