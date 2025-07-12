@@ -140,7 +140,8 @@ const EntityV4 = () => {
     category: "Supplements",
     image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
   }];
-  return <div className="min-h-screen flex flex-col bg-background">
+  return <TooltipProvider>
+    <div className="min-h-screen flex flex-col bg-background">
       <NavBarComponent />
       
       {/* Version Toggle */}
@@ -612,6 +613,7 @@ const EntityV4 = () => {
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  </TooltipProvider>;
 };
 export default EntityV4;
