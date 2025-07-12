@@ -6,13 +6,14 @@ import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
-import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye } from "lucide-react";
+import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ReviewCard from "@/components/ReviewCard";
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -74,7 +75,7 @@ const EntityV4 = () => {
     rating: stats?.averageRating || 0,
     totalReviews: stats?.reviewCount || 0,
     circleScore: 4.6, // TODO: Replace with real circle score when available
-    claimed: entity?.is_verified || false,
+    claimed: entity?.is_claimed || false,
     image: entityImage,
     website: entity?.website_url || '',
     location: entity?.venue || '',
@@ -164,13 +165,34 @@ const EntityV4 = () => {
                   <div className="flex gap-6">
                     <img src={entityData.image} alt={entityData.name} className="w-24 h-24 rounded-lg object-cover" />
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
-                        {entityData.claimed && <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Claimed
-                          </Badge>}
-                      </div>
+                       <div className="flex items-center gap-3 mb-2">
+                         <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
+                         <TooltipProvider>
+                           <Tooltip>
+                             <TooltipTrigger asChild>
+                               {entityData.claimed ? (
+                                 <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 cursor-help">
+                                   <CheckCircle className="w-3 h-3 mr-1" />
+                                   Claimed
+                                 </Badge>
+                               ) : (
+                                 <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted/80 cursor-help">
+                                   <X className="w-3 h-3 mr-1" />
+                                   Unclaimed
+                                 </Badge>
+                               )}
+                             </TooltipTrigger>
+                             <TooltipContent>
+                               <p className="text-sm">
+                                 {entityData.claimed 
+                                   ? "This entity has been verified by the brand owner." 
+                                   : "This entity hasn't been claimed yet."
+                                 }
+                               </p>
+                             </TooltipContent>
+                           </Tooltip>
+                         </TooltipProvider>
+                       </div>
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                       
                       {/* Ratings */}

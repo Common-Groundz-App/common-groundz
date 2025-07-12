@@ -212,6 +212,7 @@ const AdminEntityEdit = () => {
           category_id: entity.category_id || null,
           popularity_score: entity.popularity_score || null,
           photo_reference: entity.photo_reference?.trim() || null,
+          is_claimed: entity.is_claimed || false,
           updated_at: new Date().toISOString()
         })
         .eq('id', entity.id);
@@ -457,17 +458,37 @@ const AdminEntityEdit = () => {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={entity.description || ''}
-                      onChange={(e) => handleInputChange('description', e.target.value)}
-                      placeholder="Entity description"
-                      rows={3}
-                      disabled={entity.is_deleted}
-                    />
-                  </div>
+                   <div className="space-y-2">
+                     <Label htmlFor="description">Description</Label>
+                     <Textarea
+                       id="description"
+                       value={entity.description || ''}
+                       onChange={(e) => handleInputChange('description', e.target.value)}
+                       placeholder="Entity description"
+                       rows={3}
+                       disabled={entity.is_deleted}
+                     />
+                   </div>
+
+                   <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                     <div className="space-y-0.5">
+                       <Label className="text-base font-medium">Claimed by Brand?</Label>
+                       <p className="text-sm text-muted-foreground">
+                         Mark if this entity has been verified by the brand owner
+                       </p>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <Switch
+                         checked={entity.is_claimed || false}
+                         onCheckedChange={(checked) => handleInputChange('is_claimed', checked)}
+                         disabled={entity.is_deleted}
+                         className="data-[state=checked]:bg-green-600"
+                       />
+                       <span className={`text-sm font-medium ${entity.is_claimed ? 'text-green-600' : 'text-muted-foreground'}`}>
+                         {entity.is_claimed ? 'Claimed' : 'Unclaimed'}
+                       </span>
+                     </div>
+                   </div>
                 </CardContent>
               </Card>
 

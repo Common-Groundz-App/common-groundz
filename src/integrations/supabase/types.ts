@@ -248,6 +248,7 @@ export type Database = {
           id: string
           image_url: string | null
           ingredients: string[] | null
+          is_claimed: boolean
           is_deleted: boolean
           is_verified: boolean | null
           isbn: string | null
@@ -296,6 +297,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           ingredients?: string[] | null
+          is_claimed?: boolean
           is_deleted?: boolean
           is_verified?: boolean | null
           isbn?: string | null
@@ -344,6 +346,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           ingredients?: string[] | null
+          is_claimed?: boolean
           is_deleted?: boolean
           is_verified?: boolean | null
           isbn?: string | null
