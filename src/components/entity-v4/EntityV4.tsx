@@ -1,6 +1,9 @@
 import React from 'react';
+import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
+import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
+import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,19 +13,65 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ReviewCard from "@/components/ReviewCard";
 const EntityV4 = () => {
-  // Mock data
+  const { slug } = useParams<{ slug: string }>();
+  
+  // Fetch real entity data
+  const {
+    entity,
+    reviews,
+    stats,
+    isLoading,
+    error
+  } = useEntityDetailCached(slug || '');
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <NavBarComponent />
+        <EntityPreviewToggle />
+        <div className="flex-1 pt-16 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading entity...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (!isLoading && (error || !entity)) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <NavBarComponent />
+        <EntityPreviewToggle />
+        <div className="flex-1 pt-16 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-destructive mb-2">Entity Not Found</h2>
+            <p className="text-muted-foreground">The entity you're looking for doesn't exist or has been removed.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Get entity image with fallback
+  const entityImage = entity?.image_url || getEntityTypeFallbackImage(entity?.type || 'product');
+  
+  // Prepare entity data using real data
   const entityData = {
-    name: "Cosmix",
-    description: "Premium health and wellness brand focused on science-backed supplements and nutrition products. Trusted by fitness enthusiasts and health professionals worldwide.",
-    rating: 4.3,
-    totalReviews: 2847,
-    circleScore: 4.6,
-    claimed: true,
-    image: "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=200&h=200&fit=crop",
-    website: "www.cosmix.com",
-    location: "Indiranagar, Bangalore",
-    email: "hello@cosmix.com",
-    phone: "+91-9876543210"
+    name: entity?.name || '',
+    description: entity?.description || '',
+    rating: stats?.averageRating || 0,
+    totalReviews: stats?.reviewCount || 0,
+    circleScore: 4.6, // TODO: Replace with real circle score when available
+    claimed: entity?.is_verified || false,
+    image: entityImage,
+    website: entity?.website_url || '',
+    location: entity?.venue || '',
+    email: '', // TODO: Extract from metadata when available
+    phone: ''  // TODO: Extract from metadata when available
   };
   const trustMetrics = {
     circleCertified: 78,
@@ -94,10 +143,10 @@ const EntityV4 = () => {
           {/* SECTION 1: Header & Primary Actions */}
           <div className="bg-white border-b">
             <div className="max-w-7xl mx-auto px-4 py-6">
-              {/* Breadcrumb */}
-              <nav className="text-sm text-gray-500 mb-4">
-                <span>Home</span> / <span>Brands</span> / <span className="text-gray-900">Cosmix</span>
-              </nav>
+               {/* Breadcrumb */}
+               <nav className="text-sm text-gray-500 mb-4">
+                 <span>Home</span> / <span>Brands</span> / <span className="text-gray-900">{entityData.name}</span>
+               </nav>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left: Brand Info */}
@@ -136,7 +185,12 @@ const EntityV4 = () => {
                         <Button className="bg-blue-600 hover:bg-blue-700">
                           Write Review
                         </Button>
-                        <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
+                        <Button 
+                          variant="outline" 
+                          className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                          onClick={() => entityData.website && window.open(`https://${entityData.website.replace(/^https?:\/\//, '')}`, '_blank')}
+                          disabled={!entityData.website}
+                        >
                           <Globe className="w-4 h-4 mr-2" />
                           Visit Website
                         </Button>
