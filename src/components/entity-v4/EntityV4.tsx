@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
+import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
+import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,12 @@ const EntityV4 = () => {
     isLoading,
     error
   } = useEntityDetailCached(slug || '');
+  
+  // Fetch entity hierarchy data
+  const {
+    parentEntity,
+    isLoading: hierarchyLoading
+  } = useEntityHierarchy(entity?.id || null);
 
   // Show loading state
   if (isLoading) {
@@ -144,9 +152,11 @@ const EntityV4 = () => {
           <div className="bg-white border-b">
             <div className="max-w-7xl mx-auto px-4 py-6">
                {/* Breadcrumb */}
-               <nav className="text-sm text-gray-500 mb-4">
-                 <span>Home</span> / <span>Brands</span> / <span className="text-gray-900">{entityData.name}</span>
-               </nav>
+               <EntityParentBreadcrumb 
+                 currentEntity={entity}
+                 parentEntity={parentEntity}
+                 isLoading={hierarchyLoading}
+               />
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left: Brand Info */}
