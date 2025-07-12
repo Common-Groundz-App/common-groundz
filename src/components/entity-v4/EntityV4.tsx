@@ -208,9 +208,8 @@ const EntityV4 = () => {
                          <div className="flex items-center gap-2">
                            <ConnectedRingsRating
                              value={entityData.rating}
-                             variant="badge"
                              showValue={false}
-                             size="md"
+                             size="sm"
                              minimal={true}
                              className="flex-shrink-0"
                            />
