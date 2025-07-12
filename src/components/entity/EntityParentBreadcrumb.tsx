@@ -60,9 +60,14 @@ export const EntityParentBreadcrumb: React.FC<EntityParentBreadcrumbProps> = ({
         ) : (
           <>
             <BreadcrumbItem>
-              <BreadcrumbPage className="font-medium capitalize">
-                {currentEntity.type}s
-              </BreadcrumbPage>
+              <BreadcrumbLink asChild>
+                <Link 
+                  to={`/${currentEntity.type}s`}
+                  className="hover:text-foreground transition-colors font-medium capitalize"
+                >
+                  {currentEntity.type}s
+                </Link>
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             

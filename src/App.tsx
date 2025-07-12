@@ -20,6 +20,11 @@ import EntityDetail from '@/pages/EntityDetail';
 import PostView from '@/pages/PostView';
 import RecommendationView from '@/pages/RecommendationView';
 import ProductSearch from '@/pages/ProductSearch';
+import PlacesPage from '@/pages/PlacesPage';
+import ProductsPage from '@/pages/ProductsPage';
+import BooksPage from '@/pages/BooksPage';
+import MoviesPage from '@/pages/MoviesPage';
+import FoodPage from '@/pages/FoodPage';
 import AdminPortal from '@/pages/AdminPortal';
 import AdminEntityEdit from '@/pages/admin/AdminEntityEdit';
 import NotFound from '@/pages/NotFound';
@@ -116,6 +121,31 @@ function App() {
                   <Route path="/product-search/:query" element={
                     <ProtectedRoute>
                       <ProductSearch />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/places" element={
+                    <ProtectedRoute>
+                      <PlacesPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/products" element={
+                    <ProtectedRoute>
+                      <ProductsPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/books" element={
+                    <ProtectedRoute>
+                      <BooksPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/movies" element={
+                    <ProtectedRoute>
+                      <MoviesPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/food" element={
+                    <ProtectedRoute>
+                      <FoodPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/admin" element={
