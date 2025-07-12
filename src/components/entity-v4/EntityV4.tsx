@@ -204,8 +204,8 @@ const EntityV4 = () => {
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                       
                        {/* Ratings */}
-                       <div className="flex items-center gap-6 mb-4">
-                         <div className="flex items-center gap-2">
+                       <div className="flex items-center gap-3 mb-4">
+                         <div className="flex items-center gap-2 flex-shrink-0">
                            <ConnectedRingsRating
                              value={entityData.rating}
                              variant="badge"
@@ -214,13 +214,13 @@ const EntityV4 = () => {
                              minimal={true}
                            />
                            <span className="font-semibold">{entityData.rating}</span>
-                           <span className="text-gray-500">({entityData.totalReviews.toLocaleString()} reviews)</span>
+                           <span className="text-gray-500 whitespace-nowrap">({entityData.totalReviews.toLocaleString()} reviews)</span>
                          </div>
-                        <div className="flex items-center gap-2 text-blue-600">
+                        <div className="flex items-center gap-2 text-blue-600 flex-shrink-0">
                           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold">
                             {entityData.circleScore}
                           </div>
-                          <span className="font-medium">Circle Score</span>
+                          <span className="font-medium whitespace-nowrap">Circle Score</span>
                         </div>
                       </div>
 
