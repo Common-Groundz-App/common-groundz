@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ReviewCard from "@/components/ReviewCard";
+
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
   
@@ -82,6 +83,13 @@ const EntityV4 = () => {
     email: '', // TODO: Extract from metadata when available
     phone: ''  // TODO: Extract from metadata when available
   };
+
+  // Debug function to test tooltip interactions
+  const handleTooltipDebug = (type: string, action: string) => {
+    console.log(`Tooltip Debug - ${type} badge ${action}`);
+  };
+
+  // Trust Metrics
   const trustMetrics = {
     circleCertified: 78,
     repurchaseRate: 63,
@@ -93,6 +101,8 @@ const EntityV4 = () => {
       1: 3
     }
   };
+
+  // Mock Reviews
   const mockReviews = [{
     id: 1,
     name: "Priya Sharma",
@@ -124,6 +134,8 @@ const EntityV4 = () => {
     verified: true,
     helpful: 31
   }];
+
+  // Related Entities
   const relatedEntities = [{
     name: "HealthifyMe",
     rating: 4.2,
@@ -140,12 +152,40 @@ const EntityV4 = () => {
     category: "Supplements",
     image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
   }];
+
   return <TooltipProvider delayDuration={0}>
     <div className="min-h-screen flex flex-col bg-background">
       <NavBarComponent />
       
       {/* Version Toggle */}
       <EntityPreviewToggle />
+      
+      {/* Debug Tooltip Test - Remove this after debugging */}
+      <div className="fixed top-32 right-4 z-50 bg-white p-4 border rounded shadow">
+        <p className="text-sm mb-2">Debug Tooltip Test:</p>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button 
+              className="px-3 py-1 bg-blue-500 text-white rounded text-sm"
+              onMouseEnter={() => console.log('Debug tooltip hover entered')}
+              onMouseLeave={() => console.log('Debug tooltip hover left')}
+            >
+              Hover Me
+            </button>
+          </TooltipTrigger>
+          <TooltipContent 
+            style={{ 
+              backgroundColor: '#1f2937', 
+              color: 'white', 
+              padding: '8px 12px', 
+              borderRadius: '6px',
+              zIndex: 9999
+            }}
+          >
+            <p>Debug tooltip working!</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
       
       {/* Main Content */}
       <div className="flex-1 pt-16">
@@ -171,18 +211,37 @@ const EntityV4 = () => {
                          <Tooltip>
                            <TooltipTrigger asChild>
                              {entityData.claimed ? (
-                               <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 cursor-help">
+                               <Badge 
+                                 variant="secondary" 
+                                 className="bg-green-100 text-green-800 hover:bg-green-200 cursor-help"
+                                 onMouseEnter={() => handleTooltipDebug('claimed', 'hover entered')}
+                                 onMouseLeave={() => handleTooltipDebug('claimed', 'hover left')}
+                               >
                                  <CheckCircle className="w-3 h-3 mr-1" />
                                  Claimed
                                </Badge>
                              ) : (
-                               <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted/80 cursor-help">
+                               <Badge 
+                                 variant="secondary" 
+                                 className="bg-muted text-muted-foreground hover:bg-muted/80 cursor-help"
+                                 onMouseEnter={() => handleTooltipDebug('unclaimed', 'hover entered')}
+                                 onMouseLeave={() => handleTooltipDebug('unclaimed', 'hover left')}
+                               >
                                  <X className="w-3 h-3 mr-1" />
                                  Unclaimed
                                </Badge>
                              )}
                            </TooltipTrigger>
-                           <TooltipContent>
+                           <TooltipContent
+                             style={{ 
+                               backgroundColor: '#1f2937', 
+                               color: 'white', 
+                               padding: '8px 12px', 
+                               borderRadius: '6px',
+                               zIndex: 9999,
+                               maxWidth: '200px'
+                             }}
+                           >
                              <p className="text-sm">
                                {entityData.claimed 
                                  ? "This entity has been verified by the brand owner." 
