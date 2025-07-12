@@ -7,6 +7,7 @@ import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcru
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle } from "lucide-react";
+import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -202,15 +203,19 @@ const EntityV4 = () => {
                        </div>
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                       
-                      {/* Ratings */}
-                      <div className="flex items-center gap-6 mb-4">
-                        <div className="flex items-center gap-2">
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => <Star key={i} className={`w-5 h-5 ${i < Math.floor(entityData.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />)}
-                          </div>
-                          <span className="font-semibold">{entityData.rating}</span>
-                          <span className="text-gray-500">({entityData.totalReviews.toLocaleString()} reviews)</span>
-                        </div>
+                       {/* Ratings */}
+                       <div className="flex items-center gap-6 mb-4">
+                         <div className="flex items-center gap-2">
+                           <ConnectedRingsRating
+                             value={entityData.rating}
+                             variant="badge"
+                             showValue={false}
+                             size="md"
+                             minimal={true}
+                           />
+                           <span className="font-semibold">{entityData.rating}</span>
+                           <span className="text-gray-500">({entityData.totalReviews.toLocaleString()} reviews)</span>
+                         </div>
                         <div className="flex items-center gap-2 text-blue-600">
                           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold">
                             {entityData.circleScore}
