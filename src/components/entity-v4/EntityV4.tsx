@@ -6,6 +6,10 @@ import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { useCircleRating } from '@/hooks/use-circle-rating';
+import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { useAuth } from '@/contexts/AuthContext';
 import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
@@ -19,6 +23,7 @@ import ReviewCard from "@/components/ReviewCard";
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { user } = useAuth();
   
   // Fetch real entity data
   const {
@@ -34,6 +39,14 @@ const EntityV4 = () => {
     parentEntity,
     isLoading: hierarchyLoading
   } = useEntityHierarchy(entity?.id || null);
+  
+  // Fetch circle rating data
+  const {
+    circleRating,
+    circleRatingCount,
+    circleContributors,
+    isLoading: circleLoading
+  } = useCircleRating(entity?.id || '');
 
   // Show loading state
   if (isLoading) {
@@ -76,7 +89,7 @@ const EntityV4 = () => {
     description: entity?.description || '',
     rating: stats?.averageRating || 0,
     totalReviews: stats?.reviewCount || 0,
-    circleScore: 4.6, // TODO: Replace with real circle score when available
+    circleScore: circleRating || 0,
     claimed: entity?.is_claimed || false,
     image: entityImage,
     website: entity?.website_url || '',
@@ -216,12 +229,20 @@ const EntityV4 = () => {
                            <span className="font-semibold">{entityData.rating}</span>
                            <span className="text-gray-500 whitespace-nowrap">({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})</span>
                          </div>
-                        <div className="flex items-center gap-2 text-blue-600 flex-shrink-0">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold">
-                            {entityData.circleScore}
-                          </div>
-                          <span className="font-medium whitespace-nowrap">Circle Score</span>
-                        </div>
+                         <div className="flex items-center gap-2 text-blue-600 flex-shrink-0">
+                           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold">
+                             {user && entityData.circleScore > 0 ? entityData.circleScore.toFixed(1) : '—'}
+                           </div>
+                           <span className="font-medium whitespace-nowrap">Circle Score</span>
+                           {user && entityData.circleScore > 0 && circleContributors.length > 0 && (
+                             <CircleContributorsPreview
+                               contributors={circleContributors}
+                               totalCount={circleRatingCount}
+                               maxDisplay={3}
+                               entityName={entityData.name}
+                             />
+                           )}
+                         </div>
                       </div>
 
                       {/* Action Buttons */}
