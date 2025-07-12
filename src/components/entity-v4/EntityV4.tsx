@@ -148,44 +148,12 @@ const EntityV4 = () => {
     image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
   }];
 
-  // Debug function to test tooltip interactions
-  const handleTooltipDebug = (type: string, action: string) => {
-    console.log(`Tooltip Debug - ${type} badge ${action}`);
-  };
-
   return <TooltipProvider delayDuration={0}>
     <div className="min-h-screen flex flex-col bg-background">
       <NavBarComponent />
       
       {/* Version Toggle */}
       <EntityPreviewToggle />
-      
-      {/* Debug Tooltip Test - Remove this after debugging */}
-      <div className="fixed top-32 right-4 z-50 bg-white p-4 border rounded shadow">
-        <p className="text-sm mb-2">Debug Tooltip Test:</p>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button 
-              className="px-3 py-1 bg-blue-500 text-white rounded text-sm"
-              onMouseEnter={() => console.log('Debug tooltip hover entered')}
-              onMouseLeave={() => console.log('Debug tooltip hover left')}
-            >
-              Hover Me
-            </button>
-          </TooltipTrigger>
-          <TooltipContent 
-            style={{ 
-              backgroundColor: '#1f2937', 
-              color: 'white', 
-              padding: '8px 12px', 
-              borderRadius: '6px',
-              zIndex: 9999
-            }}
-          >
-            <p>Debug tooltip working!</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
       
       {/* Main Content */}
       <div className="flex-1 pt-16">
@@ -222,16 +190,7 @@ const EntityV4 = () => {
                                </div>
                              )}
                            </TooltipTrigger>
-                           <TooltipContent
-                             style={{ 
-                               backgroundColor: '#1f2937', 
-                               color: 'white', 
-                               padding: '8px 12px', 
-                               borderRadius: '6px',
-                               zIndex: 9999,
-                               maxWidth: '200px'
-                             }}
-                           >
+                           <TooltipContent className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs">
                              <p className="text-sm">
                                {entityData.claimed 
                                  ? "This entity has been verified by the brand owner." 
