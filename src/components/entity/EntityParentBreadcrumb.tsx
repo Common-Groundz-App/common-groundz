@@ -24,11 +24,6 @@ export const EntityParentBreadcrumb: React.FC<EntityParentBreadcrumbProps> = ({
     );
   }
 
-  // If no parent, don't show breadcrumb
-  if (!parentEntity) {
-    return null;
-  }
-
   return (
     <Breadcrumb className="mb-4">
       <BreadcrumbList>
@@ -42,23 +37,42 @@ export const EntityParentBreadcrumb: React.FC<EntityParentBreadcrumbProps> = ({
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         
-        <BreadcrumbItem>
-          <BreadcrumbLink asChild>
-            <Link 
-              to={`/entity/${parentEntity.slug || parentEntity.id}`}
-              className="hover:text-foreground transition-colors"
-            >
-              {parentEntity.name}
-            </Link>
-          </BreadcrumbLink>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator />
-        
-        <BreadcrumbItem>
-          <BreadcrumbPage className="font-medium">
-            {currentEntity.name}
-          </BreadcrumbPage>
-        </BreadcrumbItem>
+        {parentEntity ? (
+          <>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link 
+                  to={`/entity/${parentEntity.slug || parentEntity.id}`}
+                  className="hover:text-foreground transition-colors"
+                >
+                  {parentEntity.name}
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-medium">
+                {currentEntity.name}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </>
+        ) : (
+          <>
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-medium capitalize">
+                {currentEntity.type}s
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-medium">
+                {currentEntity.name}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </>
+        )}
       </BreadcrumbList>
     </Breadcrumb>
   );
