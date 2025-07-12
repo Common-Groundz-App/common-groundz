@@ -216,8 +216,8 @@ const EntityV4 = () => {
                            <span className="font-semibold">{entityData.rating}</span>
                            <span className="text-gray-500 whitespace-nowrap">({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})</span>
                          </div>
-                        <div className="flex items-center gap-2 text-blue-600 flex-shrink-0">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold">
+                        <div className="flex items-center gap-2 text-brand-orange flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-brand-orange/10 flex items-center justify-center text-sm font-semibold">
                             {entityData.circleScore}
                           </div>
                           <span className="font-medium whitespace-nowrap">Circle Score</span>
@@ -226,7 +226,7 @@ const EntityV4 = () => {
 
                       {/* Action Buttons */}
                       <div className="flex flex-wrap gap-3">
-                        <Button className="bg-blue-600 hover:bg-blue-700">
+                        <Button className="bg-brand-orange hover:bg-brand-orange/90">
                           Write Review
                         </Button>
                         <Button 
