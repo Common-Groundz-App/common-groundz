@@ -10,7 +10,7 @@ interface InfoTooltipProps {
 
 export const InfoTooltip: React.FC<InfoTooltipProps> = ({ 
   content, 
-  side = 'bottom' 
+  side = 'top' 
 }) => {
   return (
     <Tooltip>
@@ -19,9 +19,11 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
       </TooltipTrigger>
       <TooltipContent 
         side={side} 
-        className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs"
+        sideOffset={10}
+        avoidCollisions={true}
+        className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-sm z-50"
       >
-        <p className="text-sm">
+        <p className="text-sm leading-relaxed whitespace-normal">
           {content}
         </p>
       </TooltipContent>
