@@ -237,7 +237,10 @@ const EntityV4 = () => {
                             
                             <div className="leading-tight min-w-[140px]">
                               <div className="font-semibold text-sm whitespace-nowrap text-gray-900">Overall Rating</div>
-                              <div className="text-sm font-bold text-gray-900">
+                              <div 
+                                className="text-sm font-bold" 
+                                style={{ color: getSentimentColor(entityData.rating) }}
+                              >
                                 {getSentimentLabel(entityData.rating)}
                               </div>
                               <div className="text-xs text-muted-foreground">
