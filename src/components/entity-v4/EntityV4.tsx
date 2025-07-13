@@ -445,7 +445,7 @@ const EntityV4 = () => {
                           </Button>
                          <Button 
                            variant="outline"
-                           className="border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white"
+                           className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
                            onClick={() => entityData.website && window.open(`https://${entityData.website.replace(/^https?:\/\//, '')}`, '_blank')}
                            disabled={!entityData.website}
                          >
