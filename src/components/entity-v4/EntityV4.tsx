@@ -236,11 +236,11 @@ const EntityV4 = () => {
                             </div>
                             
                             <div className="leading-tight min-w-[140px]">
-                              <div className="font-semibold text-sm whitespace-nowrap text-brand-orange">Overall Rating</div>
+                              <div className="font-semibold text-sm whitespace-nowrap text-gray-900">Overall Rating</div>
                               <div className="text-xs text-muted-foreground">
                                 ({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})
                               </div>
-                              <div className="text-xs text-muted-foreground">
+                              <div className="text-sm font-bold text-gray-900">
                                 {getSentimentLabel(entityData.rating)}
                               </div>
                             </div>
