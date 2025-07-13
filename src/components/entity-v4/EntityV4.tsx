@@ -8,7 +8,7 @@ import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
-import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
@@ -216,19 +216,35 @@ const EntityV4 = () => {
                        </div>
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                       
-                       {/* Ratings */}
-                       <div className="flex items-center gap-3 mb-4">
-                         <div className="flex items-center gap-2 flex-shrink-0">
-                           <ConnectedRingsRating
-                             value={entityData.rating}
-                             variant="badge"
-                             showValue={false}
-                             size="md"
-                             minimal={true}
-                           />
-                           <span className="font-semibold">{entityData.rating}</span>
-                           <span className="text-gray-500 whitespace-nowrap">({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})</span>
-                         </div>
+                        {/* Ratings */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="flex items-center gap-4 flex-shrink-0 min-w-[300px]">
+                            <div className="flex items-center gap-2">
+                              <ConnectedRingsRating
+                                value={entityData.rating}
+                                variant="badge"
+                                showValue={false}
+                                size="md"
+                                minimal={true}
+                              />
+                              <span 
+                                className="text-lg font-bold" 
+                                style={{ color: getSentimentColor(entityData.rating) }}
+                              >
+                                {entityData.rating.toFixed(1)}
+                              </span>
+                            </div>
+                            
+                            <div className="leading-tight min-w-[140px]">
+                              <div className="font-semibold text-sm whitespace-nowrap text-brand-orange">Overall Rating</div>
+                              <div className="text-xs text-muted-foreground">
+                                ({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {getSentimentLabel(entityData.rating)}
+                              </div>
+                            </div>
+                          </div>
                           {user && (
                             circleRating !== null ? (
                               <div className="flex items-center gap-4 flex-shrink-0">
