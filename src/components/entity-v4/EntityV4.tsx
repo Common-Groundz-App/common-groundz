@@ -297,33 +297,44 @@ const EntityV4 = () => {
                 <div className="lg:col-span-2">
                   <div className="flex gap-6">
                     <img src={entityData.image} alt={entityData.name} className="w-24 h-24 rounded-lg object-cover" />
-                    <div className="flex-1">
-                         <div className="flex items-center gap-3 mb-2">
-                         <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
-                          <Tooltip>
-                           <TooltipTrigger asChild>
-                             {entityData.claimed ? (
-                               <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer">
-                                 <CheckCircle className="w-3 h-3 mr-1" />
-                                 Claimed
-                               </div>
-                             ) : (
-                               <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer">
-                                 <AlertTriangle className="w-3 h-3 mr-1" />
-                                 Unclaimed
-                               </div>
-                             )}
-                           </TooltipTrigger>
-                           <TooltipContent side="bottom" className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs">
-                             <p className="text-sm">
-                               {entityData.claimed 
-                                 ? "This listing is actively managed by the owner." 
-                                 : "This listing hasn't been claimed yet. Claim it for free to update info, add photos, respond to reviews, and more."
-                               }
-                             </p>
-                           </TooltipContent>
-                         </Tooltip>
-                       </div>
+                     <div className="flex-1 relative">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  {entityData.claimed ? (
+                                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer">
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      Claimed
+                                    </div>
+                                  ) : (
+                                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer">
+                                      <AlertTriangle className="w-3 h-3 mr-1" />
+                                      Unclaimed
+                                    </div>
+                                  )}
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs">
+                                  <p className="text-sm">
+                                    {entityData.claimed 
+                                      ? "This listing is actively managed by the owner." 
+                                      : "This listing hasn't been claimed yet. Claim it for free to update info, add photos, respond to reviews, and more."
+                                    }
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                            {/* Top-right action buttons */}
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="sm" className="border-gray-300 text-gray-600 hover:bg-gray-50">
+                                <Share2 className="w-4 h-4" />
+                              </Button>
+                              <Button variant="outline" size="sm" className="border-gray-300 text-gray-600 hover:bg-gray-50">
+                                <Heart className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                       
                         {/* Ratings */}
@@ -461,19 +472,10 @@ const EntityV4 = () => {
                              showCount={true}
                            />
                          )}
-                         <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                           <Navigation className="w-4 h-4 mr-2" />
-                           Get Directions
-                         </Button>
-                        <Button variant="outline" size="icon">
-                          <Share2 className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="icon">
-                          <Heart className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="icon">
-                          <Bookmark className="w-4 h-4" />
-                        </Button>
+                          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <Navigation className="w-4 h-4 mr-2" />
+                            Get Directions
+                          </Button>
                       </div>
                     </div>
                   </div>
