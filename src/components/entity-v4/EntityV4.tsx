@@ -10,7 +10,7 @@ import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
 import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
-import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle } from "lucide-react";
+import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, Info } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -236,7 +236,19 @@ const EntityV4 = () => {
                             </div>
                             
                             <div className="leading-tight min-w-[140px]">
-                              <div className="font-semibold text-sm whitespace-nowrap text-gray-900">Overall Rating</div>
+                              <div className="font-semibold text-sm whitespace-nowrap text-gray-900 flex items-center gap-1">
+                                Overall Rating
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Info className="h-3 w-3 text-muted-foreground" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Overall Rating is the average review rating from all users who reviewed this item on Common Groundz.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
                               <div 
                                 className="text-sm font-bold" 
                                 style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
@@ -270,7 +282,19 @@ const EntityV4 = () => {
                                 </div>
 
                                 <div className="leading-tight min-w-[140px]">
-                                  <div className="font-semibold text-sm whitespace-nowrap text-brand-orange">Circle Rating</div>
+                                  <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
+                                    Circle Rating
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <Info className="h-3 w-3 text-muted-foreground" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow).</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
                                   <div 
                                     className="text-sm font-bold" 
                                     style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
