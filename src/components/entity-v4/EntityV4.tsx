@@ -10,7 +10,7 @@ import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
 import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
-import { Star, MapPin, Navigation, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare } from "lucide-react";
+import { Star, MapPin, Navigation, Globe, Phone, Mail, Share, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -328,7 +328,7 @@ const EntityV4 = () => {
                             {/* Top-right action buttons */}
                             <div className="flex items-center gap-2">
                               <Button variant="ghost" size="sm" className="text-foreground hover:text-primary gap-2">
-                                <Share2 className="w-4 h-4" />
+                                <Share className="w-4 h-4" />
                                 Share
                               </Button>
                               <Button variant="ghost" size="sm" className="text-foreground hover:text-primary gap-2">
