@@ -327,11 +327,13 @@ const EntityV4 = () => {
                             </div>
                             {/* Top-right action buttons */}
                             <div className="flex items-center gap-2">
-                              <Button variant="outline" size="sm" className="border-gray-300 text-gray-600 hover:bg-gray-50">
+                              <Button variant="ghost" size="sm" className="text-foreground hover:text-primary gap-2">
                                 <Share2 className="w-4 h-4" />
+                                Share
                               </Button>
-                              <Button variant="outline" size="sm" className="border-gray-300 text-gray-600 hover:bg-gray-50">
+                              <Button variant="ghost" size="sm" className="text-foreground hover:text-primary gap-2">
                                 <Heart className="w-4 h-4" />
+                                Save
                               </Button>
                             </div>
                           </div>
