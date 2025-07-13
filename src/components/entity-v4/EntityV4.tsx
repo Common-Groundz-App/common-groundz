@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
@@ -10,7 +10,7 @@ import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
 import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
-import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle } from "lucide-react";
+import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import ReviewCard from "@/components/ReviewCard";
+import ReviewForm from '@/components/profile/reviews/ReviewForm';
+import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
+import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
+import { useToast } from '@/hooks/use-toast';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -42,12 +46,116 @@ const EntityV4 = () => {
 
   // Fetch circle rating data
   const { user } = useAuth();
+  const { toast } = useToast();
   const {
     circleRating,
     circleRatingCount,
     circleContributors,
     isLoading: isCircleRatingLoading
   } = useCircleRating(entity?.id || '');
+
+  // Timeline data
+  const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
+
+  // State for forms and modals
+  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
+  const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
+  const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
+
+  // Memoized user review
+  const userReview = React.useMemo(() => {
+    if (!user || !reviews) return null;
+    return reviews.find(review => review.user_id === user.id);
+  }, [user, reviews]);
+
+  // Get sidebar button configuration based on user's review status
+  const getSidebarButtonConfig = () => {
+    if (!userReview) {
+      return {
+        text: 'Write Review',
+        icon: MessageSquare,
+        action: handleAddReview,
+        tooltip: null
+      };
+    }
+    
+    if (userReview.has_timeline && userReview.timeline_count && userReview.timeline_count > 0) {
+      return {
+        text: 'Add Timeline Update',
+        icon: MessageSquare,
+        action: () => handleStartTimeline(userReview.id),
+        tooltip: 'Continue tracking how your experience evolves'
+      };
+    }
+    
+    return {
+      text: 'Update Your Review',
+      icon: MessageSquare,
+      action: () => handleStartTimeline(userReview.id),
+      tooltip: 'Already reviewed this? Add how it\'s going now.'
+    };
+  };
+
+  // Handler functions
+  const handleAddReview = () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to add a review",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsReviewFormOpen(true);
+  };
+
+  const handleStartTimeline = (reviewId: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to start a timeline",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setTimelineReviewId(reviewId);
+    setIsTimelineViewerOpen(true);
+  };
+
+  const handleReviewSubmit = async () => {
+    try {
+      setIsReviewFormOpen(false);
+      // Refresh data would be called here in a real implementation
+      toast({
+        title: "Review submitted",
+        description: "Your review has been added successfully"
+      });
+    } catch (error) {
+      console.error('Error adding review:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit review",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTimelineUpdate = async () => {
+    // Refresh data would be called here in a real implementation
+    toast({
+      title: "Timeline updated",
+      description: "Your timeline update has been added successfully"
+    });
+  };
+
+  const handleTimelineViewerClose = () => {
+    setIsTimelineViewerOpen(false);
+    setTimelineReviewId(null);
+  };
+
+  const sidebarButtonConfig = getSidebarButtonConfig();
 
   // Show loading state
   if (isLoading) {
@@ -326,11 +434,15 @@ const EntityV4 = () => {
                           )}
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap gap-3">
-                        <Button className="bg-blue-600 hover:bg-blue-700">
-                          Write Review
-                        </Button>
+                       {/* Action Buttons */}
+                       <div className="flex flex-wrap gap-3">
+                         <Button 
+                           className="bg-blue-600 hover:bg-blue-700"
+                           onClick={sidebarButtonConfig.action}
+                         >
+                           <sidebarButtonConfig.icon className="w-4 h-4 mr-2" />
+                           {sidebarButtonConfig.text}
+                         </Button>
                         <Button 
                           variant="outline" 
                           className="border-blue-600 text-blue-600 hover:bg-blue-50"
@@ -728,6 +840,36 @@ const EntityV4 = () => {
           </div>
         </div>
       </div>
+
+      {/* Review Form Modal */}
+      {isReviewFormOpen && entity && (
+        <ReviewForm
+          isOpen={isReviewFormOpen}
+          onSubmit={handleReviewSubmit}
+          onClose={() => setIsReviewFormOpen(false)}
+          entity={{
+            id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            image_url: entity.image_url,
+            description: entity.description,
+            venue: entity.venue
+          }}
+        />
+      )}
+
+      {/* Review Timeline Viewer Modal */}
+      {isTimelineViewerOpen && timelineReviewId && entity && userReview && (
+        <ReviewTimelineViewer
+          isOpen={isTimelineViewerOpen}
+          reviewId={timelineReviewId}
+          reviewOwnerId={userReview.user_id}
+          reviewTitle={userReview.title}
+          initialRating={userReview.rating}
+          onClose={handleTimelineViewerClose}
+          onTimelineUpdate={handleTimelineUpdate}
+        />
+      )}
     </div>
   </TooltipProvider>;
 };
