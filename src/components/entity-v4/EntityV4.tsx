@@ -444,7 +444,8 @@ const EntityV4 = () => {
                             {sidebarButtonConfig.text}
                           </Button>
                          <Button 
-                           className="bg-brand-orange hover:bg-brand-orange/90 text-white"
+                           variant="outline"
+                           className="border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white"
                            onClick={() => entityData.website && window.open(`https://${entityData.website.replace(/^https?:\/\//, '')}`, '_blank')}
                            disabled={!entityData.website}
                          >
