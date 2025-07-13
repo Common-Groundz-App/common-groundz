@@ -215,86 +215,86 @@ const EntityV4 = () => {
                          </Tooltip>
                        </div>
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
-                      
-                        {/* Ratings */}
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="flex items-center gap-4 flex-shrink-0 min-w-[300px]">
-                            <div className="flex items-center gap-2">
-                              <ConnectedRingsRating
-                                value={entityData.rating}
-                                variant="badge"
-                                showValue={false}
-                                size="md"
-                                minimal={true}
-                              />
-                              <span 
-                                className="text-lg font-bold" 
-                                style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
-                              >
-                                {entityData.totalReviews > 0 ? entityData.rating.toFixed(1) : "0"}
-                              </span>
-                            </div>
-                            
-                            <div className="leading-tight min-w-[140px]">
-                              <div className="font-semibold text-sm whitespace-nowrap text-gray-900 flex items-center gap-1">
-                                Overall Rating
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      <Info className="h-3 w-3 text-muted-foreground" />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Overall Rating is the average review rating from all users who reviewed this item on Common Groundz.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                              <div 
-                                className="text-sm font-bold" 
-                                style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
-                              >
-                                {getSentimentLabel(entityData.rating, entityData.totalReviews > 0)}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                ({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})
-                              </div>
-                            </div>
-                          </div>
-                          {user && (
-                            circleRating !== null ? (
-                              <div className="flex items-center gap-4 flex-shrink-0">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-fit">
-                                    <ConnectedRingsRating
-                                      value={circleRating}
-                                      variant="badge"
-                                      showValue={false}
-                                      size="md"
-                                      minimal={true}
-                                    />
-                                  </div>
-                                  <span 
-                                    className="text-lg font-bold" 
-                                    style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
-                                  >
-                                    {circleRatingCount > 0 ? circleRating.toFixed(1) : "0"}
-                                  </span>
-                                </div>
+                       
+                         {/* Ratings */}
+                         <div className="flex items-center gap-3 mb-4">
+                             <div className="flex items-center gap-4 flex-shrink-0 min-w-[300px]">
+                               <div className="flex items-center gap-2">
+                                 <ConnectedRingsRating
+                                   value={entityData.rating}
+                                   variant="badge"
+                                   showValue={false}
+                                   size="md"
+                                   minimal={true}
+                                 />
+                                 <span 
+                                   className="text-lg font-bold" 
+                                   style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
+                                 >
+                                   {entityData.totalReviews > 0 ? entityData.rating.toFixed(1) : "0"}
+                                 </span>
+                               </div>
+                               
+                               <div className="leading-tight min-w-[140px]">
+                                 <div className="font-semibold text-sm whitespace-nowrap text-gray-900 flex items-center gap-1">
+                                   Overall Rating
+                                   <Tooltip>
+                                     <TooltipTrigger>
+                                       <Info className="h-3 w-3 text-muted-foreground" />
+                                     </TooltipTrigger>
+                                     <TooltipContent side="bottom" className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs">
+                                       <p className="text-sm">
+                                         Overall Rating is the average review rating from all users who reviewed this item on Common Groundz.
+                                       </p>
+                                     </TooltipContent>
+                                   </Tooltip>
+                                 </div>
+                                 <div 
+                                   className="text-sm font-bold" 
+                                   style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
+                                 >
+                                   {getSentimentLabel(entityData.rating, entityData.totalReviews > 0)}
+                                 </div>
+                                 <div className="text-xs text-muted-foreground">
+                                   ({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})
+                                 </div>
+                               </div>
+                             </div>
+                             {user && (
+                               circleRating !== null ? (
+                                 <div className="flex items-center gap-4 flex-shrink-0">
+                                   <div className="flex items-center gap-2">
+                                     <div className="w-fit">
+                                       <ConnectedRingsRating
+                                         value={circleRating}
+                                         variant="badge"
+                                         showValue={false}
+                                         size="md"
+                                         minimal={true}
+                                       />
+                                     </div>
+                                     <span 
+                                       className="text-lg font-bold" 
+                                       style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
+                                     >
+                                       {circleRatingCount > 0 ? circleRating.toFixed(1) : "0"}
+                                     </span>
+                                   </div>
 
-                                <div className="leading-tight min-w-[140px]">
-                                  <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
-                                    Circle Rating
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger>
-                                          <Info className="h-3 w-3 text-muted-foreground" />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow).</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  </div>
+                                   <div className="leading-tight min-w-[140px]">
+                                     <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
+                                       Circle Rating
+                                       <Tooltip>
+                                         <TooltipTrigger>
+                                           <Info className="h-3 w-3 text-muted-foreground" />
+                                         </TooltipTrigger>
+                                         <TooltipContent side="bottom" className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs">
+                                           <p className="text-sm">
+                                             Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow).
+                                           </p>
+                                         </TooltipContent>
+                                       </Tooltip>
+                                     </div>
                                   <div 
                                     className="text-sm font-bold" 
                                     style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
