@@ -3,7 +3,8 @@
  * Gets the sentiment color for a rating value
  * This matches the color logic used in ConnectedRingsRating component
  */
-export const getSentimentColor = (rating: number): string => {
+export const getSentimentColor = (rating: number, hasReviews: boolean = true): string => {
+  if (!hasReviews || rating === 0) return "#6b7280"; // Gray for no reviews
   if (rating < 2) return "#ea384c"; // Red
   if (rating < 3) return "#F97316"; // Orange  
   if (rating < 4) return "#FEC006"; // Yellow
@@ -14,7 +15,8 @@ export const getSentimentColor = (rating: number): string => {
 /**
  * Gets the sentiment label for a rating value
  */
-export const getSentimentLabel = (rating: number): string => {
+export const getSentimentLabel = (rating: number, hasReviews: boolean = true): string => {
+  if (!hasReviews || rating === 0) return "No ratings yet";
   if (rating >= 4.5) return "Excellent";
   if (rating >= 4.0) return "Very Good";
   if (rating >= 3.5) return "Good";

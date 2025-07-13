@@ -229,9 +229,9 @@ const EntityV4 = () => {
                               />
                               <span 
                                 className="text-lg font-bold" 
-                                style={{ color: getSentimentColor(entityData.rating) }}
+                                style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
                               >
-                                {entityData.rating.toFixed(1)}
+                                {entityData.totalReviews > 0 ? entityData.rating.toFixed(1) : "0"}
                               </span>
                             </div>
                             
@@ -239,9 +239,9 @@ const EntityV4 = () => {
                               <div className="font-semibold text-sm whitespace-nowrap text-gray-900">Overall Rating</div>
                               <div 
                                 className="text-sm font-bold" 
-                                style={{ color: getSentimentColor(entityData.rating) }}
+                                style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
                               >
-                                {getSentimentLabel(entityData.rating)}
+                                {getSentimentLabel(entityData.rating, entityData.totalReviews > 0)}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 ({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})
@@ -263,14 +263,20 @@ const EntityV4 = () => {
                                   </div>
                                   <span 
                                     className="text-lg font-bold" 
-                                    style={{ color: getSentimentColor(circleRating) }}
+                                    style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
                                   >
-                                    {circleRating.toFixed(1)}
+                                    {circleRatingCount > 0 ? circleRating.toFixed(1) : "0"}
                                   </span>
                                 </div>
 
                                 <div className="leading-tight min-w-[140px]">
                                   <div className="font-semibold text-sm whitespace-nowrap text-brand-orange">Circle Rating</div>
+                                  <div 
+                                    className="text-sm font-bold" 
+                                    style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
+                                  >
+                                    {getSentimentLabel(circleRating, circleRatingCount > 0)}
+                                  </div>
                                   <div className="text-xs text-muted-foreground">
                                     Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
                                   </div>
