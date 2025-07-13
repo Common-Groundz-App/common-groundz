@@ -217,9 +217,10 @@ const EntityV4 = () => {
                       <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                       
                         {/* Ratings */}
-                        <div className="flex items-center gap-3 mb-4">
+                        <div className="flex items-center gap-6 mb-4">
                           {/* Overall Rating */}
-                          <div className="flex flex-col gap-1 flex-shrink-0">
+                          <div className="flex flex-col gap-1 min-w-[180px]">
+                            <span className="text-sm font-medium text-muted-foreground">Overall Rating</span>
                             <div className="flex items-center gap-2">
                               <ConnectedRingsRating
                                 value={entityData.rating}
@@ -228,9 +229,6 @@ const EntityV4 = () => {
                                 size="md"
                                 minimal={true}
                               />
-                              <span className="text-sm font-medium text-muted-foreground">Overall Rating</span>
-                            </div>
-                            <div className="flex items-center gap-1">
                               <span 
                                 className="text-lg font-semibold" 
                                 style={{ color: getSentimentColor(entityData.rating) }}
