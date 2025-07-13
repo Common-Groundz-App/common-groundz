@@ -23,7 +23,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
         avoidCollisions={true}
         className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-sm z-50"
       >
-        <p className="text-sm leading-relaxed whitespace-normal">
+        <p className="text-sm whitespace-normal">
           {content}
         </p>
       </TooltipContent>
