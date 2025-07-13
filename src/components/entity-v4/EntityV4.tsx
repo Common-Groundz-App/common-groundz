@@ -450,6 +450,14 @@ const EntityV4 = () => {
 
                        {/* Action Buttons */}
                        <div className="flex flex-wrap gap-3">
+                         {entity && (
+                           <EntityFollowButton
+                             entityId={entity.id}
+                             entityName={entity.name}
+                             variant="outline"
+                             showCount={true}
+                           />
+                         )}
                           <Button 
                             className="bg-brand-orange hover:bg-brand-orange/90 text-white"
                             onClick={sidebarButtonConfig.action}
@@ -466,14 +474,6 @@ const EntityV4 = () => {
                            <Globe className="w-4 h-4 mr-2" />
                            Visit Website
                          </Button>
-                         {entity && (
-                           <EntityFollowButton
-                             entityId={entity.id}
-                             entityName={entity.name}
-                             variant="outline"
-                             showCount={true}
-                           />
-                         )}
                           <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                             <Navigation className="w-4 h-4 mr-2" />
                             Get Directions
