@@ -10,7 +10,7 @@ import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
 import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
-import { Star, MapPin, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare } from "lucide-react";
+import { Star, MapPin, Navigation, Globe, Phone, Mail, Share2, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -436,26 +436,25 @@ const EntityV4 = () => {
 
                        {/* Action Buttons */}
                        <div className="flex flex-wrap gap-3">
+                          <Button 
+                            className="bg-brand-orange hover:bg-brand-orange/90 text-white"
+                            onClick={sidebarButtonConfig.action}
+                          >
+                            <sidebarButtonConfig.icon className="w-4 h-4 mr-2" />
+                            {sidebarButtonConfig.text}
+                          </Button>
                          <Button 
-                           className="bg-blue-600 hover:bg-blue-700"
-                           onClick={sidebarButtonConfig.action}
+                           className="bg-brand-orange hover:bg-brand-orange/90 text-white"
+                           onClick={() => entityData.website && window.open(`https://${entityData.website.replace(/^https?:\/\//, '')}`, '_blank')}
+                           disabled={!entityData.website}
                          >
-                           <sidebarButtonConfig.icon className="w-4 h-4 mr-2" />
-                           {sidebarButtonConfig.text}
+                           <Globe className="w-4 h-4 mr-2" />
+                           Visit Website
                          </Button>
-                        <Button 
-                          variant="outline" 
-                          className="border-blue-600 text-blue-600 hover:bg-blue-50"
-                          onClick={() => entityData.website && window.open(`https://${entityData.website.replace(/^https?:\/\//, '')}`, '_blank')}
-                          disabled={!entityData.website}
-                        >
-                          <Globe className="w-4 h-4 mr-2" />
-                          Visit Website
-                        </Button>
-                        <Button variant="outline">
-                          <MapPin className="w-4 h-4 mr-2" />
-                          Get Directions
-                        </Button>
+                         <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                           <Navigation className="w-4 h-4 mr-2" />
+                           Get Directions
+                         </Button>
                         <Button variant="outline" size="icon">
                           <Share2 className="w-4 h-4" />
                         </Button>
