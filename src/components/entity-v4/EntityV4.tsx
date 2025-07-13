@@ -23,7 +23,6 @@ import ReviewCard from "@/components/ReviewCard";
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
-  const { user } = useAuth();
   
   // Fetch real entity data
   const {
@@ -39,13 +38,14 @@ const EntityV4 = () => {
     parentEntity,
     isLoading: hierarchyLoading
   } = useEntityHierarchy(entity?.id || null);
-  
+
   // Fetch circle rating data
+  const { user } = useAuth();
   const {
     circleRating,
     circleRatingCount,
     circleContributors,
-    isLoading: circleLoading
+    isLoading: isCircleRatingLoading
   } = useCircleRating(entity?.id || '');
 
   // Show loading state
@@ -89,7 +89,7 @@ const EntityV4 = () => {
     description: entity?.description || '',
     rating: stats?.averageRating || 0,
     totalReviews: stats?.reviewCount || 0,
-    circleScore: circleRating || 0,
+    
     claimed: entity?.is_claimed || false,
     image: entityImage,
     website: entity?.website_url || '',
@@ -229,20 +229,66 @@ const EntityV4 = () => {
                            <span className="font-semibold">{entityData.rating}</span>
                            <span className="text-gray-500 whitespace-nowrap">({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})</span>
                          </div>
-                         <div className="flex items-center gap-2 text-blue-600 flex-shrink-0">
-                           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold">
-                             {user && entityData.circleScore > 0 ? entityData.circleScore.toFixed(1) : '—'}
-                           </div>
-                           <span className="font-medium whitespace-nowrap">Circle Score</span>
-                           {user && entityData.circleScore > 0 && circleContributors.length > 0 && (
-                             <CircleContributorsPreview
-                               contributors={circleContributors}
-                               totalCount={circleRatingCount}
-                               maxDisplay={3}
-                               entityName={entityData.name}
-                             />
-                           )}
-                         </div>
+                          {user && (
+                            circleRating !== null ? (
+                              <div className="flex items-center gap-4 flex-shrink-0">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-fit">
+                                    <ConnectedRingsRating
+                                      value={circleRating}
+                                      variant="badge"
+                                      showValue={false}
+                                      size="md"
+                                      minimal={true}
+                                    />
+                                  </div>
+                                  <span 
+                                    className="text-lg font-bold" 
+                                    style={{ color: getSentimentColor(circleRating) }}
+                                  >
+                                    {circleRating.toFixed(1)}
+                                  </span>
+                                </div>
+
+                                <div className="leading-tight min-w-[140px]">
+                                  <div className="font-semibold text-sm whitespace-nowrap text-brand-orange">Circle Rating</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
+                                  </div>
+                                  <CircleContributorsPreview 
+                                    contributors={circleContributors}
+                                    totalCount={circleRatingCount}
+                                    maxDisplay={4}
+                                    entityName={entity?.name}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-4 flex-shrink-0">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-fit">
+                                    <ConnectedRingsRating
+                                      value={0}
+                                      variant="badge"
+                                      showValue={false}
+                                      size="md"
+                                      minimal={true}
+                                    />
+                                  </div>
+                                  <span className="text-lg font-bold text-muted-foreground">
+                                    0
+                                  </span>
+                                </div>
+
+                                <div className="leading-tight min-w-[140px]">
+                                  <div className="font-semibold text-sm whitespace-nowrap text-brand-orange">Circle Rating</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    No ratings from your circle
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          )}
                       </div>
 
                       {/* Action Buttons */}
