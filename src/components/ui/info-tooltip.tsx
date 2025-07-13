@@ -19,10 +19,9 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
       </TooltipTrigger>
       <TooltipContent 
         side={side} 
-        sideOffset={8}
-        className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-sm"
+        className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs"
       >
-        <p className="text-sm leading-relaxed">
+        <p className="text-sm">
           {content}
         </p>
       </TooltipContent>
