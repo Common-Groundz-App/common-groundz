@@ -2,6 +2,7 @@
 import React from 'react';
 import { Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface InfoTooltipProps {
   content: string;
@@ -21,9 +22,9 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
         side={side} 
         sideOffset={10}
         avoidCollisions={true}
-        className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-sm z-50"
+        className={cn("max-w-sm z-50")}
       >
-        <p className="text-sm whitespace-normal">
+        <p className="whitespace-normal">
           {content}
         </p>
       </TooltipContent>
