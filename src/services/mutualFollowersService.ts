@@ -50,7 +50,7 @@ export const getMutualEntityFollowers = async (
     // Step 3: Get profile data for mutual followers
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, first_name, last_name')
+      .select('id, username, avatar_url, first_name, last_name, bio, location')
       .in('id', mutualUserIds);
 
     if (profilesError) {
