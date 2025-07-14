@@ -26,37 +26,46 @@ export const getMutualEntityFollowersManual = async (
     const followingIds = userFollows.map(f => f.following_id);
     if (followingIds.length === 0) return [];
 
-    // Then get users from that list who also follow this entity
-    const { data: mutualFollowers, error: mutualError } = await supabase
+    // Step 1: Get user IDs who follow this entity AND are in the user's following list
+    const { data: entityFollowers, error: entityError } = await supabase
       .from('entity_follows')
-      .select(`
-        user_id,
-        profiles!inner (
-          id,
-          username,
-          avatar_url,
-          first_name,
-          last_name
-        )
-      `)
+      .select('user_id')
       .eq('entity_id', entityId)
       .in('user_id', followingIds);
 
-    if (mutualError) {
-      console.error('Error fetching mutual entity followers:', mutualError);
+    if (entityError) {
+      console.error('Error fetching entity followers:', entityError);
       return [];
     }
 
-    console.log('Raw mutual followers data:', mutualFollowers);
+    if (!entityFollowers || entityFollowers.length === 0) {
+      console.log('No mutual followers found');
+      return [];
+    }
 
-    // The profiles data is directly accessible, not nested under mf.profiles
-    return mutualFollowers?.map(mf => ({
-      id: mf.profiles.id,
-      username: mf.profiles.username,
-      avatar_url: mf.profiles.avatar_url,
-      first_name: mf.profiles.first_name,
-      last_name: mf.profiles.last_name
-    })).filter(Boolean) || [];
+    const mutualUserIds = entityFollowers.map(ef => ef.user_id);
+    console.log('Mutual user IDs:', mutualUserIds);
+
+    // Step 2: Get profile data for the mutual followers
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, first_name, last_name')
+      .in('id', mutualUserIds);
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      return [];
+    }
+
+    console.log('Profiles data:', profiles);
+
+    return profiles?.map(profile => ({
+      id: profile.id,
+      username: profile.username,
+      avatar_url: profile.avatar_url,
+      first_name: profile.first_name,
+      last_name: profile.last_name
+    })) || [];
   } catch (error) {
     console.error('Error in getMutualEntityFollowersManual:', error);
     return [];
