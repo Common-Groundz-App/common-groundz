@@ -56,9 +56,9 @@ export const isFollowingEntity = async (entityId: string): Promise<boolean> => {
 };
 
 export const getEntityFollowers = async (entityId: string): Promise<number> => {
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from('entity_follows')
-    .select('*', { count: 'exact', head: true })
+    .select('id')
     .eq('entity_id', entityId);
 
   if (error) {
@@ -66,7 +66,7 @@ export const getEntityFollowers = async (entityId: string): Promise<number> => {
     return 0;
   }
 
-  return count || 0;
+  return data?.length || 0;
 };
 
 export const getUserFollowedEntities = async (userId: string): Promise<string[]> => {
