@@ -14,16 +14,7 @@ export const MutualFollowersIndicator: React.FC<MutualFollowersIndicatorProps> =
   count,
   isLoading = false
 }) => {
-  // Debug logging to track component rendering
-  console.log('🔍 [MutualFollowersIndicator] Rendering with:', { 
-    count, 
-    isLoading, 
-    mutualFollowersLength: mutualFollowers.length,
-    mutualFollowers: mutualFollowers.map(f => ({ id: f.id, displayName: f.displayName }))
-  });
-
   if (isLoading) {
-    console.log('⏳ [MutualFollowersIndicator] Showing loading state');
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <div className="animate-pulse">Loading mutual followers...</div>
@@ -32,11 +23,8 @@ export const MutualFollowersIndicator: React.FC<MutualFollowersIndicatorProps> =
   }
 
   if (count === 0) {
-    console.log('❌ [MutualFollowersIndicator] No mutual followers, hiding component');
     return null;
   }
-
-  console.log('✅ [MutualFollowersIndicator] Showing mutual followers component');
 
   const displayCount = Math.min(3, mutualFollowers.length);
   const remainingCount = count - displayCount;
