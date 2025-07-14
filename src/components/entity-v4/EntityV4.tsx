@@ -26,7 +26,6 @@ import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelin
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { useToast } from '@/hooks/use-toast';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
-import { MutualFollowersIndicator } from '@/components/entity/MutualFollowersIndicator';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -479,14 +478,7 @@ const EntityV4 = () => {
                             <Navigation className="w-4 h-4 mr-2" />
                             Get Directions
                           </Button>
-                        </div>
-
-                        {/* Mutual Followers Indicator */}
-                        {entity && (
-                          <div className="mt-3">
-                            <MutualFollowersIndicator entityId={entity.id} />
-                          </div>
-                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
