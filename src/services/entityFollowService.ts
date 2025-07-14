@@ -57,7 +57,7 @@ export const isFollowingEntity = async (entityId: string): Promise<boolean> => {
 
 export const getEntityFollowers = async (entityId: string): Promise<number> => {
   const { data, error } = await supabase
-    .rpc('get_entity_followers_count', { input_entity_id: entityId });
+    .rpc('get_entity_followers_count', { input_entity_id: entityId } as any);
 
   if (error) {
     console.error('Error getting entity followers count:', error);
