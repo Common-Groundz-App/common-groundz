@@ -47,7 +47,16 @@ export const getMutualEntityFollowersManual = async (
       return [];
     }
 
-    return mutualFollowers?.map(mf => mf.profiles).filter(Boolean) || [];
+    console.log('Raw mutual followers data:', mutualFollowers);
+
+    // The profiles data is directly accessible, not nested under mf.profiles
+    return mutualFollowers?.map(mf => ({
+      id: mf.profiles.id,
+      username: mf.profiles.username,
+      avatar_url: mf.profiles.avatar_url,
+      first_name: mf.profiles.first_name,
+      last_name: mf.profiles.last_name
+    })).filter(Boolean) || [];
   } catch (error) {
     console.error('Error in getMutualEntityFollowersManual:', error);
     return [];
