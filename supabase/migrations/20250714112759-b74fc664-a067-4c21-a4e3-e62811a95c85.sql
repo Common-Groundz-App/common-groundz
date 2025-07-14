@@ -9,7 +9,7 @@ BEGIN
   RETURN (
     SELECT COUNT(*)::INTEGER
     FROM public.entity_follows
-    WHERE entity_id = get_entity_followers_count.entity_id
+    WHERE public.entity_follows.entity_id = get_entity_followers_count.entity_id
   );
 END;
 $function$;
