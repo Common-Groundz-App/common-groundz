@@ -26,8 +26,6 @@ import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelin
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { useToast } from '@/hooks/use-toast';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
-import { MutualFollowersIndicator } from '@/components/entity/MutualFollowersIndicator';
-import { useMutualEntityFollowers } from '@/hooks/useMutualEntityFollowers';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -64,9 +62,6 @@ const EntityV4 = () => {
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
-
-  // Add mutual followers hook
-  const { mutualFollowers, count: mutualFollowersCount, isLoading: isMutualFollowersLoading } = useMutualEntityFollowers(entity?.id);
 
   // Memoized user review
   const userReview = React.useMemo(() => {
@@ -484,17 +479,6 @@ const EntityV4 = () => {
                             Get Directions
                           </Button>
                       </div>
-
-                      {/* Add Mutual Followers Indicator */}
-                      {entity && (
-                        <div className="mt-3">
-                          <MutualFollowersIndicator 
-                            mutualFollowers={mutualFollowers}
-                            count={mutualFollowersCount}
-                            isLoading={isMutualFollowersLoading}
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
