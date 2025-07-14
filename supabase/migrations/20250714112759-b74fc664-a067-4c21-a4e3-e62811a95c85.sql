@@ -1,0 +1,15 @@
+-- Create function to get entity followers count with SECURITY DEFINER
+CREATE OR REPLACE FUNCTION public.get_entity_followers_count(entity_id uuid)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  RETURN (
+    SELECT COUNT(*)::INTEGER
+    FROM public.entity_follows
+    WHERE entity_id = get_entity_followers_count.entity_id
+  );
+END;
+$function$;

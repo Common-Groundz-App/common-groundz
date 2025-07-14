@@ -2093,6 +2093,10 @@ export type Database = {
         Args: { p_entity_id: string }
         Returns: number
       }
+      get_entity_followers_count: {
+        Args: { entity_id: string }
+        Returns: number
+      }
       get_follower_count_by_user_id: {
         Args: { user_id: string }
         Returns: number

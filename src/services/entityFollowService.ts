@@ -56,17 +56,15 @@ export const isFollowingEntity = async (entityId: string): Promise<boolean> => {
 };
 
 export const getEntityFollowers = async (entityId: string): Promise<number> => {
-  const { count, error } = await supabase
-    .from('entity_follows')
-    .select('*', { count: 'exact', head: true })
-    .eq('entity_id', entityId);
+  const { data, error } = await supabase
+    .rpc('get_entity_followers_count', { entity_id: entityId });
 
   if (error) {
     console.error('Error getting entity followers count:', error);
     return 0;
   }
 
-  return count || 0;
+  return data || 0;
 };
 
 export const getUserFollowedEntities = async (userId: string): Promise<string[]> => {
