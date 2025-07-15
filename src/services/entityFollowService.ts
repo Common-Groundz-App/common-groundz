@@ -80,3 +80,26 @@ export const getUserFollowedEntities = async (userId: string): Promise<string[]>
 
   return data.map(follow => follow.entity_id);
 };
+
+export interface EntityFollowerProfile {
+  id: string;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+}
+
+export const getEntityFollowerNames = async (entityId: string, limit: number = 3): Promise<EntityFollowerProfile[]> => {
+  const { data, error } = await supabase
+    .rpc('get_entity_follower_names', { 
+      input_entity_id: entityId, 
+      follower_limit: limit 
+    });
+
+  if (error) {
+    console.error('Error getting entity follower names:', error);
+    return [];
+  }
+
+  return data || [];
+};
