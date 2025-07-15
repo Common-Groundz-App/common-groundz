@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { useEntityFollowerNames } from '@/hooks/useEntityFollowerNames';
@@ -24,15 +24,12 @@ const getDisplayName = (follower: EntityFollowerProfile): string => {
   return 'Someone';
 };
 
-const FollowerName: React.FC<{ follower: EntityFollowerProfile; index: number }> = React.memo(({ follower, index }) => {
-  const displayName = useMemo(() => getDisplayName(follower), [follower]);
-  const animationDelay = useMemo(() => ({ animationDelay: `${index * 100}ms` }), [index]);
-  
+const FollowerName: React.FC<{ follower: EntityFollowerProfile; index: number }> = ({ follower, index }) => {
   return (
     <Link 
       to={`/profile/${follower.id}`}
       className="hover:underline hover:text-primary transition-all duration-200 inline-flex items-baseline gap-1.5 group animate-fade-in hover-scale"
-      style={animationDelay}
+      style={{ animationDelay: `${index * 100}ms` }}
     >
       <ProfileAvatar 
         userId={follower.id}
@@ -40,12 +37,10 @@ const FollowerName: React.FC<{ follower: EntityFollowerProfile; index: number }>
         className="flex-shrink-0 group-hover:scale-110 transition-transform duration-200"
         showSkeleton={false}
       />
-      <span className="leading-none">{displayName}</span>
+      <span className="leading-none">{getDisplayName(follower)}</span>
     </Link>
   );
-});
-
-FollowerName.displayName = 'FollowerName';
+};
 
 const formatFollowerMessage = (
   followers: EntityFollowerProfile[], 
@@ -78,22 +73,11 @@ const formatFollowerMessage = (
   return { text: `, ${suffix}`, remainingCount };
 };
 
-export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React.memo(({
+export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = ({
   entityId,
   className = ''
 }) => {
   const { followerNames, totalFollowersCount, isLoading, error, retry } = useEntityFollowerNames(entityId, 3);
-
-  // Memoized calculations
-  const messageSuffix = useMemo(() => 
-    formatFollowerMessage(followerNames, totalFollowersCount).text, 
-    [followerNames, totalFollowersCount]
-  );
-
-  const messageSuffixDelay = useMemo(() => 
-    ({ animationDelay: `${followerNames.length * 100}ms` }), 
-    [followerNames.length]
-  );
 
   // Loading state with skeleton
   if (isLoading) {
@@ -130,6 +114,8 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
     );
   }
 
+  const { text: messageSuffix } = formatFollowerMessage(followerNames, totalFollowersCount);
+
   return (
     <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
       {followerNames.map((follower, index) => (
@@ -139,11 +125,9 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
           <FollowerName follower={follower} index={index} />
         </React.Fragment>
       ))}
-      <span className="animate-fade-in" style={messageSuffixDelay}>
+      <span className="animate-fade-in" style={{ animationDelay: `${followerNames.length * 100}ms` }}>
         {messageSuffix}
       </span>
     </div>
   );
-});
-
-EntitySocialFollowers.displayName = 'EntitySocialFollowers';
+};
