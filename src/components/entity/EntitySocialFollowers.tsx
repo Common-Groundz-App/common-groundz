@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import { useEntityFollowerNames } from '@/hooks/useEntityFollowerNames';
 import type { EntityFollowerProfile } from '@/services/entityFollowService';
 import { Button } from '@/components/ui/button';
+import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 
 interface EntitySocialFollowersProps {
   entityId: string;
@@ -27,8 +28,14 @@ const FollowerName: React.FC<{ follower: EntityFollowerProfile }> = ({ follower 
   return (
     <Link 
       to={`/profile/${follower.id}`}
-      className="hover:underline hover:text-primary transition-colors"
+      className="hover:underline hover:text-primary transition-colors inline-flex items-center gap-1.5"
     >
+      <ProfileAvatar 
+        userId={follower.id}
+        size="xs"
+        className="h-4 w-4"
+        showSkeleton={false}
+      />
       {getDisplayName(follower)}
     </Link>
   );
