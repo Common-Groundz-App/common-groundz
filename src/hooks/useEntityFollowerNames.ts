@@ -107,35 +107,27 @@ export const useEntityFollowerNames = (entityId: string, limit: number = 3) => {
     };
   }, [entityId, debouncedUpdate]);
 
-  const retry = () => {
-    setError(null);
-    setIsLoading(true);
-    // Re-trigger the effect by updating a dependency wouldn't work here
-    // Instead, we'll extract the logic to a function we can call
-    const fetchFollowerData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const [names, totalCount] = await Promise.all([
-          getEntityFollowerNames(entityId, limit),
-          getEntityFollowers(entityId)
-        ]);
-        
-        setFollowerNames(names);
-        setTotalFollowersCount(totalCount);
-      } catch (error) {
-        console.error('Error fetching follower data:', error);
-        setError('Failed to load followers');
-        setFollowerNames([]);
-        setTotalFollowersCount(0);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchFollowerData();
-  };
+  const retry = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const [names, totalCount] = await Promise.all([
+        getEntityFollowerNames(entityId, limit),
+        getEntityFollowers(entityId)
+      ]);
+      
+      setFollowerNames(names);
+      setTotalFollowersCount(totalCount);
+    } catch (error) {
+      console.error('Error fetching follower data:', error);
+      setError('Failed to load followers');
+      setFollowerNames([]);
+      setTotalFollowersCount(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [entityId, limit]);
 
   return {
     followerNames,
