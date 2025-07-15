@@ -24,19 +24,20 @@ const getDisplayName = (follower: EntityFollowerProfile): string => {
   return 'Someone';
 };
 
-const FollowerName: React.FC<{ follower: EntityFollowerProfile }> = ({ follower }) => {
+const FollowerName: React.FC<{ follower: EntityFollowerProfile; index: number }> = ({ follower, index }) => {
   return (
     <Link 
       to={`/profile/${follower.id}`}
-      className="hover:underline hover:text-primary transition-colors inline-flex items-center gap-1.5"
+      className="hover:underline hover:text-primary transition-all duration-200 inline-flex items-baseline gap-1.5 group animate-fade-in hover-scale"
+      style={{ animationDelay: `${index * 100}ms` }}
     >
       <ProfileAvatar 
         userId={follower.id}
         size="xs"
-        className="h-4 w-4"
+        className="flex-shrink-0 group-hover:scale-110 transition-transform duration-200"
         showSkeleton={false}
       />
-      {getDisplayName(follower)}
+      <span className="leading-none">{getDisplayName(follower)}</span>
     </Link>
   );
 };
@@ -81,8 +82,8 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = ({
   // Loading state with skeleton
   if (isLoading) {
     return (
-      <div className={`text-sm text-muted-foreground ${className}`}>
-        <div className="animate-pulse bg-muted h-4 w-48 rounded"></div>
+      <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
+        <div className="animate-pulse bg-muted h-4 w-48 rounded-md"></div>
       </div>
     );
   }
@@ -90,15 +91,15 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = ({
   // Error state with retry option
   if (error) {
     return (
-      <div className={`text-sm text-muted-foreground ${className} flex items-center gap-2`}>
+      <div className={`text-sm text-muted-foreground animate-fade-in ${className} flex items-center gap-2`}>
         <span>Failed to load followers</span>
         <Button
           variant="ghost"
           size="sm"
           onClick={retry}
-          className="h-auto p-1 text-xs hover:text-primary"
+          className="h-auto p-1 text-xs hover:text-primary hover-scale transition-all duration-200 hover:bg-muted/50"
         >
-          <RefreshCw className="h-3 w-3" />
+          <RefreshCw className="h-3 w-3 transition-transform duration-200 hover:rotate-180" />
         </Button>
       </div>
     );
@@ -107,7 +108,7 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = ({
   // No followers state
   if (followerNames.length === 0) {
     return (
-      <div className={`text-sm text-muted-foreground ${className}`}>
+      <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
         Be the first from your circle to follow this!
       </div>
     );
@@ -116,15 +117,17 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = ({
   const { text: messageSuffix } = formatFollowerMessage(followerNames, totalFollowersCount);
 
   return (
-    <div className={`text-sm text-muted-foreground ${className}`}>
+    <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
       {followerNames.map((follower, index) => (
         <React.Fragment key={follower.id}>
           {index > 0 && index === followerNames.length - 1 && followerNames.length > 1 && ' and '}
           {index > 0 && index < followerNames.length - 1 && ', '}
-          <FollowerName follower={follower} />
+          <FollowerName follower={follower} index={index} />
         </React.Fragment>
       ))}
-      {messageSuffix}
+      <span className="animate-fade-in" style={{ animationDelay: `${followerNames.length * 100}ms` }}>
+        {messageSuffix}
+      </span>
     </div>
   );
 };
