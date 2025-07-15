@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { useEntityFollowerNames } from '@/hooks/useEntityFollowerNames';
@@ -24,7 +24,7 @@ const getDisplayName = (follower: EntityFollowerProfile): string => {
   return 'Someone';
 };
 
-const FollowerName: React.FC<{ follower: EntityFollowerProfile; index: number }> = ({ follower, index }) => {
+const FollowerName: React.FC<{ follower: EntityFollowerProfile; index: number }> = React.memo(({ follower, index }) => {
   return (
     <Link 
       to={`/profile/${follower.id}`}
@@ -40,7 +40,7 @@ const FollowerName: React.FC<{ follower: EntityFollowerProfile; index: number }>
       <span className="leading-none">{getDisplayName(follower)}</span>
     </Link>
   );
-};
+});
 
 const formatFollowerMessage = (
   followers: EntityFollowerProfile[], 
@@ -73,11 +73,16 @@ const formatFollowerMessage = (
   return { text: `, ${suffix}`, remainingCount };
 };
 
-export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = ({
+export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React.memo(({
   entityId,
   className = ''
 }) => {
   const { followerNames, totalFollowersCount, isLoading, error, retry } = useEntityFollowerNames(entityId, 3);
+
+  const messageSuffix = useMemo(() => 
+    formatFollowerMessage(followerNames, totalFollowersCount).text,
+    [followerNames, totalFollowersCount]
+  );
 
   // Loading state with skeleton
   if (isLoading) {
@@ -114,8 +119,6 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = ({
     );
   }
 
-  const { text: messageSuffix } = formatFollowerMessage(followerNames, totalFollowersCount);
-
   return (
     <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
       {followerNames.map((follower, index) => (
@@ -130,4 +133,4 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = ({
       </span>
     </div>
   );
-};
+});

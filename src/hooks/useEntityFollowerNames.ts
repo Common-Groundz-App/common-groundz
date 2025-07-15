@@ -107,7 +107,7 @@ export const useEntityFollowerNames = (entityId: string, limit: number = 3) => {
     };
   }, [entityId, debouncedUpdate]);
 
-  const retry = () => {
+  const retry = useCallback(() => {
     setError(null);
     setIsLoading(true);
     // Re-trigger the effect by updating a dependency wouldn't work here
@@ -135,7 +135,7 @@ export const useEntityFollowerNames = (entityId: string, limit: number = 3) => {
     };
     
     fetchFollowerData();
-  };
+  }, [entityId, limit]);
 
   return {
     followerNames,
