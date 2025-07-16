@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getEntityFollowerNames, getEntityFollowers, type EntityFollowerProfile } from '@/services/entityFollowService';
 import { realtimeService } from '@/services/realtimeService';
@@ -40,6 +41,23 @@ export const useEntityFollowerNames = (entityId: string, limit: number = 3) => {
         setError('Failed to update followers');
       }
     }, 300); // 300ms debounce
+  }, [entityId, limit]);
+
+  // Public refresh function that can be called externally
+  const refreshFollowerData = useCallback(async () => {
+    try {
+      const [names, totalCount] = await Promise.all([
+        getEntityFollowerNames(entityId, limit),
+        getEntityFollowers(entityId)
+      ]);
+      
+      setFollowerNames(names);
+      setTotalFollowersCount(totalCount);
+      setError(null);
+    } catch (error) {
+      console.error('Error refreshing follower data:', error);
+      setError('Failed to refresh followers');
+    }
   }, [entityId, limit]);
 
   useEffect(() => {
@@ -143,5 +161,6 @@ export const useEntityFollowerNames = (entityId: string, limit: number = 3) => {
     isLoading,
     error,
     retry,
+    refreshFollowerData,
   };
 };

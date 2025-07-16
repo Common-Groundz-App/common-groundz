@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { useEntityFollowerNames } from '@/hooks/useEntityFollowerNames';
@@ -103,8 +104,28 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
   className = ''
 }) => {
   const { user } = useAuth();
-  const { followerNames, totalFollowersCount, isLoading, error, retry } = useEntityFollowerNames(entityId, 3);
+  const { followerNames, totalFollowersCount, isLoading, error, retry, refreshFollowerData } = useEntityFollowerNames(entityId, 3);
   const [showModal, setShowModal] = useState(false);
+
+  // Listen for global entity follow events to update the UI instantly
+  useEffect(() => {
+    const handleEntityFollowChange = (event: CustomEvent) => {
+      const { entityId: eventEntityId, userId, action } = event.detail;
+      
+      // Only update if this event is for the current entity
+      if (eventEntityId === entityId) {
+        console.log(`Entity follow event received: ${action} by user ${userId} for entity ${entityId}`);
+        // Refresh the follower data to get the latest state
+        refreshFollowerData();
+      }
+    };
+
+    window.addEventListener('entity-follow-status-changed', handleEntityFollowChange as EventListener);
+
+    return () => {
+      window.removeEventListener('entity-follow-status-changed', handleEntityFollowChange as EventListener);
+    };
+  }, [entityId, refreshFollowerData]);
 
   // Filter out current user from followerNames (backup, since DB should already exclude)
   const filteredFollowerNames = useMemo(() => {

@@ -53,10 +53,30 @@ export const useEntityFollow = (entityId: string) => {
         await unfollowEntity(entityId);
         setIsFollowing(false);
         setFollowersCount(prev => Math.max(0, prev - 1));
+        
+        // Dispatch global event for real-time updates
+        window.dispatchEvent(new CustomEvent('entity-follow-status-changed', { 
+          detail: { 
+            userId: user.id,
+            entityId: entityId,
+            action: 'unfollow',
+            newFollowerCount: followersCount - 1
+          } 
+        }));
       } else {
         await followEntity(entityId);
         setIsFollowing(true);
         setFollowersCount(prev => prev + 1);
+        
+        // Dispatch global event for real-time updates
+        window.dispatchEvent(new CustomEvent('entity-follow-status-changed', { 
+          detail: { 
+            userId: user.id,
+            entityId: entityId,
+            action: 'follow',
+            newFollowerCount: followersCount + 1
+          } 
+        }));
       }
     } catch (error) {
       console.error('Error toggling follow:', error);
