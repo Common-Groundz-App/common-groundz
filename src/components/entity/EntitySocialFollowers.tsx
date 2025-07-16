@@ -129,21 +129,38 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
 
   return (
     <>
-      <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
-        {followerNames.map((follower, index) => (
-          <React.Fragment key={follower.id}>
-            {index > 0 && index === followerNames.length - 1 && followerNames.length > 1 && ' and '}
-            {index > 0 && index < followerNames.length - 1 && ', '}
-            <FollowerName follower={follower} index={index} />
-          </React.Fragment>
-        ))}
-        <span 
-          className="animate-fade-in cursor-pointer hover:text-primary hover:underline transition-all duration-200" 
-          style={{ animationDelay: `${followerNames.length * 100}ms` }}
-          onClick={handleFollowerCountClick}
-        >
-          {messageSuffix}
-        </span>
+      <div className={`space-y-2 ${className}`}>
+        {/* Followers Header */}
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-foreground">Followers</h3>
+          <button
+            onClick={handleFollowerCountClick}
+            className="text-sm font-medium text-primary hover:text-primary/80 hover:underline transition-colors"
+          >
+            {totalFollowersCount.toLocaleString()}
+          </button>
+        </div>
+        
+        {/* Follower Names */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          {followerNames.slice(0, 2).map((follower, index) => (
+            <React.Fragment key={follower.id}>
+              {index > 0 && <span className="text-muted-foreground">,</span>}
+              <FollowerName follower={follower} index={index} />
+            </React.Fragment>
+          ))}
+          {totalFollowersCount > 2 && (
+            <button
+              onClick={handleFollowerCountClick}
+              className="text-primary hover:text-primary/80 hover:underline transition-colors font-medium"
+            >
+              and {totalFollowersCount - 2} more
+            </button>
+          )}
+          {totalFollowersCount > 0 && (
+            <span className="text-muted-foreground">follow this</span>
+          )}
+        </div>
       </div>
 
       <EntityFollowerModal

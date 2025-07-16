@@ -26,6 +26,7 @@ import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelin
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { useToast } from '@/hooks/use-toast';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
+import { EntitySocialFollowers } from '@/components/entity/EntitySocialFollowers';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -448,6 +449,13 @@ const EntityV4 = () => {
                           )}
                       </div>
 
+                       {/* Social Followers Section */}
+                       {entity && (
+                         <div className="mb-4">
+                           <EntitySocialFollowers entityId={entity.id} />
+                         </div>
+                       )}
+
                        {/* Action Buttons */}
                        <div className="flex gap-3 min-w-0 pr-4">
                          {entity && (
@@ -455,7 +463,7 @@ const EntityV4 = () => {
                              entityId={entity.id}
                              entityName={entity.name}
                              variant="outline"
-                             showCount={true}
+                             showCount={false}
                            />
                          )}
                           <Button 
