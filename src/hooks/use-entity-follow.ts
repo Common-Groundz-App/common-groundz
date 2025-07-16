@@ -45,6 +45,26 @@ export const useEntityFollow = (entityId: string) => {
     checkFollowStatus();
   }, [entityId, user]);
 
+  // Listen for global entity follow events to update follower count instantly
+  useEffect(() => {
+    const handleEntityFollowChange = (event: CustomEvent) => {
+      const { entityId: eventEntityId, userId, action, newFollowerCount } = event.detail;
+      
+      // Only update if this event is for the current entity and not from current user's own action
+      if (eventEntityId === entityId && userId !== user?.id) {
+        console.log(`Entity follow event received: ${action} by user ${userId} for entity ${entityId}`);
+        // Update follower count with the new count from the event
+        setFollowersCount(newFollowerCount);
+      }
+    };
+
+    window.addEventListener('entity-follow-status-changed', handleEntityFollowChange as EventListener);
+
+    return () => {
+      window.removeEventListener('entity-follow-status-changed', handleEntityFollowChange as EventListener);
+    };
+  }, [entityId, user?.id]);
+
   const toggleFollow = async () => {
     if (!user || !entityId) return;
 
@@ -52,7 +72,8 @@ export const useEntityFollow = (entityId: string) => {
       if (isFollowing) {
         await unfollowEntity(entityId);
         setIsFollowing(false);
-        setFollowersCount(prev => Math.max(0, prev - 1));
+        const newCount = Math.max(0, followersCount - 1);
+        setFollowersCount(newCount);
         
         // Dispatch global event for real-time updates
         window.dispatchEvent(new CustomEvent('entity-follow-status-changed', { 
@@ -60,13 +81,14 @@ export const useEntityFollow = (entityId: string) => {
             userId: user.id,
             entityId: entityId,
             action: 'unfollow',
-            newFollowerCount: followersCount - 1
+            newFollowerCount: newCount
           } 
         }));
       } else {
         await followEntity(entityId);
         setIsFollowing(true);
-        setFollowersCount(prev => prev + 1);
+        const newCount = followersCount + 1;
+        setFollowersCount(newCount);
         
         // Dispatch global event for real-time updates
         window.dispatchEvent(new CustomEvent('entity-follow-status-changed', { 
@@ -74,7 +96,7 @@ export const useEntityFollow = (entityId: string) => {
             userId: user.id,
             entityId: entityId,
             action: 'follow',
-            newFollowerCount: followersCount + 1
+            newFollowerCount: newCount
           } 
         }));
       }
