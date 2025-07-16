@@ -50,8 +50,8 @@ export const useEntityFollow = (entityId: string) => {
     const handleEntityFollowChange = (event: CustomEvent) => {
       const { entityId: eventEntityId, userId, action } = event.detail;
       
-      // Only update if this event is for the current entity and not from current user's own action
-      if (eventEntityId === entityId && userId !== user?.id) {
+      // Only update if this event is for the current entity
+      if (eventEntityId === entityId) {
         console.log(`Entity follow event received: ${action} by user ${userId} for entity ${entityId}`);
         // Calculate count change based on action type
         if (action === 'follow') {
