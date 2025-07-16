@@ -89,6 +89,17 @@ export interface EntityFollowerProfile {
   avatar_url: string | null;
 }
 
+export interface EntityFollowerWithContext extends EntityFollowerProfile {
+  is_following: boolean;
+  is_mutual: boolean;
+  followed_at: string;
+}
+
+export interface EntityFollowersResponse {
+  followers: EntityFollowerWithContext[];
+  total_count: number;
+}
+
 export const getEntityFollowerNames = async (entityId: string, limit: number = 3): Promise<EntityFollowerProfile[]> => {
   const { data, error } = await supabase
     .rpc('get_entity_follower_names', { 
@@ -98,6 +109,36 @@ export const getEntityFollowerNames = async (entityId: string, limit: number = 3
 
   if (error) {
     console.error('Error getting entity follower names:', error);
+    return [];
+  }
+
+  return data || [];
+};
+
+export const getEntityFollowersWithContext = async (
+  entityId: string,
+  currentUserId: string | null,
+  options: {
+    search?: string;
+    relationshipFilter?: 'all' | 'following' | 'mutual';
+    limit?: number;
+    offset?: number;
+  } = {}
+): Promise<EntityFollowerWithContext[]> => {
+  const { search, relationshipFilter = 'all', limit = 50, offset = 0 } = options;
+
+  const { data, error } = await supabase
+    .rpc('get_entity_followers_with_context', {
+      input_entity_id: entityId,
+      current_user_id: currentUserId,
+      search_query: search || null,
+      relationship_filter: relationshipFilter,
+      follower_limit: limit,
+      follower_offset: offset
+    });
+
+  if (error) {
+    console.error('Error getting entity followers with context:', error);
     return [];
   }
 

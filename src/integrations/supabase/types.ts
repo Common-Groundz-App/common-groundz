@@ -2107,6 +2107,26 @@ export type Database = {
         Args: { input_entity_id: string }
         Returns: number
       }
+      get_entity_followers_with_context: {
+        Args: {
+          input_entity_id: string
+          current_user_id?: string
+          search_query?: string
+          relationship_filter?: string
+          follower_limit?: number
+          follower_offset?: number
+        }
+        Returns: {
+          id: string
+          username: string
+          first_name: string
+          last_name: string
+          avatar_url: string
+          is_following: boolean
+          is_mutual: boolean
+          followed_at: string
+        }[]
+      }
       get_follower_count_by_user_id: {
         Args: { user_id: string }
         Returns: number

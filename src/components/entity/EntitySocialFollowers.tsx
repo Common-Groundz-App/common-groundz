@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { useEntityFollowerNames } from '@/hooks/useEntityFollowerNames';
 import type { EntityFollowerProfile } from '@/services/entityFollowService';
 import { Button } from '@/components/ui/button';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
+import { EntityFollowerModal } from './EntityFollowerModal';
 
 interface EntitySocialFollowersProps {
   entityId: string;
@@ -78,11 +79,18 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
   className = ''
 }) => {
   const { followerNames, totalFollowersCount, isLoading, error, retry } = useEntityFollowerNames(entityId, 3);
+  const [showModal, setShowModal] = useState(false);
 
   const messageSuffix = useMemo(() => 
     formatFollowerMessage(followerNames, totalFollowersCount).text,
     [followerNames, totalFollowersCount]
   );
+
+  const handleFollowerCountClick = () => {
+    if (totalFollowersCount > 0) {
+      setShowModal(true);
+    }
+  };
 
   // Loading state with skeleton
   if (isLoading) {
@@ -120,17 +128,30 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
   }
 
   return (
-    <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
-      {followerNames.map((follower, index) => (
-        <React.Fragment key={follower.id}>
-          {index > 0 && index === followerNames.length - 1 && followerNames.length > 1 && ' and '}
-          {index > 0 && index < followerNames.length - 1 && ', '}
-          <FollowerName follower={follower} index={index} />
-        </React.Fragment>
-      ))}
-      <span className="animate-fade-in" style={{ animationDelay: `${followerNames.length * 100}ms` }}>
-        {messageSuffix}
-      </span>
-    </div>
+    <>
+      <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
+        {followerNames.map((follower, index) => (
+          <React.Fragment key={follower.id}>
+            {index > 0 && index === followerNames.length - 1 && followerNames.length > 1 && ' and '}
+            {index > 0 && index < followerNames.length - 1 && ', '}
+            <FollowerName follower={follower} index={index} />
+          </React.Fragment>
+        ))}
+        <span 
+          className="animate-fade-in cursor-pointer hover:text-primary hover:underline transition-all duration-200" 
+          style={{ animationDelay: `${followerNames.length * 100}ms` }}
+          onClick={handleFollowerCountClick}
+        >
+          {messageSuffix}
+        </span>
+      </div>
+
+      <EntityFollowerModal
+        open={showModal}
+        onOpenChange={setShowModal}
+        entityId={entityId}
+        totalFollowersCount={totalFollowersCount}
+      />
+    </>
   );
 });
