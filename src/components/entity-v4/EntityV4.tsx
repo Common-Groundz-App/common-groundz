@@ -26,6 +26,8 @@ import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelin
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { useToast } from '@/hooks/use-toast';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
+import { EntityFollowersCount } from '@/components/entity/EntityFollowersCount';
+import { EntitySocialFollowers } from '@/components/entity/EntitySocialFollowers';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -446,7 +448,16 @@ const EntityV4 = () => {
                               </div>
                             )
                           )}
-                      </div>
+                       </div>
+
+                       {/* Followers Section */}
+                       {entity && (
+                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                           <Users className="h-4 w-4" />
+                           <span>Followers</span>
+                           <EntityFollowersCount entityId={entity.id} />
+                         </div>
+                       )}
 
                        {/* Action Buttons */}
                        <div className="flex gap-3 min-w-0 pr-4">
@@ -455,7 +466,6 @@ const EntityV4 = () => {
                              entityId={entity.id}
                              entityName={entity.name}
                              variant="outline"
-                             showCount={true}
                            />
                          )}
                           <Button 
@@ -474,14 +484,21 @@ const EntityV4 = () => {
                            <Globe className="w-4 h-4 mr-2" />
                            Visit Website
                          </Button>
-                          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                            <Navigation className="w-4 h-4 mr-2" />
-                            Get Directions
-                          </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                           <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                             <Navigation className="w-4 h-4 mr-2" />
+                             Get Directions
+                           </Button>
+                       </div>
+
+                       {/* Social Avatars Section */}
+                       {entity && (
+                         <div className="mt-4">
+                           <EntitySocialFollowers entityId={entity.id} />
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 </div>
 
                 {/* Right: Map */}
                 

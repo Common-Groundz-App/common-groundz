@@ -953,7 +953,6 @@ const EntityDetailV2 = () => {
                         entityName={entity.name}
                         variant="outline"
                         size="default"
-                        showCount={true}
                       />
                     )}
 
