@@ -64,7 +64,7 @@ const formatFollowerMessage = (
     const suffix = remainingCount > 0
       ? ` and ${remainingCount} other${remainingCount === 1 ? '' : 's'} follow this`
       : ' follow this';
-    return { text: ` and ${suffix}`, remainingCount };
+    return { text: suffix, remainingCount };
   }
 
   // 3 or more followers shown
