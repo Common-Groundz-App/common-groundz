@@ -449,7 +449,7 @@ const EntityV4 = () => {
                       </div>
 
                        {/* Action Buttons */}
-                       <div className="flex flex-wrap gap-3 min-w-0 pr-8">
+                       <div className="flex flex-wrap gap-3">
                          {entity && (
                            <EntityFollowButton
                              entityId={entity.id}
