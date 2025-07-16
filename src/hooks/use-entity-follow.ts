@@ -48,13 +48,17 @@ export const useEntityFollow = (entityId: string) => {
   // Listen for global entity follow events to update follower count instantly
   useEffect(() => {
     const handleEntityFollowChange = (event: CustomEvent) => {
-      const { entityId: eventEntityId, userId, action, newFollowerCount } = event.detail;
+      const { entityId: eventEntityId, userId, action } = event.detail;
       
       // Only update if this event is for the current entity and not from current user's own action
       if (eventEntityId === entityId && userId !== user?.id) {
         console.log(`Entity follow event received: ${action} by user ${userId} for entity ${entityId}`);
-        // Update follower count with the new count from the event
-        setFollowersCount(newFollowerCount);
+        // Calculate count change based on action type
+        if (action === 'follow') {
+          setFollowersCount(prev => prev + 1);
+        } else if (action === 'unfollow') {
+          setFollowersCount(prev => Math.max(0, prev - 1));
+        }
       }
     };
 
@@ -80,8 +84,7 @@ export const useEntityFollow = (entityId: string) => {
           detail: { 
             userId: user.id,
             entityId: entityId,
-            action: 'unfollow',
-            newFollowerCount: newCount
+            action: 'unfollow'
           } 
         }));
       } else {
@@ -95,8 +98,7 @@ export const useEntityFollow = (entityId: string) => {
           detail: { 
             userId: user.id,
             entityId: entityId,
-            action: 'follow',
-            newFollowerCount: newCount
+            action: 'follow'
           } 
         }));
       }
