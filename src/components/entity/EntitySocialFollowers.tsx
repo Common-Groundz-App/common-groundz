@@ -25,20 +25,22 @@ const getDisplayName = (follower: EntityFollowerProfile): string => {
   return 'Someone';
 };
 
-const FollowerName: React.FC<{ follower: EntityFollowerProfile; index: number }> = React.memo(({ follower, index }) => {
+const FollowerAvatar: React.FC<{ follower: EntityFollowerProfile; index: number }> = React.memo(({ follower, index }) => {
   return (
     <Link 
       to={`/profile/${follower.id}`}
-      className="hover:underline hover:text-primary transition-all duration-200 inline-flex items-baseline gap-1.5 group animate-fade-in hover-scale"
-      style={{ animationDelay: `${index * 100}ms` }}
+      className="relative group animate-fade-in hover-scale transition-all duration-200"
+      style={{ 
+        animationDelay: `${index * 100}ms`,
+        marginLeft: index > 0 ? '-0.5rem' : '0'
+      }}
     >
       <ProfileAvatar 
         userId={follower.id}
-        size="xs"
-        className="flex-shrink-0 group-hover:scale-110 transition-transform duration-200"
+        size="sm"
+        className="border-2 border-background group-hover:scale-110 transition-transform duration-200 ring-1 ring-border/20"
         showSkeleton={false}
       />
-      <span className="leading-none">{getDisplayName(follower)}</span>
     </Link>
   );
 });
@@ -52,26 +54,41 @@ const formatFollowerMessage = (
   }
 
   const remainingCount = Math.max(0, totalCount - followers.length);
+  const names = followers.map(follower => getDisplayName(follower));
 
   if (followers.length === 1) {
-    const suffix = remainingCount > 0 
-      ? ` and ${remainingCount} other${remainingCount === 1 ? '' : 's'} follow this`
-      : ' follows this';
-    return { text: suffix, remainingCount };
+    if (remainingCount > 0) {
+      return { 
+        text: `Followed by ${names[0]} and ${remainingCount} other${remainingCount === 1 ? '' : 's'}`, 
+        remainingCount 
+      };
+    }
+    return { text: `Followed by ${names[0]}`, remainingCount };
   }
 
   if (followers.length === 2) {
-    const suffix = remainingCount > 0
-      ? ` and ${remainingCount} other${remainingCount === 1 ? '' : 's'} follow this`
-      : ' follow this';
-    return { text: suffix, remainingCount };
+    if (remainingCount > 0) {
+      return { 
+        text: `Followed by ${names[0]}, ${names[1]} and ${remainingCount} other${remainingCount === 1 ? '' : 's'}`, 
+        remainingCount 
+      };
+    }
+    return { text: `Followed by ${names[0]} and ${names[1]}`, remainingCount };
   }
 
   // 3 or more followers shown
-  const suffix = remainingCount > 0
-    ? ` and ${remainingCount} other${remainingCount === 1 ? '' : 's'} follow this`
-    : ' follow this';
-  return { text: `, ${suffix}`, remainingCount };
+  const firstTwo = names.slice(0, 2).join(', ');
+  if (remainingCount > 0) {
+    return { 
+      text: `Followed by ${firstTwo} and ${remainingCount} other${remainingCount === 1 ? '' : 's'}`, 
+      remainingCount 
+    };
+  }
+  
+  return { 
+    text: `Followed by ${firstTwo} and ${names.length - 2} other${names.length - 2 === 1 ? '' : 's'}`, 
+    remainingCount 
+  };
 };
 
 export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React.memo(({
@@ -129,16 +146,17 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
 
   return (
     <>
-      <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
-        {followerNames.map((follower, index) => (
-          <React.Fragment key={follower.id}>
-            {index > 0 && index === followerNames.length - 1 && followerNames.length > 1 && ' and '}
-            {index > 0 && index < followerNames.length - 1 && ', '}
-            <FollowerName follower={follower} index={index} />
-          </React.Fragment>
-        ))}
+      <div className={`flex items-center gap-2 text-sm text-muted-foreground animate-fade-in ${className}`}>
+        {/* Avatar row */}
+        <div className="flex items-center">
+          {followerNames.map((follower, index) => (
+            <FollowerAvatar key={follower.id} follower={follower} index={index} />
+          ))}
+        </div>
+        
+        {/* Text message */}
         <span 
-          className="animate-fade-in cursor-pointer hover:text-primary hover:underline transition-all duration-200" 
+          className="animate-fade-in cursor-pointer hover:text-primary hover:underline transition-all duration-200 leading-tight" 
           style={{ animationDelay: `${followerNames.length * 100}ms` }}
           onClick={handleFollowerCountClick}
         >
