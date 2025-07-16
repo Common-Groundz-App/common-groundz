@@ -54,10 +54,11 @@ export const EntityFollowButton: React.FC<EntityFollowButtonProps> = ({
   return (
     <Button 
       size={isMobile ? "sm" : "default"} 
+      variant="outline"
       className={
         isFollowing 
-          ? `${isHovering ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'} transition-colors duration-200` 
-          : "bg-brand-orange hover:bg-brand-orange/90 transition-all transform hover:scale-105"
+          ? `${isHovering ? 'border-red-500 text-red-500 hover:bg-red-50' : 'border-brand-orange text-brand-orange hover:bg-brand-orange/5'} transition-colors duration-200` 
+          : "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white transition-all transform hover:scale-105"
       }
       onClick={handleFollow}
       disabled={isLoading}
