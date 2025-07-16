@@ -129,32 +129,21 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
 
   return (
     <>
-      <div className={`flex items-center gap-2 text-sm ${className}`}>
-        <span className="text-muted-foreground">Followers</span>
-        <button
-          onClick={handleFollowerCountClick}
-          className="text-primary hover:text-primary/80 hover:underline transition-colors font-medium"
-        >
-          {totalFollowersCount.toLocaleString()}
-        </button>
-        {followerNames.slice(0, 2).map((follower, index) => (
+      <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
+        {followerNames.map((follower, index) => (
           <React.Fragment key={follower.id}>
+            {index > 0 && index === followerNames.length - 1 && followerNames.length > 1 && ' and '}
+            {index > 0 && index < followerNames.length - 1 && ', '}
             <FollowerName follower={follower} index={index} />
-            {index < followerNames.slice(0, 2).length - 1 && <span className="text-muted-foreground">,</span>}
           </React.Fragment>
         ))}
-        {totalFollowersCount > 2 && (
-          <>
-            <span className="text-muted-foreground">and</span>
-            <button
-              onClick={handleFollowerCountClick}
-              className="text-primary hover:text-primary/80 hover:underline transition-colors font-medium"
-            >
-              {totalFollowersCount - 2} more
-            </button>
-          </>
-        )}
-        <span className="text-muted-foreground">follow this</span>
+        <span 
+          className="animate-fade-in cursor-pointer hover:text-primary hover:underline transition-all duration-200" 
+          style={{ animationDelay: `${followerNames.length * 100}ms` }}
+          onClick={handleFollowerCountClick}
+        >
+          {messageSuffix}
+        </span>
       </div>
 
       <EntityFollowerModal
