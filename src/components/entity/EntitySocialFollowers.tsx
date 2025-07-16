@@ -6,6 +6,7 @@ import type { EntityFollowerProfile } from '@/services/entityFollowService';
 import { Button } from '@/components/ui/button';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import { EntityFollowerModal } from './EntityFollowerModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EntitySocialFollowersProps {
   entityId: string;
@@ -47,8 +48,14 @@ const FollowerAvatar: React.FC<{ follower: EntityFollowerProfile; index: number 
 
 const formatFollowerMessage = (
   followers: EntityFollowerProfile[], 
-  totalCount: number
+  totalCount: number,
+  isCurrentUserFollowing: boolean
 ): { text: string; remainingCount: number } => {
+  // Handle case where only current user is following
+  if (followers.length === 0 && isCurrentUserFollowing) {
+    return { text: "You're following this", remainingCount: 0 };
+  }
+
   if (followers.length === 0) {
     return { text: '', remainingCount: 0 };
   }
@@ -95,12 +102,31 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
   entityId,
   className = ''
 }) => {
+  const { user } = useAuth();
   const { followerNames, totalFollowersCount, isLoading, error, retry } = useEntityFollowerNames(entityId, 3);
   const [showModal, setShowModal] = useState(false);
 
+  // Filter out current user from followerNames (backup, since DB should already exclude)
+  const filteredFollowerNames = useMemo(() => {
+    if (!user?.id) return followerNames;
+    return followerNames.filter(follower => follower.id !== user.id);
+  }, [followerNames, user?.id]);
+
+  // Check if current user is following by comparing original total vs filtered names
+  const isCurrentUserFollowing = useMemo(() => {
+    if (!user?.id) return false;
+    // If we have fewer filtered names than total, current user is likely following
+    return totalFollowersCount > filteredFollowerNames.length;
+  }, [totalFollowersCount, filteredFollowerNames.length, user?.id]);
+
+  // Adjust total count to exclude current user
+  const adjustedTotalCount = useMemo(() => {
+    return isCurrentUserFollowing ? totalFollowersCount - 1 : totalFollowersCount;
+  }, [totalFollowersCount, isCurrentUserFollowing]);
+
   const messageSuffix = useMemo(() => 
-    formatFollowerMessage(followerNames, totalFollowersCount).text,
-    [followerNames, totalFollowersCount]
+    formatFollowerMessage(filteredFollowerNames, adjustedTotalCount, isCurrentUserFollowing).text,
+    [filteredFollowerNames, adjustedTotalCount, isCurrentUserFollowing]
   );
 
   const handleFollowerCountClick = () => {
@@ -135,8 +161,8 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
     );
   }
 
-  // No followers state
-  if (followerNames.length === 0) {
+  // No followers state (including when only current user is following)
+  if (filteredFollowerNames.length === 0 && !isCurrentUserFollowing) {
     return (
       <div className={`text-sm text-muted-foreground animate-fade-in ${className}`}>
         Be the first from your circle to follow this!
@@ -149,7 +175,7 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
       <div className={`flex items-center gap-2 text-sm text-muted-foreground animate-fade-in ${className}`}>
         {/* Avatar row */}
         <div className="flex items-center">
-          {followerNames.map((follower, index) => (
+          {filteredFollowerNames.map((follower, index) => (
             <FollowerAvatar key={follower.id} follower={follower} index={index} />
           ))}
         </div>
@@ -157,7 +183,7 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
         {/* Text message */}
         <span 
           className="animate-fade-in cursor-pointer hover:text-primary hover:underline transition-all duration-200 leading-tight" 
-          style={{ animationDelay: `${followerNames.length * 100}ms` }}
+          style={{ animationDelay: `${filteredFollowerNames.length * 100}ms` }}
           onClick={handleFollowerCountClick}
         >
           {messageSuffix}
