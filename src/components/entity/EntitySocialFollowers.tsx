@@ -129,38 +129,31 @@ export const EntitySocialFollowers: React.FC<EntitySocialFollowersProps> = React
 
   return (
     <>
-      <div className={`space-y-2 ${className}`}>
-        {/* Followers Header */}
-        <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-foreground">Followers</h3>
+      <div className={`flex items-center gap-2 text-sm ${className}`}>
+        <span className="text-muted-foreground">Followers</span>
+        <button
+          onClick={handleFollowerCountClick}
+          className="font-medium text-primary hover:text-primary/80 hover:underline transition-colors"
+        >
+          {totalFollowersCount.toLocaleString()}
+        </button>
+        {followerNames.slice(0, 2).map((follower, index) => (
+          <React.Fragment key={follower.id}>
+            <FollowerName follower={follower} index={index} />
+            {index < Math.min(followerNames.length, 2) - 1 && <span className="text-muted-foreground">,</span>}
+          </React.Fragment>
+        ))}
+        {totalFollowersCount > 2 && (
           <button
             onClick={handleFollowerCountClick}
-            className="text-sm font-medium text-primary hover:text-primary/80 hover:underline transition-colors"
+            className="text-primary hover:text-primary/80 hover:underline transition-colors font-medium"
           >
-            {totalFollowersCount.toLocaleString()}
+            and {totalFollowersCount - 2} more
           </button>
-        </div>
-        
-        {/* Follower Names */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          {followerNames.slice(0, 2).map((follower, index) => (
-            <React.Fragment key={follower.id}>
-              {index > 0 && <span className="text-muted-foreground">,</span>}
-              <FollowerName follower={follower} index={index} />
-            </React.Fragment>
-          ))}
-          {totalFollowersCount > 2 && (
-            <button
-              onClick={handleFollowerCountClick}
-              className="text-primary hover:text-primary/80 hover:underline transition-colors font-medium"
-            >
-              and {totalFollowersCount - 2} more
-            </button>
-          )}
-          {totalFollowersCount > 0 && (
-            <span className="text-muted-foreground">follow this</span>
-          )}
-        </div>
+        )}
+        {totalFollowersCount > 0 && (
+          <span className="text-muted-foreground">follow this</span>
+        )}
       </div>
 
       <EntityFollowerModal
