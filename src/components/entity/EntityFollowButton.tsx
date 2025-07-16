@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Heart } from 'lucide-react';
+import { UserPlus, UserMinus, UserCheck } from 'lucide-react';
 import { useEntityFollow } from '@/hooks/use-entity-follow';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EntityFollowButtonProps {
   entityId: string;
@@ -18,6 +19,8 @@ export const EntityFollowButton: React.FC<EntityFollowButtonProps> = ({
   variant = 'outline',
   size = 'default'
 }) => {
+  const isMobile = useIsMobile();
+  const [isHovering, setIsHovering] = useState(false);
   const { isFollowing, isLoading, toggleFollow, canFollow } = useEntityFollow(entityId);
   const { toast } = useToast();
 
@@ -49,23 +52,32 @@ export const EntityFollowButton: React.FC<EntityFollowButtonProps> = ({
   };
 
   return (
-    <Button
-      onClick={handleFollow}
-      variant={isFollowing ? 'default' : variant}
-      size={size}
-      disabled={isLoading}
-      className={`gap-2 ${
+    <Button 
+      size={isMobile ? "sm" : "default"} 
+      className={
         isFollowing 
-          ? 'bg-red-500 hover:bg-red-600 text-white' 
-          : ''
-      }`}
+          ? `${isHovering ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'} transition-colors duration-200` 
+          : "bg-brand-orange hover:bg-brand-orange/90 transition-all transform hover:scale-105"
+      }
+      onClick={handleFollow}
+      disabled={isLoading}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
-      <Heart 
-        className={`h-4 w-4 ${
-          isFollowing ? 'fill-current' : ''
-        }`} 
-      />
-      {isFollowing ? 'Following' : 'Follow'}
+      {isFollowing ? (
+        <>
+          {isHovering ? (
+            <UserMinus size={16} className="mr-1" />
+          ) : (
+            <UserCheck size={16} className="mr-1" />
+          )}
+          {isHovering ? 'Unfollow' : 'Following'}
+        </>
+      ) : (
+        <>
+          <UserPlus size={16} className="mr-1" /> Follow
+        </>
+      )}
     </Button>
   );
 };
