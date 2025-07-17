@@ -10,6 +10,8 @@ import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
 import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEntitySave } from '@/hooks/use-entity-save';
+import { useEntityShare } from '@/hooks/use-entity-share';
 import { Star, MapPin, Navigation, Globe, Phone, Mail, Share, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,20 @@ const EntityV4 = () => {
     circleContributors,
     isLoading: isCircleRatingLoading
   } = useCircleRating(entity?.id || '');
+
+  // Entity save functionality
+  const {
+    isSaved,
+    saveCount,
+    toggleSave,
+    isLoading: isSaveLoading
+  } = useEntitySave({
+    entityId: entity?.id || '',
+    enabled: !!entity?.id
+  });
+
+  // Entity share functionality
+  const { shareEntity } = useEntityShare();
 
   // Timeline data
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
@@ -156,6 +172,18 @@ const EntityV4 = () => {
   const handleTimelineViewerClose = () => {
     setIsTimelineViewerOpen(false);
     setTimelineReviewId(null);
+  };
+
+  const handleShare = async () => {
+    if (!entity) return;
+
+    const entityUrl = `${window.location.origin}/entity/${entity.slug || entity.id}?v=4`;
+    
+    await shareEntity({
+      name: entity.name,
+      description: entity.description || undefined,
+      url: entityUrl
+    });
   };
 
   const sidebarButtonConfig = getSidebarButtonConfig();
@@ -329,13 +357,24 @@ const EntityV4 = () => {
                             </div>
                             {/* Top-right action buttons */}
                             <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm" className="text-foreground hover:text-primary gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-foreground hover:text-primary gap-2"
+                                onClick={handleShare}
+                              >
                                 <Share className="w-4 h-4" />
                                 Share
                               </Button>
-                              <Button variant="ghost" size="sm" className="text-foreground hover:text-primary gap-2">
-                                <Heart className="w-4 h-4" />
-                                Save
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className={`gap-2 ${isSaved ? 'text-red-600 hover:text-red-700' : 'text-foreground hover:text-primary'}`}
+                                onClick={toggleSave}
+                                disabled={isSaveLoading}
+                              >
+                                <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+                                {isSaved ? 'Saved' : 'Save'}
                               </Button>
                             </div>
                           </div>

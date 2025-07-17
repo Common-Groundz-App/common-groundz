@@ -632,6 +632,35 @@ export type Database = {
           },
         ]
       }
+      entity_saves: {
+        Row: {
+          created_at: string
+          entity_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_saves_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entity_views: {
         Row: {
           created_at: string | null
@@ -1997,6 +2026,10 @@ export type Database = {
         Args: { required_permission?: string }
         Returns: boolean
       }
+      check_entity_save: {
+        Args: { p_entity_id: string; p_user_id: string }
+        Returns: boolean
+      }
       check_post_like: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: boolean
@@ -2126,6 +2159,10 @@ export type Database = {
           is_mutual: boolean
           followed_at: string
         }[]
+      }
+      get_entity_saves_count: {
+        Args: { p_entity_id: string }
+        Returns: number
       }
       get_follower_count_by_user_id: {
         Args: { user_id: string }
@@ -2264,6 +2301,10 @@ export type Database = {
       mark_notifications_as_read: {
         Args: { notification_ids: string[] }
         Returns: string[]
+      }
+      toggle_entity_save: {
+        Args: { p_entity_id: string; p_user_id: string }
+        Returns: boolean
       }
       toggle_post_like: {
         Args: { p_post_id: string; p_user_id: string }
