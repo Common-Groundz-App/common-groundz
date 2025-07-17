@@ -12,7 +12,7 @@ import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
-import { Star, MapPin, Navigation, Globe, Phone, Mail, Share, Heart, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare } from "lucide-react";
+import { Star, MapPin, Navigation, Globe, Phone, Mail, Share, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -369,11 +369,11 @@ const EntityV4 = () => {
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
-                                className={`gap-2 ${isSaved ? 'text-red-600 hover:text-red-700' : 'text-foreground hover:text-primary'}`}
+                                className={`gap-2 ${isSaved ? 'text-brand-orange hover:text-brand-orange/80' : 'text-foreground hover:text-primary'}`}
                                 onClick={toggleSave}
                                 disabled={isSaveLoading}
                               >
-                                <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+                                <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
                                 {isSaved ? 'Saved' : 'Save'}
                               </Button>
                             </div>
