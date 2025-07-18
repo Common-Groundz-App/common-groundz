@@ -1,219 +1,236 @@
 
-import React, { useEffect, useState } from 'react';
-import { Star, Info, Globe, Edit3, ThumbsUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { getEntityStats } from '@/services/entityService';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import React from 'react';
+import { Entity } from '@/services/recommendation/types';
+import { ConnectedRingsRating } from "@/components/ui/connected-rings";
+import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Share, Bookmark, Globe, Navigation, CheckCircle, AlertTriangle, Users, ThumbsUp } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface EntityV3HeaderProps {
-  slug?: string;
+  entity: Entity;
+  stats: {
+    recommendationCount: number;
+    reviewCount: number;
+    averageRating: number | null;
+    circleRecommendationCount: number;
+  };
+  circleRating: number | null;
+  circleRatingCount: number;
+  user: any;
+  isSaved: boolean;
+  isSaveLoading: boolean;
+  onShare: () => void;
+  onToggleSave: () => void;
 }
 
-export const EntityV3Header = ({ slug }: EntityV3HeaderProps) => {
-  const [userId, setUserId] = useState<string | null>(null);
-
-  // Get current user
-  useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUserId(session?.user?.id || null);
-    };
-    getCurrentUser();
-  }, []);
-
-  // Mock data - will be replaced with real entity data later
-  const mockEntity = {
-    id: 'mock-entity-id', // This would come from real entity data
-    name: 'Good Ranchers',
-    image_url: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=120&h=120&fit=crop&crop=center',
-    is_verified: true,
-    website_url: 'https://goodranchers.com',
-    rating: 4.3,
-    reviewCount: 2847,
-    category: 'Food & Beverage'
-  };
-
-  // Fetch entity stats including recommendation counts
-  const { data: entityStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['entityStats', mockEntity.id, userId],
-    queryFn: () => getEntityStats(mockEntity.id, userId),
-    enabled: !!mockEntity.id
-  });
-
-  const mockRatingBreakdown = [
-    { stars: 5, count: 1245, percentage: 44 },
-    { stars: 4, count: 854, percentage: 30 },
-    { stars: 3, count: 427, percentage: 15 },
-    { stars: 2, count: 171, percentage: 6 },
-    { stars: 1, count: 150, percentage: 5 }
-  ];
-
-  const renderStars = (rating: number) => {
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-    
-    return (
-      <div className="flex items-center gap-1">
-        {[...Array(5)].map((_, index) => (
-          <Star
-            key={index}
-            className={`w-5 h-5 ${
-              index < fullStars
-                ? 'fill-yellow-400 text-yellow-400'
-                : index === fullStars && hasHalfStar
-                ? 'fill-yellow-400/50 text-yellow-400'
-                : 'fill-gray-200 text-gray-200'
-            }`}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  const renderRecommendationCount = () => {
-    if (statsLoading || !entityStats) {
-      return (
-        <div className="flex items-center gap-1 text-muted-foreground">
-          <ThumbsUp className="w-4 h-4" />
-          <span>Loading...</span>
-        </div>
-      );
-    }
-
-    const { recommendationCount, circleRecommendationCount } = entityStats;
-    
-    if (recommendationCount === 0) {
-      return (
-        <div className="flex items-center gap-1 text-muted-foreground">
-          <ThumbsUp className="w-4 h-4" />
-          <span>No recommendations yet</span>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex items-center gap-1 text-muted-foreground">
-        <ThumbsUp className="w-4 h-4 fill-green-500 text-green-500" />
-        <span>
-          {recommendationCount} Recommending
-          {userId && circleRecommendationCount > 0 && (
-            <span className="font-medium text-foreground">
-              {' '}({circleRecommendationCount} from circle)
-            </span>
-          )}
-        </span>
-      </div>
-    );
-  };
-
+export const EntityV3Header: React.FC<EntityV3HeaderProps> = ({
+  entity,
+  stats,
+  circleRating,
+  circleRatingCount,
+  user,
+  isSaved,
+  isSaveLoading,
+  onShare,
+  onToggleSave
+}) => {
+  const entityImage = entity?.image_url || '/placeholder-entity.png';
+  
   return (
-    <div className="bg-card border-b">
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Section - Brand Info */}
-          <div className="lg:col-span-2">
-            <div className="flex flex-col lg:flex-row gap-6">
-              {/* Brand Image & Info */}
-              <div className="flex gap-4">
-                <div className="flex-shrink-0">
-                  <img
-                    src={mockEntity.image_url}
-                    alt={mockEntity.name}
-                    className="w-20 h-20 lg:w-24 lg:h-24 rounded-lg object-cover border"
-                  />
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge 
-                      variant={mockEntity.is_verified ? "default" : "secondary"}
-                      className="text-xs"
-                    >
-                      {mockEntity.is_verified ? "Claimed" : "Unclaimed"}
-                    </Badge>
+    <TooltipProvider delayDuration={0}>
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left: Brand Info */}
+            <div className="lg:col-span-2">
+              <div className="flex gap-6">
+                <img 
+                  src={entityImage} 
+                  alt={entity.name} 
+                  className="w-24 h-24 rounded-lg object-cover" 
+                />
+                <div className="flex-1 relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <h1 className="text-3xl font-bold text-gray-900">{entity.name}</h1>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          {entity.is_claimed ? (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Claimed
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Unclaimed
+                            </Badge>
+                          )}
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs">
+                          <p className="text-sm">
+                            {entity.is_claimed 
+                              ? "This listing is actively managed by the owner." 
+                              : "This listing hasn't been claimed yet. Claim it for free to update info, add photos, respond to reviews, and more."
+                            }
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    {/* Top-right action buttons */}
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-foreground hover:text-primary gap-2"
+                        onClick={onShare}
+                      >
+                        <Share className="w-4 h-4" />
+                        Share
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className={`gap-2 ${isSaved ? 'text-brand-orange hover:text-brand-orange/80' : 'text-foreground hover:text-primary'}`}
+                        onClick={onToggleSave}
+                        disabled={isSaveLoading}
+                      >
+                        <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+                        {isSaved ? 'Saved' : 'Save'}
+                      </Button>
+                    </div>
                   </div>
                   
-                  <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
-                    {mockEntity.name}
-                  </h1>
+                  <p className="text-gray-600 mb-4 leading-relaxed">{entity.description}</p>
                   
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      {renderStars(mockEntity.rating)}
-                      <span className="font-semibold text-lg">{mockEntity.rating}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <span>{mockEntity.reviewCount.toLocaleString()} reviews</span>
-                      <Info className="w-4 h-4" />
+                  {/* Ratings and Stats */}
+                  <div className="flex items-center gap-6 mb-4">
+                    {/* Overall Rating */}
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      <div className="flex items-center gap-2">
+                        <ConnectedRingsRating
+                          value={stats.averageRating || 0}
+                          variant="badge"
+                          showValue={false}
+                          size="md"
+                          minimal={true}
+                        />
+                        <span 
+                          className="text-lg font-bold" 
+                          style={{ color: getSentimentColor(stats.averageRating || 0, stats.reviewCount > 0) }}
+                        >
+                          {stats.reviewCount > 0 ? (stats.averageRating || 0).toFixed(1) : "0"}
+                        </span>
+                      </div>
+                      
+                      <div className="leading-tight min-w-[140px]">
+                        <div className="font-semibold text-sm whitespace-nowrap text-gray-900 flex items-center gap-1">
+                          Overall Rating
+                          <InfoTooltip content="Overall Rating is the average review rating from all users who reviewed this item on Common Groundz." />
+                        </div>
+                        <div 
+                          className="text-sm font-bold" 
+                          style={{ color: getSentimentColor(stats.averageRating || 0, stats.reviewCount > 0) }}
+                        >
+                          {getSentimentLabel(stats.averageRating || 0, stats.reviewCount > 0)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          ({stats.reviewCount.toLocaleString()} {stats.reviewCount === 1 ? 'review' : 'reviews'})
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Recommendation Count Display */}
-                    {renderRecommendationCount()}
+                    {/* Circle Rating (only if user is logged in) */}
+                    {user && (
+                      <div className="flex items-center gap-4 flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <ConnectedRingsRating
+                            value={circleRating || 0}
+                            variant="badge"
+                            showValue={false}
+                            size="md"
+                            minimal={true}
+                          />
+                          <span 
+                            className="text-lg font-bold" 
+                            style={{ color: getSentimentColor(circleRating || 0, circleRatingCount > 0) }}
+                          >
+                            {circleRatingCount > 0 ? (circleRating || 0).toFixed(1) : "0"}
+                          </span>
+                        </div>
+
+                        <div className="leading-tight min-w-[140px]">
+                          <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
+                            Circle Rating
+                            <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
+                          </div>
+                          <div 
+                            className="text-sm font-bold" 
+                            style={{ color: getSentimentColor(circleRating || 0, circleRatingCount > 0) }}
+                          >
+                            {getSentimentLabel(circleRating || 0, circleRatingCount > 0)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recommendation Counts */}
+                  <div className="flex items-center gap-6 mb-4">
+                    <div className="flex items-center gap-2 text-green-600">
+                      <ThumbsUp className="w-4 h-4" />
+                      <span className="font-medium">
+                        {stats.recommendationCount > 0 ? (
+                          <>
+                            {stats.recommendationCount} Recommending
+                            {user && stats.circleRecommendationCount > 0 && (
+                              <span className="text-brand-orange ml-1">
+                                ({stats.circleRecommendationCount} from circle)
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          "No recommendations yet"
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Followers Section */}
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      <span>Followers</span>
+                      <span className="font-medium">0</span> {/* Placeholder - will be populated when EntityFollowersCount is available */}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 min-w-0 pr-4">
+                    <Button 
+                      variant="outline"
+                      className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                      onClick={() => entity.website_url && window.open(`https://${entity.website_url.replace(/^https?:\/\//, '')}`, '_blank')}
+                      disabled={!entity.website_url}
+                    >
+                      <Globe className="w-4 h-4 mr-2" />
+                      Visit Website
+                    </Button>
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Navigation className="w-4 h-4 mr-2" />
+                      Get Directions
+                    </Button>
                   </div>
                 </div>
               </div>
             </div>
-            
-            {/* Action Buttons */}
-            <div className="flex gap-3 mt-6">
-              <Button variant="default" className="gap-2">
-                <Edit3 className="w-4 h-4" />
-                Write a review
-              </Button>
-              
-              {mockEntity.website_url && (
-                <Button variant="outline" className="gap-2">
-                  <Globe className="w-4 h-4" />
-                  Visit website
-                </Button>
-              )}
-            </div>
-          </div>
-          
-          {/* Right Section - Review Summary */}
-          <div className="lg:col-span-1">
-            <Card className="h-fit">
-              <CardContent className="p-6">
-                <h3 className="font-semibold text-lg mb-4">Review summary</h3>
-                
-                <div className="space-y-3">
-                  {mockRatingBreakdown.map((item) => (
-                    <div key={item.stars} className="flex items-center gap-3">
-                      <div className="flex items-center gap-1 w-12">
-                        <span className="text-sm">{item.stars}</span>
-                        <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                      </div>
-                      
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-primary rounded-full transition-all duration-300"
-                          style={{ width: `${item.percentage}%` }}
-                        />
-                      </div>
-                      
-                      <span className="text-sm text-muted-foreground w-8 text-right">
-                        {item.percentage}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    Based on {mockEntity.reviewCount.toLocaleString()} reviews
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
-
-export default EntityV3Header;
