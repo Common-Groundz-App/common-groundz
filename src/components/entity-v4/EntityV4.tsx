@@ -81,6 +81,7 @@ const EntityV4 = () => {
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
+  const [isRecommendationModalOpen, setIsRecommendationModalOpen] = useState(false);
 
   // Memoized user review
   const userReview = React.useMemo(() => {
@@ -185,6 +186,12 @@ const EntityV4 = () => {
       description: entity.description || undefined,
       url: entityUrl
     });
+  };
+
+  const handleRecommendationClick = () => {
+    if (stats && stats.recommendationCount > 0) {
+      setIsRecommendationModalOpen(true);
+    }
   };
 
   const sidebarButtonConfig = getSidebarButtonConfig();
@@ -490,27 +497,39 @@ const EntityV4 = () => {
                           )}
                        </div>
 
-                       {/* Recommendation Counts Section */}
+                       {/* Enhanced Recommendation Counts Section */}
                        {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
-                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                           <ThumbsUp className="h-4 w-4" />
-                           <span>
+                         <div 
+                           className="flex items-center gap-2 text-base mb-4 p-2 rounded-lg bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-orange-200"
+                           onClick={handleRecommendationClick}
+                         >
+                           <ThumbsUp className="h-5 w-5 text-brand-orange" />
+                           <div className="flex items-center gap-1">
                              {stats.recommendationCount > 0 && (
                                <>
-                                 {stats.recommendationCount.toLocaleString()} Recommending
+                                 <span className="font-bold text-brand-orange text-lg">
+                                   {stats.recommendationCount.toLocaleString()}
+                                 </span>
+                                 <span className="text-gray-900 font-medium">Recommending</span>
                                  {user && stats.circleRecommendationCount > 0 && (
-                                   <span className="text-brand-orange font-medium">
-                                     {' '}({stats.circleRecommendationCount} from circle)
+                                   <span className="text-brand-orange font-bold">
+                                     ({stats.circleRecommendationCount} from circle)
                                    </span>
                                  )}
                                </>
                              )}
                              {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (
-                               <span className="text-brand-orange font-medium">
-                                 {stats.circleRecommendationCount} from your circle
-                               </span>
+                               <>
+                                 <span className="font-bold text-brand-orange text-lg">
+                                   {stats.circleRecommendationCount}
+                                 </span>
+                                 <span className="text-brand-orange font-medium">from your circle</span>
+                               </>
                              )}
-                           </span>
+                           </div>
+                           <Badge variant="outline" className="ml-auto text-xs text-muted-foreground border-orange-200">
+                             Click to see who
+                           </Badge>
                          </div>
                        )}
 
@@ -963,6 +982,35 @@ const EntityV4 = () => {
           onClose={handleTimelineViewerClose}
           onTimelineUpdate={handleTimelineUpdate}
         />
+      )}
+
+      {/* Recommendation Modal Placeholder */}
+      {isRecommendationModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Who Recommends This</h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setIsRecommendationModalOpen(false)}
+              >
+                ×
+              </Button>
+            </div>
+            <p className="text-muted-foreground mb-4">
+              {stats?.recommendationCount || 0} people recommend this entity
+              {user && stats?.circleRecommendationCount && (
+                <span className="block text-brand-orange font-medium">
+                  {stats.circleRecommendationCount} from your circle
+                </span>
+              )}
+            </p>
+            <div className="text-center py-8 text-muted-foreground">
+              Recommendation details coming soon...
+            </div>
+          </div>
+        </div>
       )}
     </div>
   </TooltipProvider>;
