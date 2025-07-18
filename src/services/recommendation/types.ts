@@ -16,6 +16,7 @@ export interface Entity {
   photo_reference?: string;
   created_at?: string;
   updated_at?: string;
+  is_claimed?: boolean;
   
   // Enhanced metadata fields
   authors?: string[];
