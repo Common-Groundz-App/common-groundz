@@ -397,14 +397,15 @@ export const calculateEntityRating = async (entityId: string): Promise<number | 
 };
 
 /**
- * Get entity stats
+ * Get entity stats including timeline-aware recommendation counts
  */
-export const getEntityStats = async (entityId: string): Promise<{
+export const getEntityStats = async (entityId: string, userId: string | null = null): Promise<{
   recommendationCount: number;
   reviewCount: number;
   averageRating: number | null;
+  circleRecommendationCount: number;
 }> => {
-  // Count recommendations
+  // Count recommendations (from old recommendations table)
   const { count: recommendationCount, error: recError } = await supabase
     .from('recommendations')
     .select('*', { count: 'exact', head: true })
@@ -426,12 +427,36 @@ export const getEntityStats = async (entityId: string): Promise<{
     console.error('Error counting reviews:', revError);
   }
 
+  // Get timeline-aware recommendation count using database function
+  let timelineRecommendationCount = 0;
+  const { data: recCountData, error: recCountError } = await supabase
+    .rpc('get_recommendation_count', { p_entity_id: entityId });
+  
+  if (!recCountError && recCountData !== null) {
+    timelineRecommendationCount = recCountData;
+  }
+
+  // Get circle recommendation count if user is logged in
+  let circleRecommendationCount = 0;
+  if (userId) {
+    const { data: circleCountData, error: circleCountError } = await supabase
+      .rpc('get_circle_recommendation_count', { 
+        p_entity_id: entityId, 
+        p_user_id: userId 
+      });
+    
+    if (!circleCountError && circleCountData !== null) {
+      circleRecommendationCount = circleCountData;
+    }
+  }
+
   // Get average rating
   const averageRating = await calculateEntityRating(entityId);
 
   return {
-    recommendationCount: recommendationCount || 0,
+    recommendationCount: (recommendationCount || 0) + timelineRecommendationCount,
     reviewCount: reviewCount || 0,
-    averageRating
+    averageRating,
+    circleRecommendationCount
   };
 };

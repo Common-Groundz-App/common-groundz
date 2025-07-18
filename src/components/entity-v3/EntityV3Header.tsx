@@ -1,16 +1,32 @@
-import React from 'react';
-import { Star, Info, Globe, Edit3 } from 'lucide-react';
+
+import React, { useEffect, useState } from 'react';
+import { Star, Info, Globe, Edit3, ThumbsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { getEntityStats } from '@/services/entityService';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EntityV3HeaderProps {
   slug?: string;
 }
 
 export const EntityV3Header = ({ slug }: EntityV3HeaderProps) => {
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Get current user
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUserId(session?.user?.id || null);
+    };
+    getCurrentUser();
+  }, []);
+
   // Mock data - will be replaced with real entity data later
   const mockEntity = {
+    id: 'mock-entity-id', // This would come from real entity data
     name: 'Good Ranchers',
     image_url: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=120&h=120&fit=crop&crop=center',
     is_verified: true,
@@ -19,6 +35,13 @@ export const EntityV3Header = ({ slug }: EntityV3HeaderProps) => {
     reviewCount: 2847,
     category: 'Food & Beverage'
   };
+
+  // Fetch entity stats including recommendation counts
+  const { data: entityStats, isLoading: statsLoading } = useQuery({
+    queryKey: ['entityStats', mockEntity.id, userId],
+    queryFn: () => getEntityStats(mockEntity.id, userId),
+    enabled: !!mockEntity.id
+  });
 
   const mockRatingBreakdown = [
     { stars: 5, count: 1245, percentage: 44 },
@@ -46,6 +69,42 @@ export const EntityV3Header = ({ slug }: EntityV3HeaderProps) => {
             }`}
           />
         ))}
+      </div>
+    );
+  };
+
+  const renderRecommendationCount = () => {
+    if (statsLoading || !entityStats) {
+      return (
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <ThumbsUp className="w-4 h-4" />
+          <span>Loading...</span>
+        </div>
+      );
+    }
+
+    const { recommendationCount, circleRecommendationCount } = entityStats;
+    
+    if (recommendationCount === 0) {
+      return (
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <ThumbsUp className="w-4 h-4" />
+          <span>No recommendations yet</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-1 text-muted-foreground">
+        <ThumbsUp className="w-4 h-4 fill-green-500 text-green-500" />
+        <span>
+          {recommendationCount} Recommending
+          {userId && circleRecommendationCount > 0 && (
+            <span className="font-medium text-foreground">
+              {' '}({circleRecommendationCount} from circle)
+            </span>
+          )}
+        </span>
       </div>
     );
   };
@@ -91,6 +150,9 @@ export const EntityV3Header = ({ slug }: EntityV3HeaderProps) => {
                       <span>{mockEntity.reviewCount.toLocaleString()} reviews</span>
                       <Info className="w-4 h-4" />
                     </div>
+
+                    {/* Recommendation Count Display */}
+                    {renderRecommendationCount()}
                   </div>
                 </div>
               </div>
