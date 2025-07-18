@@ -31,6 +31,7 @@ import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityFollowersCount } from '@/components/entity/EntityFollowersCount';
 import { EntitySocialFollowers } from '@/components/entity/EntitySocialFollowers';
 import { EntityType } from '@/services/recommendation/types';
+import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -81,6 +82,7 @@ const EntityV4 = () => {
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
+  const [isRecommendationModalOpen, setIsRecommendationModalOpen] = useState(false);
 
   // Memoized user review
   const userReview = React.useMemo(() => {
@@ -185,6 +187,10 @@ const EntityV4 = () => {
       description: entity.description || undefined,
       url: entityUrl
     });
+  };
+
+  const handleRecommendationCountClick = () => {
+    setIsRecommendationModalOpen(true);
   };
 
   const sidebarButtonConfig = getSidebarButtonConfig();
@@ -504,19 +510,28 @@ const EntityV4 = () => {
                            {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
                              <div className="flex items-center gap-2">
                                <ThumbsUp className="h-4 w-4" />
-                               <span>
+                               <span 
+                                 className="cursor-pointer hover:text-brand-orange transition-colors hover:underline"
+                                 onClick={handleRecommendationCountClick}
+                               >
                                  {stats.recommendationCount > 0 && (
                                    <>
                                      {stats.recommendationCount.toLocaleString()} Recommending
                                      {user && stats.circleRecommendationCount > 0 && (
-                                       <span className="text-brand-orange font-medium">
+                                       <span 
+                                         className="text-brand-orange font-medium cursor-pointer hover:underline"
+                                         onClick={handleRecommendationCountClick}
+                                       >
                                          {' '}({stats.circleRecommendationCount} from circle)
                                        </span>
                                      )}
                                    </>
                                  )}
                                  {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (
-                                   <span className="text-brand-orange font-medium">
+                                   <span 
+                                     className="text-brand-orange font-medium cursor-pointer hover:underline"
+                                     onClick={handleRecommendationCountClick}
+                                   >
                                      {stats.circleRecommendationCount} from your circle
                                    </span>
                                  )}
@@ -967,7 +982,20 @@ const EntityV4 = () => {
           onTimelineUpdate={handleTimelineUpdate}
         />
       )}
+
+      {/* Entity Recommendation Modal */}
+      {entity && stats && (
+        <EntityRecommendationModal
+          open={isRecommendationModalOpen}
+          onOpenChange={setIsRecommendationModalOpen}
+          entityId={entity.id}
+          entityName={entity.name}
+          totalRecommendationCount={stats.recommendationCount}
+          circleRecommendationCount={stats.circleRecommendationCount}
+        />
+      )}
     </div>
   </TooltipProvider>;
 };
+
 export default EntityV4;
