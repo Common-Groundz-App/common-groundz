@@ -490,36 +490,39 @@ const EntityV4 = () => {
                           )}
                        </div>
 
-                       {/* Followers Section */}
+                       {/* Followers and Recommendations Section - Combined */}
                        {entity && (
-                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                           <Users className="h-4 w-4" />
-                           <span>Followers</span>
-                           <EntityFollowersCount entityId={entity.id} />
-                         </div>
-                       )}
-
-                       {/* Recommendation Counts Section - MOVED HERE */}
-                       {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
-                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                           <ThumbsUp className="h-4 w-4" />
-                           <span>
-                             {stats.recommendationCount > 0 && (
-                               <>
-                                 {stats.recommendationCount.toLocaleString()} Recommending
-                                 {user && stats.circleRecommendationCount > 0 && (
+                         <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4">
+                           {/* Followers */}
+                           <div className="flex items-center gap-2">
+                             <Users className="h-4 w-4" />
+                             <span>Followers</span>
+                             <EntityFollowersCount entityId={entity.id} />
+                           </div>
+                           
+                           {/* Recommendations - only show if there are any */}
+                           {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
+                             <div className="flex items-center gap-2">
+                               <ThumbsUp className="h-4 w-4" />
+                               <span>
+                                 {stats.recommendationCount > 0 && (
+                                   <>
+                                     {stats.recommendationCount.toLocaleString()} Recommending
+                                     {user && stats.circleRecommendationCount > 0 && (
+                                       <span className="text-brand-orange font-medium">
+                                         {' '}({stats.circleRecommendationCount} from circle)
+                                       </span>
+                                     )}
+                                   </>
+                                 )}
+                                 {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (
                                    <span className="text-brand-orange font-medium">
-                                     {' '}({stats.circleRecommendationCount} from circle)
+                                     {stats.circleRecommendationCount} from your circle
                                    </span>
                                  )}
-                               </>
-                             )}
-                             {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (
-                               <span className="text-brand-orange font-medium">
-                                 {stats.circleRecommendationCount} from your circle
                                </span>
-                             )}
-                           </span>
+                             </div>
+                           )}
                          </div>
                        )}
 
