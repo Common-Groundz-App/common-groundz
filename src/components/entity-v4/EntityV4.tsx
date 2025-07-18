@@ -12,7 +12,7 @@ import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
-import { Star, MapPin, Navigation, Globe, Phone, Mail, Share, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare } from "lucide-react";
+import { Star, MapPin, Navigation, Globe, Phone, Mail, Share, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare, ThumbsUp } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -488,6 +488,30 @@ const EntityV4 = () => {
                             )
                           )}
                        </div>
+
+                       {/* Recommendation Counts Section */}
+                       {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
+                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                           <ThumbsUp className="h-4 w-4" />
+                           <span>
+                             {stats.recommendationCount > 0 && (
+                               <>
+                                 {stats.recommendationCount.toLocaleString()} Recommending
+                                 {user && stats.circleRecommendationCount > 0 && (
+                                   <span className="text-brand-orange font-medium">
+                                     {' '}({stats.circleRecommendationCount} from circle)
+                                   </span>
+                                 )}
+                               </>
+                             )}
+                             {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (
+                               <span className="text-brand-orange font-medium">
+                                 {stats.circleRecommendationCount} from your circle
+                               </span>
+                             )}
+                           </span>
+                         </div>
+                       )}
 
                        {/* Followers Section */}
                        {entity && (
