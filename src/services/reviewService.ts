@@ -27,6 +27,8 @@ export interface Review {
   timeline_count?: number;
   has_timeline?: boolean;
   is_verified?: boolean;
+  // Enhanced timeline-aware fields
+  latest_rating?: number;
   // AI summary fields for individual reviews
   ai_summary?: string;
   ai_summary_last_generated_at?: string;
@@ -47,8 +49,6 @@ export interface Review {
     image_url?: string;
   };
   comment_count?: number;
-  // Rating evolution field for timeline reviews
-  latest_rating?: number;
 }
 
 export interface ReviewUpdate {
@@ -105,7 +105,7 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
   try {
     console.log('📊 fetchReviewWithSummary called for reviewId:', reviewId);
     
-    // First get the review data with explicit AI summary fields
+    // First get the review data with explicit AI summary fields and latest_rating
     const { data: reviewData, error: reviewError } = await supabase
       .from('reviews')
       .select(`
@@ -114,7 +114,8 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
         ai_summary_last_generated_at,
         ai_summary_model_used,
         timeline_count,
-        has_timeline
+        has_timeline,
+        latest_rating
       `)
       .eq('id', reviewId)
       .maybeSingle();
@@ -129,23 +130,6 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
       return null;
     }
 
-    // Get the latest rating from timeline updates if review has timeline
-    let latestRating = undefined;
-    if (reviewData.has_timeline && reviewData.timeline_count && reviewData.timeline_count > 0) {
-      const { data: latestUpdate } = await supabase
-        .from('review_updates')
-        .select('rating')
-        .eq('review_id', reviewId)
-        .not('rating', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (latestUpdate?.rating) {
-        latestRating = latestUpdate.rating;
-      }
-    }
-
     // Attach profile using enhanced unified service
     const reviewsWithProfiles = await attachProfilesToEntities([reviewData]);
     const reviewWithProfile = reviewsWithProfiles[0];
@@ -153,7 +137,6 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
     // Combine the data
     const combinedData = {
       ...reviewWithProfile,
-      latest_rating: latestRating,
       user: {
         username: reviewWithProfile.user.displayName,
         avatar_url: reviewWithProfile.user.avatar_url
@@ -255,10 +238,10 @@ export const updateReviewStatus = async (reviewId: string, status: string): Prom
 // Fetch user reviews with enhanced unified profile service
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
-    // First, get the reviews
+    // First, get the reviews with latest_rating
     const { data: reviews, error: reviewsError } = await supabase
       .from('reviews')
-      .select('*')
+      .select('*, latest_rating')
       .eq('user_id', profileUserId)
       .eq('status', 'published')
       .order('created_at', { ascending: false });
@@ -348,10 +331,10 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
 // Fetch reviews that are marked as recommendations (4+ stars) - Using enhanced unified service
 export const fetchUserRecommendations = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
-    // First, get the reviews
+    // First, get the reviews with latest_rating
     const { data: reviews, error: reviewsError } = await supabase
       .from('reviews')
-      .select('*')
+      .select('*, latest_rating')
       .eq('user_id', profileUserId)
       .eq('status', 'published')
       .eq('is_recommended', true)

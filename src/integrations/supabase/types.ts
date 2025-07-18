@@ -1653,6 +1653,7 @@ export type Database = {
           is_converted: boolean
           is_recommended: boolean | null
           is_verified: boolean | null
+          latest_rating: number | null
           media: Json | null
           metadata: Json | null
           rating: number
@@ -1682,6 +1683,7 @@ export type Database = {
           is_converted?: boolean
           is_recommended?: boolean | null
           is_verified?: boolean | null
+          latest_rating?: number | null
           media?: Json | null
           metadata?: Json | null
           rating: number
@@ -1711,6 +1713,7 @@ export type Database = {
           is_converted?: boolean
           is_recommended?: boolean | null
           is_verified?: boolean | null
+          latest_rating?: number | null
           media?: Json | null
           metadata?: Json | null
           rating?: number

@@ -5,7 +5,7 @@ import { getSentimentColor } from '@/utils/ratingColorUtils';
 
 interface RatingEvolutionDisplayProps {
   initialRating: number;
-  latestRating: number;
+  latestRating?: number;
   size?: 'badge' | 'sm' | 'md' | 'lg';
   variant?: 'default' | 'badge';
 }
@@ -16,6 +16,30 @@ export const RatingEvolutionDisplay = ({
   size = 'badge', 
   variant = 'badge' 
 }: RatingEvolutionDisplayProps) => {
+  // If no latest rating, just show the initial rating
+  if (!latestRating || latestRating === initialRating) {
+    return (
+      <div className="flex items-center gap-1">
+        <ConnectedRingsRating
+          value={initialRating}
+          size={size}
+          variant={variant}
+          showValue={false}
+          isInteractive={false}
+          showLabel={false}
+          minimal={true}
+        />
+        <span 
+          className="text-sm font-bold"
+          style={{ color: getSentimentColor(initialRating) }}
+        >
+          {initialRating.toFixed(1)}
+        </span>
+      </div>
+    );
+  }
+
+  // Show evolution when there's a different latest rating
   return (
     <div className="flex items-center gap-1 flex-wrap">
       {/* Initial Rating */}
