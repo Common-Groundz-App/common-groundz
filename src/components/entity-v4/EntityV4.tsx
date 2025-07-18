@@ -490,7 +490,16 @@ const EntityV4 = () => {
                           )}
                        </div>
 
-                       {/* Recommendation Counts Section */}
+                       {/* Followers Section */}
+                       {entity && (
+                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                           <Users className="h-4 w-4" />
+                           <span>Followers</span>
+                           <EntityFollowersCount entityId={entity.id} />
+                         </div>
+                       )}
+
+                       {/* Recommendation Counts Section - MOVED HERE */}
                        {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                            <ThumbsUp className="h-4 w-4" />
@@ -511,15 +520,6 @@ const EntityV4 = () => {
                                </span>
                              )}
                            </span>
-                         </div>
-                       )}
-
-                       {/* Followers Section */}
-                       {entity && (
-                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                           <Users className="h-4 w-4" />
-                           <span>Followers</span>
-                           <EntityFollowersCount entityId={entity.id} />
                          </div>
                        )}
 
