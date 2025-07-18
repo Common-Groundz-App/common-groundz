@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityFollowersCount } from '@/components/entity/EntityFollowersCount';
 import { EntitySocialFollowers } from '@/components/entity/EntitySocialFollowers';
+import { EntityType } from '@/services/recommendation/types';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -221,7 +222,7 @@ const EntityV4 = () => {
   }
 
   // Get entity image with fallback
-  const entityImage = entity?.image_url || getEntityTypeFallbackImage(entity?.type || 'product');
+  const entityImage = entity?.image_url || getEntityTypeFallbackImage(entity?.type || EntityType.Product);
   
   // Prepare entity data using real data
   const entityData = {
