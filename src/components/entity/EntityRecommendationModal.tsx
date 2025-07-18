@@ -131,9 +131,6 @@ export const EntityRecommendationModal: React.FC<EntityRecommendationModalProps>
     );
   };
 
-  const followingCount = recommenders.filter(r => r.is_following).length;
-  const mutualCount = recommenders.filter(r => r.is_mutual).length;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md h-[80vh] flex flex-col">
@@ -215,7 +212,7 @@ export const EntityRecommendationModal: React.FC<EntityRecommendationModalProps>
                       username={recommender.username}
                       avatarUrl={recommender.avatar_url}
                       isFollowing={recommender.is_following}
-                      relationshipType="recommender"
+                      relationshipType="follower"
                       onFollowToggle={() => handleFollowToggle(recommender.id, recommender.is_following)}
                       isLoading={actionLoading === recommender.id}
                       isOwnProfile={false}

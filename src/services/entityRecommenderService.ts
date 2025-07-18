@@ -38,7 +38,7 @@ export async function getEntityRecommendersWithContext(
       created_at,
       rating,
       title,
-      profiles!inner(
+      profiles!recommendations_user_id_fkey(
         id,
         username,
         first_name,
@@ -64,42 +64,48 @@ export async function getEntityRecommendersWithContext(
   // Get follow relationships if user is logged in
   let followData: { follower_id: string; following_id: string }[] = [];
   if (currentUserId) {
-    const userIds = recommendations.map(r => r.profiles.id);
+    const userIds = recommendations
+      .map(r => r.profiles?.id)
+      .filter(Boolean) as string[];
     
-    const { data: follows } = await supabase
-      .from('follows')
-      .select('follower_id, following_id')
-      .or(`follower_id.eq.${currentUserId},following_id.eq.${currentUserId}`)
-      .in('follower_id', [currentUserId, ...userIds])
-      .in('following_id', [currentUserId, ...userIds]);
-    
-    followData = follows || [];
+    if (userIds.length > 0) {
+      const { data: follows } = await supabase
+        .from('follows')
+        .select('follower_id, following_id')
+        .or(`follower_id.eq.${currentUserId},following_id.eq.${currentUserId}`)
+        .in('follower_id', [currentUserId, ...userIds])
+        .in('following_id', [currentUserId, ...userIds]);
+      
+      followData = follows || [];
+    }
   }
 
   // Transform and add relationship context
-  const recommenders: EntityRecommenderWithContext[] = recommendations.map(rec => {
-    const profile = rec.profiles;
-    const isFollowing = currentUserId ? followData.some(
-      f => f.follower_id === currentUserId && f.following_id === profile.id
-    ) : false;
-    const isFollowedBy = currentUserId ? followData.some(
-      f => f.follower_id === profile.id && f.following_id === currentUserId
-    ) : false;
-    const isMutual = isFollowing && isFollowedBy;
+  const recommenders: EntityRecommenderWithContext[] = recommendations
+    .filter(rec => rec.profiles) // Filter out any null profiles
+    .map(rec => {
+      const profile = rec.profiles!;
+      const isFollowing = currentUserId ? followData.some(
+        f => f.follower_id === currentUserId && f.following_id === profile.id
+      ) : false;
+      const isFollowedBy = currentUserId ? followData.some(
+        f => f.follower_id === profile.id && f.following_id === currentUserId
+      ) : false;
+      const isMutual = isFollowing && isFollowedBy;
 
-    return {
-      id: profile.id,
-      username: profile.username,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      avatar_url: profile.avatar_url,
-      is_following: isFollowing,
-      is_mutual: isMutual,
-      recommended_at: rec.created_at,
-      rating: rec.rating,
-      title: rec.title
-    };
-  });
+      return {
+        id: profile.id,
+        username: profile.username || '',
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        avatar_url: profile.avatar_url,
+        is_following: isFollowing,
+        is_mutual: isMutual,
+        recommended_at: rec.created_at,
+        rating: rec.rating,
+        title: rec.title
+      };
+    });
 
   // Filter by search query
   let filteredRecommenders = recommenders;
