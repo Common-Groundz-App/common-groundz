@@ -30,6 +30,8 @@ import { useToast } from '@/hooks/use-toast';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityFollowersCount } from '@/components/entity/EntityFollowersCount';
 import { EntitySocialFollowers } from '@/components/entity/EntitySocialFollowers';
+import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
+import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
 import { EntityType } from '@/services/recommendation/types';
 
 const EntityV4 = () => {
@@ -81,6 +83,7 @@ const EntityV4 = () => {
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
+  const [isRecommendationModalOpen, setIsRecommendationModalOpen] = useState(false);
 
   // Memoized user review
   const userReview = React.useMemo(() => {
@@ -500,25 +503,40 @@ const EntityV4 = () => {
                              <EntityFollowersCount entityId={entity.id} />
                            </div>
                            
-                           {/* Recommendations - only show if there are any */}
+                           {/* Recommendations - Make clickable */}
                            {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
                              <div className="flex items-center gap-2">
                                <ThumbsUp className="h-4 w-4" />
                                <span>
                                  {stats.recommendationCount > 0 && (
                                    <>
-                                     {stats.recommendationCount.toLocaleString()} Recommending
+                                     <button
+                                       onClick={() => setIsRecommendationModalOpen(true)}
+                                       className="text-foreground hover:text-brand-orange hover:underline cursor-pointer transition-colors"
+                                     >
+                                       {stats.recommendationCount.toLocaleString()} Recommending
+                                     </button>
                                      {user && stats.circleRecommendationCount > 0 && (
-                                       <span className="text-brand-orange font-medium">
-                                         {' '}({stats.circleRecommendationCount} from circle)
-                                       </span>
+                                       <>
+                                         {' '}(
+                                         <button
+                                           onClick={() => setIsRecommendationModalOpen(true)}
+                                           className="text-brand-orange font-medium hover:underline cursor-pointer transition-colors"
+                                         >
+                                           {stats.circleRecommendationCount} from circle
+                                         </button>
+                                         )
+                                       </>
                                      )}
                                    </>
                                  )}
                                  {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (
-                                   <span className="text-brand-orange font-medium">
+                                   <button
+                                     onClick={() => setIsRecommendationModalOpen(true)}
+                                     className="text-brand-orange font-medium hover:underline cursor-pointer transition-colors"
+                                   >
                                      {stats.circleRecommendationCount} from your circle
-                                   </span>
+                                   </button>
                                  )}
                                </span>
                              </div>
@@ -965,6 +983,18 @@ const EntityV4 = () => {
           initialRating={userReview.rating}
           onClose={handleTimelineViewerClose}
           onTimelineUpdate={handleTimelineUpdate}
+        />
+      )}
+
+      {/* Recommendation Modal */}
+      {isRecommendationModalOpen && entity && (
+        <EntityRecommendationModal
+          open={isRecommendationModalOpen}
+          onOpenChange={setIsRecommendationModalOpen}
+          entityId={entity.id}
+          entityName={entity.name}
+          totalRecommendationCount={stats?.recommendationCount || 0}
+          circleRecommendationCount={stats?.circleRecommendationCount || 0}
         />
       )}
     </div>
