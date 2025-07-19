@@ -513,11 +513,11 @@ const EntityV4 = () => {
                                  {stats.recommendationCount > 0 && (
                                    <>
                                      <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> Recommending
-                                     {user && stats.circleRecommendationCount > 0 && (
-                                       <>
-                                         {' '}(<span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from circle</span>)
-                                       </>
-                                     )}
+                                      {user && stats.circleRecommendationCount > 0 && (
+                                        <>
+                                          {' '}<span className="text-muted-foreground">(</span><span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from circle</span><span className="text-muted-foreground">)</span>
+                                        </>
+                                      )}
                                    </>
                                  )}
                                  {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (

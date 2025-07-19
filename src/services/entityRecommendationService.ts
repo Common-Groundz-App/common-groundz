@@ -11,6 +11,8 @@ export interface EntityRecommenderWithContext {
   is_mutual: boolean;
   recommended_at: string;
   rating: number;
+  latest_rating: number | null;
+  effective_rating: number;
 }
 
 export const getEntityRecommendersWithContext = async (
@@ -28,7 +30,7 @@ export const getEntityRecommendersWithContext = async (
   // Step 1: Get reviews for this entity that are recommendations (is_recommended = true)
   let reviewsQuery = supabase
     .from('reviews')
-    .select('user_id, created_at, rating')
+    .select('user_id, created_at, rating, latest_rating')
     .eq('entity_id', entityId)
     .eq('is_recommended', true)
     .eq('status', 'published')
@@ -93,6 +95,8 @@ export const getEntityRecommendersWithContext = async (
       const profile = profiles.find(p => p.id === review.user_id);
       if (!profile) return null;
 
+      const effective_rating = review.latest_rating || review.rating;
+      
       return {
         id: profile.id,
         username: profile.username,
@@ -102,7 +106,9 @@ export const getEntityRecommendersWithContext = async (
         is_following: followingIds.includes(profile.id),
         is_mutual: followingIds.includes(profile.id) && followersIds.includes(profile.id),
         recommended_at: review.created_at,
-        rating: review.rating
+        rating: review.rating,
+        latest_rating: review.latest_rating,
+        effective_rating
       };
     })
     .filter((item): item is EntityRecommenderWithContext => item !== null)

@@ -230,7 +230,7 @@ export const EntityRecommendationModal: React.FC<EntityRecommendationModalProps>
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground/70">
-                          Rated {recommender.rating} star{recommender.rating !== 1 ? 's' : ''}
+                          Rated {recommender.effective_rating} circle{recommender.effective_rating !== 1 ? 's' : ''}
                         </p>
                       </div>
                     </div>
