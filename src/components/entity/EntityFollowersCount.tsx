@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useEntityFollow } from '@/hooks/use-entity-follow';
 import { EntityFollowerModal } from './EntityFollowerModal';
@@ -10,7 +11,7 @@ export const EntityFollowersCount: React.FC<EntityFollowersCountProps> = ({ enti
   const { followersCount } = useEntityFollow(entityId);
   const [showModal, setShowModal] = useState(false);
 
-  const handleCountClick = () => {
+  const handleClick = () => {
     if (followersCount > 0) {
       setShowModal(true);
     }
@@ -19,11 +20,11 @@ export const EntityFollowersCount: React.FC<EntityFollowersCountProps> = ({ enti
   return (
     <>
       <button
-        onClick={handleCountClick}
-        className="text-primary hover:underline font-medium cursor-pointer"
+        onClick={handleClick}
+        className="text-foreground hover:text-brand-orange hover:underline font-medium cursor-pointer transition-colors disabled:cursor-default disabled:hover:text-muted-foreground disabled:hover:no-underline"
         disabled={followersCount === 0}
       >
-        {followersCount}
+        Followers <span className="text-brand-orange">{followersCount}</span>
       </button>
 
       <EntityFollowerModal

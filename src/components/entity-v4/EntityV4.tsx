@@ -499,46 +499,31 @@ const EntityV4 = () => {
                            {/* Followers */}
                            <div className="flex items-center gap-2">
                              <Users className="h-4 w-4" />
-                             <span>Followers</span>
                              <EntityFollowersCount entityId={entity.id} />
                            </div>
                            
-                           {/* Recommendations - Make clickable */}
+                           {/* Recommendations - Make clickable as one unit */}
                            {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
                              <div className="flex items-center gap-2">
                                <ThumbsUp className="h-4 w-4" />
-                               <span>
+                               <button
+                                 onClick={() => setIsRecommendationModalOpen(true)}
+                                 className="text-foreground hover:text-brand-orange hover:underline font-medium cursor-pointer transition-colors"
+                               >
                                  {stats.recommendationCount > 0 && (
                                    <>
-                                     <button
-                                       onClick={() => setIsRecommendationModalOpen(true)}
-                                       className="text-foreground hover:text-brand-orange hover:underline cursor-pointer transition-colors"
-                                     >
-                                       {stats.recommendationCount.toLocaleString()} Recommending
-                                     </button>
+                                     <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> Recommending
                                      {user && stats.circleRecommendationCount > 0 && (
                                        <>
-                                         {' '}(
-                                         <button
-                                           onClick={() => setIsRecommendationModalOpen(true)}
-                                           className="text-brand-orange font-medium hover:underline cursor-pointer transition-colors"
-                                         >
-                                           {stats.circleRecommendationCount} from circle
-                                         </button>
-                                         )
+                                         {' '}(<span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from circle</span>)
                                        </>
                                      )}
                                    </>
                                  )}
                                  {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (
-                                   <button
-                                     onClick={() => setIsRecommendationModalOpen(true)}
-                                     className="text-brand-orange font-medium hover:underline cursor-pointer transition-colors"
-                                   >
-                                     {stats.circleRecommendationCount} from your circle
-                                   </button>
+                                   <span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from your circle</span>
                                  )}
-                               </span>
+                               </button>
                              </div>
                            )}
                          </div>
