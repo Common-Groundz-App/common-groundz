@@ -506,12 +506,6 @@ const EntityV4 = () => {
                            {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
                              <div className="flex items-center gap-2">
                                <ThumbsUp className="h-4 w-4" />
-                               <InfoTooltip 
-                                 content="Reviews with 4 or more circles are considered recommendations.
-&quot;From circle&quot; shows how many people you follow have recommended this recently.
-Only recent ratings are counted to keep things current and relevant."
-                                 side="top"
-                               />
                                <button
                                  onClick={() => setIsRecommendationModalOpen(true)}
                                  className="text-foreground hover:text-brand-orange hover:underline font-medium cursor-pointer transition-colors"
@@ -530,6 +524,12 @@ Only recent ratings are counted to keep things current and relevant."
                                    <span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from your circle</span>
                                  )}
                                </button>
+                               <InfoTooltip 
+                                 content={`Reviews with 4 or more circles are considered recommendations.
+"From circle" shows how many people you follow have recommended this recently.
+Only recent ratings are counted to keep things current and relevant.`}
+                                 side="top"
+                               />
                              </div>
                            )}
                          </div>

@@ -22,9 +22,9 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
         side={side} 
         sideOffset={10}
         avoidCollisions={true}
-        className={cn("max-w-sm z-50")}
+        className={cn("max-w-[280px] z-50")}
       >
-        <p className="whitespace-normal">
+        <p className="whitespace-pre-line">
           {content}
         </p>
       </TooltipContent>
