@@ -25,30 +25,31 @@ export const getEntityRecommendersWithContext = async (
 ): Promise<EntityRecommenderWithContext[]> => {
   const { search, relationshipFilter = 'all', limit = 50, offset = 0 } = options;
 
-  // Step 1: Get recommendations for this entity (4+ star ratings)
-  let recommendationsQuery = supabase
-    .from('recommendations')
+  // Step 1: Get reviews for this entity that are recommendations (is_recommended = true)
+  let reviewsQuery = supabase
+    .from('reviews')
     .select('user_id, created_at, rating')
     .eq('entity_id', entityId)
-    .gte('rating', 4)
+    .eq('is_recommended', true)
+    .eq('status', 'published')
     .eq('visibility', 'public')
     .order('created_at', { ascending: false });
 
   if (limit) {
-    recommendationsQuery = recommendationsQuery.limit(limit + offset); // Get more to account for filtering
+    reviewsQuery = reviewsQuery.limit(limit + offset); // Get more to account for filtering
   }
 
-  const { data: recommendations, error: recError } = await recommendationsQuery;
+  const { data: reviews, error: reviewError } = await reviewsQuery;
 
-  if (recError) {
-    console.error('Error fetching recommendations:', recError);
-    throw recError;
+  if (reviewError) {
+    console.error('Error fetching reviews:', reviewError);
+    throw reviewError;
   }
 
-  if (!recommendations || recommendations.length === 0) return [];
+  if (!reviews || reviews.length === 0) return [];
 
   // Step 2: Get user profiles for all recommenders
-  const userIds = recommendations.map(rec => rec.user_id);
+  const userIds = reviews.map(review => review.user_id);
   
   const { data: profiles, error: profileError } = await supabase
     .from('profiles')
@@ -87,9 +88,9 @@ export const getEntityRecommendersWithContext = async (
   }
 
   // Step 4: Combine data and create result objects
-  const result = recommendations
-    .map(rec => {
-      const profile = profiles.find(p => p.id === rec.user_id);
+  const result = reviews
+    .map(review => {
+      const profile = profiles.find(p => p.id === review.user_id);
       if (!profile) return null;
 
       return {
@@ -100,8 +101,8 @@ export const getEntityRecommendersWithContext = async (
         avatar_url: profile.avatar_url,
         is_following: followingIds.includes(profile.id),
         is_mutual: followingIds.includes(profile.id) && followersIds.includes(profile.id),
-        recommended_at: rec.created_at,
-        rating: rec.rating
+        recommended_at: review.created_at,
+        rating: review.rating
       };
     })
     .filter((item): item is EntityRecommenderWithContext => item !== null)
