@@ -25,49 +25,48 @@ export const getEntityRecommendersWithContext = async (
 ): Promise<EntityRecommenderWithContext[]> => {
   const { search, relationshipFilter = 'all', limit = 50, offset = 0 } = options;
 
-  let query = supabase
+  // Step 1: Get recommendations for this entity (4+ star ratings)
+  let recommendationsQuery = supabase
     .from('recommendations')
-    .select(`
-      user_id,
-      created_at,
-      rating,
-      profiles!inner(
-        id,
-        username,
-        first_name,
-        last_name,
-        avatar_url
-      )
-    `)
+    .select('user_id, created_at, rating')
     .eq('entity_id', entityId)
     .gte('rating', 4)
     .eq('visibility', 'public')
     .order('created_at', { ascending: false });
 
   if (limit) {
-    query = query.limit(limit);
+    recommendationsQuery = recommendationsQuery.limit(limit + offset); // Get more to account for filtering
   }
 
-  if (offset) {
-    query = query.range(offset, offset + limit - 1);
+  const { data: recommendations, error: recError } = await recommendationsQuery;
+
+  if (recError) {
+    console.error('Error fetching recommendations:', recError);
+    throw recError;
   }
 
-  const { data: recommendations, error } = await query;
+  if (!recommendations || recommendations.length === 0) return [];
 
-  if (error) {
-    console.error('Error fetching entity recommenders:', error);
-    throw error;
+  // Step 2: Get user profiles for all recommenders
+  const userIds = recommendations.map(rec => rec.user_id);
+  
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, username, first_name, last_name, avatar_url')
+    .in('id', userIds);
+
+  if (profileError) {
+    console.error('Error fetching profiles:', profileError);
+    throw profileError;
   }
 
-  if (!recommendations) return [];
+  if (!profiles) return [];
 
-  // Get follow relationships if user is authenticated
+  // Step 3: Get follow relationships if user is authenticated
   let followingIds: string[] = [];
   let followersIds: string[] = [];
 
   if (currentUserId) {
-    const userIds = recommendations.map(r => r.profiles.id);
-
     // Get who the current user follows
     const { data: following } = await supabase
       .from('follows')
@@ -87,19 +86,25 @@ export const getEntityRecommendersWithContext = async (
     followersIds = followers?.map(f => f.follower_id) || [];
   }
 
-  // Transform and filter results
+  // Step 4: Combine data and create result objects
   const result = recommendations
-    .map(rec => ({
-      id: rec.profiles.id,
-      username: rec.profiles.username,
-      first_name: rec.profiles.first_name,
-      last_name: rec.profiles.last_name,
-      avatar_url: rec.profiles.avatar_url,
-      is_following: followingIds.includes(rec.profiles.id),
-      is_mutual: followingIds.includes(rec.profiles.id) && followersIds.includes(rec.profiles.id),
-      recommended_at: rec.created_at,
-      rating: rec.rating
-    }))
+    .map(rec => {
+      const profile = profiles.find(p => p.id === rec.user_id);
+      if (!profile) return null;
+
+      return {
+        id: profile.id,
+        username: profile.username,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        avatar_url: profile.avatar_url,
+        is_following: followingIds.includes(profile.id),
+        is_mutual: followingIds.includes(profile.id) && followersIds.includes(profile.id),
+        recommended_at: rec.created_at,
+        rating: rec.rating
+      };
+    })
+    .filter((item): item is EntityRecommenderWithContext => item !== null)
     .filter(recommender => {
       // Search filter
       const searchMatch = !search || 
@@ -125,5 +130,6 @@ export const getEntityRecommendersWithContext = async (
       return new Date(b.recommended_at).getTime() - new Date(a.recommended_at).getTime();
     });
 
-  return result;
+  // Apply pagination after filtering and sorting
+  return result.slice(offset, offset + limit);
 };
