@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Entity, EntityStats } from '@/services/recommendation/types';
+import { Entity } from '@/services/recommendation/types';
 import { SafeUserProfile } from '@/types/profile';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
@@ -19,7 +19,12 @@ interface EntityHeaderProps {
   parentEntity?: Entity | null;
   hierarchyLoading: boolean;
   entityImage: string;
-  stats: EntityStats;
+  stats: {
+    averageRating?: number;
+    reviewCount?: number;
+    recommendationCount: number;
+    circleRecommendationCount: number;
+  };
   user: SafeUserProfile | null;
   circleRating: number | null;
   circleRatingCount: number;

@@ -12,6 +12,7 @@ import { useEntityShare } from '@/hooks/use-entity-share';
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { useToast } from '@/hooks/use-toast';
 import { EntityType } from '@/services/recommendation/types';
+import { SafeUserProfile } from '@/types/profile';
 import { MessageSquare } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -233,7 +234,7 @@ const EntityV4 = () => {
               hierarchyLoading={hierarchyLoading}
               entityImage={entityImage}
               stats={stats}
-              user={user}
+              user={user as unknown as SafeUserProfile | null}
               circleRating={circleRating}
               circleRatingCount={circleRatingCount}
               circleContributors={circleContributors}
@@ -292,7 +293,7 @@ const EntityV4 = () => {
                               <h4 className="font-medium">Whey Protein Isolate</h4>
                               <p className="text-sm text-gray-600">Premium quality protein powder</p>
                               <div className="flex items-center gap-1 mt-2">
-                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                <div className="w-4 h-4 bg-yellow-400 rounded" />
                                 <span className="text-sm">4.5 (234 reviews)</span>
                               </div>
                             </div>
@@ -300,7 +301,7 @@ const EntityV4 = () => {
                               <h4 className="font-medium">Complete Multivitamin</h4>
                               <p className="text-sm text-gray-600">Essential vitamins and minerals</p>
                               <div className="flex items-center gap-1 mt-2">
-                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                <div className="w-4 h-4 bg-yellow-400 rounded" />
                                 <span className="text-sm">4.3 (189 reviews)</span>
                               </div>
                             </div>
