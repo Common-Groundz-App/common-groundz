@@ -1,34 +1,38 @@
-
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
+import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { useCircleRating } from '@/hooks/use-circle-rating';
+import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
+import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntitySave } from '@/hooks/use-entity-save';
-import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
-import { useToast } from '@/hooks/use-toast';
-import { useEntityActions } from '@/hooks/useEntityActions';
-import { EntityType } from '@/services/recommendation/types';
-import { SafeUserProfile } from '@/types/profile';
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { useEntityShare } from '@/hooks/use-entity-share';
+import { Star, MapPin, Navigation, Globe, Phone, Mail, Share, Bookmark, MessageCircle, Camera, Clock, CheckCircle, TrendingUp, Users, Award, Eye, AlertTriangle, MessageSquare, ThumbsUp } from "lucide-react";
+import { ConnectedRingsRating } from "@/components/ui/connected-rings";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+import ReviewCard from "@/components/ReviewCard";
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
+import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
+import { useToast } from '@/hooks/use-toast';
+import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
+import { EntityFollowersCount } from '@/components/entity/EntityFollowersCount';
+import { EntitySocialFollowers } from '@/components/entity/EntitySocialFollowers';
 import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
 import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
-import { TrustSummaryCard } from './TrustSummaryCard';
-import { EntityHeader } from './EntityHeader';
-import { EntityActions } from './EntityActions';
-import { EntitySkeleton } from './EntitySkeleton';
-import { Skeleton } from "@/components/ui/skeleton";
-
-// Lazy load non-critical components
-const ReviewsSection = lazy(() => import('./ReviewsSection').then(module => ({ default: module.ReviewsSection })));
-const EntitySidebar = lazy(() => import('./EntitySidebar').then(module => ({ default: module.EntitySidebar })));
-const EntityTabsContent = lazy(() => import('./TabsContent').then(module => ({ default: module.EntityTabsContent })));
+import { EntityType } from '@/services/recommendation/types';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -69,6 +73,9 @@ const EntityV4 = () => {
     enabled: !!entity?.id
   });
 
+  // Entity share functionality
+  const { shareEntity } = useEntityShare();
+
   // Timeline data
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
@@ -84,27 +91,66 @@ const EntityV4 = () => {
     return reviews.find(review => review.user_id === user.id);
   }, [user, reviews]);
 
-  // Custom hooks for actions
-  const {
-    getSidebarButtonConfig,
-    handleAddReview,
-    handleStartTimeline,
-    handleShare
-  } = useEntityActions({
-    entity,
-    user: user as unknown as SafeUserProfile | null,
-    userReview,
-    onReviewFormOpen: () => setIsReviewFormOpen(true),
-    onTimelineStart: (reviewId: string) => {
-      setTimelineReviewId(reviewId);
-      setIsTimelineViewerOpen(true);
+  // Get sidebar button configuration based on user's review status
+  const getSidebarButtonConfig = () => {
+    if (!userReview) {
+      return {
+        text: 'Write Review',
+        icon: MessageSquare,
+        action: handleAddReview,
+        tooltip: null
+      };
     }
-  });
+    
+    if (userReview.has_timeline && userReview.timeline_count && userReview.timeline_count > 0) {
+      return {
+        text: 'Add Timeline Update',
+        icon: MessageSquare,
+        action: () => handleStartTimeline(userReview.id),
+        tooltip: 'Continue tracking how your experience evolves'
+      };
+    }
+    
+    return {
+      text: 'Update Your Review',
+      icon: MessageSquare,
+      action: () => handleStartTimeline(userReview.id),
+      tooltip: 'Already reviewed this? Add how it\'s going now.'
+    };
+  };
 
   // Handler functions
+  const handleAddReview = () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to add a review",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsReviewFormOpen(true);
+  };
+
+  const handleStartTimeline = (reviewId: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to start a timeline",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setTimelineReviewId(reviewId);
+    setIsTimelineViewerOpen(true);
+  };
+
   const handleReviewSubmit = async () => {
     try {
       setIsReviewFormOpen(false);
+      // Refresh data would be called here in a real implementation
       toast({
         title: "Review submitted",
         description: "Your review has been added successfully"
@@ -120,6 +166,7 @@ const EntityV4 = () => {
   };
 
   const handleTimelineUpdate = async () => {
+    // Refresh data would be called here in a real implementation
     toast({
       title: "Timeline updated",
       description: "Your timeline update has been added successfully"
@@ -131,6 +178,18 @@ const EntityV4 = () => {
     setTimelineReviewId(null);
   };
 
+  const handleShare = async () => {
+    if (!entity) return;
+
+    const entityUrl = `${window.location.origin}/entity/${entity.slug || entity.id}?v=4`;
+    
+    await shareEntity({
+      name: entity.name,
+      description: entity.description || undefined,
+      url: entityUrl
+    });
+  };
+
   const sidebarButtonConfig = getSidebarButtonConfig();
 
   // Show loading state
@@ -139,8 +198,11 @@ const EntityV4 = () => {
       <div className="min-h-screen flex flex-col bg-background">
         <NavBarComponent />
         <EntityPreviewToggle />
-        <div className="flex-1 pt-16">
-          <EntitySkeleton />
+        <div className="flex-1 pt-16 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading entity...</p>
+          </div>
         </div>
       </div>
     );
@@ -164,173 +226,769 @@ const EntityV4 = () => {
 
   // Get entity image with fallback
   const entityImage = entity?.image_url || getEntityTypeFallbackImage(entity?.type || EntityType.Product);
+  
+  // Prepare entity data using real data
+  const entityData = {
+    name: entity?.name || '',
+    description: entity?.description || '',
+    rating: stats?.averageRating || 0,
+    totalReviews: stats?.reviewCount || 0,
+    
+    claimed: entity?.is_claimed || false,
+    image: entityImage,
+    website: entity?.website_url || '',
+    location: entity?.venue || '',
+    email: '', // TODO: Extract from metadata when available
+    phone: ''  // TODO: Extract from metadata when available
+  };
 
-  return (
-    <TooltipProvider delayDuration={0}>
-      <div className="min-h-screen flex flex-col bg-background">
-        <NavBarComponent />
-        
-        {/* Version Toggle */}
-        <EntityPreviewToggle />
-        
-        {/* Main Content */}
-        <div className="flex-1 pt-16">
-          <div className="min-h-screen bg-gray-50">
-            {/* Entity Header Section */}
-            <EntityHeader
-              entity={entity}
-              parentEntity={parentEntity}
-              hierarchyLoading={hierarchyLoading}
-              entityImage={entityImage}
-              stats={stats}
-              user={user as unknown as SafeUserProfile | null}
-              circleRating={circleRating}
-              circleRatingCount={circleRatingCount}
-              circleContributors={circleContributors}
-              isSaved={isSaved}
-              isSaveLoading={isSaveLoading}
-              onShare={handleShare}
-              onToggleSave={toggleSave}
-              onRecommendationModalOpen={() => setIsRecommendationModalOpen(true)}
-              onSidebarAction={sidebarButtonConfig.action}
-              sidebarButtonConfig={sidebarButtonConfig}
-            />
+  // Trust Metrics
+  const trustMetrics = {
+    circleCertified: 78,
+    repurchaseRate: 63,
+    ratingBreakdown: {
+      5: 45,
+      4: 30,
+      3: 15,
+      2: 7,
+      1: 3
+    }
+  };
 
-            <div className="max-w-7xl mx-auto px-4 py-8">
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                {/* Main Content */}
-                <div className="lg:col-span-3">
-                  {/* Trust Summary */}
-                  {entity && (
-                    <TrustSummaryCard 
-                      entityId={entity.id}
-                      userId={user?.id || null}
-                    />
-                  )}
+  // Mock Reviews
+  const mockReviews = [{
+    id: 1,
+    name: "Priya Sharma",
+    avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b515?w=50&h=50&fit=crop",
+    rating: 5,
+    date: "2024-01-15",
+    title: "Excellent protein powder quality!",
+    content: "I've been using Cosmix whey protein for 6 months now and the results are amazing. The taste is great and it mixes well without clumps.",
+    verified: true,
+    helpful: 23
+  }, {
+    id: 2,
+    name: "Rahul Kumar",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop",
+    rating: 4,
+    date: "2024-01-10",
+    title: "Good value for money",
+    content: "The supplements are effective and reasonably priced compared to other premium brands. Delivery was quick too.",
+    verified: true,
+    helpful: 15
+  }, {
+    id: 3,
+    name: "Sneha Patel",
+    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=50&h=50&fit=crop",
+    rating: 5,
+    date: "2024-01-08",
+    title: "Circle recommended - Worth it!",
+    content: "Found this through Circle recommendations and so glad I tried it. The multivitamins have really improved my energy levels.",
+    verified: true,
+    helpful: 31
+  }];
 
-                  {/* Reviews Section - Lazy Loaded */}
-                  <Suspense fallback={
-                    <div className="mt-8">
-                      <Skeleton className="h-8 w-48 mb-4" />
-                      <div className="space-y-4">
-                        {[1, 2, 3].map(i => (
-                          <div key={i} className="p-6 border rounded-lg space-y-3">
+  // Related Entities
+  const relatedEntities = [{
+    name: "HealthifyMe",
+    rating: 4.2,
+    category: "Health Apps",
+    image: "https://images.unsplash.com/photo-1500673922987-e212871fec22?w=100&h=100&fit=crop"
+  }, {
+    name: "MyFitnessPal",
+    rating: 4.0,
+    category: "Fitness Apps",
+    image: "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=100&h=100&fit=crop"
+  }, {
+    name: "Optimum Nutrition",
+    rating: 4.5,
+    category: "Supplements",
+    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
+  }];
+
+  return <TooltipProvider delayDuration={0}>
+    <div className="min-h-screen flex flex-col bg-background">
+      <NavBarComponent />
+      
+      {/* Version Toggle */}
+      <EntityPreviewToggle />
+      
+      {/* Main Content */}
+      <div className="flex-1 pt-16">
+        <div className="min-h-screen bg-gray-50">
+          {/* SECTION 1: Header & Primary Actions */}
+          <div className="bg-white border-b">
+            <div className="max-w-7xl mx-auto px-4 py-6">
+               {/* Breadcrumb */}
+               <EntityParentBreadcrumb 
+                 currentEntity={entity}
+                 parentEntity={parentEntity}
+                 isLoading={hierarchyLoading}
+               />
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left: Brand Info */}
+                <div className="lg:col-span-2">
+                  <div className="flex gap-6">
+                    <img src={entityData.image} alt={entityData.name} className="w-24 h-24 rounded-lg object-cover" />
+                     <div className="flex-1 relative">
+                          <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-3">
-                              <Skeleton className="h-10 w-10 rounded-full" />
-                              <div className="space-y-2">
-                                <Skeleton className="h-4 w-24" />
-                                <Skeleton className="h-3 w-16" />
+                              <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  {entityData.claimed ? (
+                                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer">
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      Claimed
+                                    </div>
+                                  ) : (
+                                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer">
+                                      <AlertTriangle className="w-3 h-3 mr-1" />
+                                      Unclaimed
+                                    </div>
+                                  )}
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs">
+                                  <p className="text-sm">
+                                    {entityData.claimed 
+                                      ? "This listing is actively managed by the owner." 
+                                      : "This listing hasn't been claimed yet. Claim it for free to update info, add photos, respond to reviews, and more."
+                                    }
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                            {/* Top-right action buttons */}
+                            <div className="flex items-center gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-foreground hover:text-primary gap-2"
+                                onClick={handleShare}
+                              >
+                                <Share className="w-4 h-4" />
+                                Share
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className={`gap-2 ${isSaved ? 'text-brand-orange hover:text-brand-orange/80' : 'text-foreground hover:text-primary'}`}
+                                onClick={toggleSave}
+                                disabled={isSaveLoading}
+                              >
+                                <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+                                {isSaved ? 'Saved' : 'Save'}
+                              </Button>
+                            </div>
+                          </div>
+                      <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
+                      
+                        {/* Ratings */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="flex items-center gap-4 flex-shrink-0 min-w-[300px]">
+                            <div className="flex items-center gap-2">
+                              <ConnectedRingsRating
+                                value={entityData.rating}
+                                variant="badge"
+                                showValue={false}
+                                size="md"
+                                minimal={true}
+                              />
+                              <span 
+                                className="text-lg font-bold" 
+                                style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
+                              >
+                                {entityData.totalReviews > 0 ? entityData.rating.toFixed(1) : "0"}
+                              </span>
+                            </div>
+                            
+                            <div className="leading-tight min-w-[140px]">
+                              <div className="font-semibold text-sm whitespace-nowrap text-gray-900 flex items-center gap-1">
+                                Overall Rating
+                                <InfoTooltip content="Overall Rating is the average review rating from all users who reviewed this item on Common Groundz." />
+                              </div>
+                              <div 
+                                className="text-sm font-bold" 
+                                style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
+                              >
+                                {getSentimentLabel(entityData.rating, entityData.totalReviews > 0)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                ({entityData.totalReviews.toLocaleString()} {entityData.totalReviews === 1 ? 'review' : 'reviews'})
                               </div>
                             </div>
-                            <Skeleton className="h-4 w-full" />
-                            <Skeleton className="h-4 w-3/4" />
                           </div>
-                        ))}
+                          {user && (
+                            circleRating !== null ? (
+                              <div className="flex items-center gap-4 flex-shrink-0">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-fit">
+                                    <ConnectedRingsRating
+                                      value={circleRating}
+                                      variant="badge"
+                                      showValue={false}
+                                      size="md"
+                                      minimal={true}
+                                    />
+                                  </div>
+                                  <span 
+                                    className="text-lg font-bold" 
+                                    style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
+                                  >
+                                    {circleRatingCount > 0 ? circleRating.toFixed(1) : "0"}
+                                  </span>
+                                </div>
+
+                                <div className="leading-tight min-w-[140px]">
+                                  <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
+                                    Circle Rating
+                                    <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
+                                  </div>
+                                  <div 
+                                    className="text-sm font-bold" 
+                                    style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
+                                  >
+                                    {getSentimentLabel(circleRating, circleRatingCount > 0)}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
+                                  </div>
+                                  <CircleContributorsPreview 
+                                    contributors={circleContributors}
+                                    totalCount={circleRatingCount}
+                                    maxDisplay={4}
+                                    entityName={entity?.name}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-4 flex-shrink-0">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-fit">
+                                    <ConnectedRingsRating
+                                      value={0}
+                                      variant="badge"
+                                      showValue={false}
+                                      size="md"
+                                      minimal={true}
+                                    />
+                                  </div>
+                                  <span className="text-lg font-bold text-muted-foreground">
+                                    0
+                                  </span>
+                                </div>
+
+                                <div className="leading-tight min-w-[140px]">
+                                  <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
+                                    Circle Rating
+                                    <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    No ratings from your circle
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          )}
+                       </div>
+
+                       {/* Followers and Recommendations Section - Combined */}
+                       {entity && (
+                         <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4">
+                           {/* Followers */}
+                           <div className="flex items-center gap-2">
+                             <Users className="h-4 w-4" />
+                             <EntityFollowersCount entityId={entity.id} />
+                           </div>
+                           
+                           {/* Recommendations - Make clickable as one unit */}
+                           {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
+                             <div className="flex items-center gap-2">
+                               <ThumbsUp className="h-4 w-4" />
+                               <button
+                                 onClick={() => setIsRecommendationModalOpen(true)}
+                                 className="text-foreground hover:text-brand-orange hover:underline font-medium cursor-pointer transition-colors"
+                               >
+                                 {stats.recommendationCount > 0 && (
+                                   <>
+                                     <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> Recommending
+                                      {user && stats.circleRecommendationCount > 0 && (
+                                        <>
+                                          {' '}<span className="text-muted-foreground">(</span><span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from circle</span><span className="text-muted-foreground">)</span>
+                                        </>
+                                      )}
+                                   </>
+                                 )}
+                                 {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (
+                                   <span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from your circle</span>
+                                 )}
+                               </button>
+                               <InfoTooltip 
+                                 content={`Reviews with 4 or more circles are considered recommendations.
+"From circle" shows how many people you follow have recommended this recently.
+Only recent ratings are counted to keep things current and relevant.`}
+                                 side="top"
+                               />
+                             </div>
+                           )}
+                         </div>
+                       )}
+
+                       {/* Action Buttons */}
+                       <div className="flex gap-3 min-w-0 pr-4">
+                         {entity && (
+                           <EntityFollowButton
+                             entityId={entity.id}
+                             entityName={entity.name}
+                             variant="outline"
+                           />
+                         )}
+                          <Button 
+                            className="bg-brand-orange hover:bg-brand-orange/90 text-white"
+                            onClick={sidebarButtonConfig.action}
+                          >
+                            <sidebarButtonConfig.icon className="w-4 h-4 mr-2" />
+                            {sidebarButtonConfig.text}
+                          </Button>
+                          <Button 
+                           variant="outline"
+                           className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                           onClick={() => entityData.website && window.open(`https://${entityData.website.replace(/^https?:\/\//, '')}`, '_blank')}
+                           disabled={!entityData.website}
+                         >
+                           <Globe className="w-4 h-4 mr-2" />
+                           Visit Website
+                         </Button>
+                           <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                             <Navigation className="w-4 h-4 mr-2" />
+                             Get Directions
+                           </Button>
+                       </div>
+
+                       {/* Social Avatars Section */}
+                       {entity && (
+                         <div className="mt-4">
+                           <EntitySocialFollowers entityId={entity.id} />
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 </div>
+
+                {/* Right: Map */}
+                
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              {/* Main Content */}
+              <div className="lg:col-span-3">
+                {/* SECTION 2: Trust & Review Summary */}
+                <Card className="mb-8">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Award className="w-5 h-5 text-blue-600" />
+                      Trust Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">Circle Certified</span>
+                          <span className="text-sm font-semibold text-green-600">{trustMetrics.circleCertified}%</span>
+                        </div>
+                        <Progress value={trustMetrics.circleCertified} className="mb-4" />
+                        
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">Repurchase Rate</span>
+                          <span className="text-sm font-semibold text-blue-600">{trustMetrics.repurchaseRate}%</span>
+                        </div>
+                        <Progress value={trustMetrics.repurchaseRate} className="mb-4" />
+                      </div>
+
+                      <div>
+                        <h4 className="font-medium mb-3">Rating Breakdown</h4>
+                        {Object.entries(trustMetrics.ratingBreakdown).reverse().map(([stars, percentage]) => <div key={stars} className="flex items-center gap-3 mb-2">
+                            <span className="text-sm w-8">{stars}★</span>
+                            <Progress value={percentage} className="flex-1" />
+                            <span className="text-sm w-8 text-right">{percentage}%</span>
+                          </div>)}
                       </div>
                     </div>
-                  }>
-                    <ReviewsSection 
-                      entityId={entity?.id || ''}
-                      entityName={entity?.name || ''}
-                    />
-                  </Suspense>
 
-                  {/* Tabs Content - Lazy Loaded */}
-                  <Suspense fallback={
-                    <div className="mt-8">
-                      <div className="flex gap-4 mb-6">
-                        <Skeleton className="h-10 w-24" />
-                        <Skeleton className="h-10 w-20" />
-                        <Skeleton className="h-10 w-16" />
+                    <Separator className="my-4" />
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-green-600">
+                        <TrendingUp className="w-4 h-4" />
+                        <span className="text-sm">Rating Evolution: 4.7 → 4.2 → 3.9 → 4.3</span>
                       </div>
-                      <Skeleton className="h-64 w-full rounded-lg" />
+                      <span className="text-xs text-gray-500">Last Updated: 2 days ago</span>
                     </div>
-                  }>
-                    {entity && <EntityTabsContent entity={entity} />}
-                  </Suspense>
-                </div>
+                  </CardContent>
+                </Card>
 
-                {/* Sidebar - Lazy Loaded */}
-                <div className="lg:col-span-1">
-                  <Suspense fallback={
-                    <div className="space-y-6">
-                      <div className="p-4 border rounded-lg">
-                        <Skeleton className="h-10 w-full mb-4" />
-                        <Skeleton className="h-4 w-24" />
+                {/* Ask Community */}
+                <Card className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <MessageCircle className="w-8 h-8 text-blue-600" />
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 mb-1">Ask the Community</h3>
+                        <p className="text-sm text-gray-600">Get answers from people who have used Cosmix products</p>
                       </div>
-                      <div className="p-6 border rounded-lg space-y-4">
-                        <Skeleton className="h-6 w-32 mb-4" />
-                        {[1, 2, 3, 4].map(i => (
-                          <div key={i} className="flex items-start gap-3">
-                            <Skeleton className="h-4 w-4 mt-1" />
-                            <div className="space-y-2">
-                              <Skeleton className="h-4 w-20" />
-                              <Skeleton className="h-3 w-32" />
+                      <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50">
+                        Ask Question
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* SECTION 3: Reviews & Social Proof */}
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900">Reviews & Social Proof</h2>
+                    <div className="flex gap-2">
+                      <Badge variant="outline">Most Recent</Badge>
+                      <Badge variant="outline">Verified Only</Badge>
+                      <Badge variant="outline">5 Stars</Badge>
+                    </div>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative mb-6">
+                    <input type="text" placeholder="Search reviews..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  </div>
+
+                  {/* Review Cards */}
+                  <div className="space-y-6">
+                    {mockReviews.map(review => <ReviewCard key={review.id} review={review} />)}
+
+                    {/* Timeline Review */}
+                    <Card className="border-l-4 border-l-blue-500">
+                      <CardContent className="p-6">
+                        <div className="flex items-start gap-4">
+                          <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop" alt="Timeline reviewer" className="w-12 h-12 rounded-full" />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="font-semibold">Arjun Mehta</h4>
+                              <Badge className="bg-blue-100 text-blue-800">Timeline Review</Badge>
+                            </div>
+                            <div className="space-y-4">
+                              <div className="border-l-2 border-gray-200 pl-4">
+                                <div className="text-sm text-gray-500 mb-1">3 months ago</div>
+                                <p className="text-gray-700">Started using Cosmix whey protein. Initial impressions are good.</p>
+                              </div>
+                              <div className="border-l-2 border-gray-200 pl-4">
+                                <div className="text-sm text-gray-500 mb-1">2 months ago</div>
+                                <p className="text-gray-700">Seeing good results in muscle gain. Taste is better than expected.</p>
+                              </div>
+                              <div className="border-l-2 border-blue-400 pl-4">
+                                <div className="text-sm text-gray-500 mb-1">1 week ago</div>
+                                <p className="text-gray-700">Completely satisfied! Will definitely repurchase. ⭐⭐⭐⭐⭐</p>
+                              </div>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Circle Highlighted Review */}
+                    <Card className="border-2 border-blue-200 bg-blue-50/30">
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Badge className="bg-blue-600 text-white">Circle Highlighted</Badge>
+                          <Eye className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm text-blue-600 font-medium">Trending in your network</span>
+                        </div>
+                        <ReviewCard review={mockReviews[2]} />
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Photo Gallery */}
+                  <Card className="mt-8">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                          <Camera className="w-5 h-5" />
+                          Photos & Videos
+                        </CardTitle>
+                        <Button variant="outline" size="sm">
+                          <Camera className="w-4 h-4 mr-2" />
+                          Add Photos
+                        </Button>
                       </div>
-                    </div>
-                  }>
-                    {entity && (
-                      <EntitySidebar 
-                        entity={entity}
-                        isFollowing={false}
-                        followerCount={Math.floor(Math.random() * 1000) + 100}
-                        onFollowToggle={() => console.log('Follow toggled')}
-                      />
-                    )}
-                  </Suspense>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
+                            <Camera className="w-6 h-6 text-gray-400" />
+                          </div>)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* You Might Also Consider */}
+                  <Card className="mt-8">
+                    <CardHeader>
+                      <CardTitle>You Might Also Consider</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {relatedEntities.map((entity, index) => <div key={index} className="flex items-center gap-3 p-3 border rounded-lg hover:shadow-md transition-shadow cursor-pointer">
+                            <img src={entity.image} alt={entity.name} className="w-12 h-12 rounded-lg object-cover" />
+                            <div className="flex-1">
+                              <h4 className="font-medium">{entity.name}</h4>
+                              <p className="text-sm text-gray-500">{entity.category}</p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                <span className="text-sm">{entity.rating}</span>
+                              </div>
+                            </div>
+                          </div>)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Meet the Founders */}
+                  <Card className="mt-8">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-4">
+                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop" alt="Founder" className="w-16 h-16 rounded-full object-cover" />
+                        <div>
+                          <h3 className="font-semibold text-gray-900">Meet the Founder</h3>
+                          <p className="text-blue-600 font-medium">Rohit Sharma</p>
+                          <p className="text-sm text-gray-600">CEO & Co-founder</p>
+                          <p className="text-sm text-gray-500 mt-1">15+ years in health & wellness industry</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* SECTION 4: Tabs Navigation */}
+                <Tabs defaultValue="overview" className="mb-8">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="products">Products</TabsTrigger>
+                    <TabsTrigger value="posts">Posts</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="overview" className="mt-6">
+                    <Card>
+                      <CardContent className="p-6">
+                        <h3 className="font-semibold mb-4">Company Overview</h3>
+                        <p className="text-gray-600 leading-relaxed">
+                          Cosmix is a leading health and wellness brand that has been at the forefront of providing 
+                          science-backed nutrition solutions for over a decade. Founded with the mission to make 
+                          premium supplements accessible to everyone, we focus on quality, transparency, and innovation.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  <TabsContent value="products" className="mt-6">
+                    <Card>
+                      <CardContent className="p-6">
+                        <h3 className="font-semibold mb-4">Featured Products</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="border rounded-lg p-4">
+                            <h4 className="font-medium">Whey Protein Isolate</h4>
+                            <p className="text-sm text-gray-600">Premium quality protein powder</p>
+                            <div className="flex items-center gap-1 mt-2">
+                              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                              <span className="text-sm">4.5 (234 reviews)</span>
+                            </div>
+                          </div>
+                          <div className="border rounded-lg p-4">
+                            <h4 className="font-medium">Complete Multivitamin</h4>
+                            <p className="text-sm text-gray-600">Essential vitamins and minerals</p>
+                            <div className="flex items-center gap-1 mt-2">
+                              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                              <span className="text-sm">4.3 (189 reviews)</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  <TabsContent value="posts" className="mt-6">
+                    <Card>
+                      <CardContent className="p-6">
+                        <h3 className="font-semibold mb-4">Latest Posts</h3>
+                        <div className="space-y-4">
+                          <div className="border-b pb-4">
+                            <h4 className="font-medium mb-2">New Product Launch: Plant-Based Protein</h4>
+                            <p className="text-sm text-gray-600">We're excited to announce our latest addition to the Cosmix family...</p>
+                            <span className="text-xs text-gray-400">2 days ago</span>
+                          </div>
+                          <div className="border-b pb-4">
+                            <h4 className="font-medium mb-2">The Science Behind Whey Protein</h4>
+                            <p className="text-sm text-gray-600">Understanding the benefits and optimal usage of whey protein...</p>
+                            <span className="text-xs text-gray-400">1 week ago</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              </div>
+
+              {/* SECTION 5: Info & Discovery Sidebar */}
+              <div className="lg:col-span-1">
+                <div className="space-y-6 sticky top-8">
+                  {/* Business Hours */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Clock className="w-5 h-5" />
+                        Business Hours
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Monday - Friday</span>
+                          <span className="text-green-600 font-medium">10 AM - 7 PM</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Saturday</span>
+                          <span className="text-green-600 font-medium">10 AM - 6 PM</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Sunday</span>
+                          <span className="text-red-600 font-medium">Closed</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Contact Information */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Contact Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm">{entityData.location}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Mail className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm">{entityData.email}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Phone className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm">{entityData.phone}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Globe className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm">{entityData.website}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* About Section */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">About</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                        Cosmix is committed to delivering the highest quality health and wellness products. 
+                        Our team of experts ensures that every product meets rigorous quality standards 
+                        and is backed by scientific research.
+                      </p>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Suggest an Edit
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Related Entities */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Related Brands</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {relatedEntities.map((entity, index) => <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                            <img src={entity.image} alt={entity.name} className="w-8 h-8 rounded object-cover" />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate">{entity.name}</h4>
+                              <div className="flex items-center gap-1">
+                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                <span className="text-xs">{entity.rating}</span>
+                              </div>
+                            </div>
+                          </div>)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Talk to Circle */}
+                  <Card className="bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
+                    <CardContent className="p-4 text-center">
+                      <Users className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                      <h3 className="font-semibold text-gray-900 mb-2">Talk to Someone in Your Circle</h3>
+                      <p className="text-sm text-gray-600 mb-3">Connect with people who have experience with Cosmix</p>
+                      <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
+                        Find Connections
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
-        {/* Review Form Modal */}
-        {isReviewFormOpen && entity && (
-          <ReviewForm
-            isOpen={isReviewFormOpen}
-            onSubmit={handleReviewSubmit}
-            onClose={() => setIsReviewFormOpen(false)}
-            entity={{
-              id: entity.id,
-              name: entity.name,
-              type: entity.type,
-              image_url: entity.image_url,
-              description: entity.description,
-              venue: entity.venue
-            }}
-          />
-        )}
-
-        {/* Review Timeline Viewer Modal */}
-        {isTimelineViewerOpen && timelineReviewId && entity && userReview && (
-          <ReviewTimelineViewer
-            isOpen={isTimelineViewerOpen}
-            reviewId={timelineReviewId}
-            reviewOwnerId={userReview.user_id}
-            reviewTitle={userReview.title}
-            initialRating={userReview.rating}
-            onClose={handleTimelineViewerClose}
-            onTimelineUpdate={handleTimelineUpdate}
-          />
-        )}
-
-        {/* Recommendation Modal */}
-        {isRecommendationModalOpen && entity && (
-          <EntityRecommendationModal
-            open={isRecommendationModalOpen}
-            onOpenChange={setIsRecommendationModalOpen}
-            entityId={entity.id}
-            entityName={entity.name}
-            totalRecommendationCount={stats?.recommendationCount || 0}
-            circleRecommendationCount={stats?.circleRecommendationCount || 0}
-          />
-        )}
       </div>
-    </TooltipProvider>
-  );
-};
 
+      {/* Review Form Modal */}
+      {isReviewFormOpen && entity && (
+        <ReviewForm
+          isOpen={isReviewFormOpen}
+          onSubmit={handleReviewSubmit}
+          onClose={() => setIsReviewFormOpen(false)}
+          entity={{
+            id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            image_url: entity.image_url,
+            description: entity.description,
+            venue: entity.venue
+          }}
+        />
+      )}
+
+      {/* Review Timeline Viewer Modal */}
+      {isTimelineViewerOpen && timelineReviewId && entity && userReview && (
+        <ReviewTimelineViewer
+          isOpen={isTimelineViewerOpen}
+          reviewId={timelineReviewId}
+          reviewOwnerId={userReview.user_id}
+          reviewTitle={userReview.title}
+          initialRating={userReview.rating}
+          onClose={handleTimelineViewerClose}
+          onTimelineUpdate={handleTimelineUpdate}
+        />
+      )}
+
+      {/* Recommendation Modal */}
+      {isRecommendationModalOpen && entity && (
+        <EntityRecommendationModal
+          open={isRecommendationModalOpen}
+          onOpenChange={setIsRecommendationModalOpen}
+          entityId={entity.id}
+          entityName={entity.name}
+          totalRecommendationCount={stats?.recommendationCount || 0}
+          circleRecommendationCount={stats?.circleRecommendationCount || 0}
+        />
+      )}
+    </div>
+  </TooltipProvider>;
+};
 export default EntityV4;
