@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
@@ -9,12 +9,11 @@ import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { useCircleRating } from '@/hooks/use-circle-rating';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntitySave } from '@/hooks/use-entity-save';
-import { useEntityShare } from '@/hooks/use-entity-share';
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { useToast } from '@/hooks/use-toast';
+import { useEntityActions } from '@/hooks/useEntityActions';
 import { EntityType } from '@/services/recommendation/types';
 import { SafeUserProfile } from '@/types/profile';
-import { MessageSquare } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
@@ -22,9 +21,14 @@ import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
 import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
 import { TrustSummaryCard } from './TrustSummaryCard';
 import { EntityHeader } from './EntityHeader';
-import { ReviewsSection } from './ReviewsSection';
-import { EntitySidebar } from './EntitySidebar';
-import { EntityTabsContent } from './TabsContent';
+import { EntityActions } from './EntityActions';
+import { EntitySkeleton } from './EntitySkeleton';
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Lazy load non-critical components
+const ReviewsSection = lazy(() => import('./ReviewsSection').then(module => ({ default: module.ReviewsSection })));
+const EntitySidebar = lazy(() => import('./EntitySidebar').then(module => ({ default: module.EntitySidebar })));
+const EntityTabsContent = lazy(() => import('./TabsContent').then(module => ({ default: module.EntityTabsContent })));
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -65,9 +69,6 @@ const EntityV4 = () => {
     enabled: !!entity?.id
   });
 
-  // Entity share functionality
-  const { shareEntity } = useEntityShare();
-
   // Timeline data
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
 
@@ -83,62 +84,24 @@ const EntityV4 = () => {
     return reviews.find(review => review.user_id === user.id);
   }, [user, reviews]);
 
-  // Get sidebar button configuration based on user's review status
-  const getSidebarButtonConfig = () => {
-    if (!userReview) {
-      return {
-        text: 'Write Review',
-        icon: MessageSquare,
-        action: handleAddReview,
-        tooltip: null
-      };
+  // Custom hooks for actions
+  const {
+    getSidebarButtonConfig,
+    handleAddReview,
+    handleStartTimeline,
+    handleShare
+  } = useEntityActions({
+    entity,
+    user: user as unknown as SafeUserProfile | null,
+    userReview,
+    onReviewFormOpen: () => setIsReviewFormOpen(true),
+    onTimelineStart: (reviewId: string) => {
+      setTimelineReviewId(reviewId);
+      setIsTimelineViewerOpen(true);
     }
-    
-    if (userReview.has_timeline && userReview.timeline_count && userReview.timeline_count > 0) {
-      return {
-        text: 'Add Timeline Update',
-        icon: MessageSquare,
-        action: () => handleStartTimeline(userReview.id),
-        tooltip: 'Continue tracking how your experience evolves'
-      };
-    }
-    
-    return {
-      text: 'Update Your Review',
-      icon: MessageSquare,
-      action: () => handleStartTimeline(userReview.id),
-      tooltip: 'Already reviewed this? Add how it\'s going now.'
-    };
-  };
+  });
 
   // Handler functions
-  const handleAddReview = () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to add a review",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsReviewFormOpen(true);
-  };
-
-  const handleStartTimeline = (reviewId: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to start a timeline",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setTimelineReviewId(reviewId);
-    setIsTimelineViewerOpen(true);
-  };
-
   const handleReviewSubmit = async () => {
     try {
       setIsReviewFormOpen(false);
@@ -168,18 +131,6 @@ const EntityV4 = () => {
     setTimelineReviewId(null);
   };
 
-  const handleShare = async () => {
-    if (!entity) return;
-
-    const entityUrl = `${window.location.origin}/entity/${entity.slug || entity.id}?v=4`;
-    
-    await shareEntity({
-      name: entity.name,
-      description: entity.description || undefined,
-      url: entityUrl
-    });
-  };
-
   const sidebarButtonConfig = getSidebarButtonConfig();
 
   // Show loading state
@@ -188,11 +139,8 @@ const EntityV4 = () => {
       <div className="min-h-screen flex flex-col bg-background">
         <NavBarComponent />
         <EntityPreviewToggle />
-        <div className="flex-1 pt-16 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading entity...</p>
-          </div>
+        <div className="flex-1 pt-16">
+          <EntitySkeleton />
         </div>
       </div>
     );
@@ -260,26 +208,79 @@ const EntityV4 = () => {
                     />
                   )}
 
-                  {/* Reviews Section */}
-                  <ReviewsSection 
-                    entityId={entity?.id || ''}
-                    entityName={entity?.name || ''}
-                  />
+                  {/* Reviews Section - Lazy Loaded */}
+                  <Suspense fallback={
+                    <div className="mt-8">
+                      <Skeleton className="h-8 w-48 mb-4" />
+                      <div className="space-y-4">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className="p-6 border rounded-lg space-y-3">
+                            <div className="flex items-center gap-3">
+                              <Skeleton className="h-10 w-10 rounded-full" />
+                              <div className="space-y-2">
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-3 w-16" />
+                              </div>
+                            </div>
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-3/4" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  }>
+                    <ReviewsSection 
+                      entityId={entity?.id || ''}
+                      entityName={entity?.name || ''}
+                    />
+                  </Suspense>
 
-                  {/* Tabs Content */}
-                  {entity && <EntityTabsContent entity={entity} />}
+                  {/* Tabs Content - Lazy Loaded */}
+                  <Suspense fallback={
+                    <div className="mt-8">
+                      <div className="flex gap-4 mb-6">
+                        <Skeleton className="h-10 w-24" />
+                        <Skeleton className="h-10 w-20" />
+                        <Skeleton className="h-10 w-16" />
+                      </div>
+                      <Skeleton className="h-64 w-full rounded-lg" />
+                    </div>
+                  }>
+                    {entity && <EntityTabsContent entity={entity} />}
+                  </Suspense>
                 </div>
 
-                {/* Sidebar */}
+                {/* Sidebar - Lazy Loaded */}
                 <div className="lg:col-span-1">
-                  {entity && (
-                    <EntitySidebar 
-                      entity={entity}
-                      isFollowing={false}
-                      followerCount={Math.floor(Math.random() * 1000) + 100}
-                      onFollowToggle={() => console.log('Follow toggled')}
-                    />
-                  )}
+                  <Suspense fallback={
+                    <div className="space-y-6">
+                      <div className="p-4 border rounded-lg">
+                        <Skeleton className="h-10 w-full mb-4" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                      <div className="p-6 border rounded-lg space-y-4">
+                        <Skeleton className="h-6 w-32 mb-4" />
+                        {[1, 2, 3, 4].map(i => (
+                          <div key={i} className="flex items-start gap-3">
+                            <Skeleton className="h-4 w-4 mt-1" />
+                            <div className="space-y-2">
+                              <Skeleton className="h-4 w-20" />
+                              <Skeleton className="h-3 w-32" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  }>
+                    {entity && (
+                      <EntitySidebar 
+                        entity={entity}
+                        isFollowing={false}
+                        followerCount={Math.floor(Math.random() * 1000) + 100}
+                        onFollowToggle={() => console.log('Follow toggled')}
+                      />
+                    )}
+                  </Suspense>
                 </div>
               </div>
             </div>
