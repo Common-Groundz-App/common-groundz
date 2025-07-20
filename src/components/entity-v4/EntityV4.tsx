@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
@@ -14,8 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import { EntityType } from '@/services/recommendation/types';
 import { SafeUserProfile } from '@/types/profile';
 import { MessageSquare } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
@@ -24,6 +23,8 @@ import { EntityRecommendationModal } from '@/components/entity/EntityRecommendat
 import { TrustSummaryCard } from './TrustSummaryCard';
 import { EntityHeader } from './EntityHeader';
 import { ReviewsSection } from './ReviewsSection';
+import { EntitySidebar } from './EntitySidebar';
+import { EntityTabsContent } from './TabsContent';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -265,83 +266,20 @@ const EntityV4 = () => {
                     entityName={entity?.name || ''}
                   />
 
-                  {/* Tabs Navigation */}
-                  <Tabs defaultValue="overview" className="mb-8">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="overview">Overview</TabsTrigger>
-                      <TabsTrigger value="products">Products</TabsTrigger>
-                      <TabsTrigger value="posts">Posts</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="overview" className="mt-6">
-                      <Card>
-                        <CardContent className="p-6">
-                          <h3 className="font-semibold mb-4">Company Overview</h3>
-                          <p className="text-gray-600 leading-relaxed">
-                            {entity?.name} is a leading health and wellness brand that has been at the forefront of providing 
-                            science-backed nutrition solutions for over a decade. Founded with the mission to make 
-                            premium supplements accessible to everyone, we focus on quality, transparency, and innovation.
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                    <TabsContent value="products" className="mt-6">
-                      <Card>
-                        <CardContent className="p-6">
-                          <h3 className="font-semibold mb-4">Featured Products</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="border rounded-lg p-4">
-                              <h4 className="font-medium">Whey Protein Isolate</h4>
-                              <p className="text-sm text-gray-600">Premium quality protein powder</p>
-                              <div className="flex items-center gap-1 mt-2">
-                                <div className="w-4 h-4 bg-yellow-400 rounded" />
-                                <span className="text-sm">4.5 (234 reviews)</span>
-                              </div>
-                            </div>
-                            <div className="border rounded-lg p-4">
-                              <h4 className="font-medium">Complete Multivitamin</h4>
-                              <p className="text-sm text-gray-600">Essential vitamins and minerals</p>
-                              <div className="flex items-center gap-1 mt-2">
-                                <div className="w-4 h-4 bg-yellow-400 rounded" />
-                                <span className="text-sm">4.3 (189 reviews)</span>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                    <TabsContent value="posts" className="mt-6">
-                      <Card>
-                        <CardContent className="p-6">
-                          <h3 className="font-semibold mb-4">Latest Posts</h3>
-                          <div className="space-y-4">
-                            <div className="border-b pb-4">
-                              <h4 className="font-medium mb-2">New Product Launch: Plant-Based Protein</h4>
-                              <p className="text-sm text-gray-600">We're excited to announce our latest addition to the Cosmix family...</p>
-                              <span className="text-xs text-gray-400">2 days ago</span>
-                            </div>
-                            <div className="border-b pb-4">
-                              <h4 className="font-medium mb-2">The Science Behind Whey Protein</h4>
-                              <p className="text-sm text-gray-600">Understanding the benefits and optimal usage of whey protein...</p>
-                              <span className="text-xs text-gray-400">1 week ago</span>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  </Tabs>
+                  {/* Tabs Content */}
+                  {entity && <EntityTabsContent entity={entity} />}
                 </div>
 
-                {/* Sidebar - This will be extracted in the next phase */}
+                {/* Sidebar */}
                 <div className="lg:col-span-1">
-                  {/* Sidebar content placeholder */}
-                  <div className="space-y-6 sticky top-8">
-                    <Card>
-                      <CardContent className="p-6">
-                        <h3 className="font-semibold mb-4">Business Info</h3>
-                        <p className="text-sm text-gray-600">Sidebar content will be modularized in the next phase.</p>
-                      </CardContent>
-                    </Card>
-                  </div>
+                  {entity && (
+                    <EntitySidebar 
+                      entity={entity}
+                      isFollowing={false}
+                      followerCount={Math.floor(Math.random() * 1000) + 100}
+                      onFollowToggle={() => console.log('Follow toggled')}
+                    />
+                  )}
                 </div>
               </div>
             </div>

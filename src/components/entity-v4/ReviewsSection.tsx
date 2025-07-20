@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ReviewCard from "@/components/ReviewCard";
-import { MessageCircle, Camera, Eye, Star } from "lucide-react";
+import { MessageCircle, Eye, Star } from "lucide-react";
+import { PhotoGallery } from './PhotoGallery';
 
 interface Review {
   id: number;
@@ -171,30 +172,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ entityId, entity
           </Card>
         </div>
 
-        {/* Photo Gallery */}
-        <Card className="mt-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="w-5 h-5" />
-                Photos & Videos
-              </CardTitle>
-              <Button variant="outline" size="sm">
-                <Camera className="w-4 h-4 mr-2" />
-                Add Photos
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {[1, 2, 3, 4, 5, 6].map(i => 
-                <div key={i} className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-gray-400" />
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Photo Gallery - Now extracted to separate component */}
+        <PhotoGallery entityName={entityName} />
 
         {/* You Might Also Consider */}
         <Card className="mt-8">
@@ -216,25 +195,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ entityId, entity
                   </div>
                 </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Meet the Founders */}
-        <Card className="mt-8">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <img 
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop" 
-                alt="Founder" 
-                className="w-16 h-16 rounded-full object-cover" 
-              />
-              <div>
-                <h3 className="font-semibold text-gray-900">Meet the Founder</h3>
-                <p className="text-blue-600 font-medium">Rohit Sharma</p>
-                <p className="text-sm text-gray-600">CEO & Co-founder</p>
-                <p className="text-sm text-gray-500 mt-1">15+ years in health & wellness industry</p>
-              </div>
             </div>
           </CardContent>
         </Card>
