@@ -138,22 +138,29 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
             {hasRatingData ? (
               Object.entries(trustMetrics?.ratingBreakdown || {})
                 .sort(([a], [b]) => parseInt(b) - parseInt(a))
-                .map(([stars, percentage]) => (
-                  <div key={stars} className="flex items-center gap-3 mb-2">
-                    <div className="flex items-center gap-1 w-8">
-                      <RatingRingIcon rating={parseInt(stars)} size={14} />
-                      <span className="text-sm">{stars}</span>
+                .map(([stars, percentage]) => {
+                  const ratingColor = getSentimentColor(parseInt(stars), true);
+                  return (
+                    <div key={stars} className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center gap-1 w-8">
+                        <RatingRingIcon rating={parseInt(stars)} size={14} />
+                        <span className="text-sm">{stars}</span>
+                      </div>
+                      <div className="flex-1 relative">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                          <div 
+                            className="h-full transition-all duration-300 ease-in-out rounded-full"
+                            style={{
+                              width: `${percentage}%`,
+                              backgroundColor: ratingColor
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-sm w-8 text-right">{percentage}%</span>
                     </div>
-                    <Progress 
-                      value={percentage} 
-                      className="flex-1" 
-                      style={{
-                        '--progress-foreground': getSentimentColor(parseInt(stars), true)
-                      } as React.CSSProperties}
-                    />
-                    <span className="text-sm w-8 text-right">{percentage}%</span>
-                  </div>
-                ))
+                  );
+                })
             ) : (
               <p className="text-sm text-muted-foreground">No rating data available</p>
             )}
