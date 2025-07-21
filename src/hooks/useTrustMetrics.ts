@@ -8,6 +8,7 @@ export interface TrustMetrics {
     [key: number]: number;
   };
   ratingEvolution: number[];
+  lastUpdated: string | null;
 }
 
 export const useTrustMetrics = (entityId: string | null, userId: string | null) => {
@@ -123,16 +124,50 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
         }).reverse(); // Show chronologically (oldest to newest)
       }
 
+      // Fetch Last Updated timestamp - get the most recent activity
+      let lastUpdated: string | null = null;
+      
+      const { data: lastActivityData, error: lastActivityError } = await supabase
+        .from('reviews')
+        .select('updated_at')
+        .eq('entity_id', entityId)
+        .eq('status', 'published')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      const { data: lastTimelineData, error: lastTimelineError } = await supabase
+        .from('review_updates')
+        .select('created_at, review_id')
+        .eq('review_id', supabase.from('reviews').select('id').eq('entity_id', entityId))
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      // Get the most recent between review updates and timeline updates
+      const reviewLastUpdated = lastActivityData?.[0]?.updated_at;
+      const timelineLastUpdated = lastTimelineData?.[0]?.created_at;
+
+      if (reviewLastUpdated && timelineLastUpdated) {
+        lastUpdated = new Date(reviewLastUpdated) > new Date(timelineLastUpdated) 
+          ? reviewLastUpdated 
+          : timelineLastUpdated;
+      } else if (reviewLastUpdated) {
+        lastUpdated = reviewLastUpdated;
+      } else if (timelineLastUpdated) {
+        lastUpdated = timelineLastUpdated;
+      }
+
       console.log('📊 Trust metrics calculated:', {
         circleCertified,
         ratingBreakdown,
-        ratingEvolution
+        ratingEvolution,
+        lastUpdated
       });
 
       return {
         circleCertified,
         ratingBreakdown,
-        ratingEvolution
+        ratingEvolution,
+        lastUpdated
       };
     },
     enabled: !!entityId,

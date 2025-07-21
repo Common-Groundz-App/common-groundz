@@ -8,6 +8,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { RatingRingIcon } from "@/components/ui/rating-ring-icon";
 import { useTrustMetrics } from "@/hooks/useTrustMetrics";
 import { getSentimentColor } from "@/utils/ratingColorUtils";
+import { formatRelativeDate } from "@/utils/dateUtils";
 
 interface TrustSummaryCardProps {
   entityId: string;
@@ -90,6 +91,14 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
       return "Not enough data";
     }
     return trustMetrics.ratingEvolution.join(' → ');
+  };
+
+  // Format Last Updated display
+  const getLastUpdatedDisplay = () => {
+    if (!trustMetrics?.lastUpdated) {
+      return "No recent activity";
+    }
+    return formatRelativeDate(trustMetrics.lastUpdated);
   };
 
   const circleCertifiedDisplay = getCircleCertifiedDisplay();
@@ -177,7 +186,7 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
               <InfoTooltip content="Average rating trend over the last 4 quarters." />
             </div>
           </div>
-          <span className="text-xs text-gray-500">Last Updated: 2 days ago</span>
+          <span className="text-xs text-gray-500">Last Updated: {getLastUpdatedDisplay()}</span>
         </div>
       </CardContent>
     </Card>
