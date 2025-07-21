@@ -218,7 +218,10 @@ const EntityV4 = () => {
               {/* Main Content */}
               <div className="lg:col-span-3">
                 {/* SECTION 2: Trust & Review Summary */}
-                <TrustSummaryCard />
+                <TrustSummaryCard 
+                  entityId={entity?.id || ''} 
+                  userId={user?.id || null}
+                />
 
                 {/* SECTION 3: Reviews & Social Proof */}
                 <ReviewsSection />
