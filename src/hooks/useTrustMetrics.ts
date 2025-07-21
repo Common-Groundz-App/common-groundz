@@ -135,12 +135,25 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
         .order('updated_at', { ascending: false })
         .limit(1);
 
-      const { data: lastTimelineData, error: lastTimelineError } = await supabase
-        .from('review_updates')
-        .select('created_at, review_id')
-        .eq('review_id', supabase.from('reviews').select('id').eq('entity_id', entityId))
-        .order('created_at', { ascending: false })
-        .limit(1);
+      // First get review IDs for this entity
+      const { data: entityReviews } = await supabase
+        .from('reviews')
+        .select('id')
+        .eq('entity_id', entityId)
+        .eq('status', 'published');
+
+      const reviewIds = entityReviews?.map(r => r.id) || [];
+
+      let lastTimelineData: any[] | null = null;
+      if (reviewIds.length > 0) {
+        const { data, error: lastTimelineError } = await supabase
+          .from('review_updates')
+          .select('created_at')
+          .in('review_id', reviewIds)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        lastTimelineData = data;
+      }
 
       // Get the most recent between review updates and timeline updates
       const reviewLastUpdated = lastActivityData?.[0]?.updated_at;
