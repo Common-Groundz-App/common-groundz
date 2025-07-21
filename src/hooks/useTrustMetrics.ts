@@ -23,28 +23,32 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
       // Fetch Circle Certified percentage
       let circleCertified: number | null = null;
       if (userId) {
-        const { data: circleData, error: circleError } = await supabase
-          .from('reviews')
-          .select('rating')
-          .eq('entity_id', entityId)
-          .eq('status', 'published')
-          .in('user_id', [
-            // Get users that current user follows
-            supabase
-              .from('follows')
-              .select('following_id')
-              .eq('follower_id', userId)
-          ]);
+        // First get users that current user follows
+        const { data: followedUsers, error: followError } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', userId);
 
-        if (!circleError && circleData) {
-          const totalCircleReviews = circleData.length;
-          const highRatedCircleReviews = circleData.filter(review => 
-            (review.rating || 0) >= 4
-          ).length;
+        if (!followError && followedUsers && followedUsers.length > 0) {
+          const followedUserIds = followedUsers.map(f => f.following_id);
           
-          circleCertified = totalCircleReviews > 0 
-            ? Math.round((highRatedCircleReviews / totalCircleReviews) * 100)
-            : null;
+          const { data: circleData, error: circleError } = await supabase
+            .from('reviews')
+            .select('rating')
+            .eq('entity_id', entityId)
+            .eq('status', 'published')
+            .in('user_id', followedUserIds);
+
+          if (!circleError && circleData) {
+            const totalCircleReviews = circleData.length;
+            const highRatedCircleReviews = circleData.filter(review => 
+              (review.rating || 0) >= 4
+            ).length;
+            
+            circleCertified = totalCircleReviews > 0 
+              ? Math.round((highRatedCircleReviews / totalCircleReviews) * 100)
+              : null;
+          }
         }
       }
 
