@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { RatingRingIcon } from "@/components/ui/rating-ring-icon";
 import { useTrustMetrics } from "@/hooks/useTrustMetrics";
+import { getSentimentColor } from "@/utils/ratingColorUtils";
 
 interface TrustSummaryCardProps {
   entityId: string;
@@ -38,10 +39,16 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
               </div>
               <div className="space-y-2">
                 <div className="h-4 bg-gray-200 rounded"></div>
-                {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="flex gap-3">
+                {[5, 4, 3, 2, 1].map(rating => (
+                  <div key={rating} className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-4 bg-gray-200 rounded"></div>
-                    <div className="flex-1 h-2 bg-gray-200 rounded"></div>
+                    <Progress 
+                      value={Math.floor(Math.random() * 50) + 10} 
+                      className="flex-1" 
+                      style={{
+                        '--progress-foreground': getSentimentColor(rating, true)
+                      } as React.CSSProperties}
+                    />
                     <div className="w-8 h-4 bg-gray-200 rounded"></div>
                   </div>
                 ))}
