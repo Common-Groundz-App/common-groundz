@@ -1,10 +1,10 @@
-
 import React from 'react';
 import { Award, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { RatingRingIcon } from "@/components/ui/rating-ring-icon";
 import { useTrustMetrics } from "@/hooks/useTrustMetrics";
 
 interface TrustSummaryCardProps {
@@ -132,7 +132,10 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
                 .sort(([a], [b]) => parseInt(b) - parseInt(a))
                 .map(([stars, percentage]) => (
                   <div key={stars} className="flex items-center gap-3 mb-2">
-                    <span className="text-sm w-8">{stars}★</span>
+                    <div className="flex items-center gap-1 w-8">
+                      <RatingRingIcon rating={parseInt(stars)} size={14} />
+                      <span className="text-sm">{stars}</span>
+                    </div>
                     <Progress value={percentage} className="flex-1" />
                     <span className="text-sm w-8 text-right">{percentage}%</span>
                   </div>
