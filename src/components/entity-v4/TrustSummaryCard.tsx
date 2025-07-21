@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Award, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -143,7 +144,13 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
                       <RatingRingIcon rating={parseInt(stars)} size={14} />
                       <span className="text-sm">{stars}</span>
                     </div>
-                    <Progress value={percentage} className="flex-1" />
+                    <Progress 
+                      value={percentage} 
+                      className="flex-1" 
+                      style={{
+                        '--progress-foreground': getSentimentColor(parseInt(stars), true)
+                      } as React.CSSProperties}
+                    />
                     <span className="text-sm w-8 text-right">{percentage}%</span>
                   </div>
                 ))
