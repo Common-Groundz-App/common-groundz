@@ -34,28 +34,37 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
           
           const { data: circleData, error: circleError } = await supabase
             .from('reviews')
-            .select('rating')
+            .select('rating, latest_rating')
             .eq('entity_id', entityId)
             .eq('status', 'published')
             .in('user_id', followedUserIds);
 
           if (!circleError && circleData) {
+            console.log('🔍 Circle data found:', circleData);
             const totalCircleReviews = circleData.length;
-            const highRatedCircleReviews = circleData.filter(review => 
-              (review.rating || 0) >= 4
-            ).length;
+            const highRatedCircleReviews = circleData.filter(review => {
+              const effectiveRating = review.latest_rating ?? review.rating;
+              console.log('🔍 Review rating:', review.rating, 'latest:', review.latest_rating, 'effective:', effectiveRating);
+              return (effectiveRating || 0) >= 4;
+            }).length;
             
             circleCertified = totalCircleReviews > 0 
               ? Math.round((highRatedCircleReviews / totalCircleReviews) * 100)
               : null;
+            
+            console.log('🔍 Circle Certified calculation:', {
+              totalCircleReviews,
+              highRatedCircleReviews,
+              circleCertified
+            });
           }
         }
       }
 
-      // Fetch Rating Breakdown
+      // Fetch Rating Breakdown using latest ratings
       const { data: ratingData, error: ratingError } = await supabase
         .from('reviews')
-        .select('rating')
+        .select('rating, latest_rating')
         .eq('entity_id', entityId)
         .eq('status', 'published');
 
@@ -65,9 +74,10 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
         const breakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
         
         ratingData.forEach(review => {
-          const rating = review.rating || 0;
-          if (rating >= 1 && rating <= 5) {
-            breakdown[Math.floor(rating)] += 1;
+          const effectiveRating = review.latest_rating ?? review.rating;
+          console.log('🔍 Breakdown - rating:', review.rating, 'latest:', review.latest_rating, 'effective:', effectiveRating);
+          if (effectiveRating && effectiveRating >= 1 && effectiveRating <= 5) {
+            breakdown[Math.floor(effectiveRating)] += 1;
           }
         });
 
@@ -78,7 +88,7 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
         });
       }
 
-      // Fetch Rating Evolution (quarterly)
+      // Fetch Rating Evolution (quarterly) - using original ratings for historical progression
       const { data: evolutionData, error: evolutionError } = await supabase
         .from('reviews')
         .select('rating, created_at')
