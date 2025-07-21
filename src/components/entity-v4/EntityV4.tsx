@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
@@ -178,7 +177,7 @@ const EntityV4 = () => {
   // Get entity image with fallback
   const entityImage = entity?.image_url || getEntityTypeFallbackImage(entity?.type || EntityType.Product);
   
-  // Prepare entity data using real data
+  // Prepare entity data using real data (for EntityHeader only)
   const entityData = {
     name: entity?.name || '',
     description: entity?.description || '',
@@ -232,7 +231,7 @@ const EntityV4 = () => {
 
               {/* SECTION 5: Info & Discovery Sidebar */}
               <div className="lg:col-span-1">
-                <EntitySidebar entityData={entityData} />
+                {entity && <EntitySidebar entity={entity} />}
               </div>
             </div>
           </div>
