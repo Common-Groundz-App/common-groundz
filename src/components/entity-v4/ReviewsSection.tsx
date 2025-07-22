@@ -1,44 +1,62 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { MessageCircle, Camera, Eye, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import ReviewCard from "@/components/ReviewCard";
+import { ReviewWithUser } from '@/types/entities';
+import { 
+  transformReviewForUI, 
+  filterReviews, 
+  getTimelineReviews, 
+  getCircleHighlightedReviews,
+  generateTimelineDisplay 
+} from '@/utils/reviewDataUtils';
 
-export const ReviewsSection: React.FC = () => {
-  // Mock Reviews - TODO: Replace with real data
-  const mockReviews = [{
-    id: 1,
-    name: "Priya Sharma",
-    avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b515?w=50&h=50&fit=crop",
-    rating: 5,
-    date: "2024-01-15",
-    title: "Excellent protein powder quality!",
-    content: "I've been using Cosmix whey protein for 6 months now and the results are amazing. The taste is great and it mixes well without clumps.",
-    verified: true,
-    helpful: 23
-  }, {
-    id: 2,
-    name: "Rahul Kumar",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop",
-    rating: 4,
-    date: "2024-01-10",
-    title: "Good value for money",
-    content: "The supplements are effective and reasonably priced compared to other premium brands. Delivery was quick too.",
-    verified: true,
-    helpful: 15
-  }, {
-    id: 3,
-    name: "Sneha Patel",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=50&h=50&fit=crop",
-    rating: 5,
-    date: "2024-01-08",
-    title: "Circle recommended - Worth it!",
-    content: "Found this through Circle recommendations and so glad I tried it. The multivitamins have really improved my energy levels.",
-    verified: true,
-    helpful: 31
-  }];
+interface ReviewsSectionProps {
+  reviews: ReviewWithUser[];
+  entityName: string;
+  userFollowingIds?: string[];
+  onHelpfulClick?: (reviewId: string) => void;
+  onQuestionClick?: () => void;
+}
+
+export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ 
+  reviews = [], 
+  entityName = '',
+  userFollowingIds = [],
+  onHelpfulClick,
+  onQuestionClick 
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState({
+    mostRecent: false,
+    verified: false,
+    fiveStars: false
+  });
+
+  // Process reviews with filters
+  const filteredReviews = filterReviews(reviews, {
+    search: searchQuery || undefined,
+    verified: activeFilters.verified || undefined,
+    rating: activeFilters.fiveStars ? 5 : undefined,
+    mostRecent: activeFilters.mostRecent || undefined
+  });
+
+  // Get special review categories
+  const timelineReviews = getTimelineReviews(filteredReviews);
+  const circleHighlightedReviews = getCircleHighlightedReviews(filteredReviews, userFollowingIds);
+
+  // Transform reviews for UI
+  const transformedReviews = filteredReviews.slice(0, 3).map(transformReviewForUI);
+
+  const toggleFilter = (filter: keyof typeof activeFilters) => {
+    setActiveFilters(prev => ({
+      ...prev,
+      [filter]: !prev[filter]
+    }));
+  };
 
   return (
     <>
@@ -49,9 +67,13 @@ export const ReviewsSection: React.FC = () => {
             <MessageCircle className="w-8 h-8 text-blue-600" />
             <div className="flex-1">
               <h3 className="font-semibold text-gray-900 mb-1">Ask the Community</h3>
-              <p className="text-sm text-gray-600">Get answers from people who have used Cosmix products</p>
+              <p className="text-sm text-gray-600">Get answers from people who have used {entityName} products</p>
             </div>
-            <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50">
+            <Button 
+              variant="outline" 
+              className="border-blue-300 text-blue-700 hover:bg-blue-50"
+              onClick={onQuestionClick}
+            >
               Ask Question
             </Button>
           </div>
@@ -63,61 +85,106 @@ export const ReviewsSection: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Reviews & Social Proof</h2>
           <div className="flex gap-2">
-            <Badge variant="outline">Most Recent</Badge>
-            <Badge variant="outline">Verified Only</Badge>
-            <Badge variant="outline">5 Stars</Badge>
+            <Badge 
+              variant={activeFilters.mostRecent ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => toggleFilter('mostRecent')}
+            >
+              Most Recent
+            </Badge>
+            <Badge 
+              variant={activeFilters.verified ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => toggleFilter('verified')}
+            >
+              Verified Only
+            </Badge>
+            <Badge 
+              variant={activeFilters.fiveStars ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => toggleFilter('fiveStars')}
+            >
+              5 Stars
+            </Badge>
           </div>
         </div>
 
         {/* Search Bar */}
         <div className="relative mb-6">
-          <input type="text" placeholder="Search reviews..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <input 
+            type="text" 
+            placeholder="Search reviews..." 
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
 
         {/* Review Cards */}
         <div className="space-y-6">
-          {mockReviews.map(review => <ReviewCard key={review.id} review={review} />)}
+          {transformedReviews.length > 0 ? (
+            transformedReviews.map(review => (
+              <ReviewCard 
+                key={review.id} 
+                review={review} 
+                onHelpfulClick={onHelpfulClick}
+              />
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              {reviews.length === 0 ? (
+                <p>No reviews yet. Be the first to share your experience!</p>
+              ) : (
+                <p>No reviews match your current filters.</p>
+              )}
+            </div>
+          )}
 
           {/* Timeline Review */}
-          <Card className="border-l-4 border-l-blue-500">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop" alt="Timeline reviewer" className="w-12 h-12 rounded-full" />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-semibold">Arjun Mehta</h4>
-                    <Badge className="bg-blue-100 text-blue-800">Timeline Review</Badge>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="border-l-2 border-gray-200 pl-4">
-                      <div className="text-sm text-gray-500 mb-1">3 months ago</div>
-                      <p className="text-gray-700">Started using Cosmix whey protein. Initial impressions are good.</p>
+          {timelineReviews.length > 0 && (
+            <Card className="border-l-4 border-l-blue-500">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <img 
+                    src={timelineReviews[0].user.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop"} 
+                    alt="Timeline reviewer" 
+                    className="w-12 h-12 rounded-full" 
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-semibold">{timelineReviews[0].user.username}</h4>
+                      <Badge className="bg-blue-100 text-blue-800">Timeline Review</Badge>
                     </div>
-                    <div className="border-l-2 border-gray-200 pl-4">
-                      <div className="text-sm text-gray-500 mb-1">2 months ago</div>
-                      <p className="text-gray-700">Seeing good results in muscle gain. Taste is better than expected.</p>
-                    </div>
-                    <div className="border-l-2 border-blue-400 pl-4">
-                      <div className="text-sm text-gray-500 mb-1">1 week ago</div>
-                      <p className="text-gray-700">Completely satisfied! Will definitely repurchase. ⭐⭐⭐⭐⭐</p>
+                    <div className="space-y-4">
+                      {generateTimelineDisplay(timelineReviews[0])?.map((step, index) => (
+                        <div key={index} className={`border-l-2 ${index === 2 ? 'border-blue-400' : 'border-gray-200'} pl-4`}>
+                          <div className="text-sm text-gray-500 mb-1">{step.period}</div>
+                          <p className="text-gray-700">{step.content}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Circle Highlighted Review */}
-          <Card className="border-2 border-blue-200 bg-blue-50/30">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Badge className="bg-blue-600 text-white">Circle Highlighted</Badge>
-                <Eye className="w-4 h-4 text-blue-600" />
-                <span className="text-sm text-blue-600 font-medium">Trending in your network</span>
-              </div>
-              <ReviewCard review={mockReviews[2]} />
-            </CardContent>
-          </Card>
+          {circleHighlightedReviews.length > 0 && (
+            <Card className="border-2 border-blue-200 bg-blue-50/30">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Badge className="bg-blue-600 text-white">Circle Highlighted</Badge>
+                  <Eye className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm text-blue-600 font-medium">Trending in your network</span>
+                </div>
+                <ReviewCard 
+                  review={transformReviewForUI(circleHighlightedReviews[0])} 
+                  onHelpfulClick={onHelpfulClick}
+                />
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Photo Gallery */}

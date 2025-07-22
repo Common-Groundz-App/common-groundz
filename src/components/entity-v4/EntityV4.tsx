@@ -222,8 +222,20 @@ const EntityV4 = () => {
                   userId={user?.id || null}
                 />
 
-                {/* SECTION 3: Reviews & Social Proof */}
-                <ReviewsSection />
+                {/* SECTION 3: Reviews & Social Proof - Now Dynamic */}
+                <ReviewsSection 
+                  reviews={reviews}
+                  entityName={entity?.name || ''}
+                  userFollowingIds={[]} // TODO: Add user's following IDs from follow relationships
+                  onHelpfulClick={(reviewId) => {
+                    // TODO: Implement helpful vote functionality
+                    console.log('Helpful clicked for review:', reviewId);
+                  }}
+                  onQuestionClick={() => {
+                    // TODO: Implement ask community functionality
+                    console.log('Ask question clicked');
+                  }}
+                />
 
                 {/* SECTION 4: Tabs Navigation */}
                 <EntityTabsContent />
