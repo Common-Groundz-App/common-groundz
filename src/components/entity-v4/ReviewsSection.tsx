@@ -1,18 +1,17 @@
 
 import React, { useState } from 'react';
-import { MessageCircle, Camera, Eye, Star, Clock } from "lucide-react";
+import { MessageCircle, Camera, Eye, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import ReviewCard from "@/components/ReviewCard";
 import { ReviewWithUser } from '@/types/entities';
-import { TimelineBadge } from '@/components/profile/reviews/TimelineBadge';
-import { TimelinePreview } from '@/components/profile/reviews/TimelinePreview';
 import { 
   transformReviewForUI, 
   filterReviews, 
   getTimelineReviews, 
-  getCircleHighlightedReviews
+  getCircleHighlightedReviews,
+  generateTimelineDisplay 
 } from '@/utils/reviewDataUtils';
 
 interface ReviewsSectionProps {
@@ -21,7 +20,6 @@ interface ReviewsSectionProps {
   userFollowingIds?: string[];
   onHelpfulClick?: (reviewId: string) => void;
   onQuestionClick?: () => void;
-  onTimelineClick?: (reviewId: string, reviewOwnerId: string, reviewTitle: string, initialRating: number) => void;
 }
 
 export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ 
@@ -29,8 +27,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   entityName = '',
   userFollowingIds = [],
   onHelpfulClick,
-  onQuestionClick,
-  onTimelineClick
+  onQuestionClick 
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState({
@@ -59,12 +56,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
       ...prev,
       [filter]: !prev[filter]
     }));
-  };
-
-  const handleTimelineClick = (review: ReviewWithUser) => {
-    if (onTimelineClick) {
-      onTimelineClick(review.id, review.user_id, review.title, review.rating);
-    }
   };
 
   return (
@@ -149,74 +140,34 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             </div>
           )}
 
-          {/* Timeline Review with Basic Data */}
-          {timelineReviews.length > 0 && (() => {
-            const firstTimelineReview = timelineReviews[0];
-            const initialRating = firstTimelineReview.rating;
-            const latestRating = firstTimelineReview.latest_rating || initialRating;
-            const updateCount = firstTimelineReview.timeline_count || 0;
-
-            return (
-              <Card 
-                className="border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => handleTimelineClick(firstTimelineReview)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <img 
-                      src={firstTimelineReview.user.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop"} 
-                      alt="Timeline reviewer" 
-                      className="w-12 h-12 rounded-full" 
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-3">
-                        <h4 className="font-semibold">{firstTimelineReview.user.username}</h4>
-                        <TimelineBadge 
-                          updateCount={updateCount} 
-                          variant="default"
-                        />
-                        <Badge className="bg-blue-100 text-blue-800">Timeline Review</Badge>
-                      </div>
-
-                      {/* Timeline Preview */}
-                      {latestRating !== initialRating && (
-                        <div className="mb-4">
-                          <TimelinePreview
-                            initialRating={initialRating}
-                            latestRating={latestRating}
-                            updateCount={updateCount}
-                          />
+          {/* Timeline Review */}
+          {timelineReviews.length > 0 && (
+            <Card className="border-l-4 border-l-blue-500">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <img 
+                    src={timelineReviews[0].user.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop"} 
+                    alt="Timeline reviewer" 
+                    className="w-12 h-12 rounded-full" 
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-semibold">{timelineReviews[0].user.username}</h4>
+                      <Badge className="bg-blue-100 text-blue-800">Timeline Review</Badge>
+                    </div>
+                    <div className="space-y-4">
+                      {generateTimelineDisplay(timelineReviews[0])?.map((step, index) => (
+                        <div key={index} className={`border-l-2 ${index === 2 ? 'border-blue-400' : 'border-gray-200'} pl-4`}>
+                          <div className="text-sm text-gray-500 mb-1">{step.period}</div>
+                          <p className="text-gray-700">{step.content}</p>
                         </div>
-                      )}
-
-                      {/* Basic Timeline Info */}
-                      <div className="space-y-4">
-                        <div className="border-l-2 border-blue-300 pl-4">
-                          <div className="text-sm text-gray-500 mb-1 flex items-center gap-2">
-                            <Clock className="h-3 w-3" />
-                            Initial Review
-                            <div className="flex items-center gap-1">
-                              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                              <span className="font-medium">{initialRating}</span>
-                            </div>
-                          </div>
-                          <p className="text-gray-700 text-sm">
-                            {firstTimelineReview.description || `Started using ${entityName}.`}
-                          </p>
-                        </div>
-                        
-                        {updateCount > 0 && (
-                          <div className="text-sm text-blue-600 font-medium">
-                            +{updateCount} timeline update{updateCount !== 1 ? 's' : ''} available
-                          </div>
-                        )}
-                      </div>
+                      ))}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Circle Highlighted Review */}
           {circleHighlightedReviews.length > 0 && (
