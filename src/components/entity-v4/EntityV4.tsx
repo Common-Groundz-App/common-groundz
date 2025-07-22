@@ -256,34 +256,36 @@ const EntityV4 = () => {
                 {/* Main Content - 8 columns */}
                 <div className="lg:col-span-8 space-y-6">
                   {/* Entity Header */}
-                  <EntityHeader entity={entity} />
+                  <EntityHeader 
+                    entity={entity}
+                    stats={stats}
+                    entityImage={entity.image_url || getEntityTypeFallbackImage(entity.type)}
+                    entityData={{
+                      name: entity.name,
+                      description: entity.description || '',
+                      rating: stats?.averageRating || 0,
+                      totalReviews: stats?.reviewCount || 0,
+                      claimed: entity.is_claimed || false,
+                      website: entity.metadata?.website || ''
+                    }}
+                    onRecommendationModalOpen={() => setIsRecommendationModalOpen(true)}
+                    onReviewAction={getSidebarButtonConfig().action}
+                    reviewActionConfig={getSidebarButtonConfig()}
+                  />
                   
                   {/* Trust Summary Card */}
                   <TrustSummaryCard 
-                    entity={entity}
-                    timelineData={timelineData}
-                    isTimelineLoading={isTimelineLoading}
-                    timelineError={timelineError}
+                    entityId={entity.id}
+                    userId={user?.id}
                   />
                   
                   {/* Tabs Content */}
-                  <EntityTabsContent 
-                    entity={entity}
-                    reviews={reviews}
-                    onTimelineClick={handleTimelineClick}
-                  />
+                  <EntityTabsContent />
                 </div>
                 
                 {/* Sidebar - 4 columns */}
                 <div className="lg:col-span-4">
-                  <EntitySidebar
-                    entity={entity}
-                    stats={stats}
-                    userReview={userReview}
-                    sidebarConfig={getSidebarButtonConfig()}
-                    onFollowersClick={() => setIsFollowersModalOpen(true)}
-                    onRecommendClick={() => setIsRecommendationModalOpen(true)}
-                  />
+                  <EntitySidebar entity={entity} />
                 </div>
               </div>
             </div>
@@ -296,15 +298,20 @@ const EntityV4 = () => {
           
           {/* Modals */}
           <EntityFollowerModal
-            isOpen={isFollowersModalOpen}
-            onClose={() => setIsFollowersModalOpen(false)}
-            entityId={entity?.id}
+            open={isFollowersModalOpen}
+            onOpenChange={setIsFollowersModalOpen}
+            entityId={entity?.id || ''}
+            entityName={entity?.name}
+            totalFollowersCount={0}
           />
           
           <EntityRecommendationModal
-            entity={entity}
-            isOpen={isRecommendationModalOpen}
-            onClose={() => setIsRecommendationModalOpen(false)}
+            open={isRecommendationModalOpen}
+            onOpenChange={setIsRecommendationModalOpen}
+            entityId={entity?.id || ''}
+            entityName={entity?.name}
+            totalRecommendationCount={stats?.recommendationCount || 0}
+            circleRecommendationCount={stats?.circleRecommendationCount || 0}
           />
           
           {/* Review Form */}
@@ -312,10 +319,16 @@ const EntityV4 = () => {
             <ReviewForm
               isOpen={isReviewFormOpen}
               onClose={() => setIsReviewFormOpen(false)}
-              entity={entity}
-              entityName={entity.name}
-              totalRecommendationCount={stats?.recommendationCount || 0}
-              circleRecommendationCount={stats?.circleRecommendationCount || 0}
+              onSubmit={handleReviewSubmit}
+              entity={{
+                id: entity.id,
+                name: entity.name,
+                type: entity.type,
+                venue: entity.venue,
+                image_url: entity.image_url,
+                description: entity.description,
+                metadata: entity.metadata
+              }}
             />
           )}
 
