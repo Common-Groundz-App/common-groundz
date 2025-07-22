@@ -2065,8 +2065,12 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
       }
+      fix_duplicate_slugs: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       generate_entity_slug: {
-        Args: { name: string }
+        Args: { name: string } | { name: string; current_entity_id?: string }
         Returns: string
       }
       get_admin_analytics: {
