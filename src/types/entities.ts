@@ -44,6 +44,7 @@ export interface ReviewWithUser extends WithUserProfile, InteractionData, Timest
   timeline_count: number;
   trust_score: number;
   is_recommended: boolean;
+  is_verified?: boolean;
   latest_rating?: number;
   media?: MediaItem[];
   ai_summary?: string;
