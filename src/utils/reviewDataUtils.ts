@@ -1,5 +1,7 @@
 
 import { ReviewWithUser } from '@/types/entities';
+import { ReviewUpdate } from '@/services/reviewService';
+import { formatRelativeDate } from '@/utils/dateUtils';
 
 // Transform ReviewWithUser to format expected by UI components
 export const transformReviewForUI = (review: ReviewWithUser) => ({
@@ -69,24 +71,60 @@ export const getCircleHighlightedReviews = (reviews: ReviewWithUser[], userFollo
   );
 };
 
-// Generate mock timeline data structure for a review
-export const generateTimelineDisplay = (review: ReviewWithUser) => {
-  if (!review.has_timeline) return null;
+// Transform real timeline updates into display format
+export const transformTimelineUpdates = (review: ReviewWithUser, updates: ReviewUpdate[]) => {
+  if (!review.has_timeline || updates.length === 0) return null;
+
+  // Sort updates by creation date (oldest first)
+  const sortedUpdates = [...updates].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
 
   const timelineSteps = [
     {
-      period: `${Math.floor(Math.random() * 6) + 1} months ago`,
-      content: `Started using ${review.entity?.name || 'this product'}. Initial impressions are good.`
-    },
-    {
-      period: `${Math.floor(Math.random() * 3) + 1} months ago`,
-      content: `Seeing good results. ${review.rating >= 4 ? 'Experience is better than expected.' : 'Some mixed results so far.'}`
-    },
-    {
-      period: '1 week ago',
-      content: `${review.rating >= 4 ? 'Completely satisfied! Will definitely repurchase.' : 'Final thoughts: it\'s okay but not amazing.'} ${review.rating >= 4 ? '⭐'.repeat(Math.floor(review.latest_rating || review.rating)) : '⭐'.repeat(Math.floor(review.rating))}`
+      period: formatRelativeDate(review.created_at),
+      content: review.description || `Started using ${review.entity?.name || 'this product'}.`,
+      rating: review.rating,
+      type: 'initial' as const
     }
   ];
 
+  // Add each update as a timeline step
+  sortedUpdates.forEach((update, index) => {
+    timelineSteps.push({
+      period: formatRelativeDate(update.created_at),
+      content: update.comment,
+      rating: update.rating || undefined,
+      type: 'update' as const
+    });
+  });
+
   return timelineSteps;
+};
+
+// Calculate timeline progression (initial vs latest rating)
+export const calculateTimelineProgression = (review: ReviewWithUser, updates: ReviewUpdate[]) => {
+  const initialRating = review.rating;
+  
+  // Find the latest update with a rating
+  const updatesWithRating = updates
+    .filter(u => u.rating !== null)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  
+  const latestRating = updatesWithRating.length > 0 
+    ? updatesWithRating[0].rating!
+    : review.latest_rating || initialRating;
+
+  return {
+    initialRating,
+    latestRating,
+    updateCount: updates.length,
+    hasProgression: latestRating !== initialRating
+  };
+};
+
+// Legacy function - kept for backward compatibility but deprecated
+export const generateTimelineDisplay = (review: ReviewWithUser) => {
+  console.warn('generateTimelineDisplay is deprecated. Use transformTimelineUpdates with real data instead.');
+  return null;
 };

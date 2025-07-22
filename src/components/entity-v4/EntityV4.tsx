@@ -109,6 +109,12 @@ const EntityV4 = () => {
     setIsTimelineViewerOpen(true);
   };
 
+  // New handler for timeline clicks from ReviewsSection
+  const handleTimelineClick = (reviewId: string, reviewOwnerId: string, reviewTitle: string, initialRating: number) => {
+    setTimelineReviewId(reviewId);
+    setIsTimelineViewerOpen(true);
+  };
+
   const handleReviewSubmit = async () => {
     try {
       setIsReviewFormOpen(false);
@@ -222,7 +228,7 @@ const EntityV4 = () => {
                   userId={user?.id || null}
                 />
 
-                {/* SECTION 3: Reviews & Social Proof - Now Dynamic */}
+                {/* SECTION 3: Reviews & Social Proof - Now with Real Timeline Data */}
                 <ReviewsSection 
                   reviews={reviews}
                   entityName={entity?.name || ''}
@@ -235,6 +241,7 @@ const EntityV4 = () => {
                     // TODO: Implement ask community functionality
                     console.log('Ask question clicked');
                   }}
+                  onTimelineClick={handleTimelineClick}
                 />
 
                 {/* SECTION 4: Tabs Navigation */}
