@@ -71,6 +71,14 @@ export const getCircleHighlightedReviews = (reviews: ReviewWithUser[], userFollo
   );
 };
 
+// Timeline step type definition
+export interface TimelineStep {
+  period: string;
+  content: string;
+  rating?: number;
+  type: 'initial' | 'update';
+}
+
 // Transform real timeline updates into display format
 export const transformTimelineUpdates = (review: ReviewWithUser, updates: ReviewUpdate[]) => {
   if (!review.has_timeline || updates.length === 0) return null;
@@ -80,12 +88,12 @@ export const transformTimelineUpdates = (review: ReviewWithUser, updates: Review
     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
 
-  const timelineSteps = [
+  const timelineSteps: TimelineStep[] = [
     {
       period: formatRelativeDate(review.created_at),
       content: review.description || `Started using ${review.entity?.name || 'this product'}.`,
       rating: review.rating,
-      type: 'initial' as const
+      type: 'initial'
     }
   ];
 
