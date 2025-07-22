@@ -17,6 +17,10 @@ import AdminSidebar from '@/components/admin/AdminSidebar';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Database } from '@/integrations/supabase/types';
 import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations';
+import { BusinessHoursEditor } from '@/components/admin/BusinessHoursEditor';
+import { ContactInfoEditor } from '@/components/admin/ContactInfoEditor';
+import { EntityTypeSpecificFields } from '@/components/admin/EntityTypeSpecificFields';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -40,6 +44,8 @@ const AdminEntityEdit = () => {
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [metadataText, setMetadataText] = useState('');
   const [adminActions, setAdminActions] = useState<any[]>([]);
+  const [businessHours, setBusinessHours] = useState<any>({});
+  const [contactInfo, setContactInfo] = useState<any>({});
 
   useEffect(() => {
     if (!user || !session) {
@@ -67,6 +73,11 @@ const AdminEntityEdit = () => {
 
       setEntity(data);
       setMetadataText(data.metadata ? JSON.stringify(data.metadata, null, 2) : '{}');
+      
+      // Extract business hours and contact info from metadata
+      const metadata = (data.metadata as any) || {};
+      setBusinessHours(metadata.business_hours || {});
+      setContactInfo(metadata.contact || {});
     } catch (error) {
       console.error('Error fetching entity:', error);
       toast({
@@ -196,6 +207,13 @@ const AdminEntityEdit = () => {
     try {
       console.log('handleSave: Attempting to save entity:', entity.id);
       
+      // Merge business hours and contact info into metadata
+      const updatedMetadata = {
+        ...(entity.metadata as any || {}),
+        business_hours: businessHours,
+        contact: contactInfo
+      };
+      
       const { error } = await supabase
         .from('entities')
         .update({
@@ -208,11 +226,22 @@ const AdminEntityEdit = () => {
           venue: entity.venue?.trim() || null,
           api_source: entity.api_source?.trim() || null,
           api_ref: entity.api_ref?.trim() || null,
-          metadata: entity.metadata,
+          metadata: updatedMetadata,
           category_id: entity.category_id || null,
           popularity_score: entity.popularity_score || null,
           photo_reference: entity.photo_reference?.trim() || null,
           is_claimed: entity.is_claimed || false,
+          // Include type-specific fields
+          authors: entity.authors,
+          isbn: entity.isbn,
+          languages: entity.languages,
+          publication_year: entity.publication_year,
+          cast_crew: entity.cast_crew,
+          ingredients: entity.ingredients,
+          nutritional_info: entity.nutritional_info,
+          specifications: entity.specifications,
+          price_info: entity.price_info,
+          external_ratings: entity.external_ratings,
           updated_at: new Date().toISOString()
         })
         .eq('id', entity.id);
@@ -404,277 +433,313 @@ const AdminEntityEdit = () => {
               </p>
             </div>
 
-            <div className="space-y-6">
-              {/* Basic Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Basic Information</CardTitle>
-                  <CardDescription>
-                    Core entity details and identification
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Name *</Label>
-                      <Input
-                        id="name"
-                        value={entity.name}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
-                        placeholder="Entity name"
-                        disabled={entity.is_deleted}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Type *</Label>
-                      <Select 
-                        value={entity.type} 
-                        onValueChange={(value) => handleInputChange('type', value)}
-                        disabled={entity.is_deleted}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {entityTypes.map(type => (
-                            <SelectItem key={type} value={type}>
-                              {type.charAt(0).toUpperCase() + type.slice(1)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+            <Tabs defaultValue="basic" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="basic">Basic</TabsTrigger>
+                <TabsTrigger value="contact">Contact</TabsTrigger>
+                <TabsTrigger value="hours">Hours</TabsTrigger>
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="advanced">Advanced</TabsTrigger>
+              </TabsList>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="slug">Slug</Label>
-                    <Input
-                      id="slug"
-                      value={entity.slug || ''}
-                      onChange={(e) => handleInputChange('slug', e.target.value)}
-                      placeholder="URL-friendly identifier"
-                      disabled={entity.is_deleted}
-                    />
-                  </div>
-
-                   <div className="space-y-2">
-                     <Label htmlFor="description">Description</Label>
-                     <Textarea
-                       id="description"
-                       value={entity.description || ''}
-                       onChange={(e) => handleInputChange('description', e.target.value)}
-                       placeholder="Entity description"
-                       rows={3}
-                       disabled={entity.is_deleted}
-                     />
-                   </div>
-
-                   <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
-                     <div className="space-y-0.5">
-                       <Label className="text-base font-medium">Claimed by Brand?</Label>
-                       <p className="text-sm text-muted-foreground">
-                         Mark if this entity has been verified by the brand owner
-                       </p>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <Switch
-                         checked={entity.is_claimed || false}
-                         onCheckedChange={(checked) => handleInputChange('is_claimed', checked)}
-                         disabled={entity.is_deleted}
-                         className="data-[state=checked]:bg-green-600"
-                       />
-                       <span className={`text-sm font-medium ${entity.is_claimed ? 'text-green-600' : 'text-muted-foreground'}`}>
-                         {entity.is_claimed ? 'Claimed' : 'Unclaimed'}
-                       </span>
-                     </div>
-                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Media & Links */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Media & Links</CardTitle>
-                  <CardDescription>
-                    Images and external references
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="image_url">Image URL</Label>
-                    <Input
-                      id="image_url"
-                      value={entity.image_url || ''}
-                      onChange={(e) => handleInputChange('image_url', e.target.value)}
-                      placeholder="https://example.com/image.jpg"
-                      disabled={entity.is_deleted}
-                    />
-                    {entity.image_url && (
-                      <div className="mt-2">
-                        <p className="text-sm text-muted-foreground mb-2">Preview:</p>
-                        <div className="w-32 h-32 rounded-md overflow-hidden bg-muted">
-                          <ImageWithFallback
-                            src={entity.image_url}
-                            alt={entity.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="website_url">Website URL</Label>
-                      <Input
-                        id="website_url"
-                        value={entity.website_url || ''}
-                        onChange={(e) => handleInputChange('website_url', e.target.value)}
-                        placeholder="https://example.com"
-                        disabled={entity.is_deleted}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="venue">Venue</Label>
-                      <Input
-                        id="venue"
-                        value={entity.venue || ''}
-                        onChange={(e) => handleInputChange('venue', e.target.value)}
-                        placeholder="Physical location or venue"
-                        disabled={entity.is_deleted}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* API & Technical */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>API & Technical Data</CardTitle>
-                  <CardDescription>
-                    External API references and technical information
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="api_source">API Source</Label>
-                      <Input
-                        id="api_source"
-                        value={entity.api_source || ''}
-                        onChange={(e) => handleInputChange('api_source', e.target.value)}
-                        placeholder="google_places, omdb, etc."
-                        disabled={entity.is_deleted}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="api_ref">API Reference</Label>
-                      <Input
-                        id="api_ref"
-                        value={entity.api_ref || ''}
-                        onChange={(e) => handleInputChange('api_ref', e.target.value)}
-                        placeholder="External API ID or reference"
-                        disabled={entity.is_deleted}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="photo_reference">Photo Reference</Label>
-                    <Input
-                      id="photo_reference"
-                      value={entity.photo_reference || ''}
-                      onChange={(e) => handleInputChange('photo_reference', e.target.value)}
-                      placeholder="Google Places photo reference"
-                      disabled={entity.is_deleted}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="metadata">Metadata (JSON)</Label>
-                    <Textarea
-                      id="metadata"
-                      value={metadataText}
-                      onChange={(e) => handleMetadataChange(e.target.value)}
-                      placeholder='{"key": "value"}'
-                      rows={8}
-                      className="font-mono text-sm"
-                      disabled={entity.is_deleted}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Must be valid JSON format
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Entity Status */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Entity Status</CardTitle>
-                  <CardDescription>
-                    Current entity status and lifecycle management
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
-                    <div className="space-y-0.5">
-                      <Label className="text-base font-medium">Current Status</Label>
-                      <p className="text-sm text-muted-foreground">
-                        This entity is currently {entity.is_deleted ? 'soft deleted' : 'active'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={entity.is_deleted}
-                        disabled={true}
-                        className="data-[state=checked]:bg-destructive"
-                      />
-                      <span className={`text-sm font-medium ${entity.is_deleted ? 'text-destructive' : 'text-green-600'}`}>
-                        {entity.is_deleted ? 'Deleted' : 'Active'}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Audit Trail */}
-              {adminActions.length > 0 && (
+              <TabsContent value="basic" className="space-y-6">
+                {/* Basic Information */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <History className="h-5 w-5" />
-                      Admin Actions History
-                    </CardTitle>
+                    <CardTitle>Basic Information</CardTitle>
                     <CardDescription>
-                      Recent administrative actions performed on this entity
+                      Core entity details and identification
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {adminActions.map((action) => (
-                        <div key={action.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{action.action_type.replace('_', ' ').toUpperCase()}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(action.created_at).toLocaleString()}
-                            </p>
-                            {action.details && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Previous state: {action.details.previous_state}
-                              </p>
-                            )}
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Name *</Label>
+                        <Input
+                          id="name"
+                          value={entity.name}
+                          onChange={(e) => handleInputChange('name', e.target.value)}
+                          placeholder="Entity name"
+                          disabled={entity.is_deleted}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="type">Type *</Label>
+                        <Select 
+                          value={entity.type} 
+                          onValueChange={(value) => handleInputChange('type', value)}
+                          disabled={entity.is_deleted}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {entityTypes.map(type => (
+                              <SelectItem key={type} value={type}>
+                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="slug">Slug</Label>
+                      <Input
+                        id="slug"
+                        value={entity.slug || ''}
+                        onChange={(e) => handleInputChange('slug', e.target.value)}
+                        placeholder="URL-friendly identifier"
+                        disabled={entity.is_deleted}
+                      />
+                    </div>
+
+                     <div className="space-y-2">
+                       <Label htmlFor="description">Description</Label>
+                       <Textarea
+                         id="description"
+                         value={entity.description || ''}
+                         onChange={(e) => handleInputChange('description', e.target.value)}
+                         placeholder="Entity description"
+                         rows={3}
+                         disabled={entity.is_deleted}
+                       />
+                     </div>
+
+                     <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                       <div className="space-y-0.5">
+                         <Label className="text-base font-medium">Claimed by Brand?</Label>
+                         <p className="text-sm text-muted-foreground">
+                           Mark if this entity has been verified by the brand owner
+                         </p>
+                       </div>
+                       <div className="flex items-center gap-2">
+                         <Switch
+                           checked={entity.is_claimed || false}
+                           onCheckedChange={(checked) => handleInputChange('is_claimed', checked)}
+                           disabled={entity.is_deleted}
+                           className="data-[state=checked]:bg-green-600"
+                         />
+                         <span className={`text-sm font-medium ${entity.is_claimed ? 'text-green-600' : 'text-muted-foreground'}`}>
+                           {entity.is_claimed ? 'Claimed' : 'Unclaimed'}
+                         </span>
+                       </div>
+                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* Media & Links */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Media & Links</CardTitle>
+                    <CardDescription>
+                      Images and external references
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="image_url">Image URL</Label>
+                      <Input
+                        id="image_url"
+                        value={entity.image_url || ''}
+                        onChange={(e) => handleInputChange('image_url', e.target.value)}
+                        placeholder="https://example.com/image.jpg"
+                        disabled={entity.is_deleted}
+                      />
+                      {entity.image_url && (
+                        <div className="mt-2">
+                          <p className="text-sm text-muted-foreground mb-2">Preview:</p>
+                          <div className="w-32 h-32 rounded-md overflow-hidden bg-muted">
+                            <ImageWithFallback
+                              src={entity.image_url}
+                              alt={entity.name}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                         </div>
-                      ))}
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="website_url">Website URL</Label>
+                        <Input
+                          id="website_url"
+                          value={entity.website_url || ''}
+                          onChange={(e) => handleInputChange('website_url', e.target.value)}
+                          placeholder="https://example.com"
+                          disabled={entity.is_deleted}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="venue">Venue</Label>
+                        <Input
+                          id="venue"
+                          value={entity.venue || ''}
+                          onChange={(e) => handleInputChange('venue', e.target.value)}
+                          placeholder="Physical location or venue"
+                          disabled={entity.is_deleted}
+                        />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
-              )}
+              </TabsContent>
+
+              <TabsContent value="contact" className="space-y-6">
+                <ContactInfoEditor
+                  value={contactInfo}
+                  onChange={setContactInfo}
+                  disabled={entity.is_deleted}
+                />
+              </TabsContent>
+
+              <TabsContent value="hours" className="space-y-6">
+                <BusinessHoursEditor
+                  value={businessHours}
+                  onChange={setBusinessHours}
+                  disabled={entity.is_deleted}
+                />
+              </TabsContent>
+
+              <TabsContent value="details" className="space-y-6">
+                <EntityTypeSpecificFields
+                  entity={entity}
+                  onChange={handleInputChange}
+                  disabled={entity.is_deleted}
+                />
+              </TabsContent>
+
+              <TabsContent value="advanced" className="space-y-6">
+                {/* API & Technical */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>API & Technical Data</CardTitle>
+                    <CardDescription>
+                      External API references and technical information
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="api_source">API Source</Label>
+                        <Input
+                          id="api_source"
+                          value={entity.api_source || ''}
+                          onChange={(e) => handleInputChange('api_source', e.target.value)}
+                          placeholder="google_places, omdb, etc."
+                          disabled={entity.is_deleted}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="api_ref">API Reference</Label>
+                        <Input
+                          id="api_ref"
+                          value={entity.api_ref || ''}
+                          onChange={(e) => handleInputChange('api_ref', e.target.value)}
+                          placeholder="External API ID or reference"
+                          disabled={entity.is_deleted}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="photo_reference">Photo Reference</Label>
+                      <Input
+                        id="photo_reference"
+                        value={entity.photo_reference || ''}
+                        onChange={(e) => handleInputChange('photo_reference', e.target.value)}
+                        placeholder="Google Places photo reference"
+                        disabled={entity.is_deleted}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="metadata">Metadata (JSON)</Label>
+                      <Textarea
+                        id="metadata"
+                        value={metadataText}
+                        onChange={(e) => handleMetadataChange(e.target.value)}
+                        placeholder='{"key": "value"}'
+                        rows={8}
+                        className="font-mono text-sm"
+                        disabled={entity.is_deleted}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Must be valid JSON format
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Entity Status */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Entity Status</CardTitle>
+                    <CardDescription>
+                      Current entity status and lifecycle management
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                      <div className="space-y-0.5">
+                        <Label className="text-base font-medium">Current Status</Label>
+                        <p className="text-sm text-muted-foreground">
+                          This entity is currently {entity.is_deleted ? 'soft deleted' : 'active'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={entity.is_deleted}
+                          disabled={true}
+                          className="data-[state=checked]:bg-destructive"
+                        />
+                        <span className={`text-sm font-medium ${entity.is_deleted ? 'text-destructive' : 'text-green-600'}`}>
+                          {entity.is_deleted ? 'Deleted' : 'Active'}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Audit Trail */}
+                {adminActions.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <History className="h-5 w-5" />
+                        Admin Actions History
+                      </CardTitle>
+                      <CardDescription>
+                        Recent administrative actions performed on this entity
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {adminActions.map((action) => (
+                          <div key={action.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <p className="font-medium">{action.action_type.replace('_', ' ').toUpperCase()}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(action.created_at).toLocaleString()}
+                              </p>
+                              {action.details && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Previous state: {action.details.previous_state}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
 
               {/* Action Buttons */}
               <div className="flex items-center justify-between pt-6 border-t">
@@ -769,7 +834,8 @@ const AdminEntityEdit = () => {
                   )}
                 </div>
               </div>
-            </div>
+            </Tabs>
+
           </div>
         </div>
       </div>
