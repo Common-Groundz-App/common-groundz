@@ -8,14 +8,11 @@ import ReviewCard from "@/components/ReviewCard";
 import { ReviewWithUser } from '@/types/entities';
 import { TimelineBadge } from '@/components/profile/reviews/TimelineBadge';
 import { TimelinePreview } from '@/components/profile/reviews/TimelinePreview';
-import { useTimelineReviews } from '@/hooks/use-timeline-reviews';
 import { 
   transformReviewForUI, 
   filterReviews, 
   getTimelineReviews, 
-  getCircleHighlightedReviews,
-  transformTimelineUpdates,
-  calculateTimelineProgression
+  getCircleHighlightedReviews
 } from '@/utils/reviewDataUtils';
 
 interface ReviewsSectionProps {
@@ -53,9 +50,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   // Get special review categories
   const timelineReviews = getTimelineReviews(filteredReviews);
   const circleHighlightedReviews = getCircleHighlightedReviews(filteredReviews, userFollowingIds);
-
-  // Fetch real timeline data for timeline reviews
-  const timelineData = useTimelineReviews(timelineReviews);
 
   // Transform reviews for UI
   const transformedReviews = filteredReviews.slice(0, 3).map(transformReviewForUI);
@@ -155,100 +149,68 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             </div>
           )}
 
-          {/* Enhanced Timeline Review with Real Data */}
+          {/* Timeline Review with Basic Data */}
           {timelineReviews.length > 0 && (() => {
             const firstTimelineReview = timelineReviews[0];
-            const timelineInfo = timelineData.get(firstTimelineReview.id);
-            
-            if (!timelineInfo) {
-              return (
-                <Card className="border-l-4 border-l-blue-500">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="animate-pulse h-4 w-24 bg-gray-200 rounded"></div>
-                    </div>
-                    <p className="text-gray-500">Loading timeline data...</p>
-                  </CardContent>
-                </Card>
-              );
-            }
-
-            const { review, updates, isLoading } = timelineInfo;
-            const timelineSteps = transformTimelineUpdates(review, updates);
-            const progression = calculateTimelineProgression(review, updates);
+            const initialRating = firstTimelineReview.rating;
+            const latestRating = firstTimelineReview.latest_rating || initialRating;
+            const updateCount = firstTimelineReview.timeline_count || 0;
 
             return (
               <Card 
                 className="border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => handleTimelineClick(review)}
+                onClick={() => handleTimelineClick(firstTimelineReview)}
               >
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
                     <img 
-                      src={review.user.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop"} 
+                      src={firstTimelineReview.user.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop"} 
                       alt="Timeline reviewer" 
                       className="w-12 h-12 rounded-full" 
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-3">
-                        <h4 className="font-semibold">{review.user.username}</h4>
+                        <h4 className="font-semibold">{firstTimelineReview.user.username}</h4>
                         <TimelineBadge 
-                          updateCount={updates.length} 
+                          updateCount={updateCount} 
                           variant="default"
                         />
                         <Badge className="bg-blue-100 text-blue-800">Timeline Review</Badge>
                       </div>
 
                       {/* Timeline Preview */}
-                      {progression.hasProgression && (
+                      {latestRating !== initialRating && (
                         <div className="mb-4">
                           <TimelinePreview
-                            initialRating={progression.initialRating}
-                            latestRating={progression.latestRating}
-                            updateCount={progression.updateCount}
+                            initialRating={initialRating}
+                            latestRating={latestRating}
+                            updateCount={updateCount}
                           />
                         </div>
                       )}
 
-                      {/* Timeline Steps */}
-                      {isLoading ? (
-                        <div className="space-y-3">
-                          {[1, 2, 3].map(i => (
-                            <div key={i} className="animate-pulse">
-                              <div className="h-3 w-20 bg-gray-200 rounded mb-1"></div>
-                              <div className="h-4 w-full bg-gray-200 rounded"></div>
+                      {/* Basic Timeline Info */}
+                      <div className="space-y-4">
+                        <div className="border-l-2 border-blue-300 pl-4">
+                          <div className="text-sm text-gray-500 mb-1 flex items-center gap-2">
+                            <Clock className="h-3 w-3" />
+                            Initial Review
+                            <div className="flex items-center gap-1">
+                              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                              <span className="font-medium">{initialRating}</span>
                             </div>
-                          ))}
+                          </div>
+                          <p className="text-gray-700 text-sm">
+                            {firstTimelineReview.description || `Started using ${entityName}.`}
+                          </p>
                         </div>
-                      ) : timelineSteps ? (
-                        <div className="space-y-4">
-                          {timelineSteps.slice(0, 3).map((step, index) => (
-                            <div key={index} className={`border-l-2 ${
-                              step.type === 'initial' ? 'border-blue-300' : 
-                              index === timelineSteps.length - 1 ? 'border-blue-400' : 'border-gray-200'
-                            } pl-4`}>
-                              <div className="text-sm text-gray-500 mb-1 flex items-center gap-2">
-                                <Clock className="h-3 w-3" />
-                                {step.period}
-                                {step.rating && (
-                                  <div className="flex items-center gap-1">
-                                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                    <span className="font-medium">{step.rating}</span>
-                                  </div>
-                                )}
-                              </div>
-                              <p className="text-gray-700 text-sm">{step.content}</p>
-                            </div>
-                          ))}
-                          {timelineSteps.length > 3 && (
-                            <div className="text-sm text-blue-600 font-medium">
-                              +{timelineSteps.length - 3} more updates
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-gray-500">No timeline updates available</p>
-                      )}
+                        
+                        {updateCount > 0 && (
+                          <div className="text-sm text-blue-600 font-medium">
+                            +{updateCount} timeline update{updateCount !== 1 ? 's' : ''} available
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -354,7 +316,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 <p className="text-sm text-gray-500 mt-1">15+ years in health & wellness industry</p>
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
     </>
