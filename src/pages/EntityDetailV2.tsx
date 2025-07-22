@@ -68,6 +68,9 @@ const EntityDetailV2 = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   
+  // Debug logging
+  console.log('🔍 EntityDetailV2 - Loading entity with slug:', slug);
+  
   const {
     entity,
     recommendations,
@@ -78,6 +81,22 @@ const EntityDetailV2 = () => {
     error,
     refreshData
   } = useEntityDetail(slug || '');
+
+  // Handle entity not found - show detailed error
+  useEffect(() => {
+    if (error && !isLoading) {
+      console.error('❌ EntityDetailV2 - Entity error for slug:', slug, 'Error:', error);
+      toast({
+        title: 'Entity Not Found',
+        description: `Could not load entity: ${error}. Redirecting to V1...`,
+        variant: 'destructive',
+      });
+      // Redirect to V1 after a delay
+      setTimeout(() => {
+        navigate(`/entity/${slug}?v=1`, { replace: true });
+      }, 2000);
+    }
+  }, [error, isLoading, slug, navigate, toast]);
 
   const {
     entityWithChildren,
