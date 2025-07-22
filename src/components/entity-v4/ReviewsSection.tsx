@@ -316,7 +316,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 <p className="text-sm text-gray-500 mt-1">15+ years in health & wellness industry</p>
               </div>
             </div>
-          </div>
+          </CardContent>
         </Card>
       </div>
     </>
