@@ -81,7 +81,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         .from('entities')
         .insert({
           name: formData.name.trim(),
-          type: formData.type,
+          type: formData.type as any,
           description: formData.description.trim() || null,
           image_url: formData.image_url.trim() || null,
           website_url: formData.website_url.trim() || null,
