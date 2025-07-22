@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
@@ -14,10 +14,6 @@ import { useToast } from '@/hooks/use-toast';
 import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
 import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
 import { EntityType } from '@/services/recommendation/types';
-import { Button } from '@/components/ui/button';
-import { EntityErrorBoundary } from '@/components/entity/EntityErrorBoundary';
-import { resolveEntitySlug } from '@/services/entitySlugResolver';
-import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 
 // Imported extracted components
 import { EntityHeader } from './EntityHeader';
@@ -28,16 +24,8 @@ import { EntityTabsContent } from './EntityTabsContent';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
-  const navigate = useNavigate();
-  const [slugResolution, setSlugResolution] = useState<{
-    resolved: boolean;
-    suggestion?: string;
-  }>({ resolved: false });
   
-  // Debug logging
-  console.log('🔍 EntityV4 - Loading entity with slug:', slug);
-  
-  // Fetch real entity data with error boundary
+  // Fetch real entity data
   const {
     entity,
     reviews,
@@ -45,32 +33,6 @@ const EntityV4 = () => {
     isLoading,
     error
   } = useEntityDetailCached(slug || '');
-
-  // Handle entity not found - try slug resolution
-  useEffect(() => {
-    const handleEntityNotFound = async () => {
-      if (error && !isLoading && slug && !slugResolution.resolved) {
-        console.error('❌ EntityV4 - Entity not found for slug:', slug, 'Error:', error);
-        
-        // Try to resolve the slug
-        const resolution = await resolveEntitySlug(slug);
-        
-        if (resolution.suggestion) {
-          console.log('💡 Found slug suggestion:', resolution.suggestion);
-          setSlugResolution({ resolved: true, suggestion: resolution.suggestion });
-          // Redirect to suggested slug
-          navigate(`/entity/${resolution.suggestion}?v=4`, { replace: true });
-        } else {
-          console.log('🔄 No suggestion found, trying V1...');
-          setSlugResolution({ resolved: true });
-          // Try to redirect to V1 if no suggestion found
-          navigate(`/entity/${slug}?v=1`, { replace: true });
-        }
-      }
-    };
-
-    handleEntityNotFound();
-  }, [error, isLoading, slug, navigate, slugResolution.resolved]);
 
   // Fetch circle rating data
   const { user } = useAuth();
@@ -84,7 +46,6 @@ const EntityV4 = () => {
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isRecommendationModalOpen, setIsRecommendationModalOpen] = useState(false);
-  const [isFollowersModalOpen, setIsFollowersModalOpen] = useState(false);
 
   // Memoized user review
   const userReview = React.useMemo(() => {
@@ -148,11 +109,6 @@ const EntityV4 = () => {
     setIsTimelineViewerOpen(true);
   };
 
-  const handleTimelineClick = (reviewId: string) => {
-    setTimelineReviewId(reviewId);
-    setIsTimelineViewerOpen(true);
-  };
-
   const handleReviewSubmit = async () => {
     try {
       setIsReviewFormOpen(false);
@@ -184,6 +140,8 @@ const EntityV4 = () => {
     setTimelineReviewId(null);
   };
 
+  const reviewActionConfig = getSidebarButtonConfig();
+
   // Show loading state
   if (isLoading) {
     return (
@@ -200,154 +158,129 @@ const EntityV4 = () => {
     );
   }
 
-  // Show error state with fallback
-  if (error && !entity) {
-    console.log('🚨 EntityV4 - Showing error state:', error);
+  // Show error state
+  if (!isLoading && (error || !entity)) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <NavBarComponent />
         <EntityPreviewToggle />
         <div className="flex-1 pt-16 flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-xl font-semibold mb-2">Entity Not Found</h2>
-            <p className="text-muted-foreground mb-4">
-              The entity "{slug}" could not be found. This might be due to a slug change.
-            </p>
-            <div className="space-x-2">
-              <Button onClick={() => navigate(`/entity/${slug}?v=1`)}>
-                Try Version 1
-              </Button>
-              <Button variant="outline" onClick={() => window.history.back()}>
-                Go Back
-              </Button>
-            </div>
+            <h2 className="text-2xl font-bold text-destructive mb-2">Entity Not Found</h2>
+            <p className="text-muted-foreground">The entity you're looking for doesn't exist or has been removed.</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // If no entity but no error, still loading
-  if (!entity) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <NavBarComponent />
-        <EntityPreviewToggle />
-        <div className="flex-1 pt-16 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading entity...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Get entity image with fallback
+  const entityImage = entity?.image_url || getEntityTypeFallbackImage(entity?.type || EntityType.Product);
+  
+  // Prepare entity data using real data (for EntityHeader only)
+  const entityData = {
+    name: entity?.name || '',
+    description: entity?.description || '',
+    rating: stats?.averageRating || 0,
+    totalReviews: stats?.reviewCount || 0,
+    claimed: entity?.is_claimed || false,
+    image: entityImage,
+    website: entity?.website_url || '',
+    location: entity?.venue || '',
+    email: '', // TODO: Extract from metadata when available
+    phone: ''  // TODO: Extract from metadata when available
+  };
 
-  return (
-    <EntityErrorBoundary slug={slug}>
-      <TooltipProvider>
-        <div className="min-h-screen flex flex-col bg-background">
-          <NavBarComponent />
-          <EntityPreviewToggle />
-          
-          <div className="flex-1 pt-16 pb-20">
-            <div className="container mx-auto px-4 py-8 max-w-7xl">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Main Content - 8 columns */}
-                <div className="lg:col-span-8 space-y-6">
-                  {/* Entity Header */}
-                  <EntityHeader 
-                    entity={entity}
-                    stats={stats}
-                    entityImage={entity.image_url || getEntityTypeFallbackImage(entity.type)}
-                    entityData={{
-                      name: entity.name,
-                      description: entity.description || '',
-                      rating: stats?.averageRating || 0,
-                      totalReviews: stats?.reviewCount || 0,
-                      claimed: entity.is_claimed || false,
-                      website: entity.metadata?.website || ''
-                    }}
-                    onRecommendationModalOpen={() => setIsRecommendationModalOpen(true)}
-                    onReviewAction={getSidebarButtonConfig().action}
-                    reviewActionConfig={getSidebarButtonConfig()}
-                  />
-                  
-                  {/* Trust Summary Card */}
-                  <TrustSummaryCard 
-                    entityId={entity.id}
-                    userId={user?.id}
-                  />
-                  
-                  {/* Tabs Content */}
-                  <EntityTabsContent />
-                </div>
-                
-                {/* Sidebar - 4 columns */}
-                <div className="lg:col-span-4">
-                  <EntitySidebar entity={entity} />
-                </div>
+  return <TooltipProvider delayDuration={0}>
+    <div className="min-h-screen flex flex-col bg-background">
+      <NavBarComponent />
+      
+      {/* Version Toggle */}
+      <EntityPreviewToggle />
+      
+      {/* Main Content */}
+      <div className="flex-1 pt-16">
+        <div className="min-h-screen bg-gray-50">
+          {/* SECTION 1: Header & Primary Actions */}
+          <EntityHeader
+            entity={entity}
+            stats={stats}
+            entityImage={entityImage}
+            entityData={entityData}
+            onRecommendationModalOpen={() => setIsRecommendationModalOpen(true)}
+            onReviewAction={reviewActionConfig.action}
+            reviewActionConfig={reviewActionConfig}
+          />
+
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              {/* Main Content */}
+              <div className="lg:col-span-3">
+                {/* SECTION 2: Trust & Review Summary */}
+                <TrustSummaryCard 
+                  entityId={entity?.id || ''} 
+                  userId={user?.id || null}
+                />
+
+                {/* SECTION 3: Reviews & Social Proof */}
+                <ReviewsSection />
+
+                {/* SECTION 4: Tabs Navigation */}
+                <EntityTabsContent />
+              </div>
+
+              {/* SECTION 5: Info & Discovery Sidebar */}
+              <div className="lg:col-span-1">
+                {entity && <EntitySidebar entity={entity} />}
               </div>
             </div>
-            
-            {/* Bottom Navigation Space */}
-            <div className="h-20" />
           </div>
-          
-          <BottomNavigation />
-          
-          {/* Modals */}
-          <EntityFollowerModal
-            open={isFollowersModalOpen}
-            onOpenChange={setIsFollowersModalOpen}
-            entityId={entity?.id || ''}
-            entityName={entity?.name}
-            totalFollowersCount={0}
-          />
-          
-          <EntityRecommendationModal
-            open={isRecommendationModalOpen}
-            onOpenChange={setIsRecommendationModalOpen}
-            entityId={entity?.id || ''}
-            entityName={entity?.name}
-            totalRecommendationCount={stats?.recommendationCount || 0}
-            circleRecommendationCount={stats?.circleRecommendationCount || 0}
-          />
-          
-          {/* Review Form */}
-          {isReviewFormOpen && (
-            <ReviewForm
-              isOpen={isReviewFormOpen}
-              onClose={() => setIsReviewFormOpen(false)}
-              onSubmit={handleReviewSubmit}
-              entity={{
-                id: entity.id,
-                name: entity.name,
-                type: entity.type,
-                venue: entity.venue,
-                image_url: entity.image_url,
-                description: entity.description,
-                metadata: entity.metadata
-              }}
-            />
-          )}
-
-          {/* Review Timeline Viewer Modal */}
-          {isTimelineViewerOpen && timelineReviewId && entity && userReview && (
-            <ReviewTimelineViewer
-              isOpen={isTimelineViewerOpen}
-              reviewId={timelineReviewId}
-              reviewOwnerId={userReview.user_id}
-              reviewTitle={userReview.title}
-              initialRating={userReview.rating}
-              onClose={handleTimelineViewerClose}
-              onTimelineUpdate={handleTimelineUpdate}
-            />
-          )}
         </div>
-      </TooltipProvider>
-    </EntityErrorBoundary>
-  );
+      </div>
+
+      {/* Review Form Modal */}
+      {isReviewFormOpen && entity && (
+        <ReviewForm
+          isOpen={isReviewFormOpen}
+          onSubmit={handleReviewSubmit}
+          onClose={() => setIsReviewFormOpen(false)}
+          entity={{
+            id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            image_url: entity.image_url,
+            description: entity.description,
+            venue: entity.venue
+          }}
+        />
+      )}
+
+      {/* Review Timeline Viewer Modal */}
+      {isTimelineViewerOpen && timelineReviewId && entity && userReview && (
+        <ReviewTimelineViewer
+          isOpen={isTimelineViewerOpen}
+          reviewId={timelineReviewId}
+          reviewOwnerId={userReview.user_id}
+          reviewTitle={userReview.title}
+          initialRating={userReview.rating}
+          onClose={handleTimelineViewerClose}
+          onTimelineUpdate={handleTimelineUpdate}
+        />
+      )}
+
+      {/* Recommendation Modal */}
+      {isRecommendationModalOpen && entity && (
+        <EntityRecommendationModal
+          open={isRecommendationModalOpen}
+          onOpenChange={setIsRecommendationModalOpen}
+          entityId={entity.id}
+          entityName={entity.name}
+          totalRecommendationCount={stats?.recommendationCount || 0}
+          circleRecommendationCount={stats?.circleRecommendationCount || 0}
+        />
+      )}
+    </div>
+  </TooltipProvider>;
 };
 
 export default EntityV4;
