@@ -24,8 +24,6 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
   verified?: boolean;
   rating?: number;
   mostRecent?: boolean;
-  networkOnly?: boolean;
-  userFollowingIds?: string[];
 }) => {
   let filtered = [...reviews];
 
@@ -36,13 +34,6 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
       review.title.toLowerCase().includes(searchLower) ||
       (review.description || '').toLowerCase().includes(searchLower) ||
       (review.user.username || '').toLowerCase().includes(searchLower)
-    );
-  }
-
-  // Network filter - only show reviews from followed users
-  if (filters.networkOnly && filters.userFollowingIds && filters.userFollowingIds.length > 0) {
-    filtered = filtered.filter(review => 
-      filters.userFollowingIds!.includes(review.user_id)
     );
   }
 
