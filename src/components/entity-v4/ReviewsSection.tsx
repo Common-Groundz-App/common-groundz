@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MessageCircle, Camera, Eye, Star } from "lucide-react";
+import { MessageCircle, Camera, Eye, Star, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,14 +10,17 @@ import {
   transformReviewForUI, 
   filterReviews, 
   getTimelineReviews, 
-  getCircleHighlightedReviews
+  getCircleHighlightedReviews,
+  getNetworkContext
 } from '@/utils/reviewDataUtils';
 import { TimelineReviewCard } from './TimelineReviewCard';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
+import { NetworkRecommendations } from './NetworkRecommendations';
 
 interface ReviewsSectionProps {
   reviews: ReviewWithUser[];
   entityName: string;
+  entityId: string;
   userFollowingIds?: string[];
   onHelpfulClick?: (reviewId: string) => void;
   onQuestionClick?: () => void;
@@ -26,6 +29,7 @@ interface ReviewsSectionProps {
 export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ 
   reviews = [], 
   entityName = '',
+  entityId = '',
   userFollowingIds = [],
   onHelpfulClick,
   onQuestionClick 
@@ -155,9 +159,14 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             <Card className="border-2 border-blue-200 bg-blue-50/30">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <Badge className="bg-blue-600 text-white">Circle Highlighted</Badge>
+                  <Badge className="bg-blue-600 text-white">
+                    <Users className="w-3 h-3 mr-1" />
+                    Trending in Your Network
+                  </Badge>
                   <Eye className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm text-blue-600 font-medium">Trending in your network</span>
+                  <span className="text-sm text-blue-600 font-medium">
+                    {circleHighlightedReviews[0].user.username || 'Someone'} you follow loved this
+                  </span>
                 </div>
                 <ReviewCard 
                   review={transformReviewForUI(circleHighlightedReviews[0])} 
@@ -214,48 +223,13 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           </CardContent>
         </Card>
 
-        {/* You Might Also Consider */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>You Might Also Consider</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                {
-                  name: "HealthifyMe",
-                  rating: 4.2,
-                  category: "Health Apps",
-                  image: "https://images.unsplash.com/photo-1500673922987-e212871fec22?w=100&h=100&fit=crop"
-                },
-                {
-                  name: "MyFitnessPal",
-                  rating: 4.0,
-                  category: "Fitness Apps",
-                  image: "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=100&h=100&fit=crop"
-                },
-                {
-                  name: "Optimum Nutrition",
-                  rating: 4.5,
-                  category: "Supplements",
-                  image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
-                }
-              ].map((entity, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 border rounded-lg hover:shadow-md transition-shadow cursor-pointer">
-                  <img src={entity.image} alt={entity.name} className="w-12 h-12 rounded-lg object-cover" />
-                  <div className="flex-1">
-                    <h4 className="font-medium">{entity.name}</h4>
-                    <p className="text-sm text-gray-500">{entity.category}</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm">{entity.rating}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Network-Based Recommendations */}
+        <div className="mt-8">
+          <NetworkRecommendations 
+            entityId={entityId}
+            userFollowingIds={userFollowingIds}
+          />
+        </div>
 
         {/* Meet the Founders */}
         <Card className="mt-8">

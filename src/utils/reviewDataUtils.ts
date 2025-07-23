@@ -60,13 +60,29 @@ export const getTimelineReviews = (reviews: ReviewWithUser[]) => {
   return reviews.filter(review => review.has_timeline && (review.timeline_count || 0) > 0);
 };
 
-// Identify circle highlighted reviews (placeholder for network integration)
+// Enhanced circle highlighted reviews with proper network logic
 export const getCircleHighlightedReviews = (reviews: ReviewWithUser[], userFollowingIds: string[] = []) => {
-  return reviews.filter(review => 
-    userFollowingIds.includes(review.user_id) && 
-    review.rating >= 4 && 
-    review.likes && review.likes > 5
-  );
+  // If user has no following, no circle highlights
+  if (userFollowingIds.length === 0) {
+    return [];
+  }
+
+  // Find reviews from followed users with high engagement
+  const circleReviews = reviews.filter(review => {
+    const isFromFollowedUser = userFollowingIds.includes(review.user_id);
+    const hasHighRating = review.rating >= 4;
+    const hasGoodEngagement = (review.likes || 0) >= 3;
+    const isRecent = new Date(review.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Last 30 days
+    
+    return isFromFollowedUser && hasHighRating && (hasGoodEngagement || isRecent);
+  });
+
+  // Sort by engagement and recency
+  return circleReviews.sort((a, b) => {
+    const scoreA = (a.likes || 0) + (a.rating * 2) + (new Date(a.created_at).getTime() / 1000000000);
+    const scoreB = (b.likes || 0) + (b.rating * 2) + (new Date(b.created_at).getTime() / 1000000000);
+    return scoreB - scoreA;
+  });
 };
 
 // Generate mock timeline data structure for a review
@@ -89,4 +105,17 @@ export const generateTimelineDisplay = (review: ReviewWithUser) => {
   ];
 
   return timelineSteps;
+};
+
+// Get network context for a review
+export const getNetworkContext = (review: ReviewWithUser, userFollowingIds: string[]) => {
+  const isFromNetwork = userFollowingIds.includes(review.user_id);
+  
+  if (!isFromNetwork) return null;
+  
+  return {
+    isFromNetwork: true,
+    context: 'from your network',
+    isTrending: (review.likes || 0) >= 5 && review.rating >= 4
+  };
 };

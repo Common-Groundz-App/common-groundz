@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
@@ -14,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
 import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
 import { EntityType } from '@/services/recommendation/types';
+import { useUserFollowing } from '@/hooks/useUserFollowing';
 
 // Imported extracted components
 import { EntityHeader } from './EntityHeader';
@@ -34,9 +36,12 @@ const EntityV4 = () => {
     error
   } = useEntityDetailCached(slug || '');
 
-  // Fetch circle rating data
+  // Fetch circle rating data and user following data
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Get user's following list for circle functionality
+  const { data: userFollowingIds = [] } = useUserFollowing();
 
   // Timeline data
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);
@@ -222,11 +227,12 @@ const EntityV4 = () => {
                   userId={user?.id || null}
                 />
 
-                {/* SECTION 3: Reviews & Social Proof - Now Dynamic */}
+                {/* SECTION 3: Reviews & Social Proof - Now with Circle Network Integration */}
                 <ReviewsSection 
                   reviews={reviews}
                   entityName={entity?.name || ''}
-                  userFollowingIds={[]} // TODO: Add user's following IDs from follow relationships
+                  entityId={entity?.id || ''}
+                  userFollowingIds={userFollowingIds}
                   onHelpfulClick={(reviewId) => {
                     // TODO: Implement helpful vote functionality
                     console.log('Helpful clicked for review:', reviewId);
