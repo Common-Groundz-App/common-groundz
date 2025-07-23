@@ -67,14 +67,19 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
           </div>
           
           <div className="flex items-center gap-3 mb-2">
-            <ConnectedRingsRating
-              value={transformedReview.rating}
-              size="xs"
-              variant="badge"
-              showValue={false}
-              minimal={true}
-              className="flex-shrink-0"
-            />
+            <div className="flex items-center">
+              <ConnectedRingsRating
+                value={transformedReview.rating}
+                size="xs"
+                variant="badge"
+                showValue={false}
+                minimal={true}
+                className="mr-1"
+              />
+              <span className="text-xs text-gray-500">
+                {transformedReview.rating.toFixed(1)}
+              </span>
+            </div>
             <span className="text-sm text-gray-500">{transformedReview.date}</span>
           </div>
           
