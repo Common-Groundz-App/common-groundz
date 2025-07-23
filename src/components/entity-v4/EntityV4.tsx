@@ -43,15 +43,26 @@ const EntityV4 = () => {
   // Get user's following list for circle functionality
   const { data: userFollowingIds = [], isLoading: isFollowingLoading, error: followingError } = useUserFollowing();
 
-  // Enhanced debugging
-  console.log('EntityV4 - Enhanced Following data:', {
+  // Enhanced debugging for all environments
+  console.log('🔍 EntityV4 - Complete Authentication & Following Analysis:');
+  console.log('  🔐 Auth State:', {
+    hasUser: !!user,
+    userId: user?.id,
+    userEmail: user?.email,
+    isAuthenticatedProperly: !!user?.id
+  });
+  console.log('  👥 Following Hook State:', {
     userFollowingIds,
     userFollowingIdsType: typeof userFollowingIds,
     userFollowingIdsLength: userFollowingIds?.length || 0,
     userFollowingIdsIsArray: Array.isArray(userFollowingIds),
     isFollowingLoading,
-    followingError,
-    userIdFromAuth: user?.id
+    followingError: followingError?.message || null
+  });
+  console.log('  🌍 Environment Context:', {
+    nodeEnv: process.env.NODE_ENV,
+    currentUrl: typeof window !== 'undefined' ? window.location.href : 'SSR',
+    hasLocalStorage: typeof window !== 'undefined' && !!window.localStorage
   });
 
   // Timeline data
@@ -209,6 +220,14 @@ const EntityV4 = () => {
 
   // Ensure userFollowingIds is always an array for the ReviewsSection
   const validUserFollowingIds = Array.isArray(userFollowingIds) ? userFollowingIds : [];
+
+  // Log final data being passed to ReviewsSection
+  console.log('🔍 Final data passed to ReviewsSection:', {
+    reviewsCount: reviews?.length || 0,
+    validUserFollowingIds,
+    validUserFollowingIdsLength: validUserFollowingIds.length,
+    shouldShowCircleHighlights: validUserFollowingIds.length > 0
+  });
 
   return <TooltipProvider delayDuration={0}>
     <div className="min-h-screen flex flex-col bg-background">

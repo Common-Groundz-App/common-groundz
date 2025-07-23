@@ -9,49 +9,43 @@ export const useUserFollowing = () => {
   return useQuery({
     queryKey: ['user-following', user?.id],
     queryFn: async () => {
-      console.log('useUserFollowing - Starting query for user:', user?.id);
+      console.log('🔍 useUserFollowing - Starting query for user:', user?.id);
+      console.log('🔍 Auth state:', { 
+        hasUser: !!user, 
+        userId: user?.id, 
+        authLoading,
+        userEmail: user?.email 
+      });
       
       if (!user?.id) {
-        console.log('useUserFollowing - No user ID, returning empty array');
+        console.log('🔍 useUserFollowing - No user ID, returning empty array');
         return [];
       }
       
       try {
-        // Try the RPC function first
-        console.log('useUserFollowing - Attempting RPC call: get_following_with_profiles');
-        const { data: rpcData, error: rpcError } = await supabase
-          .rpc('get_following_with_profiles', {
-            profile_user_id: user.id,
-            current_user_id: user.id
-          });
+        // Always use direct query approach since it's more reliable
+        console.log('🔍 useUserFollowing - Using direct query to follows table');
         
-        if (!rpcError && rpcData && Array.isArray(rpcData)) {
-          console.log('useUserFollowing - RPC success, got', rpcData.length, 'following users');
-          const followingIds = rpcData.map(profile => profile.id);
-          console.log('useUserFollowing - RPC following IDs:', followingIds);
-          return followingIds;
-        }
-        
-        console.log('useUserFollowing - RPC failed with error:', rpcError);
-        console.log('useUserFollowing - Falling back to direct query');
-        
-        // Fallback: Direct query to follows table
         const { data: followsData, error: followsError } = await supabase
           .from('follows')
           .select('following_id')
           .eq('follower_id', user.id);
         
         if (followsError) {
-          console.error('useUserFollowing - Fallback query failed:', followsError);
+          console.error('🔍 useUserFollowing - Direct query failed:', followsError);
           return [];
         }
         
         const followingIds = followsData?.map(follow => follow.following_id) || [];
-        console.log('useUserFollowing - Fallback success, got', followingIds.length, 'following IDs:', followingIds);
+        console.log('🔍 useUserFollowing - Direct query success:', {
+          followsDataLength: followsData?.length || 0,
+          followingIds,
+          rawFollowsData: followsData
+        });
         
         return followingIds;
       } catch (error) {
-        console.error('useUserFollowing - Unexpected error:', error);
+        console.error('🔍 useUserFollowing - Unexpected error:', error);
         return [];
       }
     },
