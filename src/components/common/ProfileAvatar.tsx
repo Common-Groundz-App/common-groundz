@@ -12,6 +12,7 @@ interface ProfileAvatarProps {
   fallbackClassName?: string;
   showTooltip?: boolean;
   showSkeleton?: boolean; // New prop to control skeleton display
+  fallbackUsername?: string; // Username to use for initials when profile data is unavailable
 }
 
 const sizeClasses = {
@@ -28,7 +29,8 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
   className,
   fallbackClassName,
   showTooltip = false,
-  showSkeleton = true
+  showSkeleton = true,
+  fallbackUsername
 }) => {
   const { data: profile, isLoading } = useProfile(userId);
 
@@ -65,7 +67,7 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
         alt={profile?.displayName || 'User'} 
       />
       <AvatarFallback className={cn('bg-brand-orange text-white font-semibold', fallbackClassName)}>
-        {profile?.initials || 'AU'}
+        {profile?.initials || (fallbackUsername ? fallbackUsername.slice(0, 2).toUpperCase() : 'AU')}
       </AvatarFallback>
     </Avatar>
   );

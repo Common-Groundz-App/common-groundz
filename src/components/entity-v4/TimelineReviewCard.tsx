@@ -113,6 +113,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
             userId={review.user_id}
             size="lg"
             className="flex-shrink-0"
+            fallbackUsername={review.user.username}
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-3">

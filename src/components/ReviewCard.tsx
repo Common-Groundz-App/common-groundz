@@ -52,6 +52,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
         <ProfileAvatar
           userId={transformedReview.userId}
           size="lg"
+          fallbackUsername={transformedReview.name}
         />
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
