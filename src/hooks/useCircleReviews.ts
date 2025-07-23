@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ReviewWithUser } from '@/types/entities';
+import { transformToSafeProfile } from '@/types/profile';
 
 interface CircleReviewsData {
   circleReviews: ReviewWithUser[];
@@ -57,19 +58,10 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
         console.log('🔵 Found followed users:', followedUserIds.length, followedUserIds);
         setCircleUserIds(followedUserIds);
 
-        // Get reviews from followed users for this entity
+        // Get reviews from followed users for this entity - simplified approach
         const { data: reviews, error: reviewError } = await supabase
           .from('reviews')
-          .select(`
-            *,
-            user:profiles!reviews_user_id_fkey (
-              id,
-              username,
-              avatar_url,
-              first_name,
-              last_name
-            )
-          `)
+          .select('*')
           .eq('entity_id', entityId)
           .eq('status', 'published')
           .in('user_id', followedUserIds)
@@ -78,26 +70,57 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
         if (reviewError) {
           console.error('🔵 Error fetching circle reviews:', reviewError);
           setError('Failed to fetch circle reviews');
+        } else if (reviews && reviews.length > 0) {
+          // Get profile data separately to avoid foreign key issues
+          const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, first_name, last_name')
+            .in('id', reviews.map(r => r.user_id));
+
+          if (profileError) {
+            console.error('🔵 Error fetching profiles:', profileError);
+            setError('Failed to fetch user profiles');
+          } else {
+            const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+            
+            const formattedReviews = reviews.map(review => {
+              const profile = profileMap.get(review.user_id);
+              return {
+                ...review,
+                user: transformToSafeProfile(profile ? {
+                  id: review.user_id,
+                  username: profile.username,
+                  avatar_url: profile.avatar_url,
+                  first_name: profile.first_name,
+                  last_name: profile.last_name,
+                  bio: null,
+                  location: null
+                } : null),
+                // Add required InteractionData fields
+                likes: 0,
+                isLiked: false,
+                isSaved: false,
+                // Handle media properly - ensure it matches MediaItem[] type
+                media: Array.isArray(review.media) ? review.media as any[] : [],
+                // Ensure correct types
+                visibility: review.visibility as 'public' | 'private' | 'friends_only',
+                status: review.status as 'published' | 'draft' | 'deleted'
+              };
+            }).filter(review => review.user.id);
+
+            console.log('🔵 Circle reviews found:', formattedReviews.length);
+            console.log('🔵 Circle reviews details:', formattedReviews.map(r => ({
+              id: r.id,
+              user: r.user.username,
+              user_id: r.user_id,
+              rating: r.rating,
+              title: r.title
+            })));
+
+            setCircleReviews(formattedReviews);
+          }
         } else {
-          const formattedReviews = (reviews || []).map(review => ({
-            ...review,
-            user: {
-              id: review.user.id,
-              username: review.user.username || `${review.user.first_name || ''} ${review.user.last_name || ''}`.trim() || 'Anonymous',
-              avatar_url: review.user.avatar_url
-            }
-          }));
-
-          console.log('🔵 Circle reviews found:', formattedReviews.length);
-          console.log('🔵 Circle reviews details:', formattedReviews.map(r => ({
-            id: r.id,
-            user: r.user.username,
-            user_id: r.user_id,
-            rating: r.rating,
-            title: r.title
-          })));
-
-          setCircleReviews(formattedReviews);
+          setCircleReviews([]);
         }
       } catch (error) {
         console.error('🔵 Error in useCircleReviews:', error);

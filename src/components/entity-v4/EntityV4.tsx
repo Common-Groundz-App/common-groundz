@@ -279,7 +279,6 @@ const EntityV4 = () => {
                   reviews={reviews}
                   entityName={entity?.name || ''}
                   entityId={entity?.id || ''}
-                  userFollowingIds={validUserFollowingIds}
                   onHelpfulClick={(reviewId) => {
                     console.log('Helpful clicked for review:', reviewId);
                   }}
