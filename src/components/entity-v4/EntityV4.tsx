@@ -43,8 +43,12 @@ const EntityV4 = () => {
   // Get user's following list for circle functionality
   const { data: userFollowingIds = [], isLoading: isFollowingLoading, error: followingError } = useUserFollowing();
 
-  console.log('EntityV4 - Following data:', {
+  // Enhanced debugging
+  console.log('EntityV4 - Enhanced Following data:', {
     userFollowingIds,
+    userFollowingIdsType: typeof userFollowingIds,
+    userFollowingIdsLength: userFollowingIds?.length || 0,
+    userFollowingIdsIsArray: Array.isArray(userFollowingIds),
     isFollowingLoading,
     followingError,
     userIdFromAuth: user?.id
@@ -203,6 +207,9 @@ const EntityV4 = () => {
     phone: ''  // TODO: Extract from metadata when available
   };
 
+  // Ensure userFollowingIds is always an array for the ReviewsSection
+  const validUserFollowingIds = Array.isArray(userFollowingIds) ? userFollowingIds : [];
+
   return <TooltipProvider delayDuration={0}>
     <div className="min-h-screen flex flex-col bg-background">
       <NavBarComponent />
@@ -239,7 +246,7 @@ const EntityV4 = () => {
                   reviews={reviews}
                   entityName={entity?.name || ''}
                   entityId={entity?.id || ''}
-                  userFollowingIds={userFollowingIds}
+                  userFollowingIds={validUserFollowingIds}
                   onHelpfulClick={(reviewId) => {
                     // TODO: Implement helpful vote functionality
                     console.log('Helpful clicked for review:', reviewId);

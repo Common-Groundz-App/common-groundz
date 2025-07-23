@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { MessageCircle, Camera, Eye, Star, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,11 +43,21 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
 
-  console.log('ReviewsSection - Debug Info:');
-  console.log('  - userFollowingIds:', userFollowingIds);
-  console.log('  - userFollowingIds length:', userFollowingIds.length);
+  // Enhanced debugging
+  console.log('ReviewsSection - Enhanced Debug Info:');
+  console.log('  - userFollowingIds (raw):', userFollowingIds);
+  console.log('  - userFollowingIds type:', typeof userFollowingIds);
+  console.log('  - userFollowingIds length:', userFollowingIds?.length || 0);
+  console.log('  - userFollowingIds is array:', Array.isArray(userFollowingIds));
   console.log('  - total reviews:', reviews.length);
-  console.log('  - reviews user_ids:', reviews.map(r => ({ id: r.user_id, username: r.user.username })));
+  console.log('  - review user details:', reviews.map(r => ({ 
+    id: r.user_id, 
+    username: r.user.username,
+    isInFollowing: userFollowingIds?.includes(r.user_id)
+  })));
+
+  // Ensure userFollowingIds is always an array
+  const validUserFollowingIds = Array.isArray(userFollowingIds) ? userFollowingIds : [];
 
   // Process reviews with filters
   const filteredReviews = filterReviews(reviews, {
@@ -57,13 +66,13 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     rating: activeFilters.fiveStars ? 5 : undefined,
     mostRecent: activeFilters.mostRecent || undefined,
     networkOnly: activeFilters.networkOnly || undefined
-  }, userFollowingIds);
+  }, validUserFollowingIds);
 
   console.log('ReviewsSection - After filtering:', filteredReviews.length, 'reviews');
 
   // Get special review categories
   const timelineReviews = getTimelineReviews(filteredReviews);
-  const circleHighlightedReviews = getCircleHighlightedReviews(filteredReviews, userFollowingIds);
+  const circleHighlightedReviews = getCircleHighlightedReviews(filteredReviews, validUserFollowingIds);
   
   console.log('ReviewsSection - Timeline reviews:', timelineReviews.length);
   console.log('ReviewsSection - Circle highlighted reviews:', circleHighlightedReviews.length);
@@ -72,7 +81,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     user: r.user.username,
     user_id: r.user_id,
     rating: r.rating,
-    title: r.title
+    title: r.title,
+    isUserInFollowing: validUserFollowingIds.includes(r.user_id)
   })));
   
   // Get regular reviews (excluding timeline and circle highlighted)
@@ -149,26 +159,27 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             >
               5 Stars
             </Badge>
-            {userFollowingIds.length > 0 && (
+            {validUserFollowingIds.length > 0 && (
               <Badge 
                 variant={activeFilters.networkOnly ? "default" : "outline"}
                 className="cursor-pointer"
                 onClick={() => toggleFilter('networkOnly')}
               >
                 <Users className="w-3 h-3 mr-1" />
-                My Network ({userFollowingIds.length})
+                My Network ({validUserFollowingIds.length})
               </Badge>
             )}
           </div>
         </div>
 
-        {/* Debug Info - Remove this in production */}
+        {/* Enhanced Debug Info */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
-            <div>Debug: Following {userFollowingIds.length} users</div>
+            <div>Debug: Following {validUserFollowingIds.length} users: {validUserFollowingIds.join(', ')}</div>
             <div>Debug: {circleHighlightedReviews.length} circle highlighted reviews</div>
             <div>Debug: {timelineReviews.length} timeline reviews</div>
             <div>Debug: {regularReviews.length} regular reviews</div>
+            <div>Debug: Reviews by followed users: {reviews.filter(r => validUserFollowingIds.includes(r.user_id)).map(r => r.user.username).join(', ')}</div>
           </div>
         )}
 
@@ -267,7 +278,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
         <div className="mt-8">
           <NetworkRecommendations 
             entityId={entityId}
-            userFollowingIds={userFollowingIds}
+            userFollowingIds={validUserFollowingIds}
           />
         </div>
 

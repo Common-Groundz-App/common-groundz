@@ -17,7 +17,7 @@ export const useUserFollowing = () => {
       }
       
       try {
-        // First, try the optimized RPC function
+        // Try the RPC function first
         console.log('useUserFollowing - Attempting RPC call: get_following_with_profiles');
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('get_following_with_profiles', {
@@ -25,9 +25,11 @@ export const useUserFollowing = () => {
             current_user_id: user.id
           });
         
-        if (!rpcError && rpcData) {
+        if (!rpcError && rpcData && Array.isArray(rpcData)) {
           console.log('useUserFollowing - RPC success, got', rpcData.length, 'following users');
-          return rpcData.map(profile => profile.id);
+          const followingIds = rpcData.map(profile => profile.id);
+          console.log('useUserFollowing - RPC following IDs:', followingIds);
+          return followingIds;
         }
         
         console.log('useUserFollowing - RPC failed with error:', rpcError);
@@ -56,12 +58,8 @@ export const useUserFollowing = () => {
     enabled: !!user?.id && !authLoading,
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      console.log('useUserFollowing - Retry attempt', failureCount, 'for error:', error);
-      // Retry up to 2 times for network errors, but not for auth errors
-      return failureCount < 2 && !error?.message?.includes('auth');
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retry: 2,
+    retryDelay: 1000,
     // Return empty array as default
     initialData: [],
   });
