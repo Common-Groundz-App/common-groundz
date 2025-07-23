@@ -38,18 +38,23 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const [activeFilters, setActiveFilters] = useState({
     mostRecent: false,
     verified: false,
-    fiveStars: false
+    fiveStars: false,
+    networkOnly: false
   });
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
+
+  console.log('ReviewsSection - userFollowingIds:', userFollowingIds);
+  console.log('ReviewsSection - total reviews:', reviews.length);
 
   // Process reviews with filters
   const filteredReviews = filterReviews(reviews, {
     search: searchQuery || undefined,
     verified: activeFilters.verified || undefined,
     rating: activeFilters.fiveStars ? 5 : undefined,
-    mostRecent: activeFilters.mostRecent || undefined
-  });
+    mostRecent: activeFilters.mostRecent || undefined,
+    networkOnly: activeFilters.networkOnly || undefined
+  }, userFollowingIds);
 
   // Get special review categories
   const timelineReviews = getTimelineReviews(filteredReviews);
@@ -129,6 +134,16 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             >
               5 Stars
             </Badge>
+            {userFollowingIds.length > 0 && (
+              <Badge 
+                variant={activeFilters.networkOnly ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => toggleFilter('networkOnly')}
+              >
+                <Users className="w-3 h-3 mr-1" />
+                My Network
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -154,9 +169,9 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             />
           ))}
 
-          {/* Circle Highlighted Review */}
-          {circleHighlightedReviews.length > 0 && (
-            <Card className="border-2 border-blue-200 bg-blue-50/30">
+          {/* Circle Highlighted Reviews - Show ALL reviews from followed users */}
+          {circleHighlightedReviews.map(review => (
+            <Card key={review.id} className="border-2 border-blue-200 bg-blue-50/30">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Badge className="bg-blue-600 text-white">
@@ -165,16 +180,16 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   </Badge>
                   <Eye className="w-4 h-4 text-blue-600" />
                   <span className="text-sm text-blue-600 font-medium">
-                    {circleHighlightedReviews[0].user.username || 'Someone'} you follow loved this
+                    {review.user.username || 'Someone'} you follow reviewed this
                   </span>
                 </div>
                 <ReviewCard 
-                  review={transformReviewForUI(circleHighlightedReviews[0])} 
+                  review={transformReviewForUI(review)} 
                   onHelpfulClick={onHelpfulClick}
                 />
               </CardContent>
             </Card>
-          )}
+          ))}
 
           {/* Regular Reviews */}
           {transformedRegularReviews.length > 0 ? (

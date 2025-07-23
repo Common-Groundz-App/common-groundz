@@ -24,7 +24,8 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
   verified?: boolean;
   rating?: number;
   mostRecent?: boolean;
-}) => {
+  networkOnly?: boolean;
+}, userFollowingIds: string[] = []) => {
   let filtered = [...reviews];
 
   // Search filter
@@ -35,6 +36,16 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
       (review.description || '').toLowerCase().includes(searchLower) ||
       (review.user.username || '').toLowerCase().includes(searchLower)
     );
+  }
+
+  // Network only filter - show only reviews from followed users
+  if (filters.networkOnly && userFollowingIds.length > 0) {
+    console.log('Applying network filter. Following IDs:', userFollowingIds);
+    filtered = filtered.filter(review => {
+      const isFromNetwork = userFollowingIds.includes(review.user_id);
+      console.log(`Review from ${review.user.username} (${review.user_id}): ${isFromNetwork ? 'IN' : 'NOT IN'} network`);
+      return isFromNetwork;
+    });
   }
 
   // Verified filter
@@ -60,29 +71,49 @@ export const getTimelineReviews = (reviews: ReviewWithUser[]) => {
   return reviews.filter(review => review.has_timeline && (review.timeline_count || 0) > 0);
 };
 
-// Enhanced circle highlighted reviews with proper network logic
+// Simplified circle highlighted reviews - show ANY review from followed users
 export const getCircleHighlightedReviews = (reviews: ReviewWithUser[], userFollowingIds: string[] = []) => {
+  console.log('Getting circle highlighted reviews');
+  console.log('User following IDs:', userFollowingIds);
+  console.log('Total reviews:', reviews.length);
+  
   // If user has no following, no circle highlights
   if (userFollowingIds.length === 0) {
+    console.log('No following users - no circle highlights');
     return [];
   }
 
-  // Find reviews from followed users with high engagement
+  // Find ALL reviews from followed users (no restrictions on rating, engagement, or recency)
   const circleReviews = reviews.filter(review => {
     const isFromFollowedUser = userFollowingIds.includes(review.user_id);
-    const hasHighRating = review.rating >= 4;
-    const hasGoodEngagement = (review.likes || 0) >= 3;
-    const isRecent = new Date(review.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Last 30 days
     
-    return isFromFollowedUser && hasHighRating && (hasGoodEngagement || isRecent);
+    console.log(`Review by ${review.user.username} (${review.user_id}):`);
+    console.log(`  - Rating: ${review.rating}`);
+    console.log(`  - Likes: ${review.likes || 0}`);
+    console.log(`  - From followed user: ${isFromFollowedUser}`);
+    
+    return isFromFollowedUser;
   });
 
-  // Sort by engagement and recency
-  return circleReviews.sort((a, b) => {
-    const scoreA = (a.likes || 0) + (a.rating * 2) + (new Date(a.created_at).getTime() / 1000000000);
-    const scoreB = (b.likes || 0) + (b.rating * 2) + (new Date(b.created_at).getTime() / 1000000000);
-    return scoreB - scoreA;
+  console.log(`Found ${circleReviews.length} circle highlighted reviews`);
+
+  // Sort by recency first (most recent from your network), then by rating
+  const sortedCircleReviews = circleReviews.sort((a, b) => {
+    // Primary sort: most recent first
+    const dateComparison = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    if (dateComparison !== 0) return dateComparison;
+    
+    // Secondary sort: higher rating first
+    return b.rating - a.rating;
   });
+
+  console.log('Sorted circle reviews:', sortedCircleReviews.map(r => ({
+    user: r.user.username,
+    rating: r.rating,
+    date: r.created_at
+  })));
+
+  return sortedCircleReviews;
 };
 
 // Generate mock timeline data structure for a review
