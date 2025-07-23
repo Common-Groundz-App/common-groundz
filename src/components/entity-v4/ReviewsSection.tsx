@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { MessageCircle, Camera, Eye, Star, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,20 +9,18 @@ import { ReviewWithUser } from '@/types/entities';
 import { 
   transformReviewForUI, 
   filterReviews, 
-  getTimelineReviews, 
-  getCircleHighlightedReviews,
-  getNetworkContext
+  getTimelineReviews
 } from '@/utils/reviewDataUtils';
 import { TimelineReviewCard } from './TimelineReviewCard';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
 import { NetworkRecommendations } from './NetworkRecommendations';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCircleReviews } from '@/hooks/useCircleReviews';
 
 interface ReviewsSectionProps {
   reviews: ReviewWithUser[];
   entityName: string;
   entityId: string;
-  userFollowingIds?: string[];
   onHelpfulClick?: (reviewId: string) => void;
   onQuestionClick?: () => void;
 }
@@ -30,11 +29,11 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   reviews = [], 
   entityName = '',
   entityId = '',
-  userFollowingIds = [],
   onHelpfulClick,
   onQuestionClick 
 }) => {
   const { user, isLoading: authLoading } = useAuth();
+  const { circleReviews, circleUserIds, isLoading: circleLoading } = useCircleReviews(entityId);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState({
     mostRecent: false,
@@ -46,68 +45,75 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
-  // Enhanced debugging that works in all environments
-  console.log('🔍 ReviewsSection - Complete Debug Analysis:');
+  // Enhanced debugging with circle reviews data
+  console.log('🔍 ReviewsSection - Circle Reviews Debug:');
   console.log('  📊 Environment Info:', {
     currentUrl: typeof window !== 'undefined' ? window.location.href : 'SSR',
     hasAuth: !!user,
     authLoading,
     userId: user?.id
   });
-  console.log('  👥 Following Data:', {
-    userFollowingIds,
-    type: typeof userFollowingIds,
-    length: userFollowingIds?.length || 0,
-    isArray: Array.isArray(userFollowingIds),
-    values: userFollowingIds
+  console.log('  🔵 Circle Data:', {
+    circleUserIds,
+    circleUserIdsLength: circleUserIds.length,
+    circleReviews: circleReviews.length,
+    circleLoading,
+    circleReviewDetails: circleReviews.map(r => ({ 
+      id: r.id, 
+      username: r.user.username,
+      user_id: r.user_id,
+      rating: r.rating,
+      title: r.title
+    }))
   });
-  console.log('  📝 Reviews Data:', {
+  console.log('  📝 All Reviews Data:', {
     totalReviews: reviews.length,
     reviewDetails: reviews.map(r => ({ 
       id: r.id, 
       username: r.user.username,
       user_id: r.user_id,
       rating: r.rating,
-      isInFollowing: Array.isArray(userFollowingIds) ? userFollowingIds.includes(r.user_id) : false
+      isInCircle: circleUserIds.includes(r.user_id)
     }))
   });
 
-  // Safely ensure userFollowingIds is always an array and handle loading states
-  const validUserFollowingIds = Array.isArray(userFollowingIds) ? userFollowingIds : [];
   const isAuthenticated = !!user && !authLoading;
-  const hasNetworkData = isAuthenticated && validUserFollowingIds.length > 0;
+  const hasCircleData = isAuthenticated && !circleLoading && circleUserIds.length > 0;
 
-  // Process reviews with filters
+  // Process reviews with filters - using circleUserIds from the hook
   const filteredReviews = filterReviews(reviews, {
     search: searchQuery || undefined,
     verified: activeFilters.verified || undefined,
     rating: activeFilters.fiveStars ? 5 : undefined,
     mostRecent: activeFilters.mostRecent || undefined,
     networkOnly: activeFilters.networkOnly || undefined
-  }, validUserFollowingIds);
+  }, circleUserIds);
 
   console.log('🔍 After filtering:', {
     filteredCount: filteredReviews.length,
     activeFilters,
-    hasNetworkData,
+    hasCircleData,
     isAuthenticated
   });
 
-  // Get special review categories - but only if we have network data
+  // Get special review categories
   const timelineReviews = getTimelineReviews(filteredReviews);
-  const circleHighlightedReviews = hasNetworkData ? getCircleHighlightedReviews(filteredReviews, validUserFollowingIds) : [];
+  
+  // Circle highlighted reviews - reviews that are in our circle data
+  const circleHighlightedReviews = hasCircleData ? 
+    filteredReviews.filter(review => circleUserIds.includes(review.user_id)) : [];
   
   console.log('🔍 Special Categories:', {
     timelineReviews: timelineReviews.length,
     circleHighlighted: circleHighlightedReviews.length,
-    hasNetworkData,
-    circleDetails: circleHighlightedReviews.map(r => ({
+    hasCircleData,
+    circleHighlightedDetails: circleHighlightedReviews.map(r => ({
       id: r.id,
       user: r.user.username,
       user_id: r.user_id,
       rating: r.rating,
       title: r.title,
-      isUserInFollowing: validUserFollowingIds.includes(r.user_id)
+      isUserInCircle: circleUserIds.includes(r.user_id)
     }))
   });
   
@@ -185,15 +191,15 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             >
               5 Stars
             </Badge>
-            {/* Only show network filter if user is authenticated and has network data */}
-            {hasNetworkData && (
+            {/* Only show network filter if user is authenticated and has circle data */}
+            {hasCircleData && (
               <Badge 
                 variant={activeFilters.networkOnly ? "default" : "outline"}
                 className="cursor-pointer"
                 onClick={() => toggleFilter('networkOnly')}
               >
                 <Users className="w-3 h-3 mr-1" />
-                My Network ({validUserFollowingIds.length})
+                My Network ({circleUserIds.length})
               </Badge>
             )}
             <Button
@@ -207,23 +213,25 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           </div>
         </div>
 
-        {/* Debug Info - Now works in all environments */}
+        {/* Debug Info */}
         {showDebugInfo && (
           <div className="mb-4 p-4 bg-gray-100 rounded text-xs space-y-2">
-            <div className="font-semibold">🔍 Circle Highlighting Debug:</div>
+            <div className="font-semibold">🔍 Circle Reviews Debug:</div>
             <div>Auth Status: {isAuthenticated ? 'Authenticated' : authLoading ? 'Loading...' : 'Not authenticated'}</div>
             <div>User ID: {user?.id || 'None'}</div>
-            <div>Following {validUserFollowingIds.length} users: [{validUserFollowingIds.join(', ')}]</div>
+            <div>Circle Loading: {circleLoading ? 'Yes' : 'No'}</div>
+            <div>Following {circleUserIds.length} users: [{circleUserIds.join(', ')}]</div>
+            <div>Circle reviews found: {circleReviews.length}</div>
             <div>Circle highlighted reviews: {circleHighlightedReviews.length}</div>
             <div>Timeline reviews: {timelineReviews.length}</div>
             <div>Regular reviews: {regularReviews.length}</div>
-            <div>Reviews by followed users: {reviews.filter(r => validUserFollowingIds.includes(r.user_id)).map(r => r.user.username).join(', ')}</div>
-            <div className="font-semibold">Expected: hana.li should appear in circle highlights if you follow her and are authenticated</div>
+            <div>Reviews by followed users: {reviews.filter(r => circleUserIds.includes(r.user_id)).map(r => r.user.username).join(', ')}</div>
+            <div className="font-semibold">Expected: Reviews from people you follow should appear with "Trending in Your Network" badge</div>
             {!isAuthenticated && (
               <div className="text-red-600 font-semibold">⚠️ Not authenticated - circle highlighting disabled</div>
             )}
-            {isAuthenticated && validUserFollowingIds.length === 0 && (
-              <div className="text-orange-600 font-semibold">⚠️ No following data - check useUserFollowing hook</div>
+            {isAuthenticated && circleUserIds.length === 0 && !circleLoading && (
+              <div className="text-orange-600 font-semibold">⚠️ No following data - you don't follow anyone yet</div>
             )}
           </div>
         )}
@@ -250,7 +258,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             />
           ))}
 
-          {/* Circle Highlighted Reviews - Only show if user is authenticated and has network data */}
+          {/* Circle Highlighted Reviews - Only show if user is authenticated and has circle data */}
           {circleHighlightedReviews.map(review => (
             <Card key={review.id} className="border-2 border-blue-200 bg-blue-50/30">
               <CardContent className="p-6">
@@ -324,7 +332,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           <div className="mt-8">
             <NetworkRecommendations 
               entityId={entityId}
-              userFollowingIds={validUserFollowingIds}
+              userFollowingIds={circleUserIds}
             />
           </div>
         )}
