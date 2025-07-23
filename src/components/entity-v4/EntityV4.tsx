@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchEntityBySlug } from '@/services/entityService';
@@ -13,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
 import { useToast } from '@/hooks/use-toast';
 import { useUserFollowing } from '@/hooks/useUserFollowing';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface EntityV4Props {
   entitySlug: string;
@@ -23,11 +25,23 @@ const EntityV4 = ({ entitySlug }: EntityV4Props) => {
   const [reviews, setReviews] = useState<ReviewWithUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   const { followingIds } = useUserFollowing();
+
+  // Show loading while authentication is still initializing
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <LoadingSpinner size="lg" />
+          <p className="text-muted-foreground">Loading application...</p>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     const loadEntity = async () => {

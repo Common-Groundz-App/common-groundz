@@ -8,13 +8,19 @@ export interface UserFollowing {
 }
 
 export const useUserFollowing = () => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchFollowingIds = async () => {
+      // Don't fetch if auth is still loading
+      if (authLoading) {
+        return;
+      }
+
+      // If no user, clear following and return
       if (!user?.id) {
         setFollowingIds([]);
         return;
@@ -44,7 +50,7 @@ export const useUserFollowing = () => {
     };
 
     fetchFollowingIds();
-  }, [user?.id]);
+  }, [user?.id, authLoading]);
 
   return {
     followingIds,

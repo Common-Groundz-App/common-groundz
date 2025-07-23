@@ -41,6 +41,7 @@ import { mapEntityTypeToDatabase, getContextualFieldLabel, getEntityTypeFallback
 import { EntityType } from '@/services/recommendation/types';
 
 import EntityDetailV2 from './EntityDetailV2';
+import EntityV4 from '@/components/entity-v4/EntityV4';
 
 const EntityDetailOriginal = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -953,20 +954,15 @@ const EntityDetail = () => {
   const [searchParams] = useSearchParams();
   const version = searchParams.get('v') || (searchParams.get('preview') === 'true' ? '2' : '1');
 
-  // Import EntityV3 and EntityV4 dynamically
+  // Import EntityV3 dynamically but not EntityV4
   const EntityV3 = React.lazy(() => import('@/components/entity-v3/EntityV3'));
-  const EntityV4 = React.lazy(() => import('@/components/entity-v4/EntityV4'));
 
   // Get entitySlug from URL params
   const { slug } = useParams<{ slug: string }>();
   
   // Return appropriate version based on URL parameters
   if (version === '4') {
-    return (
-      <React.Suspense fallback={<div>Loading V4...</div>}>
-        <EntityV4 entitySlug={slug || ''} />
-      </React.Suspense>
-    );
+    return <EntityV4 entitySlug={slug || ''} />;
   } else if (version === '3') {
     return (
       <React.Suspense fallback={<div>Loading V3...</div>}>
