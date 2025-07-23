@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ReviewWithUser } from '@/types/entities';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
@@ -20,6 +21,11 @@ interface ReviewCardProps {
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
+  const getInitials = (name: string | null) => {
+    if (!name) return 'U';
+    return name.charAt(0).toUpperCase();
+  };
+
   // Transform ReviewWithUser to match the expected UI format
   const transformedReview = 'user' in review ? {
     id: review.id,
@@ -46,11 +52,12 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
   return (
     <div className="bg-white border rounded-lg p-6">
       <div className="flex items-start gap-4">
-        <img 
-          src={transformedReview.avatar} 
-          alt={transformedReview.name}
-          className="w-12 h-12 rounded-full object-cover"
-        />
+        <Avatar className="w-12 h-12 flex-shrink-0">
+          <AvatarImage src={transformedReview.avatar || undefined} alt={transformedReview.name} />
+          <AvatarFallback className="bg-brand-orange text-white">
+            {getInitials(transformedReview.name)}
+          </AvatarFallback>
+        </Avatar>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
             <h4 className="font-semibold text-gray-900">{transformedReview.name}</h4>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Eye, Clock } from 'lucide-react';
 import { ReviewWithUser } from '@/types/entities';
 import { ReviewUpdate } from '@/services/review/types';
@@ -27,6 +28,10 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   review,
   onTimelineClick
 }) => {
+  const getInitials = (name: string | null) => {
+    if (!name) return 'U';
+    return name.charAt(0).toUpperCase();
+  };
   const [timelineData, setTimelineData] = useState<ReviewUpdate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -108,11 +113,12 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
     >
       <CardContent className="p-6">
         <div className="flex items-start gap-4">
-          <img 
-            src={transformedReview.avatar} 
-            alt="Timeline reviewer" 
-            className="w-12 h-12 rounded-full object-cover flex-shrink-0" 
-          />
+          <Avatar className="w-12 h-12 flex-shrink-0">
+            <AvatarImage src={transformedReview.avatar || undefined} alt="Timeline reviewer" />
+            <AvatarFallback className="bg-brand-orange text-white">
+              {getInitials(transformedReview.name)}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-3">
               <h4 className="font-semibold text-gray-900">{transformedReview.name}</h4>
