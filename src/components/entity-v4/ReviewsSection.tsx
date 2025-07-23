@@ -10,9 +10,10 @@ import {
   transformReviewForUI, 
   filterReviews, 
   getTimelineReviews, 
-  getCircleHighlightedReviews,
-  generateTimelineDisplay 
+  getCircleHighlightedReviews
 } from '@/utils/reviewDataUtils';
+import { TimelineReviewCard } from './TimelineReviewCard';
+import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
 
 interface ReviewsSectionProps {
   reviews: ReviewWithUser[];
@@ -35,6 +36,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     verified: false,
     fiveStars: false
   });
+  const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
+  const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
 
   // Process reviews with filters
   const filteredReviews = filterReviews(reviews, {
@@ -47,15 +50,31 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   // Get special review categories
   const timelineReviews = getTimelineReviews(filteredReviews);
   const circleHighlightedReviews = getCircleHighlightedReviews(filteredReviews, userFollowingIds);
+  
+  // Get regular reviews (excluding timeline and circle highlighted)
+  const regularReviews = filteredReviews.filter(review => 
+    !timelineReviews.includes(review) && 
+    !circleHighlightedReviews.includes(review)
+  );
 
   // Transform reviews for UI
-  const transformedReviews = filteredReviews.slice(0, 3).map(transformReviewForUI);
+  const transformedRegularReviews = regularReviews.slice(0, 3).map(transformReviewForUI);
 
   const toggleFilter = (filter: keyof typeof activeFilters) => {
     setActiveFilters(prev => ({
       ...prev,
       [filter]: !prev[filter]
     }));
+  };
+
+  const handleTimelineClick = (review: ReviewWithUser) => {
+    setSelectedTimelineReview(review);
+    setIsTimelineViewerOpen(true);
+  };
+
+  const handleTimelineViewerClose = () => {
+    setIsTimelineViewerOpen(false);
+    setSelectedTimelineReview(null);
   };
 
   return (
@@ -122,52 +141,14 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
 
         {/* Review Cards */}
         <div className="space-y-6">
-          {transformedReviews.length > 0 ? (
-            transformedReviews.map(review => (
-              <ReviewCard 
-                key={review.id} 
-                review={review} 
-                onHelpfulClick={onHelpfulClick}
-              />
-            ))
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              {reviews.length === 0 ? (
-                <p>No reviews yet. Be the first to share your experience!</p>
-              ) : (
-                <p>No reviews match your current filters.</p>
-              )}
-            </div>
-          )}
-
-          {/* Timeline Review */}
-          {timelineReviews.length > 0 && (
-            <Card className="border-l-4 border-l-blue-500">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <img 
-                    src={timelineReviews[0].user.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop"} 
-                    alt="Timeline reviewer" 
-                    className="w-12 h-12 rounded-full" 
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-semibold">{timelineReviews[0].user.username}</h4>
-                      <Badge className="bg-blue-100 text-blue-800">Timeline Review</Badge>
-                    </div>
-                    <div className="space-y-4">
-                      {generateTimelineDisplay(timelineReviews[0])?.map((step, index) => (
-                        <div key={index} className={`border-l-2 ${index === 2 ? 'border-blue-400' : 'border-gray-200'} pl-4`}>
-                          <div className="text-sm text-gray-500 mb-1">{step.period}</div>
-                          <p className="text-gray-700">{step.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Timeline Reviews - Display first with new component */}
+          {timelineReviews.map(review => (
+            <TimelineReviewCard
+              key={review.id}
+              review={review}
+              onTimelineClick={handleTimelineClick}
+            />
+          ))}
 
           {/* Circle Highlighted Review */}
           {circleHighlightedReviews.length > 0 && (
@@ -184,6 +165,27 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 />
               </CardContent>
             </Card>
+          )}
+
+          {/* Regular Reviews */}
+          {transformedRegularReviews.length > 0 ? (
+            transformedRegularReviews.map(review => (
+              <ReviewCard 
+                key={review.id} 
+                review={review} 
+                onHelpfulClick={onHelpfulClick}
+              />
+            ))
+          ) : (
+            !timelineReviews.length && !circleHighlightedReviews.length && (
+              <div className="text-center py-8 text-gray-500">
+                {reviews.length === 0 ? (
+                  <p>No reviews yet. Be the first to share your experience!</p>
+                ) : (
+                  <p>No reviews match your current filters.</p>
+                )}
+              </div>
+            )
           )}
         </div>
 
@@ -270,6 +272,21 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           </CardContent>
         </Card>
       </div>
+
+      {/* Timeline Viewer Modal */}
+      {selectedTimelineReview && (
+        <ReviewTimelineViewer
+          isOpen={isTimelineViewerOpen}
+          onClose={handleTimelineViewerClose}
+          reviewId={selectedTimelineReview.id}
+          reviewOwnerId={selectedTimelineReview.user_id}
+          reviewTitle={selectedTimelineReview.title}
+          initialRating={selectedTimelineReview.rating}
+          onTimelineUpdate={() => {
+            // Could refresh reviews here if needed
+          }}
+        />
+      )}
     </>
   );
 };
