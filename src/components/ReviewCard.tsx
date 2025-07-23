@@ -3,7 +3,6 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ReviewWithUser } from '@/types/entities';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
@@ -24,7 +23,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
   // Transform ReviewWithUser to match the expected UI format
   const transformedReview = 'user' in review ? {
     id: review.id,
-    userId: review.user_id,
     name: review.user.username || 'Unknown User',
     avatar: review.user.avatar_url || '',
     rating: review.rating,
@@ -35,7 +33,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
     helpful: review.likes || 0
   } : {
     id: review.id.toString(),
-    userId: null, // Legacy format doesn't have user ID
     name: review.name,
     avatar: review.avatar,
     rating: review.rating,
@@ -49,10 +46,10 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
   return (
     <div className="bg-white border rounded-lg p-6">
       <div className="flex items-start gap-4">
-        <ProfileAvatar
-          userId={transformedReview.userId}
-          size="lg"
-          fallbackUsername={transformedReview.name}
+        <img 
+          src={transformedReview.avatar} 
+          alt={transformedReview.name}
+          className="w-12 h-12 rounded-full object-cover"
         />
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">

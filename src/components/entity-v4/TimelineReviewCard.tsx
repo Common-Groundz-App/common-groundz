@@ -9,7 +9,6 @@ import { fetchReviewUpdates } from '@/services/review/timeline';
 import { transformReviewForUI } from '@/utils/reviewDataUtils';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 
 interface TimelineReviewCardProps {
   review: ReviewWithUser;
@@ -109,11 +108,10 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
     >
       <CardContent className="p-6">
         <div className="flex items-start gap-4">
-          <ProfileAvatar
-            userId={review.user_id}
-            size="lg"
-            className="flex-shrink-0"
-            fallbackUsername={review.user.username}
+          <img 
+            src={transformedReview.avatar} 
+            alt="Timeline reviewer" 
+            className="w-12 h-12 rounded-full object-cover flex-shrink-0" 
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-3">
