@@ -38,7 +38,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const [activeFilters, setActiveFilters] = useState({
     mostRecent: false,
     verified: false,
-    fiveStars: false
+    fiveStars: false,
+    networkOnly: false
   });
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
@@ -48,7 +49,9 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     search: searchQuery || undefined,
     verified: activeFilters.verified || undefined,
     rating: activeFilters.fiveStars ? 5 : undefined,
-    mostRecent: activeFilters.mostRecent || undefined
+    mostRecent: activeFilters.mostRecent || undefined,
+    networkOnly: activeFilters.networkOnly || undefined,
+    userFollowingIds: activeFilters.networkOnly ? userFollowingIds : undefined
   });
 
   // Get special review categories
@@ -70,6 +73,11 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
       [filter]: !prev[filter]
     }));
   };
+
+  // Count network reviews for display
+  const networkReviewsCount = reviews.filter(review => 
+    userFollowingIds.includes(review.user_id)
+  ).length;
 
   const handleTimelineClick = (review: ReviewWithUser) => {
     setSelectedTimelineReview(review);
@@ -107,7 +115,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Reviews & Social Proof</h2>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Badge 
               variant={activeFilters.mostRecent ? "default" : "outline"}
               className="cursor-pointer"
@@ -129,6 +137,16 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             >
               5 Stars
             </Badge>
+            {userFollowingIds.length > 0 && networkReviewsCount > 0 && (
+              <Badge 
+                variant={activeFilters.networkOnly ? "default" : "outline"}
+                className="cursor-pointer flex items-center gap-1"
+                onClick={() => toggleFilter('networkOnly')}
+              >
+                <Users className="w-3 h-3" />
+                My Network {activeFilters.networkOnly && `(${networkReviewsCount})`}
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -190,6 +208,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
               <div className="text-center py-8 text-gray-500">
                 {reviews.length === 0 ? (
                   <p>No reviews yet. Be the first to share your experience!</p>
+                ) : activeFilters.networkOnly ? (
+                  <p>No reviews from your network yet. Try removing the network filter to see all reviews.</p>
                 ) : (
                   <p>No reviews match your current filters.</p>
                 )}
