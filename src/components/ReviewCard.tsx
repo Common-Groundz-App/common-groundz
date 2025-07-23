@@ -78,7 +78,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
             </div>
           </div>
           
-          <h5 className="font-medium text-gray-900 mb-2">{transformedReview.title}</h5>
           <p className="text-gray-700 text-sm leading-relaxed">{transformedReview.content}</p>
         </div>
       </div>
