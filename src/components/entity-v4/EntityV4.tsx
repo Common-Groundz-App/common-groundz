@@ -41,7 +41,14 @@ const EntityV4 = () => {
   const { toast } = useToast();
   
   // Get user's following list for circle functionality
-  const { data: userFollowingIds = [] } = useUserFollowing();
+  const { data: userFollowingIds = [], isLoading: isFollowingLoading, error: followingError } = useUserFollowing();
+
+  console.log('EntityV4 - Following data:', {
+    userFollowingIds,
+    isFollowingLoading,
+    followingError,
+    userIdFromAuth: user?.id
+  });
 
   // Timeline data
   const { summary: timelineData, isLoading: isTimelineLoading, error: timelineError } = useEntityTimelineSummary(entity?.id || null);

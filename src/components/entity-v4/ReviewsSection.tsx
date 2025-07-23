@@ -44,8 +44,11 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
 
-  console.log('ReviewsSection - userFollowingIds:', userFollowingIds);
-  console.log('ReviewsSection - total reviews:', reviews.length);
+  console.log('ReviewsSection - Debug Info:');
+  console.log('  - userFollowingIds:', userFollowingIds);
+  console.log('  - userFollowingIds length:', userFollowingIds.length);
+  console.log('  - total reviews:', reviews.length);
+  console.log('  - reviews user_ids:', reviews.map(r => ({ id: r.user_id, username: r.user.username })));
 
   // Process reviews with filters
   const filteredReviews = filterReviews(reviews, {
@@ -56,9 +59,21 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     networkOnly: activeFilters.networkOnly || undefined
   }, userFollowingIds);
 
+  console.log('ReviewsSection - After filtering:', filteredReviews.length, 'reviews');
+
   // Get special review categories
   const timelineReviews = getTimelineReviews(filteredReviews);
   const circleHighlightedReviews = getCircleHighlightedReviews(filteredReviews, userFollowingIds);
+  
+  console.log('ReviewsSection - Timeline reviews:', timelineReviews.length);
+  console.log('ReviewsSection - Circle highlighted reviews:', circleHighlightedReviews.length);
+  console.log('ReviewsSection - Circle highlighted review details:', circleHighlightedReviews.map(r => ({
+    id: r.id,
+    user: r.user.username,
+    user_id: r.user_id,
+    rating: r.rating,
+    title: r.title
+  })));
   
   // Get regular reviews (excluding timeline and circle highlighted)
   const regularReviews = filteredReviews.filter(review => 
@@ -141,11 +156,21 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 onClick={() => toggleFilter('networkOnly')}
               >
                 <Users className="w-3 h-3 mr-1" />
-                My Network
+                My Network ({userFollowingIds.length})
               </Badge>
             )}
           </div>
         </div>
+
+        {/* Debug Info - Remove this in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
+            <div>Debug: Following {userFollowingIds.length} users</div>
+            <div>Debug: {circleHighlightedReviews.length} circle highlighted reviews</div>
+            <div>Debug: {timelineReviews.length} timeline reviews</div>
+            <div>Debug: {regularReviews.length} regular reviews</div>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="relative mb-6">
