@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { Star, ThumbsUp } from 'lucide-react';
+import { ThumbsUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ReviewWithUser } from '@/types/entities';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
@@ -65,15 +66,15 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
             )}
           </div>
           
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex">
-              {[...Array(5)].map((_, i) => (
-                <Star 
-                  key={i} 
-                  className={`w-4 h-4 ${i < transformedReview.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
-                />
-              ))}
-            </div>
+          <div className="flex items-center gap-3 mb-2">
+            <ConnectedRingsRating
+              value={transformedReview.rating}
+              size="xs"
+              variant="badge"
+              showValue={false}
+              minimal={true}
+              className="flex-shrink-0"
+            />
             <span className="text-sm text-gray-500">{transformedReview.date}</span>
           </div>
           

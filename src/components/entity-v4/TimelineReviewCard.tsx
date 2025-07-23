@@ -8,6 +8,7 @@ import { ReviewUpdate } from '@/services/review/types';
 import { fetchReviewUpdates } from '@/services/review/timeline';
 import { transformReviewForUI } from '@/utils/reviewDataUtils';
 import { formatRelativeDate } from '@/utils/dateUtils';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 interface TimelineReviewCardProps {
   review: ReviewWithUser;
@@ -145,10 +146,15 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                       </Badge>
                     )}
                     {entry.rating && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm font-medium">
-                          {'⭐'.repeat(Math.floor(entry.rating))}
-                        </span>
+                      <div className="flex items-center">
+                        <ConnectedRingsRating
+                          value={entry.rating}
+                          size="xs"
+                          variant="badge"
+                          showValue={false}
+                          minimal={true}
+                          className="mr-1"
+                        />
                         <span className="text-xs text-gray-500">
                           {entry.rating.toFixed(1)}
                         </span>
