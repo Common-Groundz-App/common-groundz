@@ -166,7 +166,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   </span>
                 </div>
                 <ReviewCard 
-                  review={transformReviewForUI(circleHighlightedReviews[0])} 
+                  review={transformReviewForUI(circleHighlightedReviews[0]) as any} 
                   onHelpfulClick={onHelpfulClick}
                 />
               </CardContent>
@@ -178,7 +178,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             transformedRegularReviews.map(review => (
               <ReviewCard 
                 key={review.id} 
-                review={review} 
+                review={review as any} 
                 onHelpfulClick={onHelpfulClick}
               />
             ))

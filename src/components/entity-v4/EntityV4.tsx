@@ -6,7 +6,7 @@ import { ReviewsSection } from './ReviewsSection';
 import { EntityHeader } from './EntityHeader';
 import { EntityOverview } from './EntityOverview';
 import { EntityStatsSection } from './EntityStatsSection';
-import { Footer } from '@/components/Footer';
+import Footer from '@/components/Footer';
 import { ReviewWithUser } from '@/types/entities';
 import { fetchEntityReviews } from '@/services/entityService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -86,7 +86,27 @@ const EntityV4 = ({ entitySlug }: EntityV4Props) => {
       {/* <Navbar /> */}
 
       {/* Entity Header */}
-      <EntityHeader entity={entity} />
+      <EntityHeader 
+        entity={entity!} 
+        stats={null}
+        entityImage={entity?.image_url || ''}
+        entityData={{
+          name: entity?.name || '',
+          description: entity?.description || '',
+          rating: 0,
+          totalReviews: reviews.length,
+          claimed: false,
+          website: entity?.metadata?.website || ''
+        }}
+        onRecommendationModalOpen={() => {}}
+        onReviewAction={() => {}}
+        reviewActionConfig={{
+          text: 'Write Review',
+          icon: null,
+          action: () => {},
+          tooltip: null
+        }}
+      />
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

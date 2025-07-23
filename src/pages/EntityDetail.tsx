@@ -957,11 +957,14 @@ const EntityDetail = () => {
   const EntityV3 = React.lazy(() => import('@/components/entity-v3/EntityV3'));
   const EntityV4 = React.lazy(() => import('@/components/entity-v4/EntityV4'));
 
+  // Get entitySlug from URL params
+  const { slug } = useParams<{ slug: string }>();
+  
   // Return appropriate version based on URL parameters
   if (version === '4') {
     return (
       <React.Suspense fallback={<div>Loading V4...</div>}>
-        <EntityV4 />
+        <EntityV4 entitySlug={slug || ''} />
       </React.Suspense>
     );
   } else if (version === '3') {
