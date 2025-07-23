@@ -58,22 +58,21 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
 
       // Get entities recommended by followed users
       const { data: networkEntities } = await supabase
-        .from('entities')
+        .from('recommendations')
         .select(`
-          id,
-          name,
-          type,
-          image_url,
-          recommendations!inner(
-            user_id,
-            rating,
-            profiles(username)
+          rating,
+          user_id,
+          entities!inner(
+            id,
+            name,
+            type,
+            image_url
           )
         `)
-        .neq('id', entityId)
-        .eq('is_deleted', false)
-        .in('recommendations.user_id', userFollowingIds)
-        .gte('recommendations.rating', 4)
+        .neq('entities.id', entityId)
+        .eq('entities.is_deleted', false)
+        .in('user_id', userFollowingIds)
+        .gte('rating', 4)
         .limit(6);
 
       if (!networkEntities) return [];
@@ -81,23 +80,23 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
       // Group by entity and calculate metrics
       const entityMap = new Map<string, RecommendationEntity>();
       
-      networkEntities.forEach(entity => {
-        const recommendation = entity.recommendations?.[0];
-        const username = recommendation?.profiles?.username || 'Someone';
+      networkEntities.forEach(rec => {
+        const username = 'Network Friend'; // Simplified for now
+        const entityId = rec.entities.id;
         
-        if (!entityMap.has(entity.id)) {
-          entityMap.set(entity.id, {
-            id: entity.id,
-            name: entity.name,
-            type: entity.type,
-            image_url: entity.image_url,
-            averageRating: recommendation?.rating || 0,
+        if (!entityMap.has(entityId)) {
+          entityMap.set(entityId, {
+            id: rec.entities.id,
+            name: rec.entities.name,
+            type: rec.entities.type,
+            image_url: rec.entities.image_url,
+            averageRating: rec.rating,
             recommendedBy: [username]
           });
         } else {
-          const existing = entityMap.get(entity.id)!;
+          const existing = entityMap.get(entityId)!;
           existing.recommendedBy.push(username);
-          existing.averageRating = Math.max(existing.averageRating, recommendation?.rating || 0);
+          existing.averageRating = Math.max(existing.averageRating, rec.rating);
         }
       });
 
