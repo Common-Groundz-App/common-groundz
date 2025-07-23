@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { ThumbsUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ReviewWithUser } from '@/types/entities';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
@@ -44,12 +43,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
     helpful: review.helpful
   };
 
-  const handleHelpfulClick = () => {
-    if (onHelpfulClick && 'user' in review) {
-      onHelpfulClick(review.id);
-    }
-  };
-
   return (
     <div className="bg-white border rounded-lg p-6">
       <div className="flex items-start gap-4">
@@ -66,7 +59,10 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
             )}
           </div>
           
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="text-sm font-medium text-gray-600">
+              {transformedReview.date}
+            </div>
             <div className="flex items-center">
               <ConnectedRingsRating
                 value={transformedReview.rating}
@@ -80,21 +76,10 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
                 {transformedReview.rating.toFixed(1)}
               </span>
             </div>
-            <span className="text-sm text-gray-500">{transformedReview.date}</span>
           </div>
           
           <h5 className="font-medium text-gray-900 mb-2">{transformedReview.title}</h5>
-          <p className="text-gray-700 text-sm leading-relaxed mb-3">{transformedReview.content}</p>
-          
-          <div className="flex items-center gap-4">
-            <button 
-              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-              onClick={handleHelpfulClick}
-            >
-              <ThumbsUp className="w-4 h-4" />
-              <span>Helpful ({transformedReview.helpful})</span>
-            </button>
-          </div>
+          <p className="text-gray-700 text-sm leading-relaxed">{transformedReview.content}</p>
         </div>
       </div>
     </div>
