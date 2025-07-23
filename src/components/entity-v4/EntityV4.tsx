@@ -37,19 +37,26 @@ const EntityV4 = () => {
   } = useEntityDetailCached(slug || '');
 
   // Fetch circle rating data and user following data
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   
-  // Get user's following list for circle functionality
-  const { data: userFollowingIds = [], isLoading: isFollowingLoading, error: followingError } = useUserFollowing();
+  // Get user's following list for circle functionality with improved error handling
+  const { 
+    data: userFollowingIds = [], 
+    isLoading: isFollowingLoading, 
+    error: followingError,
+    isError: isFollowingError 
+  } = useUserFollowing();
 
-  // Enhanced debugging for all environments
+  // Enhanced debugging for all environments with authentication state tracking
   console.log('🔍 EntityV4 - Complete Authentication & Following Analysis:');
   console.log('  🔐 Auth State:', {
     hasUser: !!user,
     userId: user?.id,
     userEmail: user?.email,
-    isAuthenticatedProperly: !!user?.id
+    isAuthenticatedProperly: !!user?.id,
+    authLoading,
+    authInitialized: !authLoading
   });
   console.log('  👥 Following Hook State:', {
     userFollowingIds,
@@ -57,12 +64,14 @@ const EntityV4 = () => {
     userFollowingIdsLength: userFollowingIds?.length || 0,
     userFollowingIdsIsArray: Array.isArray(userFollowingIds),
     isFollowingLoading,
+    isFollowingError,
     followingError: followingError?.message || null
   });
   console.log('  🌍 Environment Context:', {
-    nodeEnv: process.env.NODE_ENV,
     currentUrl: typeof window !== 'undefined' ? window.location.href : 'SSR',
-    hasLocalStorage: typeof window !== 'undefined' && !!window.localStorage
+    hasLocalStorage: typeof window !== 'undefined' && !!window.localStorage,
+    isAuthReady: !!user && !authLoading,
+    isDataReady: !!user && !authLoading && !isFollowingLoading
   });
 
   // Timeline data
@@ -74,13 +83,11 @@ const EntityV4 = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isRecommendationModalOpen, setIsRecommendationModalOpen] = useState(false);
 
-  // Memoized user review
   const userReview = React.useMemo(() => {
     if (!user || !reviews) return null;
     return reviews.find(review => review.user_id === user.id);
   }, [user, reviews]);
 
-  // Get sidebar button configuration based on user's review status
   const getSidebarButtonConfig = () => {
     if (!userReview) {
       return {
@@ -108,7 +115,6 @@ const EntityV4 = () => {
     };
   };
 
-  // Handler functions
   const handleAddReview = () => {
     if (!user) {
       toast({
@@ -139,7 +145,6 @@ const EntityV4 = () => {
   const handleReviewSubmit = async () => {
     try {
       setIsReviewFormOpen(false);
-      // Refresh data would be called here in a real implementation
       toast({
         title: "Review submitted",
         description: "Your review has been added successfully"
@@ -155,7 +160,6 @@ const EntityV4 = () => {
   };
 
   const handleTimelineUpdate = async () => {
-    // Refresh data would be called here in a real implementation
     toast({
       title: "Timeline updated",
       description: "Your timeline update has been added successfully"
@@ -214,19 +218,29 @@ const EntityV4 = () => {
     image: entityImage,
     website: entity?.website_url || '',
     location: entity?.venue || '',
-    email: '', // TODO: Extract from metadata when available
-    phone: ''  // TODO: Extract from metadata when available
+    email: '',
+    phone: ''
   };
 
-  // Ensure userFollowingIds is always an array for the ReviewsSection
+  // Safely ensure userFollowingIds is always an array - with additional safeguards for external preview
   const validUserFollowingIds = Array.isArray(userFollowingIds) ? userFollowingIds : [];
+  const isAuthenticated = !!user && !authLoading;
+  const hasFollowingData = isAuthenticated && !isFollowingLoading && !isFollowingError;
 
-  // Log final data being passed to ReviewsSection
+  // Log final data being passed to ReviewsSection with authentication context
   console.log('🔍 Final data passed to ReviewsSection:', {
     reviewsCount: reviews?.length || 0,
     validUserFollowingIds,
     validUserFollowingIdsLength: validUserFollowingIds.length,
-    shouldShowCircleHighlights: validUserFollowingIds.length > 0
+    shouldShowCircleHighlights: hasFollowingData && validUserFollowingIds.length > 0,
+    isAuthenticated,
+    hasFollowingData,
+    authStatus: {
+      user: !!user,
+      authLoading,
+      isFollowingLoading,
+      isFollowingError
+    }
   });
 
   return <TooltipProvider delayDuration={0}>
@@ -260,18 +274,16 @@ const EntityV4 = () => {
                   userId={user?.id || null}
                 />
 
-                {/* SECTION 3: Reviews & Social Proof - Now with Circle Network Integration */}
+                {/* SECTION 3: Reviews & Social Proof - Now with Enhanced Authentication Handling */}
                 <ReviewsSection 
                   reviews={reviews}
                   entityName={entity?.name || ''}
                   entityId={entity?.id || ''}
                   userFollowingIds={validUserFollowingIds}
                   onHelpfulClick={(reviewId) => {
-                    // TODO: Implement helpful vote functionality
                     console.log('Helpful clicked for review:', reviewId);
                   }}
                   onQuestionClick={() => {
-                    // TODO: Implement ask community functionality
                     console.log('Ask question clicked');
                   }}
                 />
@@ -306,7 +318,6 @@ const EntityV4 = () => {
         />
       )}
 
-      {/* Review Timeline Viewer Modal */}
       {isTimelineViewerOpen && timelineReviewId && entity && userReview && (
         <ReviewTimelineViewer
           isOpen={isTimelineViewerOpen}
@@ -319,7 +330,6 @@ const EntityV4 = () => {
         />
       )}
 
-      {/* Recommendation Modal */}
       {isRecommendationModalOpen && entity && (
         <EntityRecommendationModal
           open={isRecommendationModalOpen}

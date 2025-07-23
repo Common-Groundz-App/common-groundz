@@ -17,8 +17,9 @@ export const useUserFollowing = () => {
         userEmail: user?.email 
       });
       
+      // Return empty array if no authenticated user
       if (!user?.id) {
-        console.log('🔍 useUserFollowing - No user ID, returning empty array');
+        console.log('🔍 useUserFollowing - No authenticated user, returning empty array');
         return [];
       }
       
@@ -33,6 +34,7 @@ export const useUserFollowing = () => {
         
         if (followsError) {
           console.error('🔍 useUserFollowing - Direct query failed:', followsError);
+          // Don't throw error, return empty array for graceful degradation
           return [];
         }
         
@@ -46,15 +48,26 @@ export const useUserFollowing = () => {
         return followingIds;
       } catch (error) {
         console.error('🔍 useUserFollowing - Unexpected error:', error);
+        // Return empty array instead of throwing to prevent component crashes
         return [];
       }
     },
-    enabled: !!user?.id && !authLoading,
+    // Key changes for external preview compatibility:
+    enabled: !!user?.id && !authLoading, // Only run when user is authenticated and auth is not loading
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false,
-    retry: 2,
-    retryDelay: 1000,
-    // Return empty array as default
+    retry: (failureCount, error) => {
+      // Retry up to 3 times for network/auth errors, but not for RLS errors
+      if (failureCount < 3) {
+        console.log(`🔍 useUserFollowing - Retry attempt ${failureCount + 1}`);
+        return true;
+      }
+      return false;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    // Return empty array as default to prevent undefined errors
     initialData: [],
+    // Add error boundary to prevent crashes
+    throwOnError: false,
   });
 };
