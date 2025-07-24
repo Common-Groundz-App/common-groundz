@@ -15,7 +15,21 @@ export const transformReviewForUI = (review: ReviewWithUser) => ({
   title: review.title,
   content: review.description || '',
   verified: review.is_verified || false,
-  helpful: review.likes || 0
+  helpful: review.likes || 0,
+  media: (review.media || []).map(item => ({
+    id: item.id || '',
+    url: item.url,
+    type: item.type,
+    thumbnail_url: item.thumbnail_url,
+    order: 0, // Default order since common.ts MediaItem doesn't have this
+    caption: item.alt_text,
+    alt: item.alt_text,
+    is_deleted: false,
+    width: (item as any).width,
+    height: (item as any).height,
+    orientation: (item as any).orientation,
+    source: (item as any).source
+  }))
 });
 
 // Filter reviews based on criteria

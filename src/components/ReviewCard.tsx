@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ReviewWithUser } from '@/types/entities';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
+import { TwitterStyleMediaPreview } from '@/components/feed/TwitterStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 
@@ -19,7 +19,7 @@ interface ReviewCardProps {
     content: string;
     verified: boolean;
     helpful: number;
-    media?: any[];
+    media?: MediaItem[];
   };
   onHelpfulClick?: (reviewId: string) => void;
 }
