@@ -10,7 +10,7 @@ import { fetchReviewUpdates } from '@/services/review/timeline';
 import { transformReviewForUI } from '@/utils/reviewDataUtils';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
+import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 
@@ -226,7 +226,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
               {/* Media Display */}
               {validMedia.length > 0 && (
                 <div className="mt-3">
-                  <TwitterStyleMediaPreview
+                  <YelpStyleMediaPreview
                     media={validMedia}
                     onImageClick={handleMediaClick}
                     className="max-w-md"
