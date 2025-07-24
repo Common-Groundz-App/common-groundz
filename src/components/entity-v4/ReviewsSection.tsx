@@ -263,28 +263,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
 
         {/* Review Cards */}
         <div className="space-y-6">
-          {/* Timeline Reviews - Display first with new component */}
-          {timelineReviews.map(review => {
-            const isInNetwork = hasCircleData && circleUserIds.includes(review.user_id);
-            return (
-              <div key={review.id} className="relative">
-                {isInNetwork && (
-                  <div className="mb-2">
-                    <Badge className="bg-blue-600 text-white">
-                      <Users className="w-3 h-3 mr-1" />
-                      Trending in Your Network
-                    </Badge>
-                  </div>
-                )}
-                <TimelineReviewCard
-                  review={review}
-                  onTimelineClick={handleTimelineClick}
-                />
-              </div>
-            );
-          })}
-
-          {/* Circle Highlighted Reviews - Only show if user is authenticated and has circle data */}
+          {/* Circle Highlighted Reviews - Display first (Only show if user is authenticated and has circle data) */}
           {circleHighlightedReviews.map(review => (
             <Card key={review.id} className="border-2 border-blue-200 bg-blue-50/30">
               <CardContent className="p-6">
@@ -305,6 +284,27 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
               </CardContent>
             </Card>
           ))}
+
+          {/* Timeline Reviews - Display second with new component */}
+          {timelineReviews.map(review => {
+            const isInNetwork = hasCircleData && circleUserIds.includes(review.user_id);
+            return (
+              <div key={review.id} className="relative">
+                {isInNetwork && (
+                  <div className="mb-2">
+                    <Badge className="bg-blue-600 text-white">
+                      <Users className="w-3 h-3 mr-1" />
+                      Trending in Your Network
+                    </Badge>
+                  </div>
+                )}
+                <TimelineReviewCard
+                  review={review}
+                  onTimelineClick={handleTimelineClick}
+                />
+              </div>
+            );
+          })}
 
           {/* Regular Reviews */}
           {transformedRegularReviews.length > 0 ? (
