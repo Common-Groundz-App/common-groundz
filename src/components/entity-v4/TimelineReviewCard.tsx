@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Eye, Clock } from 'lucide-react';
+import { Eye, Clock, Users } from 'lucide-react';
 import { ReviewWithUser } from '@/types/entities';
 import { ReviewUpdate } from '@/services/review/types';
 import { fetchReviewUpdates } from '@/services/review/timeline';
@@ -14,6 +14,8 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 interface TimelineReviewCardProps {
   review: ReviewWithUser;
   onTimelineClick: (review: ReviewWithUser) => void;
+  isCircleReview?: boolean;
+  circleUserName?: string;
 }
 
 interface TimelineEntry {
@@ -26,7 +28,9 @@ interface TimelineEntry {
 
 export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   review,
-  onTimelineClick
+  onTimelineClick,
+  isCircleReview = false,
+  circleUserName
 }) => {
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -108,10 +112,25 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
 
   return (
     <Card 
-      className="border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow"
+      className={`border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow ${
+        isCircleReview ? 'border-2 border-blue-200 bg-blue-50/30' : ''
+      }`}
       onClick={handleCardClick}
     >
       <CardContent className="p-6">
+        {/* Circle Review Badge - Show at top if this is a circle review */}
+        {isCircleReview && (
+          <div className="flex items-center gap-2 mb-4">
+            <Badge className="bg-blue-600 text-white">
+              <Users className="w-3 h-3 mr-1" />
+              Trending in Your Network
+            </Badge>
+            <Eye className="w-4 h-4 text-blue-600" />
+            <span className="text-sm text-blue-600 font-medium">
+              {circleUserName || transformedReview.name} you follow reviewed this
+            </span>
+          </div>
+        )}
         <div className="flex items-start gap-4">
           <Avatar className="w-12 h-12 flex-shrink-0">
             <AvatarImage src={transformedReview.avatar || undefined} alt="Timeline reviewer" />

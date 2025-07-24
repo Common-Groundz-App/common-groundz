@@ -289,20 +289,13 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           {timelineReviews.map(review => {
             const isInNetwork = hasCircleData && circleUserIds.includes(review.user_id);
             return (
-              <div key={review.id} className="relative">
-                {isInNetwork && (
-                  <div className="mb-2">
-                    <Badge className="bg-blue-600 text-white">
-                      <Users className="w-3 h-3 mr-1" />
-                      Trending in Your Network
-                    </Badge>
-                  </div>
-                )}
-                <TimelineReviewCard
-                  review={review}
-                  onTimelineClick={handleTimelineClick}
-                />
-              </div>
+              <TimelineReviewCard
+                key={review.id}
+                review={review}
+                onTimelineClick={handleTimelineClick}
+                isCircleReview={isInNetwork}
+                circleUserName={review.user.username}
+              />
             );
           })}
 
