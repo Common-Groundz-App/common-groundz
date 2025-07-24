@@ -8,12 +8,14 @@ import { cn } from '@/lib/utils';
 interface TwitterStyleMediaPreviewProps {
   media: MediaItem[];
   onRemove?: (media: MediaItem) => void;
+  onImageClick?: (index: number) => void;
   className?: string;
 }
 
 export function TwitterStyleMediaPreview({
   media,
   onRemove,
+  onImageClick,
   className
 }: TwitterStyleMediaPreviewProps) {
   const count = media.length;
@@ -24,14 +26,16 @@ export function TwitterStyleMediaPreview({
   const sortedMedia = [...media].sort((a, b) => (a.order || 0) - (b.order || 0));
 
   const renderImage = (item: MediaItem, aspectRatio?: string, isFullWidth = false) => {
+    const mediaIndex = sortedMedia.indexOf(item);
     return (
       <div 
         className={cn(
-          "relative overflow-hidden rounded-lg bg-muted", 
+          "relative overflow-hidden rounded-lg bg-muted cursor-pointer", 
           aspectRatio || "aspect-square",
           isFullWidth && "col-span-2"
         )}
         key={item.id || item.url}
+        onClick={() => onImageClick?.(mediaIndex)}
       >
         {item.type === 'image' ? (
           <img

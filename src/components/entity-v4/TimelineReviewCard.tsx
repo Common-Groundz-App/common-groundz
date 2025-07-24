@@ -53,7 +53,6 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
       url: item.url,
       type: item.type,
       thumbnail_url: item.thumbnail_url,
-      alt_text: item.alt_text,
       order: (item as any).order || 0,
       caption: (item as any).caption,
       alt: (item as any).alt,
@@ -231,8 +230,6 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                     media={validMedia}
                     onImageClick={handleMediaClick}
                     className="max-w-md"
-                    maxHeight="300px"
-                    displayMode="grid"
                   />
                 </div>
               )}

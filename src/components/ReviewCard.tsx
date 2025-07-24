@@ -41,7 +41,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
       url: (item as any).url || '',
       type: (item as any).type || 'image',
       thumbnail_url: (item as any).thumbnail_url,
-      alt_text: (item as any).alt_text,
       order: (item as any).order || 0,
       caption: (item as any).caption,
       alt: (item as any).alt,
@@ -127,8 +126,6 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
                 media={validMedia}
                 onImageClick={handleMediaClick}
                 className="max-w-md"
-                maxHeight="300px"
-                displayMode="grid"
               />
             </div>
           )}
