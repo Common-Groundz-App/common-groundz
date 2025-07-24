@@ -96,45 +96,66 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     isAuthenticated
   });
 
-  // Get special review categories with priority system to prevent duplicates
-  // 1. Timeline reviews (highest priority)
+  // 4-tier priority system: Hybrid (circle+timeline), Circle-only, Timeline-only, Regular
   const timelineReviews = getTimelineReviews(filteredReviews);
-  const timelineReviewIds = new Set(timelineReviews.map(r => r.id));
+  const allCircleReviews = hasCircleData ? 
+    filteredReviews.filter(review => circleUserIds.includes(review.user_id)) : [];
   
-  // 2. Circle highlighted reviews (second priority) - exclude timeline reviews
-  const circleHighlightedReviews = hasCircleData ? 
-    filteredReviews.filter(review => 
-      circleUserIds.includes(review.user_id) && 
-      !timelineReviewIds.has(review.id)
-    ) : [];
-  const circleHighlightedReviewIds = new Set(circleHighlightedReviews.map(r => r.id));
+  // 1. Hybrid reviews: both circle AND timeline (highest priority)
+  const hybridReviews = timelineReviews.filter(review => 
+    allCircleReviews.some(cr => cr.id === review.id)
+  );
   
-  console.log('🔍 Special Categories (Deduplicated):', {
-    timelineReviews: timelineReviews.length,
-    circleHighlighted: circleHighlightedReviews.length,
+  // 2. Circle-only reviews: circle but NOT timeline
+  const circleOnlyReviews = allCircleReviews.filter(review => 
+    !timelineReviews.some(tr => tr.id === review.id)
+  );
+  
+  // 3. Timeline-only reviews: timeline but NOT circle
+  const timelineOnlyReviews = timelineReviews.filter(review => 
+    !allCircleReviews.some(cr => cr.id === review.id)
+  );
+  
+  const hybridReviewIds = new Set(hybridReviews.map(r => r.id));
+  const circleOnlyReviewIds = new Set(circleOnlyReviews.map(r => r.id));
+  const timelineOnlyReviewIds = new Set(timelineOnlyReviews.map(r => r.id));
+  
+  console.log('🔍 4-Tier Priority System:', {
+    hybridReviews: hybridReviews.length,
+    circleOnlyReviews: circleOnlyReviews.length,
+    timelineOnlyReviews: timelineOnlyReviews.length,
     hasCircleData,
-    timelineDetails: timelineReviews.map(r => ({
+    hybridDetails: hybridReviews.map(r => ({
       id: r.id,
       user: r.user.username,
       user_id: r.user_id,
       rating: r.rating,
       title: r.title,
-      isUserInCircle: circleUserIds.includes(r.user_id),
-      showNetworkBadge: circleUserIds.includes(r.user_id)
+      type: 'HYBRID (Circle + Timeline)'
     })),
-    circleHighlightedDetails: circleHighlightedReviews.map(r => ({
+    circleOnlyDetails: circleOnlyReviews.map(r => ({
       id: r.id,
       user: r.user.username,
       user_id: r.user_id,
       rating: r.rating,
-      title: r.title
+      title: r.title,
+      type: 'Circle Only'
+    })),
+    timelineOnlyDetails: timelineOnlyReviews.map(r => ({
+      id: r.id,
+      user: r.user.username,
+      user_id: r.user_id,
+      rating: r.rating,
+      title: r.title,
+      type: 'Timeline Only'
     }))
   });
   
-  // 3. Regular reviews (lowest priority) - exclude both timeline and circle highlighted
+  // 4. Regular reviews (lowest priority) - exclude all special categories
   const regularReviews = filteredReviews.filter(review => 
-    !timelineReviewIds.has(review.id) && 
-    !circleHighlightedReviewIds.has(review.id)
+    !hybridReviewIds.has(review.id) && 
+    !circleOnlyReviewIds.has(review.id) && 
+    !timelineOnlyReviewIds.has(review.id)
   );
 
   // Transform reviews for UI
@@ -236,8 +257,9 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             <div>Circle Loading: {circleLoading ? 'Yes' : 'No'}</div>
             <div>Following {circleUserIds.length} users: [{circleUserIds.join(', ')}]</div>
             <div>Circle reviews found: {circleReviews.length}</div>
-            <div>Circle highlighted reviews: {circleHighlightedReviews.length}</div>
-            <div>Timeline reviews: {timelineReviews.length}</div>
+            <div>Hybrid reviews: {hybridReviews.length}</div>
+            <div>Circle-only reviews: {circleOnlyReviews.length}</div>
+            <div>Timeline-only reviews: {timelineOnlyReviews.length}</div>
             <div>Regular reviews: {regularReviews.length}</div>
             <div>Reviews by followed users: {reviews.filter(r => circleUserIds.includes(r.user_id)).map(r => r.user.username).join(', ')}</div>
             <div className="font-semibold">Expected: Reviews from people you follow should appear with "Trending in Your Network" badge</div>
@@ -261,10 +283,21 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           />
         </div>
 
-        {/* Review Cards */}
+        {/* Review Cards - 4-Tier Priority System */}
         <div className="space-y-6">
-          {/* Circle Highlighted Reviews - Display first (Only show if user is authenticated and has circle data) */}
-          {circleHighlightedReviews.map(review => (
+          {/* 1. Hybrid Reviews (Circle + Timeline) - HIGHEST PRIORITY */}
+          {hybridReviews.map(review => (
+            <TimelineReviewCard
+              key={review.id}
+              review={review}
+              onTimelineClick={handleTimelineClick}
+              isCircleReview={true}
+              circleUserName={review.user.username}
+            />
+          ))}
+
+          {/* 2. Circle-Only Reviews - Second Priority */}
+          {circleOnlyReviews.map(review => (
             <Card key={review.id} className="border-2 border-blue-200 bg-blue-50/30">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -285,19 +318,16 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             </Card>
           ))}
 
-          {/* Timeline Reviews - Display second with new component */}
-          {timelineReviews.map(review => {
-            const isInNetwork = hasCircleData && circleUserIds.includes(review.user_id);
-            return (
-              <TimelineReviewCard
-                key={review.id}
-                review={review}
-                onTimelineClick={handleTimelineClick}
-                isCircleReview={isInNetwork}
-                circleUserName={review.user.username}
-              />
-            );
-          })}
+          {/* 3. Timeline-Only Reviews - Third Priority */}
+          {timelineOnlyReviews.map(review => (
+            <TimelineReviewCard
+              key={review.id}
+              review={review}
+              onTimelineClick={handleTimelineClick}
+              isCircleReview={false}
+              circleUserName={review.user.username}
+            />
+          ))}
 
           {/* Regular Reviews */}
           {transformedRegularReviews.length > 0 ? (
@@ -309,7 +339,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
               />
             ))
           ) : (
-            !timelineReviews.length && !circleHighlightedReviews.length && (
+            !hybridReviews.length && !circleOnlyReviews.length && !timelineOnlyReviews.length && (
               <div className="text-center py-8 text-gray-500">
                 {reviews.length === 0 ? (
                   <p>No reviews yet. Be the first to share your experience!</p>
