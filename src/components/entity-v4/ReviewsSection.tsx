@@ -263,28 +263,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
 
         {/* Review Cards */}
         <div className="space-y-6">
-          {/* Circle Reviews - Highest Priority */}
-          {circleHighlightedReviews.length > 0 && (
-            <div className="space-y-4">
-              <div className="border-b border-border pb-2">
-                <h3 className="text-lg font-semibold text-foreground">
-                  Reviews From People You Follow ({circleHighlightedReviews.length})
-                </h3>
-              </div>
-              <div className="space-y-4 bg-blue-50/30 rounded-lg p-4 border border-blue-200">
-                {circleHighlightedReviews.map(review => (
-                  <ReviewCard 
-                    key={review.id}
-                    review={transformReviewForUI(review)} 
-                    onHelpfulClick={onHelpfulClick}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Timeline Reviews - Second Priority */}
-          {timelineReviews.length > 0 && timelineReviews.map(review => {
+          {/* Timeline Reviews - Display first with new component */}
+          {timelineReviews.map(review => {
             const isInNetwork = hasCircleData && circleUserIds.includes(review.user_id);
             return (
               <div key={review.id} className="relative">
@@ -304,7 +284,29 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             );
           })}
 
-          {/* Regular Reviews - Lowest Priority */}
+          {/* Circle Highlighted Reviews - Only show if user is authenticated and has circle data */}
+          {circleHighlightedReviews.map(review => (
+            <Card key={review.id} className="border-2 border-blue-200 bg-blue-50/30">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Badge className="bg-blue-600 text-white">
+                    <Users className="w-3 h-3 mr-1" />
+                    Trending in Your Network
+                  </Badge>
+                  <Eye className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm text-blue-600 font-medium">
+                    {review.user.username || 'Someone'} you follow reviewed this
+                  </span>
+                </div>
+                <ReviewCard 
+                  review={transformReviewForUI(review)} 
+                  onHelpfulClick={onHelpfulClick}
+                />
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Regular Reviews */}
           {transformedRegularReviews.length > 0 ? (
             transformedRegularReviews.map(review => (
               <ReviewCard 
