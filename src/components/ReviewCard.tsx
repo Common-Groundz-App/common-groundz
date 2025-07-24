@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ReviewWithUser } from '@/types/entities';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import { TwitterStyleMediaPreview } from '@/components/feed/TwitterStyleMediaPreview';
+import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 
@@ -122,10 +122,9 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
           {/* Media Display */}
           {validMedia.length > 0 && (
             <div className="mt-3">
-              <TwitterStyleMediaPreview
+              <YelpStyleMediaPreview
                 media={validMedia}
                 onImageClick={handleMediaClick}
-                className="max-w-md"
               />
             </div>
           )}
