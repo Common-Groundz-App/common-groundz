@@ -123,7 +123,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
           <div className="flex items-center gap-2 mb-4">
             <Badge className="bg-blue-600 text-white">
               <Users className="w-3 h-3 mr-1" />
-              Circle Voices
+              From Your Circle
             </Badge>
             <Eye className="w-4 h-4 text-blue-600" />
             <span className="text-sm text-blue-600 font-medium">
