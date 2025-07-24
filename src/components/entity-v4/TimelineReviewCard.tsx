@@ -10,6 +10,9 @@ import { fetchReviewUpdates } from '@/services/review/timeline';
 import { transformReviewForUI } from '@/utils/reviewDataUtils';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
+import { LightboxPreview } from '@/components/media/LightboxPreview';
+import { MediaItem } from '@/types/media';
 
 interface TimelineReviewCardProps {
   review: ReviewWithUser;
@@ -32,12 +35,41 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   isCircleReview = false,
   circleUserName
 }) => {
+  const [timelineData, setTimelineData] = useState<ReviewUpdate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
   };
-  const [timelineData, setTimelineData] = useState<ReviewUpdate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // Filter and sort media
+  const validMedia: MediaItem[] = (review.media || [])
+    .filter(item => !(item as any).is_deleted)
+    .map(item => ({
+      id: item.id || '',
+      url: item.url,
+      type: item.type,
+      thumbnail_url: item.thumbnail_url,
+      alt_text: item.alt_text,
+      order: (item as any).order || 0,
+      caption: (item as any).caption,
+      alt: (item as any).alt,
+      is_deleted: (item as any).is_deleted,
+      session_id: (item as any).session_id,
+      width: (item as any).width,
+      height: (item as any).height,
+      orientation: (item as any).orientation,
+      source: (item as any).source
+    }))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const handleMediaClick = (index: number) => {
+    setSelectedMediaIndex(index);
+    setIsLightboxOpen(true);
+  };
 
   useEffect(() => {
     const loadTimelineData = async () => {
@@ -192,6 +224,19 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                 </div>
               ))}
               
+              {/* Media Display */}
+              {validMedia.length > 0 && (
+                <div className="mt-3">
+                  <TwitterStyleMediaPreview
+                    media={validMedia}
+                    onImageClick={handleMediaClick}
+                    className="max-w-md"
+                    maxHeight="300px"
+                    displayMode="grid"
+                  />
+                </div>
+              )}
+              
               {timelineEntries.length > 4 && (
                 <div className="text-sm text-blue-600 font-medium cursor-pointer hover:underline">
                   View all {timelineEntries.length} timeline entries →
@@ -200,6 +245,15 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Lightbox */}
+        {isLightboxOpen && validMedia.length > 0 && (
+          <LightboxPreview
+            media={validMedia}
+            initialIndex={selectedMediaIndex}
+            onClose={() => setIsLightboxOpen(false)}
+          />
+        )}
       </CardContent>
     </Card>
   );

@@ -1,9 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ReviewWithUser } from '@/types/entities';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
+import { LightboxPreview } from '@/components/media/LightboxPreview';
+import { MediaItem } from '@/types/media';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
@@ -16,14 +19,44 @@ interface ReviewCardProps {
     content: string;
     verified: boolean;
     helpful: number;
+    media?: any[];
   };
   onHelpfulClick?: (reviewId: string) => void;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();
+  };
+
+  // Filter and sort media
+  const validMedia: MediaItem[] = (review.media || [])
+    .filter(item => !(item as any).is_deleted)
+    .map(item => ({
+      id: (item as any).id || '',
+      url: (item as any).url || '',
+      type: (item as any).type || 'image',
+      thumbnail_url: (item as any).thumbnail_url,
+      alt_text: (item as any).alt_text,
+      order: (item as any).order || 0,
+      caption: (item as any).caption,
+      alt: (item as any).alt,
+      is_deleted: (item as any).is_deleted,
+      session_id: (item as any).session_id,
+      width: (item as any).width,
+      height: (item as any).height,
+      orientation: (item as any).orientation,
+      source: (item as any).source
+    }))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const handleMediaClick = (index: number) => {
+    setSelectedMediaIndex(index);
+    setIsLightboxOpen(true);
   };
 
   // Transform ReviewWithUser to match the expected UI format
@@ -86,8 +119,30 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
           </div>
           
           <p className="text-gray-700 text-sm leading-relaxed">{transformedReview.content}</p>
+          
+          {/* Media Display */}
+          {validMedia.length > 0 && (
+            <div className="mt-3">
+              <TwitterStyleMediaPreview
+                media={validMedia}
+                onImageClick={handleMediaClick}
+                className="max-w-md"
+                maxHeight="300px"
+                displayMode="grid"
+              />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Lightbox */}
+      {isLightboxOpen && validMedia.length > 0 && (
+        <LightboxPreview
+          media={validMedia}
+          initialIndex={selectedMediaIndex}
+          onClose={() => setIsLightboxOpen(false)}
+        />
+      )}
     </div>
   );
 };
