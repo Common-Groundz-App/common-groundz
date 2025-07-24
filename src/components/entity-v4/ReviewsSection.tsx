@@ -96,31 +96,45 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     isAuthenticated
   });
 
-  // Get special review categories
+  // Get special review categories with priority system to prevent duplicates
+  // 1. Timeline reviews (highest priority)
   const timelineReviews = getTimelineReviews(filteredReviews);
+  const timelineReviewIds = new Set(timelineReviews.map(r => r.id));
   
-  // Circle highlighted reviews - reviews that are in our circle data
+  // 2. Circle highlighted reviews (second priority) - exclude timeline reviews
   const circleHighlightedReviews = hasCircleData ? 
-    filteredReviews.filter(review => circleUserIds.includes(review.user_id)) : [];
+    filteredReviews.filter(review => 
+      circleUserIds.includes(review.user_id) && 
+      !timelineReviewIds.has(review.id)
+    ) : [];
+  const circleHighlightedReviewIds = new Set(circleHighlightedReviews.map(r => r.id));
   
-  console.log('🔍 Special Categories:', {
+  console.log('🔍 Special Categories (Deduplicated):', {
     timelineReviews: timelineReviews.length,
     circleHighlighted: circleHighlightedReviews.length,
     hasCircleData,
-    circleHighlightedDetails: circleHighlightedReviews.map(r => ({
+    timelineDetails: timelineReviews.map(r => ({
       id: r.id,
       user: r.user.username,
       user_id: r.user_id,
       rating: r.rating,
       title: r.title,
-      isUserInCircle: circleUserIds.includes(r.user_id)
+      isUserInCircle: circleUserIds.includes(r.user_id),
+      showNetworkBadge: circleUserIds.includes(r.user_id)
+    })),
+    circleHighlightedDetails: circleHighlightedReviews.map(r => ({
+      id: r.id,
+      user: r.user.username,
+      user_id: r.user_id,
+      rating: r.rating,
+      title: r.title
     }))
   });
   
-  // Get regular reviews (excluding timeline and circle highlighted)
+  // 3. Regular reviews (lowest priority) - exclude both timeline and circle highlighted
   const regularReviews = filteredReviews.filter(review => 
-    !timelineReviews.includes(review) && 
-    !circleHighlightedReviews.includes(review)
+    !timelineReviewIds.has(review.id) && 
+    !circleHighlightedReviewIds.has(review.id)
   );
 
   // Transform reviews for UI
@@ -250,13 +264,25 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
         {/* Review Cards */}
         <div className="space-y-6">
           {/* Timeline Reviews - Display first with new component */}
-          {timelineReviews.map(review => (
-            <TimelineReviewCard
-              key={review.id}
-              review={review}
-              onTimelineClick={handleTimelineClick}
-            />
-          ))}
+          {timelineReviews.map(review => {
+            const isInNetwork = hasCircleData && circleUserIds.includes(review.user_id);
+            return (
+              <div key={review.id} className="relative">
+                {isInNetwork && (
+                  <div className="mb-2">
+                    <Badge className="bg-blue-600 text-white">
+                      <Users className="w-3 h-3 mr-1" />
+                      Trending in Your Network
+                    </Badge>
+                  </div>
+                )}
+                <TimelineReviewCard
+                  review={review}
+                  onTimelineClick={handleTimelineClick}
+                />
+              </div>
+            );
+          })}
 
           {/* Circle Highlighted Reviews - Only show if user is authenticated and has circle data */}
           {circleHighlightedReviews.map(review => (
