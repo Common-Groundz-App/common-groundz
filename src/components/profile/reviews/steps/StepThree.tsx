@@ -29,6 +29,7 @@ interface StepThreeProps {
   onMediaRemove: (mediaUrl: string) => void;
   isUploading: boolean;
   disableEntityChange?: boolean; // Prop to disable entity change
+  disableEntityFields?: boolean; // Prop to disable entity field editing
 }
 
 const StepThree = ({ 
@@ -44,7 +45,8 @@ const StepThree = ({
   onMediaAdd,
   onMediaRemove,
   isUploading,
-  disableEntityChange = false // Default to false for backward compatibility
+  disableEntityChange = false, // Default to false for backward compatibility
+  disableEntityFields = false // Default to false for backward compatibility
 }: StepThreeProps) => {
   const [showEntitySearch, setShowEntitySearch] = useState(!selectedEntity);
   const [processedEntity, setProcessedEntity] = useState<Entity | null>(null);
@@ -305,14 +307,21 @@ const StepThree = ({
           <Label htmlFor="title" className="flex items-center gap-2">
             <span className="text-lg">{category === 'food' ? '🍴' : category === 'movie' ? '🎬' : category === 'book' ? '📚' : category === 'place' ? '🏛️' : '🛍️'}</span>
             <span>{getMainFieldLabel()}</span>
+            {disableEntityFields && selectedEntity && (
+              <span className="text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
+                From entity page
+              </span>
+            )}
           </Label>
           <Input 
             id="title"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder={`Name of the ${category}`}
+            readOnly={disableEntityFields && !!selectedEntity}
             className={cn(
               !title ? "border-red-500" : "border-brand-orange/30 focus-visible:ring-brand-orange/30",
+              disableEntityFields && !!selectedEntity && "bg-muted/50 text-muted-foreground cursor-not-allowed",
               "transition-all duration-200"
             )}
           />

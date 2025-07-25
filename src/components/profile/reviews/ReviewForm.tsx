@@ -703,9 +703,10 @@ const ReviewForm = ({
                   selectedEntity={selectedEntity}
                   selectedMedia={selectedMedia}
                   onMediaAdd={handleAddMedia}
-                  onMediaRemove={handleRemoveMedia}
-                  isUploading={isUploading}
-                  disableEntityChange={isFromEntityPage} // This already exists
+                   onMediaRemove={handleRemoveMedia}
+                   isUploading={isUploading}
+                   disableEntityChange={isFromEntityPage}
+                   disableEntityFields={isFromEntityPage}
                 />
               )}
               
