@@ -88,7 +88,7 @@ const ReviewForm = ({
   });
   
   const [entityId, setEntityId] = useState(review?.entity_id || entity?.id || '');
-  const [description, setDescription] = useState(review?.description || entity?.description || '');
+  const [description, setDescription] = useState(review?.description || '');
   
   // Updated media handling
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
@@ -204,7 +204,6 @@ const ReviewForm = ({
       }
       
       setEntityId(entity.id);
-      if (entity.description) setDescription(entity.description);
 
       // Only auto-complete step 2 since we have an entity
       // Step 1 (rating) is still required
