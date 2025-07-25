@@ -65,7 +65,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
     avatar: review.user.avatar_url || '',
     rating: review.rating,
     date: new Date(review.created_at).toLocaleDateString(),
-    title: review.title,
+    title: review.subtitle,
     content: review.description || '',
     verified: review.is_verified || false,
     helpful: review.likes || 0
@@ -116,6 +116,11 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
               </span>
             </div>
           </div>
+          
+          {/* Review Headline */}
+          {transformedReview.title && (
+            <h3 className="font-semibold text-gray-900 text-base mb-2">{transformedReview.title}</h3>
+          )}
           
           <p className="text-gray-700 text-sm leading-relaxed">{transformedReview.content}</p>
           
