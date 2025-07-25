@@ -53,6 +53,8 @@ export const ReviewTimelineViewer = ({
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
+  const MAX_MEDIA_COUNT = 4;
+
   const isOwner = user?.id === reviewOwnerId;
 
   useEffect(() => {
@@ -395,30 +397,41 @@ export const ReviewTimelineViewer = ({
                         />
                       </div>
                       
+                      {/* Media Preview Section - Show above uploader when media exists */}
+                      {selectedMedia.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 text-sm font-medium">
+                            <span className="text-lg">🖼️</span>
+                            <span>Your media ({selectedMedia.length}/{MAX_MEDIA_COUNT})</span>
+                          </label>
+                          <CompactMediaGrid
+                            media={selectedMedia}
+                            onRemove={handleMediaRemove}
+                            maxVisible={MAX_MEDIA_COUNT}
+                            className="group"
+                          />
+                        </div>
+                      )}
+                      
                       {/* Media Upload Section */}
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium">Add Photos/Videos</label>
-                        
-                        {/* Media Uploader */}
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          <span className="text-lg">📸</span>
+                          <span>Add photos & videos</span>
+                        </label>
                         <MediaUploader
                           sessionId={`review-update-${Date.now()}`}
                           onMediaUploaded={handleMediaUploaded}
                           initialMedia={selectedMedia}
                           className="w-full"
-                          maxMediaCount={10}
+                          maxMediaCount={MAX_MEDIA_COUNT}
                         />
-                        
-                        {/* Display Selected Media */}
-                        {selectedMedia.length > 0 && (
-                          <div className="space-y-2">
-                            <CompactMediaGrid
-                              media={selectedMedia}
-                              onRemove={handleMediaRemove}
-                              className="w-full"
-                              maxVisible={6}
-                            />
-                          </div>
-                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {selectedMedia.length > 0 
+                            ? `${selectedMedia.length}/${MAX_MEDIA_COUNT} media items added - Add photos or videos to make your update stand out`
+                            : "Add photos or videos to make your update stand out"
+                          }
+                        </p>
                       </div>
                       
                       <div className="flex gap-2 pb-4">
