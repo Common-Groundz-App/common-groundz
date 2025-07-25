@@ -8,11 +8,17 @@ import { Plus, Calendar, User, Sparkles, AlertCircle } from 'lucide-react';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { fetchReviewUpdates, addReviewUpdate, fetchReviewWithSummary, type ReviewUpdate, type Review } from '@/services/reviewService';
+import { fetchReviewWithSummary, type Review } from '@/services/reviewService';
+import { fetchReviewUpdates, addReviewUpdate } from '@/services/review/timeline';
+import { ReviewUpdate } from '@/services/review/types';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AISummaryCard } from '@/components/ui/ai-summary-card';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
+import { LightboxPreview } from '@/components/media/LightboxPreview';
+import { MediaItem, MediaUploadState } from '@/types/media';
+import { uploadMedia, validateMediaFile } from '@/services/mediaService';
 
 interface ReviewTimelineViewerProps {
   isOpen: boolean;
@@ -42,6 +48,10 @@ export const ReviewTimelineViewer = ({
   const [newRating, setNewRating] = useState<number | null>(null);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
+  const [uploadStates, setUploadStates] = useState<MediaUploadState[]>([]);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
   const isOwner = user?.id === reviewOwnerId;
 
@@ -97,7 +107,7 @@ export const ReviewTimelineViewer = ({
 
     setIsSubmitting(true);
     try {
-      const success = await addReviewUpdate(reviewId, user.id, newRating, newComment.trim());
+      const success = await addReviewUpdate(reviewId, user.id, newRating, newComment.trim(), uploadedMedia);
       
       if (success) {
         toast({
@@ -108,6 +118,8 @@ export const ReviewTimelineViewer = ({
         // Reset form
         setNewRating(null);
         setNewComment('');
+        setUploadedMedia([]);
+        setUploadStates([]);
         setIsAddingUpdate(false);
         
         // Reload timeline data
@@ -130,6 +142,77 @@ export const ReviewTimelineViewer = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleMediaUpload = async (files: File[]) => {
+    if (!user) return;
+    
+    const sessionId = `review-update-${Date.now()}`;
+    
+    for (const file of files) {
+      const validation = validateMediaFile(file);
+      if (!validation.valid) {
+        toast({
+          title: 'Invalid file',
+          description: validation.error,
+          variant: 'destructive'
+        });
+        continue;
+      }
+
+      const uploadState: MediaUploadState = {
+        file,
+        progress: 0,
+        status: 'uploading'
+      };
+
+      setUploadStates(prev => [...prev, uploadState]);
+
+      try {
+        const mediaItem = await uploadMedia(file, user.id, sessionId, (progress) => {
+          setUploadStates(prev => 
+            prev.map(state => 
+              state.file === file ? { ...state, progress } : state
+            )
+          );
+        });
+
+        if (mediaItem) {
+          setUploadedMedia(prev => [...prev, mediaItem]);
+          setUploadStates(prev => 
+            prev.map(state => 
+              state.file === file 
+                ? { ...state, status: 'success', item: mediaItem }
+                : state
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Upload failed:', error);
+        setUploadStates(prev => 
+          prev.map(state => 
+            state.file === file 
+              ? { ...state, status: 'error', error: 'Upload failed' }
+              : state
+          )
+        );
+        toast({
+          title: 'Upload failed',
+          description: `Failed to upload ${file.name}`,
+          variant: 'destructive'
+        });
+      }
+    }
+  };
+
+  const handleMediaRemove = (mediaId: string) => {
+    setUploadedMedia(prev => prev.filter(media => media.id !== mediaId));
+    setUploadStates(prev => prev.filter(state => state.item?.id !== mediaId));
+  };
+
+  const handleMediaClick = (index: number) => {
+    setSelectedMediaIndex(index);
+    setIsLightboxOpen(true);
   };
 
   const getInitials = (name: string | null) => {
@@ -297,6 +380,20 @@ export const ReviewTimelineViewer = ({
                       <p className="text-sm text-muted-foreground">
                         {update.comment}
                       </p>
+                      
+                      {/* Display media if present */}
+                      {update.media && update.media.length > 0 && (
+                        <div className="mt-3">
+                          <YelpStyleMediaPreview
+                            media={update.media}
+                            onImageClick={(index) => {
+                              setSelectedMediaIndex(index);
+                              setIsLightboxOpen(true);
+                            }}
+                            className="max-w-md"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -360,6 +457,62 @@ export const ReviewTimelineViewer = ({
                   />
                 </div>
                 
+                {/* Media Upload Section */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Add Photos/Videos</label>
+                  <div className="space-y-3">
+                    {/* File Upload Input */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,video/*"
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length > 0) {
+                            handleMediaUpload(files);
+                          }
+                        }}
+                        className="hidden"
+                        id="media-upload"
+                      />
+                      <label
+                        htmlFor="media-upload"
+                        className="cursor-pointer px-3 py-2 text-sm border border-dashed border-gray-300 rounded-md hover:border-gray-400 transition-colors"
+                      >
+                        Choose files
+                      </label>
+                      <span className="text-xs text-muted-foreground">
+                        Images and videos up to 10MB
+                      </span>
+                    </div>
+                    
+                    {/* Media Preview */}
+                    {uploadedMedia.length > 0 && (
+                      <div className="space-y-2">
+                        <YelpStyleMediaPreview
+                          media={uploadedMedia}
+                          onImageClick={handleMediaClick}
+                          className="max-w-md"
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Upload Progress */}
+                    {uploadStates.some(state => state.status === 'uploading') && (
+                      <div className="space-y-2">
+                        {uploadStates
+                          .filter(state => state.status === 'uploading')
+                          .map((state, index) => (
+                            <div key={index} className="text-xs text-muted-foreground">
+                              Uploading {state.file.name}... {state.progress}%
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
                 <div className="flex gap-2">
                   <Button
                     onClick={handleAddUpdate}
@@ -373,6 +526,8 @@ export const ReviewTimelineViewer = ({
                       setIsAddingUpdate(false);
                       setNewRating(null);
                       setNewComment('');
+                      setUploadedMedia([]);
+                      setUploadStates([]);
                     }}
                     variant="outline"
                   >

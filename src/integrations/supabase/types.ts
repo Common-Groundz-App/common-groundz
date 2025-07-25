@@ -1604,6 +1604,7 @@ export type Database = {
           comment: string
           created_at: string
           id: string
+          media: Json | null
           rating: number | null
           review_id: string
           updated_at: string
@@ -1613,6 +1614,7 @@ export type Database = {
           comment: string
           created_at?: string
           id?: string
+          media?: Json | null
           rating?: number | null
           review_id: string
           updated_at?: string
@@ -1622,6 +1624,7 @@ export type Database = {
           comment?: string
           created_at?: string
           id?: string
+          media?: Json | null
           rating?: number | null
           review_id?: string
           updated_at?: string

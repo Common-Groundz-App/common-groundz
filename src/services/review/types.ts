@@ -1,4 +1,6 @@
 
+import { MediaItem } from '@/types/media';
+
 // Base review interface
 export interface Review {
   id: string;
@@ -61,6 +63,7 @@ export interface ReviewUpdate {
   user_id: string;
   rating: number | null;
   comment: string;
+  media?: MediaItem[];
   created_at: string;
   updated_at: string;
   profiles?: {

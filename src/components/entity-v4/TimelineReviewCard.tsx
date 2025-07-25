@@ -27,6 +27,7 @@ interface TimelineEntry {
   rating?: number;
   isLatest?: boolean;
   date: string;
+  media?: MediaItem[];
 }
 
 export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
@@ -109,7 +110,8 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
         content: update.comment,
         rating: update.rating || undefined,
         isLatest: index === timelineData.length - 1, // Mark latest update
-        date: update.created_at
+        date: update.created_at,
+        media: update.media || []
       });
     });
 
@@ -220,6 +222,20 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                   <p className="text-gray-700 text-sm leading-relaxed">
                     {entry.content}
                   </p>
+                  
+                  {/* Media for this timeline entry */}
+                  {entry.media && entry.media.length > 0 && (
+                    <div className="mt-2">
+                      <YelpStyleMediaPreview
+                        media={entry.media}
+                        onImageClick={(index) => {
+                          setSelectedMediaIndex(index);
+                          setIsLightboxOpen(true);
+                        }}
+                        className="max-w-xs"
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
               
