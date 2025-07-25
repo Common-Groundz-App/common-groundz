@@ -17,8 +17,9 @@ import { AISummaryCard } from '@/components/ui/ai-summary-card';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
-import { MediaItem, MediaUploadState } from '@/types/media';
-import { uploadMedia, validateMediaFile } from '@/services/mediaService';
+import { MediaUploader } from '@/components/media/MediaUploader';
+import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
+import { MediaItem } from '@/types/media';
 
 interface ReviewTimelineViewerProps {
   isOpen: boolean;
@@ -48,8 +49,7 @@ export const ReviewTimelineViewer = ({
   const [newRating, setNewRating] = useState<number | null>(null);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
-  const [uploadStates, setUploadStates] = useState<MediaUploadState[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
@@ -107,7 +107,7 @@ export const ReviewTimelineViewer = ({
 
     setIsSubmitting(true);
     try {
-      const success = await addReviewUpdate(reviewId, user.id, newRating, newComment.trim(), uploadedMedia);
+      const success = await addReviewUpdate(reviewId, user.id, newRating, newComment.trim(), selectedMedia);
       
       if (success) {
         toast({
@@ -118,8 +118,7 @@ export const ReviewTimelineViewer = ({
         // Reset form
         setNewRating(null);
         setNewComment('');
-        setUploadedMedia([]);
-        setUploadStates([]);
+        setSelectedMedia([]);
         setIsAddingUpdate(false);
         
         // Reload timeline data
@@ -144,70 +143,12 @@ export const ReviewTimelineViewer = ({
     }
   };
 
-  const handleMediaUpload = async (files: File[]) => {
-    if (!user) return;
-    
-    const sessionId = `review-update-${Date.now()}`;
-    
-    for (const file of files) {
-      const validation = validateMediaFile(file);
-      if (!validation.valid) {
-        toast({
-          title: 'Invalid file',
-          description: validation.error,
-          variant: 'destructive'
-        });
-        continue;
-      }
-
-      const uploadState: MediaUploadState = {
-        file,
-        progress: 0,
-        status: 'uploading'
-      };
-
-      setUploadStates(prev => [...prev, uploadState]);
-
-      try {
-        const mediaItem = await uploadMedia(file, user.id, sessionId, (progress) => {
-          setUploadStates(prev => 
-            prev.map(state => 
-              state.file === file ? { ...state, progress } : state
-            )
-          );
-        });
-
-        if (mediaItem) {
-          setUploadedMedia(prev => [...prev, mediaItem]);
-          setUploadStates(prev => 
-            prev.map(state => 
-              state.file === file 
-                ? { ...state, status: 'success', item: mediaItem }
-                : state
-            )
-          );
-        }
-      } catch (error) {
-        console.error('Upload failed:', error);
-        setUploadStates(prev => 
-          prev.map(state => 
-            state.file === file 
-              ? { ...state, status: 'error', error: 'Upload failed' }
-              : state
-          )
-        );
-        toast({
-          title: 'Upload failed',
-          description: `Failed to upload ${file.name}`,
-          variant: 'destructive'
-        });
-      }
-    }
+  const handleMediaUploaded = (media: MediaItem) => {
+    setSelectedMedia(prev => [...prev, media]);
   };
 
-  const handleMediaRemove = (mediaId: string) => {
-    setUploadedMedia(prev => prev.filter(media => media.id !== mediaId));
-    setUploadStates(prev => prev.filter(state => state.item?.id !== mediaId));
+  const handleMediaRemove = (media: MediaItem) => {
+    setSelectedMedia(prev => prev.filter(m => m.id !== media.id));
   };
 
   const handleMediaClick = (index: number) => {
@@ -458,59 +399,29 @@ export const ReviewTimelineViewer = ({
                 </div>
                 
                 {/* Media Upload Section */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label className="text-sm font-medium">Add Photos/Videos</label>
-                  <div className="space-y-3">
-                    {/* File Upload Input */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*,video/*"
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || []);
-                          if (files.length > 0) {
-                            handleMediaUpload(files);
-                          }
-                        }}
-                        className="hidden"
-                        id="media-upload"
+                  
+                  {/* Media Uploader */}
+                  <MediaUploader
+                    sessionId={`review-update-${Date.now()}`}
+                    onMediaUploaded={handleMediaUploaded}
+                    initialMedia={selectedMedia}
+                    className="w-full"
+                    maxMediaCount={10}
+                  />
+                  
+                  {/* Display Selected Media */}
+                  {selectedMedia.length > 0 && (
+                    <div className="space-y-2">
+                      <CompactMediaGrid
+                        media={selectedMedia}
+                        onRemove={handleMediaRemove}
+                        className="w-full"
+                        maxVisible={6}
                       />
-                      <label
-                        htmlFor="media-upload"
-                        className="cursor-pointer px-3 py-2 text-sm border border-dashed border-gray-300 rounded-md hover:border-gray-400 transition-colors"
-                      >
-                        Choose files
-                      </label>
-                      <span className="text-xs text-muted-foreground">
-                        Images and videos up to 10MB
-                      </span>
                     </div>
-                    
-                    {/* Media Preview */}
-                    {uploadedMedia.length > 0 && (
-                      <div className="space-y-2">
-                        <YelpStyleMediaPreview
-                          media={uploadedMedia}
-                          onImageClick={handleMediaClick}
-                          className="max-w-md"
-                        />
-                      </div>
-                    )}
-                    
-                    {/* Upload Progress */}
-                    {uploadStates.some(state => state.status === 'uploading') && (
-                      <div className="space-y-2">
-                        {uploadStates
-                          .filter(state => state.status === 'uploading')
-                          .map((state, index) => (
-                            <div key={index} className="text-xs text-muted-foreground">
-                              Uploading {state.file.name}... {state.progress}%
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
                 
                 <div className="flex gap-2">
@@ -526,8 +437,7 @@ export const ReviewTimelineViewer = ({
                       setIsAddingUpdate(false);
                       setNewRating(null);
                       setNewComment('');
-                      setUploadedMedia([]);
-                      setUploadStates([]);
+                      setSelectedMedia([]);
                     }}
                     variant="outline"
                   >
@@ -537,6 +447,15 @@ export const ReviewTimelineViewer = ({
               </div>
             )}
           </div>
+        )}
+        
+        {/* Lightbox for viewing media */}
+        {isLightboxOpen && selectedMedia.length > 0 && (
+          <LightboxPreview
+            media={selectedMedia}
+            onClose={() => setIsLightboxOpen(false)}
+            initialIndex={selectedMediaIndex}
+          />
         )}
       </DialogContent>
     </Dialog>
