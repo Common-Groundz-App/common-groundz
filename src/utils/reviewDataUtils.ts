@@ -12,7 +12,7 @@ export const transformReviewForUI = (review: ReviewWithUser) => ({
     month: 'short', 
     day: 'numeric' 
   }),
-  title: review.title,
+  title: review.subtitle || '',
   content: review.description || '',
   verified: review.is_verified || false,
   helpful: review.likes || 0,
