@@ -307,11 +307,6 @@ const StepThree = ({
           <Label htmlFor="title" className="flex items-center gap-2">
             <span className="text-lg">{category === 'food' ? '🍴' : category === 'movie' ? '🎬' : category === 'book' ? '📚' : category === 'place' ? '🏛️' : '🛍️'}</span>
             <span>{getMainFieldLabel()}</span>
-            {disableEntityFields && selectedEntity && (
-              <span className="text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
-                From entity page
-              </span>
-            )}
           </Label>
           <Input 
             id="title"

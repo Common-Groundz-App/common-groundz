@@ -85,9 +85,6 @@ export const EntityPreviewCard = ({
             Change
           </button>
         )}
-        {disableChange && (
-          <span className="text-xs text-muted-foreground">From entity page</span>
-        )}
       </div>
       <div className={cn(
         "flex flex-col sm:flex-row w-full rounded-xl bg-white p-4 shadow-md border gap-4",
