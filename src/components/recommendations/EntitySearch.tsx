@@ -50,6 +50,21 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
   } = useLocation();
 
 
+  // Convert Entity to EntityAdapter to ensure type compatibility
+  const convertEntityToAdapter = (entity: any): EntityAdapter => {
+    return {
+      id: entity.id,
+      name: entity.name,
+      description: entity.description,
+      image_url: entity.image_url,
+      type: typeof entity.type === 'string' ? entity.type : entity.type.toString(), // Handle both string and enum types
+      venue: entity.venue,
+      api_ref: entity.api_ref,
+      api_source: entity.api_source,
+      metadata: entity.metadata
+    };
+  };
+
   // Add missing function: toggleLocationSearch
   const toggleLocationSearch = () => {
     if (locationEnabled) {
@@ -69,7 +84,8 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     try {
       const entity = await createEntityFromUrl(urlInput);
       if (entity) {
-        onSelect(entity);
+        const adaptedEntity = convertEntityToAdapter(entity);
+        onSelect(adaptedEntity);
         clearUrlInput();
       }
     } catch (error) {
@@ -131,7 +147,10 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
       // Create entity and pass to parent component
       const entity = await createEntityFromExternal(result);
       if (entity) {
-        onSelect(entity as EntityAdapter);
+        console.log('✅ Entity created successfully:', entity);
+        const adaptedEntity = convertEntityToAdapter(entity);
+        console.log('✅ Entity converted to adapter:', adaptedEntity);
+        onSelect(adaptedEntity);
         setSearchQuery('');
         setShowResults(false);
       }
