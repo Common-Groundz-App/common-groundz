@@ -35,6 +35,7 @@ interface TimelineReviewCardProps {
 
 interface TimelineEntry {
   period: string;
+  title?: string;
   content: string;
   rating?: number;
   isLatest?: boolean;
@@ -117,7 +118,8 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
     // Add initial review as first entry with its media
     entries.push({
       period: formatRelativeDate(review.created_at),
-      content: review.description || `Started using ${review.title}. Initial impressions.`,
+      title: review.title,
+      content: review.description || `Initial impressions.`,
       rating: review.rating,
       isLatest: false,
       date: review.created_at,
@@ -298,9 +300,14 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                       </div>
                     )}
                   </div>
-                  <p className="text-gray-700 text-sm leading-relaxed">
-                    {entry.content}
-                  </p>
+                   {entry.title && (
+                     <h5 className="font-medium text-gray-900 text-sm mb-1">
+                       {entry.title}
+                     </h5>
+                   )}
+                   <p className="text-gray-700 text-sm leading-relaxed">
+                     {entry.content}
+                   </p>
                   
                    {/* Media for this timeline entry */}
                    {entry.media && entry.media.length > 0 && (
