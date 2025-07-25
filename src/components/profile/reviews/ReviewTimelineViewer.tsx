@@ -185,7 +185,7 @@ export const ReviewTimelineViewer = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             Timeline for "{reviewTitle}"
@@ -348,106 +348,106 @@ export const ReviewTimelineViewer = ({
                   )}
                 </div>
               )}
-            </>
-          )}
-        </div>
 
-        {/* Add Update Section for Review Owner */}
-        {isOwner && (
-          <div className="border-t pt-4 mt-4">
-            {!isAddingUpdate ? (
-              <Button
-                onClick={() => setIsAddingUpdate(true)}
-                className="w-full gap-2"
-                variant="outline"
-              >
-                <Plus className="h-4 w-4" />
-                Add Timeline Update
-              </Button>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">New Rating (optional)</label>
-                  <div className="flex items-center gap-3">
-                    <ConnectedRingsRating
-                      value={newRating || 0}
-                      onChange={setNewRating}
-                      variant="default"
-                      size="md"
-                      showValue={false}
-                      isInteractive={true}
-                    />
-                    {newRating && (
-                      <span 
-                        className="font-medium"
-                        style={{ color: getSentimentColor(newRating) }}
-                      >
-                        {newRating.toFixed(1)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Update Comment *</label>
-                  <Textarea
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Share what's changed in your experience..."
-                    rows={3}
-                  />
-                </div>
-                
-                {/* Media Upload Section */}
-                <div className="space-y-3">
-                  <label className="text-sm font-medium">Add Photos/Videos</label>
-                  
-                  {/* Media Uploader */}
-                  <MediaUploader
-                    sessionId={`review-update-${Date.now()}`}
-                    onMediaUploaded={handleMediaUploaded}
-                    initialMedia={selectedMedia}
-                    className="w-full"
-                    maxMediaCount={10}
-                  />
-                  
-                  {/* Display Selected Media */}
-                  {selectedMedia.length > 0 && (
-                    <div className="space-y-2">
-                      <CompactMediaGrid
-                        media={selectedMedia}
-                        onRemove={handleMediaRemove}
-                        className="w-full"
-                        maxVisible={6}
-                      />
+              {/* Add Update Section for Review Owner - Now inside scrollable area */}
+              {isOwner && (
+                <div className="border-t pt-4 mt-6">
+                  {!isAddingUpdate ? (
+                    <Button
+                      onClick={() => setIsAddingUpdate(true)}
+                      className="w-full gap-2"
+                      variant="outline"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Timeline Update
+                    </Button>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">New Rating (optional)</label>
+                        <div className="flex items-center gap-3">
+                          <ConnectedRingsRating
+                            value={newRating || 0}
+                            onChange={setNewRating}
+                            variant="default"
+                            size="md"
+                            showValue={false}
+                            isInteractive={true}
+                          />
+                          {newRating && (
+                            <span 
+                              className="font-medium"
+                              style={{ color: getSentimentColor(newRating) }}
+                            >
+                              {newRating.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Update Comment *</label>
+                        <Textarea
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          placeholder="Share what's changed in your experience..."
+                          rows={3}
+                        />
+                      </div>
+                      
+                      {/* Media Upload Section */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium">Add Photos/Videos</label>
+                        
+                        {/* Media Uploader */}
+                        <MediaUploader
+                          sessionId={`review-update-${Date.now()}`}
+                          onMediaUploaded={handleMediaUploaded}
+                          initialMedia={selectedMedia}
+                          className="w-full"
+                          maxMediaCount={10}
+                        />
+                        
+                        {/* Display Selected Media */}
+                        {selectedMedia.length > 0 && (
+                          <div className="space-y-2">
+                            <CompactMediaGrid
+                              media={selectedMedia}
+                              onRemove={handleMediaRemove}
+                              className="w-full"
+                              maxVisible={6}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-2 pb-4">
+                        <Button
+                          onClick={handleAddUpdate}
+                          disabled={isSubmitting || !newComment.trim()}
+                          className="flex-1"
+                        >
+                          {isSubmitting ? 'Adding...' : 'Add Update'}
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setIsAddingUpdate(false);
+                            setNewRating(null);
+                            setNewComment('');
+                            setSelectedMedia([]);
+                          }}
+                          variant="outline"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
-                
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleAddUpdate}
-                    disabled={isSubmitting || !newComment.trim()}
-                    className="flex-1"
-                  >
-                    {isSubmitting ? 'Adding...' : 'Add Update'}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setIsAddingUpdate(false);
-                      setNewRating(null);
-                      setNewComment('');
-                      setSelectedMedia([]);
-                    }}
-                    variant="outline"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </>
+          )}
+        </div>
         
         {/* Lightbox for viewing media */}
         {isLightboxOpen && selectedMedia.length > 0 && (
