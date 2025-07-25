@@ -118,7 +118,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
     // Add initial review as first entry with its media
     entries.push({
       period: formatRelativeDate(review.created_at),
-      title: review.title,
+      title: review.subtitle,
       content: review.description || `Initial impressions.`,
       rating: review.rating,
       isLatest: false,
