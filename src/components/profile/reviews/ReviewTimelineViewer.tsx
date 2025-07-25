@@ -187,14 +187,14 @@ export const ReviewTimelineViewer = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-xl">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             Timeline for "{reviewTitle}"
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+        <div className="space-y-4">
           {isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
