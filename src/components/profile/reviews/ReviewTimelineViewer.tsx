@@ -52,6 +52,7 @@ export const ReviewTimelineViewer = ({
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+  const [lightboxMedia, setLightboxMedia] = useState<MediaItem[]>([]);
 
   const MAX_MEDIA_COUNT = 4;
 
@@ -153,9 +154,40 @@ export const ReviewTimelineViewer = ({
     setSelectedMedia(prev => prev.filter(m => m.id !== media.id));
   };
 
-  const handleMediaClick = (index: number) => {
+  const handleInitialReviewMediaClick = (index: number) => {
+    // Get initial review media (from reviewData.media or legacy image_url)
+    const initialMedia = getInitialReviewMedia();
+    setLightboxMedia(initialMedia);
     setSelectedMediaIndex(index);
     setIsLightboxOpen(true);
+  };
+
+  const handleTimelineUpdateMediaClick = (updateMedia: MediaItem[], index: number) => {
+    setLightboxMedia(updateMedia);
+    setSelectedMediaIndex(index);
+    setIsLightboxOpen(true);
+  };
+
+  // Helper function to get initial review media
+  const getInitialReviewMedia = (): MediaItem[] => {
+    if (!reviewData) return [];
+    
+    // Check for new media array first
+    if (reviewData.media && Array.isArray(reviewData.media) && reviewData.media.length > 0) {
+      return reviewData.media.filter(item => !item.is_deleted);
+    }
+    
+    // Fallback to legacy image_url
+    if (reviewData.image_url) {
+      return [{
+        url: reviewData.image_url,
+        type: 'image' as const,
+        order: 0,
+        alt: reviewData.title || 'Review image'
+      }];
+    }
+    
+    return [];
   };
 
   const getInitials = (name: string | null) => {
@@ -273,6 +305,20 @@ export const ReviewTimelineViewer = ({
                         {reviewData.description}
                       </p>
                     )}
+                    
+                    {/* Display initial review media */}
+                    {(() => {
+                      const initialMedia = getInitialReviewMedia();
+                      return initialMedia.length > 0 && (
+                        <div className="mt-3">
+                          <YelpStyleMediaPreview
+                            media={initialMedia}
+                            onImageClick={handleInitialReviewMediaClick}
+                            className="max-w-md"
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -329,10 +375,7 @@ export const ReviewTimelineViewer = ({
                         <div className="mt-3">
                           <YelpStyleMediaPreview
                             media={update.media}
-                            onImageClick={(index) => {
-                              setSelectedMediaIndex(index);
-                              setIsLightboxOpen(true);
-                            }}
+                            onImageClick={(index) => handleTimelineUpdateMediaClick(update.media, index)}
                             className="max-w-md"
                           />
                         </div>
@@ -463,9 +506,9 @@ export const ReviewTimelineViewer = ({
         </div>
         
         {/* Lightbox for viewing media */}
-        {isLightboxOpen && selectedMedia.length > 0 && (
+        {isLightboxOpen && lightboxMedia.length > 0 && (
           <LightboxPreview
-            media={selectedMedia}
+            media={lightboxMedia}
             onClose={() => setIsLightboxOpen(false)}
             initialIndex={selectedMediaIndex}
           />
