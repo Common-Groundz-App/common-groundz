@@ -141,27 +141,43 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
 
   // Handle external result selection
   const handleSelectExternal = async (result: any) => {
-    try {
-      console.log('🎯 User selected external result:', result.name);
-      
-      // Create entity and pass to parent component
-      const entity = await createEntityFromExternal(result);
-      if (entity) {
-        console.log('✅ Entity created successfully:', entity);
-        const adaptedEntity = convertEntityToAdapter(entity);
-        console.log('✅ Entity converted to adapter:', adaptedEntity);
-        onSelect(adaptedEntity);
-        setSearchQuery('');
-        setShowResults(false);
+    console.log('🎯 User selected external result:', result.name);
+
+    // Step 1: Create immediate preview data from external result
+    const previewEntity: EntityAdapter = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      name: result.name,
+      description: result.description,
+      image_url: result.image_url || getImageUrl(result),
+      type: type,
+      venue: result.venue,
+      api_ref: result.api_ref,
+      api_source: result.api_source,
+      metadata: result.metadata
+    };
+
+    // Step 2: Show preview immediately
+    console.log('⚡ Showing instant preview:', previewEntity);
+    onSelect(previewEntity);
+    setSearchQuery('');
+    setShowResults(false);
+
+    // Step 3: Create entity in background (don't block UI)
+    setTimeout(async () => {
+      try {
+        console.log('🔄 Creating entity in background...');
+        const entity = await createEntityFromExternal(result);
+        if (entity) {
+          console.log('✅ Entity created successfully in background:', entity);
+          const adaptedEntity = convertEntityToAdapter(entity);
+          // Optionally update the preview with the real entity
+          onSelect(adaptedEntity);
+        }
+      } catch (error) {
+        console.error('❌ Error creating entity in background:', error);
+        // Keep the preview as is - user can still submit the form
       }
-    } catch (error) {
-      console.error('❌ Error creating entity from external result:', error);
-      toast({
-        title: 'Error',
-        description: 'Could not select this item. Please try again.',
-        variant: 'destructive'
-      });
-    }
+    }, 0);
   };
 
   const clearSearch = () => {
