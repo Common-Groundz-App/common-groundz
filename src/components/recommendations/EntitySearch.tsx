@@ -12,7 +12,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { useToast } from '@/hooks/use-toast';
-import { useOptimisticEntityCreation } from '@/hooks/use-optimistic-entity-creation';
+
 
 interface EntitySearchProps {
   type: EntityTypeString;
@@ -49,18 +49,6 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     permissionStatus
   } = useLocation();
 
-  // Use optimistic entity creation
-  const { 
-    createEntityOptimistically, 
-    isCreating: isOptimisticCreating 
-  } = useOptimisticEntityCreation({
-    entityType: type,
-    onEntityCreated: (entity) => {
-      // Entity was created successfully, no need to call onSelect
-      // since we've already navigated to the entity page
-      console.log('✅ Entity created and navigated:', entity.name);
-    }
-  });
 
   // Add missing function: toggleLocationSearch
   const toggleLocationSearch = () => {
@@ -135,37 +123,25 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     setShowResults(false);
   };
 
-  // Enhanced external result handler with optimistic creation
+  // Handle external result selection
   const handleSelectExternal = async (result: any) => {
     try {
       console.log('🎯 User selected external result:', result.name);
       
-      // Use optimistic creation for immediate navigation
-      await createEntityOptimistically(result);
-
-      // Clear search state
-      setSearchQuery('');
-      setShowResults(false);
-      
-    } catch (error) {
-      console.error('❌ Error in optimistic external selection:', error);
-      
-      // Fallback to traditional creation if optimistic fails
-      try {
-        const entity = await createEntityFromExternal(result);
-        if (entity) {
-          onSelect(entity as EntityAdapter);
-          setSearchQuery('');
-          setShowResults(false);
-        }
-      } catch (fallbackError) {
-        console.error('❌ Fallback creation also failed:', fallbackError);
-        toast({
-          title: 'Error',
-          description: 'Could not select this item. Please try again.',
-          variant: 'destructive'
-        });
+      // Create entity and pass to parent component
+      const entity = await createEntityFromExternal(result);
+      if (entity) {
+        onSelect(entity as EntityAdapter);
+        setSearchQuery('');
+        setShowResults(false);
       }
+    } catch (error) {
+      console.error('❌ Error creating entity from external result:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not select this item. Please try again.',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -305,8 +281,8 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
     return locationEnabled && item.metadata?.distance !== undefined;
   };
 
-  // Show loading state if optimistic creation is in progress
-  const isProcessing = isLoading || geoLoading || isOptimisticCreating;
+  // Show loading state
+  const isProcessing = isLoading || geoLoading;
 
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -332,7 +308,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                   aria-expanded={showResults}
                   aria-controls="entity-search-results"
                   aria-autocomplete="list"
-                  disabled={isOptimisticCreating}
+                  disabled={false}
                 />
                 <div className="absolute inset-y-0 right-2 flex items-center">
                   {isProcessing ? (
@@ -344,7 +320,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                       onClick={clearSearch}
                       className="h-6 w-6 p-0"
                       aria-label="Clear search"
-                      disabled={isOptimisticCreating}
+                      disabled={false}
                     >
                       <X className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
                     </Button>
@@ -358,7 +334,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
               <Button 
                 type="button" 
                 onClick={() => handleSearch(searchQuery, locationEnabled, position)} 
-                disabled={!searchQuery.trim() || isOptimisticCreating}
+                disabled={!searchQuery.trim()}
               >
                 Search
               </Button>
@@ -373,7 +349,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                   size="sm"
                   className="flex items-center gap-1 text-xs h-8"
                   onClick={buttonState.action || toggleLocationSearch}
-                  disabled={buttonState.disabled || isOptimisticCreating}
+                  disabled={buttonState.disabled}
                 >
                   <Navigation className={`h-3.5 w-3.5 ${geoLoading ? 'animate-pulse' : ''}`} />
                   {buttonState.text}
@@ -520,7 +496,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                 onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
                 className="pr-8"
                 aria-label="URL input"
-                disabled={isOptimisticCreating}
+                disabled={false}
               />
               <div className="absolute inset-y-0 right-2 flex items-center">
                 {urlInput ? (
@@ -530,7 +506,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                     onClick={clearUrlInput}
                     className="h-6 w-6 p-0"
                     aria-label="Clear URL"
-                    disabled={isOptimisticCreating}
+                    disabled={false}
                   >
                     <X className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
                   </Button>
@@ -542,7 +518,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
             <Button 
               type="button" 
               onClick={handleUrlSubmit} 
-              disabled={!urlInput.trim() || isOptimisticCreating}
+              disabled={!urlInput.trim()}
             >
               Add
             </Button>
