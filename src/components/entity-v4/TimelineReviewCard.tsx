@@ -94,13 +94,14 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   const generateTimelineEntries = (): TimelineEntry[] => {
     const entries: TimelineEntry[] = [];
 
-    // Add initial review as first entry
+    // Add initial review as first entry with its media
     entries.push({
       period: formatRelativeDate(review.created_at),
       content: review.description || `Started using ${review.title}. Initial impressions.`,
       rating: review.rating,
       isLatest: false,
-      date: review.created_at
+      date: review.created_at,
+      media: validMedia
     });
 
     // Add timeline updates
@@ -223,32 +224,18 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                     {entry.content}
                   </p>
                   
-                  {/* Media for this timeline entry */}
-                  {entry.media && entry.media.length > 0 && (
-                    <div className="mt-2">
-                      <YelpStyleMediaPreview
-                        media={entry.media}
-                        onImageClick={(index) => {
-                          setSelectedMediaIndex(index);
-                          setIsLightboxOpen(true);
-                        }}
-                        className="max-w-xs"
-                      />
-                    </div>
-                  )}
+                   {/* Media for this timeline entry */}
+                   {entry.media && entry.media.length > 0 && (
+                     <div className="mt-2">
+                       <YelpStyleMediaPreview
+                         media={entry.media}
+                         onImageClick={handleMediaClick}
+                         className="max-w-xs"
+                       />
+                     </div>
+                   )}
                 </div>
               ))}
-              
-              {/* Media Display */}
-              {validMedia.length > 0 && (
-                <div className="mt-3">
-                  <YelpStyleMediaPreview
-                    media={validMedia}
-                    onImageClick={handleMediaClick}
-                    className="max-w-md"
-                  />
-                </div>
-              )}
               
               {timelineEntries.length > 4 && (
                 <div className="text-sm text-blue-600 font-medium cursor-pointer hover:underline">
@@ -260,7 +247,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
         </div>
 
         {/* Lightbox */}
-        {isLightboxOpen && validMedia.length > 0 && (
+        {isLightboxOpen && (
           <LightboxPreview
             media={validMedia}
             initialIndex={selectedMediaIndex}
