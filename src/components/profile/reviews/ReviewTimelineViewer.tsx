@@ -168,17 +168,24 @@ export const ReviewTimelineViewer = ({
     setIsLightboxOpen(true);
   };
 
+  // Helper function to detect if an image is user-uploaded vs entity fallback
+  const isUserUploadedMedia = (imageUrl: string): boolean => {
+    // Entity images are stored in paths containing '/entities/entity_'
+    // User media is stored in different paths like profile_images/ or review-media/
+    return !imageUrl.includes('/entities/entity_');
+  };
+
   // Helper function to get initial review media
   const getInitialReviewMedia = (): MediaItem[] => {
     if (!reviewData) return [];
     
-    // Check for new media array first
+    // Check for new media array first (preferred)
     if (reviewData.media && Array.isArray(reviewData.media) && reviewData.media.length > 0) {
       return reviewData.media.filter(item => !item.is_deleted);
     }
     
-    // Fallback to legacy image_url
-    if (reviewData.image_url) {
+    // Only use image_url if it's actually user-uploaded media (not entity fallback)
+    if (reviewData.image_url && isUserUploadedMedia(reviewData.image_url)) {
       return [{
         url: reviewData.image_url,
         type: 'image' as const,
@@ -187,7 +194,7 @@ export const ReviewTimelineViewer = ({
       }];
     }
     
-    return [];
+    return []; // No user media to display
   };
 
   const getInitials = (name: string | null) => {
