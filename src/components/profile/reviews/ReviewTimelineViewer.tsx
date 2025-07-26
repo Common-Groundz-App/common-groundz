@@ -268,7 +268,7 @@ export const ReviewTimelineViewer = ({
               )}
 
               {/* Initial Review Entry - Enhanced with user info */}
-              <div className="p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
+              <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50/30">
                 <div className="flex items-start gap-3">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={reviewData?.user?.avatar_url || undefined} />
@@ -282,7 +282,7 @@ export const ReviewTimelineViewer = ({
                       <span className="font-medium text-sm">
                         {reviewData?.user?.username || 'User'}
                       </span>
-                      <Badge variant="outline" className="bg-primary/10 text-primary text-xs">
+                      <Badge variant="outline" className="bg-blue-100 text-blue-700 text-xs border-blue-300">
                         Initial Review
                       </Badge>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
