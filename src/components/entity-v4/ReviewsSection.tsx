@@ -1,9 +1,15 @@
 
 import React, { useState } from 'react';
-import { MessageCircle, Camera, Eye, Star, Users } from "lucide-react";
+import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import ReviewCard from "@/components/ReviewCard";
 import { ReviewWithUser } from '@/types/entities';
 import { 
@@ -43,39 +49,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   });
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
-
-  // Enhanced debugging with circle reviews data
-  console.log('🔍 ReviewsSection - Circle Reviews Debug:');
-  console.log('  📊 Environment Info:', {
-    currentUrl: typeof window !== 'undefined' ? window.location.href : 'SSR',
-    hasAuth: !!user,
-    authLoading,
-    userId: user?.id
-  });
-  console.log('  🔵 Circle Data:', {
-    circleUserIds,
-    circleUserIdsLength: circleUserIds.length,
-    circleReviews: circleReviews.length,
-    circleLoading,
-    circleReviewDetails: circleReviews.map(r => ({ 
-      id: r.id, 
-      username: r.user.username,
-      user_id: r.user_id,
-      rating: r.rating,
-      title: r.title
-    }))
-  });
-  console.log('  📝 All Reviews Data:', {
-    totalReviews: reviews.length,
-    reviewDetails: reviews.map(r => ({ 
-      id: r.id, 
-      username: r.user.username,
-      user_id: r.user_id,
-      rating: r.rating,
-      isInCircle: circleUserIds.includes(r.user_id)
-    }))
-  });
 
   const isAuthenticated = !!user && !authLoading;
   const hasCircleData = isAuthenticated && !circleLoading && circleUserIds.length > 0;
@@ -88,13 +61,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     mostRecent: activeFilters.mostRecent || undefined,
     networkOnly: activeFilters.networkOnly || undefined
   }, circleUserIds);
-
-  console.log('🔍 After filtering:', {
-    filteredCount: filteredReviews.length,
-    activeFilters,
-    hasCircleData,
-    isAuthenticated
-  });
 
   // 4-tier priority system: Hybrid (circle+timeline), Circle-only, Timeline-only, Regular
   const timelineReviews = getTimelineReviews(filteredReviews);
@@ -120,36 +86,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const circleOnlyReviewIds = new Set(circleOnlyReviews.map(r => r.id));
   const timelineOnlyReviewIds = new Set(timelineOnlyReviews.map(r => r.id));
   
-  console.log('🔍 4-Tier Priority System:', {
-    hybridReviews: hybridReviews.length,
-    circleOnlyReviews: circleOnlyReviews.length,
-    timelineOnlyReviews: timelineOnlyReviews.length,
-    hasCircleData,
-    hybridDetails: hybridReviews.map(r => ({
-      id: r.id,
-      user: r.user.username,
-      user_id: r.user_id,
-      rating: r.rating,
-      title: r.title,
-      type: 'HYBRID (Circle + Timeline)'
-    })),
-    circleOnlyDetails: circleOnlyReviews.map(r => ({
-      id: r.id,
-      user: r.user.username,
-      user_id: r.user_id,
-      rating: r.rating,
-      title: r.title,
-      type: 'Circle Only'
-    })),
-    timelineOnlyDetails: timelineOnlyReviews.map(r => ({
-      id: r.id,
-      user: r.user.username,
-      user_id: r.user_id,
-      rating: r.rating,
-      title: r.title,
-      type: 'Timeline Only'
-    }))
-  });
   
   // 4. Regular reviews (lowest priority) - exclude all special categories
   const regularReviews = filteredReviews.filter(review => 
@@ -202,85 +138,92 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
 
       {/* SECTION 3: Reviews & Social Proof */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-900">Reviews & Social Proof</h2>
-          <div className="flex gap-2">
-            <Badge 
-              variant={activeFilters.mostRecent ? "default" : "outline"}
-              className="cursor-pointer"
-              onClick={() => toggleFilter('mostRecent')}
-            >
-              Most Recent
-            </Badge>
-            <Badge 
-              variant={activeFilters.verified ? "default" : "outline"}
-              className="cursor-pointer"
-              onClick={() => toggleFilter('verified')}
-            >
-              Verified Only
-            </Badge>
-            <Badge 
-              variant={activeFilters.fiveStars ? "default" : "outline"}
-              className="cursor-pointer"
-              onClick={() => toggleFilter('fiveStars')}
-            >
-              5 Stars
-            </Badge>
-            {/* Only show network filter if user is authenticated and has circle data */}
-            {hasCircleData && (
-              <Badge 
-                variant={activeFilters.networkOnly ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => toggleFilter('networkOnly')}
-              >
-                <Users className="w-3 h-3 mr-1" />
-                My Network ({circleUserIds.length})
-              </Badge>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDebugInfo(!showDebugInfo)}
-              className="text-xs"
-            >
-              Debug
-            </Button>
-          </div>
         </div>
 
-        {/* Debug Info */}
-        {showDebugInfo && (
-          <div className="mb-4 p-4 bg-gray-100 rounded text-xs space-y-2">
-            <div className="font-semibold">🔍 Circle Reviews Debug:</div>
-            <div>Auth Status: {isAuthenticated ? 'Authenticated' : authLoading ? 'Loading...' : 'Not authenticated'}</div>
-            <div>User ID: {user?.id || 'None'}</div>
-            <div>Circle Loading: {circleLoading ? 'Yes' : 'No'}</div>
-            <div>Following {circleUserIds.length} users: [{circleUserIds.join(', ')}]</div>
-            <div>Circle reviews found: {circleReviews.length}</div>
-            <div>Hybrid reviews: {hybridReviews.length}</div>
-            <div>Circle-only reviews: {circleOnlyReviews.length}</div>
-            <div>Timeline-only reviews: {timelineOnlyReviews.length}</div>
-            <div>Regular reviews: {regularReviews.length}</div>
-            <div>Reviews by followed users: {reviews.filter(r => circleUserIds.includes(r.user_id)).map(r => r.user.username).join(', ')}</div>
-            <div className="font-semibold">Expected: Reviews from people you follow should appear with "Trending in Your Network" badge</div>
-            {!isAuthenticated && (
-              <div className="text-red-600 font-semibold">⚠️ Not authenticated - circle highlighting disabled</div>
-            )}
-            {isAuthenticated && circleUserIds.length === 0 && !circleLoading && (
-              <div className="text-orange-600 font-semibold">⚠️ No following data - you don't follow anyone yet</div>
-            )}
+        {/* Search and Filters Row - Yelp Style */}
+        <div className="flex items-center gap-4 mb-6">
+          {/* Search Bar - Left Side */}
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input 
+                type="text" 
+                placeholder="Search reviews..." 
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
-        )}
+          
+          {/* Filter Dropdowns - Right Side */}
+          <div className="flex gap-2">
+            {/* Sort Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="text-sm">
+                  Sort 
+                  <ChevronDown className="w-4 h-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
+                <DropdownMenuItem 
+                  onClick={() => toggleFilter('mostRecent')}
+                  className={activeFilters.mostRecent ? "bg-blue-50 text-blue-700" : ""}
+                >
+                  {activeFilters.mostRecent && <span className="mr-2">✓</span>}
+                  Most Recent
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setActiveFilters(prev => ({ ...prev, mostRecent: false }));
+                }}>
+                  Highest Rated
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  Most Helpful
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-        {/* Search Bar */}
-        <div className="relative mb-6">
-          <input 
-            type="text" 
-            placeholder="Search reviews..." 
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+            {/* Filter Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="text-sm">
+                  Filter
+                  <ChevronDown className="w-4 h-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
+                <DropdownMenuItem 
+                  onClick={() => toggleFilter('verified')}
+                  className={activeFilters.verified ? "bg-blue-50 text-blue-700" : ""}
+                >
+                  {activeFilters.verified && <span className="mr-2">✓</span>}
+                  Verified Only
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => toggleFilter('fiveStars')}
+                  className={activeFilters.fiveStars ? "bg-blue-50 text-blue-700" : ""}
+                >
+                  {activeFilters.fiveStars && <span className="mr-2">✓</span>}
+                  5 Stars
+                </DropdownMenuItem>
+                {hasCircleData && (
+                  <DropdownMenuItem 
+                    onClick={() => toggleFilter('networkOnly')}
+                    className={activeFilters.networkOnly ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {activeFilters.networkOnly && <span className="mr-2">✓</span>}
+                    <Users className="w-3 h-3 mr-1" />
+                    My Network ({circleUserIds.length})
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Review Cards - 4-Tier Priority System */}
