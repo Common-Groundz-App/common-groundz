@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown } from "lucide-react";
+import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,8 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import ReviewCard from "@/components/ReviewCard";
 import { ReviewWithUser } from '@/types/entities';
@@ -129,6 +130,53 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     setSelectedTimelineReview(null);
   };
 
+  // Helper functions for dynamic button labels
+  const getSortButtonText = () => {
+    switch(sortBy) {
+      case 'mostRecent': return 'Most Recent';
+      case 'highestRated': return 'Highest Rated';
+      case 'lowestRated': return 'Lowest Rated';
+      default: return 'Sort';
+    }
+  };
+
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (activeFilters.verified) count++;
+    if (activeFilters.starRating !== null) count++;
+    if (activeFilters.networkOnly) count++;
+    if (activeFilters.hasTimeline) count++;
+    if (activeFilters.hasMedia) count++;
+    return count;
+  };
+
+  const getFilterButtonText = () => {
+    const count = getActiveFiltersCount();
+    if (count === 0) return 'Filter';
+    return `Filter (${count})`;
+  };
+
+  const hasActiveFilters = () => {
+    return getActiveFiltersCount() > 0 || searchQuery.trim() !== '';
+  };
+
+  const clearAllFilters = () => {
+    setActiveFilters({
+      verified: false,
+      starRating: null,
+      starFilter: 'range',
+      networkOnly: false,
+      hasTimeline: false,
+      hasMedia: false
+    });
+    setSearchQuery('');
+    setSortBy('mostRecent');
+  };
+
+  const getTotalResultsCount = () => {
+    return hybridReviews.length + circleOnlyReviews.length + timelineOnlyReviews.length + transformedRegularReviews.length;
+  };
+
   return (
     <>
       {/* Ask Community */}
@@ -159,128 +207,230 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
         </div>
 
         {/* Search and Filters Row - Yelp Style */}
-        <div className="flex items-center gap-4 mb-6">
-          {/* Search Bar - Left Side */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Search reviews..." 
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+        <div className="space-y-4 mb-6">
+          <div className="flex items-center gap-4">
+            {/* Search Bar - Left Side */}
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input 
+                  type="text" 
+                  placeholder="Search reviews..." 
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            {/* Filter Dropdowns - Right Side */}
+            <div className="flex gap-2">
+              {/* Sort Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-sm font-medium">
+                    {getSortButtonText()}
+                    <ChevronDown className="w-4 h-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50 min-w-[160px]">
+                  <DropdownMenuItem 
+                    onClick={() => setSortBy('mostRecent')}
+                    className={sortBy === 'mostRecent' ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {sortBy === 'mostRecent' && <span className="mr-2">✓</span>}
+                    Most Recent
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setSortBy('highestRated')}
+                    className={sortBy === 'highestRated' ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {sortBy === 'highestRated' && <span className="mr-2">✓</span>}
+                    Highest Rated
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setSortBy('lowestRated')}
+                    className={sortBy === 'lowestRated' ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {sortBy === 'lowestRated' && <span className="mr-2">✓</span>}
+                    Lowest Rated
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Filter Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className={`text-sm font-medium ${getActiveFiltersCount() > 0 ? 'bg-blue-50 text-blue-700 border-blue-300' : ''}`}>
+                    {getFilterButtonText()}
+                    <ChevronDown className="w-4 h-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50 min-w-[200px]">
+                  <DropdownMenuItem 
+                    onClick={() => toggleFilter('verified')}
+                    className={activeFilters.verified ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {activeFilters.verified && <span className="mr-2">✓</span>}
+                    Verified Only
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  {/* Star Rating Filters */}
+                  <DropdownMenuItem 
+                    onClick={() => setStarRating(5, 'exact')}
+                    className={activeFilters.starRating === 5 && activeFilters.starFilter === 'exact' ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {activeFilters.starRating === 5 && activeFilters.starFilter === 'exact' && <span className="mr-2">✓</span>}
+                    <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
+                    5 Stars
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setStarRating(4, 'range')}
+                    className={activeFilters.starRating === 4 && activeFilters.starFilter === 'range' ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {activeFilters.starRating === 4 && activeFilters.starFilter === 'range' && <span className="mr-2">✓</span>}
+                    <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
+                    4+ Stars
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setStarRating(3, 'range')}
+                    className={activeFilters.starRating === 3 && activeFilters.starFilter === 'range' ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {activeFilters.starRating === 3 && activeFilters.starFilter === 'range' && <span className="mr-2">✓</span>}
+                    <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
+                    3+ Stars
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem 
+                    onClick={() => toggleFilter('hasTimeline')}
+                    className={activeFilters.hasTimeline ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {activeFilters.hasTimeline && <span className="mr-2">✓</span>}
+                    Has Timeline Updates
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    onClick={() => toggleFilter('hasMedia')}
+                    className={activeFilters.hasMedia ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {activeFilters.hasMedia && <span className="mr-2">✓</span>}
+                    <Camera className="w-3 h-3 mr-1" />
+                    Photos & Videos
+                  </DropdownMenuItem>
+
+                  {hasCircleData && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => toggleFilter('networkOnly')}
+                        className={activeFilters.networkOnly ? "bg-blue-50 text-blue-700" : ""}
+                      >
+                        {activeFilters.networkOnly && <span className="mr-2">✓</span>}
+                        <Users className="w-3 h-3 mr-1" />
+                        My Circle ({circleUserIds.length})
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Clear Filters Button - Only show when filters are active */}
+              {hasActiveFilters() && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearAllFilters}
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Clear
+                </Button>
+              )}
             </div>
           </div>
-          
-          {/* Filter Dropdowns - Right Side */}
-          <div className="flex gap-2">
-            {/* Sort Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="text-sm">
-                  Sort 
-                  <ChevronDown className="w-4 h-4 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
-                <DropdownMenuItem 
-                  onClick={() => setSortBy('mostRecent')}
-                  className={sortBy === 'mostRecent' ? "bg-blue-50 text-blue-700" : ""}
-                >
-                  {sortBy === 'mostRecent' && <span className="mr-2">✓</span>}
-                  Most Recent
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setSortBy('highestRated')}
-                  className={sortBy === 'highestRated' ? "bg-blue-50 text-blue-700" : ""}
-                >
-                  {sortBy === 'highestRated' && <span className="mr-2">✓</span>}
-                  Highest Rated
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setSortBy('lowestRated')}
-                  className={sortBy === 'lowestRated' ? "bg-blue-50 text-blue-700" : ""}
-                >
-                  {sortBy === 'lowestRated' && <span className="mr-2">✓</span>}
-                  Lowest Rated
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
 
-            {/* Filter Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="text-sm">
-                  Filter
-                  <ChevronDown className="w-4 h-4 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
-                <DropdownMenuItem 
-                  onClick={() => toggleFilter('verified')}
-                  className={activeFilters.verified ? "bg-blue-50 text-blue-700" : ""}
-                >
-                  {activeFilters.verified && <span className="mr-2">✓</span>}
-                  Verified Only
-                </DropdownMenuItem>
-                
-                {/* Star Rating Filters */}
-                <DropdownMenuItem 
-                  onClick={() => setStarRating(5, 'exact')}
-                  className={activeFilters.starRating === 5 && activeFilters.starFilter === 'exact' ? "bg-blue-50 text-blue-700" : ""}
-                >
-                  {activeFilters.starRating === 5 && activeFilters.starFilter === 'exact' && <span className="mr-2">✓</span>}
-                  <Star className="w-3 h-3 mr-1" />
-                  5 Stars
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setStarRating(4, 'range')}
-                  className={activeFilters.starRating === 4 && activeFilters.starFilter === 'range' ? "bg-blue-50 text-blue-700" : ""}
-                >
-                  {activeFilters.starRating === 4 && activeFilters.starFilter === 'range' && <span className="mr-2">✓</span>}
-                  <Star className="w-3 h-3 mr-1" />
-                  4+ Stars
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setStarRating(3, 'range')}
-                  className={activeFilters.starRating === 3 && activeFilters.starFilter === 'range' ? "bg-blue-50 text-blue-700" : ""}
-                >
-                  {activeFilters.starRating === 3 && activeFilters.starFilter === 'range' && <span className="mr-2">✓</span>}
-                  <Star className="w-3 h-3 mr-1" />
-                  3+ Stars
-                </DropdownMenuItem>
-
-                <DropdownMenuItem 
-                  onClick={() => toggleFilter('hasTimeline')}
-                  className={activeFilters.hasTimeline ? "bg-blue-50 text-blue-700" : ""}
-                >
-                  {activeFilters.hasTimeline && <span className="mr-2">✓</span>}
-                  Has Timeline Updates
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem 
-                  onClick={() => toggleFilter('hasMedia')}
-                  className={activeFilters.hasMedia ? "bg-blue-50 text-blue-700" : ""}
-                >
-                  {activeFilters.hasMedia && <span className="mr-2">✓</span>}
-                  <Camera className="w-3 h-3 mr-1" />
-                  With Media
-                </DropdownMenuItem>
-
-                {hasCircleData && (
-                  <DropdownMenuItem 
-                    onClick={() => toggleFilter('networkOnly')}
-                    className={activeFilters.networkOnly ? "bg-blue-50 text-blue-700" : ""}
-                  >
-                    {activeFilters.networkOnly && <span className="mr-2">✓</span>}
-                    <Users className="w-3 h-3 mr-1" />
-                    My Circle ({circleUserIds.length})
-                  </DropdownMenuItem>
+          {/* Results count and active filters display */}
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <span>
+              Showing {getTotalResultsCount()} review{getTotalResultsCount() !== 1 ? 's' : ''}
+              {(searchQuery || getActiveFiltersCount() > 0) && ' with current filters'}
+            </span>
+            
+            {/* Active filter pills */}
+            {(searchQuery || getActiveFiltersCount() > 0) && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {searchQuery && (
+                  <Badge variant="secondary" className="text-xs">
+                    Search: "{searchQuery}"
+                    <button 
+                      onClick={() => setSearchQuery('')}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
                 )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                {activeFilters.verified && (
+                  <Badge variant="secondary" className="text-xs">
+                    Verified
+                    <button 
+                      onClick={() => toggleFilter('verified')}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                {activeFilters.starRating && (
+                  <Badge variant="secondary" className="text-xs">
+                    {activeFilters.starFilter === 'exact' ? `${activeFilters.starRating} Stars` : `${activeFilters.starRating}+ Stars`}
+                    <button 
+                      onClick={() => setStarRating(null)}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                {activeFilters.hasTimeline && (
+                  <Badge variant="secondary" className="text-xs">
+                    Timeline Updates
+                    <button 
+                      onClick={() => toggleFilter('hasTimeline')}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                {activeFilters.hasMedia && (
+                  <Badge variant="secondary" className="text-xs">
+                    Photos & Videos
+                    <button 
+                      onClick={() => toggleFilter('hasMedia')}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                {activeFilters.networkOnly && (
+                  <Badge variant="secondary" className="text-xs">
+                    My Circle
+                    <button 
+                      onClick={() => toggleFilter('networkOnly')}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
