@@ -47,14 +47,20 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
 }, userFollowingIds: string[] = []) => {
   let filtered = [...reviews];
 
-  // Search filter
+  // Search filter - search across all content including timeline updates
   if (filters.search) {
     const searchLower = filters.search.toLowerCase();
-    filtered = filtered.filter(review => 
-      review.title.toLowerCase().includes(searchLower) ||
-      (review.description || '').toLowerCase().includes(searchLower) ||
-      (review.user.username || '').toLowerCase().includes(searchLower)
-    );
+    filtered = filtered.filter(review => {
+      // Use aggregated content if available, otherwise fallback to individual fields
+      if ((review as any).all_content) {
+        return (review as any).all_content.toLowerCase().includes(searchLower);
+      }
+      
+      // Fallback for reviews without aggregated content
+      return review.title.toLowerCase().includes(searchLower) ||
+        (review.description || '').toLowerCase().includes(searchLower) ||
+        (review.user.username || '').toLowerCase().includes(searchLower);
+    });
   }
 
   // Network only filter - show only reviews from followed users

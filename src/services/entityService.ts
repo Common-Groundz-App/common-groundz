@@ -183,10 +183,13 @@ export const fetchEntityReviews = async (
   console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
   
   try {
-    // Fetch reviews with only existing fields
+    // Fetch reviews with aggregated timeline comments for comprehensive search
     const { data: reviewsData, error } = await supabase
       .from('reviews')
-      .select('*')
+      .select(`
+        *,
+        review_updates(comment)
+      `)
       .eq('entity_id', entityId)
       .eq('visibility', 'public');
     
@@ -260,10 +263,18 @@ export const fetchEntityReviews = async (
       );
     }
     
-    // Transform to final format with interaction data
+    // Transform to final format with interaction data and aggregated timeline content
     const finalReviews: ReviewWithUser[] = reviewsWithProfiles.map(rev => {
       // Ensure proper status type
       const validStatus = rev.status as 'published' | 'draft' | 'deleted';
+      
+      // Aggregate all timeline comments for comprehensive search
+      const timelineComments = rev.review_updates?.map((update: any) => update.comment).filter(Boolean) || [];
+      const allContent = [
+        rev.title || '',
+        rev.description || '',
+        ...timelineComments
+      ].filter(Boolean).join(' ');
       
       return {
         id: rev.id,
@@ -295,9 +306,10 @@ export const fetchEntityReviews = async (
         visibility: rev.visibility as any,
         media: rev.media ? (rev.media as unknown as MediaItem[]) : [],
         ai_summary: rev.ai_summary,
+        all_content: allContent, // Aggregated searchable content including timeline updates
         created_at: rev.created_at,
         updated_at: rev.updated_at
-      };
+      } as ReviewWithUser & { all_content: string };
     });
     
     console.log('Processed reviews with enhanced unified profiles:', finalReviews.length);
