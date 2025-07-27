@@ -937,6 +937,63 @@ export type Database = {
         }
         Relationships: []
       }
+      photo_reports: {
+        Row: {
+          created_at: string
+          description: string | null
+          entity_id: string | null
+          id: string
+          photo_source: string
+          photo_url: string
+          reason: string
+          review_id: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          entity_id?: string | null
+          id?: string
+          photo_source: string
+          photo_url: string
+          reason: string
+          review_id?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          entity_id?: string | null
+          id?: string
+          photo_source?: string
+          photo_url?: string
+          reason?: string
+          review_id?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photo_reports_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photo_reports_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_comments: {
         Row: {
           content: string

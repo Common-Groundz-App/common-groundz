@@ -288,7 +288,7 @@ const EntityV4 = () => {
                 />
 
                 {/* SECTION 4: Tabs Navigation */}
-                <EntityTabsContent />
+                <EntityTabsContent entity={entity} />
               </div>
 
               {/* SECTION 5: Info & Discovery Sidebar */}

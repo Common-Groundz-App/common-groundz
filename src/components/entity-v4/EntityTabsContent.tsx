@@ -3,12 +3,15 @@ import React from 'react';
 import { Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { PhotosSection } from './PhotosSection';
+import { Entity } from '@/services/recommendation/types';
 
-export const EntityTabsContent: React.FC = () => {
+export const EntityTabsContent: React.FC<{ entity?: Entity }> = ({ entity }) => {
   return (
     <Tabs defaultValue="overview" className="mb-8">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="photos">Photos & Videos</TabsTrigger>
         <TabsTrigger value="products">Products</TabsTrigger>
         <TabsTrigger value="posts">Posts</TabsTrigger>
       </TabsList>
@@ -48,6 +51,9 @@ export const EntityTabsContent: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+      <TabsContent value="photos" className="mt-6">
+        {entity && <PhotosSection entity={entity} />}
       </TabsContent>
       <TabsContent value="posts" className="mt-6">
         <Card>
