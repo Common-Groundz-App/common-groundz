@@ -35,12 +35,15 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const loadPhotos = async () => {
     try {
       setLoading(true);
+      console.log('🎯 Loading photos for entity:', entity.name, entity.id);
       
       // Fetch Google Places photos
       const googlePhotos = await fetchGooglePlacesPhotos(entity);
+      console.log('🎯 Google Photos received:', googlePhotos.length);
       
       // Fetch review media
       const reviewMedia = await fetchEntityReviewMedia(entity.id);
+      console.log('🎯 Review Media received:', reviewMedia.length);
       
       // Combine and format photos
       const allPhotos: PhotoWithMetadata[] = [
@@ -48,9 +51,12 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
         ...reviewMedia
       ];
       
+      console.log('🎯 Total photos combined:', allPhotos.length);
+      console.log('🎯 All photos:', allPhotos);
+      
       setPhotos(allPhotos);
     } catch (error) {
-      console.error('Error loading photos:', error);
+      console.error('❌ Error loading photos:', error);
     } finally {
       setLoading(false);
     }
