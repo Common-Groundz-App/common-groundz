@@ -69,37 +69,77 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     sortBy: sortBy
   }, circleUserIds);
 
+  // Check if user wants pure sorting (bypass priority system for rating sorts)
+  const bypassPrioritySystem = sortBy === 'highestRated' || sortBy === 'lowestRated';
+  
   // 4-tier priority system: Hybrid (circle+timeline), Circle-only, Timeline-only, Regular
   const timelineReviews = getTimelineReviews(filteredReviews);
   const allCircleReviews = hasCircleData ? 
     filteredReviews.filter(review => circleUserIds.includes(review.user_id)) : [];
   
-  // 1. Hybrid reviews: both circle AND timeline (highest priority)
-  const hybridReviews = timelineReviews.filter(review => 
-    allCircleReviews.some(cr => cr.id === review.id)
-  );
+  let hybridReviews: ReviewWithUser[] = [];
+  let circleOnlyReviews: ReviewWithUser[] = [];
+  let timelineOnlyReviews: ReviewWithUser[] = [];
+  let regularReviews: ReviewWithUser[] = [];
+  let displayReviews: ReviewWithUser[];
   
-  // 2. Circle-only reviews: circle but NOT timeline
-  const circleOnlyReviews = allCircleReviews.filter(review => 
-    !timelineReviews.some(tr => tr.id === review.id)
-  );
-  
-  // 3. Timeline-only reviews: timeline but NOT circle
-  const timelineOnlyReviews = timelineReviews.filter(review => 
-    !allCircleReviews.some(cr => cr.id === review.id)
-  );
-  
-  const hybridReviewIds = new Set(hybridReviews.map(r => r.id));
-  const circleOnlyReviewIds = new Set(circleOnlyReviews.map(r => r.id));
-  const timelineOnlyReviewIds = new Set(timelineOnlyReviews.map(r => r.id));
-  
-  
-  // 4. Regular reviews (lowest priority) - exclude all special categories
-  const regularReviews = filteredReviews.filter(review => 
-    !hybridReviewIds.has(review.id) && 
-    !circleOnlyReviewIds.has(review.id) && 
-    !timelineOnlyReviewIds.has(review.id)
-  );
+  if (bypassPrioritySystem) {
+    // Pure sorting - ignore priority system, but still categorize for display
+    displayReviews = filteredReviews;
+    
+    // Still categorize for individual section display
+    hybridReviews = timelineReviews.filter(review => 
+      allCircleReviews.some(cr => cr.id === review.id)
+    );
+    
+    circleOnlyReviews = allCircleReviews.filter(review => 
+      !timelineReviews.some(tr => tr.id === review.id)
+    );
+    
+    timelineOnlyReviews = timelineReviews.filter(review => 
+      !allCircleReviews.some(cr => cr.id === review.id)
+    );
+    
+    const hybridReviewIds = new Set(hybridReviews.map(r => r.id));
+    const circleOnlyReviewIds = new Set(circleOnlyReviews.map(r => r.id));
+    const timelineOnlyReviewIds = new Set(timelineOnlyReviews.map(r => r.id));
+    
+    regularReviews = filteredReviews.filter(review => 
+      !hybridReviewIds.has(review.id) && 
+      !circleOnlyReviewIds.has(review.id) && 
+      !timelineOnlyReviewIds.has(review.id)
+    );
+  } else {
+    // Use priority system
+    // 1. Hybrid reviews: both circle AND timeline (highest priority)
+    hybridReviews = timelineReviews.filter(review => 
+      allCircleReviews.some(cr => cr.id === review.id)
+    );
+    
+    // 2. Circle-only reviews: circle but NOT timeline
+    circleOnlyReviews = allCircleReviews.filter(review => 
+      !timelineReviews.some(tr => tr.id === review.id)
+    );
+    
+    // 3. Timeline-only reviews: timeline but NOT circle
+    timelineOnlyReviews = timelineReviews.filter(review => 
+      !allCircleReviews.some(cr => cr.id === review.id)
+    );
+    
+    const hybridReviewIds = new Set(hybridReviews.map(r => r.id));
+    const circleOnlyReviewIds = new Set(circleOnlyReviews.map(r => r.id));
+    const timelineOnlyReviewIds = new Set(timelineOnlyReviews.map(r => r.id));
+    
+    // 4. Regular reviews (lowest priority) - exclude all special categories
+    regularReviews = filteredReviews.filter(review => 
+      !hybridReviewIds.has(review.id) && 
+      !circleOnlyReviewIds.has(review.id) && 
+      !timelineOnlyReviewIds.has(review.id)
+    );
+    
+    // Combine all in priority order
+    displayReviews = [...hybridReviews, ...circleOnlyReviews, ...timelineOnlyReviews, ...regularReviews];
+  }
 
   // Transform reviews for UI
   const transformedRegularReviews = regularReviews.slice(0, 3).map(transformReviewForUI);
@@ -174,7 +214,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   };
 
   const getTotalResultsCount = () => {
-    return hybridReviews.length + circleOnlyReviews.length + timelineOnlyReviews.length + transformedRegularReviews.length;
+    return displayReviews.length;
   };
 
   return (

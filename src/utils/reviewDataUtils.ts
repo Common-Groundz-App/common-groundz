@@ -72,18 +72,28 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
     filtered = filtered.filter(review => review.is_verified);
   }
 
-  // Star rating filters
+  // Star rating filters - use latest_rating for timeline reviews, fall back to rating
   if (filters.rating && filters.starFilter === 'exact') {
-    filtered = filtered.filter(review => review.rating === filters.rating);
+    filtered = filtered.filter(review => {
+      const currentRating = review.latest_rating || review.rating;
+      return currentRating === filters.rating;
+    });
   } else if (filters.rating && filters.starFilter === 'range') {
-    filtered = filtered.filter(review => review.rating >= filters.rating);
+    filtered = filtered.filter(review => {
+      const currentRating = review.latest_rating || review.rating;
+      return currentRating >= filters.rating;
+    });
   } else if (filters.minRating && filters.maxRating) {
-    filtered = filtered.filter(review => 
-      review.rating >= filters.minRating && review.rating <= filters.maxRating
-    );
+    filtered = filtered.filter(review => {
+      const currentRating = review.latest_rating || review.rating;
+      return currentRating >= filters.minRating && currentRating <= filters.maxRating;
+    });
   } else if (filters.rating) {
     // Legacy support - default to range
-    filtered = filtered.filter(review => review.rating >= filters.rating);
+    filtered = filtered.filter(review => {
+      const currentRating = review.latest_rating || review.rating;
+      return currentRating >= filters.rating;
+    });
   }
 
   // Timeline filter
