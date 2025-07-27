@@ -41,11 +41,14 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const { user, isLoading: authLoading } = useAuth();
   const { circleReviews, circleUserIds, isLoading: circleLoading } = useCircleReviews(entityId);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'mostRecent' | 'highestRated' | 'lowestRated'>('mostRecent');
   const [activeFilters, setActiveFilters] = useState({
-    mostRecent: false,
     verified: false,
-    fiveStars: false,
-    networkOnly: false
+    starRating: null as number | null,
+    starFilter: 'range' as 'exact' | 'range',
+    networkOnly: false,
+    hasTimeline: false,
+    hasMedia: false
   });
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
@@ -57,9 +60,12 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const filteredReviews = filterReviews(reviews, {
     search: searchQuery || undefined,
     verified: activeFilters.verified || undefined,
-    rating: activeFilters.fiveStars ? 5 : undefined,
-    mostRecent: activeFilters.mostRecent || undefined,
-    networkOnly: activeFilters.networkOnly || undefined
+    rating: activeFilters.starRating || undefined,
+    starFilter: activeFilters.starFilter,
+    networkOnly: activeFilters.networkOnly || undefined,
+    hasTimeline: activeFilters.hasTimeline || undefined,
+    hasMedia: activeFilters.hasMedia || undefined,
+    sortBy: sortBy
   }, circleUserIds);
 
   // 4-tier priority system: Hybrid (circle+timeline), Circle-only, Timeline-only, Regular
@@ -98,9 +104,18 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const transformedRegularReviews = regularReviews.slice(0, 3).map(transformReviewForUI);
 
   const toggleFilter = (filter: keyof typeof activeFilters) => {
+    if (filter === 'starRating') return; // Handle star rating separately
     setActiveFilters(prev => ({
       ...prev,
       [filter]: !prev[filter]
+    }));
+  };
+
+  const setStarRating = (rating: number | null, filterType: 'exact' | 'range' = 'range') => {
+    setActiveFilters(prev => ({
+      ...prev,
+      starRating: rating,
+      starFilter: filterType
     }));
   };
 
@@ -171,19 +186,25 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
                 <DropdownMenuItem 
-                  onClick={() => toggleFilter('mostRecent')}
-                  className={activeFilters.mostRecent ? "bg-blue-50 text-blue-700" : ""}
+                  onClick={() => setSortBy('mostRecent')}
+                  className={sortBy === 'mostRecent' ? "bg-blue-50 text-blue-700" : ""}
                 >
-                  {activeFilters.mostRecent && <span className="mr-2">✓</span>}
+                  {sortBy === 'mostRecent' && <span className="mr-2">✓</span>}
                   Most Recent
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
-                  setActiveFilters(prev => ({ ...prev, mostRecent: false }));
-                }}>
+                <DropdownMenuItem 
+                  onClick={() => setSortBy('highestRated')}
+                  className={sortBy === 'highestRated' ? "bg-blue-50 text-blue-700" : ""}
+                >
+                  {sortBy === 'highestRated' && <span className="mr-2">✓</span>}
                   Highest Rated
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  Most Helpful
+                <DropdownMenuItem 
+                  onClick={() => setSortBy('lowestRated')}
+                  className={sortBy === 'lowestRated' ? "bg-blue-50 text-blue-700" : ""}
+                >
+                  {sortBy === 'lowestRated' && <span className="mr-2">✓</span>}
+                  Lowest Rated
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -204,13 +225,50 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   {activeFilters.verified && <span className="mr-2">✓</span>}
                   Verified Only
                 </DropdownMenuItem>
+                
+                {/* Star Rating Filters */}
                 <DropdownMenuItem 
-                  onClick={() => toggleFilter('fiveStars')}
-                  className={activeFilters.fiveStars ? "bg-blue-50 text-blue-700" : ""}
+                  onClick={() => setStarRating(5, 'exact')}
+                  className={activeFilters.starRating === 5 && activeFilters.starFilter === 'exact' ? "bg-blue-50 text-blue-700" : ""}
                 >
-                  {activeFilters.fiveStars && <span className="mr-2">✓</span>}
+                  {activeFilters.starRating === 5 && activeFilters.starFilter === 'exact' && <span className="mr-2">✓</span>}
+                  <Star className="w-3 h-3 mr-1" />
                   5 Stars
                 </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setStarRating(4, 'range')}
+                  className={activeFilters.starRating === 4 && activeFilters.starFilter === 'range' ? "bg-blue-50 text-blue-700" : ""}
+                >
+                  {activeFilters.starRating === 4 && activeFilters.starFilter === 'range' && <span className="mr-2">✓</span>}
+                  <Star className="w-3 h-3 mr-1" />
+                  4+ Stars
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setStarRating(3, 'range')}
+                  className={activeFilters.starRating === 3 && activeFilters.starFilter === 'range' ? "bg-blue-50 text-blue-700" : ""}
+                >
+                  {activeFilters.starRating === 3 && activeFilters.starFilter === 'range' && <span className="mr-2">✓</span>}
+                  <Star className="w-3 h-3 mr-1" />
+                  3+ Stars
+                </DropdownMenuItem>
+
+                <DropdownMenuItem 
+                  onClick={() => toggleFilter('hasTimeline')}
+                  className={activeFilters.hasTimeline ? "bg-blue-50 text-blue-700" : ""}
+                >
+                  {activeFilters.hasTimeline && <span className="mr-2">✓</span>}
+                  Has Timeline Updates
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem 
+                  onClick={() => toggleFilter('hasMedia')}
+                  className={activeFilters.hasMedia ? "bg-blue-50 text-blue-700" : ""}
+                >
+                  {activeFilters.hasMedia && <span className="mr-2">✓</span>}
+                  <Camera className="w-3 h-3 mr-1" />
+                  With Media
+                </DropdownMenuItem>
+
                 {hasCircleData && (
                   <DropdownMenuItem 
                     onClick={() => toggleFilter('networkOnly')}
@@ -218,7 +276,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   >
                     {activeFilters.networkOnly && <span className="mr-2">✓</span>}
                     <Users className="w-3 h-3 mr-1" />
-                    My Network ({circleUserIds.length})
+                    My Circle ({circleUserIds.length})
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>

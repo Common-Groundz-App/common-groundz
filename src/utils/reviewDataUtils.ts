@@ -37,8 +37,13 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
   search?: string;
   verified?: boolean;
   rating?: number;
-  mostRecent?: boolean;
+  starFilter?: 'exact' | 'range';
+  minRating?: number;
+  maxRating?: number;
   networkOnly?: boolean;
+  hasTimeline?: boolean;
+  hasMedia?: boolean;
+  sortBy?: 'mostRecent' | 'highestRated' | 'lowestRated';
 }, userFollowingIds: string[] = []) => {
   let filtered = [...reviews];
 
@@ -67,14 +72,50 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
     filtered = filtered.filter(review => review.is_verified);
   }
 
-  // Rating filter
-  if (filters.rating) {
+  // Star rating filters
+  if (filters.rating && filters.starFilter === 'exact') {
+    filtered = filtered.filter(review => review.rating === filters.rating);
+  } else if (filters.rating && filters.starFilter === 'range') {
+    filtered = filtered.filter(review => review.rating >= filters.rating);
+  } else if (filters.minRating && filters.maxRating) {
+    filtered = filtered.filter(review => 
+      review.rating >= filters.minRating && review.rating <= filters.maxRating
+    );
+  } else if (filters.rating) {
+    // Legacy support - default to range
     filtered = filtered.filter(review => review.rating >= filters.rating);
   }
 
-  // Sort by most recent if requested
-  if (filters.mostRecent) {
-    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  // Timeline filter
+  if (filters.hasTimeline) {
+    filtered = filtered.filter(review => review.has_timeline && (review.timeline_count || 0) > 0);
+  }
+
+  // Media filter
+  if (filters.hasMedia) {
+    filtered = filtered.filter(review => review.media && review.media.length > 0);
+  }
+
+  // Apply sorting
+  if (filters.sortBy) {
+    filtered.sort((a, b) => {
+      switch (filters.sortBy) {
+        case 'mostRecent':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'highestRated':
+          // Use latest_rating if available, fall back to rating
+          const aRating = a.latest_rating || a.rating;
+          const bRating = b.latest_rating || b.rating;
+          return bRating - aRating;
+        case 'lowestRated':
+          // Use latest_rating if available, fall back to rating
+          const aRatingLow = a.latest_rating || a.rating;
+          const bRatingLow = b.latest_rating || b.rating;
+          return aRatingLow - bRatingLow;
+        default:
+          return 0;
+      }
+    });
   }
 
   return filtered;
