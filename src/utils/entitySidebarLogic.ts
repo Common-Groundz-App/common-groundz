@@ -114,7 +114,7 @@ export const extractContactInfo = (entity: Entity): ContactInfo => {
   };
 };
 
-export const formatBusinessHours = (hours: BusinessHours): Array<{ day: string; hours: string; isOpen: boolean }> => {
+export const formatBusinessHours = (hours: BusinessHours): Array<{ day: string; hours: string[]; isOpen: boolean }> => {
   const dayNames = {
     monday: 'Monday',
     tuesday: 'Tuesday', 
@@ -129,9 +129,14 @@ export const formatBusinessHours = (hours: BusinessHours): Array<{ day: string; 
     const dayHours = hours[key as keyof BusinessHours];
     const isOpen = dayHours && dayHours.toLowerCase() !== 'closed' && !dayHours.toLowerCase().includes('closed');
     
+    // Split multiple time ranges by comma and clean them up
+    const hoursArray = dayHours 
+      ? dayHours.split(',').map(time => time.trim()).filter(time => time)
+      : ['Closed'];
+    
     return {
       day: dayName,
-      hours: dayHours || 'Closed',
+      hours: hoursArray,
       isOpen: !!isOpen,
     };
   });

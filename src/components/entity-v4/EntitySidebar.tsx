@@ -53,11 +53,18 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
           <CardContent>
             <div className="space-y-2 text-sm">
               {formattedHours.map(({ day, hours, isOpen }) => (
-                <div key={day} className="flex justify-between">
-                  <span>{day}</span>
-                  <span className={isOpen ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                    {hours}
-                  </span>
+                <div key={day} className="grid grid-cols-[80px_1fr] gap-3">
+                  <span className="font-medium">{day}</span>
+                  <div className="space-y-1">
+                    {hours.map((timeRange, index) => (
+                      <div 
+                        key={index}
+                        className={isOpen ? "text-green-600 font-medium" : "text-red-600 font-medium"}
+                      >
+                        {timeRange}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
