@@ -234,8 +234,10 @@ const extractPlaceMetadata = async (rawData: any, baseData: EnhancedEntityData):
         body: { query: baseData.name }
       });
 
-      if (!error && data?.length > 0) {
-        const enrichedPlace = data[0]; // Use first match
+      console.log(`🔍 Search-places-deep response:`, { data, error });
+
+      if (!error && data?.results?.length > 0) {
+        const enrichedPlace = data.results[0]; // Use first match from results array
         console.log(`✅ Enriched place data found with ${enrichedPlace.metadata?.photo_references?.length || 0} photos`);
         
         // Merge enriched metadata with existing data
