@@ -74,75 +74,30 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
   const photos: PhotoWithMetadata[] = [];
   
   try {
-    console.log('🖼️ Fetching Google Places photos for entity:', entity.name);
-    console.log('🖼️ Entity photo_reference:', entity.photo_reference);
-    console.log('🖼️ Entity metadata photo_reference:', entity.metadata?.photo_reference);
-    console.log('🖼️ Entity metadata photos array:', entity.metadata?.photos);
+    // Get photo reference from metadata (where it actually exists)
+    const photoRef = entity.metadata?.photo_reference;
     
-    // Get photo reference from either top-level or metadata
-    const primaryPhotoRef = entity.photo_reference || entity.metadata?.photo_reference;
-    
-    if (primaryPhotoRef) {
-      try {
-        const photoUrl = createGooglePlacesPhotoUrl(primaryPhotoRef, 400);
-        console.log('🖼️ Generated primary photo URL:', photoUrl);
-        
-        photos.push({
-          id: `google-places-${entity.id}`,
-          url: photoUrl,
-          type: 'image' as const,
-          alt: entity.name,
-          order: 0,
-          source: 'google_places' as const,
-          originalReference: primaryPhotoRef,
-          isPrimary: true
-        });
-        console.log('✅ Added primary Google Places photo');
-      } catch (error) {
-        console.error('❌ Error processing primary photo:', error);
-      }
+    if (photoRef) {
+      const photoUrl = createGooglePlacesPhotoUrl(photoRef, 400);
+      
+      photos.push({
+        id: `google-places-${entity.id}`,
+        url: photoUrl,
+        type: 'image' as const,
+        alt: entity.name,
+        order: 0,
+        source: 'google_places' as const,
+        originalReference: photoRef,
+        isPrimary: true
+      });
+      console.log('✅ Added Google Places photo');
     } else {
-      console.log('🖼️ No primary photo reference found');
-    }
-    
-    // Check for additional photos in metadata.photos array
-    if (entity.metadata?.photos && Array.isArray(entity.metadata.photos)) {
-      console.log('🖼️ Processing additional photos from metadata.photos array...');
-      
-      const additionalPhotos = entity.metadata.photos
-        .slice(0, 5) // Limit to first 5 additional photos
-        .filter((photo: any) => photo.photo_reference && photo.photo_reference !== primaryPhotoRef);
-      
-      console.log(`🖼️ Found ${additionalPhotos.length} additional photos to process`);
-      
-      // Process photos sequentially to avoid overwhelming the API
-      for (let i = 0; i < additionalPhotos.length; i++) {
-        try {
-          const photo = additionalPhotos[i];
-          const photoUrl = createGooglePlacesPhotoUrl(photo.photo_reference, 400);
-          console.log(`🖼️ Generated additional photo URL ${i + 1}:`, photoUrl);
-          
-          photos.push({
-            id: `google-places-${entity.id}-${i}`,
-            url: photoUrl,
-            type: 'image' as const,
-            alt: entity.name,
-            order: i + 1,
-            source: 'google_places' as const,
-            originalReference: photo.photo_reference
-          });
-        } catch (error) {
-          console.error(`❌ Error processing additional photo ${i + 1}:`, error);
-        }
-      }
-    } else {
-      console.log('🖼️ No additional photos found in metadata.photos array');
+      console.log('🖼️ No photo reference found in metadata');
     }
   } catch (error) {
     console.error('❌ Error fetching Google Places photos:', error);
   }
   
-  console.log(`🖼️ Total valid Google Places photos: ${photos.length}`);
   return photos;
 };
 
