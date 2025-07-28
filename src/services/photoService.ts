@@ -15,6 +15,8 @@ export interface PhotoWithMetadata extends MediaItem {
   height?: number;
   fileSize?: number;
   contentType?: string;
+  isTimelineUpdate?: boolean;
+  timelineComment?: string;
 }
 
 /**
@@ -149,17 +151,40 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
     
     console.log('📸 Found reviews with media:', reviews?.length || 0);
     
-    if (!reviews || reviews.length === 0) {
-      console.log('📸 No reviews with media found');
-      return photos;
+    // Also fetch review updates with media
+    const { data: reviewUpdates, error: updatesError } = await supabase
+      .from('review_updates')
+      .select(`
+        id, 
+        review_id, 
+        comment, 
+        media, 
+        created_at, 
+        user_id,
+        reviews!inner(entity_id, title, status)
+      `)
+      .eq('reviews.entity_id', entityId)
+      .eq('reviews.status', 'published')
+      .not('media', 'is', null)
+      .neq('media', '[]');
+    
+    if (updatesError) {
+      console.error('❌ Error fetching review updates:', updatesError);
     }
     
-    // Get user profiles for the reviews
-    const userIds = reviews.map(r => r.user_id);
+    console.log('📸 Found review updates with media:', reviewUpdates?.length || 0);
+    
+    // Combine all user IDs for profile lookup
+    const allUserIds = [
+      ...(reviews?.map(r => r.user_id) || []),
+      ...(reviewUpdates?.map(u => u.user_id) || [])
+    ];
+    
+    // Get user profiles for all users
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, username')
-      .in('id', userIds);
+      .in('id', allUserIds);
     
     if (profilesError) {
       console.error('❌ Error fetching profiles:', profilesError);
@@ -172,29 +197,60 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
     });
     
     // Process reviews and extract media
-    reviews.forEach((review: any) => {
-      console.log('📸 Processing review:', review.id, 'media:', review.media);
-      
-      if (review.media && Array.isArray(review.media)) {
-        review.media.forEach((media: MediaItem, index: number) => {
-          if (media.type === 'image' && media.url) {
-            const userProfile = profileMap.get(review.user_id);
-            
-            photos.push({
-              ...media,
-              id: `review-${review.id}-${index}`,
-              source: 'user_review',
-              reviewId: review.id,
-              reviewTitle: review.title,
-              username: userProfile?.username || 'Anonymous',
-              createdAt: review.created_at
-            });
-            
-            console.log('📸 Added review photo:', media.url);
-          }
-        });
-      }
-    });
+    if (reviews && reviews.length > 0) {
+      reviews.forEach((review: any) => {
+        console.log('📸 Processing review:', review.id, 'media:', review.media);
+        
+        if (review.media && Array.isArray(review.media)) {
+          review.media.forEach((media: MediaItem, index: number) => {
+            if (media.type === 'image' && media.url) {
+              const userProfile = profileMap.get(review.user_id);
+              
+              photos.push({
+                ...media,
+                id: `review-${review.id}-${index}`,
+                source: 'user_review',
+                reviewId: review.id,
+                reviewTitle: review.title,
+                username: userProfile?.username || 'Anonymous',
+                createdAt: review.created_at
+              });
+              
+              console.log('📸 Added review photo:', media.url);
+            }
+          });
+        }
+      });
+    }
+    
+    // Process review updates and extract media
+    if (reviewUpdates && reviewUpdates.length > 0) {
+      reviewUpdates.forEach((update: any) => {
+        console.log('📸 Processing review update:', update.id, 'media:', update.media);
+        
+        if (update.media && Array.isArray(update.media)) {
+          update.media.forEach((media: MediaItem, index: number) => {
+            if (media.type === 'image' && media.url) {
+              const userProfile = profileMap.get(update.user_id);
+              
+              photos.push({
+                ...media,
+                id: `review-update-${update.id}-${index}`,
+                source: 'user_review',
+                reviewId: update.review_id,
+                reviewTitle: update.reviews?.title || 'Timeline Update',
+                username: userProfile?.username || 'Anonymous',
+                createdAt: update.created_at,
+                isTimelineUpdate: true,
+                timelineComment: update.comment
+              });
+              
+              console.log('📸 Added timeline update photo:', media.url);
+            }
+          });
+        }
+      });
+    }
   } catch (error) {
     console.error('❌ Error fetching review media:', error);
   }
