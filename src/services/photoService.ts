@@ -74,9 +74,45 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
   const photos: PhotoWithMetadata[] = [];
   
   try {
-    // Get photo reference from metadata (where it actually exists)
+    // First, try to fetch multiple photos using place_id
+    const placeId = entity.metadata?.place_id;
+    if (placeId) {
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-google-places-photos', {
+          body: { place_id: placeId }
+        });
+
+        if (!error && data?.photos?.length > 0) {
+          console.log(`✅ Found ${data.photos.length} Google Places photos for entity ${entity.id}`);
+          
+          // Create PhotoWithMetadata objects for each photo
+          for (let i = 0; i < data.photos.length; i++) {
+            const photo = data.photos[i];
+            const photoUrl = createGooglePlacesPhotoUrl(photo.photo_reference, 400);
+            
+            photos.push({
+              id: `google-places-${entity.id}-${i}`,
+              url: photoUrl,
+              type: 'image' as const,
+              alt: entity.name,
+              order: i,
+              source: 'google_places' as const,
+              originalReference: photo.photo_reference,
+              isPrimary: i === 0,
+              width: photo.width || 400,
+              height: photo.height || 400
+            });
+          }
+          
+          return photos;
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch multiple Google Places photos, falling back to single photo:', error);
+      }
+    }
+
+    // Fallback to single photo reference for backward compatibility
     const photoRef = entity.metadata?.photo_reference;
-    
     if (photoRef) {
       const photoUrl = createGooglePlacesPhotoUrl(photoRef, 400);
       
@@ -90,7 +126,7 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
         originalReference: photoRef,
         isPrimary: true
       });
-      console.log('✅ Added Google Places photo');
+      console.log('✅ Added Google Places photo (fallback)');
     } else {
       console.log('🖼️ No photo reference found in metadata');
     }

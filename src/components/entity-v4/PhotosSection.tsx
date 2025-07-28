@@ -156,7 +156,10 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                       {photo.source === 'google_places' ? (
                         <>
                           <ExternalLink className="w-3 h-3" />
-                          <span>Google</span>
+                          <span>Google Places</span>
+                          {photo.isPrimary && (
+                            <span className="bg-blue-500 text-white px-1 rounded text-xs">Primary</span>
+                          )}
                         </>
                       ) : (
                         <>
