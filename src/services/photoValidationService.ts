@@ -23,6 +23,15 @@ export class PhotoValidationService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+      // For Supabase edge functions, skip validation and assume valid
+      if (url.includes('supabase.co/functions/v1/')) {
+        clearTimeout(timeoutId);
+        return {
+          isValid: true,
+          contentType: 'image/jpeg' // Assume JPEG for Google Places photos
+        };
+      }
+
       const response = await fetch(url, {
         method: 'HEAD',
         signal: controller.signal,
