@@ -76,6 +76,19 @@ export class PhotoCacheService {
     try {
       console.log(`Caching photo for entity ${entityId}:`, originalUrl);
 
+      // Check if photo is already cached
+      const { data: existingPhoto } = await supabase
+        .from('cached_photos')
+        .select('*')
+        .eq('entity_id', entityId)
+        .eq('original_url', originalUrl)
+        .single();
+
+      if (existingPhoto) {
+        console.log('Photo already cached, returning existing:', originalUrl);
+        return existingPhoto as CachedPhoto;
+      }
+
       // Download the image
       const blob = await fetchImageWithRetries(originalUrl);
       if (!blob) {

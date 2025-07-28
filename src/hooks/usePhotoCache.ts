@@ -87,10 +87,9 @@ export const usePhotoCache = ({
 
       const allFreshPhotos = [...googlePhotos, ...reviewPhotos];
       
-      // Filter out photos that are already cached
-      const uncachedPhotos = allFreshPhotos.filter(photo => 
-        !cachedPhotos.some(cached => cached.original_url === photo.url)
-      );
+      // Filter out photos that are already cached - using Set for better performance
+      const cachedUrls = new Set(cachedPhotos.map(cached => cached.original_url).filter(Boolean));
+      const uncachedPhotos = allFreshPhotos.filter(photo => !cachedUrls.has(photo.url));
 
       return { allFreshPhotos, uncachedPhotos };
     } catch (error) {
@@ -128,12 +127,19 @@ export const usePhotoCache = ({
 
           if (cachedPhoto) {
             cached++;
-            // Update photos state with cached version
-            setPhotos(prev => prev.map(p => 
-              p.url === photo.url 
-                ? { ...p, url: cachedPhoto.cached_url, isCached: true }
-                : p
-            ));
+            // Update photos state with cached version, ensuring no duplicates
+            setPhotos(prev => {
+              const updatedPhotos = prev.map(p => 
+                p.url === photo.url 
+                  ? { ...p, url: cachedPhoto.cached_url, isCached: true }
+                  : p
+              );
+              // Remove any duplicates based on URL
+              const uniquePhotos = updatedPhotos.filter((photo, index, arr) => 
+                arr.findIndex(p => p.url === photo.url) === index
+              );
+              return uniquePhotos;
+            });
           } else {
             errors++;
           }
