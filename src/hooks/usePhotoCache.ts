@@ -113,36 +113,45 @@ export const usePhotoCache = ({
 
     for (const photo of photosToCache) {
       try {
-        // Validate photo first
-        const validation = await photoValidationService.validatePhoto(photo.url);
+        // For Google Places photos via edge function, skip validation as they're trusted
+        const isTrustedSource = photo.url.includes('supabase.co/functions/v1/get-google-places-photo');
+        let shouldCache = true;
         
-        if (validation.isValid) {
-          const cachedPhoto = await photoCacheService.cachePhoto(
-            entityId,
-            photo.url,
-            photo.source as 'google_places' | 'user_review',
-            photo.originalReference,
-            photo.isPrimary
-          );
-
-          if (cachedPhoto) {
-            cached++;
-            // Update photos state with cached version, ensuring no duplicates
-            setPhotos(prev => {
-              const updatedPhotos = prev.map(p => 
-                p.url === photo.url 
-                  ? { ...p, url: cachedPhoto.cached_url, isCached: true }
-                  : p
-              );
-              // Remove any duplicates based on URL
-              const uniquePhotos = updatedPhotos.filter((photo, index, arr) => 
-                arr.findIndex(p => p.url === photo.url) === index
-              );
-              return uniquePhotos;
-            });
-          } else {
+        if (!isTrustedSource) {
+          // Only validate untrusted sources
+          const validation = await photoValidationService.validatePhoto(photo.url);
+          shouldCache = validation.isValid;
+          
+          if (!shouldCache) {
+            console.warn('Photo validation failed:', photo.url, validation.errorType);
             errors++;
+            continue;
           }
+        }
+
+        const cachedPhoto = await photoCacheService.cachePhoto(
+          entityId,
+          photo.url,
+          photo.source as 'google_places' | 'user_review',
+          photo.originalReference,
+          photo.isPrimary
+        );
+
+        if (cachedPhoto) {
+          cached++;
+          // Update photos state with cached version, ensuring no duplicates
+          setPhotos(prev => {
+            const updatedPhotos = prev.map(p => 
+              p.url === photo.url 
+                ? { ...p, url: cachedPhoto.cached_url, isCached: true }
+                : p
+            );
+            // Remove any duplicates based on URL
+            const uniquePhotos = updatedPhotos.filter((photo, index, arr) => 
+              arr.findIndex(p => p.url === photo.url) === index
+            );
+            return uniquePhotos;
+          });
         } else {
           errors++;
         }

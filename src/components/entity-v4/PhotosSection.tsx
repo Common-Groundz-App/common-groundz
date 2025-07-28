@@ -141,6 +141,18 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                   alt={photo.alt || entity.name}
                   className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                   loading="lazy"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    // Show a placeholder or try a fallback URL
+                    target.style.display = 'none';
+                    const fallback = target.parentElement?.querySelector('.fallback-placeholder');
+                    if (!fallback) {
+                      const placeholder = document.createElement('div');
+                      placeholder.className = 'fallback-placeholder w-full h-full bg-muted flex items-center justify-center';
+                      placeholder.innerHTML = '<Camera class="w-8 h-8 text-muted-foreground" />';
+                      target.parentElement?.appendChild(placeholder);
+                    }
+                  }}
                 />
                 
                 {/* Photo overlay with metadata */}

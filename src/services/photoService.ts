@@ -18,12 +18,24 @@ export interface PhotoWithMetadata extends MediaItem {
 }
 
 /**
- * Validate if a photo URL is accessible
+ * Check if a URL is from a trusted source (Google Places edge function)
+ */
+const isTrustedSource = (url: string): boolean => {
+  return url.includes('supabase.co/functions/v1/get-google-places-photo');
+};
+
+/**
+ * Validate if a photo URL is accessible (only for untrusted sources)
  */
 const validatePhotoUrl = async (url: string): Promise<boolean> => {
+  // Skip validation for trusted sources (Google Places via edge function)
+  if (isTrustedSource(url)) {
+    return true;
+  }
+  
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout
     
     const response = await fetch(url, {
       method: 'HEAD',
@@ -76,23 +88,17 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
         const photoUrl = createGooglePlacesPhotoUrl(primaryPhotoRef, 800);
         console.log('🖼️ Generated primary photo URL:', photoUrl);
         
-        // Validate the photo URL
-        const isValid = await validatePhotoUrl(photoUrl);
-        console.log('🖼️ Primary photo validation result:', isValid);
-        
-        if (isValid) {
-          photos.push({
-            id: `google-places-${entity.id}`,
-            url: photoUrl,
-            type: 'image' as const,
-            alt: entity.name,
-            order: 0,
-            source: 'google_places' as const
-          });
-          console.log('✅ Added valid primary Google Places photo');
-        } else {
-          console.warn('⚠️ Primary photo failed validation, skipping');
-        }
+        // For Google Places photos, trust the edge function and add directly
+        photos.push({
+          id: `google-places-${entity.id}`,
+          url: photoUrl,
+          type: 'image' as const,
+          alt: entity.name,
+          order: 0,
+          source: 'google_places' as const,
+          isPrimary: true
+        });
+        console.log('✅ Added primary Google Places photo (trusted source)');
       } catch (error) {
         console.error('❌ Error processing primary photo:', error);
       }
@@ -119,20 +125,15 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
             const photoUrl = createGooglePlacesPhotoUrl(photo.photo_reference, 800);
             console.log(`🖼️ Generated additional photo URL ${globalIndex + 1}:`, photoUrl);
             
-            const isValid = await validatePhotoUrl(photoUrl);
-            console.log(`🖼️ Additional photo ${globalIndex + 1} validation result:`, isValid);
-            
-            if (isValid) {
-              return {
-                id: `google-places-${entity.id}-${globalIndex}`,
-                url: photoUrl,
-                type: 'image' as const,
-                alt: entity.name,
-                order: globalIndex + 1,
-                source: 'google_places' as const
-              };
-            }
-            return null;
+            // For Google Places photos, trust the edge function and add directly
+            return {
+              id: `google-places-${entity.id}-${globalIndex}`,
+              url: photoUrl,
+              type: 'image' as const,
+              alt: entity.name,
+              order: globalIndex + 1,
+              source: 'google_places' as const
+            };
           } catch (error) {
             console.error(`❌ Error processing additional photo ${globalIndex + 1}:`, error);
             return null;
