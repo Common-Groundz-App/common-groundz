@@ -51,15 +51,18 @@ export const usePhotoCache = ({
       setCachedPhotos(cached);
       
       // Convert cached photos to PhotoWithMetadata format
-      const cachedAsPhotos: PhotoWithMetadata[] = cached.map(photo => ({
+      const cachedAsPhotos: PhotoWithMetadata[] = cached.map((photo, index) => ({
         url: photo.cached_url,
+        type: 'image' as const,
+        order: index,
         source: photo.source,
         originalReference: photo.original_reference,
         width: photo.width,
         height: photo.height,
         fileSize: photo.file_size,
         contentType: photo.content_type,
-        isPrimary: photo.is_primary
+        isPrimary: photo.is_primary,
+        isCached: true
       }));
 
       setPhotos(cachedAsPhotos);
@@ -178,8 +181,10 @@ export const usePhotoCache = ({
       const newCachedPhotos = moreCached.slice(loadedCount);
       
       if (newCachedPhotos.length > 0) {
-        const newPhotos: PhotoWithMetadata[] = newCachedPhotos.map(photo => ({
+        const newPhotos: PhotoWithMetadata[] = newCachedPhotos.map((photo, index) => ({
           url: photo.cached_url,
+          type: 'image' as const,
+          order: loadedCount + index,
           source: photo.source,
           originalReference: photo.original_reference,
           width: photo.width,
