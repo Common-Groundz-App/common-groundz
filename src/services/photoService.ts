@@ -11,7 +11,46 @@ interface PhotoWithMetadata extends MediaItem {
 }
 
 /**
- * Fetch Google Places photos for an entity
+ * Validate if a photo URL is accessible
+ */
+const validatePhotoUrl = async (url: string): Promise<boolean> => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch (error) {
+    console.warn('⚠️ Photo validation failed for URL:', url, error);
+    return false;
+  }
+};
+
+/**
+ * Create a Google Places photo URL with better error handling
+ */
+const createGooglePlacesPhotoUrl = (photoReference: string, maxWidth: number = 800): string => {
+  try {
+    const baseUrl = 'https://uyjtgybbktgapspodajy.supabase.co/functions/v1/get-google-places-photo';
+    const params = new URLSearchParams({
+      photoReference,
+      maxWidth: maxWidth.toString(),
+      timestamp: Date.now().toString() // Add timestamp to prevent caching issues
+    });
+    return `${baseUrl}?${params.toString()}`;
+  } catch (error) {
+    console.error('❌ Error creating photo URL:', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch Google Places photos for an entity with validation
  */
 export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWithMetadata[]> => {
   const photos: PhotoWithMetadata[] = [];
@@ -26,39 +65,79 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
     const primaryPhotoRef = entity.photo_reference || entity.metadata?.photo_reference;
     
     if (primaryPhotoRef) {
-      const photoUrl = `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/get-google-places-photo?photoReference=${primaryPhotoRef}&maxWidth=800`;
-      
-      photos.push({
-        id: `google-places-${entity.id}`,
-        url: photoUrl,
-        type: 'image',
-        alt: entity.name,
-        order: 0,
-        source: 'google_places'
-      });
-      
-      console.log('🖼️ Added primary Google Places photo:', photoUrl);
+      try {
+        const photoUrl = createGooglePlacesPhotoUrl(primaryPhotoRef, 800);
+        console.log('🖼️ Generated primary photo URL:', photoUrl);
+        
+        // Validate the photo URL
+        const isValid = await validatePhotoUrl(photoUrl);
+        console.log('🖼️ Primary photo validation result:', isValid);
+        
+        if (isValid) {
+          photos.push({
+            id: `google-places-${entity.id}`,
+            url: photoUrl,
+            type: 'image' as const,
+            alt: entity.name,
+            order: 0,
+            source: 'google_places' as const
+          });
+          console.log('✅ Added valid primary Google Places photo');
+        } else {
+          console.warn('⚠️ Primary photo failed validation, skipping');
+        }
+      } catch (error) {
+        console.error('❌ Error processing primary photo:', error);
+      }
     }
     
     // Check for additional photos in metadata.photos array
     if (entity.metadata?.photos && Array.isArray(entity.metadata.photos)) {
       console.log('🖼️ Processing additional photos from metadata.photos array...');
-      entity.metadata.photos.slice(0, 10).forEach((photo: any, index: number) => {
-        if (photo.photo_reference && photo.photo_reference !== primaryPhotoRef) {
-          const photoUrl = `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/get-google-places-photo?photoReference=${photo.photo_reference}&maxWidth=800`;
-          
-          photos.push({
-            id: `google-places-${entity.id}-${index}`,
-            url: photoUrl,
-            type: 'image',
-            alt: entity.name,
-            order: index + 1,
-            source: 'google_places'
-          });
-          
-          console.log('🖼️ Added additional Google Places photo:', photoUrl);
-        }
-      });
+      
+      const additionalPhotos = entity.metadata.photos
+        .slice(0, 10) // Limit to first 10 photos
+        .filter((photo: any) => photo.photo_reference && photo.photo_reference !== primaryPhotoRef);
+      
+      console.log(`🖼️ Found ${additionalPhotos.length} additional photos to process`);
+      
+      // Process photos in parallel but limit concurrency
+      const batchSize = 3;
+      for (let i = 0; i < additionalPhotos.length; i += batchSize) {
+        const batch = additionalPhotos.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (photo: any, batchIndex: number) => {
+          const globalIndex = i + batchIndex;
+          try {
+            const photoUrl = createGooglePlacesPhotoUrl(photo.photo_reference, 800);
+            console.log(`🖼️ Generated additional photo URL ${globalIndex + 1}:`, photoUrl);
+            
+            const isValid = await validatePhotoUrl(photoUrl);
+            console.log(`🖼️ Additional photo ${globalIndex + 1} validation result:`, isValid);
+            
+            if (isValid) {
+              return {
+                id: `google-places-${entity.id}-${globalIndex}`,
+                url: photoUrl,
+                type: 'image' as const,
+                alt: entity.name,
+                order: globalIndex + 1,
+                source: 'google_places' as const
+              };
+            }
+            return null;
+          } catch (error) {
+            console.error(`❌ Error processing additional photo ${globalIndex + 1}:`, error);
+            return null;
+          }
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        const validPhotos = batchResults.filter(photo => photo !== null);
+        photos.push(...validPhotos);
+        
+        console.log(`✅ Batch ${Math.floor(i / batchSize) + 1} processed: ${validPhotos.length} valid photos`);
+      }
     } else {
       console.log('🖼️ No additional photos found in metadata.photos array');
     }
@@ -66,7 +145,7 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
     console.error('❌ Error fetching Google Places photos:', error);
   }
   
-  console.log('🖼️ Total Google Places photos found:', photos.length);
+  console.log(`🖼️ Total valid Google Places photos: ${photos.length}`);
   return photos;
 };
 
