@@ -114,7 +114,7 @@ export const usePhotoCache = ({
     for (const photo of photosToCache) {
       try {
         // For Google Places photos via edge function, skip validation as they're trusted
-        const isTrustedSource = photo.url.includes('supabase.co/functions/v1/get-google-places-photo');
+        const isTrustedSource = photo.url.includes('supabase.co/functions/v1/proxy-google-image');
         let shouldCache = true;
         
         if (!isTrustedSource) {

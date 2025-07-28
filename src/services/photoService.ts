@@ -21,7 +21,7 @@ export interface PhotoWithMetadata extends MediaItem {
  * Check if a URL is from a trusted source (Google Places edge function)
  */
 const isTrustedSource = (url: string): boolean => {
-  return url.includes('supabase.co/functions/v1/get-google-places-photo');
+  return url.includes('supabase.co/functions/v1/proxy-google-image');
 };
 
 /**
@@ -51,15 +51,14 @@ const validatePhotoUrl = async (url: string): Promise<boolean> => {
 };
 
 /**
- * Create a Google Places photo URL with better error handling
+ * Create a Google Places photo URL using proxy-google-image function
  */
-const createGooglePlacesPhotoUrl = (photoReference: string, maxWidth: number = 800): string => {
+const createGooglePlacesPhotoUrl = (photoReference: string, maxWidth: number = 400): string => {
   try {
-    const baseUrl = 'https://uyjtgybbktgapspodajy.supabase.co/functions/v1/get-google-places-photo';
+    const baseUrl = 'https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-image';
     const params = new URLSearchParams({
-      photoReference,
-      maxWidth: maxWidth.toString(),
-      timestamp: Date.now().toString() // Add timestamp to prevent caching issues
+      ref: photoReference,
+      maxWidth: maxWidth.toString()
     });
     return `${baseUrl}?${params.toString()}`;
   } catch (error) {
@@ -85,10 +84,9 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
     
     if (primaryPhotoRef) {
       try {
-        const photoUrl = createGooglePlacesPhotoUrl(primaryPhotoRef, 800);
+        const photoUrl = createGooglePlacesPhotoUrl(primaryPhotoRef, 400);
         console.log('🖼️ Generated primary photo URL:', photoUrl);
         
-        // For Google Places photos, trust the edge function and add directly
         photos.push({
           id: `google-places-${entity.id}`,
           url: photoUrl,
@@ -96,12 +94,15 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
           alt: entity.name,
           order: 0,
           source: 'google_places' as const,
+          originalReference: primaryPhotoRef,
           isPrimary: true
         });
-        console.log('✅ Added primary Google Places photo (trusted source)');
+        console.log('✅ Added primary Google Places photo');
       } catch (error) {
         console.error('❌ Error processing primary photo:', error);
       }
+    } else {
+      console.log('🖼️ No primary photo reference found');
     }
     
     // Check for additional photos in metadata.photos array
@@ -109,42 +110,30 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
       console.log('🖼️ Processing additional photos from metadata.photos array...');
       
       const additionalPhotos = entity.metadata.photos
-        .slice(0, 10) // Limit to first 10 photos
+        .slice(0, 5) // Limit to first 5 additional photos
         .filter((photo: any) => photo.photo_reference && photo.photo_reference !== primaryPhotoRef);
       
       console.log(`🖼️ Found ${additionalPhotos.length} additional photos to process`);
       
-      // Process photos in parallel but limit concurrency
-      const batchSize = 3;
-      for (let i = 0; i < additionalPhotos.length; i += batchSize) {
-        const batch = additionalPhotos.slice(i, i + batchSize);
-        
-        const batchPromises = batch.map(async (photo: any, batchIndex: number) => {
-          const globalIndex = i + batchIndex;
-          try {
-            const photoUrl = createGooglePlacesPhotoUrl(photo.photo_reference, 800);
-            console.log(`🖼️ Generated additional photo URL ${globalIndex + 1}:`, photoUrl);
-            
-            // For Google Places photos, trust the edge function and add directly
-            return {
-              id: `google-places-${entity.id}-${globalIndex}`,
-              url: photoUrl,
-              type: 'image' as const,
-              alt: entity.name,
-              order: globalIndex + 1,
-              source: 'google_places' as const
-            };
-          } catch (error) {
-            console.error(`❌ Error processing additional photo ${globalIndex + 1}:`, error);
-            return null;
-          }
-        });
-        
-        const batchResults = await Promise.all(batchPromises);
-        const validPhotos = batchResults.filter(photo => photo !== null);
-        photos.push(...validPhotos);
-        
-        console.log(`✅ Batch ${Math.floor(i / batchSize) + 1} processed: ${validPhotos.length} valid photos`);
+      // Process photos sequentially to avoid overwhelming the API
+      for (let i = 0; i < additionalPhotos.length; i++) {
+        try {
+          const photo = additionalPhotos[i];
+          const photoUrl = createGooglePlacesPhotoUrl(photo.photo_reference, 400);
+          console.log(`🖼️ Generated additional photo URL ${i + 1}:`, photoUrl);
+          
+          photos.push({
+            id: `google-places-${entity.id}-${i}`,
+            url: photoUrl,
+            type: 'image' as const,
+            alt: entity.name,
+            order: i + 1,
+            source: 'google_places' as const,
+            originalReference: photo.photo_reference
+          });
+        } catch (error) {
+          console.error(`❌ Error processing additional photo ${i + 1}:`, error);
+        }
       }
     } else {
       console.log('🖼️ No additional photos found in metadata.photos array');
