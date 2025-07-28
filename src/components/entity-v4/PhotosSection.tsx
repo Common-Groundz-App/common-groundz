@@ -29,6 +29,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     cacheProgress
   } = usePhotoCache({
     entityId: entity.id,
+    entity: entity, // Pass entity data for photo fetching
     initialLoadCount: 8,
     enableBackgroundCaching: true
   });

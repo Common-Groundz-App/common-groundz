@@ -5,6 +5,7 @@ import { fetchGooglePlacesPhotos, fetchEntityReviewMedia, PhotoWithMetadata } fr
 
 interface UsePhotoCacheOptions {
   entityId: string;
+  entity?: any; // Add entity data for photo fetching
   initialLoadCount?: number;
   enableBackgroundCaching?: boolean;
 }
@@ -26,6 +27,7 @@ interface UsePhotoCacheResult {
 
 export const usePhotoCache = ({
   entityId,
+  entity,
   initialLoadCount = 8,
   enableBackgroundCaching = true
 }: UsePhotoCacheOptions): UsePhotoCacheResult => {
@@ -235,10 +237,23 @@ export const usePhotoCache = ({
         }
 
         // Always try to load fresh photos if background caching is enabled
-        if (enableBackgroundCaching) {
-          // We need entity data to fetch Google Places photos
-          // For now, we'll skip this and just show cached photos
-          // This would need to be implemented based on how entity data is available
+        if (enableBackgroundCaching && entity) {
+          try {
+            const { allFreshPhotos, uncachedPhotos } = await loadFreshPhotos(entity);
+            
+            // If we have no cached photos, show fresh photos immediately
+            if (cached.length === 0 && allFreshPhotos.length > 0) {
+              setPhotos(allFreshPhotos.slice(0, initialLoadCount));
+              setIsLoading(false);
+            }
+            
+            // Start background caching for uncached photos
+            if (uncachedPhotos.length > 0) {
+              cachePhotosInBackground(uncachedPhotos);
+            }
+          } catch (error) {
+            console.error('Error fetching fresh photos:', error);
+          }
         }
       } catch (error) {
         console.error('Error initializing photos:', error);
