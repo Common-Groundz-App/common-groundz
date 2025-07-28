@@ -51,8 +51,18 @@ serve(async (req) => {
                   const placeDetail = detail.result;
                   
                   let imageUrl = null;
-                  if (placeDetail.photos && placeDetail.photos[0]) {
+                  let photoReferences = [];
+                  if (placeDetail.photos && placeDetail.photos.length > 0) {
+                    // Use first photo as primary image_url
                     imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${placeDetail.photos[0].photo_reference}&key=${googlePlacesApiKey}`;
+                    
+                    // Store all photo references for multiple images
+                    photoReferences = placeDetail.photos.map(photo => ({
+                      photo_reference: photo.photo_reference,
+                      width: photo.width,
+                      height: photo.height,
+                      html_attributions: photo.html_attributions
+                    }));
                   }
                   
                   results.push({
@@ -70,7 +80,10 @@ serve(async (req) => {
                       opening_hours: placeDetail.opening_hours,
                       website: placeDetail.website,
                       phone: placeDetail.formatted_phone_number,
-                      price_level: placeDetail.price_level
+                      price_level: placeDetail.price_level,
+                      photo_references: photoReferences,
+                      // Keep single photo_reference for backward compatibility
+                      photo_reference: placeDetail.photos?.[0]?.photo_reference || null
                     }
                   });
                 }
