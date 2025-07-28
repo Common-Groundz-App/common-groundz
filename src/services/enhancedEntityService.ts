@@ -126,7 +126,7 @@ const extractEnhancedMetadata = async (rawData: any, entityType: string): Promis
     case 'movie':
       return extractMovieMetadata(rawData, baseData);
     case 'place':
-      return extractPlaceMetadata(rawData, baseData);
+      return await extractPlaceMetadata(rawData, baseData);
     case 'food':
       return extractFoodMetadata(rawData, baseData);
     case 'product':
@@ -218,26 +218,63 @@ const extractMovieMetadata = (rawData: any, baseData: EnhancedEntityData): Enhan
 };
 
 /**
- * Extract place-specific metadata
+ * Extract place-specific metadata with enriched Google Places data
  */
-const extractPlaceMetadata = (rawData: any, baseData: EnhancedEntityData): EnhancedEntityData => {
+const extractPlaceMetadata = async (rawData: any, baseData: EnhancedEntityData): Promise<EnhancedEntityData> => {
   const metadata = rawData.metadata || {};
+  let enrichedMetadata = { ...metadata };
+  
+  // Try to enrich with search-places-deep for multiple photos and detailed data
+  if (baseData.name && !metadata.photo_references) {
+    try {
+      console.log(`🔍 Enriching place metadata for "${baseData.name}" using search-places-deep`);
+      
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await supabase.functions.invoke('search-places-deep', {
+        body: { query: baseData.name }
+      });
+
+      if (!error && data?.length > 0) {
+        const enrichedPlace = data[0]; // Use first match
+        console.log(`✅ Enriched place data found with ${enrichedPlace.metadata?.photo_references?.length || 0} photos`);
+        
+        // Merge enriched metadata with existing data
+        enrichedMetadata = {
+          ...metadata,
+          ...enrichedPlace.metadata,
+          // Preserve any existing metadata that might be more specific
+          place_id: metadata.place_id || enrichedPlace.metadata?.place_id,
+          formatted_address: metadata.formatted_address || enrichedPlace.metadata?.formatted_address,
+        };
+        
+        // Update base data with enriched information
+        if (!baseData.image_url && enrichedPlace.image_url) {
+          baseData.image_url = enrichedPlace.image_url;
+        }
+      } else {
+        console.log(`⚠️ No enriched place data found for "${baseData.name}"`);
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to enrich place metadata with search-places-deep:', error);
+    }
+  }
   
   return {
     ...baseData,
+    metadata: enrichedMetadata,
     external_ratings: {
-      google_rating: metadata.rating,
-      user_ratings_total: metadata.user_ratings_total,
-      price_level: metadata.price_level
+      google_rating: enrichedMetadata.rating,
+      user_ratings_total: enrichedMetadata.user_ratings_total,
+      price_level: enrichedMetadata.price_level
     },
     specifications: {
-      place_id: metadata.place_id,
-      address: metadata.formatted_address,
-      phone: metadata.formatted_phone_number,
-      website: metadata.website,
-      hours: metadata.opening_hours,
-      types: metadata.types,
-      location: metadata.geometry?.location
+      place_id: enrichedMetadata.place_id,
+      address: enrichedMetadata.formatted_address,
+      phone: enrichedMetadata.formatted_phone_number,
+      website: enrichedMetadata.website,
+      hours: enrichedMetadata.opening_hours,
+      types: enrichedMetadata.types,
+      location: enrichedMetadata.geometry?.location
     }
   };
 };
