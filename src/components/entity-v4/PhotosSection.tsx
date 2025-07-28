@@ -1,21 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Camera, Flag, ExternalLink, User, Calendar } from 'lucide-react';
+import React, { useState } from 'react';
+import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Entity } from '@/services/recommendation/types';
-import { MediaItem } from '@/types/media';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
-import { fetchGooglePlacesPhotos, fetchEntityReviewMedia } from '@/services/photoService';
+import { PhotoWithMetadata } from '@/services/photoService';
+import { usePhotoCache } from '@/hooks/usePhotoCache';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface PhotoWithMetadata extends MediaItem {
-  source: 'google_places' | 'user_review';
-  reviewId?: string;
-  reviewTitle?: string;
-  username?: string;
-  createdAt?: string;
-}
 
 interface PhotosSectionProps {
   entity: Entity;
@@ -23,44 +16,22 @@ interface PhotosSectionProps {
 
 export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const { user } = useAuth();
-  const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [reportModalPhoto, setReportModalPhoto] = useState<PhotoWithMetadata | null>(null);
 
-  useEffect(() => {
-    loadPhotos();
-  }, [entity.id]);
-
-  const loadPhotos = async () => {
-    try {
-      setLoading(true);
-      console.log('🎯 Loading photos for entity:', entity.name, entity.id);
-      
-      // Fetch Google Places photos
-      const googlePhotos = await fetchGooglePlacesPhotos(entity);
-      console.log('🎯 Google Photos received:', googlePhotos.length);
-      
-      // Fetch review media
-      const reviewMedia = await fetchEntityReviewMedia(entity.id);
-      console.log('🎯 Review Media received:', reviewMedia.length);
-      
-      // Combine and format photos
-      const allPhotos: PhotoWithMetadata[] = [
-        ...googlePhotos,
-        ...reviewMedia
-      ];
-      
-      console.log('🎯 Total photos combined:', allPhotos.length);
-      console.log('🎯 All photos:', allPhotos);
-      
-      setPhotos(allPhotos);
-    } catch (error) {
-      console.error('❌ Error loading photos:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    photos,
+    isLoading: loading,
+    isCaching,
+    hasMore,
+    loadMore,
+    refreshCache,
+    cacheProgress
+  } = usePhotoCache({
+    entityId: entity.id,
+    initialLoadCount: 8,
+    enableBackgroundCaching: true
+  });
 
   const handlePhotoClick = (index: number) => {
     setSelectedPhotoIndex(index);
@@ -133,7 +104,28 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
               <h3 className="text-lg font-semibold">Photos & Videos</h3>
               <span className="text-sm text-muted-foreground">({photos.length})</span>
             </div>
-            {/* Future: Add upload button here */}
+            <div className="flex items-center gap-4">
+              {/* Cache progress indicator */}
+              {isCaching && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">
+                    Caching {cacheProgress.cached}/{cacheProgress.total}
+                  </span>
+                </div>
+              )}
+              
+              {/* Refresh button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={refreshCache}
+                disabled={loading || isCaching}
+                className="h-8"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -179,16 +171,45 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                     </Button>
                   </div>
                   
-                  {photo.createdAt && (
-                    <div className="flex items-center gap-1 text-white text-xs">
-                      <Calendar className="w-3 h-3" />
-                      <span>{new Date(photo.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {photo.createdAt && (
+                      <div className="flex items-center gap-1 text-white text-xs">
+                        <Calendar className="w-3 h-3" />
+                        <span>{new Date(photo.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    
+                    {/* Cached indicator */}
+                    {(photo as any).isCached && (
+                      <div className="flex items-center gap-1 text-white text-xs bg-green-600/80 px-2 py-1 rounded-full">
+                        <Download className="w-3 h-3" />
+                        <span>Cached</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
+
+          {/* Load More Button */}
+          {hasMore && (
+            <div className="flex justify-center pt-6">
+              <Button
+                variant="outline"
+                onClick={loadMore}
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                {loading ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
+                Load More Photos
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

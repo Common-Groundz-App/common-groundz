@@ -2,12 +2,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 
-interface PhotoWithMetadata extends MediaItem {
+export interface PhotoWithMetadata extends MediaItem {
   source: 'google_places' | 'user_review';
+  originalReference?: string;
   reviewId?: string;
   reviewTitle?: string;
   username?: string;
   createdAt?: string;
+  isCached?: boolean;
+  isPrimary?: boolean;
+  width?: number;
+  height?: number;
+  fileSize?: number;
+  contentType?: string;
 }
 
 /**

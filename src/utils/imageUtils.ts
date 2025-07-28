@@ -430,7 +430,7 @@ async function handleGooglePlacesImage(imageUrl: string, entityId: string): Prom
  * Fetch image with retry logic and proper error handling
  * Enhanced with performance monitoring
  */
-async function fetchImageWithRetries(imageUrl: string, maxRetries: number = 3): Promise<Blob | null> {
+export async function fetchImageWithRetries(imageUrl: string, maxRetries: number = 3): Promise<Blob | null> {
   let retryCount = 0;
   const overallStartTime = Date.now();
   
@@ -502,7 +502,7 @@ async function fetchImageWithRetries(imageUrl: string, maxRetries: number = 3): 
  * Upload image blob to Supabase storage with retry logic
  * Enhanced with performance monitoring
  */
-async function uploadImageToStorageWithRetries(blob: Blob, entityId: string, originalUrl: string, maxRetries: number = 2): Promise<string | null> {
+export async function uploadImageToStorageWithRetries(blob: Blob, entityId: string, originalUrl: string, maxRetries: number = 2): Promise<string | null> {
   let retryCount = 0;
   
   while (retryCount <= maxRetries) {
@@ -571,7 +571,7 @@ async function uploadImageToStorageWithRetries(blob: Blob, entityId: string, ori
 /**
  * Generate a safe filename from URL
  */
-function generateSafeFileName(url: string): string {
+export function generateSafeFileName(url: string): string {
   try {
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split('/');

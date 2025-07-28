@@ -44,6 +44,71 @@ export type Database = {
         }
         Relationships: []
       }
+      cached_photos: {
+        Row: {
+          cache_quality_score: number | null
+          cached_url: string
+          content_type: string | null
+          created_at: string | null
+          entity_id: string
+          expires_at: string | null
+          file_size: number | null
+          height: number | null
+          id: string
+          is_primary: boolean | null
+          original_reference: string | null
+          original_url: string | null
+          source: string
+          thumbnail_url: string | null
+          updated_at: string | null
+          width: number | null
+        }
+        Insert: {
+          cache_quality_score?: number | null
+          cached_url: string
+          content_type?: string | null
+          created_at?: string | null
+          entity_id: string
+          expires_at?: string | null
+          file_size?: number | null
+          height?: number | null
+          id?: string
+          is_primary?: boolean | null
+          original_reference?: string | null
+          original_url?: string | null
+          source: string
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          width?: number | null
+        }
+        Update: {
+          cache_quality_score?: number | null
+          cached_url?: string
+          content_type?: string | null
+          created_at?: string | null
+          entity_id?: string
+          expires_at?: string | null
+          file_size?: number | null
+          height?: number | null
+          id?: string
+          is_primary?: boolean | null
+          original_reference?: string | null
+          original_url?: string | null
+          source?: string
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cached_photos_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cached_products: {
         Row: {
           api_ref: string | null
@@ -936,6 +1001,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      photo_cache_sessions: {
+        Row: {
+          cache_errors: number | null
+          completed_at: string | null
+          entity_id: string
+          id: string
+          photos_cached: number | null
+          session_status: string | null
+          started_at: string | null
+          total_photos_found: number | null
+        }
+        Insert: {
+          cache_errors?: number | null
+          completed_at?: string | null
+          entity_id: string
+          id?: string
+          photos_cached?: number | null
+          session_status?: string | null
+          started_at?: string | null
+          total_photos_found?: number | null
+        }
+        Update: {
+          cache_errors?: number | null
+          completed_at?: string | null
+          entity_id?: string
+          id?: string
+          photos_cached?: number | null
+          session_status?: string | null
+          started_at?: string | null
+          total_photos_found?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photo_cache_sessions_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       photo_reports: {
         Row: {
