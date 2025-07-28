@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Download } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Entity } from '@/services/recommendation/types';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
-import { PhotoWithMetadata } from '@/services/photoService';
-import { usePhotoCache } from '@/hooks/usePhotoCache';
+import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia } from '@/services/photoService';
 import { useAuth } from '@/contexts/AuthContext';
 
 
@@ -18,21 +17,29 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const { user } = useAuth();
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [reportModalPhoto, setReportModalPhoto] = useState<PhotoWithMetadata | null>(null);
+  const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const {
-    photos,
-    isLoading: loading,
-    isCaching,
-    hasMore,
-    loadMore,
-    refreshCache,
-    cacheProgress
-  } = usePhotoCache({
-    entityId: entity.id,
-    entity: entity, // Pass entity data for photo fetching
-    initialLoadCount: 8,
-    enableBackgroundCaching: true
-  });
+  const loadPhotos = async () => {
+    setLoading(true);
+    try {
+      const [googlePhotos, reviewPhotos] = await Promise.all([
+        fetchGooglePlacesPhotos(entity),
+        fetchEntityReviewMedia(entity.id)
+      ]);
+      
+      const allPhotos = [...googlePhotos, ...reviewPhotos];
+      setPhotos(allPhotos);
+    } catch (error) {
+      console.error('Error loading photos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPhotos();
+  }, [entity.id]);
 
   const handlePhotoClick = (index: number) => {
     setSelectedPhotoIndex(index);
@@ -105,28 +112,15 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
               <h3 className="text-lg font-semibold">Photos & Videos</h3>
               <span className="text-sm text-muted-foreground">({photos.length})</span>
             </div>
-            <div className="flex items-center gap-4">
-              {/* Cache progress indicator */}
-              {isCaching && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">
-                    Caching {cacheProgress.cached}/{cacheProgress.total}
-                  </span>
-                </div>
-              )}
-              
-              {/* Refresh button */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={refreshCache}
-                disabled={loading || isCaching}
-                className="h-8"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={loadPhotos}
+              disabled={loading}
+              className="h-8"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -191,38 +185,12 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                         <span>{new Date(photo.createdAt).toLocaleDateString()}</span>
                       </div>
                     )}
-                    
-                    {/* Cached indicator */}
-                    {(photo as any).isCached && (
-                      <div className="flex items-center gap-1 text-white text-xs bg-green-600/80 px-2 py-1 rounded-full">
-                        <Download className="w-3 h-3" />
-                        <span>Cached</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Load More Button */}
-          {hasMore && (
-            <div className="flex justify-center pt-6">
-              <Button
-                variant="outline"
-                onClick={loadMore}
-                disabled={loading}
-                className="flex items-center gap-2"
-              >
-                {loading ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Camera className="h-4 w-4" />
-                )}
-                Load More Photos
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 
