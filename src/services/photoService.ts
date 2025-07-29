@@ -3,7 +3,7 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 
 export interface PhotoWithMetadata extends MediaItem {
-  source: 'google_places' | 'user_review';
+  source: 'google_places' | 'user_review' | 'entity_photo';
   originalReference?: string;
   reviewId?: string;
   reviewTitle?: string;
@@ -17,6 +17,7 @@ export interface PhotoWithMetadata extends MediaItem {
   contentType?: string;
   isTimelineUpdate?: boolean;
   timelineComment?: string;
+  category?: string;
 }
 
 /**

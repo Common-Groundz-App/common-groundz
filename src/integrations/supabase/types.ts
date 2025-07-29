@@ -653,6 +653,65 @@ export type Database = {
           },
         ]
       }
+      entity_photos: {
+        Row: {
+          alt_text: string | null
+          caption: string | null
+          category: string
+          content_type: string | null
+          created_at: string
+          entity_id: string
+          file_size: number | null
+          height: number | null
+          id: string
+          status: string
+          updated_at: string
+          url: string
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          alt_text?: string | null
+          caption?: string | null
+          category?: string
+          content_type?: string | null
+          created_at?: string
+          entity_id: string
+          file_size?: number | null
+          height?: number | null
+          id?: string
+          status?: string
+          updated_at?: string
+          url: string
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          alt_text?: string | null
+          caption?: string | null
+          category?: string
+          content_type?: string | null
+          created_at?: string
+          entity_id?: string
+          file_size?: number | null
+          height?: number | null
+          id?: string
+          status?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_photos_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entity_products: {
         Row: {
           buy_link: string | null

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw } from 'lucide-react';
+import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Entity } from '@/services/recommendation/types';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia } from '@/services/photoService';
+import { fetchEntityPhotos, type EntityPhoto } from '@/services/entityPhotoService';
+import { EntityPhotoUploader } from './EntityPhotoUploader';
 import { useAuth } from '@/contexts/AuthContext';
 
 
@@ -18,22 +21,65 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [reportModalPhoto, setReportModalPhoto] = useState<PhotoWithMetadata | null>(null);
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
+  const [entityPhotos, setEntityPhotos] = useState<EntityPhoto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('all');
 
   const loadPhotos = async () => {
     setLoading(true);
     try {
-      const [googlePhotos, reviewPhotos] = await Promise.all([
+      const [googlePhotos, reviewPhotos, userPhotos] = await Promise.all([
         fetchGooglePlacesPhotos(entity),
-        fetchEntityReviewMedia(entity.id)
+        fetchEntityReviewMedia(entity.id),
+        fetchEntityPhotos(entity.id)
       ]);
       
       const allPhotos = [...googlePhotos, ...reviewPhotos];
       setPhotos(allPhotos);
+      setEntityPhotos(userPhotos);
     } catch (error) {
       console.error('Error loading photos:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEntityPhotoUploaded = (newPhoto: EntityPhoto) => {
+    setEntityPhotos(prev => [newPhoto, ...prev]);
+  };
+
+  const getAllPhotosWithEntityPhotos = (): PhotoWithMetadata[] => {
+    // Convert entity photos to PhotoWithMetadata format
+    const convertedEntityPhotos: PhotoWithMetadata[] = entityPhotos.map((photo, index) => ({
+      id: photo.id,
+      url: photo.url,
+      type: 'image' as const,
+      order: index,
+      source: 'entity_photo' as const,
+      alt: photo.alt_text || photo.caption,
+      width: photo.width,
+      height: photo.height,
+      caption: photo.caption,
+      username: photo.username,
+      createdAt: photo.created_at,
+      category: photo.category
+    }));
+
+    return [...convertedEntityPhotos, ...photos];
+  };
+
+  const getFilteredPhotos = (): PhotoWithMetadata[] => {
+    const allPhotos = getAllPhotosWithEntityPhotos();
+    
+    switch (activeTab) {
+      case 'google':
+        return allPhotos.filter(photo => photo.source === 'google_places');
+      case 'reviews':
+        return allPhotos.filter(photo => photo.source === 'user_review');
+      case 'entity':
+        return allPhotos.filter(photo => photo.source === 'entity_photo');
+      default:
+        return allPhotos;
     }
   };
 
@@ -82,13 +128,22 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     );
   }
 
-  if (photos.length === 0) {
+  const allPhotos = getAllPhotosWithEntityPhotos();
+  const filteredPhotos = getFilteredPhotos();
+
+  if (allPhotos.length === 0) {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Camera className="w-5 h-5" />
-            <h3 className="text-lg font-semibold">Photos & Videos</h3>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Camera className="w-5 h-5" />
+              <h3 className="text-lg font-semibold">Photos & Videos</h3>
+            </div>
+            <EntityPhotoUploader
+              entityId={entity.id}
+              onPhotoUploaded={handleEntityPhotoUploaded}
+            />
           </div>
           <div className="text-center py-12">
             <Camera className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -110,23 +165,38 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
             <div className="flex items-center gap-2">
               <Camera className="w-5 h-5" />
               <h3 className="text-lg font-semibold">Photos & Videos</h3>
-              <span className="text-sm text-muted-foreground">({photos.length})</span>
+              <span className="text-sm text-muted-foreground">({allPhotos.length})</span>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={loadPhotos}
-              disabled={loading}
-              className="h-8"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <EntityPhotoUploader
+                entityId={entity.id}
+                onPhotoUploaded={handleEntityPhotoUploaded}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={loadPhotos}
+                disabled={loading}
+                className="h-8"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="all">All ({allPhotos.length})</TabsTrigger>
+              <TabsTrigger value="entity">User Photos ({entityPhotos.length})</TabsTrigger>
+              <TabsTrigger value="google">Google Places ({allPhotos.filter(p => p.source === 'google_places').length})</TabsTrigger>
+              <TabsTrigger value="reviews">Reviews ({allPhotos.filter(p => p.source === 'user_review').length})</TabsTrigger>
+            </TabsList>
+          </Tabs>
           
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {photos.map((photo, index) => (
+            {filteredPhotos.map((photo, index) => (
               <div
-                key={`${photo.source}-${index}`}
+                key={`${photo.source}-${photo.id || index}`}
                 className="relative group aspect-square overflow-hidden rounded-lg cursor-pointer bg-muted"
                 onClick={() => handlePhotoClick(index)}
               >
@@ -137,13 +207,12 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                   loading="lazy"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    // Show a placeholder or try a fallback URL
                     target.style.display = 'none';
                     const fallback = target.parentElement?.querySelector('.fallback-placeholder');
                     if (!fallback) {
                       const placeholder = document.createElement('div');
                       placeholder.className = 'fallback-placeholder w-full h-full bg-muted flex items-center justify-center';
-                      placeholder.innerHTML = '<Camera class="w-8 h-8 text-muted-foreground" />';
+                      placeholder.innerHTML = '<div class="text-muted-foreground">📷</div>';
                       target.parentElement?.appendChild(placeholder);
                     }
                   }}
@@ -161,10 +230,21 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                             <span className="bg-blue-500 text-white px-1 rounded text-xs">Primary</span>
                           )}
                         </>
+                      ) : photo.source === 'entity_photo' ? (
+                        <>
+                          <Camera className="w-3 h-3" />
+                          <span>{photo.username || 'User'}</span>
+                          {photo.category && (
+                            <span className="bg-green-500 text-white px-1 rounded text-xs">{photo.category}</span>
+                          )}
+                        </>
                       ) : (
                         <>
                           <User className="w-3 h-3" />
                           <span>{photo.username || 'User'}</span>
+                          {photo.isTimelineUpdate && (
+                            <span className="bg-purple-500 text-white px-1 rounded text-xs">Timeline</span>
+                          )}
                         </>
                       )}
                     </div>
@@ -200,11 +280,11 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
       {/* Lightbox for full-screen viewing */}
       {selectedPhotoIndex !== null && (
         <PhotoLightbox
-          photos={photos}
+          photos={filteredPhotos}
           currentIndex={selectedPhotoIndex}
           onClose={closeLightbox}
-          onNext={() => setSelectedPhotoIndex((selectedPhotoIndex + 1) % photos.length)}
-          onPrevious={() => setSelectedPhotoIndex((selectedPhotoIndex - 1 + photos.length) % photos.length)}
+          onNext={() => setSelectedPhotoIndex((selectedPhotoIndex + 1) % filteredPhotos.length)}
+          onPrevious={() => setSelectedPhotoIndex((selectedPhotoIndex - 1 + filteredPhotos.length) % filteredPhotos.length)}
           onReport={(photo) => handleReportPhoto(photo as PhotoWithMetadata)}
         />
       )}
