@@ -12,6 +12,7 @@ import { AdminDashboardSummary } from '@/components/admin/AdminDashboardSummary'
 import { AdminImageHealthPanel } from '@/components/admin/AdminImageHealthPanel';
 import { AdminEntityManagementPanel } from '@/components/admin/AdminEntityManagementPanel';
 import { AdminDebugPanel } from '@/components/admin/AdminDebugPanel';
+import { AdminPhotoModerationPanel } from '@/components/admin/AdminPhotoModerationPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -88,6 +89,9 @@ const AdminPortal = () => {
 
       {/* Entity AI Summaries Section */}
       <AdminEntitiesPanel />
+
+      {/* Photo Moderation Section */}
+      <AdminPhotoModerationPanel />
     </div>
   );
 

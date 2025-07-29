@@ -9,6 +9,10 @@ export interface EntityPhoto {
   alt_text?: string;
   category: string;
   status: 'pending' | 'approved' | 'rejected';
+  moderation_status?: 'pending' | 'approved' | 'rejected';
+  moderated_by?: string;
+  moderated_at?: string;
+  moderation_reason?: string;
   file_size?: number;
   width?: number;
   height?: number;
@@ -87,7 +91,8 @@ export const uploadEntityPhoto = async (
         width: dimensions.width,
         height: dimensions.height,
         content_type: file.type,
-        status: 'approved' // Auto-approve for now
+        status: 'approved', // Auto-approve for now
+        moderation_status: 'approved' // Default to approved for legacy compatibility
       })
       .select()
       .single();
@@ -105,7 +110,8 @@ export const uploadEntityPhoto = async (
       success: true,
       photo: {
         ...photoData,
-        status: photoData.status as 'pending' | 'approved' | 'rejected'
+        status: photoData.status as 'pending' | 'approved' | 'rejected',
+        moderation_status: photoData.moderation_status as 'pending' | 'approved' | 'rejected'
       }
     };
   } catch (error) {
@@ -124,6 +130,7 @@ export const fetchEntityPhotos = async (entityId: string): Promise<EntityPhoto[]
       .select('*')
       .eq('entity_id', entityId)
       .eq('status', 'approved')
+      .eq('moderation_status', 'approved')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -145,6 +152,7 @@ export const fetchEntityPhotos = async (entityId: string): Promise<EntityPhoto[]
     return data.map(photo => ({
       ...photo,
       status: photo.status as 'pending' | 'approved' | 'rejected',
+      moderation_status: photo.moderation_status as 'pending' | 'approved' | 'rejected',
       username: profileMap.get(photo.user_id) || 'Anonymous'
     }));
   } catch (error) {

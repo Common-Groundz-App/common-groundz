@@ -664,6 +664,10 @@ export type Database = {
           file_size: number | null
           height: number | null
           id: string
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_reason: string | null
+          moderation_status: string
           status: string
           updated_at: string
           url: string
@@ -680,6 +684,10 @@ export type Database = {
           file_size?: number | null
           height?: number | null
           id?: string
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_reason?: string | null
+          moderation_status?: string
           status?: string
           updated_at?: string
           url: string
@@ -696,6 +704,10 @@ export type Database = {
           file_size?: number | null
           height?: number | null
           id?: string
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_reason?: string | null
+          moderation_status?: string
           status?: string
           updated_at?: string
           url?: string
@@ -1111,6 +1123,9 @@ export type Database = {
           photo_source: string
           photo_url: string
           reason: string
+          resolution_reason: string | null
+          resolved_at: string | null
+          resolved_by: string | null
           review_id: string | null
           status: string | null
           updated_at: string
@@ -1124,6 +1139,9 @@ export type Database = {
           photo_source: string
           photo_url: string
           reason: string
+          resolution_reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           review_id?: string | null
           status?: string | null
           updated_at?: string
@@ -1137,6 +1155,9 @@ export type Database = {
           photo_source?: string
           photo_url?: string
           reason?: string
+          resolution_reason?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           review_id?: string | null
           status?: string | null
           updated_at?: string

@@ -23,11 +23,11 @@ interface PhotoReportModalProps {
 }
 
 const REPORT_REASONS = [
-  { value: 'inappropriate', label: 'Inappropriate content' },
-  { value: 'spam', label: 'Spam or misleading' },
-  { value: 'copyright', label: 'Copyright violation' },
-  { value: 'not_relevant', label: 'Not relevant to this place' },
-  { value: 'poor_quality', label: 'Poor quality image' },
+  { value: 'nsfw', label: 'NSFW / Nudity' },
+  { value: 'spam', label: 'Spam / Irrelevant' },
+  { value: 'low_quality', label: 'Low Quality / Blurry' },
+  { value: 'inaccurate', label: 'Inaccurate / Misleading' },
+  { value: 'copyright', label: 'Copyright Violation' },
   { value: 'other', label: 'Other' }
 ];
 
