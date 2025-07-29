@@ -69,7 +69,6 @@ export const AdminPhotoModerationPanel = () => {
           moderation_reason,
           entities!inner(name)
         `)
-        .eq('status', 'approved')
         .order('created_at', { ascending: false });
 
       if (entityError) throw entityError;
@@ -149,8 +148,8 @@ export const AdminPhotoModerationPanel = () => {
           reports: reportsByUrl[photo.url] || []
         }))
         .filter(photo => 
-          // Show photos that have reports or need moderation
-          photo.reports.length > 0 || photo.moderation_status === 'pending'
+          // Show photos that have reports or are pending moderation
+          photo.reports.length > 0 || photo.moderation_status !== 'approved'
         );
 
       setPhotos(photosWithReports);
@@ -216,13 +215,16 @@ export const AdminPhotoModerationPanel = () => {
   const getFilteredPhotos = () => {
     switch (activeTab) {
       case 'pending':
-        return photos.filter(p => p.moderation_status === 'pending' || p.reports.length > 0);
+        return photos.filter(p => p.moderation_status === 'pending');
       case 'approved':
-        return photos.filter(p => p.moderation_status === 'approved' && p.reports.length > 0);
+        return photos.filter(p => p.moderation_status === 'approved');
       case 'rejected':
         return photos.filter(p => p.moderation_status === 'rejected');
       default:
-        return photos;
+        return photos.filter(p => 
+          // Show photos that have reports or need moderation
+          p.reports.length > 0 || p.moderation_status === 'pending'
+        );
     }
   };
 
@@ -275,12 +277,14 @@ export const AdminPhotoModerationPanel = () => {
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="all">All ({photos.length})</TabsTrigger>
+              <TabsTrigger value="all">
+                All ({photos.filter(p => p.reports.length > 0 || p.moderation_status === 'pending').length})
+              </TabsTrigger>
               <TabsTrigger value="pending">
-                Pending ({photos.filter(p => p.moderation_status === 'pending' || p.reports.length > 0).length})
+                Pending ({photos.filter(p => p.moderation_status === 'pending').length})
               </TabsTrigger>
               <TabsTrigger value="approved">
-                Approved ({photos.filter(p => p.moderation_status === 'approved' && p.reports.length > 0).length})
+                Approved ({photos.filter(p => p.moderation_status === 'approved').length})
               </TabsTrigger>
               <TabsTrigger value="rejected">
                 Rejected ({photos.filter(p => p.moderation_status === 'rejected').length})

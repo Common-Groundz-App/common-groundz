@@ -278,7 +278,8 @@ export const reportPhoto = async (
       throw new Error('User not authenticated');
     }
 
-    const { error } = await supabase
+    // Insert the report
+    const { error: reportError } = await supabase
       .from('photo_reports')
       .insert({
         user_id: user.id,
@@ -290,8 +291,21 @@ export const reportPhoto = async (
         description
       });
     
-    if (error) {
-      throw error;
+    if (reportError) {
+      throw reportError;
+    }
+
+    // Update the entity photo's moderation status to pending
+    if (photoSource === 'entity_photo') {
+      const { error: updateError } = await supabase
+        .from('entity_photos')
+        .update({ moderation_status: 'pending' })
+        .eq('url', photoUrl);
+      
+      if (updateError) {
+        console.error('Error updating photo moderation status:', updateError);
+        // Don't throw here as the report was successful
+      }
     }
     
     return true;
