@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter } from 'lucide-react';
+import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,9 +7,12 @@ import { Entity } from '@/services/recommendation/types';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia } from '@/services/photoService';
-import { fetchEntityPhotos, type EntityPhoto } from '@/services/entityPhotoService';
+import { fetchEntityPhotos, deleteEntityPhoto, type EntityPhoto } from '@/services/entityPhotoService';
 import { EntityPhotoUploader } from './EntityPhotoUploader';
+import { EntityPhotoEditModal } from './EntityPhotoEditModal';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface PhotosSectionProps {
@@ -18,12 +21,18 @@ interface PhotosSectionProps {
 
 export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [reportModalPhoto, setReportModalPhoto] = useState<PhotoWithMetadata | null>(null);
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
   const [entityPhotos, setEntityPhotos] = useState<EntityPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
+  
+  // Photo management states
+  const [editingPhoto, setEditingPhoto] = useState<EntityPhoto | null>(null);
+  const [deletingPhoto, setDeletingPhoto] = useState<EntityPhoto | null>(null);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
 
   const loadPhotos = async () => {
     setLoading(true);
@@ -46,6 +55,48 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
 
   const handleEntityPhotoUploaded = (newPhoto: EntityPhoto) => {
     setEntityPhotos(prev => [newPhoto, ...prev]);
+  };
+
+  const handlePhotoUpdated = (updatedPhoto: EntityPhoto) => {
+    setEntityPhotos(prev => 
+      prev.map(photo => photo.id === updatedPhoto.id ? updatedPhoto : photo)
+    );
+  };
+
+  const handleDeletePhoto = async () => {
+    if (!deletingPhoto) return;
+    
+    setIsDeletingPhoto(true);
+    try {
+      const success = await deleteEntityPhoto(deletingPhoto.id);
+      
+      if (success) {
+        setEntityPhotos(prev => prev.filter(photo => photo.id !== deletingPhoto.id));
+        setDeletingPhoto(null);
+        
+        toast({
+          title: "Photo deleted",
+          description: "Your photo has been deleted successfully.",
+        });
+      } else {
+        throw new Error('Failed to delete photo');
+      }
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete photo. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingPhoto(false);
+    }
+  };
+
+  const isOwner = (photo: PhotoWithMetadata): boolean => {
+    return photo.source === 'entity_photo' && 
+           user && 
+           entityPhotos.some(ep => ep.id === photo.id && ep.user_id === user.id);
   };
 
   const getAllPhotosWithEntityPhotos = (): PhotoWithMetadata[] => {
@@ -248,17 +299,50 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                         </>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleReportPhoto(photo);
-                      }}
-                      className="h-6 w-6 p-0 text-white hover:bg-red-500/20"
-                    >
-                      <Flag className="w-3 h-3" />
-                    </Button>
+                    
+                    {/* Action buttons based on ownership */}
+                    <div className="flex items-center gap-1">
+                      {isOwner(photo) ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const entityPhoto = entityPhotos.find(ep => ep.id === photo.id);
+                              if (entityPhoto) setEditingPhoto(entityPhoto);
+                            }}
+                            className="h-6 w-6 p-0 text-white hover:bg-blue-500/20"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const entityPhoto = entityPhotos.find(ep => ep.id === photo.id);
+                              if (entityPhoto) setDeletingPhoto(entityPhoto);
+                            }}
+                            className="h-6 w-6 p-0 text-white hover:bg-red-500/20"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReportPhoto(photo);
+                          }}
+                          className="h-6 w-6 p-0 text-white hover:bg-red-500/20"
+                        >
+                          <Flag className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -301,6 +385,26 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
           }}
         />
       )}
+
+      {/* Edit photo modal */}
+      {editingPhoto && (
+        <EntityPhotoEditModal
+          photo={editingPhoto}
+          isOpen={!!editingPhoto}
+          onClose={() => setEditingPhoto(null)}
+          onPhotoUpdated={handlePhotoUpdated}
+        />
+      )}
+
+      {/* Delete confirmation dialog */}
+      <DeleteConfirmationDialog
+        isOpen={!!deletingPhoto}
+        onClose={() => setDeletingPhoto(null)}
+        onConfirm={handleDeletePhoto}
+        title="Delete Photo"
+        description="Are you sure you want to delete this photo? This action cannot be undone."
+        isLoading={isDeletingPhoto}
+      />
     </>
   );
 };
