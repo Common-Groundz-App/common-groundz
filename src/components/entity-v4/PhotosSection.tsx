@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3 } from 'lucide-react';
+import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3, MoreVertical } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 import { Entity } from '@/services/recommendation/types';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
@@ -300,49 +306,61 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                       )}
                     </div>
                     
-                    {/* Action buttons based on ownership */}
-                    <div className="flex items-center gap-1">
-                      {isOwner(photo) ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const entityPhoto = entityPhotos.find(ep => ep.id === photo.id);
-                              if (entityPhoto) setEditingPhoto(entityPhoto);
-                            }}
-                            className="h-6 w-6 p-0 text-white hover:bg-blue-500/20"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const entityPhoto = entityPhotos.find(ep => ep.id === photo.id);
-                              if (entityPhoto) setDeletingPhoto(entityPhoto);
-                            }}
-                            className="h-6 w-6 p-0 text-white hover:bg-red-500/20"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </>
-                      ) : (
+                    {/* Action dropdown menu */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleReportPhoto(photo);
-                          }}
-                          className="h-6 w-6 p-0 text-white hover:bg-red-500/20"
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-6 w-6 p-0 text-white hover:bg-white/20"
                         >
-                          <Flag className="w-3 h-3" />
+                          <MoreVertical className="w-3 h-3" />
                         </Button>
-                      )}
-                    </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent 
+                        className="w-48 bg-popover border border-border"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {isOwner(photo) ? (
+                          <>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const entityPhoto = entityPhotos.find(ep => ep.id === photo.id);
+                                if (entityPhoto) setEditingPhoto(entityPhoto);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Edit3 className="w-4 h-4 mr-2" />
+                              Edit Photo
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const entityPhoto = entityPhotos.find(ep => ep.id === photo.id);
+                                if (entityPhoto) setDeletingPhoto(entityPhoto);
+                              }}
+                              className="cursor-pointer text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Photo
+                            </DropdownMenuItem>
+                          </>
+                        ) : (
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReportPhoto(photo);
+                            }}
+                            className="cursor-pointer text-destructive focus:text-destructive"
+                          >
+                            <Flag className="w-4 h-4 mr-2" />
+                            Report Photo
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   
                   <div className="flex items-center gap-2">
