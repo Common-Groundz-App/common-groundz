@@ -146,7 +146,7 @@ export function LightboxPreview({
   const isLandscape = orientation === 'landscape';
 
   const lightboxContent = (
-    <div className={cn("fixed inset-0 z-[9999]", className)}>
+    <div className={cn("fixed inset-0 z-[9999] lightbox-preview", className)} data-lightbox="true">
       {/* Background overlay - handles clicks to close */}
       <div 
         className="absolute inset-0 bg-black/95 cursor-pointer"
@@ -156,7 +156,7 @@ export function LightboxPreview({
       
       {/* Content container - prevents event bubbling */}
       <div 
-        className="relative z-10 flex h-full w-full items-center justify-center"
+        className="relative z-10 flex h-full w-full items-center justify-center lightbox-content"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button - smaller on mobile */}
