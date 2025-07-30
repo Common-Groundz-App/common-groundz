@@ -147,17 +147,21 @@ export function LightboxPreview({
 
   const lightboxContent = (
     <div className={cn("fixed inset-0 z-[9999] lightbox-preview", className)} data-lightbox="true">
-      {/* Background overlay - handles clicks to close */}
+      {/* Background overlay - no click handler, handled by content container */}
       <div 
-        className="absolute inset-0 bg-black/95 cursor-pointer"
-        onClick={onClose}
-        aria-label="Close lightbox"
+        className="absolute inset-0 bg-black/95"
+        aria-label="Lightbox background"
       />
       
-      {/* Content container - prevents event bubbling */}
+      {/* Content container - handles background clicks only */}
       <div 
         className="relative z-10 flex h-full w-full items-center justify-center lightbox-content"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          // Only close if clicking directly on this container (the background area)
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
       >
         {/* Close button - smaller on mobile */}
         <Button 
@@ -167,7 +171,11 @@ export function LightboxPreview({
           )}
           size="icon"
           variant="ghost"
-          onClick={onClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onClose();
+          }}
         >
           <X className={cn("text-white", isMobile ? "h-5 w-5" : "h-6 w-6")} />
           <span className="sr-only">Close</span>
@@ -244,7 +252,11 @@ export function LightboxPreview({
               )}
               size="icon"
               variant="ghost"
-              onClick={prevImage}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                prevImage();
+              }}
             >
               <ChevronLeft className={cn("text-white", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               <span className="sr-only">Previous image</span>
@@ -260,7 +272,11 @@ export function LightboxPreview({
               )}
               size="icon"
               variant="ghost"
-              onClick={nextImage}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                nextImage();
+              }}
             >
               <ChevronRight className={cn("text-white", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               <span className="sr-only">Next image</span>
@@ -274,19 +290,23 @@ export function LightboxPreview({
               )}>
                 {/* Navigation dots - simplified on mobile */}
                 <div className={cn("flex gap-2", isMobile && "gap-1")}>
-                  {media.map((item, idx) => (
-                    <button
-                      key={getImageKey(item, idx)}
-                      className={cn(
-                        "h-2 rounded-full transition-all focus:outline-none",
-                        idx === currentIndex 
-                          ? isMobile ? "w-6 bg-brand-orange" : "w-8 bg-brand-orange"
-                          : "w-2 bg-white opacity-70 hover:opacity-100"
-                      )}
-                      onClick={() => setCurrentIndex(idx)}
-                      aria-label={`Go to image ${idx + 1}`}
-                    />
-                  ))}
+                   {media.map((item, idx) => (
+                     <button
+                       key={getImageKey(item, idx)}
+                       className={cn(
+                         "h-2 rounded-full transition-all focus:outline-none",
+                         idx === currentIndex 
+                           ? isMobile ? "w-6 bg-brand-orange" : "w-8 bg-brand-orange"
+                           : "w-2 bg-white opacity-70 hover:opacity-100"
+                       )}
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         e.preventDefault();
+                         setCurrentIndex(idx);
+                       }}
+                       aria-label={`Go to image ${idx + 1}`}
+                     />
+                   ))}
                 </div>
                 
                 {/* Image counter text - more compact on mobile */}
