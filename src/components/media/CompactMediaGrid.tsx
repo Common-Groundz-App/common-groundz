@@ -12,13 +12,15 @@ interface CompactMediaGridProps {
   onRemove?: (media: MediaItem) => void;
   className?: string;
   maxVisible?: number;
+  onOpenLightbox?: (index: number) => void;
 }
 
 export function CompactMediaGrid({
   media,
   onRemove,
   className,
-  maxVisible = 4
+  maxVisible = 4,
+  onOpenLightbox
 }: CompactMediaGridProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -34,8 +36,14 @@ export function CompactMediaGrid({
   const hasMore = media.length > maxVisible;
   
   const handleOpenLightbox = (index: number) => {
-    setLightboxIndex(index);
-    setLightboxOpen(true);
+    if (onOpenLightbox) {
+      // Use parent's lightbox handler if provided
+      onOpenLightbox(index);
+    } else {
+      // Fallback to internal lightbox state
+      setLightboxIndex(index);
+      setLightboxOpen(true);
+    }
   };
   
   return (
@@ -111,8 +119,8 @@ export function CompactMediaGrid({
         )}
       </div>
       
-      {/* Lightbox preview */}
-      {lightboxOpen && (
+      {/* Lightbox preview - only render if using internal lightbox state */}
+      {!onOpenLightbox && lightboxOpen && (
         <LightboxPreview
           media={sortedMedia}
           initialIndex={lightboxIndex}
