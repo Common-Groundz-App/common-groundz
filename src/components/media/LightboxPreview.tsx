@@ -204,6 +204,7 @@ export function LightboxPreview({
                   : "max-h-[90vh] max-w-full object-contain"
               )}
               onLoadedData={() => handleImageLoad(currentItem, currentIndex)}
+              onClick={(e) => e.stopPropagation()}
             />
           )}
         </div>
