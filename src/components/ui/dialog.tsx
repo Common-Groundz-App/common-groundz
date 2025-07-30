@@ -53,6 +53,9 @@ const DialogContent = React.forwardRef<
             target.closest('.lightbox-preview') ||
             target.closest('[data-lightbox]') ||
             target.closest('.lightbox-content') ||
+            target.closest('.compact-media-grid') ||
+            target.closest('.lightbox-trigger') ||
+            target.closest('.media-remove-button') ||
             target.closest('video[controls]')) {
           e.preventDefault();
           e.stopPropagation();
@@ -70,6 +73,9 @@ const DialogContent = React.forwardRef<
             target.closest('.lightbox-preview') ||
             target.closest('[data-lightbox]') ||
             target.closest('.lightbox-content') ||
+            target.closest('.compact-media-grid') ||
+            target.closest('.lightbox-trigger') ||
+            target.closest('.media-remove-button') ||
             target.closest('video[controls]')) {
           e.stopPropagation();
         }

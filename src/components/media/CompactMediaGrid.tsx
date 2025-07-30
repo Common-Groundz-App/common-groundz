@@ -49,7 +49,7 @@ export function CompactMediaGrid({
   return (
     <>
       <div className={cn(
-        "flex overflow-x-auto gap-2 pb-2 snap-x snap-mandatory",
+        "flex overflow-x-auto gap-2 pb-2 snap-x snap-mandatory compact-media-grid",
         "scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-muted-foreground/20",
         className
       )}>
@@ -59,9 +59,12 @@ export function CompactMediaGrid({
             className={cn(
               "relative shrink-0 h-24 w-24 bg-muted rounded-md overflow-hidden",
               "snap-start cursor-pointer transition-transform hover:scale-105",
-              "border border-muted-foreground/20"
+              "border border-muted-foreground/20 lightbox-trigger"
             )}
-            onClick={() => handleOpenLightbox(index)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenLightbox(index);
+            }}
           >
             {/* Media thumbnail */}
             {item.type === 'image' ? (
@@ -91,11 +94,12 @@ export function CompactMediaGrid({
                 variant="secondary"
                 size="icon"
                 className={cn(
-                  "absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 hover:bg-black/80 text-white",
+                  "absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 hover:bg-black/80 text-white media-remove-button",
                   !isMobile && "opacity-0 group-hover:opacity-100 transition-opacity",
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
+                  e.preventDefault();
                   onRemove(item);
                 }}
               >
@@ -109,8 +113,11 @@ export function CompactMediaGrid({
         {/* "More" indicator when media count exceeds maxVisible */}
         {hasMore && (
           <div 
-            className="relative shrink-0 h-24 w-24 rounded-md bg-muted/50 flex items-center justify-center cursor-pointer"
-            onClick={() => handleOpenLightbox(maxVisible)}
+            className="relative shrink-0 h-24 w-24 rounded-md bg-muted/50 flex items-center justify-center cursor-pointer lightbox-trigger"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenLightbox(maxVisible);
+            }}
           >
             <span className="text-sm font-medium text-muted-foreground">
               +{media.length - maxVisible} more
