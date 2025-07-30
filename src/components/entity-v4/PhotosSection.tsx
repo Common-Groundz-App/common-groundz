@@ -72,8 +72,8 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   };
 
   // Handle entity media upload from EntityMediaUploadModal
-  const handleEntityMediaUploaded = (photo: EntityPhoto) => {
-    setEntityPhotos(prev => [photo, ...prev]);
+  const handleEntityMediaUploaded = (photos: EntityPhoto[]) => {
+    setEntityPhotos(prev => [...photos, ...prev]);
     setShowEntityUpload(false);
   };
 

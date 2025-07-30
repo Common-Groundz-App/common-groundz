@@ -6,8 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MediaUploader } from '@/components/media/MediaUploader';
+import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { MediaItem } from '@/types/media';
-import { uploadEntityMedia } from '@/services/entityMediaService';
+import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { EntityPhoto, PHOTO_CATEGORIES } from '@/services/entityPhotoService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -16,7 +17,7 @@ interface EntityMediaUploadModalProps {
   entityId: string;
   isOpen: boolean;
   onClose: () => void;
-  onMediaUploaded: (photo: EntityPhoto) => void;
+  onMediaUploaded: (photos: EntityPhoto[]) => void;
 }
 
 export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
@@ -50,7 +51,11 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
   };
 
   const handleMediaUploaded = (mediaItem: MediaItem) => {
-    setUploadedMedia([mediaItem]);
+    setUploadedMedia(prev => [...prev, mediaItem]);
+  };
+
+  const handleRemoveMedia = (mediaItem: MediaItem) => {
+    setUploadedMedia(prev => prev.filter(item => item.url !== mediaItem.url));
   };
 
   const handleSubmit = async () => {
@@ -58,25 +63,24 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
 
     setIsUploading(true);
     try {
-      const mediaItem = uploadedMedia[0];
-      const result = await uploadEntityMedia(
-        mediaItem,
+      const results = await uploadEntityMediaBatch(
+        uploadedMedia,
         entityId,
         user.id,
         category,
-        caption || undefined,
-        altText || undefined
+        caption,
+        altText
       );
 
-      if (result.success && result.photo) {
-        onMediaUploaded(result.photo);
+      if (results.length > 0) {
+        onMediaUploaded(results);
         toast({
           title: "Media uploaded",
-          description: "Your photo or video has been added successfully"
+          description: `${results.length} media item(s) have been added successfully`
         });
         handleClose();
       } else {
-        throw new Error(result.error || 'Upload failed');
+        throw new Error('No media was uploaded successfully');
       }
     } catch (error) {
       console.error('Media upload error:', error);
@@ -107,9 +111,20 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
               sessionId={`entity-upload-${entityId}-${Date.now()}`}
               onMediaUploaded={handleMediaUploaded}
               initialMedia={uploadedMedia}
-              maxMediaCount={1}
+              maxMediaCount={4}
               className="w-full"
             />
+            
+            {/* Media Preview Grid */}
+            {uploadedMedia.length > 0 && (
+              <div className="mt-4">
+                <CompactMediaGrid
+                  media={uploadedMedia}
+                  onRemove={handleRemoveMedia}
+                  maxVisible={4}
+                />
+              </div>
+            )}
           </div>
 
           {/* Form Fields - Only show if media is uploaded */}
