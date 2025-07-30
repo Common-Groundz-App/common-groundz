@@ -101,14 +101,24 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
         </div>
       )}
 
-      {/* Main image */}
+      {/* Main media */}
       <div className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center">
-        <img
-          src={currentPhoto.url}
-          alt={currentPhoto.alt || 'Photo'}
-          className="max-w-full max-h-full object-contain"
-          onClick={(e) => e.stopPropagation()}
-        />
+        {currentPhoto.type === 'video' ? (
+          <video
+            src={currentPhoto.url}
+            controls
+            preload="metadata"
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <img
+            src={currentPhoto.url}
+            alt={currentPhoto.alt || 'Photo'}
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
       </div>
 
       {/* Photo metadata */}
