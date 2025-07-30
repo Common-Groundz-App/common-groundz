@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileImage, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3, MoreVertical, SortAsc, SortDesc, ChevronDown, X, Upload } from 'lucide-react';
+import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3, MoreVertical, SortAsc, SortDesc, ChevronDown, X, Plus, FileImage } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,9 +17,7 @@ import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia } from '@/services/photoService';
 import { fetchEntityPhotos, deleteEntityPhoto, type EntityPhoto, PHOTO_CATEGORIES } from '@/services/entityPhotoService';
-import { MediaUploader } from '@/components/media/MediaUploader';
-import { MediaItem } from '@/types/media';
-import { uploadEntityMedia, convertEntityPhotoToMediaItem } from '@/services/entityMediaService';
+import { EntityMediaUploadModal } from './EntityMediaUploadModal';
 import { EntityPhotoEditModal } from './EntityPhotoEditModal';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,36 +71,10 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     }
   };
 
-  // Handle entity media upload from MediaUploader
-  const handleEntityMediaUploaded = async (mediaItem: MediaItem) => {
-    if (!entity?.id || !user?.id) return;
-    
-    try {
-      const result = await uploadEntityMedia(
-        mediaItem,
-        entity.id,
-        user.id,
-        'general' // Default category, can be made configurable later
-      );
-      
-      if (result.success && result.photo) {
-        setEntityPhotos(prev => [result.photo!, ...prev]);
-        
-        toast({
-          title: "Media uploaded",
-          description: "Your photo or video has been added successfully"
-        });
-      } else {
-        throw new Error(result.error || 'Upload failed');
-      }
-    } catch (error) {
-      console.error('Media upload error:', error);
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive'
-      });
-    }
+  // Handle entity media upload from EntityMediaUploadModal
+  const handleEntityMediaUploaded = (photo: EntityPhoto) => {
+    setEntityPhotos(prev => [photo, ...prev]);
+    setShowEntityUpload(false);
   };
 
   const handlePhotoUpdated = (updatedPhoto: EntityPhoto) => {
@@ -276,7 +248,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-2 mb-6">
-            <FileImage className="w-5 h-5" />
+            <Camera className="w-5 h-5" />
             <h3 className="text-lg font-semibold">Photos & Videos</h3>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -301,7 +273,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <FileImage className="w-5 h-5" />
+              <Camera className="w-5 h-5" />
               <h3 className="text-lg font-semibold">Photos & Videos</h3>
             </div>
           </div>
@@ -312,21 +284,10 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
               Be the first to share photos and videos of {entity.name}
             </p>
             {user && (
-              <div className="max-w-md mx-auto">
-                <MediaUploader
-                  sessionId={`entity-${entity.id}-${Date.now()}`}
-                  onMediaUploaded={handleEntityMediaUploaded}
-                  initialMedia={[]}
-                  className="w-full"
-                  customButton={
-                    <Button className="w-full">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Add Media
-                    </Button>
-                  }
-                  maxMediaCount={10}
-                />
-              </div>
+              <Button onClick={() => setShowEntityUpload(true)} className="w-full max-w-md mx-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Media
+              </Button>
             )}
           </div>
         </CardContent>
@@ -340,7 +301,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <FileImage className="w-5 h-5" />
+              <Camera className="w-5 h-5" />
               <h3 className="text-lg font-semibold">Photos & Videos</h3>
               <span className="text-sm text-muted-foreground">({allPhotos.length})</span>
             </div>
@@ -351,7 +312,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                   onClick={() => setShowEntityUpload(true)}
                   className="flex items-center gap-2"
                 >
-                  <Upload className="h-4 w-4" />
+                  <Plus className="h-4 w-4" />
                   Add Media
                 </Button>
               )}
@@ -672,39 +633,12 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
       />
 
       {/* Entity Media Upload Modal */}
-      {showEntityUpload && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-semibold">Add Media</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Upload photos and videos to share with others
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowEntityUpload(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <MediaUploader
-                sessionId={`entity-${entity.id}-${Date.now()}`}
-                onMediaUploaded={(mediaItem) => {
-                  handleEntityMediaUploaded(mediaItem);
-                  setShowEntityUpload(false);
-                }}
-                initialMedia={[]}
-                className="w-full"
-                maxMediaCount={5}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <EntityMediaUploadModal
+        entityId={entity.id}
+        isOpen={showEntityUpload}
+        onClose={() => setShowEntityUpload(false)}
+        onMediaUploaded={handleEntityMediaUploaded}
+      />
     </>
   );
 };
