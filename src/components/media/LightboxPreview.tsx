@@ -146,26 +146,38 @@ export function LightboxPreview({
   const isLandscape = orientation === 'landscape';
 
   const lightboxContent = (
-    <div className={cn("fixed inset-0 z-[9999] flex items-center justify-center bg-black/95", className)}>
-      {/* Close button - smaller on mobile */}
-      <Button 
-        className={cn(
-          "absolute right-4 z-50 rounded-full bg-gray-800/70 hover:bg-gray-700",
-          isMobile ? "right-2 top-2 h-8 w-8" : "right-4 top-4 h-10 w-10"
-        )}
-        size="icon"
-        variant="ghost"
+    <div className={cn("fixed inset-0 z-[9999]", className)}>
+      {/* Background overlay - handles clicks to close */}
+      <div 
+        className="absolute inset-0 bg-black/95 cursor-pointer"
         onClick={onClose}
-      >
-        <X className={cn("text-white", isMobile ? "h-5 w-5" : "h-6 w-6")} />
-        <span className="sr-only">Close</span>
-      </Button>
+        aria-label="Close lightbox"
+      />
       
-      {/* Main image container - reduced padding on mobile */}
-      <div className={cn(
-        "relative flex h-full w-full items-center justify-center",
-        isMobile ? "px-2" : "px-12"
-      )}>
+      {/* Content container - prevents event bubbling */}
+      <div 
+        className="relative z-10 flex h-full w-full items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close button - smaller on mobile */}
+        <Button 
+          className={cn(
+            "absolute right-4 z-50 rounded-full bg-gray-800/70 hover:bg-gray-700",
+            isMobile ? "right-2 top-2 h-8 w-8" : "right-4 top-4 h-10 w-10"
+          )}
+          size="icon"
+          variant="ghost"
+          onClick={onClose}
+        >
+          <X className={cn("text-white", isMobile ? "h-5 w-5" : "h-6 w-6")} />
+          <span className="sr-only">Close</span>
+        </Button>
+        
+        {/* Main image container - reduced padding on mobile */}
+        <div className={cn(
+          "relative flex h-full w-full items-center justify-center",
+          isMobile ? "px-2" : "px-12"
+        )}>
         {/* Current media item */}
         <div className="relative flex h-full max-h-[90vh] w-full items-center justify-center">
           {currentItem.type === 'image' ? (
@@ -199,12 +211,22 @@ export function LightboxPreview({
               poster={currentItem.thumbnail_url}
               controls
               className={cn(
+                "cursor-auto [&::-webkit-media-controls]:cursor-pointer [&::-webkit-media-controls-panel]:cursor-pointer",
                 isMobile && isLandscape 
                   ? "h-auto w-full object-contain" 
                   : "max-h-[90vh] max-w-full object-contain"
               )}
+              style={{ cursor: 'auto' }}
               onLoadedData={() => handleImageLoad(currentItem, currentIndex)}
               onClick={(e) => e.stopPropagation()}
+              onPlay={(e) => e.stopPropagation()}
+              onPause={(e) => e.stopPropagation()}
+              onVolumeChange={(e) => e.stopPropagation()}
+              onTimeUpdate={(e) => e.stopPropagation()}
+              onSeeking={(e) => e.stopPropagation()}
+              onSeeked={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
             />
           )}
         </div>
@@ -276,11 +298,12 @@ export function LightboxPreview({
                 </span>
               </div>
             </div>
-          </>
-        )}
+           </>
+         )}
+       </div>
       </div>
 
-      {/* Invisible preloader for adjacent images */}
+       {/* Invisible preloader for adjacent images */}
       <div className="sr-only hidden">
         {media.map((item, idx) => {
           // Only preload images not currently shown
