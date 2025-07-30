@@ -102,7 +102,21 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Media Uploader */}
+          {/* Media Preview Section - Only show when media exists */}
+          {uploadedMedia.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 font-medium">
+                <span>🖼️ Your media ({uploadedMedia.length}/4)</span>
+              </div>
+              <CompactMediaGrid
+                media={uploadedMedia}
+                onRemove={handleRemoveMedia}
+                maxVisible={4}
+              />
+            </div>
+          )}
+
+          {/* Media Upload Section - Always visible */}
           <div>
             <Label className="text-sm font-medium mb-2 block">
               Upload Media
@@ -114,17 +128,6 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
               maxMediaCount={4}
               className="w-full"
             />
-            
-            {/* Media Preview Grid */}
-            {uploadedMedia.length > 0 && (
-              <div className="mt-4">
-                <CompactMediaGrid
-                  media={uploadedMedia}
-                  onRemove={handleRemoveMedia}
-                  maxVisible={4}
-                />
-              </div>
-            )}
           </div>
 
           {/* Form Fields - Only show if media is uploaded */}
