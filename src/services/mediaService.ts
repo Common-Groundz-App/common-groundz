@@ -5,7 +5,17 @@ import { MediaItem } from '@/types/media';
 import { ensureBucketPolicies } from '@/services/storageService';
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm'];
+export const ALLOWED_VIDEO_TYPES = [
+  'video/mp4', 
+  'video/webm', 
+  'video/quicktime', // .MOV - iPhone/macOS
+  'video/x-msvideo', // .AVI - Windows
+  'video/3gpp', // .3GP - Mobile/Android
+  'video/x-matroska', // .MKV
+  'video/x-ms-wmv', // .WMV - Windows
+  'video/x-flv', // .FLV
+  'video/x-m4v' // .M4V - iTunes
+];
 export const ALLOWED_MEDIA_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
 export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 export const MAX_VIDEO_SIZE = 25 * 1024 * 1024; // 25MB
@@ -32,7 +42,7 @@ export const validateMediaFile = async (file: File): Promise<{ valid: boolean; e
   if (!ALLOWED_MEDIA_TYPES.includes(file.type)) {
     return { 
       valid: false, 
-      error: `Unsupported file type. Allowed types: ${ALLOWED_MEDIA_TYPES.join(', ')}` 
+      error: `Unsupported file type. Supported formats: Images (JPEG, PNG, GIF, WebP) and Videos (MP4, WebM, MOV, AVI, 3GP, MKV, WMV, FLV, M4V)` 
     };
   }
   
