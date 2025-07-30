@@ -16,6 +16,7 @@ interface MediaUploaderProps {
   className?: string;
   customButton?: React.ReactNode;
   maxMediaCount?: number;
+  disabled?: boolean;
 }
 
 export function MediaUploader({ 
@@ -24,7 +25,8 @@ export function MediaUploader({
   initialMedia = [], 
   className,
   customButton,
-  maxMediaCount = 4  // Default to 4 max images
+  maxMediaCount = 4,  // Default to 4 max images
+  disabled = false
 }: MediaUploaderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -37,7 +39,7 @@ export function MediaUploader({
   }, [initialMedia]);
   
   const handleFileSelect = async (files: FileList | null) => {
-    if (!files || !user) return;
+    if (!files || !user || disabled) return;
     
     const remainingSlots = maxMediaCount - currentMediaCount;
     
@@ -127,17 +129,23 @@ export function MediaUploader({
   
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    if (!disabled) {
+      setIsDragging(true);
+    }
   };
   
   const handleDragLeave = () => {
-    setIsDragging(false);
+    if (!disabled) {
+      setIsDragging(false);
+    }
   };
   
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
-    handleFileSelect(e.dataTransfer.files);
+    if (!disabled) {
+      setIsDragging(false);
+      handleFileSelect(e.dataTransfer.files);
+    }
   };
   
   const cancelUpload = (uploadToCancel: MediaUploadState) => {
@@ -149,12 +157,14 @@ export function MediaUploader({
     return (
       <div className={className}>
         <div onClick={() => {
-          if (currentMediaCount >= maxMediaCount) {
-            toast({
-              title: 'Media limit reached',
-              description: `You can only upload up to ${maxMediaCount} media items`,
-              variant: 'destructive',
-            });
+          if (disabled || currentMediaCount >= maxMediaCount) {
+            if (!disabled) {
+              toast({
+                title: 'Media limit reached',
+                description: `You can only upload up to ${maxMediaCount} media items`,
+                variant: 'destructive',
+              });
+            }
             return;
           }
           
@@ -220,20 +230,24 @@ export function MediaUploader({
     <div className={cn("space-y-4", className)}>
       <div 
         className={cn(
-          "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all",
-          isDragging ? "border-primary bg-primary/10" : "border-gray-300 hover:border-primary/50",
+          "border-2 border-dashed rounded-lg p-6 text-center transition-all",
+          disabled ? "opacity-30 cursor-not-allowed pointer-events-none" : "cursor-pointer",
+          !disabled && isDragging ? "border-primary bg-primary/10" : "border-gray-300",
+          !disabled && !isDragging && "hover:border-primary/50",
           currentMediaCount >= maxMediaCount && "opacity-50 cursor-not-allowed"
         )}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onDragOver={disabled ? undefined : handleDragOver}
+        onDragLeave={disabled ? undefined : handleDragLeave}
+        onDrop={disabled ? undefined : handleDrop}
         onClick={() => {
-          if (currentMediaCount >= maxMediaCount) {
-            toast({
-              title: 'Media limit reached',
-              description: `You can only upload up to ${maxMediaCount} media items`,
-              variant: 'destructive',
-            });
+          if (disabled || currentMediaCount >= maxMediaCount) {
+            if (!disabled) {
+              toast({
+                title: 'Media limit reached',
+                description: `You can only upload up to ${maxMediaCount} media items`,
+                variant: 'destructive',
+              });
+            }
             return;
           }
           

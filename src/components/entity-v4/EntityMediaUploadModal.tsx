@@ -140,6 +140,7 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
                 initialMedia={uploadedMedia}
                 maxMediaCount={4}
                 className="w-full"
+                disabled={lightboxOpen}
               />
             </div>
 
@@ -214,13 +215,15 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
             )}
           </div>
 
-          {/* Lightbox preview - rendered inside Dialog like in ReviewTimelineViewer */}
+          {/* Lightbox preview - rendered inside Dialog with higher z-index */}
           {lightboxOpen && uploadedMedia.length > 0 && (
-            <LightboxPreview
-              media={uploadedMedia}
-              initialIndex={lightboxIndex}
-              onClose={() => setLightboxOpen(false)}
-            />
+            <div className="fixed inset-0 z-[60]">
+              <LightboxPreview
+                media={uploadedMedia}
+                initialIndex={lightboxIndex}
+                onClose={() => setLightboxOpen(false)}
+              />
+            </div>
           )}
         </DialogContent>
       </Dialog>
