@@ -213,17 +213,17 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
               </>
             )}
           </div>
+
+          {/* Lightbox preview - rendered inside Dialog like in ReviewTimelineViewer */}
+          {lightboxOpen && uploadedMedia.length > 0 && (
+            <LightboxPreview
+              media={uploadedMedia}
+              initialIndex={lightboxIndex}
+              onClose={() => setLightboxOpen(false)}
+            />
+          )}
         </DialogContent>
       </Dialog>
-
-      {/* Lightbox preview - rendered outside Dialog to prevent conflicts */}
-      {lightboxOpen && uploadedMedia.length > 0 && (
-        <LightboxPreview
-          media={uploadedMedia}
-          initialIndex={lightboxIndex}
-          onClose={() => setLightboxOpen(false)}
-        />
-      )}
     </>
   );
 };
