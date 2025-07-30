@@ -106,12 +106,13 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
           {uploadedMedia.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 font-medium">
-                <span>🖼️ Your media ({uploadedMedia.length}/4)</span>
+                <span>📁 Your media ({uploadedMedia.length}/4)</span>
               </div>
               <CompactMediaGrid
                 media={uploadedMedia}
                 onRemove={handleRemoveMedia}
                 maxVisible={4}
+                className="group"
               />
             </div>
           )}
