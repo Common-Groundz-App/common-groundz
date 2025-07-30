@@ -24,7 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 
-type SortOption = 'newest' | 'oldest' | 'recent_upload';
+type SortOption = 'newest' | 'oldest';
 
 interface PhotosSectionProps {
   entity: Entity;
@@ -171,12 +171,6 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
       switch (sortBy) {
         case 'oldest':
           return aDate.getTime() - bDate.getTime();
-        case 'recent_upload':
-          // For entity photos, use created_at; for others, use default ordering
-          if (a.source === 'entity_photo' && b.source === 'entity_photo') {
-            return bDate.getTime() - aDate.getTime();
-          }
-          return bDate.getTime() - aDate.getTime();
         case 'newest':
         default:
           return bDate.getTime() - aDate.getTime();
@@ -331,7 +325,6 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                 <Button variant="outline" size="sm" className="justify-between min-w-[140px]">
                   {sortBy === 'newest' && <><SortDesc className="w-4 h-4 mr-2" />Newest First</>}
                   {sortBy === 'oldest' && <><SortAsc className="w-4 h-4 mr-2" />Oldest First</>}
-                  {sortBy === 'recent_upload' && <><Calendar className="w-4 h-4 mr-2" />Recent Upload</>}
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
               </DropdownMenuTrigger>
@@ -345,10 +338,6 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                 <DropdownMenuItem onClick={() => setSortBy('oldest')}>
                   <SortAsc className="w-4 h-4 mr-2" />
                   Oldest First
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSortBy('recent_upload')}>
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Recent Upload
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
