@@ -122,7 +122,11 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
       </div>
 
       {/* Photo metadata */}
-      <div className="absolute bottom-4 left-4 right-4 bg-black/50 text-white p-4 rounded-lg">
+      <div className={`absolute bg-black/50 text-white p-4 rounded-lg ${
+        currentPhoto.type === 'video' 
+          ? 'top-20 left-4 max-w-xs' 
+          : 'bottom-4 left-4 right-4'
+      }`}>
         <div className="flex justify-between items-start">
           <div>
             {currentPhoto.source === 'google_places' ? (
