@@ -62,8 +62,8 @@ export function MediaUploader({
       });
     }
     
-    filesToProcess.forEach(file => {
-      const { valid, error } = validateMediaFile(file);
+    filesToProcess.forEach(async (file) => {
+      const { valid, error } = await validateMediaFile(file);
       
       if (!valid) {
         toast({
@@ -179,6 +179,15 @@ export function MediaUploader({
                     <Film size={20} className="text-purple-500" />
                   )}
                 </div>
+                {upload.file.type.startsWith('video/') && (
+                  <div className="flex-shrink-0 w-12 h-12 bg-muted rounded overflow-hidden">
+                    <video 
+                      src={URL.createObjectURL(upload.file)} 
+                      className="w-full h-full object-cover" 
+                      muted
+                    />
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm truncate">{upload.file.name}</p>
                   <Progress value={upload.progress} className="h-1 mt-1" />
@@ -243,7 +252,7 @@ export function MediaUploader({
           <div>
             <p className="font-medium">Click to upload or drag and drop</p>
             <p className="text-sm text-muted-foreground">
-              Images (JPG, PNG, GIF, WebP) and videos (MP4, WebM) up to 10MB
+              Images up to 10MB, videos up to 25MB (max 60 seconds)
             </p>
             <p className="text-xs font-medium mt-1">
               {currentMediaCount}/{maxMediaCount} media items used
@@ -263,6 +272,15 @@ export function MediaUploader({
                   <Film size={20} className="text-purple-500" />
                 )}
               </div>
+              {upload.file.type.startsWith('video/') && (
+                <div className="flex-shrink-0 w-12 h-12 bg-muted rounded overflow-hidden">
+                  <video 
+                    src={URL.createObjectURL(upload.file)} 
+                    className="w-full h-full object-cover" 
+                    muted
+                  />
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm truncate">{upload.file.name}</p>
                 <Progress value={upload.progress} className="h-1 mt-1" />

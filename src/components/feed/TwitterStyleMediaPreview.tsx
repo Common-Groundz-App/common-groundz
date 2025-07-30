@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { MediaItem } from '@/types/media';
-import { X } from 'lucide-react';
+import { X, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -44,12 +44,21 @@ export function TwitterStyleMediaPreview({
             className="object-cover w-full h-full"
           />
         ) : (
-          <video
-            src={item.url}
-            controls={false}
-            muted
-            className="object-cover w-full h-full"
-          />
+          <>
+            <video
+              src={item.url}
+              controls={false}
+              muted
+              preload="metadata"
+              className="object-cover w-full h-full"
+            />
+            {/* Video play icon overlay */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-black/60 rounded-full p-3">
+                <Play size={24} className="text-white fill-white" />
+              </div>
+            </div>
+          </>
         )}
         
         {onRemove && (

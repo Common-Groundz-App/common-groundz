@@ -16,7 +16,7 @@ export const uploadReviewTimelineMedia = async (
 
   for (const file of files) {
     // Validate file
-    const validation = validateMediaFile(file);
+    const validation = await validateMediaFile(file);
     if (!validation.valid) {
       throw new Error(`${file.name}: ${validation.error}`);
     }
@@ -43,11 +43,11 @@ export const deleteReviewTimelineMedia = async (mediaItems: MediaItem[]): Promis
   await Promise.all(deletePromises);
 };
 
-export const validateReviewTimelineMedia = (files: File[]): { valid: boolean; errors: string[] } => {
+export const validateReviewTimelineMedia = async (files: File[]): Promise<{ valid: boolean; errors: string[] }> => {
   const errors: string[] = [];
   
   for (const file of files) {
-    const validation = validateMediaFile(file);
+    const validation = await validateMediaFile(file);
     if (!validation.valid) {
       errors.push(`${file.name}: ${validation.error}`);
     }

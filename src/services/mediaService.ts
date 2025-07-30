@@ -7,9 +7,28 @@ import { ensureBucketPolicies } from '@/services/storageService';
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm'];
 export const ALLOWED_MEDIA_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
-export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+export const MAX_VIDEO_SIZE = 25 * 1024 * 1024; // 25MB
+export const MAX_VIDEO_DURATION = 60; // 60 seconds
 
-export const validateMediaFile = (file: File): { valid: boolean; error?: string } => {
+// Helper function to get video duration
+export const getVideoDuration = (file: File): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src);
+      resolve(video.duration);
+    };
+    video.onerror = () => {
+      window.URL.revokeObjectURL(video.src);
+      reject(new Error('Error loading video metadata'));
+    };
+    video.src = URL.createObjectURL(file);
+  });
+};
+
+export const validateMediaFile = async (file: File): Promise<{ valid: boolean; error?: string }> => {
   if (!ALLOWED_MEDIA_TYPES.includes(file.type)) {
     return { 
       valid: false, 
@@ -17,11 +36,33 @@ export const validateMediaFile = (file: File): { valid: boolean; error?: string 
     };
   }
   
-  if (file.size > MAX_FILE_SIZE) {
+  const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+  const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+  const maxSizeMB = maxSize / (1024 * 1024);
+  
+  if (file.size > maxSize) {
     return { 
       valid: false, 
-      error: `File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB` 
+      error: `File too large. Maximum size for ${isVideo ? 'videos' : 'images'} is ${maxSizeMB}MB` 
     };
+  }
+  
+  // Check video duration
+  if (isVideo) {
+    try {
+      const duration = await getVideoDuration(file);
+      if (duration > MAX_VIDEO_DURATION) {
+        return {
+          valid: false,
+          error: `Video too long. Maximum duration is ${MAX_VIDEO_DURATION} seconds`
+        };
+      }
+    } catch (error) {
+      return {
+        valid: false,
+        error: 'Unable to process video file'
+      };
+    }
   }
   
   return { valid: true };
@@ -34,7 +75,7 @@ export const uploadMedia = async (
   onProgress?: (progress: number) => void
 ): Promise<MediaItem | null> => {
   try {
-    const { valid, error } = validateMediaFile(file);
+    const { valid, error } = await validateMediaFile(file);
     if (!valid) {
       throw new Error(error);
     }
