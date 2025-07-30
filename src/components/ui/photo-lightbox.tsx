@@ -48,8 +48,18 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
 
   if (!currentPhoto) return null;
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    // Only close if clicking the backdrop itself, not child elements
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
+    <div 
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+      onClick={handleBackdropClick}
+    >
       {/* Close button */}
       <Button
         variant="ghost"
@@ -108,8 +118,27 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             src={currentPhoto.url}
             controls
             preload="metadata"
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full object-contain cursor-auto"
             onClick={(e) => e.stopPropagation()}
+            onPlay={(e) => e.stopPropagation()}
+            onPause={(e) => e.stopPropagation()}
+            onVolumeChange={(e) => e.stopPropagation()}
+            onTimeUpdate={(e) => e.stopPropagation()}
+            onSeeking={(e) => e.stopPropagation()}
+            onSeeked={(e) => e.stopPropagation()}
+            onLoadStart={(e) => e.stopPropagation()}
+            onLoadedData={(e) => e.stopPropagation()}
+            onLoadedMetadata={(e) => e.stopPropagation()}
+            onCanPlay={(e) => e.stopPropagation()}
+            onCanPlayThrough={(e) => e.stopPropagation()}
+            onEnded={(e) => e.stopPropagation()}
+            onError={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseUp={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            style={{ cursor: 'auto' }}
           />
         ) : (
           <img
@@ -147,11 +176,6 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
         </div>
       </div>
 
-      {/* Click outside to close */}
-      <div
-        className="absolute inset-0 -z-10"
-        onClick={onClose}
-      />
     </div>
   );
 };
