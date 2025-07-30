@@ -1,8 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PhotoLightboxProps {
   photos: (MediaItem & { source?: string; username?: string; createdAt?: string })[];
@@ -21,31 +23,67 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   onPrevious,
   onReport
 }) => {
+  const [loaded, setLoaded] = useState<Record<string, boolean>>({});
+  const mediaRef = useRef<(MediaItem & { source?: string; username?: string; createdAt?: string })[]>([]);
+  const isMobile = useIsMobile();
+
   const currentPhoto = photos[currentIndex];
 
+  // Prevent body scrolling when lightbox is open
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      switch (event.key) {
-        case 'Escape':
-          onClose();
-          break;
-        case 'ArrowLeft':
-          onPrevious();
-          break;
-        case 'ArrowRight':
-          onNext();
-          break;
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.width = '';
+    };
+  }, []);
+
+  // Track if the media array has changed
+  useEffect(() => {
+    const mediaChanged = 
+      mediaRef.current.length !== photos.length || 
+      mediaRef.current.some((item, idx) => item.url !== photos[idx]?.url);
+    
+    if (mediaChanged) {
+      setLoaded({});
+      mediaRef.current = [...photos];
+    }
+  }, [photos]);
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        onPrevious();
+      } else if (e.key === 'ArrowRight') {
+        onNext();
+      } else if (e.key === 'Escape') {
+        onClose();
       }
     };
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'unset';
-    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, onNext, onPrevious]);
+
+  // Get a stable key for the image
+  const getImageKey = (item: MediaItem, index: number): string => {
+    return item.id || `${item.url}-${index}`;
+  };
+
+  const handleImageLoad = (item: MediaItem, index: number) => {
+    const key = getImageKey(item, index);
+    if (!loaded[key]) {
+      setLoaded(prev => ({...prev, [key]: true}));
+    }
+  };
 
   if (!currentPhoto) return null;
 
@@ -59,113 +97,217 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     document.body.appendChild(modalRoot);
   }
 
+  // Determine orientation class for responsive styling
+  const getOrientationClass = (item: MediaItem) => {
+    if (!item.orientation && item.width && item.height) {
+      const ratio = item.width / item.height;
+      if (ratio > 1.05) return 'landscape';
+      if (ratio < 0.95) return 'portrait';
+      return 'square';
+    }
+    return item.orientation || 'landscape';
+  };
+
+  const orientation = getOrientationClass(currentPhoto);
+  const isLandscape = orientation === 'landscape';
+  const imageKey = getImageKey(currentPhoto, currentIndex);
+  const isLoaded = loaded[imageKey];
+
   const lightboxContent = (
-    <div 
-      className="fixed inset-0 z-[9999] bg-black bg-opacity-90 flex items-center justify-center p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      {/* Close button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onClose}
-        className="absolute top-4 right-4 text-white hover:bg-white/10 z-20"
+    <div className="fixed inset-0 z-[9999] lightbox-preview" data-lightbox="true">
+      {/* Background overlay */}
+      <div 
+        className="absolute inset-0 bg-black/95"
+        aria-label="Lightbox background"
+      />
+      
+      {/* Content container - handles background clicks only */}
+      <div 
+        className="relative z-10 flex h-full w-full items-center justify-center lightbox-content"
+        onClick={(e) => {
+          // Only close if clicking directly on this container (the background area)
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
       >
-        <X className="w-6 h-6" />
-      </Button>
-
-      {/* Report button */}
-      {onReport && (
-        <Button
+        {/* Close button */}
+        <Button 
+          className={cn(
+            "absolute right-4 z-50 rounded-full bg-gray-800/70 hover:bg-gray-700",
+            isMobile ? "right-2 top-2 h-8 w-8" : "right-4 top-4 h-10 w-10"
+          )}
+          size="icon"
           variant="ghost"
-          size="sm"
-          onClick={() => onReport(currentPhoto)}
-          className="absolute top-4 right-16 text-white hover:bg-red-500/20 z-20"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onClose();
+          }}
         >
-          <Flag className="w-5 h-5" />
+          <X className={cn("text-white", isMobile ? "h-5 w-5" : "h-6 w-6")} />
+          <span className="sr-only">Close</span>
         </Button>
-      )}
 
-      {/* Photo counter */}
-      {photos.length > 1 && (
-        <div className="absolute top-4 left-4 text-white text-sm bg-black/50 px-3 py-1 rounded">
-          {currentIndex + 1} / {photos.length}
-        </div>
-      )}
-
-      {/* Navigation arrows */}
-      {photos.length > 1 && (
-        <>
+        {/* Report button */}
+        {onReport && (
           <Button
+            className={cn(
+              "absolute z-50 rounded-full bg-gray-800/70 hover:bg-red-500/20",
+              isMobile ? "right-12 top-2 h-8 w-8" : "right-16 top-4 h-10 w-10"
+            )}
+            size="icon"
             variant="ghost"
-            size="sm"
-            onClick={onPrevious}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 z-20"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onReport(currentPhoto);
+            }}
           >
-            <ChevronLeft className="w-8 h-8" />
+            <Flag className={cn("text-white", isMobile ? "h-4 w-4" : "h-5 w-5")} />
+            <span className="sr-only">Report photo</span>
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 z-20"
-          >
-            <ChevronRight className="w-8 h-8" />
-          </Button>
-        </>
-      )}
+        )}
 
-      {/* Media Display */}
-      <div className="flex items-center justify-center w-full h-full">
-        <div className="relative max-w-[90vw] max-h-[90vh]">
-          {currentPhoto.type === 'video' ? (
-            <video
-              src={currentPhoto.url}
-              controls
-              preload="metadata"
-              autoPlay={false}
-              className="max-w-full max-h-full w-auto h-auto object-contain"
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <img
-              src={currentPhoto.url}
-              alt={currentPhoto.alt || 'Photo'}
-              className="max-w-full max-h-full w-auto h-auto object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
+        {/* Photo counter */}
+        {photos.length > 1 && (
+          <div className={cn(
+            "absolute bg-black/50 px-3 py-1 rounded text-white text-sm z-50",
+            isMobile ? "top-2 left-2" : "top-4 left-4"
+          )}>
+            {currentIndex + 1} / {photos.length}
+          </div>
+        )}
+        
+        {/* Main image container */}
+        <div className={cn(
+          "relative flex h-full w-full items-center justify-center",
+          isMobile ? "px-2" : "px-12"
+        )}>
+          {/* Current media item */}
+          <div className="relative flex h-full max-h-[90vh] w-full items-center justify-center">
+            {currentPhoto.type === 'video' ? (
+              <video
+                key={imageKey}
+                src={currentPhoto.url}
+                poster={currentPhoto.thumbnail_url}
+                controls
+                preload="metadata"
+                autoPlay={false}
+                className={cn(
+                  "cursor-auto [&::-webkit-media-controls]:cursor-pointer [&::-webkit-media-controls-panel]:cursor-pointer",
+                  isMobile && isLandscape 
+                    ? "h-auto w-full object-contain" 
+                    : "max-h-[90vh] max-w-full object-contain"
+                )}
+                style={{ cursor: 'auto' }}
+                onLoadedData={() => handleImageLoad(currentPhoto, currentIndex)}
+                onClick={(e) => e.stopPropagation()}
+                onPlay={(e) => e.stopPropagation()}
+                onPause={(e) => e.stopPropagation()}
+                onVolumeChange={(e) => e.stopPropagation()}
+                onTimeUpdate={(e) => e.stopPropagation()}
+                onSeeking={(e) => e.stopPropagation()}
+                onSeeked={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <>
+                <img
+                  key={imageKey}
+                  src={currentPhoto.url}
+                  alt={currentPhoto.alt || 'Photo'}
+                  className={cn(
+                    "transition-opacity duration-300",
+                    isLoaded ? "opacity-100" : "opacity-0",
+                    isMobile && isLandscape 
+                      ? "h-auto w-full object-contain"
+                      : "max-h-[90vh] max-w-full object-contain"
+                  )}
+                  style={isMobile && isLandscape ? { maxHeight: '85vh' } : undefined}
+                  onLoad={() => handleImageLoad(currentPhoto, currentIndex)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {!isLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-white" />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          
+          {/* Navigation controls - only shown when there are multiple items */}
+          {photos.length > 1 && (
+            <>
+              {/* Previous button */}
+              <Button
+                className={cn(
+                  "absolute top-1/2 -translate-y-1/2 rounded-full bg-gray-800/70 hover:bg-gray-700",
+                  isMobile 
+                    ? "left-1 h-8 w-8" 
+                    : "left-4 h-12 w-12"
+                )}
+                size="icon"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onPrevious();
+                }}
+              >
+                <ChevronLeft className={cn("text-white", isMobile ? "h-5 w-5" : "h-8 w-8")} />
+                <span className="sr-only">Previous image</span>
+              </Button>
+              
+              {/* Next button */}
+              <Button
+                className={cn(
+                  "absolute top-1/2 -translate-y-1/2 rounded-full bg-gray-800/70 hover:bg-gray-700",
+                  isMobile 
+                    ? "right-1 h-8 w-8" 
+                    : "right-4 h-12 w-12"
+                )}
+                size="icon"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onNext();
+                }}
+              >
+                <ChevronRight className={cn("text-white", isMobile ? "h-5 w-5" : "h-8 w-8")} />
+                <span className="sr-only">Next image</span>
+              </Button>
+            </>
           )}
         </div>
-      </div>
 
-      {/* Photo metadata */}
-      <div className={`absolute bg-black/70 text-white p-4 rounded-lg ${
-        currentPhoto.type === 'video' 
-          ? 'top-20 left-4 max-w-xs' 
-          : 'bottom-4 left-4 max-w-md'
-      }`}>
-        <div className="flex justify-between items-start">
-          <div>
-            {currentPhoto.source === 'google_places' ? (
-              <p className="text-sm">Photo from Google Places</p>
-            ) : (
-              <div>
-                <p className="text-sm">
-                  Photo by {currentPhoto.username || 'User'}
-                </p>
-                {currentPhoto.createdAt && (
-                  <p className="text-xs text-gray-300">
-                    {new Date(currentPhoto.createdAt).toLocaleDateString()}
+        {/* Photo metadata */}
+        <div className={cn(
+          "absolute bg-black/70 text-white p-4 rounded-lg max-w-md z-40",
+          currentPhoto.type === 'video' 
+            ? isMobile ? 'top-16 left-2' : 'top-20 left-4'
+            : isMobile ? 'bottom-2 left-2' : 'bottom-4 left-4'
+        )}>
+          <div className="flex justify-between items-start">
+            <div>
+              {currentPhoto.source === 'google_places' ? (
+                <p className="text-sm">Photo from Google Places</p>
+              ) : (
+                <div>
+                  <p className="text-sm">
+                    Photo by {currentPhoto.username || 'User'}
                   </p>
-                )}
-              </div>
-            )}
+                  {currentPhoto.createdAt && (
+                    <p className="text-xs text-gray-300">
+                      {new Date(currentPhoto.createdAt).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
