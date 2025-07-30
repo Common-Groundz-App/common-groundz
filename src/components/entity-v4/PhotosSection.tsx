@@ -1,25 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3, MoreVertical } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3, MoreVertical, SortAsc, SortDesc, ChevronDown, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel
 } from '@/components/ui/dropdown-menu';
 import { Entity } from '@/services/recommendation/types';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia } from '@/services/photoService';
-import { fetchEntityPhotos, deleteEntityPhoto, type EntityPhoto } from '@/services/entityPhotoService';
+import { fetchEntityPhotos, deleteEntityPhoto, type EntityPhoto, PHOTO_CATEGORIES } from '@/services/entityPhotoService';
 import { EntityPhotoUploader } from './EntityPhotoUploader';
 import { EntityPhotoEditModal } from './EntityPhotoEditModal';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
+
+type SortOption = 'newest' | 'oldest' | 'recent_upload';
 
 interface PhotosSectionProps {
   entity: Entity;
@@ -39,6 +44,12 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const [editingPhoto, setEditingPhoto] = useState<EntityPhoto | null>(null);
   const [deletingPhoto, setDeletingPhoto] = useState<EntityPhoto | null>(null);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+
+  // Phase 2 features - Enhanced Photo Organization
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [photosToShow, setPhotosToShow] = useState(12);
+  const PHOTOS_PER_LOAD = 12;
 
   const loadPhotos = async () => {
     setLoading(true);
@@ -125,24 +136,95 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     return [...convertedEntityPhotos, ...photos];
   };
 
-  const getFilteredPhotos = (): PhotoWithMetadata[] => {
+  // Enhanced filtering and sorting logic for Phase 2
+  const getFilteredAndSortedPhotos = useMemo((): PhotoWithMetadata[] => {
     const allPhotos = getAllPhotosWithEntityPhotos();
     
+    // First filter by tab
+    let filteredPhotos = allPhotos;
     switch (activeTab) {
       case 'google':
-        return allPhotos.filter(photo => photo.source === 'google_places');
+        filteredPhotos = allPhotos.filter(photo => photo.source === 'google_places');
+        break;
       case 'reviews':
-        return allPhotos.filter(photo => photo.source === 'user_review');
+        filteredPhotos = allPhotos.filter(photo => photo.source === 'user_review');
+        break;
       case 'entity':
-        return allPhotos.filter(photo => photo.source === 'entity_photo');
+        filteredPhotos = allPhotos.filter(photo => photo.source === 'entity_photo');
+        break;
       default:
-        return allPhotos;
+        filteredPhotos = allPhotos;
     }
+
+    // Then filter by category (only for entity photos)
+    if (categoryFilter && activeTab === 'entity') {
+      filteredPhotos = filteredPhotos.filter(photo => 
+        photo.source === 'entity_photo' && photo.category === categoryFilter
+      );
+    }
+
+    // Sort photos
+    const sortedPhotos = [...filteredPhotos].sort((a, b) => {
+      const aDate = new Date(a.createdAt || a.order || 0);
+      const bDate = new Date(b.createdAt || b.order || 0);
+      
+      switch (sortBy) {
+        case 'oldest':
+          return aDate.getTime() - bDate.getTime();
+        case 'recent_upload':
+          // For entity photos, use created_at; for others, use default ordering
+          if (a.source === 'entity_photo' && b.source === 'entity_photo') {
+            return bDate.getTime() - aDate.getTime();
+          }
+          return bDate.getTime() - aDate.getTime();
+        case 'newest':
+        default:
+          return bDate.getTime() - aDate.getTime();
+      }
+    });
+
+    return sortedPhotos;
+  }, [photos, entityPhotos, activeTab, categoryFilter, sortBy]);
+
+  // Get category counts for entity photos
+  const getCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    entityPhotos.forEach(photo => {
+      const category = photo.category || 'general';
+      counts[category] = (counts[category] || 0) + 1;
+    });
+    return counts;
+  }, [entityPhotos]);
+
+  // Legacy method for backward compatibility
+  const getFilteredPhotos = (): PhotoWithMetadata[] => {
+    return getFilteredAndSortedPhotos.slice(0, photosToShow);
+  };
+
+  const hasMorePhotos = getFilteredAndSortedPhotos.length > photosToShow;
+
+  const loadMorePhotos = () => {
+    setPhotosToShow(prev => prev + PHOTOS_PER_LOAD);
+  };
+
+  const resetPagination = () => {
+    setPhotosToShow(PHOTOS_PER_LOAD);
+  };
+
+  const clearFilters = () => {
+    setCategoryFilter(null);
+    setSortBy('newest');
+    resetPagination();
   };
 
   useEffect(() => {
     loadPhotos();
   }, [entity.id]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [activeTab, categoryFilter, sortBy]);
 
   const handlePhotoClick = (index: number) => {
     setSelectedPhotoIndex(index);
@@ -241,17 +323,120 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
             </div>
           </div>
 
+          {/* Phase 2: Enhanced Controls */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            {/* Sort Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="justify-between min-w-[140px]">
+                  {sortBy === 'newest' && <><SortDesc className="w-4 h-4 mr-2" />Newest First</>}
+                  {sortBy === 'oldest' && <><SortAsc className="w-4 h-4 mr-2" />Oldest First</>}
+                  {sortBy === 'recent_upload' && <><Calendar className="w-4 h-4 mr-2" />Recent Upload</>}
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[160px]">
+                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSortBy('newest')}>
+                  <SortDesc className="w-4 h-4 mr-2" />
+                  Newest First
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortBy('oldest')}>
+                  <SortAsc className="w-4 h-4 mr-2" />
+                  Oldest First
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortBy('recent_upload')}>
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Recent Upload
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Category Filter (only for entity photos) */}
+            {activeTab === 'entity' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="justify-between min-w-[120px]">
+                    <Filter className="w-4 h-4 mr-2" />
+                    {categoryFilter ? PHOTO_CATEGORIES.find(c => c.value === categoryFilter)?.label || categoryFilter : 'All Categories'}
+                    <ChevronDown className="w-4 h-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-[180px]">
+                  <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setCategoryFilter(null)}>
+                    All Categories ({entityPhotos.length})
+                  </DropdownMenuItem>
+                  {PHOTO_CATEGORIES.map((category) => {
+                    const count = getCategoryCounts[category.value] || 0;
+                    return (
+                      <DropdownMenuItem 
+                        key={category.value} 
+                        onClick={() => setCategoryFilter(category.value)}
+                        disabled={count === 0}
+                      >
+                        {category.label} ({count})
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Active Filters */}
+            {(categoryFilter || sortBy !== 'newest') && (
+              <div className="flex items-center gap-2">
+                {categoryFilter && (
+                  <Badge variant="secondary" className="text-xs">
+                    {PHOTO_CATEGORIES.find(c => c.value === categoryFilter)?.label || categoryFilter}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 ml-1 text-muted-foreground hover:text-foreground"
+                      onClick={() => setCategoryFilter(null)}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="text-xs text-muted-foreground hover:text-foreground h-6"
+                >
+                  Clear All
+                </Button>
+              </div>
+            )}
+          </div>
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="all">All ({allPhotos.length})</TabsTrigger>
-              <TabsTrigger value="entity">User Photos ({entityPhotos.length})</TabsTrigger>
-              <TabsTrigger value="google">Google Places ({allPhotos.filter(p => p.source === 'google_places').length})</TabsTrigger>
-              <TabsTrigger value="reviews">Reviews ({allPhotos.filter(p => p.source === 'user_review').length})</TabsTrigger>
+              <TabsTrigger value="all">
+                All ({allPhotos.length})
+              </TabsTrigger>
+              <TabsTrigger value="entity">
+                User Photos ({entityPhotos.length})
+                {categoryFilter && (
+                  <Badge variant="outline" className="ml-1 text-xs">
+                    {getCategoryCounts[categoryFilter] || 0}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="google">
+                Google Places ({allPhotos.filter(p => p.source === 'google_places').length})
+              </TabsTrigger>
+              <TabsTrigger value="reviews">
+                Reviews ({allPhotos.filter(p => p.source === 'user_review').length})
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {filteredPhotos.map((photo, index) => (
+            {getFilteredPhotos().map((photo, index) => (
               <div
                 key={`${photo.source}-${photo.id || index}`}
                 className="relative group aspect-square overflow-hidden rounded-lg cursor-pointer bg-muted"
@@ -376,17 +561,40 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
             ))}
           </div>
 
+          {/* Phase 2: Show More Button / Pagination */}
+          {hasMorePhotos && (
+            <div className="flex justify-center mt-6">
+              <Button
+                variant="outline"
+                onClick={loadMorePhotos}
+                className="min-w-[120px]"
+              >
+                Show More ({getFilteredAndSortedPhotos.length - photosToShow} remaining)
+              </Button>
+            </div>
+          )}
+
+          {/* Results Info */}
+          {getFilteredAndSortedPhotos.length > 0 && (
+            <div className="text-center mt-4 text-sm text-muted-foreground">
+              Showing {Math.min(photosToShow, getFilteredAndSortedPhotos.length)} of {getFilteredAndSortedPhotos.length} photos
+              {(categoryFilter || sortBy !== 'newest') && (
+                <span> • Filters applied</span>
+              )}
+            </div>
+          )}
+
         </CardContent>
       </Card>
 
       {/* Lightbox for full-screen viewing */}
       {selectedPhotoIndex !== null && (
         <PhotoLightbox
-          photos={filteredPhotos}
+          photos={getFilteredAndSortedPhotos}
           currentIndex={selectedPhotoIndex}
           onClose={closeLightbox}
-          onNext={() => setSelectedPhotoIndex((selectedPhotoIndex + 1) % filteredPhotos.length)}
-          onPrevious={() => setSelectedPhotoIndex((selectedPhotoIndex - 1 + filteredPhotos.length) % filteredPhotos.length)}
+          onNext={() => setSelectedPhotoIndex((selectedPhotoIndex + 1) % getFilteredAndSortedPhotos.length)}
+          onPrevious={() => setSelectedPhotoIndex((selectedPhotoIndex - 1 + getFilteredAndSortedPhotos.length) % getFilteredAndSortedPhotos.length)}
           onReport={(photo) => handleReportPhoto(photo as PhotoWithMetadata)}
         />
       )}
