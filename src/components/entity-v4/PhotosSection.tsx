@@ -21,7 +21,7 @@ import { fetchEntityPhotos, deleteEntityPhoto, type EntityPhoto, PHOTO_CATEGORIE
 import { EntityPhotoEditModal } from './EntityPhotoEditModal';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-
+import { SimpleMediaUploadModal } from './SimpleMediaUploadModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,6 +36,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [reportModalPhoto, setReportModalPhoto] = useState<PhotoWithMetadata | null>(null);
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
   const [entityPhotos, setEntityPhotos] = useState<EntityPhoto[]>([]);
@@ -297,6 +298,15 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
               <span className="text-sm text-muted-foreground">({allPhotos.length})</span>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => setShowUploadModal(true)}
+                className="h-8"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Media
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -611,6 +621,20 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
         title="Delete Media"
         description="Are you sure you want to delete this media? This action cannot be undone."
         isLoading={isDeletingPhoto}
+      />
+
+      {/* Simple Media Upload Modal */}
+      <SimpleMediaUploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onSave={(media) => {
+          // For now, just store in local state - no backend sync yet
+          console.log('Media to save:', media);
+          toast({
+            title: 'Success',
+            description: `${media.length} media item(s) will be saved when backend is connected.`,
+          });
+        }}
       />
 
     </>
