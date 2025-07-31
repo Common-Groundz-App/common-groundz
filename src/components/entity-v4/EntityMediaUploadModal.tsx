@@ -35,8 +35,6 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
   const [caption, setCaption] = useState('');
   const [altText, setAltText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const resetForm = () => {
     setSelectedMedia([]);
@@ -44,8 +42,6 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
     setCaption('');
     setAltText('');
     setIsSubmitting(false);
-    setLightboxOpen(false);
-    setLightboxIndex(0);
   };
 
   const handleClose = () => {
@@ -63,10 +59,6 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
     setSelectedMedia(prev => prev.filter(item => item.url !== mediaItem.url));
   };
 
-  const handleOpenLightbox = (index: number) => {
-    setLightboxIndex(index);
-    setLightboxOpen(true);
-  };
 
   const handleSubmit = async () => {
     if (!selectedMedia.length || !user?.id) return;
@@ -105,120 +97,108 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
   };
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add Photo or Video</DialogTitle>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Photo or Video</DialogTitle>
+        </DialogHeader>
 
-          <div className="space-y-6">
-            {/* Media Upload Section */}
-            <div>
-              <Label className="text-sm font-medium mb-2 block">
-                Upload Media
-              </Label>
-              <MediaUploader
-                sessionId={`entity-upload-${entityId}-${Date.now()}`}
-                onMediaUploaded={handleMediaAdd}
-                initialMedia={selectedMedia}
-                maxMediaCount={4}
-                className="w-full"
-              />
-            </div>
-
-            {/* Media Preview Section */}
-            {selectedMedia.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 font-medium">
-                  <span>📁 Your media ({selectedMedia.length}/4)</span>
-                </div>
-                <CompactMediaGrid
-                  media={selectedMedia}
-                  onRemove={handleMediaRemove}
-                  maxVisible={4}
-                  className="group"
-                  onOpenLightbox={handleOpenLightbox}
-                />
-              </div>
-            )}
-
-            {/* Category */}
-            <div>
-              <Label htmlFor="category" className="text-sm font-medium mb-2 block">
-                Category
-              </Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PHOTO_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Caption */}
-            <div>
-              <Label htmlFor="caption" className="text-sm font-medium mb-2 block">
-                Caption
-              </Label>
-              <Textarea
-                id="caption"
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                placeholder="Add a caption for your media..."
-                rows={3}
-              />
-            </div>
-
-            {/* Alt Text */}
-            <div>
-              <Label htmlFor="altText" className="text-sm font-medium mb-2 block">
-                Alt Text
-              </Label>
-              <Input
-                id="altText"
-                value={altText}
-                onChange={(e) => setAltText(e.target.value)}
-                placeholder="Describe the content for accessibility..."
-              />
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                onClick={handleClose}
-                variant="outline"
-                disabled={isSubmitting}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting || selectedMedia.length === 0}
-                className="flex-1"
-              >
-                {isSubmitting ? "Uploading..." : "Upload Media"}
-              </Button>
-            </div>
+        <div className="space-y-6">
+          {/* Media Upload Section */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block">
+              Upload Media
+            </Label>
+            <MediaUploader
+              sessionId={`entity-upload-${entityId}-${Date.now()}`}
+              onMediaUploaded={handleMediaAdd}
+              initialMedia={selectedMedia}
+              maxMediaCount={4}
+              className="w-full"
+            />
           </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* Lightbox Preview - rendered at root level */}
-      {lightboxOpen && selectedMedia.length > 0 && (
-        <LightboxPreview
-          media={selectedMedia}
-          initialIndex={lightboxIndex}
-          onClose={() => setLightboxOpen(false)}
-        />
-      )}
-    </>
+          {/* Media Preview Section */}
+          {selectedMedia.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 font-medium">
+                <span>📁 Your media ({selectedMedia.length}/4)</span>
+              </div>
+              <CompactMediaGrid
+                media={selectedMedia}
+                onRemove={handleMediaRemove}
+                maxVisible={4}
+                className="group"
+              />
+            </div>
+          )}
+
+          {/* Category */}
+          <div>
+            <Label htmlFor="category" className="text-sm font-medium mb-2 block">
+              Category
+            </Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {PHOTO_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Caption */}
+          <div>
+            <Label htmlFor="caption" className="text-sm font-medium mb-2 block">
+              Caption
+            </Label>
+            <Textarea
+              id="caption"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="Add a caption for your media..."
+              rows={3}
+            />
+          </div>
+
+          {/* Alt Text */}
+          <div>
+            <Label htmlFor="altText" className="text-sm font-medium mb-2 block">
+              Alt Text
+            </Label>
+            <Input
+              id="altText"
+              value={altText}
+              onChange={(e) => setAltText(e.target.value)}
+              placeholder="Describe the content for accessibility..."
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4">
+            <Button
+              onClick={handleClose}
+              variant="outline"
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || selectedMedia.length === 0}
+              className="flex-1"
+            >
+              {isSubmitting ? "Uploading..." : "Upload Media"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
