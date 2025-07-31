@@ -30,37 +30,37 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [category, setCategory] = useState('general');
   const [caption, setCaption] = useState('');
   const [altText, setAltText] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const resetForm = () => {
-    setUploadedMedia([]);
+    setSelectedMedia([]);
     setCategory('general');
     setCaption('');
     setAltText('');
-    setIsUploading(false);
+    setIsSubmitting(false);
     setLightboxOpen(false);
     setLightboxIndex(0);
   };
 
   const handleClose = () => {
-    if (!isUploading) {
+    if (!isSubmitting) {
       resetForm();
       onClose();
     }
   };
 
-  const handleMediaUploaded = (mediaItem: MediaItem) => {
-    setUploadedMedia(prev => [...prev, mediaItem]);
+  const handleMediaAdd = (mediaItem: MediaItem) => {
+    setSelectedMedia(prev => [...prev, mediaItem]);
   };
 
-  const handleRemoveMedia = (mediaItem: MediaItem) => {
-    setUploadedMedia(prev => prev.filter(item => item.url !== mediaItem.url));
+  const handleMediaRemove = (mediaItem: MediaItem) => {
+    setSelectedMedia(prev => prev.filter(item => item.url !== mediaItem.url));
   };
 
   const handleOpenLightbox = (index: number) => {
@@ -69,12 +69,12 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!uploadedMedia.length || !user?.id) return;
+    if (!selectedMedia.length || !user?.id) return;
 
-    setIsUploading(true);
+    setIsSubmitting(true);
     try {
       const results = await uploadEntityMediaBatch(
-        uploadedMedia,
+        selectedMedia,
         entityId,
         user.id,
         category,
@@ -100,49 +100,48 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
         variant: 'destructive'
       });
     } finally {
-      setIsUploading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Photo or Video</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Media Preview Section - Only show when media exists */}
-            {uploadedMedia.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 font-medium">
-                  <span>📁 Your media ({uploadedMedia.length}/4)</span>
-                </div>
-                <CompactMediaGrid
-                  media={uploadedMedia}
-                  onRemove={handleRemoveMedia}
-                  maxVisible={4}
-                  className="group"
-                  onOpenLightbox={handleOpenLightbox}
-                />
-              </div>
-            )}
-
-            {/* Media Upload Section - Always visible */}
+            {/* Media Upload Section */}
             <div>
               <Label className="text-sm font-medium mb-2 block">
                 Upload Media
               </Label>
               <MediaUploader
                 sessionId={`entity-upload-${entityId}-${Date.now()}`}
-                onMediaUploaded={handleMediaUploaded}
-                initialMedia={uploadedMedia}
+                onMediaUploaded={handleMediaAdd}
+                initialMedia={selectedMedia}
                 maxMediaCount={4}
                 className="w-full"
-                disabled={lightboxOpen}
               />
             </div>
+
+            {/* Media Preview Section */}
+            {selectedMedia.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 font-medium">
+                  <span>📁 Your media ({selectedMedia.length}/4)</span>
+                </div>
+                <CompactMediaGrid
+                  media={selectedMedia}
+                  onRemove={handleMediaRemove}
+                  maxVisible={4}
+                  className="group"
+                  onOpenLightbox={handleOpenLightbox}
+                />
+              </div>
+            )}
 
             {/* Category */}
             <div>
@@ -195,27 +194,27 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
               <Button
                 onClick={handleClose}
                 variant="outline"
-                disabled={isUploading}
+                disabled={isSubmitting}
                 className="flex-1"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={isUploading || uploadedMedia.length === 0}
+                disabled={isSubmitting || selectedMedia.length === 0}
                 className="flex-1"
               >
-                {isUploading ? "Uploading..." : "Upload Media"}
+                {isSubmitting ? "Uploading..." : "Upload Media"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox preview - rendered outside Dialog to avoid z-index conflicts */}
-      {lightboxOpen && uploadedMedia.length > 0 && (
+      {/* Lightbox Preview - rendered at root level */}
+      {lightboxOpen && selectedMedia.length > 0 && (
         <LightboxPreview
-          media={uploadedMedia}
+          media={selectedMedia}
           initialIndex={lightboxIndex}
           onClose={() => setLightboxOpen(false)}
         />
