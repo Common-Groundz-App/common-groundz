@@ -84,8 +84,8 @@ export function CompactMediaGrid({
             )}
             
             {/* Zoom indicator */}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors">
-              <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors pointer-events-none">
+              <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto" />
             </div>
             
             {/* Remove button - show on hover or always on mobile */}
