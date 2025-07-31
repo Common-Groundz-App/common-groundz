@@ -17,7 +17,7 @@ import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia } from '@/services/photoService';
 import { fetchEntityPhotos, deleteEntityPhoto, type EntityPhoto, PHOTO_CATEGORIES } from '@/services/entityPhotoService';
-import { EntityMediaUploadModal } from './EntityMediaUploadModal';
+
 import { EntityPhotoEditModal } from './EntityPhotoEditModal';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -41,7 +41,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const [entityPhotos, setEntityPhotos] = useState<EntityPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
-  const [showEntityUpload, setShowEntityUpload] = useState(false);
+  
   
   // Photo management states
   const [editingPhoto, setEditingPhoto] = useState<EntityPhoto | null>(null);
@@ -73,11 +73,6 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     }
   };
 
-  // Handle entity media upload from EntityMediaUploadModal
-  const handleEntityMediaUploaded = (photos: EntityPhoto[]) => {
-    setEntityPhotos(prev => [...photos, ...prev]);
-    setShowEntityUpload(false);
-  };
 
   const handlePhotoUpdated = (updatedPhoto: EntityPhoto) => {
     setEntityPhotos(prev => 
@@ -282,15 +277,9 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
           <div className="text-center py-12">
             <FileImage className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h4 className="font-medium text-muted-foreground mb-2">No media available</h4>
-            <p className="text-sm text-muted-foreground mb-6">
-              Be the first to share photos and videos of {entity.name}
+            <p className="text-sm text-muted-foreground">
+              No media available
             </p>
-            {user && (
-              <Button onClick={() => setShowEntityUpload(true)} className="w-full max-w-md mx-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Media
-              </Button>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -308,16 +297,6 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
               <span className="text-sm text-muted-foreground">({allPhotos.length})</span>
             </div>
             <div className="flex items-center gap-2">
-              {/* Add Media Button */}
-              {user && (
-                <Button
-                  onClick={() => setShowEntityUpload(true)}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Media
-                </Button>
-              )}
               {/* Test Button */}
               {user && (
                 <Dialog>
@@ -653,13 +632,6 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
         isLoading={isDeletingPhoto}
       />
 
-      {/* Entity Media Upload Modal */}
-      <EntityMediaUploadModal
-        entityId={entity.id}
-        isOpen={showEntityUpload}
-        onClose={() => setShowEntityUpload(false)}
-        onMediaUploaded={handleEntityMediaUploaded}
-      />
     </>
   );
 };
