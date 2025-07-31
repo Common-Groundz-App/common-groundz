@@ -144,89 +144,82 @@ export const EntityMediaUploadModal: React.FC<EntityMediaUploadModalProps> = ({
               />
             </div>
 
-            {/* Form Fields - Only show if media is uploaded */}
-            {uploadedMedia.length > 0 && (
-              <>
-                {/* Category */}
-                <div>
-                  <Label htmlFor="category" className="text-sm font-medium mb-2 block">
-                    Category
-                  </Label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PHOTO_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            {/* Category */}
+            <div>
+              <Label htmlFor="category" className="text-sm font-medium mb-2 block">
+                Category
+              </Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PHOTO_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-                {/* Caption */}
-                <div>
-                  <Label htmlFor="caption" className="text-sm font-medium mb-2 block">
-                    Caption
-                  </Label>
-                  <Textarea
-                    id="caption"
-                    value={caption}
-                    onChange={(e) => setCaption(e.target.value)}
-                    placeholder="Add a caption for your media..."
-                    rows={3}
-                  />
-                </div>
-
-                {/* Alt Text */}
-                <div>
-                  <Label htmlFor="altText" className="text-sm font-medium mb-2 block">
-                    Alt Text
-                  </Label>
-                  <Input
-                    id="altText"
-                    value={altText}
-                    onChange={(e) => setAltText(e.target.value)}
-                    placeholder="Describe the content for accessibility..."
-                  />
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    onClick={handleClose}
-                    variant="outline"
-                    disabled={isUploading}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={isUploading}
-                    className="flex-1"
-                  >
-                    {isUploading ? "Uploading..." : "Upload Media"}
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Lightbox preview - rendered inside Dialog with higher z-index */}
-          {lightboxOpen && uploadedMedia.length > 0 && (
-            <div className="fixed inset-0 z-[60]">
-              <LightboxPreview
-                media={uploadedMedia}
-                initialIndex={lightboxIndex}
-                onClose={() => setLightboxOpen(false)}
+            {/* Caption */}
+            <div>
+              <Label htmlFor="caption" className="text-sm font-medium mb-2 block">
+                Caption
+              </Label>
+              <Textarea
+                id="caption"
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Add a caption for your media..."
+                rows={3}
               />
             </div>
-          )}
+
+            {/* Alt Text */}
+            <div>
+              <Label htmlFor="altText" className="text-sm font-medium mb-2 block">
+                Alt Text
+              </Label>
+              <Input
+                id="altText"
+                value={altText}
+                onChange={(e) => setAltText(e.target.value)}
+                placeholder="Describe the content for accessibility..."
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={handleClose}
+                variant="outline"
+                disabled={isUploading}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={isUploading || uploadedMedia.length === 0}
+                className="flex-1"
+              >
+                {isUploading ? "Uploading..." : "Upload Media"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* Lightbox preview - rendered outside Dialog to avoid z-index conflicts */}
+      {lightboxOpen && uploadedMedia.length > 0 && (
+        <LightboxPreview
+          media={uploadedMedia}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </>
   );
 };
