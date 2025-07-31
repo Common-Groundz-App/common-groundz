@@ -21,7 +21,7 @@ import { fetchEntityPhotos, deleteEntityPhoto, type EntityPhoto, PHOTO_CATEGORIE
 import { EntityPhotoEditModal } from './EntityPhotoEditModal';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { TestMediaUploadForm } from '@/components/test/TestMediaUploadForm';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -297,25 +297,6 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
               <span className="text-sm text-muted-foreground">({allPhotos.length})</span>
             </div>
             <div className="flex items-center gap-2">
-              {/* Test Button */}
-              {user && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="destructive"
-                      className="flex items-center gap-2"
-                    >
-                      Test
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-                    <DialogHeader>
-                      <DialogTitle>Test Media Upload</DialogTitle>
-                    </DialogHeader>
-                    <TestMediaUploadForm />
-                  </DialogContent>
-                </Dialog>
-              )}
               <Button
                 size="sm"
                 variant="outline"
