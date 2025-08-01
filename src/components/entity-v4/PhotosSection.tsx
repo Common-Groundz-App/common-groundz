@@ -17,6 +17,7 @@ import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia } from '@/services/photoService';
 import { fetchEntityPhotos, deleteEntityPhoto, type EntityPhoto, PHOTO_CATEGORIES } from '@/services/entityPhotoService';
+import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 
 import { EntityPhotoEditModal } from './EntityPhotoEditModal';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
@@ -627,13 +628,43 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
       <SimpleMediaUploadModal
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
-        onSave={(media) => {
-          // For now, just store in local state - no backend sync yet
-          console.log('Media to save:', media);
-          toast({
-            title: 'Success',
-            description: `${media.length} media item(s) will be saved when backend is connected.`,
-          });
+        onSave={async (media) => {
+          if (!user) {
+            toast({
+              title: 'Authentication required',
+              description: 'Please log in to upload media.',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          try {
+            const uploadedPhotos = await uploadEntityMediaBatch(
+              media,
+              entity.id,
+              user.id,
+              (media[0] as any)?.category || 'general',
+              media[0]?.caption,
+              media[0]?.alt
+            );
+
+            if (uploadedPhotos.length > 0) {
+              setShowUploadModal(false);
+              await loadPhotos(); // Refresh the photos list
+              
+              toast({
+                title: 'Success',
+                description: `${uploadedPhotos.length} media item(s) uploaded successfully.`,
+              });
+            }
+          } catch (error) {
+            console.error('Upload error:', error);
+            toast({
+              title: 'Upload failed',
+              description: 'Failed to upload media. Please try again.',
+              variant: 'destructive',
+            });
+          }
         }}
       />
 
