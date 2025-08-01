@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogOverlay } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
@@ -133,41 +134,44 @@ export function SimpleMediaUploadModal({
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Media Uploader */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Upload Media</h3>
-              <MediaUploader
-                onMediaUploaded={handleMediaUploaded}
-                disabled={isUploading}
-                maxMediaCount={20}
-                sessionId={`entity-upload-${Date.now()}`}
-              />
-            </div>
-
             {/* Media Preview Grid */}
             {selectedMedia.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium">
-                  Selected Media ({selectedMedia.length})
-                </h3>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  🖼️ Your media ({selectedMedia.length}/4)
+                </Label>
                 <CompactMediaGrid
                   media={selectedMedia}
                   onRemove={handleRemoveMedia}
                   onOpenLightbox={handleOpenLightbox}
-                  maxVisible={8}
+                  maxVisible={4}
                   className="max-h-48"
                 />
               </div>
             )}
 
+            {/* Media Uploader */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">📸 Add photos & videos</Label>
+              <MediaUploader
+                onMediaUploaded={handleMediaUploaded}
+                disabled={isUploading || selectedMedia.length >= 4}
+                maxMediaCount={4}
+                sessionId={`entity-upload-${Date.now()}`}
+              />
+              <p className="text-xs text-muted-foreground">
+                Add photos or videos to make your content stand out. {selectedMedia.length}/4 uploaded.
+              </p>
+            </div>
+
             {/* Media Metadata Form */}
             {selectedMedia.length > 0 && (
               <div className="space-y-4 pt-4 border-t">
-                <h3 className="text-sm font-medium">Media Details</h3>
+                <Label className="text-sm font-medium">📝 Media Details</Label>
                 
                 {/* Category Selection */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
+                  <Label className="text-sm font-medium">Category</Label>
                   <Select value={category} onValueChange={setCategory}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
@@ -184,7 +188,7 @@ export function SimpleMediaUploadModal({
 
                 {/* Caption */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Caption</label>
+                  <Label className="text-sm font-medium">Caption</Label>
                   <Textarea
                     placeholder="Add a caption for your media..."
                     value={caption}
@@ -195,7 +199,7 @@ export function SimpleMediaUploadModal({
 
                 {/* Alt Text */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Alt Text</label>
+                  <Label className="text-sm font-medium">Alt Text</Label>
                   <Input
                     placeholder="Describe the media for accessibility..."
                     value={altText}
