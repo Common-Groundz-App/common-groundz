@@ -48,6 +48,10 @@ export function SimpleMediaUploadModal({
     setIsLightboxOpen(true);
   };
 
+  const handleCloseLightbox = () => {
+    setIsLightboxOpen(false);
+  };
+
   const handleSave = () => {
     if (selectedMedia.length === 0) {
       toast({
@@ -75,8 +79,28 @@ export function SimpleMediaUploadModal({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={isOpen} onOpenChange={(open) => {
+        // Only allow closing the dialog if lightbox is not open
+        if (!isLightboxOpen && !open) {
+          onClose();
+        }
+      }}>
+        <DialogContent 
+          className="max-w-4xl max-h-[90vh] overflow-y-auto"
+          onPointerDownOutside={(e) => {
+            // Prevent closing when clicking on lightbox elements
+            const target = e.target as Element;
+            if (target.closest('[data-lightbox="true"]') || target.closest('.lightbox-preview')) {
+              e.preventDefault();
+            }
+          }}
+          onEscapeKeyDown={(e) => {
+            // If lightbox is open, let it handle the escape key
+            if (isLightboxOpen) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus size={20} />
@@ -137,7 +161,7 @@ export function SimpleMediaUploadModal({
         <LightboxPreview
           media={selectedMedia}
           initialIndex={selectedMediaIndex}
-          onClose={() => setIsLightboxOpen(false)}
+          onClose={handleCloseLightbox}
         />
       )}
     </>
