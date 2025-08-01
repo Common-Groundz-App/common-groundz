@@ -111,7 +111,7 @@ export function SimpleMediaUploadModal({
           className={isLightboxOpen ? "pointer-events-none" : ""}
         />
         <DialogContent 
-          className={`max-w-4xl max-h-[90vh] overflow-y-auto ${isLightboxOpen ? 'pointer-events-none' : ''}`}
+          className={`max-w-2xl max-h-[90vh] overflow-y-auto ${isLightboxOpen ? 'pointer-events-none' : ''}`}
           onPointerDownOutside={(e) => {
             // Prevent closing when clicking on lightbox elements
             const target = e.target as Element;
@@ -127,8 +127,7 @@ export function SimpleMediaUploadModal({
           }}
         >
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus size={20} />
+            <DialogTitle>
               Add Photos & Videos
             </DialogTitle>
           </DialogHeader>
@@ -157,11 +156,9 @@ export function SimpleMediaUploadModal({
                 onMediaUploaded={handleMediaUploaded}
                 disabled={isUploading || selectedMedia.length >= 4}
                 maxMediaCount={4}
+                initialMedia={selectedMedia}
                 sessionId={`entity-upload-${Date.now()}`}
               />
-              <p className="text-xs text-muted-foreground">
-                Add photos or videos to make your content stand out. {selectedMedia.length}/4 uploaded.
-              </p>
             </div>
 
             {/* Media Metadata Form */}
