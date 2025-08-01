@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MediaItem } from '@/types/media';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogOverlay } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
@@ -85,6 +85,9 @@ export function SimpleMediaUploadModal({
           onClose();
         }
       }}>
+        <DialogOverlay 
+          className={isLightboxOpen ? "pointer-events-none" : ""}
+        />
         <DialogContent 
           className="max-w-4xl max-h-[90vh] overflow-y-auto"
           onPointerDownOutside={(e) => {
