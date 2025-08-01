@@ -57,7 +57,7 @@ export function CompactMediaGrid({
           <div 
             key={item.id || item.url}
             className={cn(
-              "relative shrink-0 h-24 w-24 bg-muted rounded-md overflow-hidden",
+              "group relative shrink-0 h-24 w-24 bg-muted rounded-md overflow-hidden",
               "snap-start cursor-pointer transition-transform hover:scale-105",
               "border border-muted-foreground/20 lightbox-trigger"
             )}
