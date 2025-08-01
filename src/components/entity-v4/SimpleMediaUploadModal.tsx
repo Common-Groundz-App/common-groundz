@@ -89,7 +89,7 @@ export function SimpleMediaUploadModal({
           className={isLightboxOpen ? "pointer-events-none" : ""}
         />
         <DialogContent 
-          className="max-w-4xl max-h-[90vh] overflow-y-auto"
+          className={`max-w-4xl max-h-[90vh] overflow-y-auto ${isLightboxOpen ? 'pointer-events-none' : ''}`}
           onPointerDownOutside={(e) => {
             // Prevent closing when clicking on lightbox elements
             const target = e.target as Element;

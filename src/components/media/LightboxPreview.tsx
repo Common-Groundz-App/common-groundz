@@ -146,7 +146,15 @@ export function LightboxPreview({
   const isLandscape = orientation === 'landscape';
 
   const lightboxContent = (
-    <div className={cn("fixed inset-0 z-[9999] lightbox-preview", className)} data-lightbox="true">
+    <div 
+      className={cn(
+        "lightbox-preview fixed inset-0 z-[99999] bg-black/90 backdrop-blur-sm pointer-events-auto",
+        "flex items-center justify-center",
+        className
+      )}
+      style={{ position: 'fixed' }}
+      data-lightbox="true"
+    >
       {/* Background overlay - no click handler, handled by content container */}
       <div 
         className="absolute inset-0 bg-black/95"
@@ -346,10 +354,9 @@ export function LightboxPreview({
 
   // Use portal to render outside the normal component hierarchy
   const modalRoot = document.getElementById('modal-root');
-  if (!modalRoot) {
-    console.error('Modal root element not found');
-    return null;
-  }
-
-  return createPortal(lightboxContent, modalRoot);
+  const portalTarget = modalRoot || document.body;
+  
+  console.log('LightboxPreview portal target:', portalTarget === document.body ? 'document.body' : '#modal-root');
+  
+  return createPortal(lightboxContent, portalTarget);
 }
