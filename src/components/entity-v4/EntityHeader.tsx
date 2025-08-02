@@ -197,7 +197,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   </div>
                   {user && (
                     circleRating !== null ? (
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:w-auto">
                         <div className="flex items-center gap-2">
                           <div className="w-fit">
                             <ConnectedRingsRating
@@ -239,7 +239,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:w-auto">
                         <div className="flex items-center gap-2">
                           <div className="w-fit">
                             <ConnectedRingsRating
