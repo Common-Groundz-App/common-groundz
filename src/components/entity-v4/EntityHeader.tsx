@@ -102,15 +102,15 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
           isLoading={hierarchyLoading}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Brand Info */}
-          <div className="lg:col-span-2">
-            <div className="flex gap-6">
-              <img src={entityImage} alt={entityData.name} className="w-24 h-24 rounded-lg object-cover" />
-              <div className="flex-1 relative">
-                <div className="flex items-center justify-between mb-2">
+        <div className="grid grid-cols-1 gap-8">
+          {/* Brand Info */}
+          <div>
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+              <img src={entityImage} alt={entityData.name} className="w-16 h-16 sm:w-24 sm:h-24 rounded-lg object-cover flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
                   <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
+                    <h1 className="text-xl sm:text-3xl font-bold text-gray-900">{entityData.name}</h1>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         {entityData.claimed ? (
@@ -161,8 +161,8 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                 <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                 
                 {/* Ratings */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex items-center gap-4 flex-shrink-0 min-w-[300px]">
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full">
                     <div className="flex items-center gap-2">
                       <ConnectedRingsRating
                         value={entityData.rating}
@@ -179,8 +179,8 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                       </span>
                     </div>
                     
-                    <div className="leading-tight min-w-[140px]">
-                      <div className="font-semibold text-sm whitespace-nowrap text-gray-900 flex items-center gap-1">
+                    <div className="leading-tight">
+                      <div className="font-semibold text-sm text-gray-900 flex items-center gap-1">
                         Overall Rating
                         <InfoTooltip content="Overall Rating is the average review rating from all users who reviewed this item on Common Groundz." />
                       </div>
@@ -197,7 +197,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   </div>
                   {user && (
                     circleRating !== null ? (
-                      <div className="flex items-center gap-4 flex-shrink-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
                         <div className="flex items-center gap-2">
                           <div className="w-fit">
                             <ConnectedRingsRating
@@ -216,8 +216,8 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                           </span>
                         </div>
 
-                        <div className="leading-tight min-w-[140px]">
-                          <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
+                        <div className="leading-tight">
+                          <div className="font-semibold text-sm text-brand-orange flex items-center gap-1">
                             Circle Rating
                             <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
                           </div>
@@ -239,7 +239,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-4 flex-shrink-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
                         <div className="flex items-center gap-2">
                           <div className="w-fit">
                             <ConnectedRingsRating
@@ -255,8 +255,8 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                           </span>
                         </div>
 
-                        <div className="leading-tight min-w-[140px]">
-                          <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
+                        <div className="leading-tight">
+                          <div className="font-semibold text-sm text-brand-orange flex items-center gap-1">
                             Circle Rating
                             <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
                           </div>
@@ -271,7 +271,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
 
                 {/* Followers and Recommendations Section - Combined */}
                 {entity && (
-                  <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4">
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
                     {/* Followers */}
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
@@ -312,7 +312,7 @@ Only recent ratings are counted to keep things current and relevant.`}
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 min-w-0 pr-4">
+                <div className="flex flex-wrap gap-2 min-w-0">
                   {entity && (
                     <EntityFollowButton
                       entityId={entity.id}
@@ -321,24 +321,31 @@ Only recent ratings are counted to keep things current and relevant.`}
                     />
                   )}
                   <Button 
-                    className="bg-brand-orange hover:bg-brand-orange/90 text-white"
+                    className="bg-brand-orange hover:bg-brand-orange/90 text-white text-xs sm:text-sm"
+                    size="sm"
                     onClick={onReviewAction}
                   >
-                    <reviewActionConfig.icon className="w-4 h-4 mr-2" />
+                    <reviewActionConfig.icon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                     {reviewActionConfig.text}
                   </Button>
                   <Button 
                     variant="outline"
-                    className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                    size="sm"
+                    className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white text-xs sm:text-sm"
                     onClick={() => entityData.website && window.open(`https://${entityData.website.replace(/^https?:\/\//, '')}`, '_blank')}
                     disabled={!entityData.website}
                   >
-                    <Globe className="w-4 h-4 mr-2" />
-                    Visit Website
+                    <Globe className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Visit Website</span>
+                    <span className="sm:hidden">Website</span>
                   </Button>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                    <Navigation className="w-4 h-4 mr-2" />
-                    Get Directions
+                  <Button 
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm"
+                    size="sm"
+                  >
+                    <Navigation className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Get Directions</span>
+                    <span className="sm:hidden">Directions</span>
                   </Button>
                 </div>
 
