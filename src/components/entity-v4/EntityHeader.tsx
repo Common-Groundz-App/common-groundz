@@ -162,7 +162,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                 
                 {/* Ratings */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:w-auto">
                     <div className="flex items-center gap-2">
                       <ConnectedRingsRating
                         value={entityData.rating}
