@@ -161,7 +161,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                 <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
                 
                 {/* Ratings */}
-                <div className="flex items-center gap-3 mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
                   <div className="flex items-center gap-4 flex-shrink-0 min-w-[300px]">
                     <div className="flex items-center gap-2">
                       <ConnectedRingsRating
