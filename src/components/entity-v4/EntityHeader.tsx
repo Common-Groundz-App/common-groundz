@@ -8,6 +8,7 @@ import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation } from "lucide-react";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
   reviewActionConfig
 }) => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   
   // Fetch entity hierarchy data
   const {
@@ -105,12 +107,25 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Brand Info */}
           <div className="lg:col-span-2">
-            <div className="flex gap-6">
-              <img src={entityImage} alt={entityData.name} className="w-24 h-24 rounded-lg object-cover" />
+            {/* Mobile: Stack image above content, Desktop: side-by-side */}
+            <div className={`${isMobile ? 'flex flex-col' : 'flex gap-6'}`}>
+              {/* Image */}
+              <div className={`${isMobile ? 'w-full mb-4' : 'flex-shrink-0'}`}>
+                <img 
+                  src={entityImage} 
+                  alt={entityData.name} 
+                  className={`${isMobile ? 'w-full h-48 rounded-lg object-cover' : 'w-24 h-24 rounded-lg object-cover'}`} 
+                />
+              </div>
+              
+              {/* Content */}
               <div className="flex-1 relative">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold text-gray-900">{entityData.name}</h1>
+                {/* Title and Status Section */}
+                <div className={`${isMobile ? 'mb-3' : 'flex items-center justify-between mb-2'}`}>
+                  <div className={`flex items-center ${isMobile ? 'flex-wrap gap-2 mb-3' : 'gap-3'}`}>
+                    <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-900 ${isMobile ? 'w-full' : ''}`}>
+                      {entityData.name}
+                    </h1>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         {entityData.claimed ? (
@@ -135,8 +150,36 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  {/* Top-right action buttons */}
-                  <div className="flex items-center gap-2">
+                  
+                  {/* Share/Save buttons - Mobile: below title, Desktop: top-right */}
+                  {!isMobile && (
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-foreground hover:text-primary gap-2"
+                        onClick={handleShare}
+                      >
+                        <Share className="w-4 h-4" />
+                        Share
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className={`gap-2 ${isSaved ? 'text-brand-orange hover:text-brand-orange/80' : 'text-foreground hover:text-primary'}`}
+                        onClick={toggleSave}
+                        disabled={isSaveLoading}
+                      >
+                        <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+                        {isSaved ? 'Saved' : 'Save'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mobile Share/Save buttons */}
+                {isMobile && (
+                  <div className="flex items-center gap-2 mb-3">
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -157,35 +200,39 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                       {isSaved ? 'Saved' : 'Save'}
                     </Button>
                   </div>
-                </div>
-                <p className="text-gray-600 mb-4 leading-relaxed">{entityData.description}</p>
+                )}
+
+                <p className={`text-gray-600 mb-4 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
+                  {entityData.description}
+                </p>
                 
-                {/* Ratings */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-                  <div className="flex items-center gap-4 flex-shrink-0 min-w-[300px]">
+                {/* Ratings - Always stack on mobile, side-by-side on larger screens */}
+                <div className={`flex flex-col ${isMobile ? 'gap-4' : 'sm:flex-row sm:items-center gap-3'} mb-4`}>
+                  {/* Overall Rating */}
+                  <div className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
                     <div className="flex items-center gap-2">
                       <ConnectedRingsRating
                         value={entityData.rating}
                         variant="badge"
                         showValue={false}
-                        size="md"
+                        size={isMobile ? "sm" : "md"}
                         minimal={true}
                       />
                       <span 
-                        className="text-lg font-bold" 
+                        className={`${isMobile ? 'text-base' : 'text-lg'} font-bold`}
                         style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
                       >
                         {entityData.totalReviews > 0 ? entityData.rating.toFixed(1) : "0"}
                       </span>
                     </div>
                     
-                    <div className="leading-tight min-w-[140px]">
-                      <div className="font-semibold text-sm whitespace-nowrap text-gray-900 flex items-center gap-1">
+                    <div className={`leading-tight ${isMobile ? '' : 'sm:min-w-0'}`}>
+                      <div className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} text-gray-900 flex items-center gap-1`}>
                         Overall Rating
                         <InfoTooltip content="Overall Rating is the average review rating from all users who reviewed this item on Common Groundz." />
                       </div>
                       <div 
-                        className="text-sm font-bold" 
+                        className={`${isMobile ? 'text-xs' : 'text-sm'} font-bold`}
                         style={{ color: getSentimentColor(entityData.rating, entityData.totalReviews > 0) }}
                       >
                         {getSentimentLabel(entityData.rating, entityData.totalReviews > 0)}
@@ -195,34 +242,36 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Circle Rating */}
                   {user && (
                     circleRating !== null ? (
-                      <div className="flex items-center gap-4 flex-shrink-0">
+                      <div className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
                         <div className="flex items-center gap-2">
                           <div className="w-fit">
                             <ConnectedRingsRating
                               value={circleRating}
                               variant="badge"
                               showValue={false}
-                              size="md"
+                              size={isMobile ? "sm" : "md"}
                               minimal={true}
                             />
                           </div>
                           <span 
-                            className="text-lg font-bold" 
+                            className={`${isMobile ? 'text-base' : 'text-lg'} font-bold`}
                             style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
                           >
                             {circleRatingCount > 0 ? circleRating.toFixed(1) : "0"}
                           </span>
                         </div>
 
-                        <div className="leading-tight min-w-[140px]">
-                          <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
+                        <div className={`leading-tight ${isMobile ? '' : 'sm:min-w-0'}`}>
+                          <div className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} text-brand-orange flex items-center gap-1`}>
                             Circle Rating
                             <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
                           </div>
                           <div 
-                            className="text-sm font-bold" 
+                            className={`${isMobile ? 'text-xs' : 'text-sm'} font-bold`}
                             style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
                           >
                             {getSentimentLabel(circleRating, circleRatingCount > 0)}
@@ -239,24 +288,24 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-4 flex-shrink-0">
+                      <div className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
                         <div className="flex items-center gap-2">
                           <div className="w-fit">
                             <ConnectedRingsRating
                               value={0}
                               variant="badge"
                               showValue={false}
-                              size="md"
+                              size={isMobile ? "sm" : "md"}
                               minimal={true}
                             />
                           </div>
-                          <span className="text-lg font-bold text-muted-foreground">
+                          <span className={`${isMobile ? 'text-base' : 'text-lg'} font-bold text-muted-foreground`}>
                             0
                           </span>
                         </div>
 
-                        <div className="leading-tight min-w-[140px]">
-                          <div className="font-semibold text-sm whitespace-nowrap text-brand-orange flex items-center gap-1">
+                        <div className={`leading-tight ${isMobile ? '' : 'sm:min-w-0'}`}>
+                          <div className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} text-brand-orange flex items-center gap-1`}>
                             Circle Rating
                             <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
                           </div>
@@ -269,16 +318,16 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   )}
                 </div>
 
-                {/* Followers and Recommendations Section - Combined */}
+                {/* Followers and Recommendations Section */}
                 {entity && (
-                  <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4">
+                  <div className={`flex items-center ${isMobile ? 'gap-4' : 'gap-6'} text-sm text-muted-foreground mb-4`}>
                     {/* Followers */}
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
                       <EntityFollowersCount entityId={entity.id} />
                     </div>
                     
-                    {/* Recommendations - Make clickable as one unit */}
+                    {/* Recommendations */}
                     {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
                       <div className="flex items-center gap-2">
                         <ThumbsUp className="h-4 w-4" />
@@ -311,8 +360,8 @@ Only recent ratings are counted to keep things current and relevant.`}
                   </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex gap-3 min-w-0 pr-4">
+                {/* Action Buttons - Mobile: Stack 2x2, Desktop: Horizontal */}
+                <div className={`${isMobile ? 'grid grid-cols-2 gap-2' : 'flex gap-3'} min-w-0 ${isMobile ? '' : 'pr-4'}`}>
                   {entity && (
                     <EntityFollowButton
                       entityId={entity.id}
@@ -321,24 +370,24 @@ Only recent ratings are counted to keep things current and relevant.`}
                     />
                   )}
                   <Button 
-                    className="bg-brand-orange hover:bg-brand-orange/90 text-white"
+                    className={`bg-brand-orange hover:bg-brand-orange/90 text-white ${isMobile ? 'h-11 text-sm' : ''}`}
                     onClick={onReviewAction}
                   >
                     <reviewActionConfig.icon className="w-4 h-4 mr-2" />
-                    {reviewActionConfig.text}
+                    {isMobile ? 'Review' : reviewActionConfig.text}
                   </Button>
                   <Button 
                     variant="outline"
-                    className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                    className={`border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white ${isMobile ? 'h-11 text-sm' : ''}`}
                     onClick={() => entityData.website && window.open(`https://${entityData.website.replace(/^https?:\/\//, '')}`, '_blank')}
                     disabled={!entityData.website}
                   >
                     <Globe className="w-4 h-4 mr-2" />
-                    Visit Website
+                    {isMobile ? 'Website' : 'Visit Website'}
                   </Button>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Button className={`bg-blue-600 hover:bg-blue-700 text-white ${isMobile ? 'h-11 text-sm' : ''}`}>
                     <Navigation className="w-4 h-4 mr-2" />
-                    Get Directions
+                    {isMobile ? 'Directions' : 'Get Directions'}
                   </Button>
                 </div>
 
