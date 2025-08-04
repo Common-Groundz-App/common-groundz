@@ -9,7 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation } from "lucide-react";
+import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -149,58 +150,31 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                         </p>
                       </TooltipContent>
                     </Tooltip>
+                    
+                    {/* Three-dots menu for Share/Save */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover border z-50">
+                        <DropdownMenuItem onClick={handleShare} className="flex items-center gap-2 cursor-pointer">
+                          <Share className="h-4 w-4" />
+                          Share
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={toggleSave} 
+                          disabled={isSaveLoading}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-current text-brand-orange' : ''}`} />
+                          {isSaved ? 'Saved' : 'Save'}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  
-                  {/* Share/Save buttons - Mobile: below title, Desktop: top-right */}
-                  {!isMobile && (
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-foreground hover:text-primary gap-2"
-                        onClick={handleShare}
-                      >
-                        <Share className="w-4 h-4" />
-                        Share
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className={`gap-2 ${isSaved ? 'text-brand-orange hover:text-brand-orange/80' : 'text-foreground hover:text-primary'}`}
-                        onClick={toggleSave}
-                        disabled={isSaveLoading}
-                      >
-                        <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
-                        {isSaved ? 'Saved' : 'Save'}
-                      </Button>
-                    </div>
-                  )}
                 </div>
-
-                {/* Mobile Share/Save buttons */}
-                {isMobile && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-foreground hover:text-primary gap-2"
-                      onClick={handleShare}
-                    >
-                      <Share className="w-4 h-4" />
-                      Share
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className={`gap-2 ${isSaved ? 'text-brand-orange hover:text-brand-orange/80' : 'text-foreground hover:text-primary'}`}
-                      onClick={toggleSave}
-                      disabled={isSaveLoading}
-                    >
-                      <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
-                      {isSaved ? 'Saved' : 'Save'}
-                    </Button>
-                  </div>
-                )}
 
                 <p className={`text-gray-600 mb-4 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
                   {entityData.description}
