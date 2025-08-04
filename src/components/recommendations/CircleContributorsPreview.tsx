@@ -1,9 +1,9 @@
 
 import React, { useState } from 'react';
 import { CircleContributor } from '@/hooks/use-circle-rating-types';
-import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import { useProfiles } from '@/hooks/use-profile-cache';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AvatarTooltip } from '@/components/ui/avatar-tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { useNavigate } from 'react-router-dom';
 import { ContributorModal } from './ContributorModal';
 import { RatingDistribution } from './RatingDistribution';
@@ -62,21 +62,15 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
             const profile = profiles?.[contributor.userId];
             
             return (
-              <Tooltip key={contributor.userId}>
-                <TooltipTrigger asChild>
-                  <div 
-                    className="cursor-pointer relative hover:z-10 transition-all duration-200 hover:scale-110" 
-                    style={{ zIndex: maxDisplay - index }}
-                    onClick={(e) => handleAvatarClick(contributor.userId, e)}
-                  >
-                    <ProfileAvatar 
-                      userId={contributor.userId}
-                      size="xs"
-                      className="ring-2 ring-background hover:ring-primary/30 transition-all duration-200"
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs">
+              <AvatarTooltip 
+                key={contributor.userId}
+                userId={contributor.userId}
+                size="xs"
+                side="top"
+                className="ring-2 ring-background hover:ring-primary/30 transition-all duration-200 relative hover:z-10"
+                style={{ zIndex: maxDisplay - index }}
+                onClick={(e) => handleAvatarClick(contributor.userId, e)}
+                content={
                   <div className="text-xs space-y-1">
                     <div className="flex items-center gap-2">
                       <div className="font-medium">
@@ -112,8 +106,8 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
                       Click to view profile
                     </div>
                   </div>
-                </TooltipContent>
-              </Tooltip>
+                }
+              />
             );
           })}
           
