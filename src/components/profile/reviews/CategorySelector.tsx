@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 
 interface CategorySelectorProps {
   selected: string;
@@ -60,16 +60,10 @@ const CategorySelector = ({ selected, onChange, disableSelection = false }: Cate
         // Wrap in tooltip if disabled
         if (isDisabled) {
           return (
-            <TooltipProvider key={category.value}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {button}
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Category selection is locked to match the entity type</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <div key={category.value} className="relative">
+              <InfoTooltip content="Category selection is locked to match the entity type" side="top" />
+              {button}
+            </div>
           );
         }
         

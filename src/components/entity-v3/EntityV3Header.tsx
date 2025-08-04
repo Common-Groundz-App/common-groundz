@@ -7,7 +7,8 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Share, Bookmark, Globe, Navigation, CheckCircle, AlertTriangle, Users, ThumbsUp } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ClaimedBadgeTooltip } from '@/components/ui/claimed-badge-tooltip';
 
 interface EntityV3HeaderProps {
   entity: Entity;
@@ -56,29 +57,21 @@ export const EntityV3Header: React.FC<EntityV3HeaderProps> = ({
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <h1 className="text-3xl font-bold text-gray-900">{entity.name}</h1>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          {entity.is_claimed ? (
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Claimed
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer">
-                              <AlertTriangle className="w-3 h-3 mr-1" />
-                              Unclaimed
-                            </Badge>
-                          )}
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="bg-popover text-popover-foreground border rounded-md shadow-md p-3 max-w-xs">
-                          <p className="text-sm">
-                            {entity.is_claimed 
-                              ? "This listing is actively managed by the owner." 
-                              : "This listing hasn't been claimed yet. Claim it for free to update info, add photos, respond to reviews, and more."
-                            }
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
+                      {entity.is_claimed ? (
+                        <ClaimedBadgeTooltip content="This listing is actively managed by the owner.">
+                          <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Claimed
+                          </Badge>
+                        </ClaimedBadgeTooltip>
+                      ) : (
+                        <ClaimedBadgeTooltip content="This listing hasn't been claimed yet. Claim it for free to update info, add photos, respond to reviews, and more.">
+                          <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Unclaimed
+                          </Badge>
+                        </ClaimedBadgeTooltip>
+                      )}
                     </div>
                     {/* Top-right action buttons */}
                     <div className="flex items-center gap-2">

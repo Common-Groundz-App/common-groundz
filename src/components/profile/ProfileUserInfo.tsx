@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Edit, CheckCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 
 interface ProfileUserInfoProps {
   username: string;
@@ -44,11 +45,13 @@ const ProfileUserInfo = ({
           {displayName || username}
         </h2>
         {isVerified && (
-          <CheckCircle 
-            size={16} 
-            className="ml-1 text-brand-orange fill-brand-orange" 
-            data-tooltip="Verified Account"
-          />
+          <div className="ml-1 flex items-center">
+            <CheckCircle 
+              size={16} 
+              className="text-brand-orange fill-brand-orange" 
+            />
+            <InfoTooltip content="Verified Account" />
+          </div>
         )}
         {isOwnProfile && onEditClick && (
           <Button 
