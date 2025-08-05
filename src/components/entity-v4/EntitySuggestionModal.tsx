@@ -110,25 +110,15 @@ export const EntitySuggestionModal: React.FC<EntitySuggestionModalProps> = ({
   };
 
   const handleNext = () => {
-    setCurrentStep(prev => {
-      const nextStep = prev + 1;
-      // Skip step 2 (business hours) for non-business entities
-      if (nextStep === 2 && !isBusinessEntity) {
-        return 3;
-      }
-      return Math.min(nextStep, 4);
-    });
+    if (currentStep < 4) {
+      setCurrentStep(currentStep + 1);
+    }
   };
 
   const handlePrevious = () => {
-    setCurrentStep(prev => {
-      const prevStep = prev - 1;
-      // Skip step 2 (business hours) for non-business entities
-      if (prevStep === 2 && !isBusinessEntity) {
-        return 1;
-      }
-      return Math.max(prevStep, 1);
-    });
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
   };
 
   const onSubmit = async (data: SuggestionFormData) => {
@@ -256,6 +246,11 @@ export const EntitySuggestionModal: React.FC<EntitySuggestionModalProps> = ({
   );
 
   const renderStep2 = () => {
+    if (!isBusinessEntity) {
+      handleNext();
+      return null;
+    }
+
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-4">
@@ -391,7 +386,7 @@ export const EntitySuggestionModal: React.FC<EntitySuggestionModalProps> = ({
             Suggest an Edit for {entity.name}
           </DialogTitle>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Step {currentStep} of {isBusinessEntity ? 4 : 3}:</span>
+            <span>Step {currentStep} of 4:</span>
             <span>{getStepTitle()}</span>
           </div>
         </DialogHeader>
