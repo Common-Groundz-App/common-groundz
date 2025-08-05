@@ -4,6 +4,7 @@ import { Clock, MapPin, Mail, Phone, Globe, Users, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Entity } from '@/services/recommendation/types';
+import { EntitySuggestionButton } from './EntitySuggestionButton';
 import { 
   shouldShowBusinessHours, 
   shouldShowContactInfo, 
@@ -116,9 +117,7 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
           <p className="text-sm text-gray-600 leading-relaxed mb-4">
             {entity.description || "No description available for this entity. Help improve our database by suggesting an edit."}
           </p>
-          <Button variant="outline" size="sm" className="w-full">
-            Suggest an Edit
-          </Button>
+          <EntitySuggestionButton entity={entity} />
         </CardContent>
       </Card>
 
