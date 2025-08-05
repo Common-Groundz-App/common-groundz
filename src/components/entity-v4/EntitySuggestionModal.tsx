@@ -103,7 +103,7 @@ export const EntitySuggestionModal: React.FC<EntitySuggestionModalProps> = ({
     }
   }, [watchedFields, updateField, isOpen]);
 
-  const isBusinessEntity = ['place', 'food'].includes(entity.type);
+  // Allow all entity types to have business hours suggested
 
   const handleMediaUploaded = (media: MediaItem) => {
     updateField('suggestedImages', [...formData.suggestedImages, media]);
@@ -143,14 +143,12 @@ export const EntitySuggestionModal: React.FC<EntitySuggestionModalProps> = ({
       if (data.phone !== entity.metadata?.phone) suggestedChanges.phone = data.phone;
       if (data.website !== entity.website_url) suggestedChanges.website = data.website;
       
-      // Only include hours for business entities
-      if (isBusinessEntity) {
-        const hasHourChanges = DAYS.some(day => 
-          data.hours[day as keyof typeof data.hours] !== (entity.metadata?.hours?.[day] || '')
-        );
-        if (hasHourChanges) {
-          suggestedChanges.hours = data.hours;
-        }
+      // Include hours for all entity types if there are changes
+      const hasHourChanges = DAYS.some(day => 
+        data.hours[day as keyof typeof data.hours] !== (entity.metadata?.hours?.[day] || '')
+      );
+      if (hasHourChanges) {
+        suggestedChanges.hours = data.hours;
       }
 
       const { error } = await supabase
@@ -245,38 +243,31 @@ export const EntitySuggestionModal: React.FC<EntitySuggestionModalProps> = ({
     </div>
   );
 
-  const renderStep2 = () => {
-    if (!isBusinessEntity) {
-      handleNext();
-      return null;
-    }
-
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Clock className="w-5 h-5" />
-          <h3 className="text-lg font-medium">Business Hours</h3>
-        </div>
-        
-        {DAYS.map(day => (
-          <div key={day} className="flex items-center gap-4">
-            <div className="w-24 text-sm font-medium capitalize">{day}</div>
-            <Controller
-              name={`hours.${day}` as any}
-              control={control}
-              render={({ field }) => (
-                <Input
-                  {...field}
-                  placeholder="e.g., 9:00 AM - 5:00 PM or Closed"
-                  className="flex-1"
-                />
-              )}
-            />
-          </div>
-        ))}
+  const renderStep2 = () => (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Clock className="w-5 h-5" />
+        <h3 className="text-lg font-medium">Business Hours</h3>
       </div>
-    );
-  };
+      
+      {DAYS.map(day => (
+        <div key={day} className="flex items-center gap-4">
+          <div className="w-24 text-sm font-medium capitalize">{day}</div>
+          <Controller
+            name={`hours.${day}` as any}
+            control={control}
+            render={({ field }) => (
+              <Input
+                {...field}
+                placeholder="e.g., 9:00 AM - 5:00 PM or Closed"
+                className="flex-1"
+              />
+            )}
+          />
+        </div>
+      ))}
+    </div>
+  );
 
   const renderStep3 = () => (
     <div className="space-y-6">
