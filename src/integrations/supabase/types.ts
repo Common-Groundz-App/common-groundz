@@ -797,6 +797,84 @@ export type Database = {
           },
         ]
       }
+      entity_suggestions: {
+        Row: {
+          admin_notes: string | null
+          applied_at: string | null
+          context: string | null
+          created_at: string
+          duplicate_of_entity_id: string | null
+          entity_id: string
+          id: string
+          is_business_closed: boolean | null
+          is_duplicate: boolean | null
+          priority_score: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["suggestion_status"]
+          suggested_changes: Json
+          suggested_images: Json | null
+          updated_at: string
+          user_id: string
+          user_is_owner: boolean | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          applied_at?: string | null
+          context?: string | null
+          created_at?: string
+          duplicate_of_entity_id?: string | null
+          entity_id: string
+          id?: string
+          is_business_closed?: boolean | null
+          is_duplicate?: boolean | null
+          priority_score?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["suggestion_status"]
+          suggested_changes?: Json
+          suggested_images?: Json | null
+          updated_at?: string
+          user_id: string
+          user_is_owner?: boolean | null
+        }
+        Update: {
+          admin_notes?: string | null
+          applied_at?: string | null
+          context?: string | null
+          created_at?: string
+          duplicate_of_entity_id?: string | null
+          entity_id?: string
+          id?: string
+          is_business_closed?: boolean | null
+          is_duplicate?: boolean | null
+          priority_score?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["suggestion_status"]
+          suggested_changes?: Json
+          suggested_images?: Json | null
+          updated_at?: string
+          user_id?: string
+          user_is_owner?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_suggestions_duplicate_of_entity_id_fkey"
+            columns: ["duplicate_of_entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_suggestions_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entity_views: {
         Row: {
           created_at: string | null
@@ -2417,6 +2495,14 @@ export type Database = {
         Args: { p_entity_id: string }
         Returns: number
       }
+      get_entity_suggestion_stats: {
+        Args: { entity_uuid: string }
+        Returns: {
+          pending_count: number
+          approved_count: number
+          rejected_count: number
+        }[]
+      }
       get_follower_count_by_user_id: {
         Args: { user_id: string }
         Returns: number
@@ -2596,12 +2682,17 @@ export type Database = {
         Args: { user_id: string; preferences: Json }
         Returns: boolean
       }
+      user_has_pending_suggestion: {
+        Args: { entity_uuid: string; user_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       entity_type: "book" | "movie" | "place" | "product" | "food"
       post_type: "story" | "routine" | "project" | "note"
       recommendation_category: "food" | "movie" | "product" | "book" | "place"
       recommendation_visibility: "public" | "private" | "circle_only"
+      suggestion_status: "pending" | "approved" | "rejected" | "applied"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2733,6 +2824,7 @@ export const Constants = {
       post_type: ["story", "routine", "project", "note"],
       recommendation_category: ["food", "movie", "product", "book", "place"],
       recommendation_visibility: ["public", "private", "circle_only"],
+      suggestion_status: ["pending", "approved", "rejected", "applied"],
     },
   },
 } as const
