@@ -275,39 +275,84 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
       const suggestion = suggestions.find(s => s.id === suggestionId);
       if (!suggestion) throw new Error('Suggestion not found');
 
+      // Validate entity exists and is accessible
+      const { data: entityExists, error: entityError } = await supabase
+        .from('entities')
+        .select('id, name, is_deleted')
+        .eq('id', suggestion.entity_id)
+        .single();
+
+      if (entityError || !entityExists) {
+        throw new Error('Entity not found or inaccessible');
+      }
+
+      if (entityExists.is_deleted) {
+        throw new Error('Cannot update deleted entity');
+      }
+
       const changes = suggestion.suggested_changes;
       const updateData: any = { updated_at: new Date().toISOString() };
+      const appliedFields: string[] = [];
 
-      // Map suggested changes to entity fields
-      if (changes.name) updateData.name = changes.name;
-      if (changes.description) updateData.description = changes.description;
-      if (changes.website) updateData.website_url = changes.website;
+      console.log('Applying changes to entity:', {
+        entityId: suggestion.entity_id,
+        entityName: entityExists.name,
+        changes
+      });
+
+      // Map suggested changes to entity fields (allow empty strings)
+      if (changes.name !== undefined) {
+        updateData.name = changes.name;
+        appliedFields.push('name');
+      }
+      if (changes.description !== undefined) {
+        updateData.description = changes.description;
+        appliedFields.push('description');
+      }
+      if (changes.website !== undefined) {
+        updateData.website_url = changes.website;
+        appliedFields.push('website');
+      }
       
       // Handle metadata updates
-      if (changes.phone || changes.hours) {
+      if (changes.phone !== undefined || changes.hours !== undefined) {
         const currentMetadata = suggestion.entity?.metadata || {};
         updateData.metadata = { ...currentMetadata };
         
-        if (changes.phone) updateData.metadata.phone = changes.phone;
-        if (changes.hours) updateData.metadata.hours = changes.hours;
+        if (changes.phone !== undefined) {
+          updateData.metadata.phone = changes.phone;
+          appliedFields.push('phone');
+        }
+        if (changes.hours !== undefined) {
+          updateData.metadata.hours = changes.hours;
+          appliedFields.push('hours');
+        }
       }
+
+      console.log('Update data being sent:', updateData);
 
       const { error } = await supabase
         .from('entities')
         .update(updateData)
         .eq('id', suggestion.entity_id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
+
+      console.log('Successfully applied changes. Fields updated:', appliedFields);
 
       toast({
         title: 'Changes Applied',
-        description: 'Entity has been updated with suggested changes',
+        description: `Entity updated successfully. Fields changed: ${appliedFields.join(', ')}`,
       });
     } catch (error) {
       console.error('Error applying changes to entity:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: 'Error',
-        description: 'Failed to apply changes to entity',
+        description: `Failed to apply changes: ${errorMessage}`,
         variant: 'destructive'
       });
     }
