@@ -51,10 +51,11 @@ export const SuggestionReviewModal: React.FC<SuggestionReviewModalProps> = ({
 
   if (!suggestion) return null;
 
-  const handleApprove = async () => {
+  const handleApprove = async (forceReApply = false) => {
     setIsProcessing(true);
     try {
-      await onStatusUpdate(suggestion.id, 'approved', adminNotes || undefined, applyChanges);
+      const shouldApply = forceReApply || applyChanges;
+      await onStatusUpdate(suggestion.id, 'approved', adminNotes || undefined, shouldApply);
       onOpenChange(false);
       setAdminNotes('');
     } finally {
@@ -326,8 +327,20 @@ export const SuggestionReviewModal: React.FC<SuggestionReviewModalProps> = ({
               <Separator />
 
               <div className="flex items-center gap-3">
+                {suggestion.status === 'approved' && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleApprove(true)}
+                    disabled={isProcessing}
+                    className="gap-2"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    {isProcessing ? 'Re-applying...' : 'Re-apply Changes'}
+                  </Button>
+                )}
+
                 <Button
-                  onClick={handleApprove}
+                  onClick={() => handleApprove()}
                   disabled={isProcessing || suggestion.status !== 'pending'}
                   className="gap-2"
                 >
