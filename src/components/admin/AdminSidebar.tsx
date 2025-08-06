@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Shield, BarChart3, Database, FileText } from 'lucide-react';
+import { Shield, BarChart3, Database, FileText, MessageSquare } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 
 interface AdminSidebarProps {
@@ -43,6 +43,15 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         setCurrentActiveTab('Content Management');
         onTabChange('content-management');
       }
+    },
+    {
+      name: 'Suggestions Management',
+      url: '#suggestions-management',
+      icon: MessageSquare,
+      onClick: () => {
+        setCurrentActiveTab('Suggestions Management');
+        onTabChange('suggestions-management');
+      }
     }
   ];
 
@@ -55,6 +64,8 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         return 'Entity Management';
       case 'content-management':
         return 'Content Management';
+      case 'suggestions-management':
+        return 'Suggestions Management';
       default:
         return 'Overview';
     }

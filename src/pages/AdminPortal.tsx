@@ -13,6 +13,7 @@ import { AdminImageHealthPanel } from '@/components/admin/AdminImageHealthPanel'
 import { AdminEntityManagementPanel } from '@/components/admin/AdminEntityManagementPanel';
 import { AdminDebugPanel } from '@/components/admin/AdminDebugPanel';
 import { AdminPhotoModerationPanel } from '@/components/admin/AdminPhotoModerationPanel';
+import { AdminSuggestionsPanel } from '@/components/admin/AdminSuggestionsPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -95,6 +96,13 @@ const AdminPortal = () => {
     </div>
   );
 
+  const renderSuggestionsManagementContent = () => (
+    <div className="space-y-6">
+      {/* Entity Suggestions Section */}
+      <AdminSuggestionsPanel />
+    </div>
+  );
+
   const renderActiveContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -103,6 +111,8 @@ const AdminPortal = () => {
         return renderEntityManagementContent();
       case 'content-management':
         return renderContentManagementContent();
+      case 'suggestions-management':
+        return renderSuggestionsManagementContent();
       default:
         return renderOverviewContent();
     }
@@ -172,6 +182,16 @@ const AdminPortal = () => {
                   }`}
                 >
                   Content
+                </button>
+                <button
+                  onClick={() => setActiveTab('suggestions-management')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'suggestions-management'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Suggestions
                 </button>
               </div>
             </div>
