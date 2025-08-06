@@ -873,6 +873,20 @@ export type Database = {
             referencedRelation: "entities"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "entity_suggestions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_suggestions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       entity_views: {
