@@ -45,11 +45,11 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       }
     },
     {
-      name: 'Suggestions Management',
+      name: 'Suggestions',
       url: '#suggestions-management',
       icon: MessageSquare,
       onClick: () => {
-        setCurrentActiveTab('Suggestions Management');
+        setCurrentActiveTab('Suggestions');
         onTabChange('suggestions-management');
       }
     }
@@ -65,7 +65,7 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       case 'content-management':
         return 'Content Management';
       case 'suggestions-management':
-        return 'Suggestions Management';
+        return 'Suggestions';
       default:
         return 'Overview';
     }

@@ -89,7 +89,7 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
         .from('entity_suggestions')
         .select(`
           *,
-          entity:entities!entity_suggestions_entity_id_fkey (
+          entity:entities!entity_id (
             id,
             name,
             type,
@@ -98,12 +98,12 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
             metadata,
             website_url
           ),
-          user:profiles!entity_suggestions_user_id_fkey (
+          user:profiles!user_id (
             id,
             username,
             avatar_url
           ),
-          reviewer:profiles!entity_suggestions_reviewed_by_fkey (
+          reviewer:profiles!reviewed_by (
             id,
             username
           )
