@@ -14,8 +14,10 @@ import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { useToast } from '@/hooks/use-toast';
 import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
 import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
-import { EntityType } from '@/services/recommendation/types';
+import { EntityType, Entity } from '@/services/recommendation/types';
 import { useUserFollowing } from '@/hooks/useUserFollowing';
+import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
+import { useNavigate } from 'react-router-dom';
 
 // Imported extracted components
 import { EntityHeader } from './EntityHeader';
@@ -26,6 +28,7 @@ import { EntityTabsContent } from './EntityTabsContent';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   
   // Fetch real entity data
   const {
@@ -35,6 +38,16 @@ const EntityV4 = () => {
     isLoading,
     error
   } = useEntityDetailCached(slug || '');
+
+  // Fetch entity hierarchy data (children/products and parent)
+  const {
+    entityWithChildren,
+    parentEntity,
+    isLoading: isLoadingHierarchy,
+    error: hierarchyError,
+    hasChildren,
+    hasParent
+  } = useEntityHierarchy(entity?.id || null);
 
   // Fetch circle rating data and user following data
   const { user, isLoading: authLoading } = useAuth();
@@ -171,6 +184,19 @@ const EntityV4 = () => {
     setTimelineReviewId(null);
   };
 
+  // Navigation handlers for child entities (V4 navigation)
+  const handleViewChild = (child: Entity) => {
+    navigate(`/entity/${child.slug || child.id}?v=4`);
+  };
+
+  const handleViewAllProducts = () => {
+    // Could implement tab switching or modal here if needed
+    toast({
+      title: "View All Products",
+      description: "Navigate to products tab for complete list",
+    });
+  };
+
   const reviewActionConfig = getSidebarButtonConfig();
 
   // Show loading state
@@ -288,7 +314,14 @@ const EntityV4 = () => {
                 />
 
                 {/* SECTION 4: Tabs Navigation */}
-                <EntityTabsContent entity={entity} />
+                <EntityTabsContent 
+                  entity={entity} 
+                  stats={stats}
+                  entityWithChildren={entityWithChildren}
+                  parentEntity={parentEntity}
+                  onViewChild={handleViewChild}
+                  onViewAllProducts={handleViewAllProducts}
+                />
               </div>
 
               {/* SECTION 5: Info & Discovery Sidebar */}
