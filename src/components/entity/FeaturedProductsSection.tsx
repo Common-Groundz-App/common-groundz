@@ -2,20 +2,24 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { Entity } from '@/services/recommendation/types';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { EntityStats } from '@/hooks/use-entity-detail-cached';
 
 interface FeaturedProductsSectionProps {
   children: Entity[];
+  childrenStats?: Record<string, EntityStats>;
   onViewChild: (child: Entity) => void;
   onViewAllProducts: () => void;
 }
 
 export const FeaturedProductsSection: React.FC<FeaturedProductsSectionProps> = ({
   children,
+  childrenStats = {},
   onViewChild,
   onViewAllProducts
 }) => {
@@ -67,8 +71,19 @@ export const FeaturedProductsSection: React.FC<FeaturedProductsSectionProps> = (
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    <span className="text-xs text-muted-foreground">4.5</span>
+                    {childrenStats[child.id]?.averageRating ? (
+                      <>
+                        <RatingRingIcon 
+                          rating={childrenStats[child.id].averageRating} 
+                          size={12} 
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {childrenStats[child.id].averageRating.toFixed(1)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No ratings yet</span>
+                    )}
                   </div>
                   <Badge variant="outline" className="text-xs capitalize">
                     {child.type}

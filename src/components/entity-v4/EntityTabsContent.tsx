@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, Plus, MessageSquare, MessageSquareHeart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -12,6 +12,7 @@ import { EntityWithChildren } from '@/services/entityHierarchyService';
 import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { getEntityStats } from '@/services/entityService';
 
 interface EntityTabsContentProps {
   entity?: Entity;
@@ -22,14 +23,44 @@ interface EntityTabsContentProps {
   onViewAllProducts?: () => void;
 }
 
-export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({ 
-  entity, 
+export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
+  entity,
   stats,
   entityWithChildren,
   parentEntity,
   onViewChild,
   onViewAllProducts
 }) => {
+  const [childrenStats, setChildrenStats] = useState<Record<string, EntityStats>>({});
+
+  // Fetch stats for child entities
+  useEffect(() => {
+    const fetchChildrenStats = async () => {
+      if (!entityWithChildren?.children?.length) return;
+      
+      const statsPromises = entityWithChildren.children.map(async (child) => {
+        try {
+          const childStats = await getEntityStats(child.id, null);
+          return { id: child.id, stats: childStats };
+        } catch (error) {
+          console.error(`Error fetching stats for child ${child.id}:`, error);
+          return { id: child.id, stats: null };
+        }
+      });
+
+      const results = await Promise.all(statsPromises);
+      const statsMap = results.reduce((acc, { id, stats }) => {
+        if (stats) {
+          acc[id] = stats;
+        }
+        return acc;
+      }, {} as Record<string, EntityStats>);
+
+      setChildrenStats(statsMap);
+    };
+
+    fetchChildrenStats();
+  }, [entityWithChildren?.children]);
   return (
     <Tabs defaultValue="overview" className="mb-8">
       <TabsList className="grid w-full grid-cols-4">
@@ -43,6 +74,7 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
         {entityWithChildren?.children && entityWithChildren.children.length > 0 && onViewChild && onViewAllProducts && (
           <FeaturedProductsSection
             children={entityWithChildren.children}
+            childrenStats={childrenStats}
             onViewChild={onViewChild}
             onViewAllProducts={onViewAllProducts}
           />
