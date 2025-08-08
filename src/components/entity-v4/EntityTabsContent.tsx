@@ -13,6 +13,8 @@ import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSec
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { getEntityStats } from '@/services/entityService';
+import PostFeedItem from '@/components/feed/PostFeedItem';
+import { useEntityPosts } from '@/hooks/use-entity-posts';
 
 interface EntityTabsContentProps {
   entity?: Entity;
@@ -61,6 +63,14 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
 
     fetchChildrenStats();
   }, [entityWithChildren?.children]);
+
+  const { items: posts, isLoading: postsLoading, hasMore, fetchFirst, fetchNext, reset } = useEntityPosts(entity?.id);
+
+  useEffect(() => {
+    if (!entity?.id) return;
+    reset();
+    fetchFirst();
+  }, [entity?.id]);
   return (
     <Tabs defaultValue="overview" className="mb-8">
       <TabsList className="grid w-full grid-cols-4">
@@ -213,23 +223,30 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
         {entity && <PhotosSection entity={entity} />}
       </TabsContent>
       <TabsContent value="posts" className="mt-6">
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="font-semibold mb-4">Latest Posts</h3>
-            <div className="space-y-4">
-              <div className="border-b pb-4">
-                <h4 className="font-medium mb-2">New Product Launch: Plant-Based Protein</h4>
-                <p className="text-sm text-gray-600">We're excited to announce our latest addition to the Cosmix family...</p>
-                <span className="text-xs text-gray-400">2 days ago</span>
-              </div>
-              <div className="border-b pb-4">
-                <h4 className="font-medium mb-2">The Science Behind Whey Protein</h4>
-                <p className="text-sm text-gray-600">Understanding the benefits and optimal usage of whey protein...</p>
-                <span className="text-xs text-gray-400">1 week ago</span>
-              </div>
+        <div className="space-y-4">
+          {posts.length === 0 && !postsLoading ? (
+            <div className="py-12 text-center border rounded-lg bg-green-50/30 dark:bg-green-900/5">
+              <MessageSquare className="h-12 w-12 mx-auto text-green-300 dark:text-green-700" />
+              <h3 className="font-medium text-lg mt-4">No posts yet</h3>
+              <p className="text-muted-foreground mt-2">
+                Social posts tagged with this entity will appear here.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+            <div className="space-y-4">
+              {posts.map((p) => (
+                <PostFeedItem key={p.id} post={p} />
+              ))}
+            </div>
+          )}
+          <div className="flex justify-center pt-2">
+            {hasMore && (
+              <Button variant="outline" size="sm" onClick={fetchNext} disabled={postsLoading}>
+                {postsLoading ? 'Loading...' : 'Load more'}
+              </Button>
+            )}
+          </div>
+        </div>
       </TabsContent>
     </Tabs>
   );
