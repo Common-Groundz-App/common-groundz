@@ -448,14 +448,30 @@ export function ModernCreatePostForm({
                   form.setValue('content', val);
                   setContentHtml(val);
 
+                  // Handle @mention detection with debug logging
                   const caret = (e.target as HTMLTextAreaElement).selectionStart || 0;
                   const before = val.slice(0, caret);
-                  const match = before.match(/(^|\s)@([a-zA-Z0-9_]{1,30})$/);
+                  
+                  console.log('🎯 [Mention Debug] Typing:', { val, caret, before });
+                  
+                  // Improved regex - match @ followed by any characters (no length limit initially)
+                  const match = before.match(/(^|\s)@([a-zA-Z0-9_]*)$/);
                   if (match) {
-                    setMentionQuery(match[2]);
+                    const query = match[2];
+                    console.log('🎯 [Mention Debug] Match found:', { fullMatch: match[0], query, queryLength: query.length });
+                    
+                    // Always set the query, even if it's empty (just typed @)
+                    setMentionQuery(query);
                     setIsMentionOpen(true);
-                    setMentionAnchorIndex(caret - match[2].length - 1);
+                    setMentionAnchorIndex(caret - query.length - 1);
+                    
+                    console.log('🎯 [Mention Debug] State set:', { 
+                      mentionQuery: query, 
+                      isMentionOpen: true, 
+                      mentionAnchorIndex: caret - query.length - 1 
+                    });
                   } else {
+                    console.log('🎯 [Mention Debug] No match found, closing mention');
                     setIsMentionOpen(false);
                     setMentionQuery('');
                     setMentionAnchorIndex(null);
@@ -465,11 +481,16 @@ export function ModernCreatePostForm({
                 onKeyUp={saveCursorPosition}
                 onFocus={saveCursorPosition}
               />
-              {isMentionOpen && mentionQuery.length >= 2 && (
-                <div className="absolute left-0 right-0 mt-1 z-50">
+              {isMentionOpen && (
+                <div className="absolute left-0 right-0 mt-1 z-50" style={{ 
+                  border: '2px solid red',  // Temporary debug border
+                  backgroundColor: 'white',  // Ensure visible background
+                  maxWidth: '400px'
+                }}>
                   <MentionTypeahead
                     query={mentionQuery}
                     onSelect={(item) => {
+                      console.log('🎯 [Mention Debug] Item selected:', item);
                       if (!textareaRef.current || mentionAnchorIndex == null) return;
                       const textarea = textareaRef.current;
                       const current = form.getValues('content');
@@ -496,7 +517,10 @@ export function ModernCreatePostForm({
                         textarea.setSelectionRange(pos, pos);
                       }, 0);
                     }}
-                    onClose={() => setIsMentionOpen(false)}
+                    onClose={() => {
+                      console.log('🎯 [Mention Debug] Closing mention dropdown');
+                      setIsMentionOpen(false);
+                    }}
                   />
                 </div>
               )}

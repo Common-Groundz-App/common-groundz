@@ -19,21 +19,51 @@ interface MentionTypeaheadProps {
 }
 
 export const MentionTypeahead: React.FC<MentionTypeaheadProps> = ({ query, onSelect, onClose }) => {
-  const { results, isLoading } = useUnifiedSearch(query, { skipProductSearch: true });
+  console.log('🎯 [MentionTypeahead] Rendering with:', { query, queryLength: query.length });
+  
+  const { results, isLoading, error } = useUnifiedSearch(query, { skipProductSearch: true });
+
+  console.log('🎯 [MentionTypeahead] Search results:', { results, isLoading, error });
 
   const users = results.users || [];
   const entities = results.entities || [];
 
-  if (!query || query.length < 2) return null;
+  console.log('🎯 [MentionTypeahead] Processed data:', { 
+    usersCount: users.length, 
+    entitiesCount: entities.length,
+    users: users.map(u => ({ id: u.id, username: u.username }))
+  });
+
+  // Show dropdown even for short queries to aid debugging
+  if (!query) {
+    console.log('🎯 [MentionTypeahead] No query provided, not rendering');
+    return null;
+  }
 
   return (
-    <div className="rounded-md border bg-background shadow-md">
+    <div className="rounded-md border bg-background shadow-lg z-50" style={{ 
+      backgroundColor: 'white',
+      border: '1px solid #ccc',
+      minHeight: '60px'
+    }}>
+      <div className="p-2 text-xs text-gray-500 border-b">
+        Debug: Query="{query}" Users={users.length} Entities={entities.length}
+      </div>
+      
       {isLoading && (
         <div className="p-2 text-sm text-muted-foreground">Searching…</div>
       )}
 
-      {!isLoading && users.length === 0 && entities.length === 0 && (
-        <div className="p-2 text-sm text-muted-foreground">No matches</div>
+      {error && (
+        <div className="p-2 text-sm text-red-500">Error: {error}</div>
+      )}
+
+      {!isLoading && !error && users.length === 0 && entities.length === 0 && query.length >= 2 && (
+        <div className="p-2 text-sm text-muted-foreground">No matches for "{query}"</div>
+      )}
+
+      {!isLoading && !error && query.length < 2 && (
+        <div className="p-2 text-sm text-muted-foreground">Type at least 2 characters</div>
       )}
 
       {!isLoading && users.length > 0 && (
