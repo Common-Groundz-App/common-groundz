@@ -24,6 +24,7 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
 import { triggerHaptic, playSound } from '@/services/feedbackService';
+import { MentionTypeahead } from './MentionTypeahead';
 
 // Emoji picker styles are now in global CSS (index.css)
 
@@ -83,6 +84,12 @@ export function ModernCreatePostForm({
   const isMobile = useIsMobile();
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number } | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  // @mention state
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [isMentionOpen, setIsMentionOpen] = useState(false);
+  const [mentionAnchorIndex, setMentionAnchorIndex] = useState<number | null>(null);
+  const [mentions, setMentions] = useState<{ id: string; username: string | null }[]>([]);
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -284,6 +291,16 @@ export function ModernCreatePostForm({
           }
         }
 
+        // Update user mentions
+        await supabase
+          .from('post_user_mentions')
+          .delete()
+          .eq('post_id', postToEdit.id);
+        if (mentions.length > 0) {
+          const rows = mentions.map(m => ({ post_id: postToEdit.id, mentioned_user_id: m.id }));
+          await supabase.from('post_user_mentions').insert(rows);
+        }
+
         // ✅ Play sound after successful post update
         try {
           playSound('/sounds/post.mp3');
@@ -315,6 +332,11 @@ export function ModernCreatePostForm({
                 entity_id: entity.id
               });
           }
+        }
+        // Update user mentions for new post
+        if (mentions.length > 0 && newPost) {
+          const rows = mentions.map(m => ({ post_id: newPost.id, mentioned_user_id: m.id }));
+          await supabase.from('post_user_mentions').insert(rows);
         }
 
         // ✅ Play sound after successful post creation
@@ -415,20 +437,70 @@ export function ModernCreatePostForm({
           
           {/* Content Area */}
           <div className="flex-1 space-y-4">
-            {/* Main Content Input */}
-            <Textarea
-              ref={textareaRef}
-              placeholder={getPlaceholder()}
-              className="w-full min-h-[120px] p-3 text-base border-0 focus-visible:ring-0 resize-none bg-accent/10 rounded-lg"
-              value={form.watch('content')}
-              onChange={(e) => {
-                form.setValue('content', e.target.value);
-                setContentHtml(e.target.value);
-              }}
-              onClick={saveCursorPosition}
-              onKeyUp={saveCursorPosition}
-              onFocus={saveCursorPosition}
-            />
+            <div className="relative">
+              <Textarea
+                ref={textareaRef}
+                placeholder={getPlaceholder()}
+                className="w-full min-h-[120px] p-3 text-base border-0 focus-visible:ring-0 resize-none bg-accent/10 rounded-lg"
+                value={form.watch('content')}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  form.setValue('content', val);
+                  setContentHtml(val);
+
+                  const caret = (e.target as HTMLTextAreaElement).selectionStart || 0;
+                  const before = val.slice(0, caret);
+                  const match = before.match(/(^|\s)@([a-zA-Z0-9_]{1,30})$/);
+                  if (match) {
+                    setMentionQuery(match[2]);
+                    setIsMentionOpen(true);
+                    setMentionAnchorIndex(caret - match[2].length - 1);
+                  } else {
+                    setIsMentionOpen(false);
+                    setMentionQuery('');
+                    setMentionAnchorIndex(null);
+                  }
+                }}
+                onClick={saveCursorPosition}
+                onKeyUp={saveCursorPosition}
+                onFocus={saveCursorPosition}
+              />
+              {isMentionOpen && mentionQuery.length >= 2 && (
+                <div className="absolute left-0 right-0 mt-1 z-50">
+                  <MentionTypeahead
+                    query={mentionQuery}
+                    onSelect={(item) => {
+                      if (!textareaRef.current || mentionAnchorIndex == null) return;
+                      const textarea = textareaRef.current;
+                      const current = form.getValues('content');
+                      const caret = textarea.selectionStart;
+                      if (item.kind === 'user') {
+                        const replacement = '@' + (item.username || 'user');
+                        const newVal = current.slice(0, mentionAnchorIndex) + replacement + ' ' + current.slice(caret);
+                        form.setValue('content', newVal);
+                        setContentHtml(newVal);
+                        setMentions((prev) => (prev.some(m => m.id === item.id) ? prev : [...prev, { id: item.id, username: item.username || null }]));
+                      } else if (item.kind === 'entity') {
+                        // Add entity to selected list if not already present
+                        if (!selectedEntities.find(e => e.id === item.id)) {
+                          setSelectedEntities(prev => [...prev, { id: item.id, name: item.name || 'Entity' } as any]);
+                        }
+                      }
+                      setIsMentionOpen(false);
+                      setMentionQuery('');
+                      setMentionAnchorIndex(null);
+                      // Restore caret after insertion
+                      setTimeout(() => {
+                        const pos = mentionAnchorIndex + ((item.kind === 'user') ? (('@' + (item.username || 'user')).length + 1) : 0);
+                        textarea.focus();
+                        textarea.setSelectionRange(pos, pos);
+                      }, 0);
+                    }}
+                    onClose={() => setIsMentionOpen(false)}
+                  />
+                </div>
+              )}
+            </div>
             
             {/* Media Preview */}
             {mediaItems.length > 0 && (
