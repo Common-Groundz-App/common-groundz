@@ -223,7 +223,7 @@ export const useUnifiedSearch = (query: string, options?: { skipProductSearch?: 
         // If no results from specific API or it's a general/product query, try the unified search
         if (searchResults.products.length === 0 && !options?.skipProductSearch) {
           console.log('🔄 No specific results found, trying unified search...');
-          const { data, error: searchError } = await supabase.functions.invoke('search-all', {
+          const { data, error: searchError } = await supabase.functions.invoke('unified-search-v2', {
             body: { 
               query,
               limit: 20,

@@ -169,10 +169,15 @@ export function ModernCreatePostForm({
 
   // Detect mention trigger
   const detectMentionTrigger = (content: string, cursorPos: number) => {
+    console.log('🔍 Detecting mention trigger:', { content, cursorPos });
     const textBeforeCursor = content.substring(0, cursorPos);
     const mentionMatch = textBeforeCursor.match(/@([a-zA-Z0-9_]*)$/);
     
+    console.log('📝 Text before cursor:', textBeforeCursor);
+    console.log('🎯 Mention match:', mentionMatch);
+    
     if (mentionMatch) {
+      console.log('✅ Mention detected! Query:', mentionMatch[1]);
       setMentionQuery(mentionMatch[1]);
       setIsMentionOpen(true);
       
@@ -185,6 +190,7 @@ export function ModernCreatePostForm({
         });
       }
     } else {
+      console.log('❌ No mention detected, closing dropdown');
       setIsMentionOpen(false);
       setMentionQuery('');
     }
