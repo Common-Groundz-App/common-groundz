@@ -20,9 +20,9 @@ interface MentionTypeaheadProps {
 
 export const MentionTypeahead: React.FC<MentionTypeaheadProps> = ({ query, onSelect, onClose }) => {
   console.log('🎯 [MentionTypeahead] Rendering with:', { query, queryLength: query.length });
-  
-  const { results, isLoading, error } = useUnifiedSearch(query, { skipProductSearch: true });
-
+  console.log('MentionTypeahead rendering', query);
+  const { results, isLoading, error } = useUnifiedSearch(query);
+  console.log('Search results:', results);
   console.log('🎯 [MentionTypeahead] Search results:', { results, isLoading, error });
 
   const users = results.users || [];
@@ -41,11 +41,7 @@ export const MentionTypeahead: React.FC<MentionTypeaheadProps> = ({ query, onSel
   }
 
   return (
-    <div className="rounded-md border bg-background shadow-lg z-50" style={{ 
-      backgroundColor: 'white',
-      border: '1px solid #ccc',
-      minHeight: '60px'
-    }}>
+    <div className="rounded-md border-2 border-destructive bg-background shadow-lg z-[9999] min-h-[60px]">
       <div className="p-2 text-xs text-gray-500 border-b">
         Debug: Query="{query}" Users={users.length} Entities={entities.length}
       </div>

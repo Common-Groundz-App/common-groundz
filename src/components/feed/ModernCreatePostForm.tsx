@@ -90,6 +90,8 @@ export function ModernCreatePostForm({
   const [isMentionOpen, setIsMentionOpen] = useState(false);
   const [mentionAnchorIndex, setMentionAnchorIndex] = useState<number | null>(null);
   const [mentions, setMentions] = useState<{ id: string; username: string | null }[]>([]);
+  // Temporary: force-mount mention dropdown for debugging
+  const DEBUG_FORCE_MENTION = true;
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -454,11 +456,12 @@ export function ModernCreatePostForm({
                   
                   console.log('🎯 [Mention Debug] Typing:', { val, caret, before });
                   
-                  // Improved regex - match @ followed by any characters (no length limit initially)
-                  const match = before.match(/(^|\s)@([a-zA-Z0-9_]*)$/);
+                  // Simplified mention regex (no word-boundary requirement) for debugging
+                  const match = before.match(/@([a-zA-Z0-9_]*)$/);
                   if (match) {
-                    const query = match[2];
+                    const query = match[1];
                     console.log('🎯 [Mention Debug] Match found:', { fullMatch: match[0], query, queryLength: query.length });
+                    console.log('Mention detected:', query, 'len>=2?', query.length >= 2);
                     
                     // Always set the query, even if it's empty (just typed @)
                     setMentionQuery(query);
@@ -520,6 +523,46 @@ export function ModernCreatePostForm({
                     onClose={() => {
                       console.log('🎯 [Mention Debug] Closing mention dropdown');
                       setIsMentionOpen(false);
+                    }}
+                  />
+                </div>
+              )}
+              {DEBUG_FORCE_MENTION && (
+                <div className="absolute left-0 right-0 mt-1 z-[9999]" style={{ 
+                  border: '2px solid red',  // Temporary debug border
+                  backgroundColor: 'white',  // Ensure visible background
+                  maxWidth: '400px'
+                }}>
+                  <MentionTypeahead
+                    query="ish"
+                    onSelect={(item) => {
+                      console.log('🎯 [Mention Debug] [FORCED] Item selected:', item);
+                      if (!textareaRef.current) return;
+                      const textarea = textareaRef.current;
+                      const current = form.getValues('content');
+                      const caret = textarea.selectionStart;
+                      if (item.kind === 'user') {
+                        const replacement = '@' + (item.username || 'user');
+                        const newVal = current + (current.endsWith(' ') ? '' : ' ') + replacement + ' ';
+                        form.setValue('content', newVal);
+                        setContentHtml(newVal);
+                        setMentions((prev) => (prev.some(m => m.id === item.id) ? prev : [...prev, { id: item.id, username: item.username || null }]));
+                      } else if (item.kind === 'entity') {
+                        if (!selectedEntities.find(e => e.id === item.id)) {
+                          setSelectedEntities(prev => [...prev, { id: item.id, name: item.name || 'Entity' } as any]);
+                        }
+                      }
+                      setIsMentionOpen(false);
+                      setMentionQuery('');
+                      setMentionAnchorIndex(null);
+                      setTimeout(() => {
+                        const pos = (form.getValues('content') || '').length;
+                        textarea.focus();
+                        textarea.setSelectionRange(pos, pos);
+                      }, 0);
+                    }}
+                    onClose={() => {
+                      console.log('🎯 [Mention Debug] [FORCED] Closing mention dropdown');
                     }}
                   />
                 </div>
