@@ -406,12 +406,18 @@ export function ModernCreatePostForm({
         // Add user mentions
         if (pendingUserMentions.length > 0 && newPost) {
           for (const userId of pendingUserMentions) {
-            await supabase
-              .from('post_user_mentions')
-              .insert({
-                post_id: newPost.id,
-                mentioned_user_id: userId
-              });
+            try {
+              const { error: mentionError } = await supabase
+                .rpc('insert_user_mention', {
+                  post_id: newPost.id,
+                  mentioned_user_id: userId
+                });
+              if (mentionError) {
+                console.error('Error inserting user mention:', mentionError);
+              }
+            } catch (error) {
+              console.error('Error calling insert_user_mention RPC:', error);
+            }
           }
         }
 

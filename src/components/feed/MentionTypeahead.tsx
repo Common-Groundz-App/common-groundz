@@ -67,9 +67,9 @@ export function MentionTypeahead({ query, open, onSelect, onClose, position }: M
         results.push({
           type: 'user',
           id: user.id,
-          name: user.name || user.username || 'User',
-          displayName: user.name || user.username || 'User',
-          avatar: user.image_url,
+          name: user.username || 'User',
+          displayName: user.username || 'User',
+          avatar: user.avatar_url,
           username: user.username
         });
       });
