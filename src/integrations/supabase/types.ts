@@ -1470,27 +1470,6 @@ export type Database = {
           },
         ]
       }
-      post_user_mentions: {
-        Row: {
-          created_at: string
-          id: string
-          mentioned_user_id: string
-          post_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          mentioned_user_id: string
-          post_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          mentioned_user_id?: string
-          post_id?: string
-        }
-        Relationships: []
-      }
       posts: {
         Row: {
           comment_count: number
@@ -2649,10 +2628,6 @@ export type Database = {
       }
       insert_post_save: {
         Args: { p_post_id: string; p_user_id: string }
-        Returns: undefined
-      }
-      insert_user_mention: {
-        Args: { post_id: string; mentioned_user_id: string }
         Returns: undefined
       }
       is_admin_user: {
