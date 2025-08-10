@@ -131,7 +131,7 @@ export const useUnifiedSearch = (query: string, options?: { skipProductSearch?: 
 
   useEffect(() => {
     const performSearch = async () => {
-      if (!query || query.trim().length < 2) {
+      if (!query || query.trim().length < 1) {
         setResults({
           products: [],
           entities: [],
@@ -223,17 +223,20 @@ export const useUnifiedSearch = (query: string, options?: { skipProductSearch?: 
         // If no results from specific API or it's a general/product query, try the unified search
         if (searchResults.products.length === 0 && !options?.skipProductSearch) {
           console.log('🔄 No specific results found, trying unified search...');
+          console.log('📤 Sending to unified-search-v2:', { query, limit: 20 });
           const { data, error: searchError } = await supabase.functions.invoke('unified-search-v2', {
             body: { 
               query,
-              limit: 20,
-              type: 'all'
+              limit: 20
             }
           });
           
           if (searchError) {
+            console.error('❌ Search error:', searchError);
             throw new Error(`Search failed: ${searchError.message}`);
           }
+          
+          console.log('📥 Search response:', data);
           
           searchResults = {
             products: data?.products || [],
@@ -244,7 +247,7 @@ export const useUnifiedSearch = (query: string, options?: { skipProductSearch?: 
           };
         }
 
-        console.log(`✅ Search completed. Found: ${searchResults.products.length} products, ${searchResults.entities.length} entities`);
+        console.log(`✅ Search completed. Found: ${searchResults.products.length} products, ${searchResults.entities.length} entities, ${searchResults.users.length} users`);
         setResults(searchResults);
         
       } catch (err) {
@@ -262,7 +265,7 @@ export const useUnifiedSearch = (query: string, options?: { skipProductSearch?: 
       }
     };
 
-    const debounceTimer = setTimeout(performSearch, 300);
+    const debounceTimer = setTimeout(performSearch, 150);
     return () => clearTimeout(debounceTimer);
   }, [query, options?.skipProductSearch]);
 

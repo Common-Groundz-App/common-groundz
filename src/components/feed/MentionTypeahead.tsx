@@ -48,12 +48,24 @@ export function MentionTypeahead({ query, open, onSelect, onClose, position }: M
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(query);
-    }, 300);
+    }, 150);
     
     return () => clearTimeout(timer);
   }, [query]);
 
-  const { results: searchResults, isLoading } = useUnifiedSearch(debouncedQuery.length >= 2 ? debouncedQuery : '');
+  const { results: searchResults, isLoading, error } = useUnifiedSearch(debouncedQuery.length >= 1 ? debouncedQuery : '');
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 MentionTypeahead - Search Results:', {
+      query: debouncedQuery,
+      isLoading,
+      error,
+      searchResults,
+      usersFound: searchResults?.users?.length || 0,
+      entitiesFound: searchResults?.entities?.length || 0
+    });
+  }, [debouncedQuery, searchResults, isLoading, error]);
 
   // Process search results into mentions
   const mentions: MentionResult[] = React.useMemo(() => {
@@ -130,9 +142,9 @@ export function MentionTypeahead({ query, open, onSelect, onClose, position }: M
 
   if (!open) return null;
 
-  const showHint = query.length < 2;
-  const showResults = query.length >= 2 && mentions.length > 0;
-  const showNoResults = query.length >= 2 && mentions.length === 0 && !isLoading;
+  const showHint = query.length < 1;
+  const showResults = query.length >= 1 && mentions.length > 0;
+  const showNoResults = query.length >= 1 && mentions.length === 0 && !isLoading;
 
   return (
     <div 
@@ -141,11 +153,11 @@ export function MentionTypeahead({ query, open, onSelect, onClose, position }: M
     >
       {showHint && (
         <div className="p-3 text-sm text-muted-foreground">
-          Type 2+ characters to search for people and places
+          Start typing to search for people and places
         </div>
       )}
       
-      {isLoading && query.length >= 2 && (
+      {isLoading && query.length >= 1 && (
         <div className="p-3 text-sm text-muted-foreground">
           Searching...
         </div>
