@@ -15,11 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 interface SimpleEntitySelectorProps {
   onEntitiesChange: (entities: EntityAdapter[]) => void;
   initialEntities?: EntityAdapter[];
-  initialQuery?: string;
-  autoFocusSearch?: boolean;
 }
 
-export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], initialQuery = '', autoFocusSearch = false }: SimpleEntitySelectorProps) {
+export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [] }: SimpleEntitySelectorProps) {
   const [selectedEntities, setSelectedEntities] = useState<EntityAdapter[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState('');
   const [entityType, setEntityType] = useState<EntityTypeString>('place');
@@ -101,19 +99,6 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
       handleSearch(searchQuery, locationEnabled, position);
     }
   }, [position, locationEnabled, searchQuery]);
-
-  // Sync initialQuery from parent (e.g., '@' trigger)
-  useEffect(() => {
-    if (typeof initialQuery === 'string') {
-      setSearchQuery(initialQuery);
-      if (initialQuery.trim().length >= 2) {
-        setShowResults(true);
-        handleSearch(initialQuery, locationEnabled, position);
-      } else {
-        setShowResults(false);
-      }
-    }
-  }, [initialQuery, locationEnabled, position]);
   
   // Handle entity selection
   const handleEntitySelect = (entity: EntityAdapter) => {
@@ -238,7 +223,6 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
               onChange={handleSearchChange}
               className="w-full pr-8"
               ref={inputRef}
-              autoFocus={autoFocusSearch}
               aria-label={`Search for ${entityType}`}
               aria-expanded={showResults}
               aria-controls="simple-entity-search-results"
