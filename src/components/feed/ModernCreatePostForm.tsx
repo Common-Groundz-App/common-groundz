@@ -24,7 +24,6 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
 import { triggerHaptic, playSound } from '@/services/feedbackService';
-import { MentionTypeahead, type MentionResult } from './MentionTypeahead';
 
 // Emoji picker styles are now in global CSS (index.css)
 
@@ -78,13 +77,6 @@ export function ModernCreatePostForm({
     coordinates: { lat: number; lng: number };
   } | null>(null);
   const [contentHtml, setContentHtml] = useState<string>(postToEdit?.content || '');
-  
-  // Mention state
-  const [mentionQuery, setMentionQuery] = useState('');
-  const [isMentionOpen, setIsMentionOpen] = useState(false);
-  const [pendingUserMentions, setPendingUserMentions] = useState<string[]>([]);
-  const [mentionPosition, setMentionPosition] = useState<{ top: number; left: number } | undefined>();
-  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useState<string>(() => generateUUID())[0];
   const isEditMode = !!postToEdit;
@@ -165,90 +157,6 @@ export function ModernCreatePostForm({
       const end = textareaRef.current.selectionEnd;
       setCursorPosition({ start, end });
     }
-  };
-
-  // Detect mention trigger
-  const detectMentionTrigger = (content: string, cursorPos: number) => {
-    console.log('🔍 Detecting mention trigger:', { content, cursorPos });
-    const textBeforeCursor = content.substring(0, cursorPos);
-    const mentionMatch = textBeforeCursor.match(/@([a-zA-Z0-9_]*)$/);
-    
-    console.log('📝 Text before cursor:', textBeforeCursor);
-    console.log('🎯 Mention match:', mentionMatch);
-    
-    if (mentionMatch) {
-      console.log('✅ Mention detected! Query:', mentionMatch[1]);
-      setMentionQuery(mentionMatch[1]);
-      setIsMentionOpen(true);
-      
-      // Calculate position for dropdown
-      if (textareaRef.current) {
-        const rect = textareaRef.current.getBoundingClientRect();
-        setMentionPosition({
-          top: rect.bottom + 4,
-          left: rect.left + 10
-        });
-      }
-    } else {
-      console.log('❌ No mention detected, closing dropdown');
-      setIsMentionOpen(false);
-      setMentionQuery('');
-    }
-  };
-
-  // Handle mention selection
-  const handleMentionSelect = (mention: MentionResult) => {
-    if (!textareaRef.current) return;
-    
-    const textarea = textareaRef.current;
-    const currentContent = form.getValues('content');
-    const cursorPos = textarea.selectionStart;
-    
-    // Find the start of the mention (@ symbol)
-    const textBeforeCursor = currentContent.substring(0, cursorPos);
-    const mentionStart = textBeforeCursor.lastIndexOf('@');
-    
-    if (mentionStart !== -1) {
-      const textBeforeMention = currentContent.substring(0, mentionStart);
-      const textAfterCursor = currentContent.substring(cursorPos);
-      
-      let insertText: string;
-      
-      if (mention.type === 'user') {
-        insertText = `@${mention.name}`;
-        // Store user ID for database insertion
-        setPendingUserMentions(prev => [...prev, mention.id]);
-      } else {
-        insertText = mention.name;
-        // Add entity to selected entities
-        const entity: Entity = {
-          id: mention.id,
-          name: mention.name,
-          type: (mention.entityType as any) || 'product',
-          image_url: mention.avatar || null
-        };
-        setSelectedEntities(prev => [...prev, entity]);
-      }
-      
-      const newContent = textBeforeMention + insertText + ' ' + textAfterCursor;
-      const newCursorPos = mentionStart + insertText.length + 1;
-      
-      // Update form and textarea
-      form.setValue('content', newContent);
-      setContentHtml(newContent);
-      
-      // Set cursor position
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
-        }
-      }, 10);
-    }
-    
-    // Close mention dropdown
-    setIsMentionOpen(false);
-    setMentionQuery('');
   };
 
   // Handle emoji selection
@@ -408,24 +316,6 @@ export function ModernCreatePostForm({
               });
           }
         }
-        
-        // Add user mentions
-        if (pendingUserMentions.length > 0 && newPost) {
-          for (const userId of pendingUserMentions) {
-            try {
-              const { error: mentionError } = await supabase
-                .rpc('insert_user_mention', {
-                  post_id: newPost.id,
-                  mentioned_user_id: userId
-                });
-              if (mentionError) {
-                console.error('Error inserting user mention:', mentionError);
-              }
-            } catch (error) {
-              console.error('Error calling insert_user_mention RPC:', error);
-            }
-          }
-        }
 
         // ✅ Play sound after successful post creation
         try {
@@ -526,52 +416,19 @@ export function ModernCreatePostForm({
           {/* Content Area */}
           <div className="flex-1 space-y-4">
             {/* Main Content Input */}
-            <div className="relative">
-              <Textarea
-                ref={textareaRef}
-                placeholder={getPlaceholder()}
-                className="w-full min-h-[120px] p-3 text-base border-0 focus-visible:ring-0 resize-none bg-accent/10 rounded-lg"
-                value={form.watch('content')}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  form.setValue('content', newValue);
-                  setContentHtml(newValue);
-                  
-                  // Check for mention trigger
-                  const cursorPos = e.target.selectionStart;
-                  detectMentionTrigger(newValue, cursorPos);
-                }}
-                onClick={saveCursorPosition}
-                onKeyUp={(e) => {
-                  saveCursorPosition();
-                  
-                  // Re-check mention trigger on key up
-                  const textarea = e.target as HTMLTextAreaElement;
-                  detectMentionTrigger(textarea.value, textarea.selectionStart);
-                }}
-                onFocus={saveCursorPosition}
-                onKeyDown={(e) => {
-                  // Close mention dropdown on Escape
-                  if (e.key === 'Escape' && isMentionOpen) {
-                    e.preventDefault();
-                    setIsMentionOpen(false);
-                    setMentionQuery('');
-                  }
-                }}
-              />
-              
-              {/* Mention Typeahead */}
-              <MentionTypeahead
-                query={mentionQuery}
-                open={isMentionOpen}
-                onSelect={handleMentionSelect}
-                onClose={() => {
-                  setIsMentionOpen(false);
-                  setMentionQuery('');
-                }}
-                position={mentionPosition}
-              />
-            </div>
+            <Textarea
+              ref={textareaRef}
+              placeholder={getPlaceholder()}
+              className="w-full min-h-[120px] p-3 text-base border-0 focus-visible:ring-0 resize-none bg-accent/10 rounded-lg"
+              value={form.watch('content')}
+              onChange={(e) => {
+                form.setValue('content', e.target.value);
+                setContentHtml(e.target.value);
+              }}
+              onClick={saveCursorPosition}
+              onKeyUp={saveCursorPosition}
+              onFocus={saveCursorPosition}
+            />
             
             {/* Media Preview */}
             {mediaItems.length > 0 && (
