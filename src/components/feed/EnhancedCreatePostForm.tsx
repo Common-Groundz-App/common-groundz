@@ -62,6 +62,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const sessionId = useRef(uuidv4()).current;
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
   const MAX_MEDIA_COUNT = 4;
   
   // Auto-resize textarea as content changes
@@ -217,6 +218,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const handleEntitiesChange = (newEntities: Entity[]) => {
     setEntities(newEntities);
     setEntitySelectorVisible(false);
+    setSelectorPrefillQuery(''); // Clear prefill query when closing
   };
 
   const removeEntity = (entityId: string) => {
@@ -387,7 +389,26 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
             ref={textareaRef}
             placeholder="What do you want to share today?"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              const newContent = e.target.value;
+              setContent(newContent);
+              
+              // Check for @ mention trigger
+              const textarea = e.target;
+              const cursorPos = textarea.selectionStart;
+              
+              // Look for @ symbol followed by text
+              const textBeforeCursor = newContent.substring(0, cursorPos);
+              const mentionMatch = textBeforeCursor.match(/(^|\s)@(\w*)$/);
+              
+              if (mentionMatch) {
+                const mentionText = mentionMatch[2]; // Text after @
+                setSelectorPrefillQuery(mentionText);
+                setEntitySelectorVisible(true);
+                setEmojiPickerVisible(false);
+                setShowLocationInput(false);
+              }
+            }}
             className="min-h-[100px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/70"
             onClick={saveCursorPosition}
             onKeyUp={saveCursorPosition}
@@ -452,12 +473,14 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         </div>
       )}
 
-      {/* Entity Selector (only shown when tag button is clicked) */}
+      {/* Entity Selector (only shown when tag button is clicked or @ is typed) */}
       {entitySelectorVisible && (
         <div className="mt-3 p-3 border rounded-lg bg-background animate-fade-in">
           <SimpleEntitySelector 
             onEntitiesChange={handleEntitiesChange}
             initialEntities={entities}
+            initialQuery={selectorPrefillQuery}
+            autoFocusSearch={!!selectorPrefillQuery}
           />
         </div>
       )}
@@ -577,6 +600,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
               if (!entitySelectorVisible) {
                 setShowLocationInput(false);
                 setEmojiPickerVisible(false);
+                setSelectorPrefillQuery(''); // Clear prefill when manually opening
               }
             }}
             disabled={showLocationInput}
