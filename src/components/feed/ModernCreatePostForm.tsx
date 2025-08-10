@@ -77,6 +77,7 @@ export function ModernCreatePostForm({
     coordinates: { lat: number; lng: number };
   } | null>(null);
   const [contentHtml, setContentHtml] = useState<string>(postToEdit?.content || '');
+  const [selectorPrefillQuery, setSelectorPrefillQuery] = useState<string>('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useState<string>(() => generateUUID())[0];
   const isEditMode = !!postToEdit;
@@ -360,6 +361,7 @@ export function ModernCreatePostForm({
   const handleEntitiesChange = (entities: Entity[]) => {
     setSelectedEntities(entities);
     setIsEntitySelectorOpen(false);
+    setSelectorPrefillQuery('');
   };
   
   // Generate title from content if needed
@@ -422,8 +424,27 @@ export function ModernCreatePostForm({
               className="w-full min-h-[120px] p-3 text-base border-0 focus-visible:ring-0 resize-none bg-accent/10 rounded-lg"
               value={form.watch('content')}
               onChange={(e) => {
-                form.setValue('content', e.target.value);
-                setContentHtml(e.target.value);
+                const val = e.target.value;
+                form.setValue('content', val);
+                setContentHtml(val);
+
+                // Detect "@" trigger and prefill entity selector
+                const textarea = e.target as HTMLTextAreaElement;
+                const caret = textarea.selectionStart ?? val.length;
+                const atIndex = val.lastIndexOf('@', Math.max(0, caret - 1));
+                if (atIndex >= 0) {
+                  const prevChar = atIndex === 0 ? ' ' : val[atIndex - 1];
+                  const segment = val.slice(atIndex, caret);
+                  const hasWhitespace = /\s/.test(segment);
+                  // Only trigger when '@' is at start or preceded by whitespace (avoid emails)
+                  if ((prevChar === ' ' || prevChar === '\n' || prevChar === '\t') && !hasWhitespace) {
+                    const query = val.slice(atIndex + 1, caret);
+                    setIsEntitySelectorOpen(true);
+                    setSelectorPrefillQuery(query);
+                    setIsEmojiPickerOpen(false);
+                    setIsLocationSelectorOpen(false);
+                  }
+                }
               }}
               onClick={saveCursorPosition}
               onKeyUp={saveCursorPosition}
@@ -569,6 +590,8 @@ export function ModernCreatePostForm({
                     <SimpleEntitySelector
                       onEntitiesChange={handleEntitiesChange}
                       initialEntities={selectedEntities}
+                      initialQuery={selectorPrefillQuery}
+                      autoFocusSearch
                     />
                   </PopoverContent>
                 </Popover>
