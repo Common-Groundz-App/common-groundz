@@ -292,7 +292,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
           <div 
             id="simple-entity-search-results"
             ref={resultsRef}
-            className="border rounded-md max-h-40 overflow-y-auto"
+            className="border rounded-md max-h-40 overflow-y-auto w-full max-w-full overflow-x-hidden"
             role="listbox"
           >
             {isLoading || geoLoading ? (
@@ -305,7 +305,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
                     {localResults.map((entity) => (
                       <div
                         key={entity.id}
-                        className="flex items-center hover:bg-accent/30 cursor-pointer p-2"
+                        className="flex items-center hover:bg-accent/30 cursor-pointer p-2 w-full max-w-full overflow-hidden"
                         onClick={() => handleEntitySelect(entity)}
                         role="option"
                         aria-selected="false"
@@ -325,8 +325,8 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
                         </div>
                         
                         {/* Entity Details */}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{entity.name}</div>
+                        <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+                          <div className="text-sm font-medium truncate max-w-full" title={entity.name}>{entity.name}</div>
                           {shouldShowDistance(entity) && (
                             <div className="text-xs text-brand-orange">
                               {formatDistance(entity.metadata.distance)}
@@ -344,7 +344,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
                     {externalResults.map((result, index) => (
                       <div
                         key={`external-${index}-${result.name}`}
-                        className="flex items-center hover:bg-accent/30 cursor-pointer p-2"
+                        className="flex items-center hover:bg-accent/30 cursor-pointer p-2 w-full max-w-full overflow-hidden"
                         onClick={() => handleExternalResultSelect(result)}
                         role="option"
                         aria-selected="false"
@@ -365,8 +365,8 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
                         </div>
                         
                         {/* Result Details */}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{result.name}</div>
+                        <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+                          <div className="text-sm font-medium truncate max-w-full" title={result.name}>{result.name}</div>
                           {shouldShowDistance(result) && (
                             <div className="text-xs text-brand-orange">
                               {formatDistance(result.metadata.distance)}
