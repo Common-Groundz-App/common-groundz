@@ -198,6 +198,8 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
         return "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
       case 'place':
         return "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
+      case 'people':
+        return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
       default:
         return "https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
     }
@@ -211,7 +213,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-medium">Tag a place, product, or media</h4>
+      <h4 className="text-sm font-medium">Tag a place, product, person, or media</h4>
       
       <div className="space-y-2">
         <div className="flex gap-2">
@@ -225,6 +227,7 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
             <SelectContent>
               <SelectItem value="place">Place</SelectItem>
               <SelectItem value="food">Food</SelectItem>
+              <SelectItem value="people">People</SelectItem>
               <SelectItem value="movie">Movie</SelectItem>
               <SelectItem value="book">Book</SelectItem>
               <SelectItem value="product">Product</SelectItem>

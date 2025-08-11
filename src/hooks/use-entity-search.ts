@@ -62,19 +62,43 @@ export function useEntitySearch(type: EntityTypeString) {
     setIsLoading(true);
     
     try {
-      // Search in our local database first - cast the type to avoid TypeScript issues
-      const { data: localData, error: localError } = await supabase
-        .from('entities')
-        .select()
-        .eq('type', type as any) // Cast to any to handle extended entity types
-        .ilike('name', `%${query}%`)
-        .order('name')
-        .limit(5);
-      
-      if (localError) throw localError;
+      let localData: Entity[] = [];
+
+      if (type === 'people') {
+        // Search for users in profiles table
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url, bio')
+          .or(`username.ilike.%${query}%, bio.ilike.%${query}%`)
+          .limit(10);
+        
+        if (profileError) throw profileError;
+
+        // Transform user profiles to entity format
+        localData = (profileData || []).map(profile => ({
+          id: profile.id,
+          name: profile.username || 'Unknown User',
+          description: profile.bio || undefined,
+          image_url: profile.avatar_url || undefined,
+          type: 'people' as EntityTypeString,
+          metadata: { userProfile: true }
+        }));
+      } else {
+        // Search in our local database for entities
+        const { data: entityData, error: localError } = await supabase
+          .from('entities')
+          .select()
+          .eq('type', type as any) // Cast to any to handle extended entity types
+          .ilike('name', `%${query}%`)
+          .order('name')
+          .limit(5);
+        
+        if (localError) throw localError;
+        localData = entityData as Entity[] || [];
+      }
       
       // Process local results - add distance if position is available
-      let processedLocalData = localData as Entity[] || [];
+      let processedLocalData = localData;
       
       // Calculate distance for local entities if location is available and enabled
       if (useLocation && isLocationEnabled() && position && processedLocalData.length > 0) {
@@ -110,56 +134,61 @@ export function useEntitySearch(type: EntityTypeString) {
       // Set local database results
       setLocalResults(processedLocalData);
       
-      // External API search
-      let externalData;
-      
-      // Call appropriate Supabase Edge Function based on entity type
-      let functionName;
-      let payload: any = { query };
-      
-      // Add location data if available and requested
-      if (useLocation && isLocationEnabled() && position) {
-        payload.latitude = position.latitude;
-        payload.longitude = position.longitude;
+      // External API search - skip for people since we only search locally
+      if (type === 'people') {
+        setExternalResults([]);
+      } else {
+        // External API search
+        let externalData;
+        
+        // Call appropriate Supabase Edge Function based on entity type
+        let functionName;
+        let payload: any = { query };
+        
+        // Add location data if available and requested
+        if (useLocation && isLocationEnabled() && position) {
+          payload.latitude = position.latitude;
+          payload.longitude = position.longitude;
+        }
+        
+        // Always send the locationEnabled flag to the edge function
+        payload.locationEnabled = useLocation && isLocationEnabled();
+        
+        // Pass the category parameter for filtering (important for food category)
+        payload.category = type;
+        
+        switch (type) {
+          case 'place':
+          case 'food':
+            functionName = 'search-places';
+            break;
+          case 'movie':
+            functionName = 'search-movies';
+            break;
+          case 'book':
+            functionName = 'search-books';
+            break;
+          case 'product':
+            functionName = 'search-products';
+            break;
+          default:
+            functionName = 'search-places';
+        }
+        
+        console.log(`Searching for ${type} with query: "${query}"`, payload);
+        
+        const { data: funcData, error: funcError } = await supabase.functions.invoke(functionName, {
+          body: payload
+        });
+        
+        if (funcError) throw funcError;
+        
+        externalData = funcData?.results || [];
+        console.log(`Received ${externalData.length} results from ${functionName}:`, externalData);
+        
+        // Set external API results
+        setExternalResults(externalData);
       }
-      
-      // Always send the locationEnabled flag to the edge function
-      payload.locationEnabled = useLocation && isLocationEnabled();
-      
-      // Pass the category parameter for filtering (important for food category)
-      payload.category = type;
-      
-      switch (type) {
-        case 'place':
-        case 'food':
-          functionName = 'search-places';
-          break;
-        case 'movie':
-          functionName = 'search-movies';
-          break;
-        case 'book':
-          functionName = 'search-books';
-          break;
-        case 'product':
-          functionName = 'search-products';
-          break;
-        default:
-          functionName = 'search-places';
-      }
-      
-      console.log(`Searching for ${type} with query: "${query}"`, payload);
-      
-      const { data: funcData, error: funcError } = await supabase.functions.invoke(functionName, {
-        body: payload
-      });
-      
-      if (funcError) throw funcError;
-      
-      externalData = funcData?.results || [];
-      console.log(`Received ${externalData.length} results from ${functionName}:`, externalData);
-      
-      // Set external API results
-      setExternalResults(externalData);
       
     } catch (error) {
       console.error(`Error searching for ${type}:`, error);
@@ -176,6 +205,12 @@ export function useEntitySearch(type: EntityTypeString) {
 
   const createEntityFromExternal = useCallback(async (externalData: any) => {
     try {
+      // For people type, we don't create external entities - users are only from our profiles table
+      if (type === 'people') {
+        console.log('Cannot create external entity for people type');
+        return null;
+      }
+
       // Check if an entity with the same api_source and api_ref already exists
       if (externalData.api_source && externalData.api_ref) {
         const existingEntity = await findEntityByApiRef(externalData.api_source, externalData.api_ref);

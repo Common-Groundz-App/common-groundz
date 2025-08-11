@@ -226,7 +226,8 @@ export function SearchResultHandler({
       'art': 'art',
       'activity': 'activity',
       'drink': 'drink',
-      'travel': 'travel'
+      'travel': 'travel',
+      'people': 'place'
     };
     
     return categoryMap[type] || 'product';
