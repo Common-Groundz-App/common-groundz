@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { MediaUploader } from '@/components/media/MediaUploader';
-import { UserAvatar } from '@/components/ui/user-avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SimpleEntitySelector } from '@/components/feed/SimpleEntitySelector';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
@@ -378,11 +378,12 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
     >
       {/* User Info + Text Input */}
       <div className="flex gap-3">
-        <UserAvatar 
-          username={userDisplayName} 
-          imageUrl={avatarUrl}
-          className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity"
-        />
+        <Avatar className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity">
+          <AvatarImage src={avatarUrl || ''} alt={userDisplayName} />
+          <AvatarFallback className="bg-brand-orange text-white font-semibold">
+            {userDisplayName?.[0]?.toUpperCase() || 'U'}
+          </AvatarFallback>
+        </Avatar>
         <div className="flex-1 space-y-1">
           <p className="text-sm font-medium">{userDisplayName}</p>
           <Textarea
