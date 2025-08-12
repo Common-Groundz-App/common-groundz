@@ -7,6 +7,7 @@ import { PreferencesProvider } from '@/contexts/PreferencesContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 import AuthContextBoundary from '@/components/AuthContextBoundary';
 import RenderProtection from '@/components/RenderProtection';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeStorageService } from '@/services/storageService';
 import './index.css';
 
@@ -25,7 +26,9 @@ root.render(
       <AuthProvider>
         <PreferencesProvider>
           <LocationProvider>
-            <App />
+            <TooltipProvider>
+              <App />
+            </TooltipProvider>
           </LocationProvider>
         </PreferencesProvider>
       </AuthProvider>
