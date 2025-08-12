@@ -2,7 +2,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
-import { InfoTooltip } from '@/components/ui/info-tooltip';
 
 interface StepIndicatorProps {
   currentStep: number;
@@ -63,16 +62,6 @@ const StepIndicator = ({ currentStep, totalSteps, completedSteps, onStepClick }:
           </div>
         );
 
-        // Wrap non-current, non-completed steps with tooltip explaining they're not accessible
-        if (!isCompleted && !isActive) {
-          return (
-            <div key={`step-${stepNumber}`} className="flex items-center">
-              <InfoTooltip content="Complete previous steps first" side="top" />
-              {stepIndicator}
-            </div>
-          );
-        }
-        
         return stepIndicator;
       })}
     </div>
