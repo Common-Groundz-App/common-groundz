@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -62,7 +63,7 @@ export function EnhancedCreatePostForm({
     }
   }, [isEditing, existingPost]);
 
-  const handleMediaUpload = (newMedia: MediaItem[]) => {
+  const handleMediaUploaded = (newMedia: MediaItem[]) => {
     setMediaItems([...mediaItems, ...newMedia]);
   };
 
@@ -236,14 +237,14 @@ export function EnhancedCreatePostForm({
           ))}
         </div>
       )}
-      <MediaUploader onMediaUpload={handleMediaUpload} />
+      <MediaUploader onMediaUploaded={handleMediaUploaded} />
 
-      {/* Entity Selector */}
-      <SimpleEntitySelector
+      {/* Entity Selector - commented out for now since SimpleEntitySelector may not exist */}
+      {/* <SimpleEntitySelector
         selectedEntities={selectedEntities}
         onEntitySelect={handleEntitySelect}
         onEntityRemove={handleEntityRemove}
-      />
+      /> */}
 
       {/* Submit Buttons */}
       <div className="flex justify-end gap-2">

@@ -2,6 +2,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { parseHashtags, normalizeHashtag } from '@/utils/hashtagUtils';
 
+// Re-export parseHashtags for use in components
+export { parseHashtags } from '@/utils/hashtagUtils';
+
 // Type-safe interface for hashtag query results
 interface PostWithHashtag {
   posts: {
