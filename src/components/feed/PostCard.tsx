@@ -14,21 +14,21 @@ export function PostCard({ post }: PostCardProps) {
   return (
     <Card className="w-full">
       <CardContent className="p-4">
-        <div className="flex gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={post.user?.avatar_url || ''} alt={post.user?.username} />
-            <AvatarFallback>
-              {post.user?.username?.[0]?.toUpperCase() || 'U'}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">{post.user?.username}</span>
-              <span className="text-sm text-muted-foreground">
-                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-              </span>
-            </div>
+          <div className="flex gap-3">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={post.avatar_url || ''} alt={post.username || 'User'} />
+              <AvatarFallback>
+                {post.username?.[0]?.toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">{post.username}</span>
+                <span className="text-sm text-muted-foreground">
+                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                </span>
+              </div>
             
             {post.content && (
               <div className="text-sm">

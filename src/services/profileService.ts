@@ -1,128 +1,45 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { User } from '@supabase/supabase-js';
+import { SafeUserProfile } from '@/types/profile';
 
-/**
- * Fetches a user's profile data from Supabase
- */
-export const fetchUserProfile = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-      
-    if (error) {
-      console.error('Error fetching profile:', error);
-      throw error;
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error in fetchUserProfile:', error);
-    throw error;
-  }
-};
-
-/**
- * Fetches a user's following count using RPC
- */
-export const fetchFollowingCount = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .rpc('get_following_count_by_user_id', {
-        user_id: userId
-      });
-      
-    if (error) {
-      console.error('Error fetching following count:', error);
-      return 0;
-    }
-    
-    return data || 0;
-  } catch (error) {
-    console.error('Error in fetchFollowingCount:', error);
-    return 0;
-  }
-};
-
-/**
- * Fetches a user's followers count using RPC
- */
-export const fetchFollowerCount = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .rpc('get_follower_count_by_user_id', {
-        user_id: userId
-      });
-      
-    if (error) {
-      console.error('Error fetching follower count:', error);
-      return 0;
-    }
-    
-    return data || 0;
-  } catch (error) {
-    console.error('Error in fetchFollowerCount:', error);
-    return 0;
-  }
-};
-
-/**
- * Updates a user's profile
- */
-export const updateUserProfile = async (userId: string, updates: any) => {
-  const { error } = await supabase
+export async function searchProfiles(searchTerm: string): Promise<SafeUserProfile[]> {
+  const { data, error } = await supabase
     .from('profiles')
-    .update(updates)
-    .eq('id', userId);
-  
+    .select('*')
+    .ilike('username', `%${searchTerm}%`)
+    .limit(10);
+
   if (error) {
-    console.error('Error updating profile:', error);
-    throw error;
+    console.error('Error searching profiles:', error);
+    return [];
   }
-  
-  return true;
-};
 
-/**
- * Updates a user's preferences
- */
-export const updateUserPreferences = async (userId: string, preferences: any) => {
-  try {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ preferences })
-      .eq('id', userId);
-    
-    if (error) {
-      console.error('Error updating preferences:', error);
-      throw error;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error in updateUserPreferences:', error);
-    throw error;
-  }
-};
+  return data?.map(profile => ({
+    id: profile.id,
+    username: profile.username || 'Anonymous',
+    avatar_url: profile.avatar_url,
+    displayName: profile.username || 'Anonymous',
+    initials: profile.username?.[0]?.toUpperCase() || 'A',
+    fullName: profile.first_name && profile.last_name 
+      ? `${profile.first_name} ${profile.last_name}` 
+      : null,
+    first_name: profile.first_name,
+    last_name: profile.last_name,
+    bio: profile.bio,
+    location: profile.location,
+  })) || [];
+}
 
-/**
- * Gets the formatted display name from user data
- */
-export const getDisplayName = (user: User | null, profileData: any): string => {
-  if (!user) return '';
-  
-  const userMetadata = user.user_metadata;
-  const firstName = userMetadata?.first_name || '';
-  const lastName = userMetadata?.last_name || '';
-  
-  if (firstName || lastName) {
-    return `${firstName} ${lastName}`.trim();
-  } else if (profileData?.username) {
-    return profileData.username;
-  } else {
-    return user.email?.split('@')[0] || 'User';
+export async function fetchUserProfile(userId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
   }
-};
+
+  return data;
+}

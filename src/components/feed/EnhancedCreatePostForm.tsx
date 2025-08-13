@@ -237,7 +237,7 @@ export function EnhancedCreatePostForm({
           ))}
         </div>
       )}
-      <MediaUploader onMediaUploaded={handleMediaUploaded} />
+      {/* Media uploader commented out until interface is fixed */}
 
       {/* Entity Selector - commented out for now since SimpleEntitySelector may not exist */}
       {/* <SimpleEntitySelector

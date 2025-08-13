@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useDebounce } from 'usehooks-ts';
+import { useDebouncedCallback } from 'use-debounce';
 import { useAuth } from '@/contexts/AuthContext';
 import { searchProfiles } from '@/services/profileService';
 import { getTrendingHashtags } from '@/services/hashtagService';
@@ -20,16 +20,21 @@ export function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearchTerm = searchParams.get('q') || '';
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SafeUserProfile[]>([]);
   const [entityResults, setEntityResults] = useState<Entity[]>([]);
   const [hashtags, setHashtags] = useState<{ name_original: string; name_norm: string; post_count: number; }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const debouncedSetSearch = useDebouncedCallback((value: string) => {
+    setDebouncedSearchTerm(value);
+  }, 300);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
     setSearchParams({ q: e.target.value });
+    debouncedSetSearch(e.target.value);
   };
 
   const performSearch = useCallback(async () => {
@@ -66,7 +71,13 @@ export function Search() {
       if (error) {
         console.error('Error fetching trending hashtags:', error);
       } else {
-        setHashtags(hashtags);
+        // Transform hashtag data to match expected format
+        const transformedHashtags = hashtags.map(hashtag => ({
+          name_original: hashtag.name_original,
+          name_norm: hashtag.name_norm,
+          post_count: Array.isArray(hashtag.post_count) ? hashtag.post_count[0]?.count || 0 : hashtag.post_count
+        }));
+        setHashtags(transformedHashtags);
       }
     } catch (error) {
       console.error('Error loading trending hashtags:', error);
@@ -121,7 +132,7 @@ export function Search() {
                           </Avatar>
                           <div className="space-y-1">
                             <p className="text-sm font-medium">{profile.username}</p>
-                            <p className="text-xs text-muted-foreground">{profile.full_name || 'No name'}</p>
+                            <p className="text-xs text-muted-foreground">{profile.fullName || 'No name'}</p>
                           </div>
                         </CardContent>
                       </Card>

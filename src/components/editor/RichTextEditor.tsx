@@ -7,7 +7,7 @@ import { renderHashtagLinks } from '@/utils/hashtagUtils';
 
 export interface EditorProps {
   content: any;
-  onChange: (content: any) => void;
+  onChange: (json: any, html: any) => void;
   placeholder?: string;
   className?: string;
 }
@@ -20,7 +20,7 @@ export function RichTextEditor({ content, onChange, placeholder, className }: Ed
     ],
     content: content,
     onUpdate: ({ editor }) => {
-      onChange(editor.getJSON());
+      onChange(editor.getJSON(), editor.getHTML());
     },
   });
 

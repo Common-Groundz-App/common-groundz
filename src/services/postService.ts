@@ -15,6 +15,7 @@ export const createPost = async (postData: {
     const { data, error } = await supabase
       .from('posts')
       .insert({
+        title: 'Untitled',
         content: postData.content,
         post_type: postData.post_type,
         visibility: postData.visibility,
