@@ -951,6 +951,27 @@ export type Database = {
         }
         Relationships: []
       }
+      hashtags: {
+        Row: {
+          created_at: string | null
+          id: string
+          name_norm: string
+          name_original: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name_norm: string
+          name_original: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name_norm?: string
+          name_original?: string
+        }
+        Relationships: []
+      }
       image_health_results: {
         Row: {
           checked_at: string
@@ -1370,6 +1391,39 @@ export type Database = {
         }
         Relationships: []
       }
+      post_hashtags: {
+        Row: {
+          created_at: string | null
+          hashtag_id: string
+          post_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          hashtag_id: string
+          post_id: string
+        }
+        Update: {
+          created_at?: string | null
+          hashtag_id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_hashtags_hashtag_id_fkey"
+            columns: ["hashtag_id"]
+            isOneToOne: false
+            referencedRelation: "hashtags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_hashtags_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_likes: {
         Row: {
           created_at: string
@@ -1469,6 +1523,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      post_user_mentions: {
+        Row: {
+          created_at: string
+          id: string
+          mentioned_user_id: string
+          post_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mentioned_user_id: string
+          post_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mentioned_user_id?: string
+          post_id?: string
+        }
+        Relationships: []
       }
       posts: {
         Row: {
@@ -2628,6 +2703,10 @@ export type Database = {
       }
       insert_post_save: {
         Args: { p_post_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      insert_user_mention: {
+        Args: { post_id: string; mentioned_user_id: string }
         Returns: undefined
       }
       is_admin_user: {
