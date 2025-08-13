@@ -2,65 +2,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Create a new post
- */
-export const createPost = async (postData: {
-  content: string;
-  post_type: string;
-  visibility: string;
-  media?: any[];
-  tags?: string[];
-}, userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('posts')
-      .insert([{
-        content: postData.content,
-        post_type: postData.post_type as any,
-        visibility: postData.visibility as any,
-        media: postData.media || [],
-        user_id: userId,
-      }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error creating post:', error);
-    throw error;
-  }
-};
-
-/**
- * Update an existing post
- */
-export const updatePost = async (postId: string, updateData: {
-  content?: string;
-  media?: any[];
-  tags?: string[];
-}) => {
-  try {
-    const { data, error } = await supabase
-      .from('posts')
-      .update({
-        content: updateData.content,
-        media: updateData.media,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', postId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error updating post:', error);
-    throw error;
-  }
-};
-
-/**
  * Toggle like for a post
  * @param postId The ID of the post to toggle like for
  * @param userId The ID of the user doing the liking

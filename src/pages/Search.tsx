@@ -1,229 +1,993 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useDebouncedCallback } from 'use-debounce';
-import { useAuth } from '@/contexts/AuthContext';
-import { searchProfiles } from '@/services/profileService';
-import { getTrendingHashtags } from '@/services/hashtagService';
-import { searchEntities } from '@/services/entityService';
-import { SafeUserProfile } from '@/types/profile';
-import { Entity } from '@/services/recommendation/types';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { BottomNavigation } from '@/components/navigation/BottomNavigation';
+import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
+import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
+import { PillTabs } from '@/components/ui/pill-tabs';
+import { useIsMobile } from '@/hooks/use-mobile';
+import Logo from '@/components/Logo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search as SearchIcon, User, Hash, Globe2 } from 'lucide-react';
+import { UserResultItem } from '@/components/search/UserResultItem';
+import { EntityResultItem } from '@/components/search/EntityResultItem';
+import { ReviewResultItem } from '@/components/search/ReviewResultItem';
+import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
+import { SearchResultHandler } from '@/components/search/SearchResultHandler';
+import { cn } from '@/lib/utils';
+import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
+import { Badge } from '@/components/ui/badge';
+import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
 
-export function Search() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
+const Search = () => {
+  const isMobile = useIsMobile();
+  const isTablet = useIsMobile(630); // Custom breakpoint for pill tabs
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialSearchTerm = searchParams.get('q') || '';
-  const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<SafeUserProfile[]>([]);
-  const [entityResults, setEntityResults] = useState<Entity[]>([]);
-  const [hashtags, setHashtags] = useState<{ name_original: string; name_norm: string; post_count: number; }[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const query = searchParams.get('q') || '';
+  const mode = searchParams.get('mode') || 'quick';
+  const [searchQuery, setSearchQuery] = useState(query);
+  const [activeTab, setActiveTab] = useState('all');
+  const [isDeepSearching, setIsDeepSearching] = useState(mode === 'deep');
+  
+  // State for "show all" functionality
+  const [showAllStates, setShowAllStates] = useState({
+    localResults: false,
+    externalResults: false,
+    users: false
+  });
 
-  const debouncedSetSearch = useDebouncedCallback((value: string) => {
-    setDebouncedSearchTerm(value);
-  }, 300);
+  // Dropdown state for search suggestions
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownShowAll, setDropdownShowAll] = useState({
+    localResults: false,
+    books: false,
+    movies: false,
+    places: false
+  });
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-    setSearchParams({ q: e.target.value });
-    debouncedSetSearch(e.target.value);
+  // Tab items configuration matching Explore page
+  const tabItems = [
+    { value: 'all', label: 'All', emoji: '🌟' },
+    { value: 'movies', label: 'Movies', emoji: '🎬' },
+    { value: 'books', label: 'Books', emoji: '📚' },
+    { value: 'places', label: 'Places', emoji: '📍' },
+    { value: 'products', label: 'Products', emoji: '🛍️' },
+    { value: 'users', label: 'People', emoji: '👥' }
+  ];
+
+  const tubelightTabItems = [
+    { value: 'all', label: 'All', icon: Star },
+    { value: 'movies', label: 'Movies', icon: Film },
+    { value: 'books', label: 'Books', icon: Book },
+    { value: 'places', label: 'Places', icon: MapPin },
+    { value: 'products', label: 'Products', icon: ShoppingBag },
+    { value: 'users', label: 'People', icon: Users }
+  ];
+
+  // Use the faster enhanced realtime search hook for both main search and dropdown
+  const { 
+    results, 
+    isLoading, 
+    loadingStates, 
+    error,
+    showAllResults,
+    toggleShowAll,
+    searchMode
+  } = useEnhancedRealtimeSearch(query, { mode: mode as 'quick' | 'deep' });
+
+  // Separate hook for dropdown search suggestions
+  const { 
+    results: dropdownResults,
+    isLoading: dropdownLoading
+  } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
+
+  // Update the URL when search query changes
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim().length >= 2) {
+      setSearchParams({ q: searchQuery, mode: 'quick' });
+      setShowDropdown(false);
+    }
   };
 
-  const performSearch = useCallback(async () => {
-    if (!debouncedSearchTerm) {
-      setSearchResults([]);
-      setEntityResults([]);
-      return;
+  // Handle search input changes
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    // Show dropdown if query is 2+ characters and different from current query
+    if (value.trim().length >= 2 && value !== query) {
+      setShowDropdown(true);
+    } else {
+      setShowDropdown(false);
     }
+  };
 
-    setLoading(true);
-    setError(null);
+  // Handle dropdown item click with proper type handling
+  const handleDropdownItemClick = (clickedQuery: string) => {
+    setSearchQuery(clickedQuery);
+    setSearchParams({ q: clickedQuery, mode: 'quick' });
+    setShowDropdown(false);
+  };
 
-    try {
-      const [profileResults, entityResults] = await Promise.all([
-        searchProfiles(debouncedSearchTerm),
-        searchEntities(debouncedSearchTerm)
-      ]);
+  // Helper function to get the display name from different result types
+  const getResultDisplayName = (item: any): string => {
+    if ('name' in item) return item.name;
+    if ('title' in item) return item.title;
+    return 'Unknown';
+  };
 
-      setSearchResults(profileResults);
-      setEntityResults(entityResults);
-    } catch (error: any) {
-      console.error('Search error:', error);
-      setError('Failed to perform search. Please try again.');
-      setSearchResults([]);
-      setEntityResults([]);
-    } finally {
-      setLoading(false);
+  // Handle deep search request
+  const handleDeepSearch = () => {
+    if (query.trim().length >= 2) {
+      setIsDeepSearching(true);
+      setSearchParams({ q: query, mode: 'deep' });
     }
-  }, [debouncedSearchTerm]);
+  };
 
-  const loadTrendingHashtags = useCallback(async () => {
-    try {
-      const { hashtags, error } = await getTrendingHashtags();
-      if (error) {
-        console.error('Error fetching trending hashtags:', error);
-      } else {
-        // Transform hashtag data to match expected format
-        const transformedHashtags = hashtags.map(hashtag => ({
-          name_original: hashtag.name_original,
-          name_norm: hashtag.name_norm,
-          post_count: Array.isArray(hashtag.post_count) ? hashtag.post_count[0]?.count || 0 : hashtag.post_count
-        }));
-        setHashtags(transformedHashtags);
+  // Handle "View All" button clicks
+  const handleViewAll = (section: keyof typeof showAllStates) => {
+    if (section === 'users') {
+      setActiveTab('users');
+    } else {
+      setShowAllStates(prev => ({
+        ...prev,
+        [section]: !prev[section]
+      }));
+    }
+  };
+
+  // Handle dropdown "See More/Less" clicks
+  const handleDropdownViewAll = (section: keyof typeof dropdownShowAll) => {
+    setDropdownShowAll(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.search-dropdown-container')) {
+        setShowDropdown(false);
       }
-    } catch (error) {
-      console.error('Error loading trending hashtags:', error);
-    }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    performSearch();
-    loadTrendingHashtags();
-  }, [performSearch, loadTrendingHashtags]);
+  // Filter results based on active tab using backend categorization
+  const getFilteredResults = () => {
+    const allLocalResults = [
+      ...results.entities,
+      ...results.reviews,
+      ...results.recommendations
+    ];
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="container max-w-3xl mx-auto py-6 px-4">
-        {/* Search Input */}
+    // Use categorized results from backend
+    const categorizedProducts = {
+      movies: results.categorized?.movies || [],
+      books: results.categorized?.books || [],
+      places: results.categorized?.places || [],
+      // General products that don't fall into specific categories
+      products: results.products.filter(p => {
+        const movieRefs = (results.categorized?.movies || []).map(item => item.api_ref);
+        const bookRefs = (results.categorized?.books || []).map(item => item.api_ref);
+        const placeRefs = (results.categorized?.places || []).map(item => item.api_ref);
+        
+        return !movieRefs.includes(p.api_ref) &&
+               !bookRefs.includes(p.api_ref) &&
+               !placeRefs.includes(p.api_ref);
+      })
+    };
+
+    switch (activeTab) {
+      case 'movies':
+        return {
+          localResults: allLocalResults.filter(item => {
+            if ('type' in item && item.type === 'movie') return true;
+            if ('category' in item && item.category === 'movie') return true;
+            return false;
+          }),
+          externalResults: categorizedProducts.movies
+        };
+      case 'books':
+        return {
+          localResults: allLocalResults.filter(item => {
+            if ('type' in item && item.type === 'book') return true;
+            if ('category' in item && item.category === 'book') return true;
+            return false;
+          }),
+          externalResults: categorizedProducts.books
+        };
+      case 'places':
+        return {
+          localResults: allLocalResults.filter(item => {
+            if ('type' in item && item.type === 'place') return true;
+            if ('category' in item && item.category === 'place') return true;
+            return false;
+          }),
+          externalResults: categorizedProducts.places
+        };
+      case 'products':
+        return {
+          localResults: allLocalResults.filter(item => {
+            if ('type' in item && item.type === 'product') return true;
+            if ('category' in item && item.category === 'product') return true;
+            return false;
+          }),
+          externalResults: categorizedProducts.products
+        };
+      case 'users':
+        return {
+          localResults: [],
+          externalResults: [],
+          users: results.users
+        };
+      default: // 'all'
+        return {
+          localResults: allLocalResults,
+          externalResults: results.products,
+          users: results.users
+        };
+    }
+  };
+
+  const filteredResults = getFilteredResults();
+
+  // Enhanced loading screen with category-based loading facts
+  const renderEnhancedLoadingState = () => {
+    const capitalizedQuery = query.charAt(0).toUpperCase() + query.slice(1);
+    
+    // Determine category for loading facts
+    const getCategoryForFacts = (): EntityCategory => {
+      switch (activeTab) {
+        case 'movies': return 'movie';
+        case 'books': return 'book';
+        case 'places': return 'place';
+        case 'products': return 'product';
+        default: return 'product'; // Default for 'all' tab
+      }
+    };
+
+    const loadingFact = getRandomLoadingMessage(getCategoryForFacts());
+
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
         <div className="relative mb-6">
-          <Input
-            type="search"
-            placeholder="Search for people, entities, and more..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            className="rounded-full shadow-sm pl-12"
-          />
-          <SearchIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+          <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
         </div>
+        
+        <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+          🔍 {searchMode === 'deep' ? 'Deep searching' : 'Searching'} for "{capitalizedQuery}"
+        </h2>
+        
+        <div className="text-center max-w-md">
+          <p className="text-muted-foreground mb-4">
+            {loadingFact}
+          </p>
+          
+          {searchMode === 'deep' && (
+            <div className="flex gap-2 justify-center flex-wrap">
+              <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
+                📚 Books {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+              </Badge>
+              <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
+                🎬 Movies {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+              </Badge>
+              <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
+                📍 Places {loadingStates.external && <Loader2 className="w-3 h-3 ml-1 animate-spin" />}
+              </Badge>
+              <Badge variant="default" className="text-xs">
+                🛍️ Products <Loader2 className="w-3 h-3 ml-1 animate-spin" />
+              </Badge>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-        {loading && <p className="text-muted-foreground">Loading...</p>}
-        {error && <p className="text-red-500">{error}</p>}
+  // Helper function to render mixed local results with proper type handling
+  const renderLocalResultItem = (item: any) => {
+    if ('username' in item) {
+      return (
+        <UserResultItem
+          key={item.id}
+          user={item}
+          onClick={() => {}}
+        />
+      );
+    } else if ('entity_id' in item && 'rating' in item && 'title' in item && 'description' in item) {
+      return (
+        <ReviewResultItem
+          key={item.id}
+          review={item}
+          onClick={() => {}}
+        />
+      );
+    } else if ('entity_id' in item && 'title' in item && !('rating' in item)) {
+      return (
+        <RecommendationResultItem
+          key={item.id}
+          recommendation={item}
+          onClick={() => {}}
+        />
+      );
+    } else if ('name' in item && 'type' in item) {
+      return (
+        <EntityResultItem
+          key={item.id}
+          entity={item}
+          onClick={() => {}}
+        />
+      );
+    }
+    return null;
+  };
 
-        {/* Search Results */}
-        {!loading && !error && debouncedSearchTerm && (
-          <div className="space-y-6">
-            {/* User Results */}
-            {searchResults.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  People
-                </h3>
-                <ScrollArea className="h-[200px] rounded-md">
-                  <div className="space-y-2 p-3">
-                    {searchResults.map((profile) => (
-                      <Card
-                        key={profile.id}
-                        className="bg-card rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-                        onClick={() => navigate(`/profile/${profile.username}`)}
-                      >
-                        <CardContent className="flex items-center gap-4 p-3">
-                          <Avatar>
-                            <AvatarImage src={profile.avatar_url || ''} alt={profile.username} />
-                            <AvatarFallback>{profile.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-                          </Avatar>
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium">{profile.username}</p>
-                            <p className="text-xs text-muted-foreground">{profile.fullName || 'No name'}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
+  // Render search dropdown
+  const renderSearchDropdown = () => {
+    if (!showDropdown || searchQuery.trim().length < 2) return null;
 
-            {/* Entity Results */}
-            {entityResults.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Globe2 className="h-5 w-5" />
-                  Entities
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {entityResults.map((entity) => (
-                    <Card
-                      key={entity.id}
-                      className="bg-card rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-                      onClick={() => navigate(`/entity/${entity.id}`)}
+    const allLocalResults = [
+      ...dropdownResults.entities,
+      ...dropdownResults.reviews,
+      ...dropdownResults.recommendations
+    ];
+
+    const hasResults = allLocalResults.length > 0 || 
+                     dropdownResults.categorized?.books?.length > 0 ||
+                     dropdownResults.categorized?.movies?.length > 0 ||
+                     dropdownResults.categorized?.places?.length > 0;
+
+    return (
+      <div className="absolute top-full left-0 right-0 z-50 bg-background border border-border rounded-lg shadow-lg mt-1 max-h-96 overflow-y-auto">
+        {dropdownLoading ? (
+          <div className="p-4 text-center">
+            <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Searching...</p>
+          </div>
+        ) : hasResults ? (
+          <div className="p-2">
+            {/* Already on Groundz section */}
+            {allLocalResults.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between px-2 py-1">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    Already on Groundz
+                  </h3>
+                  {allLocalResults.length > 3 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDropdownViewAll('localResults')}
+                      className="text-xs h-6"
                     >
-                      <CardContent className="p-4">
-                        <p className="text-sm font-medium">{entity.name}</p>
-                        <p className="text-xs text-muted-foreground">{entity.type}</p>
-                      </CardContent>
-                    </Card>
+                      {dropdownShowAll.localResults ? (
+                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+                      ) : (
+                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {(dropdownShowAll.localResults ? allLocalResults : allLocalResults.slice(0, 3)).map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => handleDropdownItemClick(getResultDisplayName(item))}
+                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                    >
+                      {renderLocalResultItem(item)}
+                    </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Hashtag Results */}
-            {hashtags.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Hash className="h-5 w-5" />
-                  Hashtags
-                </h3>
-                <div className="grid gap-2">
-                  {hashtags.map((hashtag) => (
-                    <div 
-                      key={hashtag.name_norm}
-                      className="flex items-center justify-between p-3 bg-card rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-                      onClick={() => navigate(`/t/${hashtag.name_norm}`)}
+            {/* Books section */}
+            {dropdownResults.categorized?.books?.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between px-2 py-1">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Book className="w-4 h-4" />
+                    Books
+                  </h3>
+                  {dropdownResults.categorized.books.length > 3 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDropdownViewAll('books')}
+                      className="text-xs h-6"
                     >
-                      <div className="flex items-center gap-3">
-                        <Hash className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">#{hashtag.name_original}</span>
-                      </div>
-                      <span className="text-sm text-muted-foreground">
-                        {hashtag.post_count} posts
-                      </span>
+                      {dropdownShowAll.books ? (
+                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+                      ) : (
+                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {(dropdownShowAll.books ? dropdownResults.categorized.books : dropdownResults.categorized.books.slice(0, 3)).map((book, index) => (
+                    <div
+                      key={`${book.api_source}-${book.api_ref || index}`}
+                      onClick={() => handleDropdownItemClick(book.name)}
+                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                    >
+                      <SearchResultHandler
+                        result={book}
+                        query={searchQuery}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Movies section */}
+            {dropdownResults.categorized?.movies?.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between px-2 py-1">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Film className="w-4 h-4" />
+                    Movies
+                  </h3>
+                  {dropdownResults.categorized.movies.length > 3 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDropdownViewAll('movies')}
+                      className="text-xs h-6"
+                    >
+                      {dropdownShowAll.movies ? (
+                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+                      ) : (
+                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {(dropdownShowAll.movies ? dropdownResults.categorized.movies : dropdownResults.categorized.movies.slice(0, 3)).map((movie, index) => (
+                    <div
+                      key={`${movie.api_source}-${movie.api_ref || index}`}
+                      onClick={() => handleDropdownItemClick(movie.name)}
+                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                    >
+                      <SearchResultHandler
+                        result={movie}
+                        query={searchQuery}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Places section */}
+            {dropdownResults.categorized?.places?.length > 0 && (
+              <div className="mb-2">
+                <div className="flex items-center justify-between px-2 py-1">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Places
+                  </h3>
+                  {dropdownResults.categorized.places.length > 3 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDropdownViewAll('places')}
+                      className="text-xs h-6"
+                    >
+                      {dropdownShowAll.places ? (
+                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+                      ) : (
+                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {(dropdownShowAll.places ? dropdownResults.categorized.places : dropdownResults.categorized.places.slice(0, 3)).map((place, index) => (
+                    <div
+                      key={`${place.api_source}-${place.api_ref || index}`}
+                      onClick={() => handleDropdownItemClick(place.name)}
+                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                    >
+                      <SearchResultHandler
+                        result={place}
+                        query={searchQuery}
+                      />
                     </div>
                   ))}
                 </div>
               </div>
             )}
           </div>
-        )}
-
-        {/* Trending */}
-        {!debouncedSearchTerm && (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Hash className="h-5 w-5" />
-                Trending Hashtags
-              </h3>
-              <div className="grid gap-2">
-                {hashtags.map((hashtag) => (
-                  <div
-                    key={hashtag.name_norm}
-                    className="flex items-center justify-between p-3 bg-card rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-                    onClick={() => navigate(`/t/${hashtag.name_norm}`)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Hash className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">#{hashtag.name_original}</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {hashtag.post_count} posts
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+        ) : (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            No results found for "{searchQuery}"
           </div>
         )}
       </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
+      {/* Mobile Header - only show on screens smaller than xl */}
+      <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+        <div className="container p-3 mx-auto flex justify-start min-w-0">
+          <Logo size="sm" />
+        </div>
+      </div>
+      
+      <div className="flex flex-1 min-w-0">
+        {/* Desktop Sidebar - only show on xl+ screens */}
+        <div className="hidden xl:block">
+          <VerticalTubelightNavbar 
+            initialActiveTab="Search"
+            className="fixed left-0 top-0 h-screen pt-4" 
+          />
+        </div>
+        
+        <div className={cn(
+          "flex-1 min-w-0",
+          "pt-16 xl:pt-0 xl:pl-64" // Mobile top padding, desktop left padding
+        )}>
+          <div className="container max-w-4xl mx-auto p-4 md:p-8 min-w-0">
+            <h1 className="text-3xl font-bold mb-6">Search</h1>
+            
+            <form onSubmit={handleSearch} className="mb-6">
+              <div className="flex gap-2 min-w-0">
+                <div className="relative flex-grow search-dropdown-container min-w-0">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <SearchIcon className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Search for people, places, products..."
+                    value={searchQuery}
+                    onChange={handleSearchInputChange}
+                    className="pl-10 min-w-0"
+                  />
+                  {renderSearchDropdown()}
+                </div>
+                <Button type="submit" className="flex-shrink-0">Search</Button>
+              </div>
+            </form>
+            
+            {query ? (
+              <>
+                {/* Responsive Navigation - Pills for mobile/tablet, TubelightTabs for desktop */}
+                {isTablet ? (
+                  <div className="mb-6 overflow-x-auto">
+                    <PillTabs
+                      items={tabItems}
+                      activeTab={activeTab}
+                      onTabChange={setActiveTab}
+                    />
+                  </div>
+                ) : (
+                  <div className="mb-6 overflow-x-auto">
+                    <TubelightTabs
+                      defaultValue={activeTab}
+                      items={tubelightTabItems}
+                      onValueChange={setActiveTab}
+                      className="mb-6"
+                    >
+                      <TabsContent value={activeTab}>
+                        {/* Content will be rendered below */}
+                      </TabsContent>
+                    </TubelightTabs>
+                  </div>
+                )}
+                
+                <div className="mt-6 min-w-0">
+                  {isLoading || Object.values(loadingStates).some(Boolean) ? (
+                    renderEnhancedLoadingState()
+                  ) : error ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <AlertCircle className="h-8 w-8 text-destructive mb-4" />
+                      <p className="text-muted-foreground">{error}</p>
+                    </div>
+                  ) : (
+                    <>
+                      {activeTab === 'all' && (
+                        <>
+                          {/* Already on Groundz section - Priority 1 */}
+                          {filteredResults.localResults.length > 0 && (
+                            <div className="mb-8 min-w-0">
+                              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                <Star className="h-5 w-5 text-yellow-500" /> Already on Groundz
+                              </h2>
+                              <div className="border rounded-md overflow-hidden min-w-0">
+                                {(showAllStates.localResults ? filteredResults.localResults : filteredResults.localResults.slice(0, 5)).map((item) => renderLocalResultItem(item))}
+                              </div>
+                              {filteredResults.localResults.length > 5 && (
+                                <div className="mt-4 text-center">
+                                  <Button 
+                                    variant="outline"
+                                    onClick={() => handleViewAll('localResults')}
+                                  >
+                                    {showAllStates.localResults ? 'Show less' : `View all ${filteredResults.localResults.length} items`}
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* All Items section */}
+                          {filteredResults.externalResults.length > 0 && (
+                            <div className="mb-8 min-w-0">
+                              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                <Globe className="h-5 w-5" /> All Items
+                              </h2>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                Everything we found related to your search.
+                              </p>
+                              <div className="space-y-2 min-w-0">
+                                {(showAllStates.externalResults ? filteredResults.externalResults : filteredResults.externalResults.slice(0, 8)).map((product, index) => (
+                                  <SearchResultHandler
+                                    key={`${product.api_source}-${product.api_ref || index}`}
+                                    result={product}
+                                    query={query}
+                                  />
+                                ))}
+                              </div>
+                              {filteredResults.externalResults.length > 8 && (
+                                <div className="mt-4 text-center">
+                                  <Button 
+                                    variant="outline"
+                                    onClick={() => handleViewAll('externalResults')}
+                                  >
+                                    {showAllStates.externalResults ? 'Show less' : `View all ${filteredResults.externalResults.length} items`}
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* People section */}
+                          {results.users.length > 0 && (
+                            <div className="mb-8 min-w-0">
+                              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                <Users className="h-5 w-5" /> People
+                              </h2>
+                              <div className="border rounded-md overflow-hidden min-w-0">
+                                {results.users.slice(0, 5).map((user) => (
+                                  <UserResultItem
+                                    key={user.id}
+                                    user={user}
+                                    onClick={() => {}}
+                                  />
+                                ))}
+                              </div>
+                              {results.users.length > 5 && (
+                                <div className="mt-4 text-center">
+                                  <Button 
+                                    variant="outline"
+                                    onClick={() => handleViewAll('users')}
+                                  >
+                                    View all {results.users.length} people
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Enhanced Deep Search CTA for all tabs when no results */}
+                          {searchMode === 'quick' && (
+                            <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
+                              <h3 className="text-lg font-semibold mb-2">🔍 Want more comprehensive results?</h3>
+                              <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
+                                Deep Search analyzes multiple sources including specialized APIs for movies, books, places, and products
+                                <br />
+                                <span className="text-xs italic">(Enhanced search across all categories - may take up to 2 minutes)</span>
+                              </p>
+                              <Button 
+                                onClick={handleDeepSearch}
+                                variant="default"
+                                className="bg-brand-orange hover:bg-brand-orange/90"
+                                disabled={isDeepSearching}
+                              >
+                                {isDeepSearching ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Deep searching all categories...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Run Deep Search
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                          
+                          {/* No results message */}
+                          {!filteredResults.localResults.length && 
+                           !filteredResults.externalResults.length && 
+                           !results.users.length && (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No results found for "{query}"</p>
+                              {searchMode === 'quick' && (
+                                <Button 
+                                  onClick={handleDeepSearch} 
+                                  variant="outline" 
+                                  className="mt-4"
+                                  disabled={isDeepSearching}
+                                >
+                                  {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      {/* Category-specific content */}
+                      {activeTab === 'movies' && (
+                        <>
+                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <Film className="h-5 w-5" /> Movies
+                          </h2>
+                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
+                            <div className="space-y-6 min-w-0">
+                              {filteredResults.localResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
+                                  </h3>
+                                  <div className="border rounded-md overflow-hidden min-w-0">
+                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                  </div>
+                                </div>
+                              )}
+                              {filteredResults.externalResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Globe className="h-4 w-4" /> All Movies
+                                  </h3>
+                                  <div className="space-y-2 min-w-0">
+                                    {filteredResults.externalResults.map((movie, index) => (
+                                      <SearchResultHandler
+                                        key={`${movie.api_source}-${movie.api_ref || index}`}
+                                        result={movie}
+                                        query={query}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No movies found for "{query}"</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      {activeTab === 'books' && (
+                        <>
+                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <Book className="h-5 w-5" /> Books
+                          </h2>
+                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
+                            <div className="space-y-6 min-w-0">
+                              {filteredResults.localResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
+                                  </h3>
+                                  <div className="border rounded-md overflow-hidden min-w-0">
+                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                  </div>
+                                </div>
+                              )}
+                              {filteredResults.externalResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Globe className="h-4 w-4" /> All Books
+                                  </h3>
+                                  <div className="space-y-2 min-w-0">
+                                    {filteredResults.externalResults.map((book, index) => (
+                                      <SearchResultHandler
+                                        key={`${book.api_source}-${book.api_ref || index}`}
+                                        result={book}
+                                        query={query}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No books found for "{query}"</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      {activeTab === 'places' && (
+                        <>
+                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <MapPin className="h-5 w-5" /> Places
+                          </h2>
+                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
+                            <div className="space-y-6 min-w-0">
+                              {filteredResults.localResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
+                                  </h3>
+                                  <div className="border rounded-md overflow-hidden min-w-0">
+                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                  </div>
+                                </div>
+                              )}
+                              {filteredResults.externalResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Globe className="h-4 w-4" /> All Places
+                                  </h3>
+                                  <div className="space-y-2 min-w-0">
+                                    {filteredResults.externalResults.map((place, index) => (
+                                      <SearchResultHandler
+                                        key={`${place.api_source}-${place.api_ref || index}`}
+                                        result={place}
+                                        query={query}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No places found for "{query}"</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      {activeTab === 'products' && (
+                        <>
+                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <ShoppingBag className="h-5 w-5" /> Products
+                          </h2>
+                          
+                          {/* Deep Search CTA for products tab */}
+                          {searchMode === 'quick' && filteredResults.externalResults.length === 0 && (
+                            <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20 min-w-0">
+                              <h3 className="text-lg font-semibold mb-2">🔍 Didn't find what you're looking for?</h3>
+                              <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
+                                Try Deep Search to find comprehensive results from across the web
+                                <br />
+                                <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
+                              </p>
+                              <Button 
+                                onClick={handleDeepSearch}
+                                variant="default"
+                                className="bg-brand-orange hover:bg-brand-orange/90"
+                                disabled={isDeepSearching}
+                              >
+                                {isDeepSearching ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Searching deeply...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Run Deep Search
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                          
+                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
+                            <div className="space-y-6 min-w-0">
+                              {filteredResults.localResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
+                                  </h3>
+                                  <div className="border rounded-md overflow-hidden min-w-0">
+                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                  </div>
+                                </div>
+                              )}
+                              {filteredResults.externalResults.length > 0 && (
+                                <div>
+                                  <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
+                                    <Globe className="h-4 w-4" /> All Products
+                                  </h3>
+                                  <p className="text-sm text-muted-foreground mb-4">
+                                    Click any result to create an entity and start reviewing!
+                                  </p>
+                                  <div className="space-y-2 min-w-0">
+                                    {filteredResults.externalResults.map((product, index) => (
+                                      <SearchResultHandler
+                                        key={`${product.api_source}-${product.api_ref || index}`}
+                                        result={product}
+                                        query={query}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No products found for "{query}"</p>
+                              {searchMode === 'quick' && (
+                                <Button 
+                                  onClick={handleDeepSearch} 
+                                  variant="outline" 
+                                  className="mt-4"
+                                  disabled={isDeepSearching}
+                                >
+                                  {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      {activeTab === 'users' && (
+                        <>
+                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <Users className="h-5 w-5" /> People
+                          </h2>
+                          {results.users.length > 0 ? (
+                            <div className="border rounded-md overflow-hidden min-w-0">
+                              {results.users.map((user) => (
+                                <UserResultItem
+                                  key={user.id}
+                                  user={user}
+                                  onClick={() => {}}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No people found for "{query}"</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="py-12 text-center">
+                <p className="text-muted-foreground">Enter a search term to find people, places, products and more</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Mobile Bottom Navigation - only show on screens smaller than xl */}
+      <div className="xl:hidden">
+        <BottomNavigation />
+      </div>
     </div>
   );
-}
+};
+
+export default Search;

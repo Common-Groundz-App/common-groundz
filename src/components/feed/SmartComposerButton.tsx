@@ -237,6 +237,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           {selectedContentType === 'post' && (
             <EnhancedCreatePostForm 
+              profileData={profileData}
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)} 
             />
@@ -256,6 +257,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
           
           {selectedContentType === 'journal' && (
             <ModernCreatePostForm 
+              profileData={profileData}
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="journal"
@@ -264,6 +266,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
           
           {selectedContentType === 'watching' && (
             <ModernCreatePostForm 
+              profileData={profileData}
               onSuccess={handleContentCreated}
               onCancel={() => setIsDialogOpen(false)}
               defaultPostType="watching"

@@ -5,8 +5,6 @@ import App from './App.tsx';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
 import { LocationProvider } from '@/contexts/LocationContext';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { ThemeProvider as NextThemeProvider } from 'next-themes';
 import AuthContextBoundary from '@/components/AuthContextBoundary';
 import RenderProtection from '@/components/RenderProtection';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -23,23 +21,17 @@ if (!rootElement) throw new Error('Failed to find the root element');
 const root = createRoot(rootElement);
 
 root.render(
-  <React.StrictMode>
+  <RenderProtection maxRenders={30} timeWindow={2000}>
     <AuthContextBoundary>
       <AuthProvider>
-        <NextThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <ThemeProvider>
-            <PreferencesProvider>
-              <LocationProvider>
-                <TooltipProvider>
-                  <RenderProtection maxRenders={30} timeWindow={2000}>
-                    <App />
-                  </RenderProtection>
-                </TooltipProvider>
-              </LocationProvider>
-            </PreferencesProvider>
-          </ThemeProvider>
-        </NextThemeProvider>
+        <PreferencesProvider>
+          <LocationProvider>
+            <TooltipProvider>
+              <App />
+            </TooltipProvider>
+          </LocationProvider>
+        </PreferencesProvider>
       </AuthProvider>
     </AuthContextBoundary>
-  </React.StrictMode>
+  </RenderProtection>
 );

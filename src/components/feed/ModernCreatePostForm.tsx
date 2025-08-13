@@ -398,7 +398,7 @@ export function ModernCreatePostForm({
   
   // Get user display name using the profileData or fallback to user metadata
   const userDisplayName = user ? (
-    profileData ? profileData.username || user.email?.split('@')[0] || 'User' : 
+    profileData ? getDisplayName(user, profileData) : 
     (user.user_metadata?.username || user.email?.split('@')[0] || 'User')
   ) : 'User';
 

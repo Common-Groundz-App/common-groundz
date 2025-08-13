@@ -1,6 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,160 +8,322 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SimpleEntitySelector } from '@/components/feed/SimpleEntitySelector';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
-import { createPost, updatePost } from '@/services/postService';
-import { insertPostEntity } from '@/services/postEntityService';
-import { processPostHashtags, parseHashtags } from '@/services/hashtagService';
-import { Loader2, X, Hash } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { getDisplayName } from '@/services/profileService';
+import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
+import { supabase } from '@/integrations/supabase/client';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
+import { LocationSearchInput } from './LocationSearchInput';
 
 interface EnhancedCreatePostFormProps {
-  onSuccess?: (post: any) => void;
-  existingPost?: any;
-  isEditing?: boolean;
-  onCancel?: () => void;
+  onSuccess: () => void;
+  onCancel: () => void;
+  profileData?: any;
 }
 
-export function EnhancedCreatePostForm({ 
-  onSuccess, 
-  existingPost, 
-  isEditing = false,
-  onCancel 
-}: EnhancedCreatePostFormProps) {
-  const { user, session } = useAuth();
+type VisibilityOption = 'public' | 'private' | 'circle';
+
+// Map UI visibility types to database visibility types
+const mapVisibilityToDatabase = (visibility: VisibilityOption): 'public' | 'private' | 'circle_only' => {
+  switch (visibility) {
+    case 'public': return 'public';
+    case 'private': return 'private';
+    case 'circle': return 'circle_only';
+    default: return 'public';
+  }
+};
+
+export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: EnhancedCreatePostFormProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [content, setContent] = useState('');
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const [selectedEntities, setSelectedEntities] = useState<Entity[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [entities, setEntities] = useState<Entity[]>([]);
+  const [entitySelectorVisible, setEntitySelectorVisible] = useState(false);
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [visibility, setVisibility] = useState<VisibilityOption>('public');
+  const [showLocationInput, setShowLocationInput] = useState(false);
+  const [location, setLocation] = useState<{
+    name: string;
+    address: string;
+    placeId: string;
+    coordinates: { lat: number; lng: number };
+  } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const sessionId = useRef(uuidv4()).current;
+  const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
+  const MAX_MEDIA_COUNT = 4;
   
-  // Add hashtag preview state
-  const [detectedHashtags, setDetectedHashtags] = useState<string[]>([]);
-
+  // Auto-resize textarea as content changes
   useEffect(() => {
-    if (user) {
-      setUserDisplayName(user.user_metadata?.username || user.email);
-      setAvatarUrl(user.user_metadata?.avatar_url || null);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (isEditing && existingPost) {
-      setContent(existingPost.content || '');
-      setMediaItems(existingPost.media || []);
-      
-      // Set initial entities if available
-      if (existingPost.tags && Array.isArray(existingPost.tags)) {
-        setSelectedEntities(existingPost.tags.map((tag: string) => ({
-          id: tag, // Assuming tag can be used as a temporary ID
-          name: tag,
-          type: 'unknown'
-        })));
-      }
-    }
-  }, [isEditing, existingPost]);
-
-  const handleMediaUploaded = (newMedia: MediaItem[]) => {
-    setMediaItems([...mediaItems, ...newMedia]);
-  };
-
-  const handleMediaRemove = (mediaToRemove: MediaItem) => {
-    setMediaItems(mediaItems.filter(media => media.url !== mediaToRemove.url));
-  };
-
-  const handleEntitySelect = (entity: Entity) => {
-    setSelectedEntities([...selectedEntities, entity]);
-  };
-
-  const handleEntityRemove = (entityToRemove: Entity) => {
-    setSelectedEntities(selectedEntities.filter(entity => entity.id !== entityToRemove.id));
-  };
-
-  // Update content change handler to detect hashtags
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newContent = e.target.value;
-    setContent(newContent);
-    
-    // Update detected hashtags for preview
-    const hashtags = parseHashtags(newContent);
-    const uniqueNormalized = [...new Set(hashtags.map(h => h.normalized))];
-    setDetectedHashtags(uniqueNormalized);
-    
-    // Auto-resize textarea
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
+  }, [content]);
+
+  // Handle click outside for emoji picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerVisible && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setEmojiPickerVisible(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [emojiPickerVisible]);
+
+  // Save cursor position when textarea is focused or clicked
+  const saveCursorPosition = () => {
+    if (textareaRef.current) {
+      setCursorPosition({
+        start: textareaRef.current.selectionStart,
+        end: textareaRef.current.selectionEnd
+      });
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle emoji selection and insertion
+  const handleEmojiSelect = (emoji: any) => {
+    if (textareaRef.current) {
+      const start = cursorPosition.start;
+      const end = cursorPosition.end;
+      
+      // Insert emoji at cursor position
+      const newContent = 
+        content.substring(0, start) + 
+        emoji.native + 
+        content.substring(end);
+      
+      setContent(newContent);
+      
+      // Update cursor position for next insertion
+      const newPosition = start + emoji.native.length;
+      setCursorPosition({ start: newPosition, end: newPosition });
+      
+      // Focus back on textarea and set cursor position
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(newPosition, newPosition);
+          
+          // Ensure textarea height is adjusted
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+      }, 10);
+    }
     
-    if (!user || isSubmitting) return;
+    // Close emoji picker after selection
+    setEmojiPickerVisible(false);
+  };
+
+  // Handle keyboard shortcut for posting (Cmd/Ctrl + Enter)
+  useEffect(() => {
+    const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
     
-    if (!content.trim() && mediaItems.length === 0) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !isPostButtonDisabled) {
+        handleSubmit();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [content, media, isSubmitting]);
+
+  // Handle drag and drop for the entire form
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      if (formRef.current) {
+        formRef.current.classList.add('bg-accent/20');
+      }
+    };
+    
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      if (formRef.current) {
+        formRef.current.classList.remove('bg-accent/20');
+      }
+    };
+    
+    const handleDrop = async (e: DragEvent) => {
+      e.preventDefault();
+      if (formRef.current) {
+        formRef.current.classList.remove('bg-accent/20');
+      }
+      
+      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+          // Handle file upload logic here if you have direct access
+          // For now, we'll let the MediaUploader handle it
+        }
+      }
+    };
+    
+    const currentRef = formRef.current;
+    if (currentRef) {
+      currentRef.addEventListener('dragover', handleDragOver, { passive: true });
+      currentRef.addEventListener('dragleave', handleDragLeave, { passive: true });
+      currentRef.addEventListener('drop', handleDrop);
+    }
+    
+    return () => {
+      if (currentRef) {
+        currentRef.removeEventListener('dragover', handleDragOver);
+        currentRef.removeEventListener('dragleave', handleDragLeave);
+        currentRef.removeEventListener('drop', handleDrop);
+      }
+    };
+  }, []);
+
+  const handleMediaUpload = (mediaItem: MediaItem) => {
+    if (media.length < MAX_MEDIA_COUNT) {
+      setMedia((prev) => [...prev, { ...mediaItem, order: prev.length }]);
+    } else {
       toast({
-        title: 'Content required',
-        description: 'Please add some content or media to your post.',
+        title: 'Media limit reached',
+        description: `You can only upload up to ${MAX_MEDIA_COUNT} media items`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const removeMedia = (itemToRemove: MediaItem) => {
+    setMedia((prev) => 
+      prev
+        .filter((item) => item.url !== itemToRemove.url)
+        .map((item, index) => ({ ...item, order: index }))
+    );
+  };
+
+  const handleEntitiesChange = (newEntities: Entity[]) => {
+    setEntities(newEntities);
+    setEntitySelectorVisible(false);
+    setSelectorPrefillQuery(''); // Clear prefill query when closing
+  };
+
+  const removeEntity = (entityId: string) => {
+    setEntities(prev => prev.filter(entity => entity.id !== entityId));
+  };
+
+  const handleSubmit = async () => {
+    if (!user) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please sign in to create posts',
         variant: 'destructive',
       });
       return;
     }
 
-    setIsSubmitting(true);
+    if (!content.trim() && media.length === 0) {
+      toast({
+        title: 'Empty post',
+        description: 'Please add some content or media to your post',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
-      let newPost;
+      setIsSubmitting(true);
+
+      // Map visibility to database enum type
+      const dbVisibility = mapVisibilityToDatabase(visibility);
       
-      if (isEditing && existingPost) {
-        // Update existing post
-        newPost = await updatePost(existingPost.id, {
-          content: content.trim(),
-          media: mediaItems,
-          tags: selectedEntities.map(entity => entity.name),
-        });
-      } else {
-        // Create new post
-        newPost = await createPost({
-          content: content.trim(),
-          post_type: 'text',
-          visibility: 'public',
-          media: mediaItems,
-          tags: selectedEntities.map(entity => entity.name),
-        }, user.id);
-      }
+      // Clean media items for database
+      const mediaToSave = media.map(item => ({
+        id: item.id || uuidv4(),
+        url: item.url,
+        type: item.type,
+        caption: item.caption || '',
+        alt: item.alt || '',
+        order: item.order,
+        is_deleted: false,
+        thumbnail_url: item.thumbnail_url || item.url
+      }));
 
-      if (newPost) {
-        // Process hashtags AFTER post creation/update (handles both new and edited posts)
-        await processPostHashtags(newPost.id, content);
-        
-        // Handle entity relationships
-        if (selectedEntities.length > 0) {
-          await Promise.all(
-            selectedEntities.map(entity => insertPostEntity(newPost.id, entity.id))
-          );
+      // Store location as a tag if it exists, instead of in metadata
+      const tags = location ? [location.name] : [];
+
+      // Prepare post data for database - explicitly type the post_type
+      const postData = {
+        content,
+        media: mediaToSave,
+        visibility: dbVisibility,
+        user_id: user.id,
+        post_type: 'story' as 'story' | 'routine' | 'project' | 'note', // Explicit type casting
+        tags: tags, // Use the tags field instead of the non-existent metadata field
+      };
+
+      console.log('Submitting post:', postData);
+      
+      // Save to database
+      const { data: newPost, error } = await supabase
+        .from('posts')
+        .insert(postData)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log('Post created:', newPost);
+      
+      // Add entity relationships if any
+      if (entities.length > 0 && newPost) {
+        for (const entity of entities) {
+          const { error: entityError } = await supabase
+            .from('post_entities')
+            .insert({
+              post_id: newPost.id,
+              entity_id: entity.id
+            });
+            
+          if (entityError) {
+            console.error('Error saving entity relationship:', entityError);
+          }
         }
-
-        toast({
-          title: isEditing ? 'Post updated!' : 'Post created!',
-          description: isEditing ? 'Your post has been updated successfully.' : 'Your post has been shared successfully.',
-        });
-
-        // Reset form
-        setContent('');
-        setMediaItems([]);
-        setSelectedEntities([]);
-        setDetectedHashtags([]);
-        
-        // Call success callback
-        onSuccess?.(newPost);
       }
-    } catch (error: any) {
-      console.error('Error creating/updating post:', error);
+      
+      toast({
+        title: 'Post created',
+        description: 'Your post has been published successfully',
+      });
+
+      // Trigger refresh events for various parts of the app
+      window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
+      window.dispatchEvent(new CustomEvent('refresh-following-feed'));
+      window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+      window.dispatchEvent(new CustomEvent('refresh-posts'));
+
+      // Reset form and notify parent
+      onSuccess();
+    } catch (error) {
+      console.error('Error creating post:', error);
       toast({
         title: 'Error',
-        description: error.message || `Failed to ${isEditing ? 'update' : 'create'} post. Please try again.`,
+        description: 'Failed to create post. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -170,14 +331,50 @@ export function EnhancedCreatePostForm({
     }
   };
 
-  if (!session || !user) {
-    return <p>Please sign in to create a post.</p>;
+  function getVisibilityIcon() {
+    switch (visibility) {
+      case 'private':
+        return <Lock className="h-4 w-4" />;
+      case 'circle':
+        return <Users className="h-4 w-4" />;
+      default:
+        return <Globe className="h-4 w-4" />;
+    }
   }
 
+  function getEntityIcon(type: string) {
+    switch (type) {
+      case 'place':
+        return '🏠';
+      case 'food':
+        return '🍽️';
+      case 'movie':
+        return '🎬';
+      case 'book':
+        return '📚';
+      case 'product':
+        return '💄';
+      default:
+        return '🏷️';
+    }
+  }
+
+  // Computed properties
+  const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
+  
+  // Get user display name using the profileData or fallback to user metadata
+  const userDisplayName = user ? (
+    profileData ? getDisplayName(user, profileData) : 
+    (user.user_metadata?.username || user.email?.split('@')[0] || 'User')
+  ) : 'User';
+
+  // Get avatar URL from profileData
+  const avatarUrl = profileData?.avatar_url || null;
+
   return (
-    <form 
-      onSubmit={handleSubmit} 
-      className="bg-white rounded-lg border border-gray-200 p-4 space-y-4"
+    <div 
+      ref={formRef} 
+      className={`bg-background rounded-xl shadow-sm p-5 transition-all ${showLocationInput ? 'location-search-active' : ''}`}
     >
       {/* User Info + Text Input */}
       <div className="flex gap-3">
@@ -191,79 +388,322 @@ export function EnhancedCreatePostForm({
           <p className="text-sm font-medium">{userDisplayName}</p>
           <Textarea
             ref={textareaRef}
+            placeholder="What do you want to share today?"
             value={content}
-            onChange={handleContentChange}
-            placeholder="What's on your mind?"
-            className="min-h-[80px] resize-none border-0 p-0 text-base placeholder:text-gray-500 focus-visible:ring-0 shadow-none"
-            style={{ height: 'auto' }}
+            onChange={(e) => {
+              const newContent = e.target.value;
+              setContent(newContent);
+              
+              // Check for @ mention trigger
+              const textarea = e.target;
+              const cursorPos = textarea.selectionStart;
+              
+              // Look for @ symbol followed by text
+              const textBeforeCursor = newContent.substring(0, cursorPos);
+              const mentionMatch = textBeforeCursor.match(/(^|\s)@(\w*)$/);
+              
+              if (mentionMatch) {
+                const mentionText = mentionMatch[2]; // Text after @
+                setSelectorPrefillQuery(mentionText);
+                setEntitySelectorVisible(true);
+                setEmojiPickerVisible(false);
+                setShowLocationInput(false);
+              }
+            }}
+            className="min-h-[100px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/70"
+            onClick={saveCursorPosition}
+            onKeyUp={saveCursorPosition}
+            onFocus={saveCursorPosition}
           />
         </div>
       </div>
 
-      {/* Hashtag Preview */}
-      {detectedHashtags.length > 0 && (
-        <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Hash className="h-4 w-4" />
-            <span>Detected hashtags:</span>
-          </div>
-          {detectedHashtags.map(tag => (
-            <span key={tag} className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
-              #{tag}
-            </span>
-          ))}
-        </div>
+      {/* Twitter Style Media Preview */}
+      {media.length > 0 && (
+        <TwitterStyleMediaPreview
+          media={media}
+          onRemove={removeMedia}
+        />
       )}
 
-      {/* Media Display + Uploader */}
-      {mediaItems.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto">
-          {mediaItems.map((media, index) => (
-            <div key={index} className="relative">
-              <img
-                src={media.url}
-                alt="Media Preview"
-                className="h-20 w-20 object-cover rounded-md"
-              />
+      {/* Entity Tags */}
+      {entities.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-3">
+          {entities.map((entity) => (
+            <Badge 
+              key={entity.id} 
+              variant="outline" 
+              className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
+            >
+              <span>{getEntityIcon(entity.type)}</span>
+              <span>{entity.name}</span>
               <Button
                 variant="ghost"
-                size="icon"
-                className="absolute top-0 right-0 h-6 w-6 p-0 hover:bg-gray-200/80"
-                onClick={() => handleMediaRemove(media)}
+                size="sm"
+                className="h-4 w-4 p-0 rounded-full hover:bg-muted"
+                onClick={() => removeEntity(entity.id)}
               >
-                <X className="h-3 w-3" />
+                <X size={10} />
               </Button>
-            </div>
+            </Badge>
           ))}
         </div>
       )}
-      {/* Media uploader commented out until interface is fixed */}
 
-      {/* Entity Selector - commented out for now since SimpleEntitySelector may not exist */}
-      {/* <SimpleEntitySelector
-        selectedEntities={selectedEntities}
-        onEntitySelect={handleEntitySelect}
-        onEntityRemove={handleEntityRemove}
-      /> */}
+      {/* Location Tag */}
+      {location && (
+        <div className="flex items-center gap-1 mt-3">
+          <Badge 
+            variant="outline" 
+            className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
+          >
+            <MapPin className="h-3 w-3" />
+            <span>{location.name}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-4 w-4 p-0 rounded-full hover:bg-muted"
+              onClick={() => setLocation(null)}
+            >
+              <X size={10} />
+            </Button>
+          </Badge>
+          {location.address && (
+            <span className="text-xs text-muted-foreground">{location.address}</span>
+          )}
+        </div>
+      )}
 
-      {/* Submit Buttons */}
-      <div className="flex justify-end gap-2">
-        {isEditing && onCancel && (
-          <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+      {/* Entity Selector (only shown when tag button is clicked or @ is typed) */}
+      {entitySelectorVisible && (
+        <div className="mt-3 p-3 border rounded-lg bg-background animate-fade-in">
+          <SimpleEntitySelector 
+            onEntitiesChange={handleEntitiesChange}
+            initialEntities={entities}
+            initialQuery={selectorPrefillQuery}
+            autoFocusSearch={!!selectorPrefillQuery}
+          />
+        </div>
+      )}
+
+      {/* Location Search Input (only shown when location button is clicked) */}
+      {showLocationInput && !location && (
+        <div className="mt-3 animate-fade-in location-search-wrapper">
+          <LocationSearchInput
+            onLocationSelect={(selectedLocation) => {
+              setLocation(selectedLocation);
+              setShowLocationInput(false);
+            }}
+            onClear={() => setShowLocationInput(false)}
+          />
+        </div>
+      )}
+
+      {/* Bottom Toolbar */}
+      <div className={`flex items-center justify-between mt-4 pt-3 border-t bottom-toolbar ${showLocationInput ? 'opacity-50 pointer-events-none' : ''}`}>
+        {/* Left: Toolbar */}
+        <div className="flex items-center gap-1">
+          <MediaUploader
+            sessionId={sessionId}
+            onMediaUploaded={handleMediaUpload}
+            initialMedia={media}
+            maxMediaCount={MAX_MEDIA_COUNT}
+            customButton={
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
+                  media.length >= MAX_MEDIA_COUNT && "opacity-50 cursor-not-allowed"
+                )}
+                disabled={media.length >= MAX_MEDIA_COUNT}
+              >
+                <Image className="h-5 w-5" />
+                {media.length > 0 && (
+                  <span className="ml-1 text-xs font-medium">
+                    {media.length}/{MAX_MEDIA_COUNT}
+                  </span>
+                )}
+              </Button>
+            }
+          />
+          
+          {/* Emoji Button - Improved implementation */}
+          <div className="relative">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
+                emojiPickerVisible && "bg-accent/50 text-accent-foreground"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                saveCursorPosition();
+                setEmojiPickerVisible(!emojiPickerVisible);
+                if (!emojiPickerVisible) {
+                  setShowLocationInput(false);
+                }
+              }}
+              disabled={showLocationInput}
+            >
+              <Smile className="h-5 w-5" />
+            </Button>
+            
+            {emojiPickerVisible && !showLocationInput && (
+              <div 
+                ref={emojiPickerRef}
+                className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <Picker 
+                  data={data}
+                  onEmojiSelect={handleEmojiSelect}
+                  theme="light"
+                  previewPosition="none"
+                  set="native"
+                  skinTonePosition="none"
+                  emojiSize={20}
+                  emojiButtonSize={28}
+                  maxFrequentRows={2}
+                  modalish={false}
+                  showSkinTones={false}
+                />
+              </div>
+            )}
+          </div>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
+              entitySelectorVisible && "bg-accent/50 text-accent-foreground"
+            )}
+            onClick={() => {
+              setEntitySelectorVisible(!entitySelectorVisible);
+              if (!entitySelectorVisible) {
+                setShowLocationInput(false);
+                setEmojiPickerVisible(false);
+                setSelectorPrefillQuery(''); // Clear prefill when manually opening
+              }
+            }}
+            disabled={showLocationInput}
+          >
+            <Tag className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
+              showLocationInput && "bg-accent/50 text-accent-foreground"
+            )}
+            onClick={() => {
+              setShowLocationInput(!showLocationInput);
+              if (!showLocationInput) {
+                setEmojiPickerVisible(false);
+                setEntitySelectorVisible(false);
+              }
+            }}
+          >
+            <MapPin className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full p-2 hover:bg-accent hover:text-accent-foreground"
+            disabled={showLocationInput}
+          >
+            <MoreHorizontal className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Right: Visibility + Post Actions */}
+        <div className="flex items-center gap-2">
+          <Select
+            value={visibility}
+            onValueChange={(value: VisibilityOption) => setVisibility(value)}
+            disabled={showLocationInput}
+          >
+            <SelectTrigger className="w-[130px] h-9 border-none">
+              <SelectValue>
+                <div className="flex items-center gap-2">
+                  {getVisibilityIcon()}
+                  <span>
+                    {visibility === 'public' ? 'Public' : 
+                     visibility === 'private' ? 'Only Me' : 
+                     'Circle Only'}
+                  </span>
+                </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="public">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  <span>Public</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="private">
+                <div className="flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  <span>Only Me</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="circle">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <span>Circle Only</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Button 
+            variant="outline" 
+            onClick={onCancel} 
+            disabled={isSubmitting || showLocationInput}
+            className="hover:bg-accent/50"
+          >
             Cancel
           </Button>
-        )}
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? (
-            <>
-              {isEditing ? 'Updating...' : 'Creating...'}
-              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-            </>
-          ) : (
-            isEditing ? 'Update Post' : 'Create Post'
-          )}
-        </Button>
+          
+          <Button 
+            className={cn(
+              "bg-brand-orange hover:bg-brand-orange/90 transition-all",
+              (!isPostButtonDisabled && !isSubmitting) && "animate-fade-in"
+            )}
+            onClick={handleSubmit} 
+            disabled={isPostButtonDisabled || showLocationInput}
+          >
+            {isSubmitting ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 border-2 border-t-transparent rounded-full animate-spin" /> 
+                <span>Posting...</span>
+              </div>
+            ) : (
+              <span>Post</span>
+            )}
+          </Button>
+        </div>
       </div>
-    </form>
+    </div>
   );
 }

@@ -1,70 +1,171 @@
 
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { ContentViewerProvider } from '@/contexts/ContentViewerContext';
+import AuthErrorBoundary from '@/components/AuthErrorBoundary';
+import AuthInitializer from '@/components/AuthInitializer';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import NavBarComponent from '@/components/NavBarComponent';
-import { Search } from '@/pages/Search';
-import { TagPage } from '@/pages/TagPage';
+import AdminRoute from '@/components/AdminRoute';
+import Index from '@/pages/Index';
+import Feed from '@/pages/Feed';
+import Auth from '@/pages/Auth';
+import Profile from '@/pages/Profile';
+import Explore from '@/pages/Explore';
+import Settings from '@/pages/Settings';
+import Search from '@/pages/Search';
+import EntityDetail from '@/pages/EntityDetail';
+import PostView from '@/pages/PostView';
+import RecommendationView from '@/pages/RecommendationView';
+import ProductSearch from '@/pages/ProductSearch';
+import PlacesPage from '@/pages/PlacesPage';
+import ProductsPage from '@/pages/ProductsPage';
+import BooksPage from '@/pages/BooksPage';
+import MoviesPage from '@/pages/MoviesPage';
+import FoodPage from '@/pages/FoodPage';
+import AdminPortal from '@/pages/AdminPortal';
+import AdminEntityEdit from '@/pages/admin/AdminEntityEdit';
+import NotFound from '@/pages/NotFound';
+import { preloadSounds } from '@/services/feedbackService';
+import { Howl } from 'howler';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+// Create a client
+const queryClient = new QueryClient();
 
 function App() {
+  useEffect(() => {
+    // Preload sounds on mount
+    preloadSounds();
+
+    // Unlock audio context on first user interaction
+    const unlockAudio = () => {
+      try {
+        const silent = new Howl({ src: ['/sounds/like.mp3'], volume: 0 });
+        silent.play();
+        document.removeEventListener('click', unlockAudio);
+      } catch (error) {
+        console.error('Audio unlock failed:', error);
+      }
+    };
+
+    document.addEventListener('click', unlockAudio);
+
+    // Cleanup function to remove listener if component unmounts
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <div className="min-h-screen bg-background">
-            <Routes>
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-background">
-                    <NavBarComponent />
-                    <div className="pt-16">
-                      <div className="text-center py-20">
-                        <h1 className="text-4xl font-bold mb-4">Welcome</h1>
-                        <p className="text-muted-foreground">Your feed will be here soon!</p>
-                      </div>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/search" element={
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-background">
-                    <NavBarComponent />
-                    <div className="pt-16">
+      <ThemeProvider>
+        <ContentViewerProvider>
+          <AuthErrorBoundary>
+            <Router>
+              <AuthInitializer>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/home" element={
+                    <ProtectedRoute>
+                      <Feed />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile" element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile/:id" element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/explore" element={
+                    <ProtectedRoute>
+                      <Explore />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/settings" element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/search" element={
+                    <ProtectedRoute>
                       <Search />
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/t/:tag" element={
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-background">
-                    <NavBarComponent />
-                    <div className="pt-16">
-                      <TagPage />
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              } />
-            </Routes>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/search/:query" element={
+                    <ProtectedRoute>
+                      <Search />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/entity/:slug" element={
+                    <ProtectedRoute>
+                      <EntityDetail />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/post/:postId" element={
+                    <ProtectedRoute>
+                      <PostView />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/recommendations/:recommendationId" element={
+                    <ProtectedRoute>
+                      <RecommendationView />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/product-search/:query" element={
+                    <ProtectedRoute>
+                      <ProductSearch />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/places" element={
+                    <ProtectedRoute>
+                      <PlacesPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/products" element={
+                    <ProtectedRoute>
+                      <ProductsPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/books" element={
+                    <ProtectedRoute>
+                      <BooksPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/movies" element={
+                    <ProtectedRoute>
+                      <MoviesPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/food" element={
+                    <ProtectedRoute>
+                      <FoodPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin" element={
+                    <AdminRoute>
+                      <AdminPortal />
+                    </AdminRoute>
+                  } />
+                  <Route path="/admin/entities/:id/edit" element={
+                    <AdminRoute>
+                      <AdminEntityEdit />
+                    </AdminRoute>
+                  } />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </AuthInitializer>
+            </Router>
             <Toaster />
-          </div>
-        </Router>
-      </AuthProvider>
+          </AuthErrorBoundary>
+        </ContentViewerProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

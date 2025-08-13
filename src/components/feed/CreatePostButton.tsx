@@ -102,6 +102,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
           }}
         >
           <EnhancedCreatePostForm 
+            profileData={profileData}
             onSuccess={() => {
               setIsDialogOpen(false);
               
