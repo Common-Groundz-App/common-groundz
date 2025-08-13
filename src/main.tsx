@@ -21,17 +21,19 @@ if (!rootElement) throw new Error('Failed to find the root element');
 const root = createRoot(rootElement);
 
 root.render(
-  <RenderProtection maxRenders={30} timeWindow={2000}>
+  <React.StrictMode>
     <AuthContextBoundary>
       <AuthProvider>
         <PreferencesProvider>
           <LocationProvider>
             <TooltipProvider>
-              <App />
+              <RenderProtection maxRenders={30} timeWindow={2000}>
+                <App />
+              </RenderProtection>
             </TooltipProvider>
           </LocationProvider>
         </PreferencesProvider>
       </AuthProvider>
     </AuthContextBoundary>
-  </RenderProtection>
+  </React.StrictMode>
 );
