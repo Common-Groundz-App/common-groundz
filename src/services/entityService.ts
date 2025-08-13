@@ -1,8 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Entity, RecommendationCategory } from '@/services/recommendation/types';
-import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
-import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
-import { MediaItem } from '@/types/common';
+import { Entity } from '@/services/recommendation/types';
 
 /**
  * Fetch an entity by its slug or ID
@@ -46,7 +43,7 @@ export const fetchEntityBySlug = async (slugOrId: string): Promise<Entity | null
     console.log('❌ Entity not found for:', slugOrId);
   }
 
-  return data as Entity;
+  return data as Entity | null;
 };
 
 /**
@@ -69,7 +66,10 @@ export async function getEntityById(entityId: string): Promise<Entity | null> {
     return null;
   }
 
-  return data;
+  return {
+    ...data,
+    metadata: typeof data.metadata === 'string' ? {} : (data.metadata as Record<string, any>) || {}
+  } as Entity;
 }
 
 export async function searchEntities(searchTerm: string): Promise<Entity[]> {
@@ -86,6 +86,28 @@ export async function searchEntities(searchTerm: string): Promise<Entity[]> {
 
   return data?.map(entity => ({
     ...entity,
+    metadata: typeof entity.metadata === 'string' ? {} : (entity.metadata as Record<string, any>) || {},
     category: entity.type || 'uncategorized'
-  })) || [];
+  } as Entity)) || [];
+}
+
+// Add missing functions that are imported elsewhere
+export async function fetchEntityRecommendations(entityId: string, userId?: string) {
+  // Placeholder implementation
+  return [];
+}
+
+export async function fetchEntityReviews(entityId: string, userId?: string) {
+  // Placeholder implementation
+  return [];
+}
+
+export async function getEntityStats(entityId: string, userId?: string) {
+  // Placeholder implementation
+  return {
+    recommendationCount: 0,
+    reviewCount: 0,
+    averageRating: null,
+    circleRecommendationCount: 0
+  };
 }

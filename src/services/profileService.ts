@@ -43,3 +43,39 @@ export async function fetchUserProfile(userId: string) {
 
   return data;
 }
+
+// Add missing functions that are imported elsewhere
+export async function getDisplayName(userId: string): Promise<string> {
+  const profile = await fetchUserProfile(userId);
+  return profile?.username || 'Anonymous User';
+}
+
+export async function updateUserPreferences(userId: string, preferences: any) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(preferences)
+    .eq('id', userId);
+  
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchFollowerCount(userId: string): Promise<number> {
+  // Placeholder implementation
+  return 0;
+}
+
+export async function fetchFollowingCount(userId: string): Promise<number> {
+  // Placeholder implementation
+  return 0;
+}
+
+export async function updateUserProfile(userId: string, updates: any) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId);
+  
+  if (error) throw error;
+  return data;
+}

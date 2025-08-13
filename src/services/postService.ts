@@ -10,17 +10,17 @@ export const createPost = async (postData: {
   visibility: string;
   media?: any[];
   tags?: string[];
-}) => {
+}, userId: string) => {
   try {
     const { data, error } = await supabase
       .from('posts')
-      .insert({
-        title: 'Untitled',
+      .insert([{
         content: postData.content,
-        post_type: postData.post_type,
-        visibility: postData.visibility,
+        post_type: postData.post_type as any,
+        visibility: postData.visibility as any,
         media: postData.media || [],
-      })
+        user_id: userId,
+      }])
       .select()
       .single();
 

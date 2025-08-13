@@ -6,13 +6,14 @@ import Link from '@tiptap/extension-link';
 import { renderHashtagLinks } from '@/utils/hashtagUtils';
 
 export interface EditorProps {
-  content: any;
+  content?: any;
+  value?: string;
   onChange: (json: any, html: any) => void;
   placeholder?: string;
   className?: string;
 }
 
-export function RichTextEditor({ content, onChange, placeholder, className }: EditorProps) {
+export function RichTextEditor({ content, value, onChange, placeholder, className }: EditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit,

@@ -158,7 +158,7 @@ export function Search() {
                     >
                       <CardContent className="p-4">
                         <p className="text-sm font-medium">{entity.name}</p>
-                        <p className="text-xs text-muted-foreground">{entity.category}</p>
+                        <p className="text-xs text-muted-foreground">{entity.type}</p>
                       </CardContent>
                     </Card>
                   ))}

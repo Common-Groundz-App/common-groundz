@@ -130,7 +130,7 @@ export function EnhancedCreatePostForm({
           visibility: 'public',
           media: mediaItems,
           tags: selectedEntities.map(entity => entity.name),
-        });
+        }, user.id);
       }
 
       if (newPost) {
