@@ -2426,6 +2426,17 @@ export type Database = {
         Args: { p_category: string; p_user_id: string }
         Returns: number
       }
+      calculate_trending_hashtags: {
+        Args: { result_limit?: number; time_window_hours?: number }
+        Returns: {
+          created_at: string
+          id: string
+          name_norm: string
+          name_original: string
+          post_count: number
+          trending_score: number
+        }[]
+      }
       calculate_trending_score: {
         Args: { p_entity_id: string }
         Returns: number

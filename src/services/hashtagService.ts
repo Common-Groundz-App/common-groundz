@@ -62,13 +62,17 @@ export const processPostHashtags = async (
 };
 
 /**
- * Remove all hashtags for a post (Phase 2: simplified for now)
+ * Remove all hashtags for a post
  * @param postId - The post ID
  */
 export const removePostHashtags = async (postId: string): Promise<boolean> => {
   try {
-    // For now, we'll implement this when needed by the create post form
-    console.log(`Would remove hashtags for post ${postId}`);
+    const { error } = await supabase
+      .from('post_hashtags')
+      .delete()
+      .eq('post_id', postId);
+      
+    if (error) throw error;
     return true;
   } catch (error) {
     console.error('Error in removePostHashtags:', error);
@@ -98,20 +102,40 @@ export const updatePostHashtags = async (
 };
 
 /**
- * Create or get existing hashtag by name (Phase 2: simplified for now)
+ * Create or get existing hashtag by name
  * @param originalName - The original hashtag text (case-sensitive)
  * @param normalizedName - The normalized hashtag text (lowercase)
  * @returns The hashtag record
  */
 export const createOrGetHashtag = async (originalName: string, normalizedName: string): Promise<Hashtag | null> => {
   try {
-    // For now, return a mock hashtag until tables are properly typed
-    return {
-      id: `mock-${normalizedName}`,
-      name_original: originalName,
-      name_norm: normalizedName,
-      created_at: new Date().toISOString()
-    };
+    // First try to get existing hashtag
+    const { data: existing, error: selectError } = await supabase
+      .from('hashtags')
+      .select('*')
+      .eq('name_norm', normalizedName)
+      .single();
+      
+    if (selectError && selectError.code !== 'PGRST116') {
+      throw selectError;
+    }
+    
+    if (existing) {
+      return existing;
+    }
+    
+    // Create new hashtag if it doesn't exist
+    const { data: newHashtag, error: insertError } = await supabase
+      .from('hashtags')
+      .insert({
+        name_original: originalName,
+        name_norm: normalizedName
+      })
+      .select()
+      .single();
+      
+    if (insertError) throw insertError;
+    return newHashtag;
   } catch (error) {
     console.error('Error in createOrGetHashtag:', error);
     return null;
@@ -119,14 +143,24 @@ export const createOrGetHashtag = async (originalName: string, normalizedName: s
 };
 
 /**
- * Link hashtags to a post (Phase 2: simplified for now)
+ * Link hashtags to a post
  * @param postId - The post ID
  * @param hashtagIds - Array of hashtag IDs to link
  */
 export const linkHashtagsToPost = async (postId: string, hashtagIds: string[]): Promise<boolean> => {
   try {
-    // For now, just log the linking until tables are properly typed
-    console.log(`Would link hashtags to post ${postId}:`, hashtagIds);
+    if (hashtagIds.length === 0) return true;
+    
+    const insertData = hashtagIds.map(hashtagId => ({
+      post_id: postId,
+      hashtag_id: hashtagId
+    }));
+    
+    const { error } = await supabase
+      .from('post_hashtags')
+      .insert(insertData);
+      
+    if (error) throw error;
     return true;
   } catch (error) {
     console.error('Error in linkHashtagsToPost:', error);
@@ -135,21 +169,43 @@ export const linkHashtagsToPost = async (postId: string, hashtagIds: string[]): 
 };
 
 /**
- * Search hashtags by query (Phase 3A: real implementation)
+ * Search hashtags by query
  * @param query - Search query
  * @param limit - Maximum number of results
  * @returns Array of hashtags with post counts
  */
 export const searchHashtags = async (query: string, limit = 10): Promise<HashtagWithCount[]> => {
   try {
-    // For Phase 3A, simulate with mock data until tables are properly set up
-    const mockResults: HashtagWithCount[] = [
-      { id: '1', name_original: 'travel', name_norm: 'travel', post_count: 42, created_at: new Date().toISOString() },
-      { id: '2', name_original: 'photography', name_norm: 'photography', post_count: 38, created_at: new Date().toISOString() },
-      { id: '3', name_original: 'food', name_norm: 'food', post_count: 29, created_at: new Date().toISOString() },
-    ].filter(tag => tag.name_norm.includes(query.toLowerCase()));
+    // Get hashtags matching the query
+    const { data: hashtags, error: hashtagError } = await supabase
+      .from('hashtags')
+      .select('*')
+      .ilike('name_norm', `%${query.toLowerCase()}%`)
+      .limit(limit);
+      
+    if (hashtagError) throw hashtagError;
+    if (!hashtags || hashtags.length === 0) return [];
     
-    return mockResults.slice(0, limit);
+    // Get post counts for each hashtag
+    const hashtagsWithCounts = await Promise.all(
+      hashtags.map(async (hashtag) => {
+        const { count, error: countError } = await supabase
+          .from('post_hashtags')
+          .select('*', { count: 'exact' })
+          .eq('hashtag_id', hashtag.id);
+          
+        return {
+          id: hashtag.id,
+          name_original: hashtag.name_original,
+          name_norm: hashtag.name_norm,
+          post_count: countError ? 0 : (count || 0),
+          created_at: hashtag.created_at
+        };
+      })
+    );
+    
+    // Sort by post count descending
+    return hashtagsWithCounts.sort((a, b) => b.post_count - a.post_count);
   } catch (error) {
     console.error('Error in searchHashtags:', error);
     return [];
@@ -157,47 +213,27 @@ export const searchHashtags = async (query: string, limit = 10): Promise<Hashtag
 };
 
 /**
- * Get trending hashtags (Phase 3A: mock implementation)
+ * Get trending hashtags using the database RPC function
  * @param limit - Maximum number of results
  * @returns Array of trending hashtags
  */
-// Enhanced trending hashtags with better algorithm simulation
 export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[]> => {
   try {
-    // Enhanced mock implementation simulating a real trending algorithm
-    // In production, this would:
-    // 1. Calculate growth rate (24h vs 7d posts)
-    // 2. Factor in engagement metrics (likes, comments)
-    // 3. Consider posting velocity and user diversity
-    // 4. Apply time-decay scoring
+    const { data, error } = await supabase
+      .rpc('calculate_trending_hashtags', {
+        time_window_hours: 72,
+        result_limit: limit
+      });
+      
+    if (error) throw error;
     
-    const mockTrending: HashtagWithCount[] = [
-      { id: '1', name_original: 'Photography', name_norm: 'photography', post_count: 234, created_at: new Date().toISOString() },
-      { id: '2', name_original: 'Travel', name_norm: 'travel', post_count: 189, created_at: new Date().toISOString() },
-      { id: '3', name_original: 'FoodieLife', name_norm: 'foodielife', post_count: 167, created_at: new Date().toISOString() },
-      { id: '4', name_original: 'DigitalArt', name_norm: 'digitalart', post_count: 145, created_at: new Date().toISOString() },
-      { id: '5', name_original: 'MusicLovers', name_norm: 'musiclovers', post_count: 132, created_at: new Date().toISOString() },
-      { id: '6', name_original: 'BookReview', name_norm: 'bookreview', post_count: 98, created_at: new Date().toISOString() },
-      { id: '7', name_original: 'Fitness', name_norm: 'fitness', post_count: 87, created_at: new Date().toISOString() },
-      { id: '8', name_original: 'TechNews', name_norm: 'technews', post_count: 76, created_at: new Date().toISOString() },
-      { id: '9', name_original: 'MovieNight', name_norm: 'movienight', post_count: 65, created_at: new Date().toISOString() },
-      { id: '10', name_original: 'Inspiration', name_norm: 'inspiration', post_count: 54, created_at: new Date().toISOString() }
-    ];
-    
-    // Simulate trending algorithm with randomized scores
-    const trendingWithScores = mockTrending.map(hashtag => ({
-      ...hashtag,
-      // Simulate trending score calculation
-      trendingScore: hashtag.post_count * (0.8 + Math.random() * 0.4),
-      // Add some growth simulation
-      post_count: hashtag.post_count + Math.floor(Math.random() * 20)
+    return (data || []).map(hashtag => ({
+      id: hashtag.id,
+      name_original: hashtag.name_original,
+      name_norm: hashtag.name_norm,
+      post_count: Number(hashtag.post_count),
+      created_at: hashtag.created_at
     }));
-    
-    // Sort by trending score and return limited results
-    return trendingWithScores
-      .sort((a, b) => b.trendingScore - a.trendingScore)
-      .slice(0, limit)
-      .map(({ trendingScore, ...hashtag }) => hashtag);
   } catch (error) {
     console.error('Error in getTrendingHashtags:', error);
     return [];
@@ -205,7 +241,7 @@ export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[
 };
 
 /**
- * Get posts by hashtag (for TagPage) - simplified for Phase 2
+ * Get posts by hashtag using proper hashtag relationships
  * @param hashtag - The normalized hashtag name
  * @param sortBy - Sort criteria ('recent' or 'popular')
  * @param timeFilter - Time filter ('all', 'week', 'month')
@@ -217,6 +253,31 @@ export const getPostsByHashtag = async (
   timeFilter: 'all' | 'week' | 'month' = 'all'
 ) => {
   try {
+    // First get the hashtag ID
+    const { data: hashtagData, error: hashtagError } = await supabase
+      .from('hashtags')
+      .select('id')
+      .eq('name_norm', hashtag)
+      .single();
+      
+    if (hashtagError || !hashtagData) {
+      // Fallback to content search if hashtag not found
+      return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter);
+    }
+    
+    // Get post IDs that have this hashtag
+    const { data: postHashtagData, error: postHashtagError } = await supabase
+      .from('post_hashtags')
+      .select('post_id')
+      .eq('hashtag_id', hashtagData.id);
+      
+    if (postHashtagError || !postHashtagData || postHashtagData.length === 0) {
+      return [];
+    }
+    
+    const postIds = postHashtagData.map(ph => ph.post_id);
+    
+    // Build the posts query
     let query = supabase
       .from('posts')
       .select(`
@@ -227,8 +288,9 @@ export const getPostsByHashtag = async (
           avatar_url
         )
       `)
-      .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
-      .eq('is_deleted', false);
+      .eq('is_deleted', false)
+      .eq('visibility', 'public')
+      .in('id', postIds);
 
     // Apply time filter
     if (timeFilter === 'week') {
@@ -245,8 +307,6 @@ export const getPostsByHashtag = async (
     if (sortBy === 'recent') {
       query = query.order('created_at', { ascending: false });
     } else {
-      // For 'popular', we could sort by view_count or comment_count
-      // For now, we'll use view_count
       query = query.order('view_count', { ascending: false });
     }
       
@@ -255,6 +315,56 @@ export const getPostsByHashtag = async (
     return data || [];
   } catch (error) {
     console.error('Error in getPostsByHashtag:', error);
+    return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter);
+  }
+};
+
+/**
+ * Fallback method using content search
+ */
+const getPostsByHashtagFallback = async (
+  hashtag: string, 
+  sortBy: 'recent' | 'popular' = 'recent',
+  timeFilter: 'all' | 'week' | 'month' = 'all'
+) => {
+  try {
+    let query = supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles!posts_user_id_fkey (
+          id,
+          username, 
+          avatar_url
+        )
+      `)
+      .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
+      .eq('is_deleted', false)
+      .eq('visibility', 'public');
+
+    // Apply time filter
+    if (timeFilter === 'week') {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      query = query.gte('created_at', oneWeekAgo.toISOString());
+    } else if (timeFilter === 'month') {
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      query = query.gte('created_at', oneMonthAgo.toISOString());
+    }
+
+    // Apply sorting
+    if (sortBy === 'recent') {
+      query = query.order('created_at', { ascending: false });
+    } else {
+      query = query.order('view_count', { ascending: false });
+    }
+      
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error in getPostsByHashtagFallback:', error);
     return [];
   }
 };
