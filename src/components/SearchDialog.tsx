@@ -1,16 +1,16 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, X, Loader2, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { Search, X, Loader2, ChevronDown, ChevronUp, AlertCircle, Hash } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
 import { SearchResultHandler } from './search/SearchResultHandler';
-import { useRealtimeUnifiedSearch } from '@/hooks/use-realtime-unified-search';
+import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Button } from '@/components/ui/button';
 
 interface SearchDialogProps {
@@ -22,16 +22,15 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   
-  // Use the working realtime unified search hook
+  // Use the enhanced realtime search hook with hashtag support
   const { 
     results, 
     isLoading, 
     loadingStates, 
     error,
     showAllResults,
-    toggleShowAll,
-    apiErrors
-  } = useRealtimeUnifiedSearch(query, { mode: 'quick' });
+    toggleShowAll
+  } = useEnhancedRealtimeSearch(query, { mode: 'quick' });
 
   const handleResultClick = () => {
     onOpenChange(false);
@@ -77,9 +76,9 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
         <span className="text-sm text-muted-foreground">Searching...</span>
       </div>
       <div className="flex gap-1 justify-center flex-wrap">
-        {loadingStates.books && <span className="text-xs text-muted-foreground">📚 Books</span>}
-        {loadingStates.movies && <span className="text-xs text-muted-foreground">🎬 Movies</span>}
-        {loadingStates.places && <span className="text-xs text-muted-foreground">📍 Places</span>}
+        {loadingStates.external && <span className="text-xs text-muted-foreground">📚 Books</span>}
+        {loadingStates.external && <span className="text-xs text-muted-foreground">🎬 Movies</span>}
+        {loadingStates.external && <span className="text-xs text-muted-foreground">📍 Places</span>}
       </div>
     </div>
   );
@@ -88,6 +87,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const hasExternalResults = results.categorized?.books?.length > 0 ||
                             results.categorized?.movies?.length > 0 ||
                             results.categorized?.places?.length > 0;
+  const hasHashtagResults = results.hashtags && results.hashtags.length > 0;
 
   // Show dropdown for any query with 1+ characters
   const shouldShowDropdown = query.trim().length >= 1;
@@ -118,15 +118,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
         {shouldShowDropdown && (
           <div className="max-h-[70vh] overflow-y-auto">
-            {/* API Errors State */}
-            {apiErrors.length > 0 && (
-              <div className="p-3 text-center border-b bg-yellow-50">
-                <div className="flex items-center justify-center gap-2 text-sm text-yellow-700">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>Some search sources are temporarily unavailable</span>
-                </div>
-              </div>
-            )}
 
             {/* Global Error State */}
             {error && (
@@ -142,8 +133,33 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             {(isLoading || Object.values(loadingStates).some(Boolean)) && renderLoadingState()}
 
             {/* Search Results */}
-            {(hasLocalResults || hasExternalResults) && (
+            {(hasLocalResults || hasExternalResults || hasHashtagResults) && (
               <>
+                {/* Hashtags */}
+                {hasHashtagResults && (
+                  <div className="flex flex-col">
+                    {renderSectionHeader('# Hashtags', results.hashtags?.length || 0, false)}
+                    {results.hashtags?.slice(0, 3).map((hashtag) => (
+                      <div
+                        key={hashtag.id}
+                        onClick={() => {
+                          navigate(`/t/${hashtag.name_norm}`);
+                          handleResultClick();
+                        }}
+                        className="flex items-center justify-between p-3 hover:bg-muted cursor-pointer border-b border-border/50 last:border-b-0"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Hash className="w-4 h-4 text-primary" />
+                          <div>
+                            <p className="font-medium text-sm">#{hashtag.name_original}</p>
+                            <p className="text-xs text-muted-foreground">{hashtag.post_count} posts</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Already on Groundz - Local Results */}
                 {results.entities.length > 0 && (
                   <div className="flex flex-col">
@@ -161,7 +177,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 {/* Books */}
                 {results.categorized?.books?.length > 0 && (
                   <div className="flex flex-col">
-                    {renderSectionHeader('Books', results.categorized.books.length, loadingStates.books, 'books')}
+                    {renderSectionHeader('Books', results.categorized.books.length, loadingStates.external, 'books')}
                     {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
                       <SearchResultHandler
                         key={`${book.api_source}-${book.api_ref || index}`}
@@ -176,7 +192,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 {/* Movies */}
                 {results.categorized?.movies?.length > 0 && (
                   <div className="flex flex-col">
-                    {renderSectionHeader('Movies & TV', results.categorized.movies.length, loadingStates.movies, 'movies')}
+                    {renderSectionHeader('Movies & TV', results.categorized.movies.length, loadingStates.external, 'movies')}
                     {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
                       <SearchResultHandler
                         key={`${movie.api_source}-${movie.api_ref || index}`}
@@ -191,7 +207,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 {/* Places */}
                 {results.categorized?.places?.length > 0 && (
                   <div className="flex flex-col">
-                    {renderSectionHeader('Places', results.categorized.places.length, loadingStates.places, 'places')}
+                    {renderSectionHeader('Places', results.categorized.places.length, loadingStates.external, 'places')}
                     {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
                       <SearchResultHandler
                         key={`${place.api_source}-${place.api_ref || index}`}
@@ -220,13 +236,10 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             )}
 
             {/* No Results State - only show if not loading and no results */}
-            {shouldShowDropdown && !hasLocalResults && !hasExternalResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
+            {shouldShowDropdown && !hasLocalResults && !hasExternalResults && !hasHashtagResults && !isLoading && !Object.values(loadingStates).some(Boolean) && (
               <div className="p-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  {apiErrors.length > 0 
-                    ? "No results found. Some search sources are temporarily unavailable." 
-                    : "No suggestions found. Press Enter to search more sources."
-                  }
+                  No suggestions found. Press Enter to search more sources.
                 </p>
               </div>
             )}

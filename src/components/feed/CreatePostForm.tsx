@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
+import { HashtagAutocomplete } from '@/components/hashtag/HashtagAutocomplete';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -96,6 +97,10 @@ export function CreatePostForm({
   // Store the HTML string content separately
   const [contentHtml, setContentHtml] = useState<string>('');
   const MAX_MEDIA_COUNT = 4;
+  
+  // Refs for hashtag autocomplete
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const contentEditorRef = useRef<HTMLTextAreaElement>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -390,7 +395,11 @@ export function CreatePostForm({
             <FormItem>
               <FormLabel>{getTitleLabel()}</FormLabel>
               <FormControl>
-                <Input placeholder={`Add a title...`} {...field} />
+                <Input 
+                  ref={titleInputRef}
+                  placeholder={`Add a title...`} 
+                  {...field} 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -495,6 +504,14 @@ export function CreatePostForm({
             {isEditMode ? (isSubmitting ? 'Updating...' : 'Update Post') : (isSubmitting ? 'Publishing...' : 'Publish Post')}
           </Button>
         </div>
+        
+        {/* Hashtag Autocomplete */}
+        <HashtagAutocomplete
+          inputRef={titleInputRef}
+          onHashtagSelect={(hashtag) => {
+            console.log('Hashtag selected:', hashtag);
+          }}
+        />
       </form>
     </Form>
   );

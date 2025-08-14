@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UnifiedSearchResults } from '@/hooks/use-unified-search';
+import { searchHashtags } from '@/services/hashtagService';
 
 export interface SearchLoading {
   local: boolean;
@@ -9,12 +10,13 @@ export interface SearchLoading {
 }
 
 export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'quick' | 'deep' }) => {
-  const [results, setResults] = useState<UnifiedSearchResults & { categorized: Record<string, any[]> }>({
+  const [results, setResults] = useState<UnifiedSearchResults & { categorized: Record<string, any[]>; hashtags?: any[] }>({
     users: [],
     entities: [],
     reviews: [],
     recommendations: [],
     products: [],
+    hashtags: [],
     categorized: {
       books: [],
       movies: [],
@@ -48,13 +50,14 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
   useEffect(() => {
     const performSearch = async () => {
       // Show dropdown for any query with 1+ characters
-      if (!query || query.trim().length < 1) {
+        if (!query || query.trim().length < 1) {
         setResults({
           users: [],
           entities: [],
           reviews: [],
           recommendations: [],
           products: [],
+          hashtags: [],
           categorized: {
             books: [],
             movies: [],
@@ -86,6 +89,16 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
         } else if (data) {
           console.log(`✅ Enhanced search results (${searchMode} mode):`, data);
           
+          // Search hashtags if query starts with #
+          let hashtagResults = [];
+          if (query.startsWith('#') && query.length > 1) {
+            const hashtagQuery = query.substring(1);
+            hashtagResults = await searchHashtags(hashtagQuery, 10);
+          } else if (query.length >= 2) {
+            // Also search hashtags for general queries
+            hashtagResults = await searchHashtags(query, 5);
+          }
+
           // Update results with the enhanced categorized data
           setResults({
             users: data?.users || [],
@@ -93,6 +106,7 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
             reviews: data?.reviews || [],
             recommendations: data?.recommendations || [],
             products: data?.products || [],
+            hashtags: hashtagResults,
             categorized: data?.categorized || {
               books: [],
               movies: [],

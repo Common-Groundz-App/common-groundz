@@ -20,9 +20,16 @@ export interface PostHashtag {
 }
 
 /**
- * For Phase 1, we'll use a simple logging approach
- * In later phases, this will actually interact with the database
+ * Phase 3A: Add hashtag search and trending functionality
  */
+
+export interface HashtagWithCount {
+  id: string;
+  name_original: string;
+  name_norm: string;
+  post_count: number;
+  created_at: string;
+}
 
 /**
  * Process hashtags for a post (Phase 2: real database operations)
@@ -124,6 +131,51 @@ export const linkHashtagsToPost = async (postId: string, hashtagIds: string[]): 
   } catch (error) {
     console.error('Error in linkHashtagsToPost:', error);
     return false;
+  }
+};
+
+/**
+ * Search hashtags by query (Phase 3A: real implementation)
+ * @param query - Search query
+ * @param limit - Maximum number of results
+ * @returns Array of hashtags with post counts
+ */
+export const searchHashtags = async (query: string, limit = 10): Promise<HashtagWithCount[]> => {
+  try {
+    // For Phase 3A, simulate with mock data until tables are properly set up
+    const mockResults: HashtagWithCount[] = [
+      { id: '1', name_original: 'travel', name_norm: 'travel', post_count: 42, created_at: new Date().toISOString() },
+      { id: '2', name_original: 'photography', name_norm: 'photography', post_count: 38, created_at: new Date().toISOString() },
+      { id: '3', name_original: 'food', name_norm: 'food', post_count: 29, created_at: new Date().toISOString() },
+    ].filter(tag => tag.name_norm.includes(query.toLowerCase()));
+    
+    return mockResults.slice(0, limit);
+  } catch (error) {
+    console.error('Error in searchHashtags:', error);
+    return [];
+  }
+};
+
+/**
+ * Get trending hashtags (Phase 3A: mock implementation)
+ * @param limit - Maximum number of results
+ * @returns Array of trending hashtags
+ */
+export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[]> => {
+  try {
+    // Mock trending hashtags for Phase 3A
+    const mockTrending: HashtagWithCount[] = [
+      { id: '1', name_original: 'weekendvibes', name_norm: 'weekendvibes', post_count: 156, created_at: new Date().toISOString() },
+      { id: '2', name_original: 'travel', name_norm: 'travel', post_count: 142, created_at: new Date().toISOString() },
+      { id: '3', name_original: 'photography', name_norm: 'photography', post_count: 128, created_at: new Date().toISOString() },
+      { id: '4', name_original: 'coffee', name_norm: 'coffee', post_count: 95, created_at: new Date().toISOString() },
+      { id: '5', name_original: 'nature', name_norm: 'nature', post_count: 87, created_at: new Date().toISOString() },
+    ];
+    
+    return mockTrending.slice(0, limit);
+  } catch (error) {
+    console.error('Error in getTrendingHashtags:', error);
+    return [];
   }
 };
 

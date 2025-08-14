@@ -14,7 +14,7 @@ import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
-import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp, Hash } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
@@ -49,6 +49,7 @@ const Search = () => {
   // Tab items configuration matching Explore page
   const tabItems = [
     { value: 'all', label: 'All', emoji: '🌟' },
+    { value: 'hashtags', label: 'Hashtags', emoji: '#️⃣' },
     { value: 'movies', label: 'Movies', emoji: '🎬' },
     { value: 'books', label: 'Books', emoji: '📚' },
     { value: 'places', label: 'Places', emoji: '📍' },
@@ -58,6 +59,7 @@ const Search = () => {
 
   const tubelightTabItems = [
     { value: 'all', label: 'All', icon: Star },
+    { value: 'hashtags', label: 'Hashtags', icon: Hash },
     { value: 'movies', label: 'Movies', icon: Film },
     { value: 'books', label: 'Books', icon: Book },
     { value: 'places', label: 'Places', icon: MapPin },
@@ -185,6 +187,12 @@ const Search = () => {
     };
 
     switch (activeTab) {
+      case 'hashtags':
+        return {
+          localResults: [],
+          externalResults: [],
+          hashtags: results.hashtags || []
+        };
       case 'movies':
         return {
           localResults: allLocalResults.filter(item => {
@@ -192,7 +200,8 @@ const Search = () => {
             if ('category' in item && item.category === 'movie') return true;
             return false;
           }),
-          externalResults: categorizedProducts.movies
+          externalResults: categorizedProducts.movies,
+          hashtags: []
         };
       case 'books':
         return {
@@ -201,7 +210,8 @@ const Search = () => {
             if ('category' in item && item.category === 'book') return true;
             return false;
           }),
-          externalResults: categorizedProducts.books
+          externalResults: categorizedProducts.books,
+          hashtags: []
         };
       case 'places':
         return {
@@ -210,7 +220,8 @@ const Search = () => {
             if ('category' in item && item.category === 'place') return true;
             return false;
           }),
-          externalResults: categorizedProducts.places
+          externalResults: categorizedProducts.places,
+          hashtags: []
         };
       case 'products':
         return {
@@ -219,19 +230,22 @@ const Search = () => {
             if ('category' in item && item.category === 'product') return true;
             return false;
           }),
-          externalResults: categorizedProducts.products
+          externalResults: categorizedProducts.products,
+          hashtags: []
         };
       case 'users':
         return {
           localResults: [],
           externalResults: [],
-          users: results.users
+          users: results.users,
+          hashtags: []
         };
       default: // 'all'
         return {
           localResults: allLocalResults,
           externalResults: results.products,
-          users: results.users
+          users: results.users,
+          hashtags: results.hashtags || []
         };
     }
   };
@@ -947,6 +961,37 @@ const Search = () => {
                         </>
                       )}
                       
+                       {activeTab === 'hashtags' && (
+                        <>
+                          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <Hash className="h-5 w-5" /> Hashtags
+                          </h2>
+                          {filteredResults.hashtags && filteredResults.hashtags.length > 0 ? (
+                            <div className="space-y-3 min-w-0">
+                              {filteredResults.hashtags.map((hashtag) => (
+                                <div
+                                  key={hashtag.id}
+                                  onClick={() => navigate(`/t/${hashtag.name_norm}`)}
+                                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <Hash className="w-5 h-5 text-primary" />
+                                    <div>
+                                      <p className="font-medium">#{hashtag.name_original}</p>
+                                      <p className="text-sm text-muted-foreground">{hashtag.post_count} posts</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No hashtags found for "{query}"</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+
                       {activeTab === 'users' && (
                         <>
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
