@@ -12,6 +12,8 @@ import { EntityResultItem } from './search/EntityResultItem';
 import { SearchResultHandler } from './search/SearchResultHandler';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Button } from '@/components/ui/button';
+import { TrendingHashtags } from '@/components/hashtag/TrendingHashtags';
+import { getTrendingHashtags, HashtagWithCount } from '@/services/hashtagService';
 
 interface SearchDialogProps {
   open: boolean;
@@ -21,6 +23,29 @@ interface SearchDialogProps {
 export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
+  
+  // Trending hashtags state
+  const [trendingHashtags, setTrendingHashtags] = useState<HashtagWithCount[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+
+  // Load trending hashtags when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      const loadTrendingHashtags = async () => {
+        try {
+          setTrendingLoading(true);
+          const hashtags = await getTrendingHashtags(4);
+          setTrendingHashtags(hashtags);
+        } catch (error) {
+          console.error('Failed to load trending hashtags:', error);
+        } finally {
+          setTrendingLoading(false);
+        }
+      };
+
+      loadTrendingHashtags();
+    }
+  }, [open]);
   
   // Use the enhanced realtime search hook with hashtag support
   const { 
@@ -259,6 +284,24 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Show trending hashtags when search is empty */}
+        {!shouldShowDropdown && (
+          <div className="p-4">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">🔥 Trending Now</h3>
+            <TrendingHashtags 
+              hashtags={trendingHashtags}
+              isLoading={trendingLoading}
+              displayMode="compact"
+              limit={4}
+              showGrowth={false}
+              onHashtagClick={(hashtag) => {
+                navigate(`/t/${hashtag}`);
+                onOpenChange(false);
+              }}
+            />
           </div>
         )}
       </DialogContent>

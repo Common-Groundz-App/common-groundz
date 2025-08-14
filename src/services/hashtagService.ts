@@ -161,18 +161,43 @@ export const searchHashtags = async (query: string, limit = 10): Promise<Hashtag
  * @param limit - Maximum number of results
  * @returns Array of trending hashtags
  */
+// Enhanced trending hashtags with better algorithm simulation
 export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[]> => {
   try {
-    // Mock trending hashtags for Phase 3A
+    // Enhanced mock implementation simulating a real trending algorithm
+    // In production, this would:
+    // 1. Calculate growth rate (24h vs 7d posts)
+    // 2. Factor in engagement metrics (likes, comments)
+    // 3. Consider posting velocity and user diversity
+    // 4. Apply time-decay scoring
+    
     const mockTrending: HashtagWithCount[] = [
-      { id: '1', name_original: 'weekendvibes', name_norm: 'weekendvibes', post_count: 156, created_at: new Date().toISOString() },
-      { id: '2', name_original: 'travel', name_norm: 'travel', post_count: 142, created_at: new Date().toISOString() },
-      { id: '3', name_original: 'photography', name_norm: 'photography', post_count: 128, created_at: new Date().toISOString() },
-      { id: '4', name_original: 'coffee', name_norm: 'coffee', post_count: 95, created_at: new Date().toISOString() },
-      { id: '5', name_original: 'nature', name_norm: 'nature', post_count: 87, created_at: new Date().toISOString() },
+      { id: '1', name_original: 'Photography', name_norm: 'photography', post_count: 234, created_at: new Date().toISOString() },
+      { id: '2', name_original: 'Travel', name_norm: 'travel', post_count: 189, created_at: new Date().toISOString() },
+      { id: '3', name_original: 'FoodieLife', name_norm: 'foodielife', post_count: 167, created_at: new Date().toISOString() },
+      { id: '4', name_original: 'DigitalArt', name_norm: 'digitalart', post_count: 145, created_at: new Date().toISOString() },
+      { id: '5', name_original: 'MusicLovers', name_norm: 'musiclovers', post_count: 132, created_at: new Date().toISOString() },
+      { id: '6', name_original: 'BookReview', name_norm: 'bookreview', post_count: 98, created_at: new Date().toISOString() },
+      { id: '7', name_original: 'Fitness', name_norm: 'fitness', post_count: 87, created_at: new Date().toISOString() },
+      { id: '8', name_original: 'TechNews', name_norm: 'technews', post_count: 76, created_at: new Date().toISOString() },
+      { id: '9', name_original: 'MovieNight', name_norm: 'movienight', post_count: 65, created_at: new Date().toISOString() },
+      { id: '10', name_original: 'Inspiration', name_norm: 'inspiration', post_count: 54, created_at: new Date().toISOString() }
     ];
     
-    return mockTrending.slice(0, limit);
+    // Simulate trending algorithm with randomized scores
+    const trendingWithScores = mockTrending.map(hashtag => ({
+      ...hashtag,
+      // Simulate trending score calculation
+      trendingScore: hashtag.post_count * (0.8 + Math.random() * 0.4),
+      // Add some growth simulation
+      post_count: hashtag.post_count + Math.floor(Math.random() * 20)
+    }));
+    
+    // Sort by trending score and return limited results
+    return trendingWithScores
+      .sort((a, b) => b.trendingScore - a.trendingScore)
+      .slice(0, limit)
+      .map(({ trendingScore, ...hashtag }) => hashtag);
   } catch (error) {
     console.error('Error in getTrendingHashtags:', error);
     return [];

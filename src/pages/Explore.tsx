@@ -25,7 +25,9 @@ import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { FeaturedEntities } from '@/components/explore/FeaturedEntities';
 import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
+import { TrendingHashtags } from '@/components/hashtag/TrendingHashtags';
 import { enhancedExploreService } from '@/services/enhancedExploreService';
+import { getTrendingHashtags, HashtagWithCount } from '@/services/hashtagService';
 
 const Explore = () => {
   const { user } = useAuth();
@@ -40,6 +42,27 @@ const Explore = () => {
   const [isProcessingEntity, setIsProcessingEntity] = useState(false);
   const [processingEntityName, setProcessingEntityName] = useState('');
   const [processingMessage, setProcessingMessage] = useState('');
+  
+  // Trending hashtags state
+  const [trendingHashtags, setTrendingHashtags] = useState<HashtagWithCount[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+
+  // Load trending hashtags
+  useEffect(() => {
+    const loadTrendingHashtags = async () => {
+      try {
+        setTrendingLoading(true);
+        const hashtags = await getTrendingHashtags(8);
+        setTrendingHashtags(hashtags);
+      } catch (error) {
+        console.error('Failed to load trending hashtags:', error);
+      } finally {
+        setTrendingLoading(false);
+      }
+    };
+
+    loadTrendingHashtags();
+  }, []);
 
   // Use the enhanced realtime search hook
   const { 
@@ -430,6 +453,20 @@ const Explore = () => {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsContent value="featured">
                 <div className="space-y-8">
+                  {/* Trending Hashtags Section */}
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                      🔥 Trending Hashtags
+                    </h2>
+                    <TrendingHashtags 
+                      hashtags={trendingHashtags}
+                      isLoading={trendingLoading}
+                      displayMode="grid"
+                      limit={6}
+                      showGrowth={true}
+                    />
+                  </div>
+                  
                   <FeaturedEntities />
                   <CategoryHighlights />
                 </div>
