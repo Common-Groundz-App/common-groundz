@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -951,6 +951,27 @@ export type Database = {
         }
         Relationships: []
       }
+      hashtags: {
+        Row: {
+          created_at: string | null
+          id: string
+          name_norm: string
+          name_original: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name_norm: string
+          name_original: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name_norm?: string
+          name_original?: string
+        }
+        Relationships: []
+      }
       image_health_results: {
         Row: {
           checked_at: string
@@ -1370,6 +1391,39 @@ export type Database = {
         }
         Relationships: []
       }
+      post_hashtags: {
+        Row: {
+          created_at: string | null
+          hashtag_id: string
+          post_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          hashtag_id: string
+          post_id: string
+        }
+        Update: {
+          created_at?: string | null
+          hashtag_id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_hashtags_hashtag_id_fkey"
+            columns: ["hashtag_id"]
+            isOneToOne: false
+            referencedRelation: "hashtags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_hashtags_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_likes: {
         Row: {
           created_at: string
@@ -1469,6 +1523,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      post_user_mentions: {
+        Row: {
+          created_at: string
+          id: string
+          mentioned_user_id: string
+          post_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mentioned_user_id: string
+          post_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mentioned_user_id?: string
+          post_id?: string
+        }
+        Relationships: []
       }
       posts: {
         Row: {
@@ -2336,9 +2411,9 @@ export type Database = {
     Functions: {
       add_comment: {
         Args: {
+          p_content: string
           p_item_id: string
           p_item_type: string
-          p_content: string
           p_user_id: string
         }
         Returns: boolean
@@ -2348,7 +2423,7 @@ export type Database = {
         Returns: number
       }
       calculate_social_influence_score: {
-        Args: { p_user_id: string; p_category: string }
+        Args: { p_category: string; p_user_id: string }
         Returns: number
       }
       calculate_trending_score: {
@@ -2388,11 +2463,11 @@ export type Database = {
         Returns: boolean
       }
       create_storage_policy: {
-        Args: { bucket_name: string; policy_name: string; definition: string }
+        Args: { bucket_name: string; definition: string; policy_name: string }
         Returns: boolean
       }
       delete_comment: {
-        Args: { p_comment_id: string; p_user_id: string; p_item_type: string }
+        Args: { p_comment_id: string; p_item_type: string; p_user_id: string }
         Returns: boolean
       }
       delete_post_like: {
@@ -2408,17 +2483,17 @@ export type Database = {
         Returns: number
       }
       generate_entity_slug: {
-        Args: { name: string } | { name: string; current_entity_id?: string }
+        Args: { current_entity_id?: string; name: string } | { name: string }
         Returns: string
       }
       get_admin_analytics: {
         Args: Record<PropertyKey, never>
         Returns: {
-          total_reviews: number
-          total_entities: number
-          reviews_with_ai_summary: number
           entities_with_dynamic_reviews: number
           recent_ai_generations: number
+          reviews_with_ai_summary: number
+          total_entities: number
+          total_reviews: number
         }[]
       }
       get_cached_products: {
@@ -2440,11 +2515,11 @@ export type Database = {
       get_child_entities: {
         Args: { parent_uuid: string }
         Returns: {
+          description: string
           id: string
+          image_url: string
           name: string
           type: Database["public"]["Enums"]["entity_type"]
-          image_url: string
-          description: string
         }[]
       }
       get_circle_rating: {
@@ -2456,15 +2531,15 @@ export type Database = {
         Returns: number
       }
       get_comments_with_profiles: {
-        Args: { p_table_name: string; p_id_field: string; p_item_id: string }
+        Args: { p_id_field: string; p_item_id: string; p_table_name: string }
         Returns: {
-          id: string
+          avatar_url: string
           content: string
           created_at: string
+          edited_at: string
+          id: string
           user_id: string
           username: string
-          avatar_url: string
-          edited_at: string
         }[]
       }
       get_dynamic_rating: {
@@ -2472,13 +2547,13 @@ export type Database = {
         Returns: number
       }
       get_entity_follower_names: {
-        Args: { input_entity_id: string; follower_limit?: number }
+        Args: { follower_limit?: number; input_entity_id: string }
         Returns: {
-          id: string
-          username: string
-          first_name: string
-          last_name: string
           avatar_url: string
+          first_name: string
+          id: string
+          last_name: string
+          username: string
         }[]
       }
       get_entity_followers_count: {
@@ -2487,22 +2562,22 @@ export type Database = {
       }
       get_entity_followers_with_context: {
         Args: {
-          input_entity_id: string
           current_user_id?: string
-          search_query?: string
-          relationship_filter?: string
           follower_limit?: number
           follower_offset?: number
+          input_entity_id: string
+          relationship_filter?: string
+          search_query?: string
         }
         Returns: {
-          id: string
-          username: string
-          first_name: string
-          last_name: string
           avatar_url: string
+          first_name: string
+          followed_at: string
+          id: string
           is_following: boolean
           is_mutual: boolean
-          followed_at: string
+          last_name: string
+          username: string
         }[]
       }
       get_entity_saves_count: {
@@ -2512,8 +2587,8 @@ export type Database = {
       get_entity_suggestion_stats: {
         Args: { entity_uuid: string }
         Returns: {
-          pending_count: number
           approved_count: number
+          pending_count: number
           rejected_count: number
         }[]
       }
@@ -2522,12 +2597,12 @@ export type Database = {
         Returns: number
       }
       get_followers_with_profiles: {
-        Args: { profile_user_id: string; current_user_id: string }
+        Args: { current_user_id: string; profile_user_id: string }
         Returns: {
-          id: string
-          username: string
           avatar_url: string
+          id: string
           is_following: boolean
+          username: string
         }[]
       }
       get_following_count_by_user_id: {
@@ -2535,12 +2610,12 @@ export type Database = {
         Returns: number
       }
       get_following_with_profiles: {
-        Args: { profile_user_id: string; current_user_id: string }
+        Args: { current_user_id: string; profile_user_id: string }
         Returns: {
-          id: string
-          username: string
           avatar_url: string
+          id: string
           is_following: boolean
+          username: string
         }[]
       }
       get_overall_rating: {
@@ -2548,7 +2623,7 @@ export type Database = {
         Returns: number
       }
       get_personalized_entities: {
-        Args: { p_user_id: string; p_limit?: number }
+        Args: { p_limit?: number; p_user_id: string }
         Returns: {
           entity_id: string
           personalization_score: number
@@ -2558,8 +2633,8 @@ export type Database = {
       get_post_likes_by_posts: {
         Args: { p_post_ids: string[] }
         Returns: {
-          post_id: string
           like_count: number
+          post_id: string
         }[]
       }
       get_recommendation_count: {
@@ -2569,15 +2644,15 @@ export type Database = {
       get_recommendation_likes_by_ids: {
         Args: { p_recommendation_ids: string[] }
         Returns: {
-          recommendation_id: string
           like_count: number
+          recommendation_id: string
         }[]
       }
       get_review_likes_batch: {
         Args: { p_review_ids: string[] }
         Returns: {
-          review_id: string
           like_count: number
+          review_id: string
         }[]
       }
       get_user_post_likes: {
@@ -2611,7 +2686,7 @@ export type Database = {
         }[]
       }
       increment_comment_count: {
-        Args: { table_name: string; item_id: string }
+        Args: { item_id: string; table_name: string }
         Returns: undefined
       }
       increment_recommendation_view: {
@@ -2619,7 +2694,7 @@ export type Database = {
         Returns: undefined
       }
       insert_post_entity: {
-        Args: { p_post_id: string; p_entity_id: string }
+        Args: { p_entity_id: string; p_post_id: string }
         Returns: undefined
       }
       insert_post_like: {
@@ -2628,6 +2703,10 @@ export type Database = {
       }
       insert_post_save: {
         Args: { p_post_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      insert_user_mention: {
+        Args: { mentioned_user_id: string; post_id: string }
         Returns: undefined
       }
       is_admin_user: {
@@ -2645,9 +2724,9 @@ export type Database = {
       log_admin_action: {
         Args: {
           p_action_type: string
-          p_target_type: string
-          p_target_id: string
           p_details?: Json
+          p_target_id: string
+          p_target_type: string
         }
         Returns: undefined
       }
@@ -2687,13 +2766,13 @@ export type Database = {
         Args: {
           p_comment_id: string
           p_content: string
-          p_user_id: string
           p_item_type: string
+          p_user_id: string
         }
         Returns: boolean
       }
       update_profile_preferences: {
-        Args: { user_id: string; preferences: Json }
+        Args: { preferences: Json; user_id: string }
         Returns: boolean
       }
       user_has_pending_suggestion: {
