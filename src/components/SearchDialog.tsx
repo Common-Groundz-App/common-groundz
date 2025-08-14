@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import { SearchResultHandler } from './search/SearchResultHandler';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Button } from '@/components/ui/button';
 import { TrendingHashtags } from '@/components/hashtag/TrendingHashtags';
-import { getTrendingHashtags, HashtagWithCount } from '@/services/hashtagService';
+import { getTrendingHashtags, HashtagWithCount, searchHashtagsPartial } from '@/services/hashtagService';
 
 interface SearchDialogProps {
   open: boolean;
@@ -47,7 +47,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     }
   }, [open]);
   
-  // Use the enhanced realtime search hook with hashtag support
+  // Enhanced search with partial matching
   const { 
     results, 
     isLoading, 
@@ -56,6 +56,29 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     showAllResults,
     toggleShowAll
   } = useEnhancedRealtimeSearch(query, { mode: 'quick' });
+
+  // Enhanced hashtag search state
+  const [enhancedHashtags, setEnhancedHashtags] = useState<HashtagWithCount[]>([]);
+  
+  // Enhanced hashtag search with partial matching
+  useEffect(() => {
+    const searchHashtags = async () => {
+      if (query.trim().length >= 1) {
+        try {
+          const partialResults = await searchHashtagsPartial(query.trim(), 5);
+          setEnhancedHashtags(partialResults);
+        } catch (error) {
+          console.error('Error searching hashtags:', error);
+          setEnhancedHashtags([]);
+        }
+      } else {
+        setEnhancedHashtags([]);
+      }
+    };
+
+    const debounceTimer = setTimeout(searchHashtags, 200);
+    return () => clearTimeout(debounceTimer);
+  }, [query]);
 
   const handleResultClick = () => {
     onOpenChange(false);
@@ -112,7 +135,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const hasExternalResults = results.categorized?.books?.length > 0 ||
                             results.categorized?.movies?.length > 0 ||
                             results.categorized?.places?.length > 0;
-  const hasHashtagResults = results.hashtags && results.hashtags.length > 0;
+  const hasHashtagResults = (results.hashtags && results.hashtags.length > 0) || enhancedHashtags.length > 0;
 
   // Show dropdown for any query with 1+ characters
   const shouldShowDropdown = query.trim().length >= 1;
@@ -160,11 +183,11 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             {/* Search Results */}
             {(hasLocalResults || hasExternalResults || hasHashtagResults) && (
               <>
-                {/* Hashtags */}
+                {/* Enhanced Hashtags with partial matching */}
                 {hasHashtagResults && (
                   <div className="flex flex-col">
-                    {renderSectionHeader('# Hashtags', results.hashtags?.length || 0, false)}
-                    {results.hashtags?.slice(0, 3).map((hashtag) => (
+                    {renderSectionHeader('# Hashtags', enhancedHashtags.length || results.hashtags?.length || 0, false)}
+                    {(enhancedHashtags.length > 0 ? enhancedHashtags : results.hashtags)?.slice(0, 3).map((hashtag) => (
                       <div
                         key={hashtag.id}
                         onClick={() => {

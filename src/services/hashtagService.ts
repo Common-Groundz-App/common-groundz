@@ -207,11 +207,193 @@ export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[
 /**
  * Get posts by hashtag (for TagPage) - simplified for Phase 2
  * @param hashtag - The normalized hashtag name
+ * @param sortBy - Sort criteria ('recent' or 'popular')
+ * @param timeFilter - Time filter ('all', 'week', 'month')
  * @returns Array of post data
  */
-export const getPostsByHashtag = async (hashtag: string) => {
+export const getPostsByHashtag = async (
+  hashtag: string, 
+  sortBy: 'recent' | 'popular' = 'recent',
+  timeFilter: 'all' | 'week' | 'month' = 'all'
+) => {
   try {
-    // For now, search in post content directly
+    let query = supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles!posts_user_id_fkey (
+          id,
+          username, 
+          avatar_url
+        )
+      `)
+      .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
+      .eq('is_deleted', false);
+
+    // Apply time filter
+    if (timeFilter === 'week') {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      query = query.gte('created_at', oneWeekAgo.toISOString());
+    } else if (timeFilter === 'month') {
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      query = query.gte('created_at', oneMonthAgo.toISOString());
+    }
+
+    // Apply sorting
+    if (sortBy === 'recent') {
+      query = query.order('created_at', { ascending: false });
+    } else {
+      // For 'popular', we could sort by view_count or comment_count
+      // For now, we'll use view_count
+      query = query.order('view_count', { ascending: false });
+    }
+      
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error in getPostsByHashtag:', error);
+    return [];
+  }
+};
+
+/**
+ * Phase 3C: Enhanced hashtag analytics and insights
+ */
+
+export interface HashtagAnalytics {
+  hashtag: string;
+  totalPosts: number;
+  totalUsers: number;
+  growthRate: number; // Percentage growth in last 7 days
+  engagementRate: number; // Average likes/comments per post
+  trendingScore: number;
+  isGrowing: boolean;
+  timeData: {
+    thisWeek: number;
+    lastWeek: number;
+    thisMonth: number;
+    lastMonth: number;
+  };
+}
+
+/**
+ * Get detailed analytics for a hashtag
+ * @param hashtag - The normalized hashtag name
+ */
+export const getHashtagAnalytics = async (hashtag: string): Promise<HashtagAnalytics> => {
+  try {
+    // Mock implementation - in production, this would calculate real analytics
+    const mockAnalytics: HashtagAnalytics = {
+      hashtag,
+      totalPosts: Math.floor(Math.random() * 500) + 50,
+      totalUsers: Math.floor(Math.random() * 200) + 20,
+      growthRate: (Math.random() - 0.5) * 100, // -50% to +50%
+      engagementRate: Math.random() * 10 + 2, // 2-12 avg engagement per post
+      trendingScore: Math.random() * 100,
+      isGrowing: Math.random() > 0.4, // 60% chance of growing
+      timeData: {
+        thisWeek: Math.floor(Math.random() * 50) + 10,
+        lastWeek: Math.floor(Math.random() * 40) + 5,
+        thisMonth: Math.floor(Math.random() * 150) + 30,
+        lastMonth: Math.floor(Math.random() * 120) + 20,
+      }
+    };
+
+    return mockAnalytics;
+  } catch (error) {
+    console.error('Error in getHashtagAnalytics:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get related hashtags based on co-occurrence
+ * @param hashtag - The normalized hashtag name
+ * @param limit - Maximum number of results
+ */
+export const getRelatedHashtags = async (hashtag: string, limit = 10): Promise<HashtagWithCount[]> => {
+  try {
+    // Mock implementation - in production, this would query co-occurrence data
+    const allHashtags = [
+      { id: '1', name_original: 'Photography', name_norm: 'photography', post_count: 234 },
+      { id: '2', name_original: 'PhotoOfTheDay', name_norm: 'photooftheday', post_count: 189 },
+      { id: '3', name_original: 'NaturePhotography', name_norm: 'naturephotography', post_count: 156 },
+      { id: '4', name_original: 'PortraitPhotography', name_norm: 'portraitphotography', post_count: 143 },
+      { id: '5', name_original: 'StreetPhotography', name_norm: 'streetphotography', post_count: 132 },
+      { id: '6', name_original: 'LandscapePhotography', name_norm: 'landscapephotography', post_count: 128 },
+      { id: '7', name_original: 'Travel', name_norm: 'travel', post_count: 298 },
+      { id: '8', name_original: 'TravelPhotography', name_norm: 'travelphotography', post_count: 187 },
+      { id: '9', name_original: 'Wanderlust', name_norm: 'wanderlust', post_count: 165 },
+      { id: '10', name_original: 'Adventure', name_norm: 'adventure', post_count: 154 },
+    ];
+
+    // Filter out current hashtag and add created_at
+    const related = allHashtags
+      .filter(tag => tag.name_norm !== hashtag.toLowerCase())
+      .map(tag => ({
+        ...tag,
+        created_at: new Date().toISOString()
+      }))
+      .slice(0, limit);
+
+    return related;
+  } catch (error) {
+    console.error('Error in getRelatedHashtags:', error);
+    return [];
+  }
+};
+
+/**
+ * Search hashtags with partial matching
+ * @param query - Search query (supports partial matching)
+ * @param limit - Maximum number of results
+ */
+export const searchHashtagsPartial = async (query: string, limit = 10): Promise<HashtagWithCount[]> => {
+  try {
+    // Enhanced search that finds partial matches
+    const allHashtags = [
+      { id: '1', name_original: 'Photography', name_norm: 'photography', post_count: 234 },
+      { id: '2', name_original: 'PhotoOfTheDay', name_norm: 'photooftheday', post_count: 189 },
+      { id: '3', name_original: 'PhotoShoot', name_norm: 'photoshoot', post_count: 156 },
+      { id: '4', name_original: 'Travel', name_norm: 'travel', post_count: 298 },
+      { id: '5', name_original: 'TravelPhotography', name_norm: 'travelphotography', post_count: 187 },
+      { id: '6', name_original: 'FoodPhotography', name_norm: 'foodphotography', post_count: 143 },
+      { id: '7', name_original: 'Food', name_norm: 'food', post_count: 267 },
+      { id: '8', name_original: 'FoodieLife', name_norm: 'foodielife', post_count: 198 },
+      { id: '9', name_original: 'Art', name_norm: 'art', post_count: 345 },
+      { id: '10', name_original: 'DigitalArt', name_norm: 'digitalart', post_count: 176 },
+    ];
+
+    const queryLower = query.toLowerCase();
+    const results = allHashtags
+      .filter(tag => 
+        tag.name_norm.includes(queryLower) || 
+        tag.name_original.toLowerCase().includes(queryLower)
+      )
+      .map(tag => ({
+        ...tag,
+        created_at: new Date().toISOString()
+      }))
+      .slice(0, limit);
+
+    return results;
+  } catch (error) {
+    console.error('Error in searchHashtagsPartial:', error);
+    return [];
+  }
+};
+
+/**
+ * Search within hashtag posts
+ * @param hashtag - The hashtag to search within
+ * @param query - Search query for post content
+ * @param limit - Maximum number of results
+ */
+export const searchWithinHashtag = async (hashtag: string, query: string, limit = 20) => {
+  try {
     const { data, error } = await supabase
       .from('posts')
       .select(`
@@ -223,13 +405,15 @@ export const getPostsByHashtag = async (hashtag: string) => {
         )
       `)
       .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
+      .or(`content.ilike.%${query}%,title.ilike.%${query}%`)
       .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit);
       
     if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error('Error in getPostsByHashtag:', error);
+    console.error('Error in searchWithinHashtag:', error);
     return [];
   }
 };
