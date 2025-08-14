@@ -2428,8 +2428,8 @@ export type Database = {
       }
       calculate_trending_hashtags: {
         Args:
+          | { p_limit?: number }
           | { result_limit?: number; time_window_hours?: number }
-          | { trending_limit?: number }
         Returns: {
           created_at: string
           id: string

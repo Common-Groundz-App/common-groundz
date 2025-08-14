@@ -41,22 +41,35 @@ export const processPostHashtags = async (
   hashtags: Array<{ original: string; normalized: string }>
 ): Promise<boolean> => {
   try {
-    if (hashtags.length === 0) return true;
+    console.log('🏷️ Processing hashtags for post:', postId, 'hashtags:', hashtags);
+    
+    if (hashtags.length === 0) {
+      console.log('No hashtags to process');
+      return true;
+    }
 
     // Create/get hashtags and link them to the post
     const hashtagIds: string[] = [];
     
     for (const hashtag of hashtags) {
+      console.log('Creating/getting hashtag:', hashtag);
       const hashtagRecord = await createOrGetHashtag(hashtag.original, hashtag.normalized);
       if (hashtagRecord) {
+        console.log('✅ Hashtag created/found:', hashtagRecord);
         hashtagIds.push(hashtagRecord.id);
+      } else {
+        console.error('❌ Failed to create/get hashtag:', hashtag);
       }
     }
     
+    console.log('Linking hashtags to post. Hashtag IDs:', hashtagIds);
+    
     // Link hashtags to post
-    return await linkHashtagsToPost(postId, hashtagIds);
+    const result = await linkHashtagsToPost(postId, hashtagIds);
+    console.log('✅ Hashtag processing result:', result);
+    return result;
   } catch (error) {
-    console.error('Error in processPostHashtags:', error);
+    console.error('❌ Error in processPostHashtags:', error);
     return false;
   }
 };
@@ -109,6 +122,8 @@ export const updatePostHashtags = async (
  */
 export const createOrGetHashtag = async (originalName: string, normalizedName: string): Promise<Hashtag | null> => {
   try {
+    console.log('🔍 Looking for existing hashtag:', { originalName, normalizedName });
+    
     // First try to get existing hashtag
     const { data: existing, error: selectError } = await supabase
       .from('hashtags')
@@ -117,12 +132,16 @@ export const createOrGetHashtag = async (originalName: string, normalizedName: s
       .single();
       
     if (selectError && selectError.code !== 'PGRST116') {
+      console.error('❌ Error selecting hashtag:', selectError);
       throw selectError;
     }
     
     if (existing) {
+      console.log('✅ Found existing hashtag:', existing);
       return existing;
     }
+    
+    console.log('🆕 Creating new hashtag:', { originalName, normalizedName });
     
     // Create new hashtag if it doesn't exist
     const { data: newHashtag, error: insertError } = await supabase
@@ -134,10 +153,15 @@ export const createOrGetHashtag = async (originalName: string, normalizedName: s
       .select()
       .single();
       
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error('❌ Error inserting hashtag:', insertError);
+      throw insertError;
+    }
+    
+    console.log('✅ Created new hashtag:', newHashtag);
     return newHashtag;
   } catch (error) {
-    console.error('Error in createOrGetHashtag:', error);
+    console.error('❌ Error in createOrGetHashtag:', error);
     return null;
   }
 };
@@ -149,21 +173,31 @@ export const createOrGetHashtag = async (originalName: string, normalizedName: s
  */
 export const linkHashtagsToPost = async (postId: string, hashtagIds: string[]): Promise<boolean> => {
   try {
-    if (hashtagIds.length === 0) return true;
+    if (hashtagIds.length === 0) {
+      console.log('No hashtag IDs to link');
+      return true;
+    }
     
     const insertData = hashtagIds.map(hashtagId => ({
       post_id: postId,
       hashtag_id: hashtagId
     }));
     
+    console.log('🔗 Linking hashtags to post:', { postId, insertData });
+    
     const { error } = await supabase
       .from('post_hashtags')
       .insert(insertData);
       
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error linking hashtags to post:', error);
+      throw error;
+    }
+    
+    console.log('✅ Successfully linked hashtags to post');
     return true;
   } catch (error) {
-    console.error('Error in linkHashtagsToPost:', error);
+    console.error('❌ Error in linkHashtagsToPost:', error);
     return false;
   }
 };
@@ -221,7 +255,7 @@ export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[
   try {
     const { data, error } = await supabase
       .rpc('calculate_trending_hashtags', {
-        trending_limit: limit
+        p_limit: limit
       });
       
     if (error) throw error;

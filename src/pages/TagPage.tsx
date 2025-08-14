@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { processPosts } from '@/hooks/feed/api/posts';
 import { getHashtagAnalytics, getPostsByHashtag, searchWithinHashtag, HashtagAnalytics } from '@/services/hashtagService';
 import { Loader2, Hash, TrendingUp, TrendingDown, Users, Calendar, Search, Filter } from 'lucide-react';
+import { HashtagDebug } from '@/components/dev/HashtagDebug';
 
 const TagPage = () => {
   const { hashtag } = useParams<{ hashtag: string }>();
@@ -146,6 +147,9 @@ const TagPage = () => {
     <div className="min-h-screen flex flex-col">
       <NavBarComponent />
       <div className="flex-1 container max-w-3xl mx-auto py-6 px-4">
+        {/* Debug tools for development */}
+        <HashtagDebug />
+        
         {/* Enhanced Header with Analytics */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-3">
