@@ -9,6 +9,7 @@ import { PostFeedItem as PostItem } from '@/hooks/feed/types';
 import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
+import { HashtagRenderer } from '@/components/hashtag/HashtagRenderer';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
@@ -402,7 +403,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         {/* Post Content */}
         <div className="mt-4">
           <div className={cn("text-sm relative", isExpanded ? "" : "max-h-[120px] overflow-hidden")}>
-            <RichTextDisplay content={post.content} />
+            <div className="min-w-0">
+              {post.content ? (
+                <HashtagRenderer content={post.content} />
+              ) : (
+                <RichTextDisplay content={post.content} />
+              )}
+            </div>
             {(!isExpanded && post.content && post.content.length > CONTENT_LIMIT) && (
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background to-transparent h-8" />
             )}

@@ -33,7 +33,7 @@ import { Json } from '@/integrations/supabase/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import { X } from 'lucide-react';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
-import { extractHashtagsFromPost } from '@/utils/hashtag';
+import { extractHashtagsFromPost, normalizeHashtag } from '@/utils/hashtag';
 import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
 
 // Define valid database post types
@@ -197,7 +197,11 @@ export function CreatePostForm({
         }
         
         // Process hashtags for updated post
-        const hashtags = extractHashtagsFromPost(data.title, contentHtml);
+        const hashtagStrings = extractHashtagsFromPost(data.title, contentHtml);
+        const hashtags = hashtagStrings.map(tag => ({
+          original: tag,
+          normalized: normalizeHashtag(tag)
+        }));
         await updatePostHashtags(postToEdit.id, hashtags);
 
         if (selectedEntities.length > 0) {
@@ -251,7 +255,11 @@ export function CreatePostForm({
         console.log('New post created:', newPost);
         
         // Process hashtags for new post
-        const hashtags = extractHashtagsFromPost(data.title, contentHtml);
+        const hashtagStrings = extractHashtagsFromPost(data.title, contentHtml);
+        const hashtags = hashtagStrings.map(tag => ({
+          original: tag,
+          normalized: normalizeHashtag(tag)
+        }));
         await processPostHashtags(newPost.id, hashtags);
         
         // Add entity relationships with just the entity ID

@@ -19,6 +19,7 @@ import Search from '@/pages/Search';
 import EntityDetail from '@/pages/EntityDetail';
 import PostView from '@/pages/PostView';
 import RecommendationView from '@/pages/RecommendationView';
+import TagPage from '@/pages/TagPage';
 import ProductSearch from '@/pages/ProductSearch';
 import PlacesPage from '@/pages/PlacesPage';
 import ProductsPage from '@/pages/ProductsPage';
@@ -116,6 +117,11 @@ function App() {
                   <Route path="/recommendations/:recommendationId" element={
                     <ProtectedRoute>
                       <RecommendationView />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/t/:hashtag" element={
+                    <ProtectedRoute>
+                      <TagPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/product-search/:query" element={
