@@ -315,7 +315,7 @@ export const getPostsByHashtag = async (
       .from('posts')
       .select(`
         *,
-        profiles!posts_user_id_fkey (
+        profiles!user_id (
           id,
           username, 
           avatar_url
