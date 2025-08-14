@@ -2427,7 +2427,9 @@ export type Database = {
         Returns: number
       }
       calculate_trending_hashtags: {
-        Args: { result_limit?: number; time_window_hours?: number }
+        Args:
+          | { result_limit?: number; time_window_hours?: number }
+          | { trending_limit?: number }
         Returns: {
           created_at: string
           id: string

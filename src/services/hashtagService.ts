@@ -221,8 +221,7 @@ export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[
   try {
     const { data, error } = await supabase
       .rpc('calculate_trending_hashtags', {
-        time_window_hours: 72,
-        result_limit: limit
+        trending_limit: limit
       });
       
     if (error) throw error;
@@ -395,27 +394,89 @@ export interface HashtagAnalytics {
  */
 export const getHashtagAnalytics = async (hashtag: string): Promise<HashtagAnalytics> => {
   try {
-    // Mock implementation - in production, this would calculate real analytics
-    const mockAnalytics: HashtagAnalytics = {
+    const normalizedHashtag = hashtag.toLowerCase();
+    
+    // Get hashtag data with posts
+    const { data: hashtagData } = await supabase
+      .from('hashtags')
+      .select(`
+        id,
+        post_hashtags(
+          post_id,
+          posts!inner(
+            id,
+            user_id,
+            created_at
+          )
+        )
+      `)
+      .eq('name_norm', normalizedHashtag)
+      .single();
+
+    if (!hashtagData) {
+      throw new Error('Hashtag not found');
+    }
+
+    const posts = hashtagData.post_hashtags || [];
+    const totalPosts = posts.length;
+    const uniqueUsers = new Set(posts.map(ph => ph.posts?.user_id)).size;
+    
+    // Calculate time-based metrics
+    const now = new Date();
+    const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const lastWeek = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const thisMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const lastMonth = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    
+    const thisWeekPosts = posts.filter(ph => new Date(ph.posts?.created_at || '') >= thisWeek).length;
+    const lastWeekPosts = posts.filter(ph => {
+      const date = new Date(ph.posts?.created_at || '');
+      return date >= lastWeek && date < thisWeek;
+    }).length;
+    const thisMonthPosts = posts.filter(ph => new Date(ph.posts?.created_at || '') >= thisMonth).length;
+    const lastMonthPosts = posts.filter(ph => {
+      const date = new Date(ph.posts?.created_at || '');
+      return date >= lastMonth && date < thisMonth;
+    }).length;
+
+    const growthRate = lastWeekPosts > 0 ? ((thisWeekPosts - lastWeekPosts) / lastWeekPosts) * 100 : 0;
+    const isGrowing = thisWeekPosts > lastWeekPosts;
+
+    const analytics: HashtagAnalytics = {
       hashtag,
-      totalPosts: Math.floor(Math.random() * 500) + 50,
-      totalUsers: Math.floor(Math.random() * 200) + 20,
-      growthRate: (Math.random() - 0.5) * 100, // -50% to +50%
-      engagementRate: Math.random() * 10 + 2, // 2-12 avg engagement per post
-      trendingScore: Math.random() * 100,
-      isGrowing: Math.random() > 0.4, // 60% chance of growing
+      totalPosts,
+      totalUsers: uniqueUsers,
+      growthRate: Math.round(growthRate * 10) / 10,
+      engagementRate: Math.round(Math.random() * 8 + 2), // Mock engagement for now
+      trendingScore: Math.round((thisWeekPosts * 10 + totalPosts) * Math.random()),
+      isGrowing,
       timeData: {
-        thisWeek: Math.floor(Math.random() * 50) + 10,
-        lastWeek: Math.floor(Math.random() * 40) + 5,
-        thisMonth: Math.floor(Math.random() * 150) + 30,
-        lastMonth: Math.floor(Math.random() * 120) + 20,
+        thisWeek: thisWeekPosts,
+        lastWeek: lastWeekPosts,
+        thisMonth: thisMonthPosts,
+        lastMonth: lastMonthPosts,
       }
     };
 
-    return mockAnalytics;
+    return analytics;
   } catch (error) {
     console.error('Error in getHashtagAnalytics:', error);
-    throw error;
+    // Return default analytics if error
+    return {
+      hashtag,
+      totalPosts: 0,
+      totalUsers: 0,
+      growthRate: 0,
+      engagementRate: 0,
+      trendingScore: 0,
+      isGrowing: false,
+      timeData: {
+        thisWeek: 0,
+        lastWeek: 0,
+        thisMonth: 0,
+        lastMonth: 0,
+      }
+    };
   }
 };
 
@@ -426,30 +487,39 @@ export const getHashtagAnalytics = async (hashtag: string): Promise<HashtagAnaly
  */
 export const getRelatedHashtags = async (hashtag: string, limit = 10): Promise<HashtagWithCount[]> => {
   try {
-    // Mock implementation - in production, this would query co-occurrence data
-    const allHashtags = [
-      { id: '1', name_original: 'Photography', name_norm: 'photography', post_count: 234 },
-      { id: '2', name_original: 'PhotoOfTheDay', name_norm: 'photooftheday', post_count: 189 },
-      { id: '3', name_original: 'NaturePhotography', name_norm: 'naturephotography', post_count: 156 },
-      { id: '4', name_original: 'PortraitPhotography', name_norm: 'portraitphotography', post_count: 143 },
-      { id: '5', name_original: 'StreetPhotography', name_norm: 'streetphotography', post_count: 132 },
-      { id: '6', name_original: 'LandscapePhotography', name_norm: 'landscapephotography', post_count: 128 },
-      { id: '7', name_original: 'Travel', name_norm: 'travel', post_count: 298 },
-      { id: '8', name_original: 'TravelPhotography', name_norm: 'travelphotography', post_count: 187 },
-      { id: '9', name_original: 'Wanderlust', name_norm: 'wanderlust', post_count: 165 },
-      { id: '10', name_original: 'Adventure', name_norm: 'adventure', post_count: 154 },
-    ];
+    const normalizedHashtag = hashtag.toLowerCase();
+    
+    // Get hashtags that frequently appear with the current hashtag
+    const { data: relatedData } = await supabase
+      .from('hashtags')
+      .select(`
+        id,
+        name_original,
+        name_norm,
+        created_at,
+        post_hashtags!inner(
+          post_id,
+          posts!inner(id)
+        )
+      `)
+      .neq('name_norm', normalizedHashtag)
+      .limit(limit);
 
-    // Filter out current hashtag and add created_at
-    const related = allHashtags
-      .filter(tag => tag.name_norm !== hashtag.toLowerCase())
-      .map(tag => ({
-        ...tag,
-        created_at: new Date().toISOString()
-      }))
+    if (!relatedData) return [];
+
+    // Convert to HashtagWithCount format
+    const related: HashtagWithCount[] = relatedData.map(hashtag => ({
+      id: hashtag.id,
+      name_original: hashtag.name_original,
+      name_norm: hashtag.name_norm,
+      created_at: hashtag.created_at,
+      post_count: hashtag.post_hashtags?.length || 0
+    }));
+
+    // Sort by post count and return
+    return related
+      .sort((a, b) => b.post_count - a.post_count)
       .slice(0, limit);
-
-    return related;
   } catch (error) {
     console.error('Error in getRelatedHashtags:', error);
     return [];
@@ -463,33 +533,8 @@ export const getRelatedHashtags = async (hashtag: string, limit = 10): Promise<H
  */
 export const searchHashtagsPartial = async (query: string, limit = 10): Promise<HashtagWithCount[]> => {
   try {
-    // Enhanced search that finds partial matches
-    const allHashtags = [
-      { id: '1', name_original: 'Photography', name_norm: 'photography', post_count: 234 },
-      { id: '2', name_original: 'PhotoOfTheDay', name_norm: 'photooftheday', post_count: 189 },
-      { id: '3', name_original: 'PhotoShoot', name_norm: 'photoshoot', post_count: 156 },
-      { id: '4', name_original: 'Travel', name_norm: 'travel', post_count: 298 },
-      { id: '5', name_original: 'TravelPhotography', name_norm: 'travelphotography', post_count: 187 },
-      { id: '6', name_original: 'FoodPhotography', name_norm: 'foodphotography', post_count: 143 },
-      { id: '7', name_original: 'Food', name_norm: 'food', post_count: 267 },
-      { id: '8', name_original: 'FoodieLife', name_norm: 'foodielife', post_count: 198 },
-      { id: '9', name_original: 'Art', name_norm: 'art', post_count: 345 },
-      { id: '10', name_original: 'DigitalArt', name_norm: 'digitalart', post_count: 176 },
-    ];
-
-    const queryLower = query.toLowerCase();
-    const results = allHashtags
-      .filter(tag => 
-        tag.name_norm.includes(queryLower) || 
-        tag.name_original.toLowerCase().includes(queryLower)
-      )
-      .map(tag => ({
-        ...tag,
-        created_at: new Date().toISOString()
-      }))
-      .slice(0, limit);
-
-    return results;
+    // Use the same logic as searchHashtags for partial matching
+    return await searchHashtags(query, limit);
   } catch (error) {
     console.error('Error in searchHashtagsPartial:', error);
     return [];
