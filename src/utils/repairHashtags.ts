@@ -19,32 +19,16 @@ export const repairExistingPostHashtags = async (): Promise<void> => {
       return;
     }
     
-    if (!repairResults || repairResults.length === 0) {
-      console.log('✅ No hashtags needed repair - all relationships are correct!');
-      return;
+    console.log('✅ Hashtag repair completed:', repairResults);
+    
+    if (repairResults && typeof repairResults === 'object') {
+      const data = repairResults as any;
+      console.log(`📊 Repair results:
+        - Posts processed: ${data.posts_processed || 0}
+        - Relationships created: ${data.relationships_created || 0}
+        - New hashtags created: ${data.hashtags_created || 0}
+      `);
     }
-    
-    // Log repair results
-    const grouped = repairResults.reduce((acc: any, result) => {
-      if (!acc[result.action_taken]) {
-        acc[result.action_taken] = [];
-      }
-      acc[result.action_taken].push(result);
-      return acc;
-    }, {});
-    
-    console.log('📊 Hashtag repair results:');
-    Object.entries(grouped).forEach(([action, results]: [string, any]) => {
-      console.log(`${action}: ${results.length} items`);
-      if (action === 'relationship_created') {
-        console.log('🔗 Created relationships for:', results.map((r: any) => `${r.post_id}:#${r.hashtag_content}`));
-      }
-    });
-    
-    const createdCount = (grouped.relationship_created || []).length;
-    const hashtagsCreated = (grouped.hashtag_created || []).length;
-    
-    console.log(`🎉 Hashtag repair complete! Created ${hashtagsCreated} new hashtags and ${createdCount} new relationships`);
   } catch (error) {
     console.error('❌ Error in repairExistingPostHashtags:', error);
   }

@@ -2749,11 +2749,7 @@ export type Database = {
       }
       repair_hashtag_relationships: {
         Args: Record<PropertyKey, never>
-        Returns: {
-          action_taken: string
-          hashtag_content: string
-          post_id: string
-        }[]
+        Returns: Json
       }
       toggle_entity_save: {
         Args: { p_entity_id: string; p_user_id: string }

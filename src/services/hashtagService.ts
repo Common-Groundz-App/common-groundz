@@ -318,53 +318,95 @@ export const getPostsByHashtag = async (
       return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter);
     }
     
-    // Step 2: Get post IDs that have this hashtag
+    // Step 2: Get posts via relationship table
     const { data: postHashtagData, error: postHashtagError } = await supabase
       .from('post_hashtags')
       .select('post_id')
       .eq('hashtag_id', hashtagData.id);
       
-    if (postHashtagError || !postHashtagData || postHashtagData.length === 0) {
-      console.log(`📭 [HashtagService] No posts found for hashtag #${hashtag}`);
-      return [];
-    }
-    
-    const postIds = postHashtagData.map(ph => ph.post_id);
-    console.log(`📊 [HashtagService] Found ${postIds.length} posts for hashtag #${hashtag}`);
-    
-    // Step 3: Fetch posts by IDs (no complex joins)
-    let query = supabase
-      .from('posts')
-      .select(POST_SELECT)
-      .eq('is_deleted', false)
-      .eq('visibility', 'public')
-      .in('id', postIds);
-
-    // Apply time filter
-    if (timeFilter === 'week') {
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      query = query.gte('created_at', oneWeekAgo.toISOString());
-    } else if (timeFilter === 'month') {
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-      query = query.gte('created_at', oneMonthAgo.toISOString());
-    }
-
-    // Apply sorting
-    if (sortBy === 'recent') {
-      query = query.order('created_at', { ascending: false });
-    } else {
-      query = query.order('view_count', { ascending: false });
-    }
+    let relationshipPosts: any[] = [];
+    if (!postHashtagError && postHashtagData && postHashtagData.length > 0) {
+      const postIds = postHashtagData.map(ph => ph.post_id);
+      console.log(`📊 [HashtagService] Found ${postIds.length} posts via relationships for hashtag #${hashtag}`);
       
-    const { data: postsData, error } = await query;
-    if (error) throw error;
+      // Step 3: Fetch posts by IDs
+      let query = supabase
+        .from('posts')
+        .select(POST_SELECT)
+        .eq('is_deleted', false)
+        .eq('visibility', 'public')
+        .in('id', postIds);
+
+      // Apply time filter
+      if (timeFilter === 'week') {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        query = query.gte('created_at', oneWeekAgo.toISOString());
+      } else if (timeFilter === 'month') {
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        query = query.gte('created_at', oneMonthAgo.toISOString());
+      }
+
+      // Apply sorting
+      if (sortBy === 'recent') {
+        query = query.order('created_at', { ascending: false });
+      } else {
+        query = query.order('view_count', { ascending: false });
+      }
+        
+      const { data: postsData, error } = await query;
+      if (!error && postsData) {
+        relationshipPosts = postsData;
+      }
+    }
     
-    console.log(`✅ [HashtagService] Successfully fetched ${postsData?.length || 0} posts for #${hashtag}`);
+    // Step 4: Get posts via content search as fallback/supplement
+    const fallbackPosts = await getPostsByHashtagFallback(hashtag, sortBy, timeFilter);
     
-    // Return raw posts data to avoid double processing
-    return postsData || [];
+    // Step 5: Combine and deduplicate posts
+    const allPostsMap = new Map();
+    
+    // Add relationship-based posts first (higher priority)
+    relationshipPosts.forEach(post => {
+      allPostsMap.set(post.id, post);
+    });
+    
+    // Add fallback posts if not already present
+    fallbackPosts.forEach(post => {
+      if (!allPostsMap.has(post.id)) {
+        allPostsMap.set(post.id, post);
+      }
+    });
+    
+    let combinedPosts = Array.from(allPostsMap.values());
+    
+    // Apply time filter if specified (in case fallback posts need filtering)
+    if (timeFilter !== 'all') {
+      const timeMap = {
+        'week': 7,
+        'month': 30
+      };
+      const days = timeMap[timeFilter];
+      if (days) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        combinedPosts = combinedPosts.filter(post => 
+          new Date(post.created_at) >= cutoffDate
+        );
+      }
+    }
+    
+    // Apply sorting to combined results
+    if (sortBy === 'recent') {
+      combinedPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    } else {
+      combinedPosts.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
+    }
+    
+    console.log(`✅ [HashtagService] Found ${combinedPosts.length} total posts (${relationshipPosts.length} via relationships, ${fallbackPosts.length} via content search) for #${hashtag}`);
+    
+    return combinedPosts;
     
   } catch (error) {
     console.error(`❌ [HashtagService] Error in getPostsByHashtag for #${hashtag}:`, error);
