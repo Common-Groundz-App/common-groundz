@@ -5,6 +5,24 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { processPosts } from '@/hooks/feed/api/posts/processor';
+import type { PostFeedItem } from '@/hooks/feed/api/posts/types';
+
+const POST_SELECT = `
+  id,
+  title,
+  content,
+  post_type,
+  visibility,
+  user_id,
+  created_at,
+  updated_at,
+  media,
+  view_count,
+  status,
+  is_deleted,
+  tags
+`;
 
 export interface Hashtag {
   id: string;
@@ -283,10 +301,13 @@ export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[
 export const getPostsByHashtag = async (
   hashtag: string, 
   sortBy: 'recent' | 'popular' = 'recent',
-  timeFilter: 'all' | 'week' | 'month' = 'all'
-) => {
+  timeFilter: 'all' | 'week' | 'month' = 'all',
+  currentUserId: string | null = null
+): Promise<PostFeedItem[]> => {
+  console.log(`🔍 [HashtagService] Fetching posts for hashtag: #${hashtag}`);
+  
   try {
-    // First get the hashtag ID
+    // Step 1: Get the hashtag ID
     const { data: hashtagData, error: hashtagError } = await supabase
       .from('hashtags')
       .select('id')
@@ -294,33 +315,28 @@ export const getPostsByHashtag = async (
       .single();
       
     if (hashtagError || !hashtagData) {
-      // Fallback to content search if hashtag not found
-      return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter);
+      console.log(`📝 [HashtagService] Hashtag not found, using fallback for #${hashtag}`);
+      return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter, currentUserId);
     }
     
-    // Get post IDs that have this hashtag
+    // Step 2: Get post IDs that have this hashtag
     const { data: postHashtagData, error: postHashtagError } = await supabase
       .from('post_hashtags')
       .select('post_id')
       .eq('hashtag_id', hashtagData.id);
       
     if (postHashtagError || !postHashtagData || postHashtagData.length === 0) {
+      console.log(`📭 [HashtagService] No posts found for hashtag #${hashtag}`);
       return [];
     }
     
     const postIds = postHashtagData.map(ph => ph.post_id);
+    console.log(`📊 [HashtagService] Found ${postIds.length} posts for hashtag #${hashtag}`);
     
-    // Build the posts query
+    // Step 3: Fetch posts by IDs (no complex joins)
     let query = supabase
       .from('posts')
-      .select(`
-        *,
-        profiles!user_id (
-          id,
-          username, 
-          avatar_url
-        )
-      `)
+      .select(POST_SELECT)
       .eq('is_deleted', false)
       .eq('visibility', 'public')
       .in('id', postIds);
@@ -343,38 +359,37 @@ export const getPostsByHashtag = async (
       query = query.order('view_count', { ascending: false });
     }
       
-    const { data, error } = await query;
+    const { data: postsData, error } = await query;
     if (error) throw error;
-    return data || [];
+    
+    console.log(`✅ [HashtagService] Successfully fetched ${postsData?.length || 0} posts for #${hashtag}`);
+    
+    // Step 4: Process posts with profiles using the proven processPosts function
+    const userIdForProcessing = currentUserId || '';
+    return await processPosts(postsData || [], userIdForProcessing);
+    
   } catch (error) {
-    console.error('Error in getPostsByHashtag:', error);
-    return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter);
+    console.error(`❌ [HashtagService] Error in getPostsByHashtag for #${hashtag}:`, error);
+    return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter, currentUserId);
   }
 };
 
 /**
- * Fallback method using content search with enhanced error handling
+ * Fallback method using content search - simplified to use processPosts
  */
 const getPostsByHashtagFallback = async (
   hashtag: string, 
   sortBy: 'recent' | 'popular' = 'recent',
-  timeFilter: 'all' | 'week' | 'month' = 'all'
-) => {
-  console.log(`🔄 [HashtagFallback] Starting fallback for hashtag: #${hashtag}`);
+  timeFilter: 'all' | 'week' | 'month' = 'all',
+  currentUserId: string | null = null
+): Promise<PostFeedItem[]> => {
+  console.log(`🔄 [HashtagFallback] Starting content search fallback for #${hashtag}`);
   
   try {
-    // First attempt: Try with join
-    console.log(`📊 [HashtagFallback] Attempting join query for #${hashtag}`);
+    // Fetch posts that contain the hashtag in content or title (no complex joins)
     let query = supabase
       .from('posts')
-      .select(`
-        *,
-        profiles!user_id (
-          id,
-          username, 
-          avatar_url
-        )
-      `)
+      .select(POST_SELECT)
       .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
       .eq('is_deleted', false)
       .eq('visibility', 'public');
@@ -397,84 +412,18 @@ const getPostsByHashtagFallback = async (
       query = query.order('view_count', { ascending: false });
     }
       
-    const { data, error } = await query;
+    const { data: postsData, error } = await query;
     if (error) throw error;
     
-    console.log(`✅ [HashtagFallback] Join query successful. Found ${data?.length || 0} posts for #${hashtag}`);
-    return data || [];
+    console.log(`✅ [HashtagFallback] Content search found ${postsData?.length || 0} posts for #${hashtag}`);
     
-  } catch (joinError) {
-    console.warn(`⚠️ [HashtagFallback] Join query failed for #${hashtag}:`, joinError);
+    // Use the proven processPosts function to handle profile data
+    const userIdForProcessing = currentUserId || '';
+    return await processPosts(postsData || [], userIdForProcessing);
     
-    // Second attempt: Two-step fetch (posts without profiles, then merge)
-    try {
-      console.log(`🔄 [HashtagFallback] Attempting two-step fetch for #${hashtag}`);
-      
-      // Step 1: Fetch posts without profiles
-      let postsQuery = supabase
-        .from('posts')
-        .select('*')
-        .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
-        .eq('is_deleted', false)
-        .eq('visibility', 'public');
-
-      // Apply time filter
-      if (timeFilter === 'week') {
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        postsQuery = postsQuery.gte('created_at', oneWeekAgo.toISOString());
-      } else if (timeFilter === 'month') {
-        const oneMonthAgo = new Date();
-        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-        postsQuery = postsQuery.gte('created_at', oneMonthAgo.toISOString());
-      }
-
-      // Apply sorting
-      if (sortBy === 'recent') {
-        postsQuery = postsQuery.order('created_at', { ascending: false });
-      } else {
-        postsQuery = postsQuery.order('view_count', { ascending: false });
-      }
-
-      const { data: posts, error: postsError } = await postsQuery;
-      if (postsError) throw postsError;
-      
-      console.log(`📄 [HashtagFallback] Step 1: Found ${posts?.length || 0} posts for #${hashtag}`);
-      
-      if (!posts || posts.length === 0) {
-        console.log(`📭 [HashtagFallback] No posts found for #${hashtag}`);
-        return [];
-      }
-
-      // Step 2: Fetch profiles separately
-      const userIds = [...new Set(posts.map(post => post.user_id))];
-      console.log(`👥 [HashtagFallback] Step 2: Fetching ${userIds.length} unique profiles`);
-      
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.warn(`⚠️ [HashtagFallback] Profile fetch failed:`, profilesError);
-        // Return posts without profiles
-        return posts.map(post => ({ ...post, profiles: null }));
-      }
-
-      // Step 3: Merge posts with profiles
-      const profilesMap = new Map(profiles?.map(profile => [profile.id, profile]) || []);
-      const mergedData = posts.map(post => ({
-        ...post,
-        profiles: profilesMap.get(post.user_id) || null
-      }));
-
-      console.log(`✅ [HashtagFallback] Two-step fetch successful. Merged ${mergedData.length} posts with profiles for #${hashtag}`);
-      return mergedData;
-      
-    } catch (twoStepError) {
-      console.error(`❌ [HashtagFallback] Two-step fetch failed for #${hashtag}:`, twoStepError);
-      return [];
-    }
+  } catch (error) {
+    console.error(`❌ [HashtagFallback] Content search failed for #${hashtag}:`, error);
+    return [];
   }
 };
 
