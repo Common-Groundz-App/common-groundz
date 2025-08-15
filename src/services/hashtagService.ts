@@ -397,6 +397,7 @@ export const getPostsByHashtag = async (
         media,
         view_count,
         status,
+        is_deleted,
         tags
       `)
       .in('id', postIds)
@@ -472,6 +473,7 @@ const getPostsByHashtagFallback = async (
         media,
         view_count,
         status,
+        is_deleted,
         tags
       `)
       .eq('visibility', 'public')
