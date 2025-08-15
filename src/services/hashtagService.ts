@@ -292,138 +292,234 @@ export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[
 };
 
 /**
- * Get posts by hashtag using proper hashtag relationships
- * @param hashtag - The normalized hashtag name
- * @param sortBy - Sort criteria ('recent' or 'popular')
- * @param timeFilter - Time filter ('all', 'week', 'month')
- * @returns Array of post data
+ * Get posts by hashtag using optimized two-step approach
+ * Returns raw posts data only - processing done by caller
  */
 export const getPostsByHashtag = async (
   hashtag: string, 
   sortBy: 'recent' | 'popular' = 'recent',
   timeFilter: 'all' | 'week' | 'month' = 'all',
-  currentUserId: string | null = null
-): Promise<PostFeedItem[]> => {
-  console.log(`🔍 [HashtagService] Fetching posts for hashtag: #${hashtag}`);
+  currentUserId: string | null = null,
+  cursor?: { created_at: string; id: string },
+  limit: number = 20
+): Promise<{ posts: any[]; nextCursor?: { created_at: string; id: string }; logs: any }> => {
+  const startTime = Date.now();
+  const logs = {
+    path: 'main',
+    hashtagNormalized: hashtag.toLowerCase().replace(/^#/, ''),
+    postIdsCount: 0,
+    postsFetched: 0,
+    timingMs: 0,
+    error: null
+  };
   
   try {
-    // Step 1: Get the hashtag ID
+    // Validate and normalize hashtag
+    const normalizedHashtag = hashtag.toLowerCase().replace(/^#/, '');
+    if (!normalizedHashtag || normalizedHashtag.length < 1) {
+      throw new Error('Invalid hashtag');
+    }
+    
+    logs.hashtagNormalized = normalizedHashtag;
+    
+    // Step 1: Get hashtag ID and validate it exists
     const { data: hashtagData, error: hashtagError } = await supabase
       .from('hashtags')
       .select('id')
-      .eq('name_norm', hashtag)
-      .single();
+      .eq('name_norm', normalizedHashtag)
+      .maybeSingle();
       
-    if (hashtagError || !hashtagData) {
-      console.log(`📝 [HashtagService] Hashtag not found, using fallback for #${hashtag}`);
-      return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter, currentUserId);
+    if (hashtagError) {
+      logs.error = { code: hashtagError.code, message: hashtagError.message };
+      throw hashtagError;
     }
     
-    // Step 2: Get post IDs that have this hashtag
-    const { data: postHashtagData, error: postHashtagError } = await supabase
+    if (!hashtagData) {
+      logs.path = 'no_hashtag_found';
+      logs.timingMs = Date.now() - startTime;
+      return { posts: [], logs };
+    }
+    
+    // Step 2: Get post IDs using optimized query with new composite index
+    let postHashtagsQuery = supabase
       .from('post_hashtags')
-      .select('post_id')
-      .eq('hashtag_id', hashtagData.id);
+      .select('post_id, created_at')
+      .eq('hashtag_id', hashtagData.id)
+      .order('created_at', { ascending: false })
+      .limit(limit + 1); // +1 to check if there are more
       
-    if (postHashtagError || !postHashtagData || postHashtagData.length === 0) {
-      console.log(`📭 [HashtagService] No posts found for hashtag #${hashtag}`);
-      return [];
+    // Apply cursor pagination if provided
+    if (cursor) {
+      postHashtagsQuery = postHashtagsQuery.lt('created_at', cursor.created_at);
     }
     
-    const postIds = postHashtagData.map(ph => ph.post_id);
-    console.log(`📊 [HashtagService] Found ${postIds.length} posts for hashtag #${hashtag}`);
+    const { data: postHashtagsData, error: postHashtagsError } = await postHashtagsQuery;
     
-    // Step 3: Fetch posts by IDs (no complex joins)
-    let query = supabase
+    if (postHashtagsError) {
+      logs.error = { code: postHashtagsError.code, message: postHashtagsError.message };
+      
+      // Fallback on 400/406 errors
+      if (postHashtagsError.code === '400' || postHashtagsError.code === '406') {
+        return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter, currentUserId, cursor, limit, logs);
+      }
+      throw postHashtagsError;
+    }
+    
+    if (!postHashtagsData || postHashtagsData.length === 0) {
+      logs.path = 'no_posts_found';
+      logs.timingMs = Date.now() - startTime;
+      return { posts: [], logs };
+    }
+    
+    // Check if there are more posts (for pagination)
+    const hasMore = postHashtagsData.length > limit;
+    const postHashtagsToUse = hasMore ? postHashtagsData.slice(0, limit) : postHashtagsData;
+    const nextCursor = hasMore ? {
+      created_at: postHashtagsToUse[postHashtagsToUse.length - 1].created_at,
+      id: postHashtagsToUse[postHashtagsToUse.length - 1].post_id
+    } : undefined;
+    
+    const postIds = postHashtagsToUse.map(ph => ph.post_id);
+    logs.postIdsCount = postIds.length;
+    
+    // Step 3: Get full post data - trimmed select for performance
+    const { data: postsData, error: postsError } = await supabase
       .from('posts')
-      .select(POST_SELECT)
-      .eq('is_deleted', false)
+      .select(`
+        id,
+        title,
+        content,
+        post_type,
+        visibility,
+        user_id,
+        created_at,
+        updated_at,
+        media,
+        view_count,
+        status,
+        tags
+      `)
+      .in('id', postIds)
       .eq('visibility', 'public')
-      .in('id', postIds);
-
-    // Apply time filter
-    if (timeFilter === 'week') {
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      query = query.gte('created_at', oneWeekAgo.toISOString());
-    } else if (timeFilter === 'month') {
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-      query = query.gte('created_at', oneMonthAgo.toISOString());
-    }
-
-    // Apply sorting
-    if (sortBy === 'recent') {
-      query = query.order('created_at', { ascending: false });
-    } else {
-      query = query.order('view_count', { ascending: false });
-    }
+      .eq('is_deleted', false);
       
-    const { data: postsData, error } = await query;
-    if (error) throw error;
+    if (postsError) {
+      logs.error = { code: postsError.code, message: postsError.message };
+      throw postsError;
+    }
     
-    console.log(`✅ [HashtagService] Successfully fetched ${postsData?.length || 0} posts for #${hashtag}`);
+    // Sort posts to maintain the hashtag creation order
+    const sortedPosts = postIds.map(id => postsData?.find(post => post.id === id)).filter(Boolean);
     
-    // Step 4: Process posts with profiles using the proven processPosts function
-    const userIdForProcessing = currentUserId || '';
-    return await processPosts(postsData || [], userIdForProcessing);
+    logs.postsFetched = sortedPosts.length;
+    logs.timingMs = Date.now() - startTime;
+    
+    return { 
+      posts: sortedPosts,
+      nextCursor,
+      logs
+    };
     
   } catch (error) {
-    console.error(`❌ [HashtagService] Error in getPostsByHashtag for #${hashtag}:`, error);
-    return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter, currentUserId);
+    logs.error = { code: error.code || 'unknown', message: error.message };
+    logs.timingMs = Date.now() - startTime;
+    
+    // Only fallback on specific error codes
+    if (error.code === '400' || error.code === '406') {
+      return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter, currentUserId, cursor, limit, logs);
+    }
+    
+    console.error('Hashtag posts fetch error:', logs);
+    throw error;
   }
 };
 
 /**
- * Fallback method using content search - simplified to use processPosts
+ * Fallback method for content search when main path fails
+ * Returns raw posts data only - processing done by caller
  */
 const getPostsByHashtagFallback = async (
-  hashtag: string, 
+  hashtag: string,
   sortBy: 'recent' | 'popular' = 'recent',
   timeFilter: 'all' | 'week' | 'month' = 'all',
-  currentUserId: string | null = null
-): Promise<PostFeedItem[]> => {
-  console.log(`🔄 [HashtagFallback] Starting content search fallback for #${hashtag}`);
+  currentUserId: string | null = null,
+  cursor?: { created_at: string; id: string },
+  limit: number = 20,
+  originalLogs?: any
+): Promise<{ posts: any[]; nextCursor?: { created_at: string; id: string }; logs: any }> => {
+  const startTime = Date.now();
+  const logs = {
+    ...originalLogs,
+    path: 'fallback_content_search',
+    fallbackReason: originalLogs?.error || 'main_path_failed'
+  };
   
   try {
-    // Fetch posts that contain the hashtag in content or title (no complex joins)
+    const normalizedHashtag = hashtag.toLowerCase().replace(/^#/, '');
+    const hashtagPattern = `%#${normalizedHashtag}%`;
+    
     let query = supabase
       .from('posts')
-      .select(POST_SELECT)
-      .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
+      .select(`
+        id,
+        title,
+        content,
+        post_type,
+        visibility,
+        user_id,
+        created_at,
+        updated_at,
+        media,
+        view_count,
+        status,
+        tags
+      `)
+      .eq('visibility', 'public')
       .eq('is_deleted', false)
-      .eq('visibility', 'public');
-
-    // Apply time filter
-    if (timeFilter === 'week') {
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      query = query.gte('created_at', oneWeekAgo.toISOString());
-    } else if (timeFilter === 'month') {
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-      query = query.gte('created_at', oneMonthAgo.toISOString());
-    }
-
-    // Apply sorting
-    if (sortBy === 'recent') {
-      query = query.order('created_at', { ascending: false });
-    } else {
-      query = query.order('view_count', { ascending: false });
-    }
+      .ilike('content', hashtagPattern)
+      .order('created_at', { ascending: false })
+      .limit(limit + 1);
       
-    const { data: postsData, error } = await query;
-    if (error) throw error;
+    // Apply cursor pagination
+    if (cursor) {
+      query = query.lt('created_at', cursor.created_at);
+    }
     
-    console.log(`✅ [HashtagFallback] Content search found ${postsData?.length || 0} posts for #${hashtag}`);
+    // Apply time filtering
+    if (timeFilter !== 'all') {
+      const timeThreshold = new Date();
+      if (timeFilter === 'week') {
+        timeThreshold.setDate(timeThreshold.getDate() - 7);
+      } else if (timeFilter === 'month') {
+        timeThreshold.setDate(timeThreshold.getDate() - 30);
+      }
+      query = query.gte('created_at', timeThreshold.toISOString());
+    }
     
-    // Use the proven processPosts function to handle profile data
-    const userIdForProcessing = currentUserId || '';
-    return await processPosts(postsData || [], userIdForProcessing);
+    const { data: postsData, error: postsError } = await query;
+    
+    if (postsError) {
+      logs.error = { code: postsError.code, message: postsError.message };
+      throw postsError;
+    }
+    
+    const hasMore = postsData && postsData.length > limit;
+    const posts = hasMore ? postsData.slice(0, limit) : (postsData || []);
+    const nextCursor = hasMore && posts.length > 0 ? {
+      created_at: posts[posts.length - 1].created_at,
+      id: posts[posts.length - 1].id
+    } : undefined;
+    
+    logs.postsFetched = posts.length;
+    logs.timingMs = Date.now() - startTime;
+    
+    return { posts, nextCursor, logs };
     
   } catch (error) {
-    console.error(`❌ [HashtagFallback] Content search failed for #${hashtag}:`, error);
-    return [];
+    logs.error = { code: error.code || 'unknown', message: error.message };
+    logs.timingMs = Date.now() - startTime;
+    console.error('Hashtag fallback search error:', logs);
+    throw error;
   }
 };
 
@@ -601,7 +697,7 @@ export const searchHashtagsPartial = async (query: string, limit = 10): Promise<
 };
 
 /**
- * Search within hashtag posts
+ * Search within hashtag posts - returns raw posts data only
  * @param hashtag - The hashtag to search within
  * @param query - Search query for post content
  * @param limit - Maximum number of results
@@ -610,19 +706,28 @@ export const searchWithinHashtag = async (hashtag: string, query: string, limit 
   console.log(`🔍 [SearchWithinHashtag] Searching for "${query}" within hashtag #${hashtag}`);
   
   try {
+    const normalizedHashtag = hashtag.toLowerCase().replace(/^#/, '');
+    
     const { data, error } = await supabase
       .from('posts')
       .select(`
-        *,
-        profiles!user_id (
-          id,
-          username, 
-          avatar_url
-        )
+        id,
+        title,
+        content,
+        post_type,
+        visibility,
+        user_id,
+        created_at,
+        updated_at,
+        media,
+        view_count,
+        status,
+        tags
       `)
-      .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
+      .or(`content.ilike.%#${normalizedHashtag}%,title.ilike.%#${normalizedHashtag}%`)
       .or(`content.ilike.%${query}%,title.ilike.%${query}%`)
       .eq('is_deleted', false)
+      .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .limit(limit);
       
