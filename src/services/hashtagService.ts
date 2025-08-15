@@ -353,19 +353,23 @@ export const getPostsByHashtag = async (
 };
 
 /**
- * Fallback method using content search
+ * Fallback method using content search with enhanced error handling
  */
 const getPostsByHashtagFallback = async (
   hashtag: string, 
   sortBy: 'recent' | 'popular' = 'recent',
   timeFilter: 'all' | 'week' | 'month' = 'all'
 ) => {
+  console.log(`🔄 [HashtagFallback] Starting fallback for hashtag: #${hashtag}`);
+  
   try {
+    // First attempt: Try with join
+    console.log(`📊 [HashtagFallback] Attempting join query for #${hashtag}`);
     let query = supabase
       .from('posts')
       .select(`
         *,
-        profiles!posts_user_id_fkey (
+        profiles!user_id (
           id,
           username, 
           avatar_url
@@ -395,10 +399,82 @@ const getPostsByHashtagFallback = async (
       
     const { data, error } = await query;
     if (error) throw error;
+    
+    console.log(`✅ [HashtagFallback] Join query successful. Found ${data?.length || 0} posts for #${hashtag}`);
     return data || [];
-  } catch (error) {
-    console.error('Error in getPostsByHashtagFallback:', error);
-    return [];
+    
+  } catch (joinError) {
+    console.warn(`⚠️ [HashtagFallback] Join query failed for #${hashtag}:`, joinError);
+    
+    // Second attempt: Two-step fetch (posts without profiles, then merge)
+    try {
+      console.log(`🔄 [HashtagFallback] Attempting two-step fetch for #${hashtag}`);
+      
+      // Step 1: Fetch posts without profiles
+      let postsQuery = supabase
+        .from('posts')
+        .select('*')
+        .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
+        .eq('is_deleted', false)
+        .eq('visibility', 'public');
+
+      // Apply time filter
+      if (timeFilter === 'week') {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        postsQuery = postsQuery.gte('created_at', oneWeekAgo.toISOString());
+      } else if (timeFilter === 'month') {
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        postsQuery = postsQuery.gte('created_at', oneMonthAgo.toISOString());
+      }
+
+      // Apply sorting
+      if (sortBy === 'recent') {
+        postsQuery = postsQuery.order('created_at', { ascending: false });
+      } else {
+        postsQuery = postsQuery.order('view_count', { ascending: false });
+      }
+
+      const { data: posts, error: postsError } = await postsQuery;
+      if (postsError) throw postsError;
+      
+      console.log(`📄 [HashtagFallback] Step 1: Found ${posts?.length || 0} posts for #${hashtag}`);
+      
+      if (!posts || posts.length === 0) {
+        console.log(`📭 [HashtagFallback] No posts found for #${hashtag}`);
+        return [];
+      }
+
+      // Step 2: Fetch profiles separately
+      const userIds = [...new Set(posts.map(post => post.user_id))];
+      console.log(`👥 [HashtagFallback] Step 2: Fetching ${userIds.length} unique profiles`);
+      
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.warn(`⚠️ [HashtagFallback] Profile fetch failed:`, profilesError);
+        // Return posts without profiles
+        return posts.map(post => ({ ...post, profiles: null }));
+      }
+
+      // Step 3: Merge posts with profiles
+      const profilesMap = new Map(profiles?.map(profile => [profile.id, profile]) || []);
+      const mergedData = posts.map(post => ({
+        ...post,
+        profiles: profilesMap.get(post.user_id) || null
+      }));
+
+      console.log(`✅ [HashtagFallback] Two-step fetch successful. Merged ${mergedData.length} posts with profiles for #${hashtag}`);
+      return mergedData;
+      
+    } catch (twoStepError) {
+      console.error(`❌ [HashtagFallback] Two-step fetch failed for #${hashtag}:`, twoStepError);
+      return [];
+    }
   }
 };
 
@@ -582,12 +658,14 @@ export const searchHashtagsPartial = async (query: string, limit = 10): Promise<
  * @param limit - Maximum number of results
  */
 export const searchWithinHashtag = async (hashtag: string, query: string, limit = 20) => {
+  console.log(`🔍 [SearchWithinHashtag] Searching for "${query}" within hashtag #${hashtag}`);
+  
   try {
     const { data, error } = await supabase
       .from('posts')
       .select(`
         *,
-        profiles!posts_user_id_fkey (
+        profiles!user_id (
           id,
           username, 
           avatar_url
@@ -600,9 +678,11 @@ export const searchWithinHashtag = async (hashtag: string, query: string, limit 
       .limit(limit);
       
     if (error) throw error;
+    
+    console.log(`✅ [SearchWithinHashtag] Found ${data?.length || 0} posts matching "${query}" in #${hashtag}`);
     return data || [];
   } catch (error) {
-    console.error('Error in searchWithinHashtag:', error);
+    console.error(`❌ [SearchWithinHashtag] Error searching for "${query}" in #${hashtag}:`, error);
     return [];
   }
 };
