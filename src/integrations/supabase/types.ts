@@ -2467,6 +2467,10 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: boolean
       }
+      cleanup_spaced_hashtags: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       create_storage_helper_functions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
