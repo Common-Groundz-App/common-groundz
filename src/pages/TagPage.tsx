@@ -33,37 +33,53 @@ const TagPage = () => {
   const [searchResults, setSearchResults] = useState<PostItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Enhanced data fetching for Phase 3C
+  // Enhanced data fetching with error boundaries and sequential loading
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const fetchHashtagData = async () => {
       if (!hashtag || !user) return;
       
       setLoading(true);
-      setAnalyticsLoading(true);
       setError(null);
       
       try {
         // Set original hashtag display name
         setOriginalHashtag(hashtag);
         
-        // Fetch posts with sorting and filtering
+        // Phase 1: Fetch and process posts first (critical path)
+        console.log('🔄 Fetching posts for hashtag:', hashtag);
         const rawPosts = await getPostsByHashtag(hashtag, sortBy, timeFilter);
         const processedPosts = await processPosts(rawPosts, user.id);
         setPosts(processedPosts);
+        setLoading(false);
 
-        // Fetch hashtag analytics
-        const hashtagAnalytics = await getHashtagAnalytics(hashtag);
-        setAnalytics(hashtagAnalytics);
+        // Phase 2: Fetch analytics separately (non-blocking)
+        console.log('🔄 Fetching analytics for hashtag:', hashtag);
+        setAnalyticsLoading(true);
+        try {
+          const hashtagAnalytics = await getHashtagAnalytics(hashtag);
+          setAnalytics(hashtagAnalytics);
+        } catch (analyticsErr) {
+          console.error('Error fetching analytics:', analyticsErr);
+          // Don't block the page for analytics errors
+        } finally {
+          setAnalyticsLoading(false);
+        }
+        
       } catch (err) {
         console.error('Error fetching hashtag data:', err);
         setError('Failed to load data for this hashtag');
-      } finally {
         setLoading(false);
         setAnalyticsLoading(false);
       }
     };
 
     fetchHashtagData();
+    
+    return () => {
+      abortController.abort();
+    };
   }, [hashtag, user, sortBy, timeFilter]);
 
   // Search within hashtag posts
@@ -91,15 +107,17 @@ const TagPage = () => {
     return () => clearTimeout(debounceTimer);
   }, [searchQuery, hashtag, user]);
 
-  const refreshFeed = () => {
+  const refreshFeed = async () => {
     // Re-fetch posts when needed
     if (hashtag && user) {
-      const fetchPosts = async () => {
+      try {
+        console.log('🔄 Refreshing feed for hashtag:', hashtag);
         const rawPosts = await getPostsByHashtag(hashtag, sortBy, timeFilter);
         const processedPosts = await processPosts(rawPosts, user.id);
         setPosts(processedPosts);
-      };
-      fetchPosts();
+      } catch (err) {
+        console.error('Error refreshing feed:', err);
+      }
     }
   };
 

@@ -301,9 +301,8 @@ export const getTrendingHashtags = async (limit = 10): Promise<HashtagWithCount[
 export const getPostsByHashtag = async (
   hashtag: string, 
   sortBy: 'recent' | 'popular' = 'recent',
-  timeFilter: 'all' | 'week' | 'month' = 'all',
-  currentUserId: string | null = null
-): Promise<PostFeedItem[]> => {
+  timeFilter: 'all' | 'week' | 'month' = 'all'
+): Promise<any[]> => {
   console.log(`🔍 [HashtagService] Fetching posts for hashtag: #${hashtag}`);
   
   try {
@@ -316,7 +315,7 @@ export const getPostsByHashtag = async (
       
     if (hashtagError || !hashtagData) {
       console.log(`📝 [HashtagService] Hashtag not found, using fallback for #${hashtag}`);
-      return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter, currentUserId);
+      return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter);
     }
     
     // Step 2: Get post IDs that have this hashtag
@@ -364,13 +363,12 @@ export const getPostsByHashtag = async (
     
     console.log(`✅ [HashtagService] Successfully fetched ${postsData?.length || 0} posts for #${hashtag}`);
     
-    // Step 4: Process posts with profiles using the proven processPosts function
-    const userIdForProcessing = currentUserId || '';
-    return await processPosts(postsData || [], userIdForProcessing);
+    // Return raw posts data to avoid double processing
+    return postsData || [];
     
   } catch (error) {
     console.error(`❌ [HashtagService] Error in getPostsByHashtag for #${hashtag}:`, error);
-    return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter, currentUserId);
+    return await getPostsByHashtagFallback(hashtag, sortBy, timeFilter);
   }
 };
 
@@ -380,9 +378,8 @@ export const getPostsByHashtag = async (
 const getPostsByHashtagFallback = async (
   hashtag: string, 
   sortBy: 'recent' | 'popular' = 'recent',
-  timeFilter: 'all' | 'week' | 'month' = 'all',
-  currentUserId: string | null = null
-): Promise<PostFeedItem[]> => {
+  timeFilter: 'all' | 'week' | 'month' = 'all'
+): Promise<any[]> => {
   console.log(`🔄 [HashtagFallback] Starting content search fallback for #${hashtag}`);
   
   try {
@@ -417,9 +414,8 @@ const getPostsByHashtagFallback = async (
     
     console.log(`✅ [HashtagFallback] Content search found ${postsData?.length || 0} posts for #${hashtag}`);
     
-    // Use the proven processPosts function to handle profile data
-    const userIdForProcessing = currentUserId || '';
-    return await processPosts(postsData || [], userIdForProcessing);
+    // Return raw posts data to avoid double processing
+    return postsData || [];
     
   } catch (error) {
     console.error(`❌ [HashtagFallback] Content search failed for #${hashtag}:`, error);
