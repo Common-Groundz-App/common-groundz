@@ -7,6 +7,7 @@ import { NotificationBell } from './notifications/NotificationBell';
 import { useLocation } from 'react-router-dom';
 import { SearchDialog } from '@/components/SearchDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { isExploreRelatedRoute } from '@/utils/navigation';
 
 export function NavBarComponent() {
   const location = useLocation();
@@ -53,7 +54,7 @@ export function NavBarComponent() {
       setActiveTab('Profile');
     } else if (location.pathname === '/home' || location.pathname === '/feed') {
       setActiveTab('Home');
-    } else if (location.pathname === '/explore') {
+    } else if (isExploreRelatedRoute(location.pathname)) {
       setActiveTab('Explore');
     }
   }, [location.pathname]);

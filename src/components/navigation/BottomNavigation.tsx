@@ -4,6 +4,7 @@ import { Home, Search, User, PlusCircle, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAuth } from '@/contexts/AuthContext';
+import { isExploreRelatedRoute } from '@/utils/navigation';
 
 interface NavItem {
   name: string;
@@ -54,7 +55,7 @@ export const BottomNavigation = () => {
         {navItems.map((item) => {
           const isActive = location.pathname === item.path || 
                           (item.path === '/profile' && location.pathname.startsWith('/profile')) ||
-                          (item.path === '/explore' && location.pathname.startsWith('/explore')) ||
+                          (item.path === '/explore' && isExploreRelatedRoute(location.pathname)) ||
                           (item.path === '/home' && (location.pathname === '/home' || location.pathname === '/feed'));
           
           if (item.path.startsWith('#')) {
