@@ -238,19 +238,64 @@ export const searchHashtags = async (query: string, limit = 10): Promise<Hashtag
     if (hashtagError) throw hashtagError;
     if (!hashtags || hashtags.length === 0) return [];
     
-    // Get post counts for each hashtag
+    // Get accurate post counts using hybrid approach for each hashtag
     const hashtagsWithCounts = await Promise.all(
       hashtags.map(async (hashtag) => {
-        const { count, error: countError } = await supabase
+        let allPosts: any[] = [];
+        
+        // Step 1: Get posts via relationship table
+        const { data: postHashtagData } = await supabase
           .from('post_hashtags')
-          .select('*', { count: 'exact' })
+          .select('post_id')
           .eq('hashtag_id', hashtag.id);
+          
+        if (postHashtagData && postHashtagData.length > 0) {
+          const postIds = postHashtagData.map(ph => ph.post_id);
+          
+          const { data: relationshipPosts } = await supabase
+            .from('posts')
+            .select('id')
+            .eq('is_deleted', false)
+            .eq('visibility', 'public')
+            .in('id', postIds);
+            
+          if (relationshipPosts) {
+            allPosts.push(...relationshipPosts);
+          }
+        }
+        
+        // Step 2: Get posts via content search
+        const { data: contentPosts } = await supabase
+          .from('posts')
+          .select('id')
+          .or(`content.ilike.%#${hashtag.name_norm}%,title.ilike.%#${hashtag.name_norm}%`)
+          .eq('is_deleted', false)
+          .eq('visibility', 'public');
+          
+        // Step 3: Combine and deduplicate
+        const postsMap = new Map();
+        
+        // Add relationship posts first (higher priority)
+        allPosts.forEach(post => {
+          postsMap.set(post.id, post);
+        });
+        
+        // Add content search posts if not already present
+        if (contentPosts) {
+          contentPosts.forEach(post => {
+            if (!postsMap.has(post.id)) {
+              postsMap.set(post.id, post);
+            }
+          });
+        }
+        
+        const postCount = postsMap.size;
           
         return {
           id: hashtag.id,
           name_original: hashtag.name_original,
           name_norm: hashtag.name_norm,
-          post_count: countError ? 0 : (count || 0),
+          post_count: postCount,
           created_at: hashtag.created_at
         };
       })
