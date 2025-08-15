@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import NavBarComponent from '@/components/NavBarComponent';
-import Footer from '@/components/Footer';
+import { useParams, useNavigate } from 'react-router-dom';
+import { BottomNavigation } from '@/components/navigation/BottomNavigation';
+import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
+import { useIsMobile } from '@/hooks/use-mobile';
+import Logo from '@/components/Logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostFeedItem } from '@/components/feed/PostFeedItem';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
 import { HashtagSuggestions } from '@/components/hashtag/HashtagSuggestions';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { processPosts } from '@/hooks/feed/api/posts';
 import { getHashtagAnalytics, getPostsByHashtag, searchWithinHashtag, HashtagAnalytics } from '@/services/hashtagService';
@@ -19,6 +20,8 @@ import { Loader2, Hash, TrendingUp, TrendingDown, Users, Calendar, Search, Filte
 const TagPage = () => {
   const { hashtag } = useParams<{ hashtag: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,39 +135,110 @@ const TagPage = () => {
 
   const displayedPosts = searchQuery.trim() ? searchResults : posts;
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      const encodedQuery = encodeURIComponent(searchQuery.trim());
+      navigate(`/search?q=${encodedQuery}&hashtag=${hashtag}`);
+    }
+  };
+
+  const getInitialActiveTab = () => {
+    return 'Hashtags';
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <NavBarComponent />
-        <div className="flex-1 container max-w-3xl mx-auto py-6 px-4">
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="min-h-screen flex flex-col overflow-x-hidden">
+        {/* Mobile Header */}
+        <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+          <div className="container p-3 mx-auto flex justify-start">
+            <Logo size="sm" />
           </div>
         </div>
-        <Footer />
+        
+        <div className="flex flex-1 overflow-x-hidden">
+          {/* Desktop Sidebar */}
+          <div className="hidden xl:block">
+            <VerticalTubelightNavbar 
+              initialActiveTab={getInitialActiveTab()}
+              className="fixed left-0 top-0 h-screen pt-4 pl-4"
+            />
+          </div>
+          
+          <div className="flex-1 pt-16 xl:pt-0 xl:ml-64 min-w-0">
+            <div className="container max-w-4xl mx-auto p-4 md:p-8 min-w-0">
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Mobile Bottom Navigation */}
+        <div className="xl:hidden">
+          <BottomNavigation />
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <NavBarComponent />
-        <div className="flex-1 container max-w-3xl mx-auto py-6 px-4">
-          <div className="text-center py-12">
-            <h2 className="text-xl font-medium mb-2">Error</h2>
-            <p className="text-muted-foreground">{error}</p>
+      <div className="min-h-screen flex flex-col overflow-x-hidden">
+        {/* Mobile Header */}
+        <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+          <div className="container p-3 mx-auto flex justify-start">
+            <Logo size="sm" />
           </div>
         </div>
-        <Footer />
+        
+        <div className="flex flex-1 overflow-x-hidden">
+          {/* Desktop Sidebar */}
+          <div className="hidden xl:block">
+            <VerticalTubelightNavbar 
+              initialActiveTab={getInitialActiveTab()}
+              className="fixed left-0 top-0 h-screen pt-4 pl-4"
+            />
+          </div>
+          
+          <div className="flex-1 pt-16 xl:pt-0 xl:ml-64 min-w-0">
+            <div className="container max-w-4xl mx-auto p-4 md:p-8 min-w-0">
+              <div className="text-center py-12">
+                <h2 className="text-xl font-medium mb-2">Error</h2>
+                <p className="text-muted-foreground">{error}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Mobile Bottom Navigation */}
+        <div className="xl:hidden">
+          <BottomNavigation />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <NavBarComponent />
-      <div className="flex-1 container max-w-3xl mx-auto py-6 px-4">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
+      {/* Mobile Header - Only show on mobile screens */}
+      <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
+        <div className="container p-3 mx-auto flex justify-start">
+          <Logo size="sm" />
+        </div>
+      </div>
+      
+      <div className="flex flex-1 overflow-x-hidden">
+        {/* Desktop Sidebar - Only show on xl+ screens */}
+        <div className="hidden xl:block">
+          <VerticalTubelightNavbar 
+            initialActiveTab={getInitialActiveTab()}
+            className="fixed left-0 top-0 h-screen pt-4 pl-4"
+          />
+        </div>
+        
+        <div className="flex-1 pt-16 xl:pt-0 xl:ml-64 min-w-0">
+          <div className="container max-w-4xl mx-auto p-4 md:p-8 min-w-0">
         
         {/* Enhanced Header with Analytics */}
         <div className="mb-6">
@@ -214,18 +288,38 @@ const TagPage = () => {
             </div>
           )}
 
-          {/* Search within hashtag */}
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          {/* Enhanced Search within hashtag - Matching Explore page style */}
+          <div className="relative mb-6 overflow-visible">
+            <div className="flex items-center border rounded-lg overflow-hidden bg-background min-w-0">
+              <div className="pl-3 text-muted-foreground shrink-0">
+                <Search size={18} />
+              </div>
               <Input
+                type="text"
                 placeholder={`Search within #${originalHashtag}...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                onKeyDown={handleKeyDown}
+                className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0"
               />
+              {searchQuery && (
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  className="mr-1 bg-brand-orange hover:bg-brand-orange/90 shrink-0 max-[500px]:text-xs max-[500px]:px-2"
+                  onClick={() => {
+                    const encodedQuery = encodeURIComponent(searchQuery.trim());
+                    navigate(`/search?q=${encodedQuery}&hashtag=${hashtag}`);
+                  }}
+                >
+                  <span className="max-[400px]:hidden">Search More</span>
+                  <span className="min-[401px]:hidden">More</span>
+                </Button>
+              )}
               {isSearching && (
-                <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin" />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
               )}
             </div>
           </div>
@@ -314,8 +408,14 @@ const TagPage = () => {
             ))}
           </div>
         )}
+          </div>
+        </div>
       </div>
-      <Footer />
+      
+      {/* Mobile Bottom Navigation - Only show on mobile screens */}
+      <div className="xl:hidden">
+        <BottomNavigation />
+      </div>
     </div>
   );
 };
