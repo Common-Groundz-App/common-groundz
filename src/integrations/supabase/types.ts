@@ -2747,6 +2747,14 @@ export type Database = {
         Args: { notification_ids: string[] }
         Returns: string[]
       }
+      repair_hashtag_relationships: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          action_taken: string
+          hashtag_content: string
+          post_id: string
+        }[]
+      }
       toggle_entity_save: {
         Args: { p_entity_id: string; p_user_id: string }
         Returns: boolean

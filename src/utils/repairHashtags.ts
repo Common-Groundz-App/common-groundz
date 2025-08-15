@@ -4,10 +4,59 @@ import { processPostHashtags } from '@/services/hashtagService';
 
 /**
  * Repair hashtags for existing posts that may be missing hashtag data
+ * Uses the database function for more robust hashtag extraction and linking
  */
 export const repairExistingPostHashtags = async (): Promise<void> => {
   try {
-    console.log('🔧 Starting hashtag repair for existing posts...');
+    console.log('🔧 Starting hashtag repair using database function...');
+    
+    // Use the new database repair function
+    const { data: repairResults, error } = await supabase
+      .rpc('repair_hashtag_relationships');
+      
+    if (error) {
+      console.error('❌ Error running hashtag repair function:', error);
+      return;
+    }
+    
+    if (!repairResults || repairResults.length === 0) {
+      console.log('✅ No hashtags needed repair - all relationships are correct!');
+      return;
+    }
+    
+    // Log repair results
+    const grouped = repairResults.reduce((acc: any, result) => {
+      if (!acc[result.action_taken]) {
+        acc[result.action_taken] = [];
+      }
+      acc[result.action_taken].push(result);
+      return acc;
+    }, {});
+    
+    console.log('📊 Hashtag repair results:');
+    Object.entries(grouped).forEach(([action, results]: [string, any]) => {
+      console.log(`${action}: ${results.length} items`);
+      if (action === 'relationship_created') {
+        console.log('🔗 Created relationships for:', results.map((r: any) => `${r.post_id}:#${r.hashtag_content}`));
+      }
+    });
+    
+    const createdCount = (grouped.relationship_created || []).length;
+    const hashtagsCreated = (grouped.hashtag_created || []).length;
+    
+    console.log(`🎉 Hashtag repair complete! Created ${hashtagsCreated} new hashtags and ${createdCount} new relationships`);
+  } catch (error) {
+    console.error('❌ Error in repairExistingPostHashtags:', error);
+  }
+};
+
+/**
+ * Alternative repair method using the original client-side logic
+ * Use this as a fallback if the database function approach has issues
+ */
+export const repairExistingPostHashtagsLegacy = async (): Promise<void> => {
+  try {
+    console.log('🔧 Starting legacy hashtag repair...');
     
     // Get all posts that might have hashtags
     const { data: posts, error } = await supabase
@@ -52,9 +101,9 @@ export const repairExistingPostHashtags = async (): Promise<void> => {
       }
     }
     
-    console.log(`🎉 Hashtag repair complete! Repaired ${repairedCount} posts`);
+    console.log(`🎉 Legacy hashtag repair complete! Repaired ${repairedCount} posts`);
   } catch (error) {
-    console.error('❌ Error in repairExistingPostHashtags:', error);
+    console.error('❌ Error in repairExistingPostHashtagsLegacy:', error);
   }
 };
 
