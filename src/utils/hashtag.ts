@@ -2,9 +2,9 @@
  * Hashtag utility functions for parsing and processing hashtags
  */
 
-// Enhanced regex pattern to match hashtags including multi-word ones
-// Matches #word, #word123, #xuv 700 service, #react-native, etc.
-const HASHTAG_PATTERN = /#([a-zA-Z0-9][a-zA-Z0-9\s\-_]*[a-zA-Z0-9]|[a-zA-Z0-9])/g;
+// Standard hashtag pattern following Twitter/Instagram behavior
+// Matches #word, #word123, #react-native, etc. (no spaces allowed)
+const HASHTAG_PATTERN = /#([a-zA-Z0-9][a-zA-Z0-9\-_]*)/g;
 
 /**
  * Extract hashtags from text content
@@ -34,9 +34,8 @@ export const normalizeHashtag = (hashtag: string): string => {
   return hashtag
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-')        // spaces to dashes  
+    .replace(/[^a-z0-9\-_]/g, '') // remove invalid characters
     .replace(/-+/g, '-')         // collapse multiple dashes
-    .replace(/[^a-z0-9\-]/g, '') // remove non-ASCII for now
     .replace(/^-+|-+$/g, '');    // trim leading/trailing dashes
 };
 
@@ -46,8 +45,8 @@ export const normalizeHashtag = (hashtag: string): string => {
  * @returns Boolean indicating if valid
  */
 export const isValidHashtag = (hashtag: string): boolean => {
-  // Allow letters, numbers, spaces, dashes, underscores
-  const validPattern = /^[a-zA-Z0-9][a-zA-Z0-9\s\-_]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/;
+  // Allow letters, numbers, dashes, underscores (no spaces)
+  const validPattern = /^[a-zA-Z0-9][a-zA-Z0-9\-_]*$/;
   return validPattern.test(hashtag) && hashtag.length >= 1 && hashtag.length <= 100;
 };
 
