@@ -493,30 +493,67 @@ export const getHashtagAnalytics = async (hashtag: string): Promise<HashtagAnaly
   try {
     const normalizedHashtag = hashtag.toLowerCase();
     
-    // Get hashtag data with posts
+    // Use hybrid approach - same as getPostsByHashtag
+    let allPosts: any[] = [];
+    
+    // Step 1: Get posts via relationship table
     const { data: hashtagData } = await supabase
       .from('hashtags')
-      .select(`
-        id,
-        post_hashtags(
-          post_id,
-          posts!inner(
-            id,
-            user_id,
-            created_at
-          )
-        )
-      `)
+      .select('id')
       .eq('name_norm', normalizedHashtag)
       .single();
-
-    if (!hashtagData) {
-      throw new Error('Hashtag not found');
+      
+    if (hashtagData) {
+      // Get posts via relationship table
+      const { data: postHashtagData } = await supabase
+        .from('post_hashtags')
+        .select('post_id')
+        .eq('hashtag_id', hashtagData.id);
+        
+      if (postHashtagData && postHashtagData.length > 0) {
+        const postIds = postHashtagData.map(ph => ph.post_id);
+        
+        const { data: relationshipPosts } = await supabase
+          .from('posts')
+          .select('id, user_id, created_at')
+          .eq('is_deleted', false)
+          .eq('visibility', 'public')
+          .in('id', postIds);
+          
+        if (relationshipPosts) {
+          allPosts.push(...relationshipPosts);
+        }
+      }
     }
-
-    const posts = hashtagData.post_hashtags || [];
-    const totalPosts = posts.length;
-    const uniqueUsers = new Set(posts.map(ph => ph.posts?.user_id)).size;
+    
+    // Step 2: Get posts via content search (fallback/supplement)
+    const { data: contentPosts } = await supabase
+      .from('posts')
+      .select('id, user_id, created_at')
+      .or(`content.ilike.%#${normalizedHashtag}%,title.ilike.%#${normalizedHashtag}%`)
+      .eq('is_deleted', false)
+      .eq('visibility', 'public');
+      
+    // Step 3: Combine and deduplicate
+    const postsMap = new Map();
+    
+    // Add relationship posts first (higher priority)
+    allPosts.forEach(post => {
+      postsMap.set(post.id, post);
+    });
+    
+    // Add content search posts if not already present
+    if (contentPosts) {
+      contentPosts.forEach(post => {
+        if (!postsMap.has(post.id)) {
+          postsMap.set(post.id, post);
+        }
+      });
+    }
+    
+    const combinedPosts = Array.from(postsMap.values());
+    const totalPosts = combinedPosts.length;
+    const uniqueUsers = new Set(combinedPosts.map(post => post.user_id)).size;
     
     // Calculate time-based metrics
     const now = new Date();
@@ -525,14 +562,14 @@ export const getHashtagAnalytics = async (hashtag: string): Promise<HashtagAnaly
     const thisMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const lastMonth = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
     
-    const thisWeekPosts = posts.filter(ph => new Date(ph.posts?.created_at || '') >= thisWeek).length;
-    const lastWeekPosts = posts.filter(ph => {
-      const date = new Date(ph.posts?.created_at || '');
+    const thisWeekPosts = combinedPosts.filter(post => new Date(post.created_at) >= thisWeek).length;
+    const lastWeekPosts = combinedPosts.filter(post => {
+      const date = new Date(post.created_at);
       return date >= lastWeek && date < thisWeek;
     }).length;
-    const thisMonthPosts = posts.filter(ph => new Date(ph.posts?.created_at || '') >= thisMonth).length;
-    const lastMonthPosts = posts.filter(ph => {
-      const date = new Date(ph.posts?.created_at || '');
+    const thisMonthPosts = combinedPosts.filter(post => new Date(post.created_at) >= thisMonth).length;
+    const lastMonthPosts = combinedPosts.filter(post => {
+      const date = new Date(post.created_at);
       return date >= lastMonth && date < thisMonth;
     }).length;
 
