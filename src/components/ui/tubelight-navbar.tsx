@@ -40,9 +40,14 @@ export function NavBar({
   const isSmallMobile = useIsMobile(650);
   const navigate = useNavigate();
 
+  // Fix: Use the initialActiveTab directly instead of internal state when it exists
+  const currentActiveTab = initialActiveTab || activeTab;
+
   useEffect(() => {
-    setActiveTab(initialActiveTab || items[0].name);
-  }, [initialActiveTab, items]);
+    if (initialActiveTab) {
+      setActiveTab(initialActiveTab);
+    }
+  }, [initialActiveTab]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -110,7 +115,7 @@ export function NavBar({
             )}>
               {items.map(item => {
                 const Icon = item.icon;
-                const isActive = activeTab === item.name;
+                const isActive = currentActiveTab === item.name;
                 return <div 
                     key={item.name} 
                     onClick={() => handleNavItemClick(item)} 
@@ -159,7 +164,7 @@ export function NavBar({
                     <nav className="flex flex-col space-y-4">
                       {items.map(item => {
                         const Icon = item.icon;
-                        const isActive = activeTab === item.name;
+                        const isActive = currentActiveTab === item.name;
                         return <div 
                           key={item.name} 
                           onClick={() => handleNavItemClick(item)}
