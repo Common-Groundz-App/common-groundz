@@ -16,6 +16,7 @@ import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useMemoryOptimization } from '@/hooks/useMemoryOptimization';
 import { Toaster } from '@/components/ui/toaster';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { EnhancedSearchInput } from '@/components/search/EnhancedSearchInput';
 import { checkForNewContent, getLastRefreshTime, setLastRefreshTime, NewContentCheckResult } from '@/services/feedContentService';
 import { feedbackActions } from '@/services/feedbackService';
 import { smartPrefetchService } from '@/services/smartPrefetchService';
@@ -666,16 +667,7 @@ const Feed = React.memo(() => {
               <div className="sticky top-4 space-y-4">
                 {/* Search */}
                 <div className="bg-background rounded-xl border p-4">
-                  <button 
-                    onClick={() => {
-                      const event = new CustomEvent('open-search-dialog');
-                      window.dispatchEvent(event);
-                    }}
-                    className="flex items-center w-full gap-2 text-muted-foreground rounded-md border px-3 py-2 hover:bg-accent transition-colors"
-                  >
-                    <Search size={18} />
-                    <span>Search...</span>
-                  </button>
+                  <EnhancedSearchInput />
                 </div>
 
                 {/* Trending Topics */}
