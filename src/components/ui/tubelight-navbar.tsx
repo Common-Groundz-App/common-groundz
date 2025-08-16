@@ -41,10 +41,8 @@ export function NavBar({
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (initialActiveTab) {
-      setActiveTab(initialActiveTab);
-    }
-  }, [initialActiveTab]);
+    setActiveTab(initialActiveTab || items[0].name);
+  }, [initialActiveTab, items]);
 
   useEffect(() => {
     const handleScroll = () => {
