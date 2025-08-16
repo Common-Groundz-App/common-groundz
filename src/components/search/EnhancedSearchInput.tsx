@@ -25,6 +25,7 @@ export function EnhancedSearchInput({
     books: false,
     movies: false,
     places: false,
+    hashtags: false,
   });
   const [isProcessingEntity, setIsProcessingEntity] = useState(false);
   
@@ -36,6 +37,7 @@ export function EnhancedSearchInput({
   const hasExternalResults = results.categorized?.books?.length > 0 || 
                              results.categorized?.movies?.length > 0 || 
                              results.categorized?.places?.length > 0;
+  const hasHashtagResults = results.hashtags?.length > 0;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
@@ -213,6 +215,32 @@ export function EnhancedSearchInput({
               ))}
             </div>
           )}
+
+          {/* Hashtags */}
+          {results.hashtags?.length > 0 && (
+            <div className="border-b last:border-b-0 bg-background">
+              {renderSectionHeader('# Hashtags', results.hashtags.length, 'hashtags')}
+              {(showAllResults.hashtags ? results.hashtags : results.hashtags.slice(0, 3)).map((hashtag) => (
+                <div
+                  key={hashtag.id}
+                  onClick={() => {
+                    navigate(`/t/${hashtag.name_norm}`);
+                    handleResultClick();
+                  }}
+                  className="flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-primary font-medium">#{hashtag.name_original}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {hashtag.post_count} posts
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           
           {/* People */}
           {results.users.length > 0 && (
@@ -242,7 +270,7 @@ export function EnhancedSearchInput({
           )}
 
           {/* No Results State */}
-          {!hasLocalResults && !hasExternalResults && !isLoading && (
+          {!hasLocalResults && !hasExternalResults && !hasHashtagResults && !isLoading && (
             <div className="p-4 text-center bg-background">
               <p className="text-sm text-muted-foreground mb-2">No immediate results found</p>
               <button 

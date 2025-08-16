@@ -34,7 +34,8 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
     entities: false,
     books: false,
     movies: false,
-    places: false
+    places: false,
+    hashtags: false
   });
   
   // Default to quick mode if not specified
