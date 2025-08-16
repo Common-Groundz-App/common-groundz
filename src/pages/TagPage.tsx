@@ -13,7 +13,8 @@ import { PostFeedItem as PostItem } from '@/hooks/feed/types';
 import { HashtagSuggestions } from '@/components/hashtag/HashtagSuggestions';
 import { useAuth } from '@/contexts/AuthContext';
 import { processPosts } from '@/hooks/feed/api/posts';
-import { getHashtagAnalytics, getPostsByHashtag, searchWithinHashtag, HashtagAnalytics } from '@/services/hashtagService';
+import { getHashtagAnalytics, getPostsByHashtag, searchWithinHashtag, HashtagAnalytics, SearchFilters } from '@/services/hashtagService';
+import { EnhancedHashtagSearch } from '@/components/hashtag/EnhancedHashtagSearch';
 import { Loader2, Hash, TrendingUp, TrendingDown, Users, Calendar, Search, Filter } from 'lucide-react';
 
 
@@ -35,6 +36,11 @@ const TagPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PostItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+    dateRange: 'all',
+    postType: 'all',
+    sortBy: 'recent'
+  });
 
   // Enhanced data fetching with error boundaries and sequential loading
   useEffect(() => {
@@ -85,30 +91,32 @@ const TagPage = () => {
     };
   }, [hashtag, user, sortBy, timeFilter]);
 
-  // Search within hashtag posts
-  useEffect(() => {
-    const performSearch = async () => {
-      if (!searchQuery.trim() || !hashtag || !user) {
-        setSearchResults([]);
-        setIsSearching(false);
-        return;
-      }
+  // Enhanced search within hashtag posts with filters
+  const handleSearch = async (query: string, filters: SearchFilters) => {
+    if (!query.trim() || !hashtag || !user) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
 
-      setIsSearching(true);
-      try {
-        const rawResults = await searchWithinHashtag(hashtag, searchQuery);
-        const processedResults = await processPosts(rawResults, user.id);
-        setSearchResults(processedResults);
-      } catch (err) {
-        console.error('Error searching within hashtag:', err);
-      } finally {
-        setIsSearching(false);
-      }
-    };
+    setIsSearching(true);
+    setSearchFilters(filters);
+    try {
+      const rawResults = await searchWithinHashtag(hashtag, query, filters);
+      const processedResults = await processPosts(rawResults, user.id);
+      setSearchResults(processedResults);
+    } catch (err) {
+      console.error('Error searching within hashtag:', err);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
-    const debounceTimer = setTimeout(performSearch, 300);
-    return () => clearTimeout(debounceTimer);
-  }, [searchQuery, hashtag, user]);
+  const handleNavigateToGlobalSearch = (query: string) => {
+    const encodedQuery = encodeURIComponent(query.trim());
+    navigate(`/search?q=${encodedQuery}&hashtag=${hashtag}`);
+  };
 
   const refreshFeed = async () => {
     // Re-fetch posts when needed
@@ -135,12 +143,6 @@ const TagPage = () => {
 
   const displayedPosts = searchQuery.trim() ? searchResults : posts;
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && searchQuery.trim()) {
-      const encodedQuery = encodeURIComponent(searchQuery.trim());
-      navigate(`/search?q=${encodedQuery}&hashtag=${hashtag}`);
-    }
-  };
 
   const getInitialActiveTab = () => {
     return 'Explore';
@@ -288,40 +290,16 @@ const TagPage = () => {
             </div>
           )}
 
-          {/* Enhanced Search within hashtag - Matching Explore page style */}
-          <div className="relative mb-6 overflow-visible">
-            <div className="flex items-center border rounded-lg overflow-hidden bg-background min-w-0">
-              <div className="pl-3 text-muted-foreground shrink-0">
-                <Search size={18} />
-              </div>
-              <Input
-                type="text"
-                placeholder={`Search within #${originalHashtag}...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0"
-              />
-              {searchQuery && (
-                <Button 
-                  variant="default" 
-                  size="sm"
-                  className="mr-1 bg-brand-orange hover:bg-brand-orange/90 shrink-0 max-[500px]:text-xs max-[500px]:px-2"
-                  onClick={() => {
-                    const encodedQuery = encodeURIComponent(searchQuery.trim());
-                    navigate(`/search?q=${encodedQuery}&hashtag=${hashtag}`);
-                  }}
-                >
-                  <span className="max-[400px]:hidden">Search More</span>
-                  <span className="min-[401px]:hidden">More</span>
-                </Button>
-              )}
-              {isSearching && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </div>
-              )}
-            </div>
+          {/* Enhanced Search Component */}
+          <div className="mb-6">
+            <EnhancedHashtagSearch
+              hashtag={originalHashtag}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              onSearch={handleSearch}
+              isSearching={isSearching}
+              onNavigateToGlobalSearch={handleNavigateToGlobalSearch}
+            />
           </div>
 
           {/* Related hashtags */}

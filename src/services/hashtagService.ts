@@ -767,16 +767,36 @@ export const searchHashtagsPartial = async (query: string, limit = 10): Promise<
 };
 
 /**
- * Search within hashtag posts
+ * Enhanced search within hashtag posts with filters and suggestions
+ */
+export interface SearchFilters {
+  dateRange: 'all' | 'day' | 'week' | 'month';
+  postType: 'all' | 'text' | 'media' | 'discussion';
+  sortBy: 'recent' | 'popular' | 'engagement';
+}
+
+/**
+ * Search within hashtag posts with enhanced filtering
  * @param hashtag - The hashtag to search within
  * @param query - Search query for post content
+ * @param filters - Search filters for refinement
  * @param limit - Maximum number of results
  */
-export const searchWithinHashtag = async (hashtag: string, query: string, limit = 20) => {
-  console.log(`🔍 [SearchWithinHashtag] Searching for "${query}" within hashtag #${hashtag}`);
+export const searchWithinHashtag = async (
+  hashtag: string, 
+  query: string, 
+  filters: SearchFilters = {
+    dateRange: 'all',
+    postType: 'all',
+    sortBy: 'recent'
+  },
+  limit = 50
+) => {
+  console.log(`🔍 [Enhanced SearchWithinHashtag] Searching for "${query}" within hashtag #${hashtag} with filters:`, filters);
   
   try {
-    const { data, error } = await supabase
+    // Build base query
+    let baseQuery = supabase
       .from('posts')
       .select(`
         *,
@@ -784,20 +804,101 @@ export const searchWithinHashtag = async (hashtag: string, query: string, limit 
           id,
           username, 
           avatar_url
-        )
+        ),
+        post_likes(count),
+        post_comments(count)
       `)
-      .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
-      .or(`content.ilike.%${query}%,title.ilike.%${query}%`)
       .eq('is_deleted', false)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+      .eq('visibility', 'public');
+
+    // Apply hashtag and content filters
+    baseQuery = baseQuery
+      .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
+      .or(`content.ilike.%${query}%,title.ilike.%${query}%`);
+
+    // Apply date range filter
+    if (filters.dateRange !== 'all') {
+      const dateThreshold = new Date();
+      switch (filters.dateRange) {
+        case 'day':
+          dateThreshold.setDate(dateThreshold.getDate() - 1);
+          break;
+        case 'week':
+          dateThreshold.setDate(dateThreshold.getDate() - 7);
+          break;
+        case 'month':
+          dateThreshold.setMonth(dateThreshold.getMonth() - 1);
+          break;
+      }
+      baseQuery = baseQuery.gte('created_at', dateThreshold.toISOString());
+    }
+
+    // Apply post type filter
+    if (filters.postType !== 'all') {
+      switch (filters.postType) {
+        case 'text':
+          baseQuery = baseQuery.is('media', null);
+          break;
+        case 'media':
+          baseQuery = baseQuery.not('media', 'is', null);
+          break;
+        case 'discussion':
+          // Filter for posts that might be discussions (posts with high comment count or question marks)
+          baseQuery = baseQuery.or('content.ilike.%?%,title.ilike.%?%');
+          break;
+      }
+    }
+
+    // Apply sorting
+    switch (filters.sortBy) {
+      case 'popular':
+        baseQuery = baseQuery.order('view_count', { ascending: false });
+        break;
+      case 'engagement':
+        // Sort by view count as proxy for engagement
+        baseQuery = baseQuery.order('view_count', { ascending: false });
+        break;
+      case 'recent':
+      default:
+        baseQuery = baseQuery.order('created_at', { ascending: false });
+        break;
+    }
+
+    const { data, error } = await baseQuery.limit(limit);
       
     if (error) throw error;
     
-    console.log(`✅ [SearchWithinHashtag] Found ${data?.length || 0} posts matching "${query}" in #${hashtag}`);
+    console.log(`✅ [Enhanced SearchWithinHashtag] Found ${data?.length || 0} posts matching "${query}" in #${hashtag}`);
     return data || [];
   } catch (error) {
-    console.error(`❌ [SearchWithinHashtag] Error searching for "${query}" in #${hashtag}:`, error);
+    console.error(`❌ [Enhanced SearchWithinHashtag] Error searching for "${query}" in #${hashtag}:`, error);
+    return [];
+  }
+};
+
+/**
+ * Get search suggestions for a hashtag based on popular terms
+ * @param hashtag - The hashtag to get suggestions for
+ * @param query - Current search query to filter suggestions
+ */
+export const getHashtagSearchSuggestions = async (hashtag: string, query: string = ''): Promise<string[]> => {
+  try {
+    // Common search terms that work well across hashtags
+    const commonTerms = [
+      'reviews', 'recommendations', 'experience', 'tips', 'opinion', 
+      'best', 'worst', 'amazing', 'terrible', 'great', 'good', 'bad',
+      'price', 'quality', 'worth it', 'compare', 'vs', 'alternatives'
+    ];
+    
+    if (query) {
+      return commonTerms
+        .filter(term => term.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 6);
+    }
+
+    return commonTerms.slice(0, 6);
+  } catch (error) {
+    console.error('Error getting hashtag search suggestions:', error);
     return [];
   }
 };
