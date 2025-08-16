@@ -22,12 +22,19 @@ import { smartPrefetchService } from '@/services/smartPrefetchService';
 import { performanceAnalyticsService } from '@/services/performanceAnalyticsService';
 import { getTrendingHashtags, HashtagWithCount } from '@/services/hashtagService';
 import { TrendingHashtags } from '@/components/hashtag/TrendingHashtags';
+import { getUserRecommendations, RecommendedUser } from '@/services/userRecommendationService';
+import { useFollow } from '@/hooks/use-follow';
+import { ProfileAvatar } from '@/components/common/ProfileAvatar';
+import UsernameLink from '@/components/common/UsernameLink';
+import { UserRecommendationCard } from '@/components/feed/UserRecommendationCard';
 
 const Feed = React.memo(() => {
   const { user, isLoading } = useAuth();
   const { startRender, endRender } = usePerformanceMonitor('Feed');
   const [trendingHashtags, setTrendingHashtags] = useState<HashtagWithCount[]>([]);
   const [hashtagsLoading, setHashtagsLoading] = useState(true);
+  const [recommendedUsers, setRecommendedUsers] = useState<RecommendedUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   
   // Performance optimization
   useMemoryOptimization({
@@ -139,6 +146,26 @@ const Feed = React.memo(() => {
 
     fetchTrendingHashtags();
   }, []);
+
+  // User Recommendations
+  useEffect(() => {
+    const fetchUserRecommendations = async () => {
+      if (!user) return;
+      
+      try {
+        setUsersLoading(true);
+        const users = await getUserRecommendations(user.id, 3);
+        setRecommendedUsers(users);
+      } catch (error) {
+        console.error('Error fetching user recommendations:', error);
+        setRecommendedUsers([]);
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+
+    fetchUserRecommendations();
+  }, [user]);
 
   // Smart Prefetching
   useEffect(() => {
@@ -687,24 +714,25 @@ const Feed = React.memo(() => {
                 {/* Who to Follow */}
                 <div className="bg-background rounded-xl border p-4">
                   <h3 className="font-semibold text-lg mb-3">Who to Follow</h3>
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                            <span className="text-xs">User</span>
-                          </div>
-                          <div>
-                            <div className="font-medium text-sm">User Name {i}</div>
-                            <div className="text-xs text-muted-foreground">@username{i}</div>
-                          </div>
+                  {usersLoading ? (
+                    <div className="space-y-3">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="animate-pulse">
+                          <div className="h-10 bg-muted rounded-lg"></div>
                         </div>
-                        <button className="text-xs bg-primary text-primary-foreground rounded-full px-3 py-1 hover:bg-primary/90 transition-colors">
-                          Follow
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : recommendedUsers.length > 0 ? (
+                    <div className="space-y-3">
+                      {recommendedUsers.map((user) => (
+                        <UserRecommendationCard key={user.id} user={user} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-4">
+                      No recommendations available
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
