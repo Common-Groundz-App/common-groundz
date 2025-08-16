@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { RecommendedUser } from '@/services/userRecommendationService';
+import { RecommendedUser, logUserImpression } from '@/services/userRecommendationService';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import UsernameLink from '@/components/common/UsernameLink';
 import { useFollow } from '@/hooks/use-follow';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UserRecommendationCardProps {
   user: RecommendedUser;
@@ -14,6 +15,7 @@ export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({
   user, 
   onFollowSuccess 
 }) => {
+  const { user: currentUser } = useAuth();
   const { isFollowing, followLoading, handleFollowToggle } = useFollow(user.id);
   const [isHidden, setIsHidden] = useState(false);
 
@@ -23,6 +25,12 @@ export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({
     
     try {
       await handleFollowToggle();
+      
+      // Log impression only after successful follow
+      if (currentUser?.id) {
+        await logUserImpression(currentUser.id, user.id);
+      }
+      
       onFollowSuccess?.();
     } catch (error) {
       // Restore the card if follow failed

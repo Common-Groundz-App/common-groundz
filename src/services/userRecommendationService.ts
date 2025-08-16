@@ -39,11 +39,8 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
         score: user.score
       }));
 
-    // Log impressions for cooldown tracking
-    if (enhancedRecommendations.length > 0) {
-      await logUserImpressions(currentUserId, enhancedRecommendations.map(u => u.id));
-    }
-
+    // Only return recommendations without logging impressions
+    // Impressions will be logged only when user actually follows someone
     return enhancedRecommendations;
   } catch (error) {
     console.error('Error fetching user recommendations:', error);
@@ -83,19 +80,17 @@ const getFallbackRecommendations = async (currentUserId: string, limit: number):
   }
 };
 
-// Log impressions for cooldown tracking
-const logUserImpressions = async (viewerId: string, suggestedUserIds: string[]) => {
+// Log impression for cooldown tracking (only called on follow action)
+export const logUserImpression = async (viewerId: string, suggestedUserId: string) => {
   try {
-    const impressions = suggestedUserIds.map(suggestedId => ({
-      viewer_id: viewerId,
-      suggested_id: suggestedId
-    }));
-
     await supabase
       .from('suggestion_impressions')
-      .insert(impressions);
+      .insert({
+        viewer_id: viewerId,
+        suggested_id: suggestedUserId
+      });
   } catch (error) {
-    console.error('Error logging impressions:', error);
+    console.error('Error logging impression:', error);
     // Don't throw - this is non-critical
   }
 };
