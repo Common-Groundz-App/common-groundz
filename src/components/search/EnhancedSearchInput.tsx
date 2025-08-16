@@ -44,8 +44,10 @@ export function EnhancedSearchInput({
   };
 
   const handleComplexProductSearch = () => {
-    navigate(`/explore?q=${encodeURIComponent(searchQuery)}`);
-    setSearchQuery('');
+    if (searchQuery.trim().length >= 2) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}&mode=quick`);
+      setSearchQuery('');
+    }
   };
 
   const handleResultClick = useCallback((entityId?: string, entityType?: string) => {
