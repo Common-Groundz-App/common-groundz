@@ -2266,6 +2266,30 @@ export type Database = {
         }
         Relationships: []
       }
+      suggestion_impressions: {
+        Row: {
+          created_at: string
+          id: string
+          seen_at: string
+          suggested_id: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          seen_at?: string
+          suggested_id: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          seen_at?: string
+          suggested_id?: string
+          viewer_id?: string
+        }
+        Relationships: []
+      }
       user_activity_patterns: {
         Row: {
           activity_score: number | null
@@ -2700,6 +2724,20 @@ export type Database = {
         Args: { p_review_ids: string[]; p_user_id: string }
         Returns: {
           review_id: string
+        }[]
+      }
+      get_who_to_follow: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          activity_count: number
+          avatar_url: string
+          id: string
+          mutuals: number
+          profile_quality: number
+          reason: string
+          score: number
+          source: string
+          username: string
         }[]
       }
       increment_comment_count: {

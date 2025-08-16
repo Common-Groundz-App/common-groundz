@@ -7,54 +7,64 @@ export interface RecommendedUser {
   displayName?: string;
   initials?: string;
   isFollowing?: boolean;
+  reason?: string;
+  source?: string;
+  score?: number;
 }
 
 export const getUserRecommendations = async (currentUserId?: string, limit: number = 5): Promise<RecommendedUser[]> => {
   if (!currentUserId) return [];
 
   try {
-    // Get users that the current user is already following
-    const { data: followingData } = await supabase
-      .from('follows')
-      .select('following_id')
-      .eq('follower_id', currentUserId);
-
-    const followingIds = followingData?.map(f => f.following_id) || [];
-
-    // Build the query to exclude current user and already followed users
-    let query = supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .neq('id', currentUserId)
-      .not('username', 'is', null) // Only users with usernames
-      .limit(limit * 2); // Get more to account for filtering
-
-    // Exclude users already being followed
-    if (followingIds.length > 0) {
-      query = query.not('id', 'in', `(${followingIds.join(',')})`);
-    }
-
-    const { data: users, error } = await query;
+    // Call the enhanced RPC function
+    const { data: recommendations, error } = await supabase
+      .rpc('get_who_to_follow', {
+        p_user_id: currentUserId,
+        p_limit: limit
+      });
 
     if (error) throw error;
 
     // Transform the data and add display properties
-    const recommendations: RecommendedUser[] = (users || [])
-      .filter(user => user.username) // Additional filter for safety
-      .slice(0, limit)
+    const enhancedRecommendations: RecommendedUser[] = (recommendations || [])
       .map(user => ({
         id: user.id,
         username: user.username,
         avatar_url: user.avatar_url,
         displayName: user.username || 'Anonymous User',
         initials: getInitials(user.username),
-        isFollowing: false
+        isFollowing: false,
+        reason: user.reason,
+        source: user.source,
+        score: user.score
       }));
 
-    return recommendations;
+    // Log impressions for cooldown tracking
+    if (enhancedRecommendations.length > 0) {
+      await logUserImpressions(currentUserId, enhancedRecommendations.map(u => u.id));
+    }
+
+    return enhancedRecommendations;
   } catch (error) {
     console.error('Error fetching user recommendations:', error);
     return [];
+  }
+};
+
+// Log impressions for cooldown tracking
+const logUserImpressions = async (viewerId: string, suggestedUserIds: string[]) => {
+  try {
+    const impressions = suggestedUserIds.map(suggestedId => ({
+      viewer_id: viewerId,
+      suggested_id: suggestedId
+    }));
+
+    await supabase
+      .from('suggestion_impressions')
+      .insert(impressions);
+  } catch (error) {
+    console.error('Error logging impressions:', error);
+    // Don't throw - this is non-critical
   }
 };
 
