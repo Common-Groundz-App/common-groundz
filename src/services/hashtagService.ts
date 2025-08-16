@@ -668,35 +668,81 @@ export const getRelatedHashtags = async (hashtag: string, limit = 10): Promise<H
   try {
     const normalizedHashtag = hashtag.toLowerCase();
     
-    // Get hashtags that frequently appear with the current hashtag
-    const { data: relatedData } = await supabase
+    // Get all hashtags except the current one
+    const { data: allHashtags } = await supabase
       .from('hashtags')
-      .select(`
-        id,
-        name_original,
-        name_norm,
-        created_at,
-        post_hashtags!inner(
-          post_id,
-          posts!inner(id)
-        )
-      `)
+      .select('id, name_original, name_norm, created_at')
       .neq('name_norm', normalizedHashtag)
-      .limit(limit);
+      .limit(limit * 2); // Get more to allow for proper sorting
 
-    if (!relatedData) return [];
+    if (!allHashtags) return [];
 
-    // Convert to HashtagWithCount format
-    const related: HashtagWithCount[] = relatedData.map(hashtag => ({
-      id: hashtag.id,
-      name_original: hashtag.name_original,
-      name_norm: hashtag.name_norm,
-      created_at: hashtag.created_at,
-      post_count: hashtag.post_hashtags?.length || 0
-    }));
+    // Calculate accurate post counts using hybrid approach for each hashtag
+    const hashtagsWithCounts: HashtagWithCount[] = await Promise.all(
+      allHashtags.map(async (hashtagItem) => {
+        let allPosts: any[] = [];
+        
+        // Step 1: Get posts via relationship table
+        const { data: postHashtagData } = await supabase
+          .from('post_hashtags')
+          .select('post_id')
+          .eq('hashtag_id', hashtagItem.id);
+          
+        if (postHashtagData && postHashtagData.length > 0) {
+          const postIds = postHashtagData.map(ph => ph.post_id);
+          
+          const { data: relationshipPosts } = await supabase
+            .from('posts')
+            .select('id')
+            .eq('is_deleted', false)
+            .eq('visibility', 'public')
+            .in('id', postIds);
+            
+          if (relationshipPosts) {
+            allPosts.push(...relationshipPosts);
+          }
+        }
+        
+        // Step 2: Get posts via content search (supplement)
+        const { data: contentPosts } = await supabase
+          .from('posts')
+          .select('id')
+          .or(`content.ilike.%#${hashtagItem.name_norm}%,title.ilike.%#${hashtagItem.name_norm}%`)
+          .eq('is_deleted', false)
+          .eq('visibility', 'public');
+          
+        // Step 3: Combine and deduplicate
+        const postsMap = new Map();
+        
+        // Add relationship posts first (higher priority)
+        allPosts.forEach(post => {
+          postsMap.set(post.id, post);
+        });
+        
+        // Add content search posts if not already present
+        if (contentPosts) {
+          contentPosts.forEach(post => {
+            if (!postsMap.has(post.id)) {
+              postsMap.set(post.id, post);
+            }
+          });
+        }
+        
+        const totalPosts = postsMap.size;
+        
+        return {
+          id: hashtagItem.id,
+          name_original: hashtagItem.name_original,
+          name_norm: hashtagItem.name_norm,
+          created_at: hashtagItem.created_at,
+          post_count: totalPosts
+        };
+      })
+    );
 
-    // Sort by post count and return
-    return related
+    // Sort by post count and return top results
+    return hashtagsWithCounts
+      .filter(h => h.post_count > 0) // Only show hashtags with posts
       .sort((a, b) => b.post_count - a.post_count)
       .slice(0, limit);
   } catch (error) {
