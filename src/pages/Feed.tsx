@@ -20,10 +20,14 @@ import { checkForNewContent, getLastRefreshTime, setLastRefreshTime, NewContentC
 import { feedbackActions } from '@/services/feedbackService';
 import { smartPrefetchService } from '@/services/smartPrefetchService';
 import { performanceAnalyticsService } from '@/services/performanceAnalyticsService';
+import { getTrendingHashtags, HashtagWithCount } from '@/services/hashtagService';
+import { TrendingHashtags } from '@/components/hashtag/TrendingHashtags';
 
 const Feed = React.memo(() => {
   const { user, isLoading } = useAuth();
   const { startRender, endRender } = usePerformanceMonitor('Feed');
+  const [trendingHashtags, setTrendingHashtags] = useState<HashtagWithCount[]>([]);
+  const [hashtagsLoading, setHashtagsLoading] = useState(true);
   
   // Performance optimization
   useMemoryOptimization({
@@ -117,6 +121,24 @@ const Feed = React.memo(() => {
       };
     }
   }, [user, activeTab]);
+
+  // Trending Hashtags
+  useEffect(() => {
+    const fetchTrendingHashtags = async () => {
+      try {
+        setHashtagsLoading(true);
+        const hashtags = await getTrendingHashtags(5);
+        setTrendingHashtags(hashtags);
+      } catch (error) {
+        console.error('Error fetching trending hashtags:', error);
+        setTrendingHashtags([]);
+      } finally {
+        setHashtagsLoading(false);
+      }
+    };
+
+    fetchTrendingHashtags();
+  }, []);
 
   // Smart Prefetching
   useEffect(() => {
@@ -632,17 +654,34 @@ const Feed = React.memo(() => {
                 {/* Trending Topics */}
                 <div className="bg-background rounded-xl border p-4">
                   <h3 className="font-semibold text-lg mb-3">Trending Topics</h3>
-                  <div className="space-y-3">
-                    {["Photography", "Technology", "Travel", "Art", "Food"].map((topic, i) => (
-                      <div key={topic} className="flex justify-between items-center group cursor-pointer hover:bg-accent/20 -mx-2 px-2 py-1 rounded-md">
-                        <div>
-                          <div className="text-xs text-muted-foreground">Trending #{i + 1}</div>
-                          <div className="font-medium">{topic}</div>
-                          <div className="text-xs text-muted-foreground">{200 - i * 30}+ posts</div>
+                  {hashtagsLoading ? (
+                    <div className="space-y-3">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="animate-pulse">
+                          <div className="h-12 bg-muted rounded-lg"></div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : trendingHashtags.length > 0 ? (
+                    <TrendingHashtags 
+                      hashtags={trendingHashtags}
+                      displayMode="compact"
+                      limit={5}
+                      showGrowth={false}
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {["Food", "Tech", "Travel", "Books", "Movies"].map((topic, i) => (
+                        <div key={topic} className="flex justify-between items-center group cursor-pointer hover:bg-accent/20 -mx-2 px-2 py-1 rounded-md">
+                          <div>
+                            <div className="text-xs text-muted-foreground">Popular #{i + 1}</div>
+                            <div className="font-medium">{topic}</div>
+                            <div className="text-xs text-muted-foreground">Category</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Who to Follow */}
