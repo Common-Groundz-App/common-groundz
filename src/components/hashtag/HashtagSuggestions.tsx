@@ -25,23 +25,30 @@ export const HashtagSuggestions: React.FC<HashtagSuggestionsProps> = ({
     const fetchRelatedHashtags = async () => {
       setLoading(true);
       try {
-        // Mock related hashtags based on co-occurrence patterns
-        // In production, this would query the database for hashtags that frequently appear together
-        const mockRelated: HashtagWithCount[] = [
-          { id: '1', name_original: 'Photography', name_norm: 'photography', post_count: 234, created_at: new Date().toISOString() },
-          { id: '2', name_original: 'PhotoOfTheDay', name_norm: 'photooftheday', post_count: 189, created_at: new Date().toISOString() },
-          { id: '3', name_original: 'NaturePhotography', name_norm: 'naturephotography', post_count: 156, created_at: new Date().toISOString() },
-          { id: '4', name_original: 'PortraitPhotography', name_norm: 'portraitphotography', post_count: 143, created_at: new Date().toISOString() },
-          { id: '5', name_original: 'StreetPhotography', name_norm: 'streetphotography', post_count: 132, created_at: new Date().toISOString() },
-          { id: '6', name_original: 'LandscapePhotography', name_norm: 'landscapephotography', post_count: 128, created_at: new Date().toISOString() },
-        ].filter(tag => tag.name_norm !== currentHashtag.toLowerCase());
-
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const { getRelatedHashtags, getTrendingHashtags } = await import('@/services/hashtagService');
         
-        setRelatedHashtags(mockRelated.slice(0, limit));
+        // Try to get related hashtags first
+        let related = await getRelatedHashtags(currentHashtag, limit * 2);
+        
+        // Filter out the current hashtag
+        related = related.filter(tag => tag.name_norm !== currentHashtag.toLowerCase());
+        
+        // If we don't have enough related hashtags, supplement with trending ones
+        if (related.length < limit) {
+          const trending = await getTrendingHashtags(limit * 2);
+          const filteredTrending = trending.filter(tag => 
+            tag.name_norm !== currentHashtag.toLowerCase() &&
+            !related.some(r => r.name_norm === tag.name_norm)
+          );
+          
+          // Combine related and trending, up to the limit
+          related = [...related, ...filteredTrending].slice(0, limit);
+        }
+        
+        setRelatedHashtags(related);
       } catch (error) {
         console.error('Error fetching related hashtags:', error);
+        setRelatedHashtags([]);
       } finally {
         setLoading(false);
       }
