@@ -16,7 +16,7 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
   if (!currentUserId) return [];
 
   try {
-    // Call the enhanced RPC function with new signature
+    // Call the enhanced RPC function
     const { data: recommendations, error } = await supabase
       .rpc('get_who_to_follow', {
         p_user_id: currentUserId,
@@ -28,7 +28,7 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
     // Transform the data and add display properties
     const enhancedRecommendations: RecommendedUser[] = (recommendations || [])
       .map(user => ({
-        id: user.user_id, // Updated field name
+        id: user.id,
         username: user.username,
         avatar_url: user.avatar_url,
         displayName: user.username || 'Anonymous User',
@@ -47,38 +47,6 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
     return enhancedRecommendations;
   } catch (error) {
     console.error('Error fetching user recommendations:', error);
-    
-    // Fallback: return simple user suggestions when RPC fails
-    return getFallbackRecommendations(currentUserId, limit);
-  }
-};
-
-// Fallback function for when RPC fails
-const getFallbackRecommendations = async (currentUserId: string, limit: number): Promise<RecommendedUser[]> => {
-  try {
-    const { data: users, error } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url, created_at')
-      .neq('id', currentUserId)
-      .not('username', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-
-    return (users || []).map(user => ({
-      id: user.id,
-      username: user.username,
-      avatar_url: user.avatar_url,
-      displayName: user.username || 'Anonymous User',
-      initials: getInitials(user.username),
-      isFollowing: false,
-      reason: 'Suggested for you',
-      source: 'fallback',
-      score: 0.5
-    }));
-  } catch (fallbackError) {
-    console.error('Fallback recommendations failed:', fallbackError);
     return [];
   }
 };

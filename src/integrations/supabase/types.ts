@@ -2731,12 +2731,12 @@ export type Database = {
         Returns: {
           activity_count: number
           avatar_url: string
+          id: string
           mutuals: number
           profile_quality: number
           reason: string
           score: number
           source: string
-          user_id: string
           username: string
         }[]
       }
