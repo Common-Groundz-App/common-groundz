@@ -143,7 +143,7 @@ const TagPage = () => {
   };
 
   const getInitialActiveTab = () => {
-    return 'Hashtags';
+    return 'Explore';
   };
 
   if (loading) {

@@ -547,7 +547,7 @@ const Search = () => {
         {/* Desktop Sidebar - only show on xl+ screens */}
         <div className="hidden xl:block">
           <VerticalTubelightNavbar 
-            initialActiveTab="Search"
+            initialActiveTab="Explore"
             className="fixed left-0 top-0 h-screen pt-4" 
           />
         </div>
