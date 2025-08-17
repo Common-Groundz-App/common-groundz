@@ -778,14 +778,7 @@ export const searchWithinHashtag = async (hashtag: string, query: string, limit 
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select(`
-        *,
-        profiles!user_id (
-          id,
-          username, 
-          avatar_url
-        )
-      `)
+      .select(POST_SELECT)
       .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
       .or(`content.ilike.%${query}%,title.ilike.%${query}%`)
       .eq('is_deleted', false)
