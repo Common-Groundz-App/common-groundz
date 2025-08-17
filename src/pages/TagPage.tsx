@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostFeedItem } from '@/components/feed/PostFeedItem';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
 import { HashtagSuggestions } from '@/components/hashtag/HashtagSuggestions';
+import { EnhancedHashtagSearchResults } from '@/components/hashtag/EnhancedHashtagSearchResults';
 import { useAuth } from '@/contexts/AuthContext';
 import { processPosts } from '@/hooks/feed/api/posts';
 import { getHashtagAnalytics, getPostsByHashtag, searchWithinHashtag, HashtagAnalytics } from '@/services/hashtagService';
@@ -35,6 +36,7 @@ const TagPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PostItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [showEnhancedSearch, setShowEnhancedSearch] = useState(false);
 
   // Enhanced data fetching with error boundaries and sequential loading
   useEffect(() => {
@@ -137,8 +139,13 @@ const TagPage = () => {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
-      const encodedQuery = encodeURIComponent(searchQuery.trim());
-      navigate(`/search?q=${encodedQuery}&hashtag=${hashtag}`);
+      setShowEnhancedSearch(true);
+    }
+  };
+
+  const handleSearchMore = () => {
+    if (searchQuery.trim()) {
+      setShowEnhancedSearch(true);
     }
   };
 
@@ -307,10 +314,7 @@ const TagPage = () => {
                   variant="default" 
                   size="sm"
                   className="mr-1 bg-brand-orange hover:bg-brand-orange/90 shrink-0 max-[500px]:text-xs max-[500px]:px-2"
-                  onClick={() => {
-                    const encodedQuery = encodeURIComponent(searchQuery.trim());
-                    navigate(`/search?q=${encodedQuery}&hashtag=${hashtag}`);
-                  }}
+                  onClick={handleSearchMore}
                 >
                   <span className="max-[400px]:hidden">Search More</span>
                   <span className="min-[401px]:hidden">More</span>
@@ -416,6 +420,15 @@ const TagPage = () => {
       <div className="xl:hidden">
         <BottomNavigation />
       </div>
+
+      {/* Enhanced Search Results Modal */}
+      <EnhancedHashtagSearchResults
+        isOpen={showEnhancedSearch}
+        onClose={() => setShowEnhancedSearch(false)}
+        hashtag={originalHashtag}
+        initialQuery={searchQuery}
+        onPostsUpdate={refreshFeed}
+      />
     </div>
   );
 };

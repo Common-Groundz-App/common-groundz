@@ -772,18 +772,25 @@ export const searchHashtagsPartial = async (query: string, limit = 10): Promise<
  * @param query - Search query for post content
  * @param limit - Maximum number of results
  */
-export const searchWithinHashtag = async (hashtag: string, query: string, limit = 20) => {
-  console.log(`🔍 [SearchWithinHashtag] Searching for "${query}" within hashtag #${hashtag}`);
+export const searchWithinHashtag = async (hashtag: string, query: string, sortBy: 'recent' | 'popular' = 'recent', limit = 20) => {
+  console.log(`🔍 [SearchWithinHashtag] Searching for "${query}" within hashtag #${hashtag} (sort: ${sortBy})`);
   
   try {
-    const { data, error } = await supabase
+    let queryBuilder = supabase
       .from('posts')
       .select(POST_SELECT)
       .or(`content.ilike.%#${hashtag}%,title.ilike.%#${hashtag}%`)
       .or(`content.ilike.%${query}%,title.ilike.%${query}%`)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+      .eq('is_deleted', false);
+
+    // Apply sorting
+    if (sortBy === 'popular') {
+      queryBuilder = queryBuilder.order('engagement_count', { ascending: false });
+    } else {
+      queryBuilder = queryBuilder.order('created_at', { ascending: false });
+    }
+
+    const { data, error } = await queryBuilder.limit(limit);
       
     if (error) throw error;
     
