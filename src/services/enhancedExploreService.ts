@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getEntityStats } from '@/services/entityService';
 
 export interface PersonalizedEntity {
   id: string;
@@ -35,6 +36,31 @@ export interface ActivityPattern {
 
 // Enhanced service for personalized entity recommendations
 export class EnhancedExploreService {
+  
+  // Enrich entities with rating and review data
+  private async enrichWithRatingData(entities: any[]): Promise<PersonalizedEntity[]> {
+    try {
+      // Batch fetch rating data for all entities
+      const ratingPromises = entities.map(async (entity) => {
+        const stats = await getEntityStats(entity.id);
+        return {
+          ...entity,
+          averageRating: stats.averageRating,
+          reviewCount: stats.reviewCount + stats.recommendationCount // Total review count
+        };
+      });
+
+      return await Promise.all(ratingPromises);
+    } catch (error) {
+      console.error('Error enriching entities with rating data:', error);
+      // Return entities without rating data if enrichment fails
+      return entities.map(entity => ({
+        ...entity,
+        averageRating: undefined,
+        reviewCount: 0
+      }));
+    }
+  }
   
   // Track user interactions with enhanced pattern analysis
   async trackUserInteraction(
@@ -294,7 +320,10 @@ export class EnhancedExploreService {
       // Apply diversity injection to prevent same type domination
       const diverseEntities = this.injectDiversity(scoredEntities, limit);
       
-      return diverseEntities
+      // Enrich with rating data before returning
+      const enrichedEntities = await this.enrichWithRatingData(diverseEntities);
+      
+      return enrichedEntities
         .sort((a, b) => (b.personalization_score || 0) - (a.personalization_score || 0))
         .slice(0, limit);
 
@@ -425,10 +454,13 @@ export class EnhancedExploreService {
 
       if (!entities) return [];
 
-      return entities.map(entity => ({
+      const entitiesWithReason = entities.map(entity => ({
         ...entity,
         reason: entity.view_velocity > 5 ? 'Rapidly trending' : 'Trending this week'
       }));
+
+      // Enrich with rating data
+      return await this.enrichWithRatingData(entitiesWithReason);
     } catch (error) {
       console.error('Error getting trending entities:', error);
       return [];
@@ -465,11 +497,14 @@ export class EnhancedExploreService {
         })
         .slice(0, limit);
 
-      return hiddenGems.map(entity => ({
+      const hiddenGemsWithReason = hiddenGems.map(entity => ({
         ...entity,
         is_hidden_gem: true,
         reason: 'Hidden gem - highly rated'
       }));
+
+      // Enrich with rating data
+      return await this.enrichWithRatingData(hiddenGemsWithReason);
     } catch (error) {
       console.error('Error getting hidden gems:', error);
       return [];
@@ -523,10 +558,15 @@ export class EnhancedExploreService {
         .order('popularity_score', { ascending: false })
         .limit(limit);
 
-      return entities?.map(entity => ({
+      if (!entities) return [];
+
+      const entitiesWithReason = entities.map(entity => ({
         ...entity,
         reason: 'Popular choice'
-      })) || [];
+      }));
+
+      // Enrich with rating data
+      return await this.enrichWithRatingData(entitiesWithReason);
     } catch (error) {
       console.error('Error getting popular entities:', error);
       return [];
