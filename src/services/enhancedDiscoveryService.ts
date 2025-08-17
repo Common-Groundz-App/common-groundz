@@ -5,8 +5,34 @@ import { advancedPersonalizationService, PersonalizationContext } from './advanc
 import { collaborativeFilteringService } from './collaborativeFilteringService';
 import { socialIntelligenceService } from './socialIntelligenceService';
 import { PersonalizedEntity } from './enhancedExploreService';
+import { getEntityStats } from '@/services/entityService';
 
 export class EnhancedDiscoveryService {
+
+  // Enrich entities with rating and review data
+  private async enrichWithRatingData(entities: any[]): Promise<PersonalizedEntity[]> {
+    try {
+      // Batch fetch rating data for all entities
+      const ratingPromises = entities.map(async (entity) => {
+        const stats = await getEntityStats(entity.id);
+        return {
+          ...entity,
+          averageRating: stats.averageRating,
+          reviewCount: stats.reviewCount + stats.recommendationCount // Total review count
+        };
+      });
+
+      return await Promise.all(ratingPromises);
+    } catch (error) {
+      console.error('Error enriching entities with rating data:', error);
+      // Return entities without rating data if enrichment fails
+      return entities.map(entity => ({
+        ...entity,
+        averageRating: undefined,
+        reviewCount: 0
+      }));
+    }
+  }
 
   // Get enhanced discovery collections with advanced algorithms
   async getEnhancedDiscoveryCollections(userId?: string): Promise<DiscoveryCollection[]> {
@@ -43,9 +69,10 @@ export class EnhancedDiscoveryService {
 
       // Add collaborative filtering collection if we have recommendations
       if (collaborativeRecs.length > 0) {
+        const enrichedCollaborativeRecs = await this.enrichWithRatingData(collaborativeRecs);
         enhancedCollections.unshift({
           title: 'Because You Liked',
-          entities: collaborativeRecs.map(rec => ({
+          entities: enrichedCollaborativeRecs.map(rec => ({
             ...rec,
             reason: rec.reason || 'Users like you also enjoyed this'
           })),
@@ -56,9 +83,10 @@ export class EnhancedDiscoveryService {
 
       // Add social intelligence collection
       if (socialRecs.length > 0) {
+        const enrichedSocialRecs = await this.enrichWithRatingData(socialRecs);
         enhancedCollections.unshift({
           title: 'Your Network Loves',
-          entities: socialRecs.map(rec => ({
+          entities: enrichedSocialRecs.map(rec => ({
             ...rec,
             reason: rec.reason || 'Popular in your extended network'
           })),
@@ -69,9 +97,10 @@ export class EnhancedDiscoveryService {
 
       // Add influencer recommendations
       if (influencerRecs.length > 0) {
+        const enrichedInfluencerRecs = await this.enrichWithRatingData(influencerRecs);
         enhancedCollections.unshift({
           title: 'Influencer Picks',
-          entities: influencerRecs.map(rec => ({
+          entities: enrichedInfluencerRecs.map(rec => ({
             ...rec,
             reason: rec.reason || 'Recommended by trusted reviewers'
           })),
@@ -80,13 +109,16 @@ export class EnhancedDiscoveryService {
         });
       }
 
-      // Enhance existing collections with better explanations
-      enhancedCollections.forEach(collection => {
-        collection.entities = collection.entities.map(entity => ({
-          ...entity,
-          reason: this.enhanceReasonWithConfidence(entity.reason, entity.personalization_score)
-        }));
-      });
+      // Enhance existing collections with better explanations and rating data
+      for (const collection of enhancedCollections) {
+        if (collection.entities && collection.entities.length > 0) {
+          const enrichedEntities = await this.enrichWithRatingData(collection.entities);
+          collection.entities = enrichedEntities.map(entity => ({
+            ...entity,
+            reason: this.enhanceReasonWithConfidence(entity.reason, entity.personalization_score)
+          }));
+        }
+      }
 
       return enhancedCollections;
 
@@ -114,11 +146,13 @@ export class EnhancedDiscoveryService {
         limit
       );
 
-      // Convert to PersonalizedEntity format with enhanced reasons
-      return advancedRecs.map(rec => ({
+      // Convert to PersonalizedEntity format with enhanced reasons and enrich with rating data
+      const entitiesWithReasons = advancedRecs.map(rec => ({
         ...rec,
         reason: this.generateSmartReason(rec.algorithm, rec.confidenceScore, rec.explanation)
       }));
+
+      return await this.enrichWithRatingData(entitiesWithReasons);
 
     } catch (error) {
       console.error('Error getting smart for you recommendations:', error);
@@ -159,9 +193,12 @@ export class EnhancedDiscoveryService {
         };
       }).filter(Boolean) as PersonalizedEntity[];
 
-      return qualityEnhanced
+      const sortedEntities = qualityEnhanced
         .sort((a, b) => (b.personalization_score || 0) - (a.personalization_score || 0))
         .slice(0, limit);
+
+      // Enrich with rating data before returning
+      return await this.enrichWithRatingData(sortedEntities);
 
     } catch (error) {
       console.error('Error getting quality new this week:', error);
