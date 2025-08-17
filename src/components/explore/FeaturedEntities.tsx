@@ -10,7 +10,6 @@ import { useEnhancedExplore } from '@/hooks/use-enhanced-explore';
 import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { useAuth } from '@/contexts/AuthContext';
-import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 export const FeaturedEntities = () => {
   const navigate = useNavigate();
@@ -173,32 +172,15 @@ export const FeaturedEntities = () => {
               {entity.venue && (
                 <p className="text-sm text-muted-foreground truncate">{entity.venue}</p>
               )}
-              {entity.hasReviews ? (
-                <div className="flex items-center mt-2 gap-2">
-                  <ConnectedRingsRating
-                    value={entity.averageRating || 0}
-                    variant="badge"
-                    size="sm"
-                    minimal={true}
-                    showValue={false}
-                    className="flex-shrink-0"
-                  />
-                  <span className="text-sm font-medium">{entity.averageRating?.toFixed(1)}</span>
-                  <span className="text-xs text-muted-foreground">
-                    ({entity.reviewCount} reviews)
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center mt-2 gap-2">
-                  <ConnectedRingsRating
-                    value={0}
-                    variant="badge"
-                    size="sm"
-                    minimal={true}
-                    showValue={false}
-                    className="flex-shrink-0"
-                  />
-                  <span className="text-xs text-muted-foreground">No ratings yet</span>
+              {entity.metadata?.rating && (
+                <div className="flex items-center mt-2">
+                  <StarIcon className="h-4 w-4 text-yellow-400 mr-1" />
+                  <span className="text-sm font-medium">{entity.metadata.rating}</span>
+                  {entity.metadata.user_ratings_total && (
+                    <span className="text-xs text-muted-foreground ml-1">
+                      ({entity.metadata.user_ratings_total})
+                    </span>
+                  )}
                 </div>
               )}
               {entity.personalization_score && entity.personalization_score > 10 && (
