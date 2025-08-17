@@ -82,14 +82,14 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
     return (
       <div className="bg-white">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-96">
+          <div className="grid grid-cols-2 gap-2 h-auto">
             {/* Main Image Skeleton */}
-            <div className="lg:col-span-3 bg-muted animate-pulse rounded-lg" />
+            <div className="bg-muted animate-pulse rounded-lg aspect-[4/3]" />
             
-            {/* Side Images Skeleton */}
-            <div className="space-y-4">
-              {[1, 2].map((index) => (
-                <div key={index} className="bg-muted animate-pulse rounded-lg h-44" />
+            {/* Side Images Skeleton - 2x2 Grid */}
+            <div className="grid grid-cols-2 gap-2">
+              {[1, 2, 3, 4].map((index) => (
+                <div key={index} className="bg-muted animate-pulse rounded-lg aspect-[4/3]" />
               ))}
             </div>
           </div>
@@ -103,11 +103,11 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
     return null;
   }
 
-  // Show up to 3 photos in preview (1 main + 2 side)
-  const previewPhotos = photos.slice(0, 3);
+  // Show up to 5 photos in preview (1 main + 4 side)
+  const previewPhotos = photos.slice(0, 5);
   const mainPhoto = previewPhotos[0];
   const sidePhotos = previewPhotos.slice(1);
-  const hasMorePhotos = photos.length > 3;
+  const hasMorePhotos = photos.length > 5;
 
   return (
     <>
@@ -132,9 +132,10 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-96">
-            {/* Main Image */}
-            <div className="lg:col-span-3 relative group cursor-pointer overflow-hidden rounded-lg">
+          {/* Airbnb-style layout */}
+          <div className="grid grid-cols-2 gap-2 h-auto">
+            {/* Main Image - Left Half */}
+            <div className="relative group cursor-pointer overflow-hidden rounded-lg aspect-[4/3]">
               <img
                 src={mainPhoto.url}
                 alt={mainPhoto.alt || entity.name}
@@ -156,21 +157,14 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                   {mainPhoto.source === 'entity_photo' && (mainPhoto.category || 'User Photo')}
                 </span>
               </div>
-
-              {/* More photos indicator */}
-              {hasMorePhotos && (
-                <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm">
-                  +{photos.length - 1} more
-                </div>
-              )}
             </div>
 
-            {/* Side Images */}
-            <div className="space-y-4">
-              {sidePhotos.map((photo, index) => (
+            {/* Right Side - 2x2 Grid */}
+            <div className="grid grid-cols-2 gap-2">
+              {sidePhotos.slice(0, 3).map((photo, index) => (
                 <div 
                   key={index} 
-                  className="relative group cursor-pointer overflow-hidden rounded-lg h-44"
+                  className="relative group cursor-pointer overflow-hidden rounded-lg aspect-[4/3]"
                   onClick={() => handlePhotoClick(index + 1)}
                 >
                   <img
@@ -195,15 +189,39 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                 </div>
               ))}
               
-              {/* Placeholder for consistent layout */}
-              {sidePhotos.length === 1 && (
-                <div className="h-44 border-2 border-dashed border-muted rounded-lg flex items-center justify-center">
-                  <div className="text-center text-muted-foreground">
-                    <Camera className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">More photos in gallery</p>
-                  </div>
+              {/* Last image with "Show all photos" overlay if more photos exist */}
+              {sidePhotos.length >= 3 && (
+                <div 
+                  className="relative group cursor-pointer overflow-hidden rounded-lg aspect-[4/3]"
+                  onClick={handleViewAllClick}
+                >
+                  {sidePhotos[3] && (
+                    <img
+                      src={sidePhotos[3].url}
+                      alt={sidePhotos[3].alt || entity.name}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  {hasMorePhotos && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                      <div className="text-center">
+                        <span className="text-lg font-semibold">+{photos.length - 4}</span>
+                        <p className="text-sm">Show all photos</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+              
+              {/* Fill empty slots with placeholders if needed */}
+              {Array.from({ length: Math.max(0, 4 - sidePhotos.length) }).map((_, index) => (
+                <div 
+                  key={`placeholder-${index}`} 
+                  className="aspect-[4/3] border-2 border-dashed border-muted rounded-lg flex items-center justify-center opacity-50"
+                >
+                  <Camera className="w-6 h-6 text-muted-foreground" />
+                </div>
+              ))}
             </div>
           </div>
         </div>
