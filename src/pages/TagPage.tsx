@@ -11,11 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostFeedItem } from '@/components/feed/PostFeedItem';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
 import { HashtagSuggestions } from '@/components/hashtag/HashtagSuggestions';
-import { EnhancedHashtagSearchResults } from '@/components/hashtag/EnhancedHashtagSearchResults';
 import { useAuth } from '@/contexts/AuthContext';
 import { processPosts } from '@/hooks/feed/api/posts';
 import { getHashtagAnalytics, getPostsByHashtag, searchWithinHashtag, HashtagAnalytics } from '@/services/hashtagService';
-import { Loader2, Hash, TrendingUp, TrendingDown, Users, Calendar, Search, Filter } from 'lucide-react';
+import { useSearchHistory } from '@/hooks/useSearchHistory';
+import { Loader2, Hash, TrendingUp, TrendingDown, Users, Calendar, Search, Filter, X, Clock } from 'lucide-react';
 
 
 const TagPage = () => {
@@ -36,7 +36,10 @@ const TagPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PostItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [showEnhancedSearch, setShowEnhancedSearch] = useState(false);
+  const [showSearchHistory, setShowSearchHistory] = useState(false);
+  
+  // Search history hook
+  const { searchHistory, addToHistory, removeFromHistory } = useSearchHistory(hashtag || '');
 
   // Enhanced data fetching with error boundaries and sequential loading
   useEffect(() => {
@@ -138,15 +141,36 @@ const TagPage = () => {
   const displayedPosts = searchQuery.trim() ? searchResults : posts;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && searchQuery.trim()) {
-      setShowEnhancedSearch(true);
+    if (e.key === 'Enter') {
+      if (searchQuery.trim()) {
+        addToHistory(searchQuery);
+        setShowSearchHistory(false);
+      } else {
+        setSearchQuery('');
+      }
     }
   };
 
-  const handleSearchMore = () => {
-    if (searchQuery.trim()) {
-      setShowEnhancedSearch(true);
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setShowSearchHistory(false);
+  };
+
+  const handleSearchFocus = () => {
+    if (searchHistory.length > 0) {
+      setShowSearchHistory(true);
     }
+  };
+
+  const handleSearchBlur = () => {
+    // Delay hiding to allow clicks on history items
+    setTimeout(() => setShowSearchHistory(false), 200);
+  };
+
+  const handleHistoryItemClick = (query: string) => {
+    setSearchQuery(query);
+    addToHistory(query);
+    setShowSearchHistory(false);
   };
 
   const getInitialActiveTab = () => {
@@ -295,7 +319,7 @@ const TagPage = () => {
             </div>
           )}
 
-          {/* Enhanced Search within hashtag - Matching Explore page style */}
+          {/* Enhanced Search within hashtag */}
           <div className="relative mb-6 overflow-visible">
             <div className="flex items-center border rounded-lg overflow-hidden bg-background min-w-0">
               <div className="pl-3 text-muted-foreground shrink-0">
@@ -307,25 +331,56 @@ const TagPage = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onFocus={handleSearchFocus}
+                onBlur={handleSearchBlur}
                 className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0"
               />
               {searchQuery && (
                 <Button 
-                  variant="default" 
+                  variant="ghost" 
                   size="sm"
-                  className="mr-1 bg-brand-orange hover:bg-brand-orange/90 shrink-0 max-[500px]:text-xs max-[500px]:px-2"
-                  onClick={handleSearchMore}
+                  className="mr-1 shrink-0 h-8 w-8 p-0"
+                  onClick={handleClearSearch}
                 >
-                  <span className="max-[400px]:hidden">Search More</span>
-                  <span className="min-[401px]:hidden">More</span>
+                  <X className="h-4 w-4" />
                 </Button>
               )}
               {isSearching && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="absolute right-12 top-1/2 transform -translate-y-1/2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </div>
               )}
             </div>
+            
+            {/* Search History Dropdown */}
+            {showSearchHistory && searchHistory.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                <div className="p-2 border-b text-xs text-muted-foreground flex items-center gap-2">
+                  <Clock className="h-3 w-3" />
+                  Recent searches
+                </div>
+                {searchHistory.map((item, index) => (
+                  <div
+                    key={index}
+                    className="p-2 hover:bg-muted/50 cursor-pointer flex items-center justify-between group"
+                    onClick={() => handleHistoryItemClick(item.query)}
+                  >
+                    <span className="text-sm">{item.query}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromHistory(item.query);
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Related hashtags */}
@@ -421,14 +476,6 @@ const TagPage = () => {
         <BottomNavigation />
       </div>
 
-      {/* Enhanced Search Results Modal */}
-      <EnhancedHashtagSearchResults
-        isOpen={showEnhancedSearch}
-        onClose={() => setShowEnhancedSearch(false)}
-        hashtag={originalHashtag}
-        initialQuery={searchQuery}
-        onPostsUpdate={refreshFeed}
-      />
     </div>
   );
 };
