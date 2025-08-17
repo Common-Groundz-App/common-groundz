@@ -5,7 +5,9 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
-import { StarIcon, TrendingUp, Clock, Users, Sparkles } from 'lucide-react';
+import { TrendingUp, Clock, Users, Sparkles } from 'lucide-react';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { useEnhancedExplore } from '@/hooks/use-enhanced-explore';
 import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
@@ -172,17 +174,32 @@ export const FeaturedEntities = () => {
               {entity.venue && (
                 <p className="text-sm text-muted-foreground truncate">{entity.venue}</p>
               )}
-              {entity.metadata?.rating && (
-                <div className="flex items-center mt-2">
-                  <StarIcon className="h-4 w-4 text-yellow-400 mr-1" />
-                  <span className="text-sm font-medium">{entity.metadata.rating}</span>
-                  {entity.metadata.user_ratings_total && (
-                    <span className="text-xs text-muted-foreground ml-1">
-                      ({entity.metadata.user_ratings_total})
-                    </span>
+              <div className="flex items-center mt-2">
+                <div className="flex items-center gap-1">
+                  {entity.averageRating && entity.reviewCount > 0 ? (
+                    <>
+                      <RatingRingIcon 
+                        rating={entity.averageRating} 
+                        size={12} 
+                      />
+                      <span className="text-xs font-medium" style={{ color: getSentimentColor(entity.averageRating) }}>
+                        {entity.averageRating.toFixed(1)}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({entity.reviewCount} review{entity.reviewCount !== 1 ? 's' : ''})
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <RatingRingIcon 
+                        rating={0} 
+                        size={12} 
+                      />
+                      <span className="text-xs text-muted-foreground">No ratings yet</span>
+                    </>
                   )}
                 </div>
-              )}
+              </div>
               {entity.personalization_score && entity.personalization_score > 10 && (
                 <div className="mt-2">
                   <Badge variant="outline" className="text-xs">

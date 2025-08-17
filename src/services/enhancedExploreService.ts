@@ -15,6 +15,8 @@ export interface PersonalizedEntity {
   reason?: string;
   geographic_boost?: number;
   seasonal_boost?: number;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 export interface UserInteractionData {

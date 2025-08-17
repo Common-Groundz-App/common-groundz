@@ -5,7 +5,9 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
-import { StarIcon, TrendingUp, Gem, Clock, Users, Sparkles } from 'lucide-react';
+import { TrendingUp, Gem, Clock, Users, Sparkles } from 'lucide-react';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { useEnhancedExplore } from '@/hooks/use-enhanced-explore';
 import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
@@ -125,12 +127,32 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                     {entity.venue && (
                       <p className="text-xs text-muted-foreground truncate">{entity.venue}</p>
                     )}
-                    {entity.metadata?.rating && (
-                      <div className="flex items-center mt-1">
-                        <StarIcon className="h-3 w-3 text-yellow-400 mr-1" />
-                        <span className="text-xs font-medium">{entity.metadata.rating}</span>
+                    <div className="flex items-center mt-1">
+                      <div className="flex items-center gap-1">
+                        {entity.averageRating && entity.reviewCount > 0 ? (
+                          <>
+                            <RatingRingIcon 
+                              rating={entity.averageRating} 
+                              size={10} 
+                            />
+                            <span className="text-xs font-medium" style={{ color: getSentimentColor(entity.averageRating) }}>
+                              {entity.averageRating.toFixed(1)}
+                            </span>
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({entity.reviewCount})
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <RatingRingIcon 
+                              rating={0} 
+                              size={10} 
+                            />
+                            <span className="text-xs text-muted-foreground">No ratings yet</span>
+                          </>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -169,12 +191,32 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                     {entity.venue && (
                       <p className="text-xs text-muted-foreground truncate">{entity.venue}</p>
                     )}
-                    {entity.metadata?.rating && (
-                      <div className="flex items-center mt-1">
-                        <StarIcon className="h-3 w-3 text-yellow-400 mr-1" />
-                        <span className="text-xs font-medium">{entity.metadata.rating}</span>
+                    <div className="flex items-center mt-1">
+                      <div className="flex items-center gap-1">
+                        {entity.averageRating && entity.reviewCount > 0 ? (
+                          <>
+                            <RatingRingIcon 
+                              rating={entity.averageRating} 
+                              size={10} 
+                            />
+                            <span className="text-xs font-medium" style={{ color: getSentimentColor(entity.averageRating) }}>
+                              {entity.averageRating.toFixed(1)}
+                            </span>
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({entity.reviewCount})
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <RatingRingIcon 
+                              rating={0} 
+                              size={10} 
+                            />
+                            <span className="text-xs text-muted-foreground">No ratings yet</span>
+                          </>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -259,12 +301,32 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                   {entity.venue && (
                     <p className="text-xs text-muted-foreground truncate">{entity.venue}</p>
                   )}
-                  {entity.metadata?.rating && (
-                    <div className="flex items-center mt-1">
-                      <StarIcon className="h-3 w-3 text-yellow-400 mr-1" />
-                      <span className="text-xs font-medium">{entity.metadata.rating}</span>
+                  <div className="flex items-center mt-1">
+                    <div className="flex items-center gap-1">
+                      {entity.averageRating && entity.reviewCount > 0 ? (
+                        <>
+                          <RatingRingIcon 
+                            rating={entity.averageRating} 
+                            size={10} 
+                          />
+                          <span className="text-xs font-medium" style={{ color: getSentimentColor(entity.averageRating) }}>
+                            {entity.averageRating.toFixed(1)}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-1">
+                            ({entity.reviewCount})
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <RatingRingIcon 
+                            rating={0} 
+                            size={10} 
+                          />
+                          <span className="text-xs text-muted-foreground">No ratings yet</span>
+                        </>
+                      )}
                     </div>
-                  )}
+                  </div>
                   {entity.reason && (
                     <p className="text-xs text-muted-foreground/80 mt-1 truncate">
                       {entity.reason}
