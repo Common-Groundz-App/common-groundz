@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 
 // Imported extracted components
 import { EntityHeader } from './EntityHeader';
+import { MediaPreviewSection } from './MediaPreviewSection';
 import { TrustSummaryCard } from './TrustSummaryCard';
 import { ReviewsSection } from './ReviewsSection';
 import { EntitySidebar } from './EntitySidebar';
@@ -290,17 +291,36 @@ const EntityV4 = () => {
             reviewActionConfig={reviewActionConfig}
           />
 
+          {/* SECTION 2: Media Preview */}
+          <MediaPreviewSection 
+            entity={entity}
+            onViewAllClick={() => {
+              // Navigate to photos tab - you can customize this behavior
+              const tabElement = document.querySelector('[data-value="photos"]');
+              if (tabElement) {
+                (tabElement as HTMLElement).click();
+                // Scroll to tabs section
+                setTimeout(() => {
+                  const tabsSection = document.querySelector('[role="tabpanel"]');
+                  if (tabsSection) {
+                    tabsSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }, 100);
+              }
+            }}
+          />
+
           <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
               {/* Main Content */}
               <div className="lg:col-span-3">
-                {/* SECTION 2: Trust & Review Summary */}
+                {/* SECTION 3: Trust & Review Summary */}
                 <TrustSummaryCard 
                   entityId={entity?.id || ''} 
                   userId={user?.id || null}
                 />
 
-                {/* SECTION 3: Reviews & Social Proof - Now with Enhanced Authentication Handling */}
+                {/* SECTION 4: Reviews & Social Proof - Now with Enhanced Authentication Handling */}
                 <ReviewsSection 
                   reviews={reviews}
                   entityName={entity?.name || ''}
@@ -313,7 +333,7 @@ const EntityV4 = () => {
                   }}
                 />
 
-                {/* SECTION 4: Tabs Navigation */}
+                {/* SECTION 5: Tabs Navigation */}
                 <EntityTabsContent 
                   entity={entity} 
                   stats={stats}
@@ -324,7 +344,7 @@ const EntityV4 = () => {
                 />
               </div>
 
-              {/* SECTION 5: Info & Discovery Sidebar */}
+              {/* SECTION 6: Info & Discovery Sidebar */}
               <div className="lg:col-span-1">
                 {entity && <EntitySidebar entity={entity} />}
               </div>
