@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getEntityStats } from '@/services/entityService';
 
 export interface PersonalizedEntity {
   id: string;
@@ -15,6 +16,11 @@ export interface PersonalizedEntity {
   reason?: string;
   geographic_boost?: number;
   seasonal_boost?: number;
+  created_at?: string;
+  // Real rating data from our platform
+  reviewCount?: number;
+  averageRating?: number | null;
+  hasReviews?: boolean;
 }
 
 export interface UserInteractionData {
@@ -255,8 +261,11 @@ export class EnhancedExploreService {
 
       if (!entities) return [];
 
+      // Enhance entities with real rating data
+      const entitiesWithRatings = await this.enhanceEntitiesWithRatings(entities);
+
       // Enhanced scoring with temporal context and diversity
-      const scoredEntities = entities.map(entity => {
+      const scoredEntities = entitiesWithRatings.map(entity => {
         const userInterest = interests.find(i => i.entity_type === entity.type);
         const timePattern = patterns?.find(p => 
           p.entity_type === entity.type && 
@@ -271,7 +280,7 @@ export class EnhancedExploreService {
         const seasonalBoost = entity.seasonal_boost || 0;
         
         // Enhanced personalization with recency bias
-        const recencyBoost = this.calculateRecencyBoost(entity.created_at);
+        const recencyBoost = entity.created_at ? this.calculateRecencyBoost(entity.created_at) : 0;
         
         const personalizationScore = 
           (interestScore * 0.30) + 
@@ -423,7 +432,10 @@ export class EnhancedExploreService {
 
       if (!entities) return [];
 
-      return entities.map(entity => ({
+      // Enhance with real rating data
+      const entitiesWithRatings = await this.enhanceEntitiesWithRatings(entities);
+
+      return entitiesWithRatings.map(entity => ({
         ...entity,
         reason: entity.view_velocity > 5 ? 'Rapidly trending' : 'Trending this week'
       }));
@@ -463,7 +475,10 @@ export class EnhancedExploreService {
         })
         .slice(0, limit);
 
-      return hiddenGems.map(entity => ({
+      // Enhance hidden gems with real rating data
+      const hiddenGemsWithRatings = await this.enhanceEntitiesWithRatings(hiddenGems);
+
+      return hiddenGemsWithRatings.map(entity => ({
         ...entity,
         is_hidden_gem: true,
         reason: 'Hidden gem - highly rated'
@@ -500,7 +515,10 @@ export class EnhancedExploreService {
         if (entities.length > 0) {
           result[collection.name] = entities.map((entity: any) => ({
             ...entity,
-            reason: `From ${collection.name} collection`
+            reason: `From ${collection.name} collection`,
+            reviewCount: 0,
+            averageRating: null,
+            hasReviews: false
           }));
         }
       });
@@ -521,13 +539,54 @@ export class EnhancedExploreService {
         .order('popularity_score', { ascending: false })
         .limit(limit);
 
-      return entities?.map(entity => ({
+      if (!entities) return [];
+
+      // Enhance with real rating data
+      const entitiesWithRatings = await this.enhanceEntitiesWithRatings(entities);
+
+      return entitiesWithRatings.map(entity => ({
         ...entity,
         reason: 'Popular choice'
-      })) || [];
+      }));
     } catch (error) {
       console.error('Error getting popular entities:', error);
       return [];
+    }
+  }
+
+  // Enhance entities with real rating data from our platform
+  private async enhanceEntitiesWithRatings(entities: any[]): Promise<PersonalizedEntity[]> {
+    try {
+      const enhancedEntities = await Promise.all(
+        entities.map(async (entity) => {
+          try {
+            const stats = await getEntityStats(entity.id, null);
+            return {
+              ...entity,
+              reviewCount: stats.reviewCount + stats.recommendationCount,
+              averageRating: stats.averageRating,
+              hasReviews: (stats.reviewCount + stats.recommendationCount) > 0
+            };
+          } catch (error) {
+            console.error(`Error fetching stats for entity ${entity.id}:`, error);
+            return {
+              ...entity,
+              reviewCount: 0,
+              averageRating: null,
+              hasReviews: false
+            };
+          }
+        })
+      );
+      return enhancedEntities;
+    } catch (error) {
+      console.error('Error enhancing entities with ratings:', error);
+      return entities.map(entity => ({
+        ...entity,
+        reviewCount: 0,
+        averageRating: null,
+        hasReviews: false
+      }));
     }
   }
 

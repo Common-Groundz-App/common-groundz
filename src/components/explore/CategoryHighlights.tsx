@@ -10,6 +10,7 @@ import { useEnhancedExplore } from '@/hooks/use-enhanced-explore';
 import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { EntityTypeString } from '@/hooks/feed/api/types';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 interface CategoryHighlightsProps {
   entityType?: EntityTypeString;
@@ -125,10 +126,32 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                     {entity.venue && (
                       <p className="text-xs text-muted-foreground truncate">{entity.venue}</p>
                     )}
-                    {entity.metadata?.rating && (
-                      <div className="flex items-center mt-1">
-                        <StarIcon className="h-3 w-3 text-yellow-400 mr-1" />
-                        <span className="text-xs font-medium">{entity.metadata.rating}</span>
+                    {entity.hasReviews ? (
+                      <div className="flex items-center mt-1 gap-1">
+                        <ConnectedRingsRating
+                          value={entity.averageRating || 0}
+                          variant="badge"
+                          size="xs"
+                          minimal={true}
+                          showValue={false}
+                          className="flex-shrink-0"
+                        />
+                        <span className="text-xs font-medium">{entity.averageRating?.toFixed(1)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({entity.reviewCount})
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center mt-1 gap-1">
+                        <ConnectedRingsRating
+                          value={0}
+                          variant="badge"
+                          size="xs"
+                          minimal={true}
+                          showValue={false}
+                          className="flex-shrink-0"
+                        />
+                        <span className="text-xs text-muted-foreground">No ratings yet</span>
                       </div>
                     )}
                   </div>
@@ -169,10 +192,32 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                     {entity.venue && (
                       <p className="text-xs text-muted-foreground truncate">{entity.venue}</p>
                     )}
-                    {entity.metadata?.rating && (
-                      <div className="flex items-center mt-1">
-                        <StarIcon className="h-3 w-3 text-yellow-400 mr-1" />
-                        <span className="text-xs font-medium">{entity.metadata.rating}</span>
+                    {entity.hasReviews ? (
+                      <div className="flex items-center mt-1 gap-1">
+                        <ConnectedRingsRating
+                          value={entity.averageRating || 0}
+                          variant="badge"
+                          size="xs"
+                          minimal={true}
+                          showValue={false}
+                          className="flex-shrink-0"
+                        />
+                        <span className="text-xs font-medium">{entity.averageRating?.toFixed(1)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({entity.reviewCount})
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center mt-1 gap-1">
+                        <ConnectedRingsRating
+                          value={0}
+                          variant="badge"
+                          size="xs"
+                          minimal={true}
+                          showValue={false}
+                          className="flex-shrink-0"
+                        />
+                        <span className="text-xs text-muted-foreground">No ratings yet</span>
                       </div>
                     )}
                   </div>
@@ -259,10 +304,32 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                   {entity.venue && (
                     <p className="text-xs text-muted-foreground truncate">{entity.venue}</p>
                   )}
-                  {entity.metadata?.rating && (
-                    <div className="flex items-center mt-1">
-                      <StarIcon className="h-3 w-3 text-yellow-400 mr-1" />
-                      <span className="text-xs font-medium">{entity.metadata.rating}</span>
+                  {entity.hasReviews ? (
+                    <div className="flex items-center mt-1 gap-1">
+                      <ConnectedRingsRating
+                        value={entity.averageRating || 0}
+                        variant="badge"
+                        size="xs"
+                        minimal={true}
+                        showValue={false}
+                        className="flex-shrink-0"
+                      />
+                      <span className="text-xs font-medium">{entity.averageRating?.toFixed(1)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({entity.reviewCount})
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center mt-1 gap-1">
+                      <ConnectedRingsRating
+                        value={0}
+                        variant="badge"
+                        size="xs"
+                        minimal={true}
+                        showValue={false}
+                        className="flex-shrink-0"
+                      />
+                      <span className="text-xs text-muted-foreground">No ratings yet</span>
                     </div>
                   )}
                   {entity.reason && (
