@@ -116,7 +116,7 @@ export const FeaturedEntities = () => {
                          featuredEntities.length > 0 ? featuredEntities : 
                          newThisWeek.slice(0, 3);
 
-  const sectionTitle = user && forYou.length > 0 ? 'For You' : 
+  const sectionTitle = user && forYou.length > 0 ? 'Curated for You' : 
                       featuredEntities.length > 0 ? 'Featured' : 
                       'New This Week';
 
@@ -128,9 +128,9 @@ export const FeaturedEntities = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {user && forYou.length > 0 && <Users className="h-5 w-5 text-blue-500" />}
+          {user && forYou.length > 0 && <Sparkles className="h-5 w-5 text-blue-500" />}
           {!user || forYou.length === 0 && featuredEntities.length === 0 && <Sparkles className="h-5 w-5 text-emerald-500" />}
-          <h2 className="text-xl font-semibold mb-4">{sectionTitle}</h2>
+          <h2 className="text-xl font-semibold">{sectionTitle}</h2>
         </div>
         {(lastRefresh || discoveryRefresh) && (
           <span className="text-xs text-muted-foreground">

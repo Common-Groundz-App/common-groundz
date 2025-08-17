@@ -231,7 +231,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
   const allSections = [
     // Discovery collections first
     ...discoveryCollections.map(collection => ({
-      title: collection.title,
+      title: collection.title === 'For You' ? 'Discover More' : collection.title,
       entities: collection.entities.slice(0, 3),
       icon: getIconForCollectionType(collection.type),
       reason: collection.reason
