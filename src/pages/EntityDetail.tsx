@@ -951,6 +951,7 @@ const EntityDetailOriginal = () => {
 
 const EntityDetail = () => {
   const [searchParams] = useSearchParams();
+  const { slug } = useParams<{ slug: string }>();
   const version = searchParams.get('v') || (searchParams.get('preview') === 'true' ? '2' : '1');
 
   // Import EntityV3 and EntityV4 dynamically
@@ -960,13 +961,13 @@ const EntityDetail = () => {
   // Return appropriate version based on URL parameters
   if (version === '4') {
     return (
-      <React.Suspense fallback={<div>Loading V4...</div>}>
+      <React.Suspense fallback={<EntityDetailLoadingProgress entityName={slug || 'Entity'} entityType="product" />}>
         <EntityV4 />
       </React.Suspense>
     );
   } else if (version === '3') {
     return (
-      <React.Suspense fallback={<div>Loading V3...</div>}>
+      <React.Suspense fallback={<EntityDetailLoadingProgress entityName={slug || 'Entity'} entityType="product" />}>
         <EntityV3 />
       </React.Suspense>
     );
