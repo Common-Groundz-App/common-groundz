@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, ChevronRight, Play } from 'lucide-react';
+import { Camera, ChevronRight, Play, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoGalleryModal } from '@/components/ui/photo-gallery-modal';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia, PhotoQuality } from '@/services/photoService';
 import { fetchEntityPhotos } from '@/services/entityPhotoService';
+import { uploadEntityMediaBatch } from '@/services/entityMediaService';
+import { SimpleMediaUploadModal } from './SimpleMediaUploadModal';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 
 interface MediaPreviewSectionProps {
@@ -16,12 +20,15 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   entity, 
   onViewAllClick 
 }) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryScrollPosition, setGalleryScrollPosition] = useState(0);
   const [lightboxSource, setLightboxSource] = useState<'direct' | 'gallery'>('direct');
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const loadPhotos = async () => {
     setLoading(true);
@@ -143,14 +150,14 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
               <span className="text-sm text-muted-foreground">({photos.length})</span>
             </div>
             {photos.length > 0 && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleViewAllClick}
-                className="gap-2"
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => setShowUploadModal(true)}
+                className="h-8"
               >
-                View All Photos
-                <ChevronRight className="w-4 h-4" />
+                <Plus className="h-4 w-4 mr-2" />
+                Add Media
               </Button>
             )}
           </div>
@@ -165,7 +172,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 onClick={() => handlePhotoClick(0)}
               />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 pointer-events-none" />
               
               {/* Photo metadata overlay */}
               <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full">
@@ -195,7 +202,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                     alt={photo.alt || entity.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 pointer-events-none" />
                   
                   {/* Photo source indicator */}
                   <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium">
@@ -280,6 +287,41 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
           source={lightboxSource}
         />
       )}
+
+      {/* Upload Modal */}
+      <SimpleMediaUploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onSave={async (mediaItems) => {
+          if (!user) {
+            toast({
+              title: "Authentication required",
+              description: "Please sign in to upload media.",
+              variant: "destructive",
+            });
+            return;
+          }
+
+          try {
+            await uploadEntityMediaBatch(mediaItems, entity.id, user.id);
+            
+            toast({
+              title: "Media uploaded successfully",
+              description: `${mediaItems.length} item(s) have been added.`,
+            });
+            
+            // Refresh photos to include the new ones
+            loadPhotos();
+          } catch (error) {
+            console.error('Error uploading media:', error);
+            toast({
+              title: "Upload failed",
+              description: "Failed to upload media. Please try again.",
+              variant: "destructive",
+            });
+          }
+        }}
+      />
     </>
   );
 };
