@@ -74,20 +74,20 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Filter and sort photos
+  // Filter and sort photos (using correct source values from PhotosSection)
   const filteredAndSortedPhotos = React.useMemo(() => {
     let filtered = photos;
 
-    // Filter by tab
+    // Filter by tab/source
     if (activeTab !== 'all') {
       filtered = photos.filter(photo => {
         switch (activeTab) {
           case 'google_places':
             return photo.source === 'google_places';
           case 'reviews':
-            return photo.source === 'review';
+            return photo.source === 'user_review';
           case 'user':
-            return photo.source === 'user' || photo.source === 'entity';
+            return photo.source === 'entity_photo';
           default:
             return true;
         }
@@ -107,13 +107,13 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
     });
   }, [photos, activeTab, sortBy]);
 
-  // Get category counts
+  // Get category counts (using correct source values)
   const categoryCounts = React.useMemo(() => {
     return {
       all: photos.length,
       google_places: photos.filter(p => p.source === 'google_places').length,
-      reviews: photos.filter(p => p.source === 'review').length,
-      user: photos.filter(p => p.source === 'user' || p.source === 'entity').length
+      reviews: photos.filter(p => p.source === 'user_review').length,
+      user: photos.filter(p => p.source === 'entity_photo').length
     };
   }, [photos]);
 
@@ -138,16 +138,16 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
   };
 
   const galleryContent = (
-    <div className="fixed inset-0 z-[9998] photo-gallery-modal" data-gallery="true">
-      {/* Background overlay */}
-      <div className="absolute inset-0 bg-black/95" />
+    <div className="fixed inset-0 z-[9998] photo-gallery-modal flex items-center justify-center p-4" data-gallery="true">
+      {/* Background overlay with blur */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
-      {/* Content container */}
-      <div className="relative z-10 flex h-full w-full flex-col">
+      {/* Content container - floating design */}
+      <div className="relative z-10 flex h-full w-full max-w-6xl max-h-[90vh] flex-col bg-background rounded-lg shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 bg-black/50 p-4">
+        <div className="flex items-center justify-between border-b border-border bg-background p-4">
           <div className="flex items-center space-x-4">
-            <h2 className="text-xl font-semibold text-white">
+            <h2 className="text-xl font-semibold text-foreground">
               All Photos ({photos.length})
             </h2>
             
@@ -164,8 +164,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                   variant={activeTab === key ? "default" : "ghost"}
                   size="sm"
                   className={cn(
-                    "text-white",
-                    activeTab === key ? "bg-primary" : "hover:bg-white/10"
+                    activeTab === key ? "" : "text-muted-foreground hover:bg-muted/80"
                   )}
                   onClick={() => setActiveTab(key as any)}
                   disabled={count === 0}
@@ -181,7 +180,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
             <Button
               variant="ghost"
               size="sm"
-              className="text-white hover:bg-white/10"
+              className="text-muted-foreground hover:bg-muted/80"
               onClick={() => setSortBy(sortBy === 'recent' ? 'oldest' : 'recent')}
             >
               <SortAsc className="h-4 w-4 mr-2" />
@@ -192,7 +191,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:bg-white/10"
+              className="text-muted-foreground hover:bg-muted/80"
               onClick={onClose}
             >
               <X className="h-6 w-6" />
@@ -202,7 +201,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
         </div>
 
         {/* Mobile filters */}
-        <div className="md:hidden border-b border-white/10 bg-black/50 p-4">
+        <div className="md:hidden border-b border-border bg-background p-4">
           <div className="flex space-x-2 overflow-x-auto">
             {[
               { key: 'all', label: 'All', count: categoryCounts.all },
@@ -215,8 +214,8 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                 variant={activeTab === key ? "default" : "ghost"}
                 size="sm"
                 className={cn(
-                  "text-white whitespace-nowrap",
-                  activeTab === key ? "bg-primary" : "hover:bg-white/10"
+                  "whitespace-nowrap",
+                  activeTab === key ? "" : "text-muted-foreground hover:bg-muted/80"
                 )}
                 onClick={() => setActiveTab(key as any)}
                 disabled={count === 0}
@@ -234,7 +233,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
         >
           {filteredAndSortedPhotos.length === 0 ? (
             <div className="flex h-64 items-center justify-center">
-              <p className="text-white/60">No photos found in this category</p>
+              <p className="text-muted-foreground">No photos found in this category</p>
             </div>
           ) : (
             <div className={cn(
@@ -246,7 +245,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
               {filteredAndSortedPhotos.map((photo, index) => (
                 <div
                   key={`${photo.url}-${index}`}
-                  className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg bg-gray-800"
+                  className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg bg-muted"
                   onClick={() => handlePhotoClick(photo)}
                 >
                   <img
@@ -270,7 +269,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                   {/* Source indicator */}
                   <div className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-xs text-white">
                     {photo.source === 'google_places' ? 'GP' : 
-                     photo.source === 'review' ? 'R' : 'U'}
+                     photo.source === 'user_review' ? 'R' : 'U'}
                   </div>
 
                   {/* Hover overlay */}
