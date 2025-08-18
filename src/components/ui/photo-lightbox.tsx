@@ -13,6 +13,8 @@ interface PhotoLightboxProps {
   onNext: () => void;
   onPrevious: () => void;
   onReport?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
+  onBackToGallery?: () => void;
+  source?: 'direct' | 'gallery';
 }
 
 export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
@@ -21,7 +23,9 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   onClose,
   onNext,
   onPrevious,
-  onReport
+  onReport,
+  onBackToGallery,
+  source = 'direct'
 }) => {
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const mediaRef = useRef<(MediaItem & { source?: string; username?: string; createdAt?: string })[]>([]);
@@ -131,6 +135,26 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
           }
         }}
       >
+        {/* Back to Gallery button (when opened from gallery) */}
+        {onBackToGallery && source === 'gallery' && (
+          <Button
+            className={cn(
+              "absolute z-50 rounded-full bg-gray-800/70 hover:bg-gray-700",
+              isMobile ? "left-2 top-2 h-8 w-8" : "left-4 top-4 h-10 w-10"
+            )}
+            size="icon"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onBackToGallery();
+            }}
+          >
+            <ChevronLeft className={cn("text-white", isMobile ? "h-5 w-5" : "h-6 w-6")} />
+            <span className="sr-only">Back to gallery</span>
+          </Button>
+        )}
+
         {/* Close button */}
         <Button 
           className={cn(

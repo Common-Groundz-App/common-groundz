@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Camera, ChevronRight, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
+import { PhotoGalleryModal } from '@/components/ui/photo-gallery-modal';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia, PhotoQuality } from '@/services/photoService';
 import { fetchEntityPhotos } from '@/services/entityPhotoService';
 import { Entity } from '@/services/recommendation/types';
@@ -18,6 +19,9 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryScrollPosition, setGalleryScrollPosition] = useState(0);
+  const [lightboxSource, setLightboxSource] = useState<'direct' | 'gallery'>('direct');
 
   const loadPhotos = async () => {
     setLoading(true);
@@ -62,21 +66,37 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
 
   const handlePhotoClick = (index: number) => {
     setSelectedPhotoIndex(index);
+    setLightboxSource('direct');
+  };
+
+  const handleGalleryPhotoClick = (index: number) => {
+    setSelectedPhotoIndex(index);
+    setLightboxSource('gallery');
   };
 
   const closeLightbox = () => {
     setSelectedPhotoIndex(null);
   };
 
+  const openGallery = () => {
+    setIsGalleryOpen(true);
+  };
+
+  const closeGallery = () => {
+    setIsGalleryOpen(false);
+    setGalleryScrollPosition(0);
+  };
+
+  const backToGallery = () => {
+    setSelectedPhotoIndex(null);
+    setIsGalleryOpen(true);
+  };
+
   const handleViewAllClick = () => {
     if (onViewAllClick) {
       onViewAllClick();
     } else {
-      // Default behavior: scroll to tabs section
-      const tabsSection = document.querySelector('[data-tabs="photos"]');
-      if (tabsSection) {
-        tabsSection.scrollIntoView({ behavior: 'smooth' });
-      }
+      openGallery();
     }
   };
 
@@ -196,7 +216,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
               {sidePhotos.length >= 3 && (
                 <div 
                   className="relative group cursor-pointer overflow-hidden rounded-lg aspect-[4/3]"
-                  onClick={handleViewAllClick}
+                  onClick={openGallery}
                 >
                   {sidePhotos[3] && (
                     <img
@@ -230,12 +250,22 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
         </div>
       </div>
 
+      {/* Photo Gallery Modal */}
+      <PhotoGalleryModal
+        photos={photos}
+        isOpen={isGalleryOpen}
+        onClose={closeGallery}
+        onPhotoClick={handleGalleryPhotoClick}
+        initialScrollPosition={galleryScrollPosition}
+        onScrollPositionChange={setGalleryScrollPosition}
+      />
+
       {/* Photo Lightbox */}
       {selectedPhotoIndex !== null && (
         <PhotoLightbox
           photos={photos}
           currentIndex={selectedPhotoIndex}
-          onClose={closeLightbox}
+          onClose={lightboxSource === 'gallery' ? backToGallery : closeLightbox}
           onPrevious={() => setSelectedPhotoIndex(prev => 
             prev !== null ? (prev > 0 ? prev - 1 : photos.length - 1) : null
           )}
@@ -246,6 +276,8 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
             console.log('Report photo:', photo);
             // Could implement photo reporting here
           }}
+          onBackToGallery={lightboxSource === 'gallery' ? backToGallery : undefined}
+          source={lightboxSource}
         />
       )}
     </>
