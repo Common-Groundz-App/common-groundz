@@ -1,21 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Filter, SortAsc, SortDesc, ChevronDown } from 'lucide-react';
+import { X, Filter, SortAsc } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { PHOTO_CATEGORIES, EntityPhoto } from '@/services/entityPhotoService';
 
 interface PhotoGalleryModalProps {
   photos: (MediaItem & { source?: string; username?: string; createdAt?: string })[];
@@ -24,13 +13,6 @@ interface PhotoGalleryModalProps {
   onPhotoClick: (index: number) => void;
   initialScrollPosition?: number;
   onScrollPositionChange?: (position: number) => void;
-  galleryPhotoIndex?: number | null;
-  onResetGalleryScroll?: () => void;
-  entityPhotos?: EntityPhoto[];
-  onEdit?: (photo: EntityPhoto) => void;
-  onDelete?: (photo: EntityPhoto) => void;
-  onReport?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
-  isOwner?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => boolean;
 }
 
 export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
@@ -39,21 +21,12 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
   onClose,
   onPhotoClick,
   initialScrollPosition = 0,
-  onScrollPositionChange,
-  galleryPhotoIndex,
-  onResetGalleryScroll,
-  entityPhotos = [],
-  onEdit,
-  onDelete,
-  onReport,
-  isOwner
+  onScrollPositionChange
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'google_places' | 'reviews' | 'user'>('all');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'recent' | 'oldest'>('recent');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-
 
   // Restore scroll position when modal opens
   useEffect(() => {
@@ -101,7 +74,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Filter and sort photos (enhanced with category filtering)
+  // Filter and sort photos (using correct source values from PhotosSection)
   const filteredAndSortedPhotos = React.useMemo(() => {
     let filtered = photos;
 
@@ -121,49 +94,28 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
       });
     }
 
-    // Filter by category (only for entity photos)
-    if (categoryFilter && activeTab === 'user') {
-      filtered = filtered.filter(photo => 
-        photo.source === 'entity_photo' && (photo as any).category === categoryFilter
-      );
-    }
-
     // Sort photos
     return filtered.sort((a, b) => {
       const aDate = new Date(a.createdAt || 0).getTime();
       const bDate = new Date(b.createdAt || 0).getTime();
       
-      if (sortBy === 'newest') {
+      if (sortBy === 'recent') {
         return bDate - aDate;
       } else {
         return aDate - bDate;
       }
     });
-  }, [photos, activeTab, sortBy, categoryFilter]);
+  }, [photos, activeTab, sortBy]);
 
-  // Get category counts (using correct source values and adding category counts)
+  // Get category counts (using correct source values)
   const categoryCounts = React.useMemo(() => {
-    const entityPhotos = photos.filter(p => p.source === 'entity_photo');
-    const categoryBreakdown: Record<string, number> = {};
-    
-    entityPhotos.forEach(photo => {
-      const category = (photo as any).category || 'general';
-      categoryBreakdown[category] = (categoryBreakdown[category] || 0) + 1;
-    });
-
     return {
       all: photos.length,
       google_places: photos.filter(p => p.source === 'google_places').length,
       reviews: photos.filter(p => p.source === 'user_review').length,
-      user: entityPhotos.length,
-      categories: categoryBreakdown
+      user: photos.filter(p => p.source === 'entity_photo').length
     };
   }, [photos]);
-
-  const clearFilters = () => {
-    setCategoryFilter(null);
-    setSortBy('newest');
-  };
 
   if (!isOpen) return null;
 
@@ -224,78 +176,16 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* Category Filter (only for entity photos) */}
-            {activeTab === 'user' && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="min-w-[120px]">
-                    <Filter className="w-4 h-4 mr-2" />
-                    {categoryFilter ? PHOTO_CATEGORIES.find(c => c.value === categoryFilter)?.label || categoryFilter : 'All Categories'}
-                    <ChevronDown className="w-4 h-4 ml-2" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[180px]">
-                  <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCategoryFilter(null);
-                    }}
-                  >
-                    All Categories ({categoryCounts.user})
-                  </DropdownMenuItem>
-                  {PHOTO_CATEGORIES.map((category) => {
-                    const count = categoryCounts.categories[category.value] || 0;
-                    return (
-                      <DropdownMenuItem 
-                        key={category.value} 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCategoryFilter(category.value);
-                        }}
-                        disabled={count === 0}
-                      >
-                        {category.label} ({count})
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
-            {/* Sort dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="min-w-[140px]">
-                  {sortBy === 'newest' && <><SortDesc className="w-4 h-4 mr-2" />Newest First</>}
-                  {sortBy === 'oldest' && <><SortAsc className="w-4 h-4 mr-2" />Oldest First</>}
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[160px]">
-                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setSortBy('newest');
-                  }}
-                >
-                  <SortDesc className="w-4 h-4 mr-2" />
-                  Newest First
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setSortBy('oldest');
-                  }}
-                >
-                  <SortAsc className="w-4 h-4 mr-2" />
-                  Oldest First
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Sort button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:bg-muted/80"
+              onClick={() => setSortBy(sortBy === 'recent' ? 'oldest' : 'recent')}
+            >
+              <SortAsc className="h-4 w-4 mr-2" />
+              {sortBy === 'recent' ? 'Newest First' : 'Oldest First'}
+            </Button>
 
             {/* Close button */}
             <Button
@@ -335,38 +225,6 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
             ))}
           </div>
         </div>
-
-        {/* Active Filter Badges */}
-        {(categoryFilter || sortBy !== 'newest') && (
-          <div className="border-b border-border bg-background p-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-muted-foreground">Active filters:</span>
-              {categoryFilter && (
-                <Badge variant="secondary" className="text-xs">
-                  {PHOTO_CATEGORIES.find(c => c.value === categoryFilter)?.label || categoryFilter}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 ml-1 text-muted-foreground hover:text-foreground"
-                    onClick={() => setCategoryFilter(null)}
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                </Badge>
-              )}
-              {(categoryFilter || sortBy !== 'newest') && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  className="text-xs text-muted-foreground hover:text-foreground h-6"
-                >
-                  Clear All
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Photo grid */}
         <div 
@@ -421,38 +279,6 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
             </div>
           )}
         </div>
-
-        {/* PhotoLightbox Integration */}
-        {galleryPhotoIndex !== null && (
-          <PhotoLightbox
-            photos={filteredAndSortedPhotos}
-            currentIndex={galleryPhotoIndex}
-            onClose={onClose}
-            onNext={() => {
-              const nextIndex = (galleryPhotoIndex + 1) % filteredAndSortedPhotos.length;
-              const originalIndex = photos.findIndex(p => p.url === filteredAndSortedPhotos[nextIndex]?.url);
-              if (originalIndex !== -1) {
-                onPhotoClick(originalIndex);
-              }
-            }}
-            onPrevious={() => {
-              const prevIndex = (galleryPhotoIndex - 1 + filteredAndSortedPhotos.length) % filteredAndSortedPhotos.length;
-              const originalIndex = photos.findIndex(p => p.url === filteredAndSortedPhotos[prevIndex]?.url);
-              if (originalIndex !== -1) {
-                onPhotoClick(originalIndex);
-              }
-            }}
-            onBackToGallery={() => {
-              if (onPhotoClick) onPhotoClick(-1);
-            }}
-            source="gallery"
-            entityPhotos={entityPhotos}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onReport={onReport}
-            isOwner={isOwner}
-          />
-        )}
       </div>
     </div>
   );

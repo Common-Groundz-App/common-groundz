@@ -1,21 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, ChevronRight, Play, Plus, MoreVertical, Edit3, Trash2, Flag } from 'lucide-react';
+import { Camera, ChevronRight, Play, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoGalleryModal } from '@/components/ui/photo-gallery-modal';
-import { PhotoReportModal } from '@/components/ui/photo-report-modal';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia, PhotoQuality } from '@/services/photoService';
-import { fetchEntityPhotos, deleteEntityPhoto, type EntityPhoto } from '@/services/entityPhotoService';
+import { fetchEntityPhotos } from '@/services/entityPhotoService';
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { SimpleMediaUploadModal } from './SimpleMediaUploadModal';
-import { EntityPhotoEditModal } from './EntityPhotoEditModal';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
@@ -32,19 +23,12 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
-  const [entityPhotos, setEntityPhotos] = useState<EntityPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryScrollPosition, setGalleryScrollPosition] = useState(0);
   const [lightboxSource, setLightboxSource] = useState<'direct' | 'gallery'>('direct');
   const [showUploadModal, setShowUploadModal] = useState(false);
-  
-  // Photo management states
-  const [reportModalPhoto, setReportModalPhoto] = useState<PhotoWithMetadata | null>(null);
-  const [editingPhoto, setEditingPhoto] = useState<EntityPhoto | null>(null);
-  const [deletingPhoto, setDeletingPhoto] = useState<EntityPhoto | null>(null);
-  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
 
   const loadPhotos = async () => {
     setLoading(true);
@@ -52,17 +36,14 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
       // Request high quality for main image, medium for grid images  
       const qualityPreference: PhotoQuality[] = ['high', 'medium', 'medium', 'medium', 'medium'];
       
-      const [googlePhotos, reviewPhotos, userPhotos] = await Promise.all([
+      const [googlePhotos, reviewPhotos, entityPhotos] = await Promise.all([
         fetchGooglePlacesPhotos(entity, qualityPreference),
         fetchEntityReviewMedia(entity.id),
         fetchEntityPhotos(entity.id)
       ]);
       
-      // Store entity photos separately for ownership detection
-      setEntityPhotos(userPhotos);
-      
       // Convert entity photos to PhotoWithMetadata format
-      const convertedEntityPhotos: PhotoWithMetadata[] = userPhotos.map((photo, index) => ({
+      const convertedEntityPhotos: PhotoWithMetadata[] = entityPhotos.map((photo, index) => ({
         id: photo.id,
         url: photo.url,
         type: 'image' as const,
@@ -124,78 +105,6 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
     } else {
       openGallery();
     }
-  };
-
-  // Photo management handlers
-  const isOwner = (photo: PhotoWithMetadata): boolean => {
-    return photo.source === 'entity_photo' && 
-           user && 
-           entityPhotos.some(ep => ep.id === photo.id && ep.user_id === user.id);
-  };
-
-  const handleReportPhoto = (photo: PhotoWithMetadata) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to report photos.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setReportModalPhoto(photo);
-  };
-
-  const handlePhotoUpdated = (updatedPhoto: EntityPhoto) => {
-    setEntityPhotos(prev => 
-      prev.map(photo => photo.id === updatedPhoto.id ? updatedPhoto : photo)
-    );
-    // Also update the photos array
-    setPhotos(prev => prev.map(photo => {
-      if (photo.source === 'entity_photo' && photo.id === updatedPhoto.id) {
-        return {
-          ...photo,
-          caption: updatedPhoto.caption,
-          alt: updatedPhoto.alt_text || updatedPhoto.caption,
-          category: updatedPhoto.category
-        };
-      }
-      return photo;
-    }));
-  };
-
-  const handleDeletePhoto = async () => {
-    if (!deletingPhoto) return;
-    
-    setIsDeletingPhoto(true);
-    try {
-      const success = await deleteEntityPhoto(deletingPhoto.id);
-      
-      if (success) {
-        setEntityPhotos(prev => prev.filter(photo => photo.id !== deletingPhoto.id));
-        setPhotos(prev => prev.filter(photo => photo.id !== deletingPhoto.id));
-        setDeletingPhoto(null);
-        
-        toast({
-          title: "Photo deleted",
-          description: "Your photo has been deleted successfully.",
-        });
-      } else {
-        throw new Error('Failed to delete photo');
-      }
-    } catch (error) {
-      console.error('Error deleting photo:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete photo. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeletingPhoto(false);
-    }
-  };
-
-  const closeReportModal = () => {
-    setReportModalPhoto(null);
   };
 
   // Show loading skeleton
@@ -263,61 +172,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 onClick={() => handlePhotoClick(0)}
               />
-              
-              {/* Hover overlay with actions */}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex justify-between p-3 pointer-events-none">
-                <div></div>
-                {/* 3-dot menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-white hover:bg-white/20 pointer-events-auto"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    {isOwner(mainPhoto) ? (
-                      <>
-                        <DropdownMenuItem 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const entityPhoto = entityPhotos.find(ep => ep.id === mainPhoto.id);
-                            if (entityPhoto) setEditingPhoto(entityPhoto);
-                          }}
-                        >
-                          <Edit3 className="w-4 h-4 mr-2" />
-                          Edit Media
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const entityPhoto = entityPhotos.find(ep => ep.id === mainPhoto.id);
-                            if (entityPhoto) setDeletingPhoto(entityPhoto);
-                          }}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete Media
-                        </DropdownMenuItem>
-                      </>
-                    ) : (
-                      <DropdownMenuItem 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReportPhoto(mainPhoto);
-                        }}
-                      >
-                        <Flag className="w-4 h-4 mr-2" />
-                        Report Media
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 pointer-events-none" />
               
               {/* Photo metadata overlay */}
               <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full">
@@ -347,61 +202,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                     alt={photo.alt || entity.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  
-                  {/* Hover overlay with actions */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex justify-between p-2">
-                    <div></div>
-                    {/* 3-dot menu */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-white hover:bg-white/20"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreVertical className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        {isOwner(photo) ? (
-                          <>
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const entityPhoto = entityPhotos.find(ep => ep.id === photo.id);
-                                if (entityPhoto) setEditingPhoto(entityPhoto);
-                              }}
-                            >
-                              <Edit3 className="w-4 h-4 mr-2" />
-                              Edit Media
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const entityPhoto = entityPhotos.find(ep => ep.id === photo.id);
-                                if (entityPhoto) setDeletingPhoto(entityPhoto);
-                              }}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete Media
-                            </DropdownMenuItem>
-                          </>
-                        ) : (
-                          <DropdownMenuItem 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleReportPhoto(photo);
-                            }}
-                          >
-                            <Flag className="w-4 h-4 mr-2" />
-                            Report Media
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 pointer-events-none" />
                   
                   {/* Photo source indicator */}
                   <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium">
@@ -464,11 +265,6 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
         onPhotoClick={handleGalleryPhotoClick}
         initialScrollPosition={galleryScrollPosition}
         onScrollPositionChange={setGalleryScrollPosition}
-        entityPhotos={entityPhotos}
-        onEdit={setEditingPhoto}
-        onDelete={setDeletingPhoto}
-        onReport={handleReportPhoto}
-        isOwner={isOwner}
       />
 
       {/* Photo Lightbox */}
@@ -483,13 +279,12 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
           onNext={() => setSelectedPhotoIndex(prev => 
             prev !== null ? (prev < photos.length - 1 ? prev + 1 : 0) : null
           )}
-          onReport={handleReportPhoto}
+          onReport={(photo) => {
+            console.log('Report photo:', photo);
+            // Could implement photo reporting here
+          }}
           onBackToGallery={lightboxSource === 'gallery' ? backToGallery : undefined}
           source={lightboxSource}
-          entityPhotos={entityPhotos}
-          onEdit={setEditingPhoto}
-          onDelete={setDeletingPhoto}
-          isOwner={isOwner}
         />
       )}
 
@@ -526,42 +321,6 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
             });
           }
         }}
-      />
-
-      {/* Photo Report Modal */}
-      {reportModalPhoto && (
-        <PhotoReportModal
-          photo={reportModalPhoto}
-          entityId={entity.id}
-          onClose={closeReportModal}
-          onReported={() => {
-            closeReportModal();
-            toast({
-              title: "Photo reported",
-              description: "Thank you for helping keep our community safe.",
-            });
-          }}
-        />
-      )}
-
-      {/* Entity Photo Edit Modal */}
-      {editingPhoto && (
-        <EntityPhotoEditModal
-          photo={editingPhoto}
-          isOpen={!!editingPhoto}
-          onClose={() => setEditingPhoto(null)}
-          onPhotoUpdated={handlePhotoUpdated}
-        />
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={!!deletingPhoto}
-        onClose={() => setDeletingPhoto(null)}
-        onConfirm={handleDeletePhoto}
-        title="Delete Photo"
-        description="Are you sure you want to delete this photo? This action cannot be undone."
-        isLoading={isDeletingPhoto}
       />
     </>
   );

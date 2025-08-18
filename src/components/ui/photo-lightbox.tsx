@@ -1,17 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, Flag, MoreVertical, Edit3, Trash2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { EntityPhoto } from '@/services/entityPhotoService';
 
 interface PhotoLightboxProps {
   photos: (MediaItem & { source?: string; username?: string; createdAt?: string })[];
@@ -22,10 +15,6 @@ interface PhotoLightboxProps {
   onReport?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
   onBackToGallery?: () => void;
   source?: 'direct' | 'gallery';
-  entityPhotos?: EntityPhoto[];
-  onEdit?: (photo: EntityPhoto) => void;
-  onDelete?: (photo: EntityPhoto) => void;
-  isOwner?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => boolean;
 }
 
 export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
@@ -36,11 +25,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   onPrevious,
   onReport,
   onBackToGallery,
-  source = 'direct',
-  entityPhotos = [],
-  onEdit,
-  onDelete,
-  isOwner
+  source = 'direct'
 }) => {
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const mediaRef = useRef<(MediaItem & { source?: string; username?: string; createdAt?: string })[]>([]);
@@ -188,64 +173,25 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
           <span className="sr-only">Close</span>
         </Button>
 
-        {/* 3-dot menu for actions */}
-        <div className={cn(
-          "absolute z-50",
-          isMobile ? "right-12 top-2" : "right-16 top-4"
-        )}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "rounded-full bg-gray-800/70 hover:bg-gray-700 text-white",
-                  isMobile ? "h-8 w-8" : "h-10 w-10"
-                )}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {isOwner && isOwner(currentPhoto) ? (
-                <>
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const entityPhoto = entityPhotos.find(ep => ep.id === currentPhoto.id);
-                      if (entityPhoto && onEdit) onEdit(entityPhoto);
-                    }}
-                  >
-                    <Edit3 className="w-4 h-4 mr-2" />
-                    Edit Media
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const entityPhoto = entityPhotos.find(ep => ep.id === currentPhoto.id);
-                      if (entityPhoto && onDelete) onDelete(entityPhoto);
-                    }}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Media
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <DropdownMenuItem 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onReport) onReport(currentPhoto);
-                  }}
-                >
-                  <Flag className="w-4 h-4 mr-2" />
-                  Report Media
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {/* Report button */}
+        {onReport && (
+          <Button
+            className={cn(
+              "absolute z-50 rounded-full bg-gray-800/70 hover:bg-red-500/20",
+              isMobile ? "right-12 top-2 h-8 w-8" : "right-16 top-4 h-10 w-10"
+            )}
+            size="icon"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onReport(currentPhoto);
+            }}
+          >
+            <Flag className={cn("text-white", isMobile ? "h-4 w-4" : "h-5 w-5")} />
+            <span className="sr-only">Report photo</span>
+          </Button>
+        )}
 
         {/* Photo counter */}
         {photos.length > 1 && (
