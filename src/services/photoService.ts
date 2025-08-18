@@ -53,11 +53,24 @@ const validatePhotoUrl = async (url: string): Promise<boolean> => {
   }
 };
 
+// Photo quality presets
+export type PhotoQuality = 'high' | 'medium' | 'low';
+
+const PHOTO_QUALITY_SETTINGS = {
+  high: 1200,    // Main/hero images
+  medium: 800,   // Grid images  
+  low: 400       // Thumbnails
+} as const;
+
 /**
  * Create a Google Places photo URL using proxy-google-image function
  */
-const createGooglePlacesPhotoUrl = (photoReference: string, maxWidth: number = 400): string => {
+export const createGooglePlacesPhotoUrl = (
+  photoReference: string, 
+  quality: PhotoQuality | number = 'medium'
+): string => {
   try {
+    const maxWidth = typeof quality === 'number' ? quality : PHOTO_QUALITY_SETTINGS[quality];
     const baseUrl = 'https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-image';
     const params = new URLSearchParams({
       ref: photoReference,
@@ -71,9 +84,12 @@ const createGooglePlacesPhotoUrl = (photoReference: string, maxWidth: number = 4
 };
 
 /**
- * Fetch Google Places photos for an entity with validation
+ * Fetch Google Places photos for an entity with validation and quality selection
  */
-export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWithMetadata[]> => {
+export const fetchGooglePlacesPhotos = async (
+  entity: Entity, 
+  qualityPreference?: PhotoQuality[]
+): Promise<PhotoWithMetadata[]> => {
   const photos: PhotoWithMetadata[] = [];
   
   try {
@@ -82,7 +98,10 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
       console.log(`✅ Using ${entity.metadata.photo_references.length} stored photo references for entity ${entity.id}`);
       
       entity.metadata.photo_references.forEach((photoRef: any, index: number) => {
-        const photoUrl = createGooglePlacesPhotoUrl(photoRef.photo_reference, 400);
+        // Use quality preference if provided, otherwise default to medium for first image (high) and others (medium)
+        const quality = qualityPreference?.[index] || (index === 0 ? 'high' : 'medium');
+        const photoUrl = createGooglePlacesPhotoUrl(photoRef.photo_reference, quality);
+        const maxWidth = typeof quality === 'number' ? quality : PHOTO_QUALITY_SETTINGS[quality];
         
         photos.push({
           id: `google-places-${entity.id}-${index}`,
@@ -93,8 +112,8 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
           source: 'google_places' as const,
           originalReference: photoRef.photo_reference,
           isPrimary: index === 0,
-          width: photoRef.width || 400,
-          height: photoRef.height || 400
+          width: photoRef.width || maxWidth,
+          height: photoRef.height || maxWidth
         });
       });
       
@@ -104,7 +123,9 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
     // Method 2: Fallback to single photo reference (backward compatibility)
     const photoRef = entity.metadata?.photo_reference;
     if (photoRef) {
-      const photoUrl = createGooglePlacesPhotoUrl(photoRef, 400);
+      const quality = qualityPreference?.[0] || 'high';
+      const photoUrl = createGooglePlacesPhotoUrl(photoRef, quality);
+      const maxWidth = typeof quality === 'number' ? quality : PHOTO_QUALITY_SETTINGS[quality];
       
       photos.push({
         id: `google-places-${entity.id}`,
@@ -114,7 +135,9 @@ export const fetchGooglePlacesPhotos = async (entity: Entity): Promise<PhotoWith
         order: 0,
         source: 'google_places' as const,
         originalReference: photoRef,
-        isPrimary: true
+        isPrimary: true,
+        width: maxWidth,
+        height: maxWidth
       });
       console.log('✅ Added Google Places photo (fallback)');
     } else {

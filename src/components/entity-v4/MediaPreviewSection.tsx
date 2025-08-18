@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Camera, ChevronRight, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
-import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia } from '@/services/photoService';
+import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia, PhotoQuality } from '@/services/photoService';
 import { fetchEntityPhotos } from '@/services/entityPhotoService';
 import { Entity } from '@/services/recommendation/types';
 
@@ -22,8 +22,11 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   const loadPhotos = async () => {
     setLoading(true);
     try {
+      // Request high quality for main image, medium for grid images  
+      const qualityPreference: PhotoQuality[] = ['high', 'medium', 'medium', 'medium', 'medium'];
+      
       const [googlePhotos, reviewPhotos, entityPhotos] = await Promise.all([
-        fetchGooglePlacesPhotos(entity),
+        fetchGooglePlacesPhotos(entity, qualityPreference),
         fetchEntityReviewMedia(entity.id),
         fetchEntityPhotos(entity.id)
       ]);
