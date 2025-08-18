@@ -11,9 +11,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
+import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { PHOTO_CATEGORIES, EntityPhoto } from '@/services/entityPhotoService';
 
 interface PhotoGalleryModalProps {
   photos: (MediaItem & { source?: string; username?: string; createdAt?: string })[];
@@ -22,6 +24,13 @@ interface PhotoGalleryModalProps {
   onPhotoClick: (index: number) => void;
   initialScrollPosition?: number;
   onScrollPositionChange?: (position: number) => void;
+  galleryPhotoIndex?: number | null;
+  onResetGalleryScroll?: () => void;
+  entityPhotos?: EntityPhoto[];
+  onEdit?: (photo: EntityPhoto) => void;
+  onDelete?: (photo: EntityPhoto) => void;
+  onReport?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
+  isOwner?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => boolean;
 }
 
 export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
@@ -30,7 +39,14 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
   onClose,
   onPhotoClick,
   initialScrollPosition = 0,
-  onScrollPositionChange
+  onScrollPositionChange,
+  galleryPhotoIndex,
+  onResetGalleryScroll,
+  entityPhotos = [],
+  onEdit,
+  onDelete,
+  onReport,
+  isOwner
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'google_places' | 'reviews' | 'user'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
@@ -38,17 +54,6 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  // Photo categories for filtering (only for entity photos)
-  const PHOTO_CATEGORIES = [
-    { value: 'general', label: 'General' },
-    { value: 'food', label: 'Food & Drinks' },
-    { value: 'interior', label: 'Interior' },
-    { value: 'exterior', label: 'Exterior' },
-    { value: 'atmosphere', label: 'Atmosphere' },
-    { value: 'menu', label: 'Menu' },
-    { value: 'staff', label: 'Staff' },
-    { value: 'event', label: 'Events' }
-  ];
 
   // Restore scroll position when modal opens
   useEffect(() => {
@@ -232,7 +237,12 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                 <DropdownMenuContent align="end" className="w-[180px]">
                   <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setCategoryFilter(null)}>
+                  <DropdownMenuItem 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCategoryFilter(null);
+                    }}
+                  >
                     All Categories ({categoryCounts.user})
                   </DropdownMenuItem>
                   {PHOTO_CATEGORIES.map((category) => {
@@ -240,7 +250,10 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                     return (
                       <DropdownMenuItem 
                         key={category.value} 
-                        onClick={() => setCategoryFilter(category.value)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCategoryFilter(category.value);
+                        }}
                         disabled={count === 0}
                       >
                         {category.label} ({count})
@@ -263,11 +276,21 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
               <DropdownMenuContent align="end" className="w-[160px]">
                 <DropdownMenuLabel>Sort by</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setSortBy('newest')}>
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSortBy('newest');
+                  }}
+                >
                   <SortDesc className="w-4 h-4 mr-2" />
                   Newest First
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSortBy('oldest')}>
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSortBy('oldest');
+                  }}
+                >
                   <SortAsc className="w-4 h-4 mr-2" />
                   Oldest First
                 </DropdownMenuItem>
@@ -398,6 +421,38 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* PhotoLightbox Integration */}
+        {galleryPhotoIndex !== null && (
+          <PhotoLightbox
+            photos={filteredAndSortedPhotos}
+            currentIndex={galleryPhotoIndex}
+            onClose={onClose}
+            onNext={() => {
+              const nextIndex = (galleryPhotoIndex + 1) % filteredAndSortedPhotos.length;
+              const originalIndex = photos.findIndex(p => p.url === filteredAndSortedPhotos[nextIndex]?.url);
+              if (originalIndex !== -1) {
+                onPhotoClick(originalIndex);
+              }
+            }}
+            onPrevious={() => {
+              const prevIndex = (galleryPhotoIndex - 1 + filteredAndSortedPhotos.length) % filteredAndSortedPhotos.length;
+              const originalIndex = photos.findIndex(p => p.url === filteredAndSortedPhotos[prevIndex]?.url);
+              if (originalIndex !== -1) {
+                onPhotoClick(originalIndex);
+              }
+            }}
+            onBackToGallery={() => {
+              if (onPhotoClick) onPhotoClick(-1);
+            }}
+            source="gallery"
+            entityPhotos={entityPhotos}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onReport={onReport}
+            isOwner={isOwner}
+          />
+        )}
       </div>
     </div>
   );

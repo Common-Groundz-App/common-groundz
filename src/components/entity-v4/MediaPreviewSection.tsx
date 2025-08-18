@@ -265,7 +265,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
               />
               
               {/* Hover overlay with actions */}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex justify-between p-3">
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex justify-between p-3 pointer-events-none">
                 <div></div>
                 {/* 3-dot menu */}
                 <DropdownMenu>
@@ -273,7 +273,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-white hover:bg-white/20"
+                      className="h-8 w-8 text-white hover:bg-white/20 pointer-events-auto"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <MoreVertical className="h-4 w-4" />
@@ -464,6 +464,11 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
         onPhotoClick={handleGalleryPhotoClick}
         initialScrollPosition={galleryScrollPosition}
         onScrollPositionChange={setGalleryScrollPosition}
+        entityPhotos={entityPhotos}
+        onEdit={setEditingPhoto}
+        onDelete={setDeletingPhoto}
+        onReport={handleReportPhoto}
+        isOwner={isOwner}
       />
 
       {/* Photo Lightbox */}
@@ -481,6 +486,10 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
           onReport={handleReportPhoto}
           onBackToGallery={lightboxSource === 'gallery' ? backToGallery : undefined}
           source={lightboxSource}
+          entityPhotos={entityPhotos}
+          onEdit={setEditingPhoto}
+          onDelete={setDeletingPhoto}
+          isOwner={isOwner}
         />
       )}
 
