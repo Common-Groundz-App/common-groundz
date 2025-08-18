@@ -1,10 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Filter, SortAsc } from 'lucide-react';
+import { X, Filter, SortAsc, MoreVertical, Edit3, Trash2, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { EntityPhoto } from '@/services/entityPhotoService';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface PhotoGalleryModalProps {
   photos: (MediaItem & { source?: string; username?: string; createdAt?: string })[];
@@ -13,6 +20,11 @@ interface PhotoGalleryModalProps {
   onPhotoClick: (index: number) => void;
   initialScrollPosition?: number;
   onScrollPositionChange?: (position: number) => void;
+  user?: any;
+  entityPhotos?: EntityPhoto[];
+  onEditPhoto?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
+  onDeletePhoto?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
+  onReportPhoto?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
 }
 
 export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
@@ -21,7 +33,12 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
   onClose,
   onPhotoClick,
   initialScrollPosition = 0,
-  onScrollPositionChange
+  onScrollPositionChange,
+  user,
+  entityPhotos = [],
+  onEditPhoto,
+  onDeletePhoto,
+  onReportPhoto
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'google_places' | 'reviews' | 'user'>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'oldest'>('recent');
@@ -116,6 +133,13 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
       user: photos.filter(p => p.source === 'entity_photo').length
     };
   }, [photos]);
+
+  // Photo management handlers
+  const isOwner = useCallback((photo: MediaItem & { source?: string; username?: string; createdAt?: string }): boolean => {
+    return photo.source === 'entity_photo' && 
+           user && 
+           entityPhotos.some(ep => ep.id === photo.id && ep.user_id === user.id);
+  }, [user, entityPhotos]);
 
   if (!isOpen) return null;
 
@@ -254,6 +278,60 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
                     loading="lazy"
                   />
+                  
+                  {/* 3-dot dropdown menu */}
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-10">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 bg-black/60 hover:bg-black/80 text-white border-0 pointer-events-auto"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent 
+                        align="end" 
+                        className="w-48 bg-background border border-border shadow-lg z-50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {isOwner(photo) ? (
+                          <>
+                            {onEditPhoto && (
+                              <DropdownMenuItem 
+                                onClick={() => onEditPhoto(photo)}
+                                className="flex items-center gap-2 cursor-pointer"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                                Edit Media
+                              </DropdownMenuItem>
+                            )}
+                            {onDeletePhoto && (
+                              <DropdownMenuItem 
+                                onClick={() => onDeletePhoto(photo)}
+                                className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete Media
+                              </DropdownMenuItem>
+                            )}
+                          </>
+                        ) : (
+                          onReportPhoto && (
+                            <DropdownMenuItem 
+                              onClick={() => onReportPhoto(photo)}
+                              className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
+                            >
+                              <Flag className="h-4 w-4" />
+                              Report Media
+                            </DropdownMenuItem>
+                          )
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                   
                   {/* Video indicator */}
                   {photo.type === 'video' && (
