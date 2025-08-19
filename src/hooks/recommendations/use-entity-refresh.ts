@@ -72,8 +72,8 @@ export const useEntityImageRefresh = () => {
   };
 
   /**
-   * Refreshes an entity's image using the unified edge function approach
-   * All entities now go through the edge function to avoid CORS issues
+   * Refreshes an entity's image using specialized logic for different entity types
+   * Google Places entities get fresh photo references, others use existing refresh logic
    */
   const refreshEntityImage = async (entityId: string, placeId?: string, photoReference?: string): Promise<string | null> => {
     if (!entityId) {
@@ -98,9 +98,6 @@ export const useEntityImageRefresh = () => {
         { placeId, photoReference }
       );
       
-      // First, ensure the entity-images bucket has correct policies
-      await ensureBucketPolicies('entity-images');
-      
       // Get entity data to determine refresh strategy
       const { data: entity, error } = await supabase
         .from('entities')
@@ -119,9 +116,6 @@ export const useEntityImageRefresh = () => {
         throw new Error('Entity not found');
       }
 
-      // All entities now use the edge function for consistent behavior
-      console.log(`Using edge function for entity: ${entity.api_source || 'external'}`);
-      
       // Get current session for edge function authorization
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -129,48 +123,115 @@ export const useEntityImageRefresh = () => {
         console.error('No active session found for edge function authorization');
         throw new Error('Authentication required to refresh image');
       }
-      
-      // Prepare request data based on entity type
-      const requestData = prepareEdgeFunctionRequest(entity);
-      
-      console.log(`Calling edge function with data:`, requestData);
-      
-      const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify(requestData)
-      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response from refresh-entity-image:', errorText);
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { error: errorText || 'Failed to refresh entity image' };
+      let result;
+
+      // Handle Google Places entities with fresh data fetch
+      if (entity.api_source === 'google_places' && entity.api_ref) {
+        console.log(`🔄 Refreshing Google Places entity with fresh data from API`);
+        
+        const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-google-places-entity`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            entityId: entity.id,
+            placeId: entity.api_ref
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error response from refresh-google-places-entity:', errorText);
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || 'Failed to refresh Google Places entity' };
+          }
+          throw new Error(errorData.error || 'Failed to refresh Google Places entity');
         }
-        throw new Error(errorData.error || 'Failed to refresh entity image');
-      }
 
-      const responseData = await response.json();
-      console.log('Successful edge function response:', responseData);
+        const refreshData = await response.json();
+        console.log('Fresh Google Places data:', refreshData);
+
+        if (!refreshData.success) {
+          throw new Error(refreshData.error || 'Failed to get fresh Google Places data');
+        }
+
+        // Update entity with fresh metadata and new image URL
+        const existingMetadata = entity.metadata && typeof entity.metadata === 'object' ? entity.metadata : {};
+        const newMetadata = refreshData.updatedMetadata && typeof refreshData.updatedMetadata === 'object' ? refreshData.updatedMetadata : {};
+        const updatedMetadata = { ...existingMetadata as Record<string, any>, ...newMetadata as Record<string, any> };
+
+        const { error: updateError } = await supabase
+          .from('entities')
+          .update({
+            image_url: refreshData.newImageUrl,
+            metadata: updatedMetadata
+          })
+          .eq('id', entityId);
+
+        if (updateError) {
+          console.error('Error updating entity with fresh data:', updateError);
+          throw new Error(`Failed to update entity: ${updateError.message}`);
+        }
+
+        result = { imageUrl: refreshData.newImageUrl };
+        console.log('✅ Google Places entity refreshed with fresh data');
+      } 
+      // Handle all other entities using existing refresh logic
+      else {
+        console.log(`Using existing refresh logic for entity: ${entity.api_source || 'external'}`);
+        
+        // First, ensure the entity-images bucket has correct policies
+        await ensureBucketPolicies('entity-images');
+        
+        // Prepare request data based on entity type
+        const requestData = prepareEdgeFunctionRequest(entity);
+        
+        console.log(`Calling refresh-entity-image with data:`, requestData);
+        
+        const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error response from refresh-entity-image:', errorText);
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || 'Failed to refresh entity image' };
+          }
+          throw new Error(errorData.error || 'Failed to refresh entity image');
+        }
+
+        result = await response.json();
+        console.log('Successful edge function response:', result);
+      }
       
-      const { imageUrl } = responseData;
+      const imageUrl = result?.imageUrl;
       
       // Track successful refresh
       imagePerformanceService.trackImageStorage(
         'manual_refresh_success',
         entityId,
-        imageUrl,
+        imageUrl || '',
         startTime,
         true,
         undefined,
-        { apiSource: entity.api_source, method: 'edge_function' }
+        { apiSource: entity.api_source, method: entity.api_source === 'google_places' ? 'google_places_refresh' : 'edge_function' }
       );
 
       console.log('Entity image refreshed successfully:', entityId);
