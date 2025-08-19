@@ -263,7 +263,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 bg-black/60 hover:bg-black/80 text-white border-0 pointer-events-auto"
+                      className="h-6 w-6 p-0 text-white hover:bg-white/20 pointer-events-auto"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <MoreVertical className="h-4 w-4" />
@@ -341,7 +341,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-6 w-6 bg-black/60 hover:bg-black/80 text-white border-0 pointer-events-auto"
+                          className="h-6 w-6 p-0 text-white hover:bg-white/20 pointer-events-auto"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="h-3 w-3" />
