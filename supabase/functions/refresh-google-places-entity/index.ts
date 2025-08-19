@@ -32,6 +32,7 @@ serve(async (req) => {
     const { entityId, placeId } = requestData;
 
     console.log("🔄 Refreshing Google Places entity:", { entityId, placeId });
+    console.log("🔑 Google Places API Key available:", !!GOOGLE_PLACES_API_KEY);
 
     if (!entityId || !placeId) {
       return new Response(
@@ -57,6 +58,8 @@ serve(async (req) => {
         'User-Agent': 'Mozilla/5.0 (compatible; EntityApp/1.0)'
       }
     });
+
+    console.log(`📡 Google Places API response status: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       throw new Error(`Google Places API error: ${response.status} ${response.statusText}`);
