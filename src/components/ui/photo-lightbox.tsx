@@ -26,6 +26,7 @@ interface PhotoLightboxProps {
   entityPhotos?: EntityPhoto[];
   onEditPhoto?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
   onDeletePhoto?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
+  onReportComplete?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
 }
 
 export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
@@ -40,7 +41,8 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   user,
   entityPhotos = [],
   onEditPhoto,
-  onDeletePhoto
+  onDeletePhoto,
+  onReportComplete
 }) => {
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const mediaRef = useRef<(MediaItem & { source?: string; username?: string; createdAt?: string })[]>([]);
@@ -227,7 +229,10 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                 <>
                   {onEditPhoto && (
                     <DropdownMenuItem 
-                      onClick={() => onEditPhoto(currentPhoto)}
+                      onClick={() => {
+                        onClose();
+                        setTimeout(() => onEditPhoto(currentPhoto), 100);
+                      }}
                       className="flex items-center gap-2 cursor-pointer"
                     >
                       <Edit3 className="h-4 w-4" />
@@ -236,7 +241,10 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                   )}
                   {onDeletePhoto && (
                     <DropdownMenuItem 
-                      onClick={() => onDeletePhoto(currentPhoto)}
+                      onClick={() => {
+                        onClose();
+                        setTimeout(() => onDeletePhoto(currentPhoto), 100);
+                      }}
                       className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -245,9 +253,18 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                   )}
                 </>
               ) : (
-                onReport && (
+                (onReport || onReportComplete) && (
                   <DropdownMenuItem 
-                    onClick={() => onReport(currentPhoto)}
+                    onClick={() => {
+                      onClose();
+                      setTimeout(() => {
+                        if (onReportComplete) {
+                          onReportComplete(currentPhoto);
+                        } else if (onReport) {
+                          onReport(currentPhoto);
+                        }
+                      }, 100);
+                    }}
                     className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
                   >
                     <Flag className="h-4 w-4" />
