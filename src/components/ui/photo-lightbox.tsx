@@ -27,6 +27,7 @@ interface PhotoLightboxProps {
   onEditPhoto?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
   onDeletePhoto?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
   onReportComplete?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
+  onCloseGallery?: () => void;
 }
 
 export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
@@ -42,7 +43,8 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   entityPhotos = [],
   onEditPhoto,
   onDeletePhoto,
-  onReportComplete
+  onReportComplete,
+  onCloseGallery
 }) => {
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const mediaRef = useRef<(MediaItem & { source?: string; username?: string; createdAt?: string })[]>([]);
@@ -231,7 +233,12 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                     <DropdownMenuItem 
                       onClick={() => {
                         onClose();
-                        setTimeout(() => onEditPhoto(currentPhoto), 100);
+                        if (onCloseGallery && source === 'gallery') {
+                          setTimeout(() => onCloseGallery(), 100);
+                          setTimeout(() => onEditPhoto(currentPhoto), 200);
+                        } else {
+                          setTimeout(() => onEditPhoto(currentPhoto), 100);
+                        }
                       }}
                       className="flex items-center gap-2 cursor-pointer"
                     >
@@ -243,7 +250,12 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                     <DropdownMenuItem 
                       onClick={() => {
                         onClose();
-                        setTimeout(() => onDeletePhoto(currentPhoto), 100);
+                        if (onCloseGallery && source === 'gallery') {
+                          setTimeout(() => onCloseGallery(), 100);
+                          setTimeout(() => onDeletePhoto(currentPhoto), 200);
+                        } else {
+                          setTimeout(() => onDeletePhoto(currentPhoto), 100);
+                        }
                       }}
                       className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
                     >
@@ -257,13 +269,24 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                   <DropdownMenuItem 
                     onClick={() => {
                       onClose();
-                      setTimeout(() => {
-                        if (onReportComplete) {
-                          onReportComplete(currentPhoto);
-                        } else if (onReport) {
-                          onReport(currentPhoto);
-                        }
-                      }, 100);
+                      if (onCloseGallery && source === 'gallery') {
+                        setTimeout(() => onCloseGallery(), 100);
+                        setTimeout(() => {
+                          if (onReportComplete) {
+                            onReportComplete(currentPhoto);
+                          } else if (onReport) {
+                            onReport(currentPhoto);
+                          }
+                        }, 200);
+                      } else {
+                        setTimeout(() => {
+                          if (onReportComplete) {
+                            onReportComplete(currentPhoto);
+                          } else if (onReport) {
+                            onReport(currentPhoto);
+                          }
+                        }, 100);
+                      }
                     }}
                     className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
                   >

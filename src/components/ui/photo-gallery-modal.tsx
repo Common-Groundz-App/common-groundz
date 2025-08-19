@@ -301,7 +301,10 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                           <>
                             {onEditPhoto && (
                               <DropdownMenuItem 
-                                onClick={() => onEditPhoto(photo)}
+                                onClick={() => {
+                                  onClose();
+                                  setTimeout(() => onEditPhoto(photo), 100);
+                                }}
                                 className="flex items-center gap-2 cursor-pointer"
                               >
                                 <Edit3 className="h-4 w-4" />
@@ -310,7 +313,10 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                             )}
                             {onDeletePhoto && (
                               <DropdownMenuItem 
-                                onClick={() => onDeletePhoto(photo)}
+                                onClick={() => {
+                                  onClose();
+                                  setTimeout(() => onDeletePhoto(photo), 100);
+                                }}
                                 className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -321,7 +327,10 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                         ) : (
                           onReportPhoto && (
                             <DropdownMenuItem 
-                              onClick={() => onReportPhoto(photo)}
+                              onClick={() => {
+                                onClose();
+                                setTimeout(() => onReportPhoto(photo), 100);
+                              }}
                               className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
                             >
                               <Flag className="h-4 w-4" />

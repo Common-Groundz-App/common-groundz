@@ -467,9 +467,10 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
           source={lightboxSource}
           user={user}
           entityPhotos={entityPhotos}
-            onEditPhoto={handleEditPhoto}
-            onDeletePhoto={handleDeletePhoto}
-            onReportComplete={handleReportPhoto}
+          onEditPhoto={handleEditPhoto}
+          onDeletePhoto={handleDeletePhoto}
+          onReportComplete={handleReportPhoto}
+          onCloseGallery={lightboxSource === 'gallery' ? closeGallery : undefined}
         />
       )}
 
