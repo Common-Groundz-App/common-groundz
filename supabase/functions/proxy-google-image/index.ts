@@ -6,6 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cache-control, pragma, expires',
 }
 
+// Allowed image widths for optimization and consistency
+const ALLOWED_WIDTHS = [400, 800, 1200, 1600];
+const DEFAULT_WIDTH = 400;
+
 // Simple in-memory cache for frequently requested images
 const imageCache = new Map<string, { data: Blob, contentType: string, timestamp: number }>();
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
@@ -18,7 +22,7 @@ serve(async (req) => {
   try {
     const url = new URL(req.url)
     const photoReference = url.searchParams.get('ref')
-    const maxWidth = url.searchParams.get('maxWidth') || '400'
+    const requestedWidth = url.searchParams.get('maxWidth') || DEFAULT_WIDTH.toString()
     
     if (!photoReference) {
       return new Response(
@@ -30,6 +34,18 @@ serve(async (req) => {
       )
     }
 
+    // Validate and normalize width to allowed values
+    const requestedWidthNum = parseInt(requestedWidth, 10);
+    const maxWidth = ALLOWED_WIDTHS.includes(requestedWidthNum) 
+      ? requestedWidthNum 
+      : ALLOWED_WIDTHS.reduce((prev, curr) => 
+          Math.abs(curr - requestedWidthNum) < Math.abs(prev - requestedWidthNum) ? curr : prev
+        );
+
+    if (requestedWidthNum !== maxWidth) {
+      console.log(`📐 Width ${requestedWidthNum} not allowed, using closest: ${maxWidth}`);
+    }
+
     // Check cache first
     const cacheKey = `${photoReference}_${maxWidth}`;
     const cached = imageCache.get(cacheKey);
@@ -39,7 +55,7 @@ serve(async (req) => {
         headers: {
           ...corsHeaders,
           'Content-Type': cached.contentType,
-          'Cache-Control': 'public, max-age=3600',
+          'Cache-Control': 'public, s-maxage=604800, stale-while-revalidate=2592000',
         },
       });
     }
@@ -126,7 +142,7 @@ serve(async (req) => {
         headers: {
           ...corsHeaders,
           'Content-Type': contentType,
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'public, s-maxage=604800, stale-while-revalidate=2592000',
         },
       })
       
