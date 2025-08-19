@@ -3,8 +3,11 @@ import { Camera, ChevronRight, Play, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoGalleryModal } from '@/components/ui/photo-gallery-modal';
+import { PhotoReportModal } from '@/components/ui/photo-report-modal';
+import { EntityPhotoEditModal } from './EntityPhotoEditModal';
+import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { PhotoWithMetadata, fetchGooglePlacesPhotos, fetchEntityReviewMedia, PhotoQuality } from '@/services/photoService';
-import { fetchEntityPhotos } from '@/services/entityPhotoService';
+import { fetchEntityPhotos, deleteEntityPhoto } from '@/services/entityPhotoService';
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { SimpleMediaUploadModal } from './SimpleMediaUploadModal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,12 +26,19 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
+  const [entityPhotos, setEntityPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryScrollPosition, setGalleryScrollPosition] = useState(0);
   const [lightboxSource, setLightboxSource] = useState<'direct' | 'gallery'>('direct');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  
+  // Modal states
+  const [reportModalPhoto, setReportModalPhoto] = useState<PhotoWithMetadata | null>(null);
+  const [editingPhoto, setEditingPhoto] = useState<any | null>(null);
+  const [deletingPhoto, setDeletingPhoto] = useState<any | null>(null);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
 
   const loadPhotos = async () => {
     setLoading(true);
@@ -36,14 +46,17 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
       // Request high quality for main image, medium for grid images  
       const qualityPreference: PhotoQuality[] = ['high', 'medium', 'medium', 'medium', 'medium'];
       
-      const [googlePhotos, reviewPhotos, entityPhotos] = await Promise.all([
+      const [googlePhotos, reviewPhotos, fetchedEntityPhotos] = await Promise.all([
         fetchGooglePlacesPhotos(entity, qualityPreference),
         fetchEntityReviewMedia(entity.id),
         fetchEntityPhotos(entity.id)
       ]);
       
+      // Store entity photos for ownership checking
+      setEntityPhotos(fetchedEntityPhotos);
+      
       // Convert entity photos to PhotoWithMetadata format
-      const convertedEntityPhotos: PhotoWithMetadata[] = entityPhotos.map((photo, index) => ({
+      const convertedEntityPhotos: PhotoWithMetadata[] = fetchedEntityPhotos.map((photo, index) => ({
         id: photo.id,
         url: photo.url,
         type: 'image' as const,
@@ -104,6 +117,50 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
       onViewAllClick();
     } else {
       openGallery();
+    }
+  };
+
+  // Modal handlers
+  const handleReportPhoto = (photo: PhotoWithMetadata) => {
+    setReportModalPhoto(photo);
+  };
+
+  const handleEditPhoto = (photo: any) => {
+    setEditingPhoto(photo);
+  };
+
+  const handleDeletePhoto = (photo: any) => {
+    setDeletingPhoto(photo);
+  };
+
+  const handlePhotoUpdated = (updatedPhoto: any) => {
+    setEditingPhoto(null);
+    loadPhotos(); // Refresh photos after edit
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingPhoto || !user) return;
+
+    setIsDeletingPhoto(true);
+    try {
+      await deleteEntityPhoto(deletingPhoto.id);
+      
+      toast({
+        title: "Photo deleted",
+        description: "The photo has been successfully deleted.",
+      });
+      
+      setDeletingPhoto(null);
+      loadPhotos(); // Refresh photos after delete
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete photo. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingPhoto(false);
     }
   };
 
@@ -279,14 +336,52 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
           onNext={() => setSelectedPhotoIndex(prev => 
             prev !== null ? (prev < photos.length - 1 ? prev + 1 : 0) : null
           )}
-          onReport={(photo) => {
-            console.log('Report photo:', photo);
-            // Could implement photo reporting here
-          }}
           onBackToGallery={lightboxSource === 'gallery' ? backToGallery : undefined}
           source={lightboxSource}
+          entityPhotos={entityPhotos}
+          entity={entity}
+          user={user}
+          onEdit={handleEditPhoto}
+          onDelete={handleDeletePhoto}
+          onReportComplete={handleReportPhoto}
         />
       )}
+
+      {/* Report Modal */}
+      {reportModalPhoto && (
+        <PhotoReportModal
+          photo={reportModalPhoto}
+          entityId={entity.id}
+          onClose={() => setReportModalPhoto(null)}
+          onReported={() => {
+            setReportModalPhoto(null);
+            toast({
+              title: "Report submitted",
+              description: "Thank you for reporting this content.",
+            });
+          }}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editingPhoto && (
+        <EntityPhotoEditModal
+          photo={editingPhoto}
+          isOpen={!!editingPhoto}
+          onClose={() => setEditingPhoto(null)}
+          onPhotoUpdated={handlePhotoUpdated}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={!!deletingPhoto}
+        onClose={() => setDeletingPhoto(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Photo"
+        description="Are you sure you want to delete this photo? This action cannot be undone."
+        isLoading={isDeletingPhoto}
+      />
 
       {/* Upload Modal */}
       <SimpleMediaUploadModal
