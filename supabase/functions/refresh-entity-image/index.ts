@@ -424,14 +424,22 @@ serve(async (req) => {
         
         console.log("Using provided photo reference to fetch image:", photoReference);
         
-        // Save image to our storage
-        const storedImageUrl = await saveImageToStorage(googleImageUrl, entityId, supabase);
-        
-        if (!storedImageUrl) {
-          throw new Error("Failed to save Google Places image to storage");
+        try {
+          // Save image to our storage
+          const storedImageUrl = await saveImageToStorage(googleImageUrl, entityId, supabase);
+          
+          if (!storedImageUrl) {
+            throw new Error("Failed to save Google Places image to storage");
+          }
+          
+          result = { imageUrl: storedImageUrl, photoReference };
+        } catch (error) {
+          // Handle expired photo reference more gracefully
+          if (error.message.includes('400') || error.message.includes('Bad Request')) {
+            throw new Error(`Photo reference appears to be expired. The Google Places entity needs fresh data with a valid place_id to get new photo references.`);
+          }
+          throw error;
         }
-        
-        result = { imageUrl: storedImageUrl, photoReference };
       } else if (placeId) {
         // Fetch place details to get photo reference
         console.log("No photo reference provided, fetching place details for:", placeId);

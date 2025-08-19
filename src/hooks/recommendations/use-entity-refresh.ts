@@ -31,7 +31,7 @@ export const useEntityImageRefresh = () => {
       return {
         ...baseRequest,
         placeId: (entity.metadata as any)?.place_id,
-        photoReference: entity.metadata?.photo_reference,
+        photoReference: (entity.metadata as any)?.photo_reference,
         apiSource: 'google_places'
       };
     }
@@ -183,6 +183,61 @@ export const useEntityImageRefresh = () => {
         result = { imageUrl: refreshData.newImageUrl };
         console.log('✅ Google Places entity refreshed with fresh data');
       } 
+      // Handle Google Places entities WITHOUT place_id (special error handling)
+      else if (entity.api_source === 'google_places' && !(entity.metadata as any)?.place_id) {
+        console.log(`⚠️ Google Places entity missing place_id, checking photo_reference fallback`);
+        
+        const photoReference = (entity.metadata as any)?.photo_reference;
+        if (!photoReference) {
+          toast({
+            title: "Image refresh failed",
+            description: `This Google Places entity is missing both place_id and photo_reference. Please contact support to fix the entity data.`,
+            variant: "destructive",
+          });
+          throw new Error('Google Places entity missing both place_id and photo_reference');
+        }
+
+        // Try to use the old photo reference but handle expired references gracefully
+        console.log(`🔄 Trying to refresh with existing photo_reference (may be expired)`);
+        
+        const requestData = prepareEdgeFunctionRequest(entity);
+        
+        const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-entity-image`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error response from refresh-entity-image:', errorText);
+          
+          // Check if it's likely an expired photo reference error
+          if (errorText.includes('expired') || errorText.includes('400') || errorText.includes('Bad Request')) {
+            toast({
+              title: "Image refresh failed",
+              description: `This Google Places entity has an expired photo reference and is missing place_id. The entity needs to be updated with current Google Places data.`,
+              variant: "destructive",
+            });
+            throw new Error('Google Places entity has expired photo reference and missing place_id');
+          } else {
+            let errorData;
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { error: errorText || 'Failed to refresh entity image' };
+            }
+            throw new Error(errorData.error || 'Failed to refresh entity image');
+          }
+        }
+
+        result = await response.json();
+        console.log('✅ Google Places entity refreshed using fallback photo_reference');
+      }
       // Handle all other entities using existing refresh logic
       else {
         console.log(`Using existing refresh logic for entity: ${entity.api_source || 'external'}`);

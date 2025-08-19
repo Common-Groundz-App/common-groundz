@@ -36,6 +36,7 @@ import { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations';
 import { CreateEntityDialog } from './CreateEntityDialog';
+import { AdminEntityPlaceIdTool } from './AdminEntityPlaceIdTool';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -779,14 +780,24 @@ export const AdminEntityManagementPanel = () => {
                                 </div>
                               )}
                               
-                              {entity.metadata && (
-                                <div>
-                                  <label className="text-sm font-medium">Metadata</label>
-                                  <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-32">
-                                    {JSON.stringify(entity.metadata, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
+                               {entity.metadata && (
+                                 <div>
+                                   <label className="text-sm font-medium">Metadata</label>
+                                   <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-32">
+                                     {JSON.stringify(entity.metadata, null, 2)}
+                                   </pre>
+                                 </div>
+                               )}
+                               
+                               {/* Google Places ID Management Tool */}
+                               {entity.api_source === 'google_places' && (
+                                 <AdminEntityPlaceIdTool
+                                   entityId={entity.id}
+                                   entityName={entity.name}
+                                   currentMetadata={entity.metadata}
+                                   onUpdate={fetchEntities}
+                                 />
+                               )}
                             </div>
                           </DialogContent>
                         </Dialog>
