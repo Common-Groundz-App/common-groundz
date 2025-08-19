@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Flag, MoreVertical, Edit3, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { EntityPhoto } from '@/services/entityPhotoService';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface PhotoLightboxProps {
   photos: (MediaItem & { source?: string; username?: string; createdAt?: string })[];
@@ -16,12 +22,10 @@ interface PhotoLightboxProps {
   onReport?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
   onBackToGallery?: () => void;
   source?: 'direct' | 'gallery';
-  entityPhotos?: any[];
-  entity?: any;
   user?: any;
-  onEdit?: (photo: any) => void;
-  onDelete?: (photo: any) => void;
-  onReportComplete?: (photo: any) => void;
+  entityPhotos?: EntityPhoto[];
+  onEditPhoto?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
+  onDeletePhoto?: (photo: MediaItem & { source?: string; username?: string; createdAt?: string }) => void;
 }
 
 export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
@@ -33,26 +37,16 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   onReport,
   onBackToGallery,
   source = 'direct',
-  entityPhotos = [],
-  entity,
   user,
-  onEdit,
-  onDelete,
-  onReportComplete
+  entityPhotos = [],
+  onEditPhoto,
+  onDeletePhoto
 }) => {
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const mediaRef = useRef<(MediaItem & { source?: string; username?: string; createdAt?: string })[]>([]);
   const isMobile = useIsMobile();
 
   const currentPhoto = photos[currentIndex];
-  
-  // Check if current photo is owned by user
-  const isOwnerPhoto = currentPhoto.source === 'entity_photo' && user && entityPhotos.some(ep => 
-    ep.id === currentPhoto.id && ep.user_id === user.id
-  );
-  
-  // Get entity photo data for edit/delete operations
-  const entityPhoto = isOwnerPhoto ? entityPhotos.find(ep => ep.id === currentPhoto.id) : null;
 
   // Prevent body scrolling when lightbox is open
   useEffect(() => {
@@ -109,6 +103,13 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
       setLoaded(prev => ({...prev, [key]: true}));
     }
   };
+
+  // Photo management handlers
+  const isOwner = useCallback((photo: MediaItem & { source?: string; username?: string; createdAt?: string }): boolean => {
+    return photo.source === 'entity_photo' && 
+           user && 
+           entityPhotos.some(ep => ep.id === photo.id && ep.user_id === user.id);
+  }, [user, entityPhotos]);
 
   if (!currentPhoto) return null;
 
@@ -195,67 +196,68 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
         </Button>
 
         {/* 3-dot dropdown menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              className={cn(
-                "absolute z-[60] rounded-full bg-gray-800/70 hover:bg-gray-700",
-                isMobile ? "right-12 top-2 h-8 w-8" : "right-16 top-4 h-10 w-10"
-              )}
-              size="icon"
-              variant="ghost"
+        <div className={cn(
+          "absolute z-50",
+          isMobile ? "right-12 top-2" : "right-16 top-4"
+        )}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  "rounded-full bg-gray-800/70 hover:bg-gray-700",
+                  isMobile ? "h-8 w-8" : "h-10 w-10"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+              >
+                <MoreVertical className={cn("text-white", isMobile ? "h-4 w-4" : "h-5 w-5")} />
+                <span className="sr-only">Photo options</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              align="end" 
+              className="w-48 bg-background border border-border shadow-lg z-[10000]"
               onClick={(e) => e.stopPropagation()}
             >
-              <MoreVertical className={cn("text-white", isMobile ? "h-4 w-4" : "h-5 w-5")} />
-              <span className="sr-only">Photo options</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent 
-            className="z-[61] bg-background border border-border shadow-lg"
-            align="end"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {isOwnerPhoto && onEdit && entityPhoto && (
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose();
-                  setTimeout(() => onEdit(entityPhoto), 100);
-                }}
-                className="cursor-pointer"
-              >
-                <Edit3 className="mr-2 h-4 w-4" />
-                Edit Media
-              </DropdownMenuItem>
-            )}
-            {isOwnerPhoto && onDelete && entityPhoto && (
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose();
-                  setTimeout(() => onDelete(entityPhoto), 100);
-                }}
-                className="cursor-pointer text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Media
-              </DropdownMenuItem>
-            )}
-            {!isOwnerPhoto && onReportComplete && (
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose();
-                  setTimeout(() => onReportComplete(currentPhoto), 100);
-                }}
-                className="cursor-pointer text-destructive focus:text-destructive"
-              >
-                <Flag className="mr-2 h-4 w-4" />
-                Report Media
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {isOwner(currentPhoto) ? (
+                <>
+                  {onEditPhoto && (
+                    <DropdownMenuItem 
+                      onClick={() => onEditPhoto(currentPhoto)}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                      Edit Media
+                    </DropdownMenuItem>
+                  )}
+                  {onDeletePhoto && (
+                    <DropdownMenuItem 
+                      onClick={() => onDeletePhoto(currentPhoto)}
+                      className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete Media
+                    </DropdownMenuItem>
+                  )}
+                </>
+              ) : (
+                onReport && (
+                  <DropdownMenuItem 
+                    onClick={() => onReport(currentPhoto)}
+                    className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
+                  >
+                    <Flag className="h-4 w-4" />
+                    Report Media
+                  </DropdownMenuItem>
+                )
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         {/* Photo counter */}
         {photos.length > 1 && (
