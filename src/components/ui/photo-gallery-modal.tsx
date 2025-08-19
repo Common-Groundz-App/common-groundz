@@ -294,8 +294,9 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent 
                         align="end" 
-                        className="w-48 bg-background border border-border shadow-lg z-50"
+                        className="w-48 bg-background border border-border shadow-lg z-[9999]"
                         onClick={(e) => e.stopPropagation()}
+                        side="left"
                       >
                         {isOwner(photo) ? (
                           <>

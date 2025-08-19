@@ -254,7 +254,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 onClick={() => handlePhotoClick(0)}
               />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 pointer-events-none" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 pointer-events-none" />
               
               {/* 3-dot dropdown menu */}
               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
@@ -332,7 +332,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                     alt={photo.alt || entity.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 pointer-events-none" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 pointer-events-none" />
                   
                   {/* 3-dot dropdown menu */}
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
