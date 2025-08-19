@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Trash2, Shield, AlertCircle, AlertTriangle, RotateCcw, History } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Shield, AlertCircle, AlertTriangle, RotateCcw, History, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NavBarComponent from '@/components/NavBarComponent';
@@ -46,6 +46,7 @@ const AdminEntityEdit = () => {
   const [adminActions, setAdminActions] = useState<any[]>([]);
   const [businessHours, setBusinessHours] = useState<any>({});
   const [contactInfo, setContactInfo] = useState<any>({});
+  const [refreshingMetadata, setRefreshingMetadata] = useState(false);
 
   useEffect(() => {
     if (!user || !session) {
@@ -296,6 +297,56 @@ const AdminEntityEdit = () => {
       setShowRestoreConfirm(false);
       setEntity({ ...entity, is_deleted: false });
       fetchAdminActions(); // Refresh audit trail
+    }
+  };
+
+  const handleFixMetadata = async () => {
+    if (!entity || !session) return;
+
+    const hasAdminPermission = await checkAdminPermission();
+    if (!hasAdminPermission) {
+      return;
+    }
+
+    setRefreshingMetadata(true);
+    try {
+      console.log('handleFixMetadata: Refreshing metadata for entity:', entity.id);
+
+      const { data, error } = await supabase.functions.invoke('refresh-entity-metadata', {
+        body: { entityId: entity.id }
+      });
+
+      if (error) {
+        console.error('Error calling refresh-entity-metadata function:', error);
+        throw error;
+      }
+
+      if (data?.success) {
+        // Update the entity with the refreshed metadata
+        setEntity({
+          ...entity,
+          metadata: data.metadata
+        });
+        setMetadataText(JSON.stringify(data.metadata, null, 2));
+
+        toast({
+          title: 'Success',
+          description: data.message || 'Metadata refreshed successfully',
+        });
+
+        fetchAdminActions(); // Refresh audit trail
+      } else {
+        throw new Error(data?.error || 'Failed to refresh metadata');
+      }
+    } catch (error) {
+      console.error('Error refreshing metadata:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to refresh metadata: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'destructive'
+      });
+    } finally {
+      setRefreshingMetadata(false);
     }
   };
 
@@ -659,7 +710,19 @@ const AdminEntityEdit = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="metadata">Metadata (JSON)</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="metadata">Metadata (JSON)</Label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleFixMetadata}
+                          disabled={entity.is_deleted || refreshingMetadata}
+                          className="gap-2"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${refreshingMetadata ? 'animate-spin' : ''}`} />
+                          {refreshingMetadata ? 'Refreshing...' : 'Fix Metadata'}
+                        </Button>
+                      </div>
                       <Textarea
                         id="metadata"
                         value={metadataText}
@@ -670,7 +733,7 @@ const AdminEntityEdit = () => {
                         disabled={entity.is_deleted}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Must be valid JSON format
+                        Must be valid JSON format. Click "Fix Metadata" to refresh from external APIs.
                       </p>
                     </div>
                   </CardContent>
