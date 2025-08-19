@@ -64,26 +64,15 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
       return false;
     }
 
-    // For Google Places entities, fetch fresh photo from the API
-    if (entity.api_source === 'google_places' && entity.api_ref && entity.metadata?.photo_reference) {
-      // We need to call our Edge Function to get the fresh photo URL
-      const { data, error } = await supabase.functions.invoke('refresh-entity-image', {
-        body: {
-          entityId,
-          placeId: entity.api_ref,
-          photoReference: entity.metadata.photo_reference
-        }
-      });
+    // For Google Places entities, use proxy URL with existing photo reference
+    if (entity.api_source === 'google_places' && entity.metadata?.photo_reference) {
+      // Generate new proxy URL using existing photo reference
+      const proxyUrl = `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-image?ref=${entity.metadata.photo_reference}&maxWidth=400`;
 
-      if (error || !data?.imageUrl) {
-        console.error('Error refreshing entity image:', error);
-        return false;
-      }
-
-      // Update the entity with the new image URL
+      // Update the entity with the proxy URL
       const { error: updateError } = await supabase
         .from('entities')
-        .update({ image_url: data.imageUrl })
+        .update({ image_url: proxyUrl })
         .eq('id', entityId);
 
       if (updateError) {
@@ -91,6 +80,7 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
         return false;
       }
 
+      console.log('✅ Google Places entity image refreshed with proxy URL');
       return true;
     }
     
@@ -190,8 +180,8 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
 
   console.log(`✅ Basic entity created successfully with slug: ${data?.slug}`, data);
   
-  // For basic entities, also try to save the image locally if provided
-  if (data && entity.image_url && !entity.image_url.includes('entity-images')) {
+  // Skip local image storage for Google Places entities - they use proxy URLs
+  if (data && entity.image_url && !entity.image_url.includes('entity-images') && entity.api_source !== 'google_places') {
     console.log('🖼️ Attempting to save image locally for basic entity:', data.id);
     const savedImageUrl = await saveExternalImageToStorage(entity.image_url, data.id);
     
@@ -207,6 +197,8 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
         console.log('✅ Basic entity image updated to local storage');
       }
     }
+  } else if (entity.api_source === 'google_places') {
+    console.log('✅ Google Places entity using proxy URL - no local storage needed');
   }
   
   return data as Entity;

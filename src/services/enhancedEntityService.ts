@@ -75,8 +75,8 @@ export const createEnhancedEntity = async (rawData: any, entityType: string): Pr
     
     console.log('✅ Entity created with ID:', entity.id);
     
-    // Now save image locally using the actual entity ID
-    if (enhancedData.image_url) {
+    // Skip local image storage for Google Places images - they use proxy URLs
+    if (enhancedData.image_url && enhancedData.api_source !== 'google_places') {
       console.log('🖼️ Saving image to local storage for entity:', entity.id);
       const savedImageUrl = await saveExternalImageToStorage(enhancedData.image_url, entity.id);
       
@@ -94,6 +94,8 @@ export const createEnhancedEntity = async (rawData: any, entityType: string): Pr
           entity.image_url = savedImageUrl;
         }
       }
+    } else if (enhancedData.api_source === 'google_places') {
+      console.log('✅ Google Places image using proxy URL - no local storage needed');
     }
     
     console.log('✅ Enhanced entity created successfully:', entity);

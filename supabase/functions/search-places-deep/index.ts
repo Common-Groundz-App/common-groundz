@@ -53,8 +53,8 @@ serve(async (req) => {
                   let imageUrl = null;
                   let photoReferences = [];
                   if (placeDetail.photos && placeDetail.photos.length > 0) {
-                    // Use first photo as primary image_url
-                    imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${placeDetail.photos[0].photo_reference}&key=${googlePlacesApiKey}`;
+                    // Use proxy URL for primary image_url  
+                    imageUrl = `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-image?ref=${placeDetail.photos[0].photo_reference}&maxWidth=400`;
                     
                     // Store all photo references for multiple images
                     photoReferences = placeDetail.photos.map(photo => ({
