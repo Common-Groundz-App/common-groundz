@@ -30,7 +30,7 @@ export const useEntityImageRefresh = () => {
     if (entity.api_source === 'google_places') {
       return {
         ...baseRequest,
-        placeId: entity.api_ref,
+        placeId: (entity.metadata as any)?.place_id,
         photoReference: entity.metadata?.photo_reference,
         apiSource: 'google_places'
       };
@@ -127,7 +127,7 @@ export const useEntityImageRefresh = () => {
       let result;
 
       // Handle Google Places entities with fresh data fetch
-      if (entity.api_source === 'google_places' && entity.api_ref) {
+      if (entity.api_source === 'google_places' && (entity.metadata as any)?.place_id) {
         console.log(`🔄 Refreshing Google Places entity with fresh data from API`);
         
         const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-google-places-entity`, {
@@ -139,7 +139,7 @@ export const useEntityImageRefresh = () => {
           },
           body: JSON.stringify({
             entityId: entity.id,
-            placeId: entity.api_ref
+            placeId: (entity.metadata as any).place_id
           })
         });
 
