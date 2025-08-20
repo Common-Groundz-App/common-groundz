@@ -123,7 +123,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     const convertedEntityPhotos: PhotoWithMetadata[] = entityPhotos.map((photo, index) => ({
       id: photo.id,
       url: photo.url,
-      type: 'image' as const,
+      type: photo.content_type?.startsWith('video/') ? 'video' : 'image',
       order: index,
       source: 'entity_photo' as const,
       alt: photo.alt_text || photo.caption,
@@ -434,23 +434,47 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                 className="relative group aspect-square overflow-hidden rounded-lg cursor-pointer bg-muted"
                 onClick={() => handlePhotoClick(index)}
               >
-                <img
-                  src={photo.url}
-                  alt={photo.alt || entity.name}
-                  className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                  loading="lazy"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const fallback = target.parentElement?.querySelector('.fallback-placeholder');
-                    if (!fallback) {
-                      const placeholder = document.createElement('div');
-                      placeholder.className = 'fallback-placeholder w-full h-full bg-muted flex items-center justify-center';
-                      placeholder.innerHTML = '<div class="text-muted-foreground">📷</div>';
-                      target.parentElement?.appendChild(placeholder);
-                    }
-                  }}
-                />
+                {photo.type === 'video' ? (
+                  <video
+                    src={photo.url}
+                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={photo.url}
+                    alt={photo.alt || entity.name}
+                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const fallback = target.parentElement?.querySelector('.fallback-placeholder');
+                      if (!fallback) {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'fallback-placeholder w-full h-full bg-muted flex items-center justify-center';
+                        placeholder.innerHTML = '<div class="text-muted-foreground">📷</div>';
+                        target.parentElement?.appendChild(placeholder);
+                      }
+                    }}
+                  />
+                )}
+                
+                {/* Video play button overlay */}
+                {photo.type === 'video' && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="rounded-full bg-black/50 p-2">
+                      <svg
+                        className="h-4 w-4 text-white"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Photo overlay with metadata */}
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-between p-2">
