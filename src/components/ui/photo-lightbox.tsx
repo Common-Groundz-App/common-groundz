@@ -424,11 +424,13 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
           <div className="flex justify-between items-start">
             <div>
               {currentPhoto.source === 'google_places' ? (
-                <p className="text-sm">Photo from Google Places</p>
+                <p className="text-sm">
+                  {currentPhoto.type === 'video' ? 'Video' : 'Photo'} from Google Places
+                </p>
               ) : (
                 <div>
                   <p className="text-sm">
-                    Photo by {currentPhoto.username || 'User'}
+                    {currentPhoto.type === 'video' ? 'Video' : 'Photo'} by {currentPhoto.username || 'User'}
                   </p>
                   {currentPhoto.createdAt && (
                     <p className="text-xs text-gray-300">
