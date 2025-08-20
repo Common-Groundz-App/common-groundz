@@ -127,19 +127,26 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
     });
 
     // Add timeline updates
-    timelineData.forEach((update, index) => {
+    timelineData.forEach((update) => {
       entries.push({
         period: formatRelativeDate(update.created_at),
         content: update.comment,
         rating: update.rating || undefined,
-        isLatest: index === timelineData.length - 1, // Mark latest update
+        isLatest: false, // Will be set after sorting
         date: update.created_at,
         media: update.media || []
       });
     });
 
     // Sort by date (oldest first)
-    return entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedEntries = entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // Mark the last entry (most recent chronologically) as latest
+    if (sortedEntries.length > 1) {
+      sortedEntries[sortedEntries.length - 1].isLatest = true;
+    }
+
+    return sortedEntries;
   };
 
   const timelineEntries = generateTimelineEntries();
