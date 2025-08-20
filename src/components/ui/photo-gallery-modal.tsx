@@ -188,7 +188,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                 { key: 'all', label: 'All', count: categoryCounts.all },
                 { key: 'google_places', label: 'Google Places', count: categoryCounts.google_places },
                 { key: 'reviews', label: 'Reviews', count: categoryCounts.reviews },
-                { key: 'user', label: 'User Photos', count: categoryCounts.user }
+                { key: 'user', label: 'User Uploads', count: categoryCounts.user }
               ].map(({ key, label, count }) => (
                 <Button
                   key={key}
@@ -238,7 +238,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
               { key: 'all', label: 'All', count: categoryCounts.all },
               { key: 'google_places', label: 'Places', count: categoryCounts.google_places },
               { key: 'reviews', label: 'Reviews', count: categoryCounts.reviews },
-              { key: 'user', label: 'User', count: categoryCounts.user }
+              { key: 'user', label: 'Uploads', count: categoryCounts.user }
             ].map(({ key, label, count }) => (
               <Button
                 key={key}

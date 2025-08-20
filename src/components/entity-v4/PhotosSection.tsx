@@ -411,7 +411,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                 All ({allPhotos.length})
               </TabsTrigger>
               <TabsTrigger value="entity">
-                User Photos ({entityPhotos.length})
+                User Uploads ({entityPhotos.length})
                 {categoryFilter && (
                   <Badge variant="outline" className="ml-1 text-xs">
                     {getCategoryCounts[categoryFilter] || 0}
