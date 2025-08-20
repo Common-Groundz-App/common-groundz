@@ -64,7 +64,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
       const convertedEntityPhotos: PhotoWithMetadata[] = fetchedEntityPhotos.map((photo, index) => ({
         id: photo.id,
         url: photo.url,
-        type: 'image' as const,
+        type: photo.content_type?.startsWith('video/') ? 'video' : 'image',
         order: index,
         source: 'entity_photo' as const,
         alt: photo.alt_text || photo.caption,
@@ -248,12 +248,37 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
           <div className="grid grid-cols-2 gap-2 h-auto">
             {/* Main Image - Left Half */}
             <div className="relative group cursor-pointer overflow-hidden rounded-lg aspect-[4/3]">
-              <img
-                src={mainPhoto.url}
-                alt={mainPhoto.alt || entity.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                onClick={() => handlePhotoClick(0)}
-              />
+              {mainPhoto.type === 'video' ? (
+                <video
+                  src={mainPhoto.url}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  onClick={() => handlePhotoClick(0)}
+                  muted
+                  playsInline
+                />
+              ) : (
+                <img
+                  src={mainPhoto.url}
+                  alt={mainPhoto.alt || entity.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  onClick={() => handlePhotoClick(0)}
+                />
+              )}
+              
+              {/* Video play button overlay */}
+              {mainPhoto.type === 'video' && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="rounded-full bg-black/50 p-3">
+                    <svg
+                      className="h-6 w-6 text-white"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+              )}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 pointer-events-none" />
               
               {/* 3-dot dropdown menu */}
@@ -327,11 +352,35 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                   className="relative group cursor-pointer overflow-hidden rounded-lg aspect-[4/3]"
                   onClick={() => handlePhotoClick(index + 1)}
                 >
-                  <img
-                    src={photo.url}
-                    alt={photo.alt || entity.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+                  {photo.type === 'video' ? (
+                    <video
+                      src={photo.url}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      muted
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={photo.url}
+                      alt={photo.alt || entity.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  )}
+                  
+                  {/* Video play button overlay */}
+                  {photo.type === 'video' && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="rounded-full bg-black/50 p-2">
+                        <svg
+                          className="h-4 w-4 text-white"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 pointer-events-none" />
                   
                   {/* 3-dot dropdown menu */}
