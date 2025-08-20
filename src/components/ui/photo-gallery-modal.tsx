@@ -109,9 +109,16 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
             return true;
         }
       });
+    } else {
+      // For 'all' tab, prioritize Google Photos first, then reviews, then user photos
+      const googlePhotos = photos.filter(p => p.source === 'google_places');
+      const reviewPhotos = photos.filter(p => p.source === 'user_review');
+      const userPhotos = photos.filter(p => p.source === 'entity_photo');
+      
+      filtered = [...googlePhotos, ...reviewPhotos, ...userPhotos];
     }
 
-    // Sort photos
+    // Sort photos within each group
     return filtered.sort((a, b) => {
       const aDate = new Date(a.createdAt || 0).getTime();
       const bDate = new Date(b.createdAt || 0).getTime();
