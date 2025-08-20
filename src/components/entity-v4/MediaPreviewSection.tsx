@@ -76,8 +76,14 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
         category: photo.category
       }));
       
-      const allPhotos = [...convertedEntityPhotos, ...googlePhotos, ...reviewPhotos];
-      setPhotos(allPhotos);
+      // Prioritize Google Photos first, then review photos, then user uploads
+      const allPhotos = [...googlePhotos, ...reviewPhotos, ...convertedEntityPhotos];
+      
+      // Ensure hero image is a photo (not video) unless no photos are available
+      const photosOnly = allPhotos.filter(photo => photo.type === 'image');
+      const videosOnly = allPhotos.filter(photo => photo.type === 'video');
+      const prioritizedPhotos = photosOnly.length > 0 ? [...photosOnly, ...videosOnly] : allPhotos;
+      setPhotos(prioritizedPhotos);
     } catch (error) {
       console.error('Error loading photos:', error);
     } finally {
