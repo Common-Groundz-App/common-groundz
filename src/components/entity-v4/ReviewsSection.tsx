@@ -343,6 +343,14 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                     <RatingRingIcon rating={3} size={12} className="mr-1" />
                     3+ Rings
                   </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setStarRating(1, 'exact')}
+                    className={activeFilters.starRating === 1 && activeFilters.starFilter === 'exact' ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {activeFilters.starRating === 1 && activeFilters.starFilter === 'exact' && <span className="mr-2">✓</span>}
+                    <RatingRingIcon rating={1} size={12} className="mr-1" />
+                    1 Ring
+                  </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
 
