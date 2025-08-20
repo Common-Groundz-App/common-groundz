@@ -227,7 +227,7 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
         
         if (review.media && Array.isArray(review.media)) {
           review.media.forEach((media: MediaItem, index: number) => {
-            if (media.type === 'image' && media.url) {
+            if ((media.type === 'image' || media.type === 'video') && media.url) {
               const userProfile = profileMap.get(review.user_id);
               
               photos.push({
@@ -240,7 +240,7 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
                 createdAt: review.created_at
               });
               
-              console.log('📸 Added review photo:', media.url);
+              console.log('📸 Added review media:', media.url);
             }
           });
         }
@@ -254,7 +254,7 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
         
         if (update.media && Array.isArray(update.media)) {
           update.media.forEach((media: MediaItem, index: number) => {
-            if (media.type === 'image' && media.url) {
+            if ((media.type === 'image' || media.type === 'video') && media.url) {
               const userProfile = profileMap.get(update.user_id);
               
               photos.push({
