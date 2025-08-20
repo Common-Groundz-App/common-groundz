@@ -279,12 +279,22 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                   className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg bg-muted"
                   onClick={() => handlePhotoClick(photo)}
                 >
-                  <img
-                    src={photo.thumbnail_url || photo.url}
-                    alt={photo.alt || 'Photo'}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    loading="lazy"
-                  />
+                  {photo.type === 'video' ? (
+                    <video
+                      src={photo.url}
+                      poster={photo.thumbnail_url}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      muted
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={photo.thumbnail_url || photo.url}
+                      alt={photo.alt || 'Photo'}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      loading="lazy"
+                    />
+                  )}
                   
                   {/* 3-dot dropdown menu */}
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-10">
