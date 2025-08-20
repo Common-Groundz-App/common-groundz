@@ -110,4 +110,11 @@
       display: block;
     }
   }
+
+  /* Lightbox scroll management - only used when not inside a Radix UI modal */
+  .lightbox-open {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+  }
 }

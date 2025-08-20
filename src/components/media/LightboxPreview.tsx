@@ -26,20 +26,18 @@ export function LightboxPreview({
   
   // Prevent body scrolling when lightbox is open
   useEffect(() => {
-    // Save the current overflow value
-    const originalOverflow = document.body.style.overflow;
-    const originalPosition = document.body.style.position;
+    // Check if we're already in a modal context (Radix UI Dialog handles body scroll)
+    const isInModal = document.querySelector('[data-radix-portal]') !== null;
     
-    // Prevent scrolling
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
+    // Only apply our own scroll prevention if we're not already in a modal
+    if (!isInModal) {
+      document.body.classList.add('lightbox-open');
+    }
     
-    // Cleanup function to restore original styles
+    // Cleanup function
     return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.position = originalPosition;
-      document.body.style.width = '';
+      // Always remove our class, but be defensive about it
+      document.body.classList.remove('lightbox-open');
     };
   }, []);
   
