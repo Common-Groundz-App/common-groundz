@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown, X } from "lucide-react";
+import { RatingRingIcon } from "@/components/ui/rating-ring-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -323,24 +324,24 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                     className={activeFilters.starRating === 5 && activeFilters.starFilter === 'exact' ? "bg-blue-50 text-blue-700" : ""}
                   >
                     {activeFilters.starRating === 5 && activeFilters.starFilter === 'exact' && <span className="mr-2">✓</span>}
-                    <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
-                    5 Stars
+                    <RatingRingIcon rating={5} size={12} className="mr-1" />
+                    5 Rings
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => setStarRating(4, 'range')}
                     className={activeFilters.starRating === 4 && activeFilters.starFilter === 'range' ? "bg-blue-50 text-blue-700" : ""}
                   >
                     {activeFilters.starRating === 4 && activeFilters.starFilter === 'range' && <span className="mr-2">✓</span>}
-                    <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
-                    4+ Stars
+                    <RatingRingIcon rating={4} size={12} className="mr-1" />
+                    4+ Rings
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => setStarRating(3, 'range')}
                     className={activeFilters.starRating === 3 && activeFilters.starFilter === 'range' ? "bg-blue-50 text-blue-700" : ""}
                   >
                     {activeFilters.starRating === 3 && activeFilters.starFilter === 'range' && <span className="mr-2">✓</span>}
-                    <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
-                    3+ Stars
+                    <RatingRingIcon rating={3} size={12} className="mr-1" />
+                    3+ Rings
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
@@ -427,7 +428,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 )}
                 {activeFilters.starRating && (
                   <Badge variant="secondary" className="text-xs">
-                    {activeFilters.starFilter === 'exact' ? `${activeFilters.starRating} Stars` : `${activeFilters.starRating}+ Stars`}
+                    {activeFilters.starFilter === 'exact' ? `${activeFilters.starRating} Rings` : `${activeFilters.starRating}+ Rings`}
                     <button 
                       onClick={() => setStarRating(null)}
                       className="ml-1 hover:text-red-600"
