@@ -2633,6 +2633,25 @@ export type Database = {
           rejected_count: number
         }[]
       }
+      get_fallback_entity_recommendations: {
+        Args: {
+          p_current_user_id?: string
+          p_entity_id: string
+          p_limit?: number
+        }
+        Returns: {
+          average_rating: number
+          entity_id: string
+          entity_image_url: string
+          entity_name: string
+          entity_slug: string
+          entity_type: Database["public"]["Enums"]["entity_type"]
+          popularity_score: number
+          reason: string
+          recommendation_count: number
+          trending_score: number
+        }[]
+      }
       get_follower_count_by_user_id: {
         Args: { user_id: string }
         Returns: number
@@ -2657,6 +2676,27 @@ export type Database = {
           id: string
           is_following: boolean
           username: string
+        }[]
+      }
+      get_network_entity_recommendations: {
+        Args: {
+          p_current_user_id: string
+          p_entity_id: string
+          p_limit?: number
+        }
+        Returns: {
+          average_rating: number
+          entity_id: string
+          entity_image_url: string
+          entity_name: string
+          entity_slug: string
+          entity_type: Database["public"]["Enums"]["entity_type"]
+          is_mutual_connection: boolean
+          latest_recommendation_date: string
+          recommendation_count: number
+          recommender_avatar_url: string
+          recommender_id: string
+          recommender_username: string
         }[]
       }
       get_overall_rating: {
@@ -2739,6 +2779,15 @@ export type Database = {
           user_id: string
           username: string
         }[]
+      }
+      has_network_recommendations: {
+        Args: {
+          p_current_user_id: string
+          p_entity_id: string
+          p_min_following?: number
+          p_min_recommendations?: number
+        }
+        Returns: boolean
       }
       increment_comment_count: {
         Args: { item_id: string; table_name: string }
