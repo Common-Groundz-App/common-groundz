@@ -380,3 +380,169 @@ export const getProfileCacheStats = () => {
 export const clearAllProfileCache = (): void => {
   profileCache.clearCache();
 };
+
+/**
+ * Network recommendation context methods
+ */
+
+/**
+ * Check if user has sufficient network for entity recommendations
+ * Requires at least 3 follows AND at least 2 relevant recommendations from network
+ */
+export const hasStrongNetwork = async (
+  userId: string,
+  entityId: string
+): Promise<boolean> => {
+  try {
+    // Check follow count
+    const { data: followData, error: followError } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', userId);
+
+    if (followError || !followData || followData.length < 3) {
+      return false;
+    }
+
+    // Check if network has relevant recommendations
+    const followingIds = followData.map(f => f.following_id);
+    
+    const { data: recData, error: recError } = await supabase
+      .from('recommendations')
+      .select('id')
+      .in('user_id', followingIds)
+      .gte('rating', 4) // Only high-quality recommendations
+      .neq('entity_id', entityId) // Different from current entity
+      .limit(2);
+
+    if (recError || !recData || recData.length < 2) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error checking network strength:', error);
+    return false;
+  }
+};
+
+/**
+ * Get user's following IDs for network recommendations
+ */
+export const getUserFollowingIds = async (userId: string): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', userId);
+
+    if (error) {
+      console.error('Error fetching following IDs:', error);
+      return [];
+    }
+
+    return data?.map(f => f.following_id) || [];
+  } catch (error) {
+    console.error('Exception in getUserFollowingIds:', error);
+    return [];
+  }
+};
+
+/**
+ * Detect mutual connections between users
+ */
+export const getMutualConnections = async (
+  userId: string,
+  targetUserIds: string[]
+): Promise<Record<string, boolean>> => {
+  if (!targetUserIds.length) return {};
+
+  try {
+    // Get user's following list
+    const userFollowing = await getUserFollowingIds(userId);
+    if (userFollowing.length === 0) {
+      return targetUserIds.reduce((acc, id) => ({ ...acc, [id]: false }), {});
+    }
+
+    // Check which target users also follow the same people (mutual connections)
+    const { data, error } = await supabase
+      .from('follows')
+      .select('follower_id, following_id')
+      .in('follower_id', targetUserIds)
+      .in('following_id', userFollowing);
+
+    if (error) {
+      console.error('Error checking mutual connections:', error);
+      return targetUserIds.reduce((acc, id) => ({ ...acc, [id]: false }), {});
+    }
+
+    // Build mutual connection map
+    const mutualMap: Record<string, boolean> = {};
+    targetUserIds.forEach(id => {
+      mutualMap[id] = false;
+    });
+
+    data?.forEach(follow => {
+      mutualMap[follow.follower_id] = true;
+    });
+
+    return mutualMap;
+  } catch (error) {
+    console.error('Exception in getMutualConnections:', error);
+    return targetUserIds.reduce((acc, id) => ({ ...acc, [id]: false }), {});
+  }
+};
+
+/**
+ * Create unified recommendation data format for both network and fallback
+ */
+export interface UnifiedRecommendationData {
+  id: string;
+  name: string;
+  type: string;
+  image_url?: string;
+  averageRating: number;
+  recommendedBy: string[];
+  isNetworkRecommendation: boolean;
+  displayReason: string;
+  userProfiles?: SafeUserProfile[];
+}
+
+/**
+ * Transform network recommendation to unified format
+ */
+export const transformNetworkToUnified = (
+  networkRec: any,
+  userProfiles: SafeUserProfile[]
+): UnifiedRecommendationData => {
+  return {
+    id: networkRec.entity_id,
+    name: networkRec.entity_name,
+    type: networkRec.entity_type,
+    image_url: networkRec.entity_image_url,
+    averageRating: networkRec.avg_rating,
+    recommendedBy: networkRec.displayUsernames || [],
+    isNetworkRecommendation: true,
+    displayReason: `Recommended by ${networkRec.displayUsernames?.slice(0, 2).join(', ') || 'your network'}`,
+    userProfiles
+  };
+};
+
+/**
+ * Transform fallback recommendation to unified format
+ */
+export const transformFallbackToUnified = (
+  fallbackRec: any
+): UnifiedRecommendationData => {
+  return {
+    id: fallbackRec.entity_id,
+    name: fallbackRec.entity_name,
+    type: fallbackRec.entity_type,
+    image_url: fallbackRec.entity_image_url,
+    averageRating: fallbackRec.avg_rating,
+    recommendedBy: [],
+    isNetworkRecommendation: false,
+    displayReason: fallbackRec.displayReason || 'Popular choice',
+    userProfiles: []
+  };
+};
