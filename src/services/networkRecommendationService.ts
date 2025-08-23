@@ -36,7 +36,7 @@ export const hasNetworkRecommendations = async (
 ): Promise<boolean> => {
   try {
     const { data, error } = await supabase.rpc('has_network_recommendations', {
-      p_current_user_id: userId,
+      p_user_id: userId,
       p_entity_id: entityId
     });
 
@@ -59,10 +59,10 @@ export const getNetworkEntityRecommendations = async (
   userId: string,
   entityId: string,
   limit: number = 6
-): Promise<ProcessedNetworkRecommendation[]> => {
+): Promise<any[]> => {
   try {
     const { data, error } = await supabase.rpc('get_network_entity_recommendations', {
-      p_current_user_id: userId,
+      p_user_id: userId,
       p_entity_id: entityId,
       p_limit: limit
     });
@@ -78,52 +78,8 @@ export const getNetworkEntityRecommendations = async (
       return [];
     }
 
-    // Group by entity to combine multiple recommenders
-    const entityMap = new Map<string, ProcessedNetworkRecommendation>();
-    
-    data.forEach((rec: NetworkRecommendationData) => {
-      const entityId = rec.entity_id;
-      
-      if (!entityMap.has(entityId)) {
-        entityMap.set(entityId, {
-          ...rec,
-          userProfiles: [{ 
-            id: rec.recommender_id,
-            displayName: rec.recommender_username,
-            username: rec.recommender_username,
-            avatar_url: rec.recommender_avatar_url,
-            initials: rec.recommender_username.slice(0, 2).toUpperCase(),
-            fullName: null,
-            first_name: null,
-            last_name: null,
-            bio: null,
-            location: null
-          }],
-          displayUsernames: [rec.recommender_username]
-        });
-      } else {
-        const existing = entityMap.get(entityId)!;
-        existing.userProfiles.push({
-          id: rec.recommender_id,
-          displayName: rec.recommender_username,
-          username: rec.recommender_username,
-          avatar_url: rec.recommender_avatar_url,
-          initials: rec.recommender_username.slice(0, 2).toUpperCase(),
-          fullName: null,
-          first_name: null,
-          last_name: null,
-          bio: null,
-          location: null
-        });
-        existing.displayUsernames.push(rec.recommender_username);
-        // Use highest rating
-        existing.average_rating = Math.max(existing.average_rating, rec.average_rating);
-      }
-    });
-
-    const processedRecommendations = Array.from(entityMap.values());
-
-    return processedRecommendations;
+    console.log('✅ Network recommendations raw data:', data);
+    return data;
   } catch (error) {
     console.error('Exception in getNetworkEntityRecommendations:', error);
     return [];

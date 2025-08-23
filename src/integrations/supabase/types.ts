@@ -2634,23 +2634,24 @@ export type Database = {
         }[]
       }
       get_fallback_entity_recommendations: {
-        Args:
-          | {
-              p_current_user_id?: string
-              p_entity_id: string
-              p_limit?: number
-            }
-          | { p_entity_id: string; p_limit?: number }
+        Args: {
+          p_current_user_id?: string
+          p_entity_id: string
+          p_limit?: number
+        }
         Returns: {
-          average_rating: number
+          avg_rating: number
+          category: string
+          entity_description: string
           entity_id: string
           entity_image_url: string
           entity_name: string
-          entity_slug: string
           entity_type: Database["public"]["Enums"]["entity_type"]
-          popularity_score: number
+          id: string
+          latest_recommendation_date: string
           reason: string
-          recommendation_count: number
+          score: number
+          total_recommendations: number
           trending_score: number
         }[]
       }
@@ -2681,24 +2682,26 @@ export type Database = {
         }[]
       }
       get_network_entity_recommendations: {
-        Args: {
-          p_current_user_id: string
-          p_entity_id: string
-          p_limit?: number
-        }
+        Args: { p_entity_id: string; p_limit?: number; p_user_id: string }
         Returns: {
-          average_rating: number
+          avatar_url: string
+          category: Database["public"]["Enums"]["recommendation_category"]
+          comment_count: number
+          content: string
+          created_at: string
           entity_id: string
-          entity_image_url: string
-          entity_name: string
-          entity_slug: string
-          entity_type: Database["public"]["Enums"]["entity_type"]
-          is_mutual_connection: boolean
-          latest_recommendation_date: string
-          recommendation_count: number
-          recommender_avatar_url: string
-          recommender_id: string
-          recommender_username: string
+          first_name: string
+          id: string
+          image_url: string
+          last_name: string
+          like_count: number
+          rating: number
+          score: number
+          title: string
+          updated_at: string
+          user_id: string
+          username: string
+          visibility: Database["public"]["Enums"]["recommendation_visibility"]
         }[]
       }
       get_overall_rating: {
@@ -2784,13 +2787,13 @@ export type Database = {
       }
       has_network_recommendations: {
         Args:
-          | { p_current_user_id: string; p_entity_id: string }
           | {
               p_current_user_id: string
               p_entity_id: string
               p_min_following?: number
               p_min_recommendations?: number
             }
+          | { p_entity_id: string; p_user_id: string }
         Returns: boolean
       }
       increment_comment_count: {

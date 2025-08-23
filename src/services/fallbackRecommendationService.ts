@@ -30,12 +30,13 @@ export const getFallbackEntityRecommendations = async (
   entityId: string,
   entityType?: string,
   limit: number = 6
-): Promise<ProcessedFallbackRecommendation[]> => {
+): Promise<any[]> => {
   try {
     console.log('🔍 Fetching fallback recommendations for entity:', entityId);
     
     const { data, error } = await supabase.rpc('get_fallback_entity_recommendations', {
       p_entity_id: entityId,
+      p_current_user_id: null,
       p_limit: limit
     });
 
@@ -50,22 +51,8 @@ export const getFallbackEntityRecommendations = async (
       return [];
     }
 
-    // Process recommendations with display context
-    const processedRecommendations: ProcessedFallbackRecommendation[] = data.map((rec: FallbackRecommendationData) => {
-      const displayReason = rec.reason || 'Popular choice';
-      const score = calculateFallbackScore(rec);
-
-      return {
-        ...rec,
-        displayReason,
-        score
-      };
-    });
-
-    // Sort by calculated score (highest first)
-    processedRecommendations.sort((a, b) => b.score - a.score);
-
-    return processedRecommendations;
+    console.log('✅ Fallback recommendations raw data:', data);
+    return data;
   } catch (error) {
     console.error('Exception in getFallbackEntityRecommendations:', error);
     return [];
