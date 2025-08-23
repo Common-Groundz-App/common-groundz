@@ -221,29 +221,94 @@ export const getFallbackEntityRecommendationsWithCache = async (
 };
 
 /**
- * Get mixed recommendation strategy (trending + category + highly rated)
+ * Get mixed recommendation strategy with diversity controls (Phase 4.3)
  */
 export const getMixedFallbackRecommendations = async (
   entityId: string,
   entityType?: string,
   limit: number = 6
 ): Promise<ProcessedFallbackRecommendation[]> => {
-  const [trending, category, highlyRated] = await Promise.all([
-    getTrendingEntities(entityId, entityType, 2),
-    getCategoryRecommendations(entityId, entityType, 2),
-    getHighlyRatedRecommendations(entityId, entityType, 2)
-  ]);
+  try {
+    const [trending, category, highlyRated] = await Promise.all([
+      getTrendingEntities(entityId, entityType, 3),
+      getCategoryRecommendations(entityId, entityType, 3),
+      getHighlyRatedRecommendations(entityId, entityType, 3)
+    ]);
 
-  // Combine and deduplicate
-  const combined = [...trending, ...category, ...highlyRated];
-  const seen = new Set<string>();
-  const unique = combined.filter(rec => {
-    if (seen.has(rec.entity_id)) return false;
-    seen.add(rec.entity_id);
-    return true;
-  });
+    // Combine and deduplicate
+    const combined = [...trending, ...category, ...highlyRated];
+    const seen = new Set<string>();
+    const unique = combined.filter(rec => {
+      if (seen.has(rec.entity_id)) return false;
+      seen.add(rec.entity_id);
+      return true;
+    });
 
-  // Sort by score and limit
-  unique.sort((a, b) => b.score - a.score);
-  return unique.slice(0, limit);
+    // Apply diversity controls and rating balance
+    const diversified = applyDiversityControls(unique, limit);
+    
+    return diversified;
+  } catch (error) {
+    console.error('Error in getMixedFallbackRecommendations:', error);
+    return [];
+  }
+};
+
+/**
+ * Apply diversity controls to prevent category repetition (Phase 4.3)
+ */
+const applyDiversityControls = (
+  recommendations: ProcessedFallbackRecommendation[],
+  limit: number
+): ProcessedFallbackRecommendation[] => {
+  const categoryCount = new Map<string, number>();
+  const result: ProcessedFallbackRecommendation[] = [];
+  
+  // Sort by score first
+  const sorted = recommendations.sort((a, b) => b.score - a.score);
+  
+  for (const rec of sorted) {
+    if (result.length >= limit) break;
+    
+    const currentCount = categoryCount.get(rec.entity_type) || 0;
+    
+    // Limit: max 2 items per category
+    if (currentCount < 2) {
+      result.push(rec);
+      categoryCount.set(rec.entity_type, currentCount + 1);
+    }
+  }
+  
+  // If we don't have enough diverse items, fill with remaining high-scoring ones
+  if (result.length < limit) {
+    const remaining = sorted.filter(rec => !result.includes(rec));
+    result.push(...remaining.slice(0, limit - result.length));
+  }
+  
+  return applyRatingBalance(result);
+};
+
+/**
+ * Balance high-rated and trending items (Phase 4.3)
+ */
+const applyRatingBalance = (
+  recommendations: ProcessedFallbackRecommendation[]
+): ProcessedFallbackRecommendation[] => {
+  const highRated = recommendations.filter(rec => rec.average_rating >= 4.5);
+  const trending = recommendations.filter(rec => rec.trending_score > 0.6 && rec.average_rating < 4.5);
+  const others = recommendations.filter(rec => 
+    rec.average_rating < 4.5 && rec.trending_score <= 0.6
+  );
+  
+  // Aim for 60% high-rated, 30% trending, 10% others
+  const targetHighRated = Math.ceil(recommendations.length * 0.6);
+  const targetTrending = Math.ceil(recommendations.length * 0.3);
+  
+  const balanced = [
+    ...highRated.slice(0, targetHighRated),
+    ...trending.slice(0, targetTrending),
+    ...others
+  ];
+  
+  return balanced.slice(0, recommendations.length);
 };

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RecommendationEntityCard } from '@/components/entity/RecommendationEntityCard';
 import { ProcessedNetworkRecommendation } from '@/services/networkRecommendationService';
 import { ProcessedFallbackRecommendation } from '@/services/fallbackRecommendationService';
+import { analytics } from '@/services/analytics';
 
 interface RecommendationsModalProps {
   isOpen: boolean;
@@ -176,11 +177,22 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({
           ) : filteredRecommendations.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredRecommendations.map((rec) => (
-                <RecommendationEntityCard
+                <div
                   key={rec.id}
-                  recommendation={rec}
-                  isNetworkRecommendation={rec.isNetwork}
-                />
+                  onClick={() => {
+                    analytics.trackRecommendationClick(
+                      rec.id,
+                      rec.name,
+                      rec.isNetwork,
+                      'modal'
+                    );
+                  }}
+                >
+                  <RecommendationEntityCard
+                    recommendation={rec}
+                    isNetworkRecommendation={rec.isNetwork}
+                  />
+                </div>
               ))}
             </div>
           ) : allRecommendations.length === 0 ? (

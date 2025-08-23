@@ -197,24 +197,86 @@ export const cacheNetworkRecommendations = (
 };
 
 /**
- * Get network recommendations with caching
+ * Get network recommendations with caching and quality filtering
  */
 export const getNetworkEntityRecommendationsWithCache = async (
   userId: string,
   entityId: string,
   limit: number = 6
 ): Promise<ProcessedNetworkRecommendation[]> => {
-  // Check cache first
-  const cached = getCachedNetworkRecommendations(userId, entityId);
-  if (cached) {
-    return cached.slice(0, limit);
-  }
+  try {
+    // Check cache first
+    const cached = getCachedNetworkRecommendations(userId, entityId);
+    if (cached) {
+      return applyQualityFiltering(cached).slice(0, limit);
+    }
 
-  // Fetch fresh data
-  const recommendations = await getNetworkEntityRecommendations(userId, entityId, limit);
+    // Fetch fresh data
+    const recommendations = await getNetworkEntityRecommendations(userId, entityId, limit * 2); // Fetch more to account for filtering
+    
+    // Apply quality filtering and recency weighting
+    const qualityFiltered = applyQualityFiltering(recommendations);
+    const recentWeighted = applyRecencyWeighting(qualityFiltered);
+    
+    // Cache the results
+    cacheNetworkRecommendations(userId, entityId, recentWeighted);
+    
+    return recentWeighted.slice(0, limit);
+  } catch (error) {
+    console.error('Error in getNetworkEntityRecommendationsWithCache:', error);
+    return [];
+  }
+};
+
+/**
+ * Apply quality filtering to network recommendations (Phase 4.1)
+ */
+const applyQualityFiltering = (recommendations: ProcessedNetworkRecommendation[]): ProcessedNetworkRecommendation[] => {
+  return recommendations.filter(rec => {
+    // Quality threshold: minimum 3.5 rating
+    if (rec.average_rating < 3.5) return false;
+    
+    // Must have valid entity data
+    if (!rec.entity_name || !rec.entity_id) return false;
+    
+    return true;
+  });
+};
+
+/**
+ * Apply recency weighting to boost recent recommendations (Phase 4.1)
+ */
+const applyRecencyWeighting = (recommendations: ProcessedNetworkRecommendation[]): ProcessedNetworkRecommendation[] => {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   
-  // Cache the results
-  cacheNetworkRecommendations(userId, entityId, recommendations);
-  
-  return recommendations;
+  return recommendations.map(rec => {
+    const recDate = new Date(rec.latest_recommendation_date);
+    const isRecent = recDate > thirtyDaysAgo;
+    
+    // Boost score for recent recommendations
+    if (isRecent) {
+      rec.average_rating = Math.min(rec.average_rating * 1.1, 5); // Cap at 5
+    }
+    
+    return rec;
+  }).sort((a, b) => b.average_rating - a.average_rating);
+};
+
+/**
+ * Check if user has sufficient high-quality network recommendations (Phase 4.1)
+ */
+export const hasQualityNetworkRecommendations = async (
+  userId: string,
+  entityId: string,
+  minCount: number = 2
+): Promise<boolean> => {
+  try {
+    const recommendations = await getNetworkEntityRecommendationsWithCache(userId, entityId, 10);
+    const qualityRecs = applyQualityFiltering(recommendations);
+    return qualityRecs.length >= minCount;
+  } catch (error) {
+    console.error('Error checking quality network recommendations:', error);
+    return false;
+  }
 };

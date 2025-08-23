@@ -2,6 +2,7 @@ import React from 'react';
 import { Star, TrendingUp, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { analytics } from '@/services/analytics';
 
 interface RecommendationData {
   id: string;
@@ -26,6 +27,14 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
   const navigate = useNavigate();
 
   const handleClick = () => {
+    // Track analytics (Phase 5.2)
+    analytics.trackRecommendationClick(
+      recommendation.id,
+      recommendation.name,
+      isNetworkRecommendation,
+      'main'
+    );
+    
     if (recommendation.slug) {
       navigate(`/entity/${recommendation.slug}?v=4`);
     } else {
@@ -47,7 +56,7 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
   return (
     <div 
       onClick={handleClick}
-      className="group cursor-pointer bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+      className="group cursor-pointer bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95"
     >
       {/* Image */}
       <div className="aspect-[4/3] bg-muted relative overflow-hidden">
