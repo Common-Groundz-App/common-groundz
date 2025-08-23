@@ -62,7 +62,7 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
             const profile = profiles?.[contributor.userId];
             
             return (
-              <Tooltip key={contributor.userId}>
+              <Tooltip key={`${contributor.userId}-${index}`}>
                 <TooltipTrigger asChild>
                   <div 
                     className="cursor-pointer relative hover:z-10 transition-all duration-200 hover:scale-110" 

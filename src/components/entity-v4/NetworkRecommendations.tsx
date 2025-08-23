@@ -102,6 +102,14 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
   const showSeeAllButton = totalRecommendations > 3;
   const isLoading = networkLoading || fallbackLoading;
   const hasError = networkError || fallbackError;
+  
+  // Enhanced error messaging (Phase 5.1)
+  const getEmptyStateMessage = () => {
+    if (hasError) return "Unable to load recommendations. Please try again.";
+    if (hasQualityNetworkData) return "Showing recommendations from your network";
+    if (fallbackDisplay.length === 0) return "No recommendations available at the moment";
+    return "Showing popular recommendations";
+  };
 
   // Retry handler (Phase 5.1)
   const handleRetry = () => {

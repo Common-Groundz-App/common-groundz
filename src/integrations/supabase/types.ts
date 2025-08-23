@@ -2634,11 +2634,13 @@ export type Database = {
         }[]
       }
       get_fallback_entity_recommendations: {
-        Args: {
-          p_current_user_id?: string
-          p_entity_id: string
-          p_limit?: number
-        }
+        Args:
+          | {
+              p_current_user_id?: string
+              p_entity_id: string
+              p_limit?: number
+            }
+          | { p_entity_id: string; p_limit?: number }
         Returns: {
           average_rating: number
           entity_id: string
@@ -2781,12 +2783,14 @@ export type Database = {
         }[]
       }
       has_network_recommendations: {
-        Args: {
-          p_current_user_id: string
-          p_entity_id: string
-          p_min_following?: number
-          p_min_recommendations?: number
-        }
+        Args:
+          | { p_current_user_id: string; p_entity_id: string }
+          | {
+              p_current_user_id: string
+              p_entity_id: string
+              p_min_following?: number
+              p_min_recommendations?: number
+            }
         Returns: boolean
       }
       increment_comment_count: {

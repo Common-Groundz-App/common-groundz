@@ -32,17 +32,21 @@ export const getFallbackEntityRecommendations = async (
   limit: number = 6
 ): Promise<ProcessedFallbackRecommendation[]> => {
   try {
+    console.log('🔍 Fetching fallback recommendations for entity:', entityId);
+    
     const { data, error } = await supabase.rpc('get_fallback_entity_recommendations', {
       p_entity_id: entityId,
       p_limit: limit
     });
 
     if (error) {
-      console.error('Error fetching fallback recommendations:', error);
+      console.error('❌ Error fetching fallback recommendations:', error);
+      console.error('Error details:', { message: error.message, details: error.details, hint: error.hint });
       return [];
     }
 
     if (!data || data.length === 0) {
+      console.log('📭 No fallback recommendations found');
       return [];
     }
 

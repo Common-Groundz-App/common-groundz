@@ -68,11 +68,13 @@ export const getNetworkEntityRecommendations = async (
     });
 
     if (error) {
-      console.error('Error fetching network recommendations:', error);
+      console.error('❌ Error fetching network recommendations:', error);
+      console.error('Error details:', { message: error.message, details: error.details, hint: error.hint });
       return [];
     }
 
     if (!data || data.length === 0) {
+      console.log('📭 No network recommendations found for userId:', userId);
       return [];
     }
 
