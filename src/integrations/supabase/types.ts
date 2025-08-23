@@ -2635,24 +2635,18 @@ export type Database = {
       }
       get_fallback_entity_recommendations: {
         Args: {
-          p_current_user_id?: string
+          p_current_user_id: string
           p_entity_id: string
           p_limit?: number
         }
         Returns: {
           avg_rating: number
-          category: string
-          entity_description: string
+          display_reason: string
           entity_id: string
           entity_image_url: string
           entity_name: string
-          entity_type: Database["public"]["Enums"]["entity_type"]
-          id: string
-          latest_recommendation_date: string
-          reason: string
-          score: number
-          total_recommendations: number
-          trending_score: number
+          entity_type: string
+          recommendation_count: number
         }[]
       }
       get_follower_count_by_user_id: {
