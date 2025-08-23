@@ -2781,7 +2781,7 @@ export type Database = {
               p_min_following?: number
               p_min_recommendations?: number
             }
-          | { p_entity_id: string; p_user_id: string }
+          | { p_entity_id: string; p_min_count?: number; p_user_id: string }
         Returns: boolean
       }
       increment_comment_count: {
