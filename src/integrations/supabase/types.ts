@@ -2678,24 +2678,18 @@ export type Database = {
       get_network_entity_recommendations: {
         Args: { p_entity_id: string; p_limit?: number; p_user_id: string }
         Returns: {
-          avatar_url: string
-          category: Database["public"]["Enums"]["recommendation_category"]
-          comment_count: number
-          content: string
           created_at: string
+          description: string
           entity_id: string
-          first_name: string
-          id: string
-          image_url: string
-          last_name: string
-          like_count: number
+          entity_image_url: string
+          entity_name: string
+          entity_type: string
+          is_recommended: boolean
           rating: number
-          score: number
-          title: string
-          updated_at: string
+          recommendation_id: string
+          user_avatar_url: string
           user_id: string
           username: string
-          visibility: Database["public"]["Enums"]["recommendation_visibility"]
         }[]
       }
       get_overall_rating: {
