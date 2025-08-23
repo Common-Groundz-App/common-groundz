@@ -54,8 +54,14 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
   const { data: networkRecommendations = [], isLoading: networkLoading, error: networkError, refetch: refetchNetwork } = useQuery({
     queryKey: ['network-recommendations', entityId, user?.id, retryCount],
     queryFn: async () => {
-      if (!user?.id || !hasNetworkThreshold) return [];
-      return await getNetworkEntityRecommendationsWithCache(user.id, entityId, 6);
+      if (!user?.id || !hasNetworkThreshold) {
+        console.log('🚫 Skipping network recommendations - no user or insufficient network');
+        return [];
+      }
+      console.log('🔍 Fetching network recommendations for user:', user.id, 'entity:', entityId);
+      const results = await getNetworkEntityRecommendationsWithCache(user.id, entityId, 6);
+      console.log('📊 Network recommendations fetched:', results.length);
+      return results;
     },
     enabled: !!user?.id && hasNetworkThreshold,
     staleTime: 1000 * 60 * 10, // 10 minutes
@@ -66,7 +72,10 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
   const { data: fallbackRecommendations = [], isLoading: fallbackLoading, error: fallbackError, refetch: refetchFallback } = useQuery({
     queryKey: ['fallback-recommendations', entityId, retryCount],
     queryFn: async () => {
-      return await getMixedFallbackRecommendations(entityId, undefined, 6);
+      console.log('🔍 Fetching fallback recommendations for entity:', entityId);
+      const results = await getMixedFallbackRecommendations(entityId, undefined, 6);
+      console.log('📊 Fallback recommendations fetched:', results.length);
+      return results;
     },
     enabled: true,
     staleTime: 1000 * 60 * 15, // 15 minutes
@@ -102,6 +111,16 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
   const showSeeAllButton = totalRecommendations > 3;
   const isLoading = networkLoading || fallbackLoading;
   const hasError = networkError || fallbackError;
+  
+  console.log('🎯 Recommendation state:', {
+    hasQualityNetwork,
+    networkCount: networkDisplay.length,
+    fallbackCount: fallbackDisplay.length,
+    displayingNetwork: hasQualityNetworkData,
+    totalRecommendations,
+    isLoading,
+    hasError: !!hasError
+  });
   
   // Enhanced error messaging (Phase 5.1)
   const getEmptyStateMessage = () => {
