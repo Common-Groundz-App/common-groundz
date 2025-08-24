@@ -13,7 +13,7 @@ import { analytics } from '@/services/analytics';
 
 interface NetworkRecommendationsProps {
   entityId: string;
-  userFollowingIds: string[];
+  userFollowingIds?: string[];
 }
 
 interface DisplayRecommendation {
@@ -25,86 +25,84 @@ interface DisplayRecommendation {
   recommendedBy: string[];
   slug?: string;
   reason?: string;
+  is_same_category?: boolean;
 }
 
 export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
   entityId,
-  userFollowingIds
+  userFollowingIds = []
 }) => {
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
-  // Enhanced intelligent thresholds (Phase 4.1)
-  const hasNetworkThreshold = user && userFollowingIds.length >= 3;
+  console.log('NetworkRecommendations props:', { entityId, userFollowingIds });
 
-  // Check if user has quality network recommendations (Phase 4.1)
-  const { data: hasQualityNetwork = false } = useQuery({
-    queryKey: ['has-quality-network', entityId, user?.id],
+  // Check if user has any network activity (not entity-specific)
+  const {
+    data: hasNetworkActivity,
+    isLoading: isCheckingNetwork,
+    error: networkCheckError
+  } = useQuery({
+    queryKey: ['has-network-activity', user?.id],
     queryFn: async () => {
-      if (!user?.id || !hasNetworkThreshold) return false;
+      if (!user?.id) return false;
       
-      console.log('🔍 Checking network quality for:', { userId: user.id, entityId });
+      const { data, error } = await supabase.rpc('has_network_activity', {
+        p_user_id: user.id,
+        p_min_count: 3
+      });
       
-      try {
-        const { data, error } = await supabase.rpc('has_network_recommendations', {
-          p_user_id: user.id,
-          p_entity_id: entityId
-        });
-        
-        if (error) {
-          console.error('❌ Error checking network quality:', error);
-          return false;
-        }
-        
-        console.log('✅ Network quality result:', data);
-        return data || false;
-      } catch (error) {
-        console.error('❌ Network quality check failed:', error);
+      if (error) {
+        console.error('Error checking network activity:', error);
         return false;
       }
+      
+      console.log('has_network_activity result:', data);
+      return data || false;
     },
-    enabled: !!user?.id && hasNetworkThreshold,
+    enabled: !!user?.id,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 3
   });
 
-  // Get network recommendations with retry logic (Phase 5.1)
-  const { data: networkRecommendations = [], isLoading: networkLoading, error: networkError, refetch: refetchNetwork } = useQuery({
-    queryKey: ['network-recommendations', entityId, user?.id, retryCount],
+  // Fetch network discovery recommendations (from people you follow, any entities)
+  const {
+    data: networkRecommendations = [],
+    isLoading: isLoadingNetwork,
+    error: networkError,
+    refetch: refetchNetwork
+  } = useQuery({
+    queryKey: ['network-discovery-recommendations', user?.id, entityId],
     queryFn: async () => {
-      if (!user?.id || !hasNetworkThreshold) {
-        console.log('🚫 Skipping network recommendations - no user or insufficient network');
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase.rpc('get_network_recommendations_discovery', {
+        p_user_id: user.id,
+        p_current_entity_id: entityId,
+        p_limit: 6
+      });
+      
+      if (error) {
+        console.error('Error fetching network discovery recommendations:', error);
         return [];
       }
       
-      console.log('🔍 Fetching network recommendations for user:', user.id, 'entity:', entityId);
-      
-      try {
-        const { data, error } = await supabase.rpc('get_network_entity_recommendations', {
-          p_user_id: user.id,
-          p_entity_id: entityId,
-          p_limit: 6
-        });
-        
-        if (error) {
-          console.error('❌ Error fetching network recommendations:', error);
-          throw error;
-        }
-        
-        console.log('📊 Network recommendations fetched:', data?.length || 0);
-        return data || [];
-      } catch (error) {
-        console.error('❌ Network recommendations fetch failed:', error);
-        throw error;
-      }
+      console.log('Network discovery recommendations fetched:', data?.length || 0);
+      return data || [];
     },
-    enabled: !!user?.id && hasNetworkThreshold,
-    staleTime: 1000 * 60 * 10, // 10 minutes
-    retry: 2,
+    enabled: !!user?.id && !!entityId && hasNetworkActivity === true,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 3
   });
 
-  // Get fallback recommendations with diversity (Phase 4.3)
-  const { data: fallbackRecommendations = [], isLoading: fallbackLoading, error: fallbackError, refetch: refetchFallback } = useQuery({
+  // Get fallback recommendations when no network activity
+  const {
+    data: fallbackRecommendations = [],
+    isLoading: fallbackLoading,
+    error: fallbackError,
+    refetch: refetchFallback
+  } = useQuery({
     queryKey: ['fallback-recommendations', entityId, retryCount],
     queryFn: async () => {
       console.log('🔍 Fetching fallback recommendations for entity:', entityId);
@@ -128,60 +126,55 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
         throw error;
       }
     },
-    enabled: true,
+    enabled: hasNetworkActivity === false, // Only when no network activity
     staleTime: 1000 * 60 * 15, // 15 minutes
     retry: 2,
   });
 
-  // Convert to display format based on actual database response
+  // Convert network discovery recommendations to display format
   const networkDisplay: DisplayRecommendation[] = networkRecommendations.map(rec => ({
     id: rec.entity_id,
-    name: rec.title || 'Untitled', // Network recommendations return recommendation title, not entity name
-    type: rec.category || 'Unknown',
-    image_url: rec.image_url,
+    name: rec.entity_name || 'Untitled',
+    type: rec.entity_type || 'Unknown',
+    image_url: rec.entity_image_url,
     averageRating: rec.rating || 0,
-    recommendedBy: [rec.username || 'Unknown User'], // Single user from database
-    slug: undefined // Network recommendations don't include entity slug
+    recommendedBy: [rec.username || 'Unknown User'],
+    slug: undefined,
+    reason: rec.recommendation_reason,
+    is_same_category: rec.is_same_category
   }));
 
+  // Convert fallback recommendations to display format
   const fallbackDisplay: DisplayRecommendation[] = fallbackRecommendations.map(rec => ({
     id: rec.entity_id,
     name: rec.entity_name,
     type: rec.entity_type,
     image_url: rec.entity_image_url,
-    averageRating: rec.avg_rating || 0, // Note: avg_rating not average_rating
+    averageRating: rec.avg_rating || 0,
     recommendedBy: [],
-    slug: undefined, // Fallback recommendations don't include entity slug  
-    reason: rec.reason
+    slug: undefined,
+    reason: rec.display_reason
   }));
 
-  // Enhanced logic for showing network vs fallback (Phase 4.1)
-  const hasQualityNetworkData = hasQualityNetwork && networkDisplay.length >= 2;
-  const displayEntities = hasQualityNetworkData ? networkDisplay.slice(0, 3) : fallbackDisplay.slice(0, 3);
-  const totalRecommendations = networkDisplay.length + fallbackDisplay.length;
+  // Determine what to show: always prefer network recommendations when available
+  const showNetworkRecommendations = hasNetworkActivity && networkDisplay.length > 0;
+  const displayEntities = showNetworkRecommendations ? networkDisplay.slice(0, 3) : fallbackDisplay.slice(0, 3);
+  const totalRecommendations = showNetworkRecommendations ? networkDisplay.length : fallbackDisplay.length;
   const showSeeAllButton = totalRecommendations > 3;
-  const isLoading = networkLoading || fallbackLoading;
-  const hasError = networkError || fallbackError;
+  const isLoading = isCheckingNetwork || isLoadingNetwork || fallbackLoading;
+  const hasError = networkCheckError || networkError || fallbackError;
   
   console.log('🎯 Recommendation state:', {
-    hasQualityNetwork,
+    hasNetworkActivity,
     networkCount: networkDisplay.length,
     fallbackCount: fallbackDisplay.length,
-    displayingNetwork: hasQualityNetworkData,
+    showingNetwork: showNetworkRecommendations,
     totalRecommendations,
     isLoading,
     hasError: !!hasError
   });
-  
-  // Enhanced error messaging (Phase 5.1)
-  const getEmptyStateMessage = () => {
-    if (hasError) return "Unable to load recommendations. Please try again.";
-    if (hasQualityNetworkData) return "Showing recommendations from your network";
-    if (fallbackDisplay.length === 0) return "No recommendations available at the moment";
-    return "Showing popular recommendations";
-  };
 
-  // Retry handler (Phase 5.1)
+  // Retry handler
   const handleRetry = () => {
     setRetryCount(prev => prev + 1);
     refetchNetwork();
@@ -193,14 +186,14 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
       <Card className="transition-all duration-200 hover:shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-base font-semibold">
-            {hasQualityNetworkData ? "Recommended by Your Network" : "You Might Also Consider"}
+            {showNetworkRecommendations ? "Recommended by Your Network" : "You Might Also Consider"}
           </CardTitle>
           {showSeeAllButton && (
             <Button 
               variant="ghost" 
               size="sm"
               onClick={() => {
-                analytics.trackSeeAllClick(totalRecommendations, hasQualityNetworkData);
+                analytics.trackSeeAllClick(totalRecommendations, showNetworkRecommendations);
                 analytics.trackModalInteraction('open', totalRecommendations);
                 setIsModalOpen(true);
               }}
@@ -238,7 +231,7 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
                 <RecommendationEntityCard
                   key={entity.id || index}
                   recommendation={entity}
-                  isNetworkRecommendation={hasQualityNetworkData}
+                  isNetworkRecommendation={showNetworkRecommendations}
                 />
               ))}
             </div>
@@ -246,14 +239,14 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
             <div className="text-center py-8">
               <div className="flex flex-col items-center gap-2">
                 <p className="text-sm font-medium text-muted-foreground">
-                  {hasNetworkThreshold 
-                    ? "No quality recommendations found in your network yet" 
+                  {hasNetworkActivity 
+                    ? "No recommendations found in your network yet" 
                     : "Connect with more people to see personalized recommendations"
                   }
                 </p>
-                {!hasNetworkThreshold && (
+                {!hasNetworkActivity && (
                   <p className="text-xs text-muted-foreground">
-                    Follow 3+ people to unlock network recommendations
+                    Follow more active users to unlock network recommendations
                   </p>
                 )}
               </div>
@@ -271,7 +264,7 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
         entityName="this entity"
         networkRecommendations={[]} // Simplified for now - pass empty array
         fallbackRecommendations={[]} // Simplified for now - pass empty array
-        hasNetworkData={hasQualityNetworkData}
+        hasNetworkData={showNetworkRecommendations}
         isLoading={isLoading}
       />
     </ErrorBoundary>

@@ -2696,6 +2696,30 @@ export type Database = {
           visibility: Database["public"]["Enums"]["recommendation_visibility"]
         }[]
       }
+      get_network_recommendations_discovery: {
+        Args: {
+          p_current_entity_id: string
+          p_limit?: number
+          p_user_id: string
+        }
+        Returns: {
+          avatar_url: string
+          created_at: string
+          description: string
+          entity_category: string
+          entity_id: string
+          entity_image_url: string
+          entity_name: string
+          entity_type: Database["public"]["Enums"]["entity_type"]
+          id: string
+          is_same_category: boolean
+          rating: number
+          recommendation_reason: string
+          title: string
+          user_id: string
+          username: string
+        }[]
+      }
       get_overall_rating: {
         Args: { p_entity_id: string }
         Returns: number
@@ -2776,6 +2800,10 @@ export type Database = {
           user_id: string
           username: string
         }[]
+      }
+      has_network_activity: {
+        Args: { p_min_count?: number; p_user_id: string }
+        Returns: boolean
       }
       has_network_recommendations: {
         Args:
