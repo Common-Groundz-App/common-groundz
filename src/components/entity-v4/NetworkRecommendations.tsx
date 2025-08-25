@@ -23,6 +23,7 @@ interface DisplayRecommendation {
   image_url?: string;
   averageRating: number;
   recommendedBy: string[];
+  recommendedByUserId?: string;
   slug?: string;
   reason?: string;
   is_same_category?: boolean;
@@ -139,6 +140,7 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     image_url: rec.entity_image_url,
     averageRating: rec.rating || 0,
     recommendedBy: [rec.username || 'Unknown User'],
+    recommendedByUserId: rec.user_id,
     slug: undefined,
     reason: rec.recommendation_reason,
     is_same_category: rec.is_same_category
