@@ -102,7 +102,7 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
               showSkeleton={false}
             />
             <p className="text-xs text-muted-foreground">
-              Recommended by {recommendation.recommendedBy[0]}
+              {recommendation.recommendedBy[0]} recommended this
             </p>
           </div>
         )}

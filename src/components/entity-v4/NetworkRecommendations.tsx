@@ -10,6 +10,8 @@ import { RecommendationsModal } from '@/components/modals/RecommendationsModal';
 import { RecommendationEntityCard } from '@/components/entity/RecommendationEntityCard';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { analytics } from '@/services/analytics';
+import { ProcessedNetworkRecommendation } from '@/services/networkRecommendationService';
+import { ProcessedFallbackRecommendation } from '@/services/fallbackRecommendationService';
 
 interface NetworkRecommendationsProps {
   entityId: string;
@@ -158,11 +160,56 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     reason: rec.display_reason
   }));
 
+  // Transform for modal - create proper types
+  const transformedNetworkRecs: ProcessedNetworkRecommendation[] = networkRecommendations.map(rec => ({
+    entity_id: rec.entity_id,
+    entity_name: rec.entity_name || 'Untitled',
+    entity_type: rec.entity_type,
+    entity_image_url: rec.entity_image_url,
+    entity_slug: '',
+    average_rating: rec.rating || 0,
+    is_mutual_connection: false,
+    latest_recommendation_date: rec.created_at,
+    recommendation_count: 1,
+    recommender_avatar_url: rec.avatar_url || '',
+    recommender_id: rec.user_id,
+    recommender_username: rec.username || 'Unknown User',
+    userProfiles: [{
+      id: rec.user_id,
+      username: rec.username || 'Unknown User',
+      avatar_url: rec.avatar_url || null,
+      displayName: rec.username || 'Unknown User',
+      initials: (rec.username || 'UU').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+      fullName: null,
+      first_name: null,
+      last_name: null,
+      bio: null,
+      location: null
+    }],
+    displayUsernames: [rec.username || 'Unknown User']
+  }));
+
+  const transformedFallbackRecs: ProcessedFallbackRecommendation[] = fallbackRecommendations.map(rec => ({
+    entity_id: rec.entity_id,
+    entity_name: rec.entity_name,
+    entity_type: rec.entity_type,
+    entity_image_url: rec.entity_image_url,
+    entity_slug: '',
+    average_rating: rec.avg_rating || 0,
+    popularity_score: 0,
+    reason: rec.display_reason,
+    recommendation_count: rec.recommendation_count || 0,
+    trending_score: 0,
+    displayReason: rec.display_reason,
+    score: 0
+  }));
+
   // Determine what to show: always prefer network recommendations when available
   const showNetworkRecommendations = hasNetworkActivity && networkDisplay.length > 0;
   const displayEntities = showNetworkRecommendations ? networkDisplay.slice(0, 3) : fallbackDisplay.slice(0, 3);
   const totalRecommendations = showNetworkRecommendations ? networkDisplay.length : fallbackDisplay.length;
-  const showSeeAllButton = totalRecommendations > 3;
+  // Always show "See All" button when there are recommendations (≥1), but only for fallback section
+  const showSeeAllButton = !showNetworkRecommendations && totalRecommendations >= 1;
   const isLoading = isCheckingNetwork || isLoadingNetwork || fallbackLoading;
   const hasError = networkCheckError || networkError || fallbackError;
   
@@ -264,8 +311,8 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
           setIsModalOpen(false);
         }}
         entityName="this entity"
-        networkRecommendations={[]} // Simplified for now - pass empty array
-        fallbackRecommendations={[]} // Simplified for now - pass empty array
+        networkRecommendations={showNetworkRecommendations ? transformedNetworkRecs : []}
+        fallbackRecommendations={!showNetworkRecommendations ? transformedFallbackRecs : []}
         hasNetworkData={showNetworkRecommendations}
         isLoading={isLoading}
       />
