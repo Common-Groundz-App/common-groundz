@@ -25,10 +25,14 @@ interface DisplayRecommendation {
   image_url?: string;
   averageRating: number;
   recommendedBy: string[];
-  recommendedByUserId?: string;
+  recommendedByUserId?: string | string[];
+  recommendedByAvatars?: string[];
+  recommendationCount?: number;
   slug?: string;
   reason?: string;
   is_same_category?: boolean;
+  latestRecommendationDate?: string;
+  hasTimelineUpdates?: boolean;
 }
 
 export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
@@ -80,7 +84,7 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     queryFn: async () => {
       if (!user?.id) return [];
       
-      return await getNetworkEntityRecommendationsWithCache(user.id, entityId, 6);
+      return await getNetworkEntityRecommendationsWithCache(user.id, entityId, 50);
     },
     enabled: !!user?.id && !!entityId && hasNetworkActivity === true,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -133,10 +137,14 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     image_url: rec.entity_image_url,
     averageRating: rec.circle_rating || rec.average_rating || 0,
     recommendedBy: rec.displayUsernames,
-    recommendedByUserId: Array.isArray(rec.recommendedByUserId) ? rec.recommendedByUserId[0] : rec.recommendedByUserId,
+    recommendedByUserId: rec.recommendedByUserId,
+    recommendedByAvatars: rec.displayAvatars,
+    recommendationCount: rec.recommendation_count,
     slug: rec.entity_slug,
     reason: undefined, // No reason field in network recommendations
-    is_same_category: undefined // No category field in network recommendations
+    is_same_category: undefined, // No category field in network recommendations
+    latestRecommendationDate: rec.latest_recommendation_date,
+    hasTimelineUpdates: rec.has_timeline_updates
   }));
 
   // Convert fallback recommendations to display format

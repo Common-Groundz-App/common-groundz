@@ -248,7 +248,7 @@ export const getNetworkEntityRecommendationsWithCache = async (
         user_id: rec.recommender_user_ids?.[0] || '',
         username: rec.recommender_usernames?.[0] || 'Unknown User',
         avatar_url: rec.recommender_avatars?.[0] || null,
-        created_at: new Date().toISOString(), // Use current date as fallback
+        created_at: new Date().toISOString(), // Fallback since function doesn't return dates
         
         // Aggregated data
         userProfiles,
@@ -260,7 +260,7 @@ export const getNetworkEntityRecommendationsWithCache = async (
         recommendation_count: rec.recommendation_count,
         circle_rating: rec.average_rating,
         overall_rating: rec.average_rating,
-        latest_recommendation_date: new Date().toISOString(),
+        latest_recommendation_date: new Date().toISOString(), // Fallback since function doesn't return dates
         has_timeline_updates: false,
         is_mutual_connection: false // Not applicable for aggregated data
       };

@@ -67,11 +67,20 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
     const date = new Date(dateString);
     const now = new Date();
     const diffInMs = now.getTime() - date.getTime();
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
     const diffInWeeks = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 7));
+    const diffInMonths = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 30));
     
-    if (diffInWeeks === 0) return 'recommended this week';
+    if (diffInHours < 1) return 'recommended recently';
+    if (diffInHours < 24) return `recommended ${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
+    if (diffInDays === 1) return 'recommended yesterday';
+    if (diffInDays < 7) return `recommended ${diffInDays} days ago`;
     if (diffInWeeks === 1) return 'recommended 1 week ago';
-    return `recommended ${diffInWeeks} weeks ago`;
+    if (diffInWeeks < 4) return `recommended ${diffInWeeks} weeks ago`;
+    if (diffInMonths === 1) return 'recommended 1 month ago';
+    if (diffInMonths < 12) return `recommended ${diffInMonths} months ago`;
+    return 'recommended over a year ago';
   };
 
   const getInitials = (name: string) => {
