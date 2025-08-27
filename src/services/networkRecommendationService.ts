@@ -202,9 +202,9 @@ export const getNetworkEntityRecommendationsWithCache = async (
   try {
     // Get aggregated data from the new database function
     const { data: rawData, error } = await supabase.rpc('get_aggregated_network_recommendations_discovery', {
-      p_user_id: userId,
-      p_entity_id: entityId,
-      p_limit: limit
+      current_user_id: userId,
+      entity_id_param: entityId,
+      limit_param: limit
     });
 
     if (error) {
@@ -241,14 +241,14 @@ export const getNetworkEntityRecommendationsWithCache = async (
         entity_name: rec.entity_name,
         entity_type: rec.entity_type,
         entity_image_url: rec.entity_image_url,
-        entity_slug: rec.entity_slug,
-        average_rating: rec.circle_rating || rec.overall_rating || 0,
+        entity_slug: rec.entity_name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), // Generate slug from name
+        average_rating: rec.average_rating || 0,
         
         // Primary recommender data (first in list)
         user_id: rec.recommender_user_ids?.[0] || '',
         username: rec.recommender_usernames?.[0] || 'Unknown User',
         avatar_url: rec.recommender_avatars?.[0] || null,
-        created_at: rec.latest_recommendation_date,
+        created_at: new Date().toISOString(), // Use current date as fallback
         
         // Aggregated data
         userProfiles,
@@ -258,10 +258,10 @@ export const getNetworkEntityRecommendationsWithCache = async (
         
         // Enhanced fields
         recommendation_count: rec.recommendation_count,
-        circle_rating: rec.circle_rating,
-        overall_rating: rec.overall_rating,
-        latest_recommendation_date: rec.latest_recommendation_date,
-        has_timeline_updates: rec.has_timeline_updates,
+        circle_rating: rec.average_rating,
+        overall_rating: rec.average_rating,
+        latest_recommendation_date: new Date().toISOString(),
+        has_timeline_updates: false,
         is_mutual_connection: false // Not applicable for aggregated data
       };
     });
