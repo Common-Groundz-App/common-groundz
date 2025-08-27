@@ -186,7 +186,9 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
       bio: null,
       location: null
     }],
-    displayUsernames: [rec.username || 'Unknown User']
+    displayUsernames: [rec.username || 'Unknown User'],
+    displayAvatars: rec.avatar_url ? [rec.avatar_url] : [],
+    recommendedByUserId: [rec.user_id]
   }));
 
   const transformedFallbackRecs: ProcessedFallbackRecommendation[] = fallbackRecommendations.map(rec => ({

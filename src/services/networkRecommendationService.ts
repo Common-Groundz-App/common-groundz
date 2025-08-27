@@ -25,6 +25,8 @@ export interface NetworkRecommendationData {
 export interface ProcessedNetworkRecommendation extends NetworkRecommendationData {
   userProfiles: SafeUserProfile[];
   displayUsernames: string[];
+  displayAvatars: string[];
+  recommendedByUserId: string[];
 }
 
 /**

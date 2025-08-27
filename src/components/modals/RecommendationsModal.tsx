@@ -33,7 +33,7 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({
   const [sortBy, setSortBy] = useState<'relevance' | 'rating' | 'recent' | 'popularity'>('relevance');
 
   const title = hasNetworkData 
-    ? `Network Recommendations for ${entityName}`
+    ? `Recommended by Your Network`
     : `Similar to ${entityName}`;
 
   // Combine and normalize all recommendations
@@ -45,6 +45,7 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({
       image_url: rec.entity_image_url,
       averageRating: rec.average_rating,
       recommendedBy: rec.displayUsernames,
+      recommendedByUserId: rec.recommendedByUserId?.[0],
       slug: rec.entity_slug,
       isNetwork: true,
       reason: undefined
@@ -111,14 +112,6 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({
           <DialogTitle className="text-xl font-semibold">
             {title}
           </DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="absolute right-4 top-4 h-8 w-8 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </DialogHeader>
         
         {/* Filters and Search */}
