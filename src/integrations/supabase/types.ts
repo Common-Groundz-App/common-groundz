@@ -2537,6 +2537,25 @@ export type Database = {
           total_reviews: number
         }[]
       }
+      get_aggregated_network_recommendations_discovery: {
+        Args: { p_entity_id: string; p_limit?: number; p_user_id: string }
+        Returns: {
+          circle_rating: number
+          entity_id: string
+          entity_image_url: string
+          entity_name: string
+          entity_slug: string
+          entity_type: Database["public"]["Enums"]["entity_type"]
+          entity_venue: string
+          has_timeline_updates: boolean
+          latest_recommendation_date: string
+          overall_rating: number
+          recommendation_count: number
+          recommender_avatars: string[]
+          recommender_user_ids: string[]
+          recommender_usernames: string[]
+        }[]
+      }
       get_cached_products: {
         Args: { query_text: string }
         Returns: {

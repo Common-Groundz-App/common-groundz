@@ -13,9 +13,13 @@ interface RecommendationData {
   image_url?: string;
   averageRating: number;
   recommendedBy: string[];
-  recommendedByUserId?: string;
+  recommendedByUserId?: string | string[];
+  recommendedByAvatars?: string[];
+  recommendationCount?: number;
   slug?: string;
   reason?: string;
+  latestRecommendationDate?: string;
+  hasTimelineUpdates?: boolean;
 }
 
 interface RecommendationEntityCardProps {
@@ -45,11 +49,29 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
     }
   };
 
-  const formatRecommendedBy = (recommendedBy: string[]) => {
-    if (recommendedBy.length === 0) return null;
-    if (recommendedBy.length === 1) return recommendedBy[0];
-    if (recommendedBy.length === 2) return `${recommendedBy[0]} & ${recommendedBy[1]}`;
-    return `${recommendedBy[0]} & ${recommendedBy.length - 1} others`;
+  const formatRecommendedBy = (users: string[], count?: number): string => {
+    if (users.length === 0) return 'Unknown';
+    if (users.length === 1) return `${users[0]} recommends this`;
+    if (users.length === 2) return `${users[0]} and ${users[1]} recommend this`;
+    if (users.length === 3) return `${users[0]}, ${users[1]} and ${users[2]} recommend this`;
+    
+    // If we have a count and it's different from users.length, use the count
+    const totalCount = count || users.length;
+    const othersCount = totalCount - 2;
+    return `${users[0]}, ${users[1]} and ${othersCount} others recommend this`;
+  };
+
+  const formatTimeAgo = (dateString?: string): string => {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInWeeks = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 7));
+    
+    if (diffInWeeks === 0) return 'recommended this week';
+    if (diffInWeeks === 1) return 'recommended 1 week ago';
+    return `recommended ${diffInWeeks} weeks ago`;
   };
 
   const getInitials = (name: string) => {
@@ -94,16 +116,45 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
         </div>
         
         {/* Attribution */}
-        {isNetworkRecommendation && recommendation.recommendedBy.length > 0 && recommendation.recommendedByUserId && (
-          <div className="flex items-center gap-2">
-            <ProfileAvatar 
-              userId={recommendation.recommendedByUserId}
-              size="xs"
-              showSkeleton={false}
-            />
-            <p className="text-xs text-muted-foreground">
-              {recommendation.recommendedBy[0]} recommended this
-            </p>
+        {isNetworkRecommendation && recommendation.recommendedBy.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1">
+              {/* Show multiple avatars */}
+              <div className="flex -space-x-1">
+                {(recommendation.recommendedByAvatars || recommendation.recommendedBy)
+                  .slice(0, 3)
+                  .map((avatar, index) => {
+                    const isUrl = typeof avatar === 'string' && avatar.startsWith('http');
+                    const userId = Array.isArray(recommendation.recommendedByUserId) 
+                      ? recommendation.recommendedByUserId[index] 
+                      : recommendation.recommendedByUserId;
+                    
+                    return (
+                      <Avatar key={index} className="h-4 w-4 border border-background">
+                        <AvatarImage src={isUrl ? avatar : ''} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(recommendation.recommendedBy[index] || 'Unknown')}
+                        </AvatarFallback>
+                      </Avatar>
+                    );
+                  })}
+                {(recommendation.recommendationCount || recommendation.recommendedBy.length) > 3 && (
+                  <div className="h-4 w-4 rounded-full bg-muted border border-background flex items-center justify-center">
+                    <span className="text-xs font-medium">
+                      +{(recommendation.recommendationCount || recommendation.recommendedBy.length) - 3}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {formatRecommendedBy(recommendation.recommendedBy, recommendation.recommendationCount)}
+              </p>
+            </div>
+            {recommendation.latestRecommendationDate && (
+              <p className="text-xs text-muted-foreground/70">
+                {formatTimeAgo(recommendation.latestRecommendationDate)}
+              </p>
+            )}
           </div>
         )}
         

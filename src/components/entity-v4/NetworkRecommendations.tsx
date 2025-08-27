@@ -10,7 +10,7 @@ import { RecommendationsModal } from '@/components/modals/RecommendationsModal';
 import { RecommendationEntityCard } from '@/components/entity/RecommendationEntityCard';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { analytics } from '@/services/analytics';
-import { ProcessedNetworkRecommendation } from '@/services/networkRecommendationService';
+import { ProcessedNetworkRecommendation, getNetworkEntityRecommendationsWithCache } from '@/services/networkRecommendationService';
 import { ProcessedFallbackRecommendation } from '@/services/fallbackRecommendationService';
 
 interface NetworkRecommendationsProps {
@@ -69,30 +69,18 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     retry: 3
   });
 
-  // Fetch network discovery recommendations (from people you follow, any entities)
+  // Fetch aggregated network recommendations (from people you follow, any entities)
   const {
     data: networkRecommendations = [],
     isLoading: isLoadingNetwork,
     error: networkError,
     refetch: refetchNetwork
   } = useQuery({
-    queryKey: ['network-discovery-recommendations', user?.id, entityId],
+    queryKey: ['aggregated-network-recommendations', user?.id, entityId],
     queryFn: async () => {
       if (!user?.id) return [];
       
-      const { data, error } = await supabase.rpc('get_network_recommendations_discovery', {
-        p_user_id: user.id,
-        p_current_entity_id: entityId,
-        p_limit: 6
-      });
-      
-      if (error) {
-        console.error('Error fetching network discovery recommendations:', error);
-        return [];
-      }
-      
-      console.log('Network discovery recommendations fetched:', data?.length || 0);
-      return data || [];
+      return await getNetworkEntityRecommendationsWithCache(user.id, entityId, 6);
     },
     enabled: !!user?.id && !!entityId && hasNetworkActivity === true,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -134,16 +122,16 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     retry: 2,
   });
 
-  // Convert network discovery recommendations to display format
+  // Convert aggregated network recommendations to display format
   const networkDisplay: DisplayRecommendation[] = networkRecommendations.map(rec => ({
     id: rec.entity_id,
     name: rec.entity_name || 'Untitled',
     type: rec.entity_type || 'Unknown',
     image_url: rec.entity_image_url,
-    averageRating: rec.rating || 0,
-    recommendedBy: [rec.username || 'Unknown User'],
-    recommendedByUserId: rec.user_id,
-    slug: undefined,
+    averageRating: rec.circle_rating || rec.average_rating || 0,
+    recommendedBy: rec.displayUsernames,
+    recommendedByUserId: Array.isArray(rec.recommendedByUserId) ? rec.recommendedByUserId[0] : rec.recommendedByUserId,
+    slug: rec.entity_slug,
     reason: undefined, // No reason field in network recommendations
     is_same_category: undefined // No category field in network recommendations
   }));
@@ -160,36 +148,8 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     reason: rec.display_reason
   }));
 
-  // Transform for modal - create proper types
-  const transformedNetworkRecs: ProcessedNetworkRecommendation[] = networkRecommendations.map(rec => ({
-    entity_id: rec.entity_id,
-    entity_name: rec.entity_name || 'Untitled',
-    entity_type: rec.entity_type,
-    entity_image_url: rec.entity_image_url,
-    entity_slug: '',
-    average_rating: rec.rating || 0,
-    is_mutual_connection: false,
-    latest_recommendation_date: rec.created_at,
-    recommendation_count: 1,
-    recommender_avatar_url: rec.avatar_url || '',
-    recommender_id: rec.user_id,
-    recommender_username: rec.username || 'Unknown User',
-    userProfiles: [{
-      id: rec.user_id,
-      username: rec.username || 'Unknown User',
-      avatar_url: rec.avatar_url || null,
-      displayName: rec.username || 'Unknown User',
-      initials: (rec.username || 'UU').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
-      fullName: null,
-      first_name: null,
-      last_name: null,
-      bio: null,
-      location: null
-    }],
-    displayUsernames: [rec.username || 'Unknown User'],
-    displayAvatars: rec.avatar_url ? [rec.avatar_url] : [],
-    recommendedByUserId: [rec.user_id]
-  }));
+  // Network recommendations are already in the correct format from the aggregated function
+  const transformedNetworkRecs: ProcessedNetworkRecommendation[] = networkRecommendations;
 
   const transformedFallbackRecs: ProcessedFallbackRecommendation[] = fallbackRecommendations.map(rec => ({
     entity_id: rec.entity_id,

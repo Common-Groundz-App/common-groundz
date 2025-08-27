@@ -22,11 +22,35 @@ export interface NetworkRecommendationData {
   recommender_username: string;
 }
 
-export interface ProcessedNetworkRecommendation extends NetworkRecommendationData {
+export interface ProcessedNetworkRecommendation {
+  // Core entity data
+  entity_id: string;
+  entity_name: string;
+  entity_type: string;
+  entity_image_url: string;
+  entity_slug: string;
+  entity_venue?: string;
+  average_rating: number;
+  
+  // Recommender data
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  created_at: string;
+  
+  // Aggregated data
   userProfiles: SafeUserProfile[];
   displayUsernames: string[];
   displayAvatars: string[];
   recommendedByUserId: string[];
+  
+  // Optional enhanced fields
+  recommendation_count?: number;
+  circle_rating?: number;
+  overall_rating?: number;
+  latest_recommendation_date?: string;
+  has_timeline_updates?: boolean;
+  is_mutual_connection?: boolean;
 }
 
 /**
@@ -157,33 +181,100 @@ export const cacheNetworkRecommendations = (
 };
 
 /**
- * Get network recommendations with caching and quality filtering
+ * Get aggregated network entity recommendations for discovery with cache
  */
 export const getNetworkEntityRecommendationsWithCache = async (
-  userId: string,
-  entityId: string,
-  limit: number = 6
+  userId: string, 
+  entityId: string, 
+  limit: number = 5
 ): Promise<ProcessedNetworkRecommendation[]> => {
+  const cacheKey = `aggregated_network_recs_${userId}_${entityId}`;
+  
+  // Check cache first
+  const cached = getCachedNetworkRecommendations(userId, entityId);
+  if (cached) {
+    console.log(`[NetworkRecs] Cache hit for user ${userId}, entity ${entityId}`);
+    return cached.slice(0, limit);
+  }
+
+  console.log(`[NetworkRecs] Cache miss for user ${userId}, entity ${entityId}`);
+
   try {
-    // Check cache first
-    const cached = getCachedNetworkRecommendations(userId, entityId);
-    if (cached) {
-      return applyQualityFiltering(cached).slice(0, limit);
+    // Get aggregated data from the new database function
+    const { data: rawData, error } = await supabase.rpc('get_aggregated_network_recommendations_discovery', {
+      p_user_id: userId,
+      p_entity_id: entityId,
+      p_limit: limit
+    });
+
+    if (error) {
+      console.error('[NetworkRecs] Error calling aggregated function:', error);
+      return [];
+    }
+    
+    if (!rawData || rawData.length === 0) {
+      console.log(`[NetworkRecs] No aggregated network recommendations found for user ${userId}, entity ${entityId}`);
+      return [];
     }
 
-    // Fetch fresh data
-    const recommendations = await getNetworkEntityRecommendations(userId, entityId, limit * 2); // Fetch more to account for filtering
-    
-    // Apply quality filtering and recency weighting
-    const qualityFiltered = applyQualityFiltering(recommendations);
-    const recentWeighted = applyRecencyWeighting(qualityFiltered);
-    
+    // Process the aggregated data
+    const processedData: ProcessedNetworkRecommendation[] = rawData.map(rec => {
+      const userProfiles = rec.recommender_user_ids?.map((id: string, index: number) => {
+        const username = rec.recommender_usernames?.[index] || 'Unknown User';
+        return {
+          id,
+          username,
+          avatar_url: rec.recommender_avatars?.[index] || null,
+          displayName: username,
+          initials: username.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+          fullName: null,
+          first_name: null,
+          last_name: null,
+          bio: null,
+          location: null
+        };
+      }) || [];
+
+      return {
+        // Core entity data
+        entity_id: rec.entity_id,
+        entity_name: rec.entity_name,
+        entity_type: rec.entity_type,
+        entity_image_url: rec.entity_image_url,
+        entity_venue: rec.entity_venue,
+        entity_slug: rec.entity_slug,
+        average_rating: rec.circle_rating || rec.overall_rating || 0,
+        
+        // Primary recommender data (first in list)
+        user_id: rec.recommender_user_ids?.[0] || '',
+        username: rec.recommender_usernames?.[0] || 'Unknown User',
+        avatar_url: rec.recommender_avatars?.[0] || null,
+        created_at: rec.latest_recommendation_date,
+        
+        // Aggregated data
+        userProfiles,
+        displayUsernames: rec.recommender_usernames || ['Unknown User'],
+        displayAvatars: rec.recommender_avatars?.filter(Boolean) || [],
+        recommendedByUserId: rec.recommender_user_ids || [],
+        
+        // Enhanced fields
+        recommendation_count: rec.recommendation_count,
+        circle_rating: rec.circle_rating,
+        overall_rating: rec.overall_rating,
+        latest_recommendation_date: rec.latest_recommendation_date,
+        has_timeline_updates: rec.has_timeline_updates,
+        is_mutual_connection: false // Not applicable for aggregated data
+      };
+    });
+
     // Cache the results
-    cacheNetworkRecommendations(userId, entityId, recentWeighted);
+    cacheNetworkRecommendations(userId, entityId, processedData);
+
+    console.log(`[NetworkRecs] Processed ${processedData.length} aggregated recommendations for user ${userId}, entity ${entityId}`);
     
-    return recentWeighted.slice(0, limit);
+    return processedData;
   } catch (error) {
-    console.error('Error in getNetworkEntityRecommendationsWithCache:', error);
+    console.error('[NetworkRecs] Error fetching aggregated network recommendations:', error);
     return [];
   }
 };
@@ -211,7 +302,7 @@ const applyRecencyWeighting = (recommendations: ProcessedNetworkRecommendation[]
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   
   return recommendations.map(rec => {
-    const recDate = new Date(rec.latest_recommendation_date);
+    const recDate = new Date(rec.latest_recommendation_date || rec.created_at);
     const isRecent = recDate > thirtyDaysAgo;
     
     // Boost score for recent recommendations
@@ -220,7 +311,13 @@ const applyRecencyWeighting = (recommendations: ProcessedNetworkRecommendation[]
     }
     
     return rec;
-  }).sort((a, b) => b.average_rating - a.average_rating);
+  }).sort((a, b) => {
+    // Sort by recommendation count first, then by rating
+    if ((a.recommendation_count || 1) !== (b.recommendation_count || 1)) {
+      return (b.recommendation_count || 1) - (a.recommendation_count || 1);
+    }
+    return b.average_rating - a.average_rating;
+  });
 };
 
 /**
