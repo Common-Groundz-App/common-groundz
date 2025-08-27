@@ -208,8 +208,8 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
   const showNetworkRecommendations = hasNetworkActivity && networkDisplay.length > 0;
   const displayEntities = showNetworkRecommendations ? networkDisplay.slice(0, 3) : fallbackDisplay.slice(0, 3);
   const totalRecommendations = showNetworkRecommendations ? networkDisplay.length : fallbackDisplay.length;
-  // Always show "See All" button when there are recommendations (≥1)
-  const showSeeAllButton = totalRecommendations >= 1;
+  // Always show "See All" button when there are recommendations (≥1), but only for fallback section
+  const showSeeAllButton = !showNetworkRecommendations && totalRecommendations >= 1;
   const isLoading = isCheckingNetwork || isLoadingNetwork || fallbackLoading;
   const hasError = networkCheckError || networkError || fallbackError;
   
