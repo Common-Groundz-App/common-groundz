@@ -2703,15 +2703,21 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
+          avatar_url: string
+          created_at: string
+          description: string
+          entity_category: string
           entity_id: string
           entity_image_url: string
           entity_name: string
           entity_type: Database["public"]["Enums"]["entity_type"]
-          entity_venue: string
+          id: string
+          is_same_category: boolean
           rating: number
-          recommender_avatar: string
-          recommender_name: string
-          review_count: number
+          recommendation_reason: string
+          title: string
+          user_id: string
+          username: string
         }[]
       }
       get_overall_rating: {
