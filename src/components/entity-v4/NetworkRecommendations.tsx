@@ -117,7 +117,10 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
         throw error;
       }
     },
-    enabled: !!entityId && (hasNetworkActivity === false || (hasNetworkActivity === true && (!!networkError || networkRecommendations.length === 0))), // When no network activity OR when network fails/has no data
+    enabled: !!entityId && (
+      hasNetworkActivity === false || 
+      (hasNetworkActivity === true && (!!networkError || (!isLoadingNetwork && networkRecommendations.length === 0)))
+    ),
     staleTime: 1000 * 60 * 15, // 15 minutes
     retry: 2,
   });
@@ -171,22 +174,28 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     : [];
 
   // Determine what to show: prefer network recommendations when available, otherwise show fallback
-  const showNetworkRecommendations = hasNetworkActivity && !networkError && networkDisplay.length > 0;
+  const hasNetworkError = !!networkError;
+  const hasValidNetworkData = networkDisplay.length > 0;
+  const showNetworkRecommendations = hasNetworkActivity && !hasNetworkError && hasValidNetworkData;
+  const shouldShowFallback = !showNetworkRecommendations && fallbackDisplay.length > 0;
+  
   const displayEntities = showNetworkRecommendations ? networkDisplay.slice(0, 3) : fallbackDisplay.slice(0, 3);
   const totalRecommendations = showNetworkRecommendations ? networkDisplay.length : fallbackDisplay.length;
   // Always show "See All" button when there are recommendations (≥1)
   const showSeeAllButton = totalRecommendations >= 1;
   const isLoading = isCheckingNetwork || isLoadingNetwork || fallbackLoading;
-  const hasError = (networkCheckError || (networkError && fallbackError)) && displayEntities.length === 0;
+  const hasError = (networkCheckError || (hasNetworkError && fallbackError)) && displayEntities.length === 0;
   
   console.log('🎯 Recommendation state:', {
     hasNetworkActivity,
     networkCount: networkDisplay.length,
     fallbackCount: fallbackDisplay.length,
     showingNetwork: showNetworkRecommendations,
+    shouldShowFallback,
     totalRecommendations,
     isLoading,
-    hasError: !!hasError
+    hasError: !!hasError,
+    hasNetworkError
   });
 
   // Retry handler
