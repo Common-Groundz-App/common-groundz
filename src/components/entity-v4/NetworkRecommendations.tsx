@@ -87,7 +87,7 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     retry: 3
   });
 
-  // Get fallback recommendations when no network activity
+  // Get fallback recommendations when no network activity OR when network recommendations fail
   const {
     data: fallbackRecommendations = [],
     isLoading: fallbackLoading,
@@ -117,7 +117,7 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
         throw error;
       }
     },
-    enabled: hasNetworkActivity === false, // Only when no network activity
+    enabled: !!entityId && (hasNetworkActivity === false || (hasNetworkActivity === true && (!!networkError || networkRecommendations.length === 0))), // When no network activity OR when network fails/has no data
     staleTime: 1000 * 60 * 15, // 15 minutes
     retry: 2,
   });
@@ -137,43 +137,47 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
   }));
 
   // Convert fallback recommendations to display format
-  const fallbackDisplay: DisplayRecommendation[] = fallbackRecommendations.map(rec => ({
-    id: rec.entity_id,
-    name: rec.entity_name,
-    type: rec.entity_type,
-    image_url: rec.entity_image_url,
-    averageRating: rec.avg_rating || 0,
-    recommendedBy: [],
-    slug: undefined,
-    reason: rec.display_reason
-  }));
+  const fallbackDisplay: DisplayRecommendation[] = Array.isArray(fallbackRecommendations) 
+    ? fallbackRecommendations.map((rec: any) => ({
+        id: rec.entity_id,
+        name: rec.entity_name,
+        type: rec.entity_type,
+        image_url: rec.entity_image_url,
+        averageRating: rec.avg_rating || 0,
+        recommendedBy: [],
+        slug: undefined,
+        reason: rec.display_reason
+      }))
+    : [];
 
   // Network recommendations are already in the correct format from the aggregated function
   const transformedNetworkRecs: ProcessedNetworkRecommendation[] = networkRecommendations;
 
-  const transformedFallbackRecs: ProcessedFallbackRecommendation[] = fallbackRecommendations.map(rec => ({
-    entity_id: rec.entity_id,
-    entity_name: rec.entity_name,
-    entity_type: rec.entity_type,
-    entity_image_url: rec.entity_image_url,
-    entity_slug: '',
-    average_rating: rec.avg_rating || 0,
-    popularity_score: 0,
-    reason: rec.display_reason,
-    recommendation_count: rec.recommendation_count || 0,
-    trending_score: 0,
-    displayReason: rec.display_reason,
-    score: 0
-  }));
+  const transformedFallbackRecs: ProcessedFallbackRecommendation[] = Array.isArray(fallbackRecommendations) 
+    ? fallbackRecommendations.map((rec: any) => ({
+        entity_id: rec.entity_id,
+        entity_name: rec.entity_name,
+        entity_type: rec.entity_type,
+        entity_image_url: rec.entity_image_url,
+        entity_slug: '',
+        average_rating: rec.avg_rating || 0,
+        popularity_score: 0,
+        reason: rec.display_reason,
+        recommendation_count: rec.recommendation_count || 0,
+        trending_score: 0,
+        displayReason: rec.display_reason,
+        score: 0
+      }))
+    : [];
 
-  // Determine what to show: always prefer network recommendations when available
-  const showNetworkRecommendations = hasNetworkActivity && networkDisplay.length > 0;
+  // Determine what to show: prefer network recommendations when available, otherwise show fallback
+  const showNetworkRecommendations = hasNetworkActivity && !networkError && networkDisplay.length > 0;
   const displayEntities = showNetworkRecommendations ? networkDisplay.slice(0, 3) : fallbackDisplay.slice(0, 3);
   const totalRecommendations = showNetworkRecommendations ? networkDisplay.length : fallbackDisplay.length;
   // Always show "See All" button when there are recommendations (≥1)
   const showSeeAllButton = totalRecommendations >= 1;
   const isLoading = isCheckingNetwork || isLoadingNetwork || fallbackLoading;
-  const hasError = networkCheckError || networkError || fallbackError;
+  const hasError = (networkCheckError || (networkError && fallbackError)) && displayEntities.length === 0;
   
   console.log('🎯 Recommendation state:', {
     hasNetworkActivity,

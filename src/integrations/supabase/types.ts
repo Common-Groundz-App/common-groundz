@@ -2546,7 +2546,6 @@ export type Database = {
           entity_name: string
           entity_slug: string
           entity_type: Database["public"]["Enums"]["entity_type"]
-          entity_venue: string
           has_timeline_updates: boolean
           latest_recommendation_date: string
           overall_rating: number

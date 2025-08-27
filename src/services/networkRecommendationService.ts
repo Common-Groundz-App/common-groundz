@@ -241,7 +241,6 @@ export const getNetworkEntityRecommendationsWithCache = async (
         entity_name: rec.entity_name,
         entity_type: rec.entity_type,
         entity_image_url: rec.entity_image_url,
-        entity_venue: rec.entity_venue,
         entity_slug: rec.entity_slug,
         average_rating: rec.circle_rating || rec.overall_rating || 0,
         
