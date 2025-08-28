@@ -2550,8 +2550,9 @@ export type Database = {
           has_timeline_updates: boolean
           latest_recommendation_date: string
           recommendation_count: number
-          recommender_ids: string[]
-          recommender_names: string[]
+          recommender_avatars: string[]
+          recommender_user_ids: string[]
+          recommender_usernames: string[]
         }[]
       }
       get_cached_products: {
