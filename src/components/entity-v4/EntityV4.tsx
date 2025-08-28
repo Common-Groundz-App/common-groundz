@@ -187,31 +187,48 @@ const EntityV4 = () => {
 
   // Function to scroll to Reviews & Social Proof section
   const scrollToReviewsSection = () => {
-    const reviewsSection = document.getElementById('reviews-section') ||
-                          document.querySelector('[data-section="reviews"]');
+    console.log('🔄 Scroll to reviews triggered');
     
-    if (!reviewsSection) {
-      // Fallback: try to find by text content
-      const headings = document.querySelectorAll('h2');
-      const reviewsHeading = Array.from(headings).find(h => 
-        h.textContent?.includes('Reviews & Social Proof') || 
-        h.textContent?.includes('Reviews')
-      );
+    // For mobile devices, add a small delay to ensure touch events complete
+    const isMobile = window.innerWidth < 768;
+    const delay = isMobile ? 100 : 0;
+    
+    setTimeout(() => {
+      const reviewsSection = document.getElementById('reviews-section') ||
+                            document.querySelector('[data-section="reviews"]');
       
-      if (reviewsHeading) {
-        reviewsHeading.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start',
-          inline: 'nearest'
+      if (!reviewsSection) {
+        // Fallback: try to find by text content
+        const headings = document.querySelectorAll('h2');
+        const reviewsHeading = Array.from(headings).find(h => 
+          h.textContent?.includes('Reviews & Social Proof') || 
+          h.textContent?.includes('Reviews')
+        );
+        
+        if (reviewsHeading) {
+          console.log('📍 Found reviews heading, scrolling...');
+          
+          // Use requestAnimationFrame for smoother mobile scrolling
+          requestAnimationFrame(() => {
+            reviewsHeading.scrollIntoView({ 
+              behavior: isMobile ? 'auto' : 'smooth', // iOS Safari can have issues with smooth scroll
+              block: 'start',
+              inline: 'nearest'
+            });
+          });
+        }
+      } else {
+        console.log('📍 Found reviews section, scrolling...');
+        
+        requestAnimationFrame(() => {
+          reviewsSection.scrollIntoView({ 
+            behavior: isMobile ? 'auto' : 'smooth',
+            block: 'start',
+            inline: 'nearest'
+          });
         });
       }
-    } else {
-      reviewsSection.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start',
-        inline: 'nearest'
-      });
-    }
+    }, delay);
   };
 
   // Navigation handlers for child entities (V4 navigation)

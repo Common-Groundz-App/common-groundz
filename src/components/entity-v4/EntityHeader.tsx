@@ -186,8 +186,13 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                 <div className={`flex flex-col ${isMobile ? 'gap-4' : 'sm:flex-row sm:items-center gap-3'} mb-4`}>
                   {/* Overall Rating */}
                   <div 
-                    className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer hover:scale-105 transition-transform duration-200' : ''}`}
+                    className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
+                    style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
                     onClick={onRatingClick}
+                    onTouchEnd={onRatingClick ? (e) => {
+                      e.preventDefault();
+                      onRatingClick();
+                    } : undefined}
                     role={onRatingClick ? "button" : undefined}
                     tabIndex={onRatingClick ? 0 : undefined}
                     onKeyDown={onRatingClick ? (e) => {
@@ -235,8 +240,13 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   {user && (
                     circleRating !== null ? (
                       <div 
-                        className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer hover:scale-105 transition-transform duration-200' : ''}`}
+                        className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
+                        style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
                         onClick={onRatingClick}
+                        onTouchEnd={onRatingClick ? (e) => {
+                          e.preventDefault();
+                          onRatingClick();
+                        } : undefined}
                         role={onRatingClick ? "button" : undefined}
                         tabIndex={onRatingClick ? 0 : undefined}
                         onKeyDown={onRatingClick ? (e) => {
@@ -289,8 +299,13 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                       </div>
                     ) : (
                       <div 
-                        className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer hover:scale-105 transition-transform duration-200' : ''}`}
+                        className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
+                        style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
                         onClick={onRatingClick}
+                        onTouchEnd={onRatingClick ? (e) => {
+                          e.preventDefault();
+                          onRatingClick();
+                        } : undefined}
                         role={onRatingClick ? "button" : undefined}
                         tabIndex={onRatingClick ? 0 : undefined}
                         onKeyDown={onRatingClick ? (e) => {
