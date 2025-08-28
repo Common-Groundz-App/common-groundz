@@ -2539,20 +2539,17 @@ export type Database = {
       }
       get_aggregated_network_recommendations_discovery: {
         Args:
-          | {
-              current_user_id: string
-              entity_id_param: string
-              limit_param?: number
-            }
+          | { p_entity_id: string; p_limit?: number; p_user_id: string }
           | { p_following_ids: string[]; p_limit?: number; p_user_id: string }
         Returns: {
           average_rating: number
           entity_id: string
           entity_image_url: string
           entity_name: string
-          entity_type: Database["public"]["Enums"]["entity_type"]
-          entity_venue: string
-          recent_activity_count: number
+          entity_slug: string
+          entity_type: string
+          has_timeline_updates: boolean
+          latest_recommendation_date: string
           recommendation_count: number
           recommender_avatars: string[]
           recommender_user_ids: string[]

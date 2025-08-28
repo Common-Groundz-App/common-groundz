@@ -202,9 +202,9 @@ export const getNetworkEntityRecommendationsWithCache = async (
   try {
     // Get aggregated data from the new database function
     const { data: rawData, error } = await supabase.rpc('get_aggregated_network_recommendations_discovery', {
-      current_user_id: userId,
-      entity_id_param: entityId,
-      limit_param: limit
+      p_user_id: userId,
+      p_entity_id: entityId,
+      p_limit: limit
     });
 
     if (error) {
@@ -248,7 +248,7 @@ export const getNetworkEntityRecommendationsWithCache = async (
         user_id: rec.recommender_user_ids?.[0] || '',
         username: rec.recommender_usernames?.[0] || 'Unknown User',
         avatar_url: rec.recommender_avatars?.[0] || null,
-        created_at: new Date().toISOString(), // Fallback since function doesn't return dates
+        created_at: rec.latest_recommendation_date || new Date().toISOString(),
         
         // Aggregated data
         userProfiles,
@@ -260,8 +260,8 @@ export const getNetworkEntityRecommendationsWithCache = async (
         recommendation_count: rec.recommendation_count,
         circle_rating: rec.average_rating,
         overall_rating: rec.average_rating,
-        latest_recommendation_date: new Date().toISOString(), // Fallback since function doesn't return dates
-        has_timeline_updates: false,
+        latest_recommendation_date: rec.latest_recommendation_date || new Date().toISOString(),
+        has_timeline_updates: rec.has_timeline_updates || false,
         is_mutual_connection: false // Not applicable for aggregated data
       };
     });

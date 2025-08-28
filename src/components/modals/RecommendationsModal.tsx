@@ -64,7 +64,8 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({
       recommendedBy: [],
       slug: rec.entity_slug,
       isNetwork: false,
-      reason: rec.displayReason
+      reason: rec.displayReason,
+      latestRecommendationDate: undefined // Fallback recommendations don't have dates
     }));
 
     return [...network, ...fallback];
@@ -97,8 +98,11 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({
         case 'rating':
           return b.averageRating - a.averageRating;
         case 'recent':
-          // For now, maintain current order as we don't have timestamps
-          return 0;
+          // Sort by latest recommendation date (newest first)
+          if (!a.latestRecommendationDate && !b.latestRecommendationDate) return 0;
+          if (!a.latestRecommendationDate) return 1;
+          if (!b.latestRecommendationDate) return -1;
+          return new Date(b.latestRecommendationDate).getTime() - new Date(a.latestRecommendationDate).getTime();
         case 'popularity':
           return b.recommendedBy.length - a.recommendedBy.length;
         default:
