@@ -81,27 +81,27 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
           </CardHeader>
           <CardContent className="space-y-3">
             {contactInfo.location && (
-              <div className="flex items-center gap-3 min-w-0">
-                <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                <span className="text-sm break-words min-w-0">{contactInfo.location}</span>
+              <div className="flex items-center gap-3">
+                <MapPin className="w-4 h-4 text-gray-500" />
+                <span className="text-sm">{contactInfo.location}</span>
               </div>
             )}
             {contactInfo.email && (
-              <div className="flex items-center gap-3 min-w-0">
-                <Mail className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                <span className="text-sm break-all min-w-0">{contactInfo.email}</span>
+              <div className="flex items-center gap-3">
+                <Mail className="w-4 h-4 text-gray-500" />
+                <span className="text-sm">{contactInfo.email}</span>
               </div>
             )}
             {contactInfo.phone && (
-              <div className="flex items-center gap-3 min-w-0">
-                <Phone className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                <span className="text-sm break-all min-w-0">{contactInfo.phone}</span>
+              <div className="flex items-center gap-3">
+                <Phone className="w-4 h-4 text-gray-500" />
+                <span className="text-sm">{contactInfo.phone}</span>
               </div>
             )}
             {contactInfo.website && (
-              <div className="flex items-center gap-3 min-w-0">
-                <Globe className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                <span className="text-sm break-all min-w-0">{contactInfo.website}</span>
+              <div className="flex items-center gap-3">
+                <Globe className="w-4 h-4 text-gray-500" />
+                <span className="text-sm">{contactInfo.website}</span>
               </div>
             )}
           </CardContent>
