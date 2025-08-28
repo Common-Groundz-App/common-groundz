@@ -187,9 +187,8 @@ const EntityV4 = () => {
 
   // Function to scroll to Reviews & Social Proof section
   const scrollToReviewsSection = () => {
-    const reviewsSection = document.querySelector('h2:has-text("Reviews & Social Proof")') ||
-                          document.querySelector('[data-section="reviews"]') ||
-                          document.querySelector('h2[class*="text-2xl"][class*="font-bold"]:contains("Reviews")');
+    const reviewsSection = document.getElementById('reviews-section') ||
+                          document.querySelector('[data-section="reviews"]');
     
     if (!reviewsSection) {
       // Fallback: try to find by text content
@@ -205,11 +204,8 @@ const EntityV4 = () => {
           block: 'start',
           inline: 'nearest'
         });
-        return;
       }
-    }
-    
-    if (reviewsSection) {
+    } else {
       reviewsSection.scrollIntoView({ 
         behavior: 'smooth', 
         block: 'start',
