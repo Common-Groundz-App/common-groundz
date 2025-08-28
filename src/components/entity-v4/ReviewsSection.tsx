@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown, X } from "lucide-react";
 import { RatingRingIcon } from "@/components/ui/rating-ring-icon";
@@ -58,7 +57,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const isAuthenticated = !!user && !authLoading;
   const hasCircleData = isAuthenticated && !circleLoading && circleUserIds.length > 0;
 
-  // Process reviews with filters - using circleUserIds from the hook
   const filteredReviews = filterReviews(reviews, {
     search: searchQuery || undefined,
     verified: activeFilters.verified || undefined,
@@ -70,10 +68,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     sortBy: sortBy
   }, circleUserIds);
 
-  // Check if user wants pure sorting (bypass priority system for rating sorts)
   const bypassPrioritySystem = sortBy === 'highestRated' || sortBy === 'lowestRated';
   
-  // 4-tier priority system: Hybrid (circle+timeline), Circle-only, Timeline-only, Regular
   const timelineReviews = getTimelineReviews(filteredReviews);
   const allCircleReviews = hasCircleData ? 
     filteredReviews.filter(review => circleUserIds.includes(review.user_id)) : [];
@@ -85,10 +81,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   let displayReviews: ReviewWithUser[];
   
   if (bypassPrioritySystem) {
-    // Pure sorting - ignore priority system, but still categorize for display
     displayReviews = filteredReviews;
     
-    // Still categorize for individual section display
     hybridReviews = timelineReviews.filter(review => 
       allCircleReviews.some(cr => cr.id === review.id)
     );
@@ -111,18 +105,14 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
       !timelineOnlyReviewIds.has(review.id)
     );
   } else {
-    // Use priority system
-    // 1. Hybrid reviews: both circle AND timeline (highest priority)
     hybridReviews = timelineReviews.filter(review => 
       allCircleReviews.some(cr => cr.id === review.id)
     );
     
-    // 2. Circle-only reviews: circle but NOT timeline
     circleOnlyReviews = allCircleReviews.filter(review => 
       !timelineReviews.some(tr => tr.id === review.id)
     );
     
-    // 3. Timeline-only reviews: timeline but NOT circle
     timelineOnlyReviews = timelineReviews.filter(review => 
       !allCircleReviews.some(cr => cr.id === review.id)
     );
@@ -131,22 +121,19 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     const circleOnlyReviewIds = new Set(circleOnlyReviews.map(r => r.id));
     const timelineOnlyReviewIds = new Set(timelineOnlyReviews.map(r => r.id));
     
-    // 4. Regular reviews (lowest priority) - exclude all special categories
     regularReviews = filteredReviews.filter(review => 
       !hybridReviewIds.has(review.id) && 
       !circleOnlyReviewIds.has(review.id) && 
       !timelineOnlyReviewIds.has(review.id)
     );
     
-    // Combine all in priority order
     displayReviews = [...hybridReviews, ...circleOnlyReviews, ...timelineOnlyReviews, ...regularReviews];
   }
 
-  // Transform reviews for UI
   const transformedRegularReviews = regularReviews.slice(0, 3).map(transformReviewForUI);
 
   const toggleFilter = (filter: keyof typeof activeFilters) => {
-    if (filter === 'starRating') return; // Handle star rating separately
+    if (filter === 'starRating') return;
     setActiveFilters(prev => ({
       ...prev,
       [filter]: !prev[filter]
@@ -171,7 +158,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     setSelectedTimelineReview(null);
   };
 
-  // Helper functions for dynamic button labels
   const getSortButtonText = () => {
     switch(sortBy) {
       case 'mostRecent': return 'Most Recent';
@@ -220,7 +206,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
 
   return (
     <>
-      {/* Ask Community */}
       <Card className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
         <CardContent className="p-6">
           <div className="flex items-center gap-4">
@@ -240,17 +225,13 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
         </CardContent>
       </Card>
 
-      {/* SECTION 3: Reviews & Social Proof */}
       <div className="mb-8">
-        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-900">Reviews & Social Proof</h2>
         </div>
 
-        {/* Search and Filters Row - Yelp Style */}
         <div className="space-y-4 mb-6">
           <div className="flex items-center gap-4">
-            {/* Search Bar - Left Side */}
             <div className="flex-1 max-w-md">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -264,9 +245,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
               </div>
             </div>
             
-            {/* Filter Dropdowns - Right Side */}
             <div className="flex gap-2">
-              {/* Sort Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="text-sm font-medium">
@@ -299,7 +278,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Filter Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className={`text-sm font-medium ${getActiveFiltersCount() > 0 ? 'bg-blue-50 text-blue-700 border-blue-300' : ''}`}>
@@ -318,7 +296,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   
                   <DropdownMenuSeparator />
                   
-                  {/* Star Rating Filters */}
                   <DropdownMenuItem 
                     onClick={() => setStarRating(5, 'exact')}
                     className={activeFilters.starRating === 5 && activeFilters.starFilter === 'exact' ? "bg-blue-50 text-blue-700" : ""}
@@ -387,7 +364,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Clear Filters Button - Only show when filters are active */}
               {hasActiveFilters() && (
                 <Button 
                   variant="ghost" 
@@ -402,14 +378,12 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             </div>
           </div>
 
-          {/* Results count and active filters display */}
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
               Showing {getTotalResultsCount()} review{getTotalResultsCount() !== 1 ? 's' : ''}
               {(searchQuery || getActiveFiltersCount() > 0) && ' with current filters'}
             </span>
             
-            {/* Active filter pills */}
             {(searchQuery || getActiveFiltersCount() > 0) && (
               <div className="flex items-center gap-2 flex-wrap">
                 {searchQuery && (
@@ -483,9 +457,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           </div>
         </div>
 
-        {/* Review Cards - 4-Tier Priority System */}
         <div className="space-y-6">
-          {/* 1. Hybrid Reviews (Circle + Timeline) - HIGHEST PRIORITY */}
           {hybridReviews.map(review => (
             <TimelineReviewCard
               key={review.id}
@@ -496,7 +468,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             />
           ))}
 
-          {/* 2. Circle-Only Reviews - Second Priority */}
           {circleOnlyReviews.map(review => (
             <Card key={review.id} className="border-2 border-blue-200 bg-blue-50/30">
               <CardContent className="p-6">
@@ -518,7 +489,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             </Card>
           ))}
 
-          {/* 3. Timeline-Only Reviews - Third Priority */}
           {timelineOnlyReviews.map(review => (
             <TimelineReviewCard
               key={review.id}
@@ -529,7 +499,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             />
           ))}
 
-          {/* Regular Reviews */}
           {transformedRegularReviews.length > 0 ? (
             transformedRegularReviews.map(review => (
               <ReviewCard 
@@ -550,31 +519,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             )
           )}
         </div>
-
-        {/* Photo Gallery */}
-        <Card className="mt-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="w-5 h-5" />
-                Photos & Videos
-              </CardTitle>
-              <Button variant="outline" size="sm">
-                <Camera className="w-4 h-4 mr-2" />
-                Add Photos
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-gray-400" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Network-Based Recommendations - Only show if authenticated */}
         {isAuthenticated && (
