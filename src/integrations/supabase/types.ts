@@ -2546,14 +2546,12 @@ export type Database = {
           entity_id: string
           entity_image_url: string
           entity_name: string
-          entity_slug: string
-          entity_type: string
+          entity_type: Database["public"]["Enums"]["entity_type"]
           has_timeline_updates: boolean
           latest_recommendation_date: string
           recommendation_count: number
-          recommender_avatars: string[]
-          recommender_user_ids: string[]
-          recommender_usernames: string[]
+          recommender_ids: string[]
+          recommender_names: string[]
         }[]
       }
       get_cached_products: {
