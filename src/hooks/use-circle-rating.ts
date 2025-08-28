@@ -22,7 +22,25 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
       setIsLoading(true);
 
       try {
-        // First, get the list of users that the current user follows
+        // Use the database function to get the circle rating
+        const { data: circleRatingData, error: ratingError } = await supabase
+          .rpc('get_circle_rating', {
+            p_entity_id: entityId,
+            p_user_id: user.id
+          });
+
+        if (ratingError) {
+          console.error('Error fetching circle rating:', ratingError);
+          setCircleRating(null);
+          setCircleRatingCount(0);
+          setCircleContributors([]);
+          setIsLoading(false);
+          return;
+        }
+
+        const circleRatingValue = circleRatingData || 0;
+        
+        // Get contributors for display (with latest ratings)
         const { data: followedUsers, error: followError } = await supabase
           .from('follows')
           .select('following_id')
@@ -30,6 +48,9 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
 
         if (followError) {
           console.error('Error fetching followed users:', followError);
+          setCircleRating(circleRatingValue);
+          setCircleRatingCount(circleRatingValue > 0 ? 1 : 0);
+          setCircleContributors([]);
           setIsLoading(false);
           return;
         }
@@ -44,81 +65,49 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
         }
 
         const followedUserIds = followedUsers.map(f => f.following_id);
-        console.log('🔵 Found followed users:', followedUserIds.length);
 
-        // Get recommendations from followed users for this entity
-        const { data: recommendations, error: recError } = await supabase
-          .from('recommendations')
-          .select('rating, user_id')
-          .eq('entity_id', entityId)
-          .in('user_id', followedUserIds);
-
-        if (recError) {
-          console.error('Error fetching circle recommendations:', recError);
-        }
-
-        // Get reviews from followed users for this entity
+        // Get reviews from followed users for contributors display (with latest_rating)
         const { data: reviews, error: reviewError } = await supabase
           .from('reviews')
-          .select('rating, user_id')
+          .select('rating, latest_rating, user_id')
           .eq('entity_id', entityId)
+          .eq('status', 'published')
           .in('user_id', followedUserIds);
 
         if (reviewError) {
           console.error('Error fetching circle reviews:', reviewError);
         }
 
-        // Combine all ratings and contributors from followed users
-        const allRatings: number[] = [];
+        // Build contributors with latest ratings
         const contributors: CircleContributor[] = [];
+        let ratingCount = 0;
         
-        if (recommendations) {
-          recommendations.forEach(rec => {
-            if (rec.rating && typeof rec.rating === 'number') {
-              const rating = Number(rec.rating);
-              allRatings.push(rating);
-              contributors.push({
-                userId: rec.user_id,
-                rating: rating,
-                type: 'recommendation'
-              });
-            }
-          });
-        }
-
         if (reviews) {
           reviews.forEach(review => {
-            if (review.rating && typeof review.rating === 'number') {
-              allRatings.push(review.rating);
+            const effectiveRating = review.latest_rating || review.rating;
+            if (effectiveRating && typeof effectiveRating === 'number') {
+              ratingCount++;
               contributors.push({
                 userId: review.user_id,
-                rating: review.rating,
+                rating: effectiveRating,
                 type: 'review'
               });
             }
           });
         }
 
-        console.log('🔵 Circle ratings found:', allRatings);
-        console.log('🔵 Circle contributors found:', contributors.length);
-
         // Sort contributors by rating (highest first) and limit to top contributors
         const sortedContributors = contributors
           .sort((a, b) => b.rating - a.rating)
-          .slice(0, 5); // Limit to top 5 contributors for performance
+          .slice(0, 5);
 
-        if (allRatings.length === 0) {
-          setCircleRating(null);
-          setCircleRatingCount(0);
-          setCircleContributors([]);
-        } else {
-          const averageRating = allRatings.reduce((sum, rating) => sum + rating, 0) / allRatings.length;
-          setCircleRating(averageRating);
-          setCircleRatingCount(allRatings.length);
-          setCircleContributors(sortedContributors);
-          console.log('🔵 Circle rating calculated:', averageRating, 'from', allRatings.length, 'ratings');
-          console.log('🔵 Top contributors:', sortedContributors);
-        }
+        setCircleRating(circleRatingValue > 0 ? circleRatingValue : null);
+        setCircleRatingCount(ratingCount);
+        setCircleContributors(sortedContributors);
+        
+        console.log('🔵 Circle rating from DB function:', circleRatingValue);
+        console.log('🔵 Circle contributors found:', contributors.length);
+        console.log('🔵 Top contributors:', sortedContributors);
       } catch (error) {
         console.error('Error calculating circle rating:', error);
         setCircleRating(null);
