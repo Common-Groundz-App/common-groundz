@@ -21,7 +21,6 @@ import { useNavigate } from 'react-router-dom';
 
 // Imported extracted components
 import { EntityHeader } from './EntityHeader';
-import { MediaPreviewSection } from './MediaPreviewSection';
 import { TrustSummaryCard } from './TrustSummaryCard';
 import { ReviewsSection } from './ReviewsSection';
 import { EntitySidebar } from './EntitySidebar';
@@ -291,24 +290,6 @@ const EntityV4 = () => {
             reviewActionConfig={reviewActionConfig}
           />
 
-          {/* SECTION 2: Media Preview */}
-          <MediaPreviewSection 
-            entity={entity}
-            onViewAllClick={() => {
-              // Navigate to photos tab - you can customize this behavior
-              const tabElement = document.querySelector('[data-value="photos"]');
-              if (tabElement) {
-                (tabElement as HTMLElement).click();
-                // Scroll to tabs section
-                setTimeout(() => {
-                  const tabsSection = document.querySelector('[role="tabpanel"]');
-                  if (tabsSection) {
-                    tabsSection.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }, 100);
-              }
-            }}
-          />
 
           <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
