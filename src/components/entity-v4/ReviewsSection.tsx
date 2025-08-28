@@ -225,9 +225,9 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
         </CardContent>
       </Card>
 
-      <div className="mb-8">
+      <div className="mb-8" data-section="reviews">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">Reviews & Social Proof</h2>
+          <h2 className="text-2xl font-bold text-gray-900" id="reviews-section">Reviews & Social Proof</h2>
         </div>
 
         <div className="space-y-4 mb-6">
