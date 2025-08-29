@@ -3,6 +3,7 @@ import React from 'react';
 import { Clock, MapPin, Mail, Phone, Globe, Users, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionButton } from './EntitySuggestionButton';
 import { useRelatedEntities } from '@/hooks/use-related-entities';
@@ -187,7 +188,12 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
 
       {/* Talk to Circle */}
       <Card className="bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
-        <CardContent className="p-4 text-center">
+        <CardContent className="p-4 text-center relative">
+          <Badge 
+            className="absolute top-2 right-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium border-0 hover:from-purple-600 hover:to-pink-600"
+          >
+            Coming Soon
+          </Badge>
           <Users className="w-8 h-8 text-purple-600 mx-auto mb-2" />
           <h3 className="font-semibold text-gray-900 mb-2">Talk to Someone in Your Circle</h3>
           <p className="text-sm text-gray-600 mb-3">Connect with people who have experience with {entity.name}</p>

@@ -207,7 +207,12 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   return (
     <>
       <Card className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-        <CardContent className="p-6">
+        <CardContent className="p-6 relative">
+          <Badge 
+            className="absolute top-3 right-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-medium border-0 hover:from-blue-600 hover:to-cyan-600"
+          >
+            Coming Soon
+          </Badge>
           <div className="flex items-center gap-4">
             <MessageCircle className="w-8 h-8 text-blue-600" />
             <div className="flex-1">
