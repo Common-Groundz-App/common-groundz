@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionButton } from './EntitySuggestionButton';
+import { useRelatedEntities } from '@/hooks/use-related-entities';
+import { useNavigate } from 'react-router-dom';
 import { 
   shouldShowBusinessHours, 
   shouldShowContactInfo, 
@@ -18,27 +20,24 @@ interface EntitySidebarProps {
 }
 
 export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
+  const navigate = useNavigate();
   const contactInfo = extractContactInfo(entity);
   const businessHours = extractBusinessHours(entity);
   const formattedHours = formatBusinessHours(businessHours);
   
-  // Related Entities - TODO: Make this dynamic later
-  const relatedEntities = [{
-    name: "HealthifyMe",
-    rating: 4.2,
-    category: "Health Apps",
-    image: "https://images.unsplash.com/photo-1500673922987-e212871fec22?w=100&h=100&fit=crop"
-  }, {
-    name: "MyFitnessPal",
-    rating: 4.0,
-    category: "Fitness Apps",
-    image: "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=100&h=100&fit=crop"
-  }, {
-    name: "Optimum Nutrition",
-    rating: 4.5,
-    category: "Supplements",
-    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100&h=100&fit=crop"
-  }];
+  // Dynamic Related Entities
+  const { relatedEntities, isLoading } = useRelatedEntities({
+    entityId: entity.id,
+    entityType: entity.type as any,
+    parentId: entity.parent_id,
+    limit: 3
+  });
+
+  const handleEntityClick = (relatedEntity: Entity) => {
+    if (relatedEntity.slug) {
+      navigate(`/entity/${relatedEntity.slug}`);
+    }
+  };
 
   return (
     <div className="space-y-6 sticky top-8">
@@ -122,27 +121,40 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
       </Card>
 
       {/* Related Entities */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Related Brands</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {relatedEntities.map((relatedEntity, index) => (
-              <div key={index} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                <img src={relatedEntity.image} alt={relatedEntity.name} className="w-8 h-8 rounded object-cover" />
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm truncate">{relatedEntity.name}</h4>
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                    <span className="text-xs">{relatedEntity.rating}</span>
+      {relatedEntities.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Related Brands</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {isLoading ? (
+                <div className="text-sm text-muted-foreground">Loading related entities...</div>
+              ) : (
+                relatedEntities.map((relatedEntity, index) => (
+                  <div 
+                    key={relatedEntity.id || index} 
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                    onClick={() => handleEntityClick(relatedEntity)}
+                  >
+                    <img 
+                      src={relatedEntity.image_url || '/placeholder.svg'} 
+                      alt={relatedEntity.name} 
+                      className="w-8 h-8 rounded object-cover" 
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm truncate">{relatedEntity.name}</h4>
+                      <div className="text-xs text-muted-foreground capitalize">
+                        {relatedEntity.type.replace('_', ' ')}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Talk to Circle */}
       <Card className="bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">

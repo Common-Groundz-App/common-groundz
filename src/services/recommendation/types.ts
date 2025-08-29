@@ -17,6 +17,7 @@ export interface Entity {
   created_at?: string;
   updated_at?: string;
   is_claimed?: boolean;
+  parent_id?: string;
   
   // Enhanced metadata fields
   authors?: string[];
