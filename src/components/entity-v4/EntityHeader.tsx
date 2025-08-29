@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTapDetection } from '@/hooks/use-tap-detection';
 import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
@@ -84,6 +85,15 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
 
   // Entity share functionality
   const { shareEntity } = useEntityShare();
+
+  // Tap detection for rating blocks
+  const ratingTapDetection = useTapDetection({
+    onTap: () => {
+      if (onRatingClick) {
+        onRatingClick();
+      }
+    }
+  });
 
   const handleShare = async () => {
     if (!entity) return;
@@ -188,11 +198,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   <div 
                     className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
                     style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
-                    onClick={onRatingClick}
-                    onTouchEnd={onRatingClick ? (e) => {
-                      e.preventDefault();
-                      onRatingClick();
-                    } : undefined}
+                    {...(onRatingClick ? ratingTapDetection : {})}
                     role={onRatingClick ? "button" : undefined}
                     tabIndex={onRatingClick ? 0 : undefined}
                     onKeyDown={onRatingClick ? (e) => {
@@ -242,11 +248,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                       <div 
                         className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
                         style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
-                        onClick={onRatingClick}
-                        onTouchEnd={onRatingClick ? (e) => {
-                          e.preventDefault();
-                          onRatingClick();
-                        } : undefined}
+                        {...(onRatingClick ? ratingTapDetection : {})}
                         role={onRatingClick ? "button" : undefined}
                         tabIndex={onRatingClick ? 0 : undefined}
                         onKeyDown={onRatingClick ? (e) => {
@@ -301,11 +303,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                       <div 
                         className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
                         style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
-                        onClick={onRatingClick}
-                        onTouchEnd={onRatingClick ? (e) => {
-                          e.preventDefault();
-                          onRatingClick();
-                        } : undefined}
+                        {...(onRatingClick ? ratingTapDetection : {})}
                         role={onRatingClick ? "button" : undefined}
                         tabIndex={onRatingClick ? 0 : undefined}
                         onKeyDown={onRatingClick ? (e) => {
