@@ -7,6 +7,8 @@ import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionButton } from './EntitySuggestionButton';
 import { useRelatedEntities } from '@/hooks/use-related-entities';
 import { useNavigate } from 'react-router-dom';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { 
   shouldShowBusinessHours, 
   shouldShowContactInfo, 
@@ -147,6 +149,33 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
                       <div className="text-xs text-muted-foreground capitalize">
                         {relatedEntity.type.replace('_', ' ')}
                       </div>
+                      {(relatedEntity as any).reviewCount > 0 ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <RatingRingIcon 
+                            rating={(relatedEntity as any).avgRating} 
+                            size={12} 
+                          />
+                          <span 
+                            className="text-xs font-medium"
+                            style={{ color: getSentimentColor((relatedEntity as any).avgRating, true) }}
+                          >
+                            {(relatedEntity as any).avgRating.toFixed(1)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            ({(relatedEntity as any).reviewCount} review{(relatedEntity as any).reviewCount !== 1 ? 's' : ''})
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 mt-1">
+                          <RatingRingIcon 
+                            rating={0} 
+                            size={12} 
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            No ratings yet
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))

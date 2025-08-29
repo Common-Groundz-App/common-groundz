@@ -30,14 +30,29 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
       if (parentId) {
         const { data: siblings, error: siblingsError } = await supabase
           .from('entities')
-          .select('*')
+          .select(`
+            *,
+            reviews!inner(rating)
+          `)
           .eq('parent_id', parentId)
           .neq('id', entityId)
           .eq('is_deleted', false)
           .limit(limit);
           
         if (siblingsError) throw siblingsError;
-        entities = siblings as Entity[] || [];
+        
+        // Process siblings with ratings
+        const siblingsWithRatings = (siblings as any[])?.map(entity => {
+          const ratings = entity.reviews?.map((r: any) => r.rating) || [];
+          const avgRating = ratings.length > 0 ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length : 0;
+          return {
+            ...entity,
+            avgRating,
+            reviewCount: ratings.length
+          };
+        }) || [];
+        
+        entities = siblingsWithRatings;
       }
       
       // If we don't have enough entities, fill with same-type highly rated ones
