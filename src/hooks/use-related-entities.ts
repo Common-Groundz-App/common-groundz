@@ -32,7 +32,7 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
           .from('entities')
           .select(`
             *,
-            reviews!inner(rating)
+            reviews!inner(rating, latest_rating)
           `)
           .eq('parent_id', parentId)
           .neq('id', entityId)
@@ -43,7 +43,7 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
         
         // Process siblings with ratings
         const siblingsWithRatings = (siblings as any[])?.map(entity => {
-          const ratings = entity.reviews?.map((r: any) => r.rating) || [];
+          const ratings = entity.reviews?.map((r: any) => r.latest_rating || r.rating) || [];
           const avgRating = ratings.length > 0 ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length : 0;
           return {
             ...entity,
@@ -63,7 +63,7 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
           .from('entities')
           .select(`
             *,
-            reviews!inner(rating)
+            reviews!inner(rating, latest_rating)
           `)
           .eq('type', entityType)
           .neq('id', entityId)
@@ -75,7 +75,7 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
         
         // Process and sort by average rating
         const entitiesWithRatings = (sameTypeEntities as any[])?.map(entity => {
-          const ratings = entity.reviews?.map((r: any) => r.rating) || [];
+          const ratings = entity.reviews?.map((r: any) => r.latest_rating || r.rating) || [];
           const avgRating = ratings.length > 0 ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length : 0;
           return {
             ...entity,
