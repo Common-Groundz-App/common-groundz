@@ -231,7 +231,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
     <>
       <div className="bg-white">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div className="flex flex-col gap-2 min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between mb-4">
             <div className="flex items-center gap-2">
               <Camera className="w-5 h-5 text-muted-foreground" />
               <h3 className="text-lg font-semibold">Photos & Videos</h3>
@@ -242,7 +242,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                 size="sm"
                 variant="default"
                 onClick={() => setShowUploadModal(true)}
-                className="h-8 w-full sm:w-auto"
+                className="h-8 w-full min-[400px]:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Media
