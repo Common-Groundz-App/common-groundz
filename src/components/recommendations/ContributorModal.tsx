@@ -8,7 +8,7 @@ import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import { useProfiles } from '@/hooks/use-profile-cache';
 import { CircleContributor } from '@/hooks/use-circle-rating-types';
 import { formatRelativeDate } from '@/utils/dateUtils';
-import { Star, MessageSquareHeart, MessageSquare, ArrowUpDown } from 'lucide-react';
+import { MessageSquareHeart, MessageSquare, ArrowUpDown } from 'lucide-react';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { useNavigate } from 'react-router-dom';
 
@@ -76,7 +76,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Star className="h-5 w-5 text-amber-500" />
+            <RatingRingIcon rating={4.2} size={20} />
             Circle Contributors
             {entityName && (
               <span className="text-muted-foreground font-normal">
@@ -101,16 +101,6 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
 
           {/* Filters and Sort */}
           <div className="flex items-center justify-between gap-4">
-            <Tabs value={filterType} onValueChange={(value) => setFilterType(value as any)}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="all">All ({contributors.length})</TabsTrigger>
-                <TabsTrigger value="recommendation">
-                  Recommendations ({recommendationCount})
-                </TabsTrigger>
-                <TabsTrigger value="review">Reviews ({reviewCount})</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
             <div className="flex items-center gap-2">
               <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
               <select
@@ -126,72 +116,220 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
             </div>
           </div>
 
-          {/* Contributors List */}
-          <div className="flex-1 overflow-y-auto space-y-3">
-            {sortedContributors.map((contributor) => {
-              const profile = profiles?.[contributor.userId];
-              
-              return (
-                <div
-                  key={contributor.userId}
-                  className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
-                  onClick={() => handleProfileClick(contributor.userId)}
-                >
-                  <ProfileAvatar
-                    userId={contributor.userId}
-                    size="sm"
-                    className="ring-2 ring-background"
-                  />
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">
-                        {profile?.displayName || profile?.username || 'User'}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="capitalize text-xs"
-                        style={{
-                          borderColor: contributor.type === 'recommendation' ? '#3b82f6' : '#f59e0b',
-                          color: contributor.type === 'recommendation' ? '#3b82f6' : '#f59e0b'
-                        }}
-                      >
-                        {contributor.type}
-                      </Badge>
-                    </div>
-                    {profile?.username && (
-                      <div className="text-sm text-muted-foreground">
-                        @{profile.username}
-                      </div>
-                    )}
-                  </div>
-                  
-                   <div className="flex items-center gap-2">
-                     <div className="flex items-center gap-1">
-                       <RatingRingIcon
-                         rating={contributor.rating}
-                         size={16}
-                       />
-                       <span
-                         className="font-semibold"
-                         style={{ color: getRatingColor(contributor.rating) }}
-                       >
-                         {contributor.rating}
-                       </span>
-                     </div>
-                   </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* Tabs with Content */}
+          <Tabs value={filterType} onValueChange={(value) => setFilterType(value as any)} className="flex-1 overflow-hidden flex flex-col">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="all">All ({contributors.length})</TabsTrigger>
+              <TabsTrigger value="recommendation">
+                Recommendations ({recommendationCount})
+              </TabsTrigger>
+              <TabsTrigger value="review">Reviews ({reviewCount})</TabsTrigger>
+            </TabsList>
 
-          {/* Empty State */}
-          {sortedContributors.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <Star className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No contributors found for the selected filter.</p>
-            </div>
-          )}
+            <TabsContent value="all" className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto space-y-3 h-full">
+                {sortedContributors.map((contributor) => {
+                  const profile = profiles?.[contributor.userId];
+                  
+                  return (
+                    <div
+                      key={contributor.userId}
+                      className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => handleProfileClick(contributor.userId)}
+                    >
+                      <ProfileAvatar
+                        userId={contributor.userId}
+                        size="sm"
+                        className="ring-2 ring-background"
+                      />
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">
+                            {profile?.displayName || profile?.username || 'User'}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="capitalize text-xs"
+                            style={{
+                              borderColor: contributor.type === 'recommendation' ? '#3b82f6' : '#f59e0b',
+                              color: contributor.type === 'recommendation' ? '#3b82f6' : '#f59e0b'
+                            }}
+                          >
+                            {contributor.type}
+                          </Badge>
+                        </div>
+                        {profile?.username && (
+                          <div className="text-sm text-muted-foreground">
+                            @{profile.username}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <RatingRingIcon
+                            rating={contributor.rating}
+                            size={16}
+                          />
+                          <span
+                            className="font-semibold"
+                            style={{ color: getRatingColor(contributor.rating) }}
+                          >
+                            {contributor.rating}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Empty State for All */}
+                {sortedContributors.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <RatingRingIcon rating={3} size={32} className="mx-auto mb-2 opacity-50" />
+                    <p>No contributors found.</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="recommendation" className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto space-y-3 h-full">
+                {sortedContributors.filter(c => c.type === 'recommendation').map((contributor) => {
+                  const profile = profiles?.[contributor.userId];
+                  
+                  return (
+                    <div
+                      key={contributor.userId}
+                      className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => handleProfileClick(contributor.userId)}
+                    >
+                      <ProfileAvatar
+                        userId={contributor.userId}
+                        size="sm"
+                        className="ring-2 ring-background"
+                      />
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">
+                            {profile?.displayName || profile?.username || 'User'}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="capitalize text-xs"
+                            style={{
+                              borderColor: '#3b82f6',
+                              color: '#3b82f6'
+                            }}
+                          >
+                            recommendation
+                          </Badge>
+                        </div>
+                        {profile?.username && (
+                          <div className="text-sm text-muted-foreground">
+                            @{profile.username}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <RatingRingIcon
+                            rating={contributor.rating}
+                            size={16}
+                          />
+                          <span
+                            className="font-semibold"
+                            style={{ color: getRatingColor(contributor.rating) }}
+                          >
+                            {contributor.rating}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Empty State for Recommendations */}
+                {sortedContributors.filter(c => c.type === 'recommendation').length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <RatingRingIcon rating={3} size={32} className="mx-auto mb-2 opacity-50" />
+                    <p>No recommendation contributors found.</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="review" className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto space-y-3 h-full">
+                {sortedContributors.filter(c => c.type === 'review').map((contributor) => {
+                  const profile = profiles?.[contributor.userId];
+                  
+                  return (
+                    <div
+                      key={contributor.userId}
+                      className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => handleProfileClick(contributor.userId)}
+                    >
+                      <ProfileAvatar
+                        userId={contributor.userId}
+                        size="sm"
+                        className="ring-2 ring-background"
+                      />
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">
+                            {profile?.displayName || profile?.username || 'User'}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="capitalize text-xs"
+                            style={{
+                              borderColor: '#f59e0b',
+                              color: '#f59e0b'
+                            }}
+                          >
+                            review
+                          </Badge>
+                        </div>
+                        {profile?.username && (
+                          <div className="text-sm text-muted-foreground">
+                            @{profile.username}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <RatingRingIcon
+                            rating={contributor.rating}
+                            size={16}
+                          />
+                          <span
+                            className="font-semibold"
+                            style={{ color: getRatingColor(contributor.rating) }}
+                          >
+                            {contributor.rating}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Empty State for Reviews */}
+                {sortedContributors.filter(c => c.type === 'review').length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <RatingRingIcon rating={3} size={32} className="mx-auto mb-2 opacity-50" />
+                    <p>No review contributors found.</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </DialogContent>
     </Dialog>
