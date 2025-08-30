@@ -346,7 +346,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
 
                 {/* Followers and Recommendations Section */}
                 {entity && (
-                  <div className={`flex flex-col gap-2 sm:flex-row sm:items-center ${isMobile ? 'sm:gap-4' : 'sm:gap-6'} text-sm text-muted-foreground mb-4`}>
+                  <div className={`flex flex-col gap-2 min-[400px]:flex-row min-[400px]:items-center ${isMobile ? 'min-[400px]:gap-4' : 'min-[400px]:gap-6'} text-sm text-muted-foreground mb-4`}>
                     {/* Followers */}
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
