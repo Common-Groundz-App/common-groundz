@@ -7,7 +7,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useNavigate } from 'react-router-dom';
 import { ContributorModal } from './ContributorModal';
 import { RatingDistribution } from './RatingDistribution';
-import { Star, Clock } from 'lucide-react';
+import { Clock } from 'lucide-react';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 
 interface CircleContributorsPreviewProps {
   contributors: CircleContributor[];
@@ -89,20 +90,19 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
                       )}
                     </div>
                     
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <Star 
-                          className="h-3 w-3" 
-                          style={{ color: getRatingColor(contributor.rating) }}
-                          fill="currentColor"
-                        />
-                        <span 
-                          className="font-semibold"
-                          style={{ color: getRatingColor(contributor.rating) }}
-                        >
-                          {contributor.rating}★
-                        </span>
-                      </div>
+                     <div className="flex items-center gap-2">
+                       <div className="flex items-center gap-1">
+                         <RatingRingIcon 
+                           rating={contributor.rating}
+                           size={12}
+                         />
+                         <span 
+                           className="font-semibold"
+                           style={{ color: getRatingColor(contributor.rating) }}
+                         >
+                           {contributor.rating}
+                         </span>
+                       </div>
                       <div className="text-muted-foreground capitalize">
                         {contributor.type}
                       </div>

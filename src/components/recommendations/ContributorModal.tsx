@@ -9,6 +9,7 @@ import { useProfiles } from '@/hooks/use-profile-cache';
 import { CircleContributor } from '@/hooks/use-circle-rating-types';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { Star, MessageSquareHeart, MessageSquare, ArrowUpDown } from 'lucide-react';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { useNavigate } from 'react-router-dom';
 
 interface ContributorModalProps {
@@ -165,21 +166,20 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
                     )}
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      <Star
-                        className="h-4 w-4"
-                        style={{ color: getRatingColor(contributor.rating) }}
-                        fill="currentColor"
-                      />
-                      <span
-                        className="font-semibold"
-                        style={{ color: getRatingColor(contributor.rating) }}
-                      >
-                        {contributor.rating}
-                      </span>
-                    </div>
-                  </div>
+                   <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-1">
+                       <RatingRingIcon
+                         rating={contributor.rating}
+                         size={16}
+                       />
+                       <span
+                         className="font-semibold"
+                         style={{ color: getRatingColor(contributor.rating) }}
+                       >
+                         {contributor.rating}
+                       </span>
+                     </div>
+                   </div>
                 </div>
               );
             })}
