@@ -61,7 +61,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`max-w-2xl max-h-[80vh] overflow-hidden flex flex-col ${isMobile ? 'mx-4 px-4' : ''}`}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col mx-4 rounded-xl sm:rounded-xl">
         <DialogHeader className={isMobile ? 'pb-2' : ''}>
           <DialogTitle className={isMobile ? 'flex flex-col items-start gap-1' : 'flex items-center gap-2'}>
             <div className="flex items-center gap-2">
