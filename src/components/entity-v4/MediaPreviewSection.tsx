@@ -335,19 +335,6 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                 </DropdownMenu>
               </div>
               
-              {/* Photo metadata overlay */}
-              <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full">
-                <span className="text-sm font-medium flex items-center gap-1">
-                  {mainPhoto.type === 'video' ? (
-                    <Play className="w-4 h-4" />
-                  ) : (
-                    <Camera className="w-4 h-4" />
-                  )}
-                  {mainPhoto.source === 'google_places' && 'Google Places'}
-                  {mainPhoto.source === 'user_review' && 'Review Photo'}
-                  {mainPhoto.source === 'entity_photo' && (mainPhoto.category || 'User Photo')}
-                </span>
-              </div>
             </div>
 
             {/* Right Side - 2x2 Grid */}
@@ -437,12 +424,6 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                     </DropdownMenu>
                   </div>
                   
-                  {/* Photo source indicator */}
-                  <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium">
-                    {photo.source === 'google_places' && 'Google'}
-                    {photo.source === 'user_review' && 'Review'}
-                    {photo.source === 'entity_photo' && (photo.category || 'User')}
-                  </div>
                   
                   {photo.type === 'video' && (
                     <div className="absolute top-2 right-2">
