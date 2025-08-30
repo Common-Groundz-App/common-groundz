@@ -78,25 +78,16 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
             <div className="flex items-center gap-2">
               <MessageSquareHeart className="h-4 w-4 text-blue-500" />
               <span>
-                {totalRecommendationCount > 0 && (
-                  <>
-                    {totalRecommendationCount.toLocaleString()} Recommending
-                    {user && circleRecommendationCount > 0 && (
-                      <span className="text-muted-foreground"> ({circleRecommendationCount} from circle)</span>
-                    )}
-                  </>
-                )}
-                {totalRecommendationCount === 0 && user && circleRecommendationCount > 0 && (
+                {circleRecommendationCount > 0 ? (
                   <>{circleRecommendationCount} from your circle</>
-                )}
-                {totalRecommendationCount === 0 && circleRecommendationCount === 0 && (
-                  <>0 Recommendations</>
+                ) : (
+                  <>0 from your circle</>
                 )}
               </span>
             </div>
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-amber-500" />
-              <span>{reviewCount} Reviews</span>
+              <span>{reviewCount} reviews from your circle</span>
             </div>
           </div>
 
