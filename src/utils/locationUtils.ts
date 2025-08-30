@@ -44,3 +44,10 @@ export const openGoogleMaps = (entity: Entity): void => {
     window.open(mapsUrl, '_blank');
   }
 };
+
+/**
+ * Checks if an entity has website data
+ */
+export const hasWebsiteData = (entity: Entity): boolean => {
+  return !!entity.website_url && entity.website_url.trim() !== '';
+};
