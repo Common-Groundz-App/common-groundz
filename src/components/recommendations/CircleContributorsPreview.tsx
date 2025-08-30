@@ -116,29 +116,25 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
               </Tooltip>
             );
           })}
-          
-          {remainingCount > 0 && (
-            <div className="flex items-center gap-2 ml-2">
-              <button
-                onClick={handleViewAllClick}
-                className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer hover:underline"
-              >
-                +{remainingCount} more
-              </button>
-            </div>
-          )}
-          
-          {remainingCount === 0 && contributors.length > 0 && (
-            <div className="flex items-center gap-2 ml-2">
-              <button
-                onClick={handleViewAllClick}
-                className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer hover:underline"
-              >
-                View All
-              </button>
-            </div>
-          )}
         </div>
+        
+        {remainingCount > 0 && (
+          <button
+            onClick={handleViewAllClick}
+            className="ml-2 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer hover:underline"
+          >
+            +{remainingCount} more
+          </button>
+        )}
+        
+        {remainingCount === 0 && contributors.length > 0 && (
+          <button
+            onClick={handleViewAllClick}
+            className="ml-2 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer hover:underline"
+          >
+            View All
+          </button>
+        )}
         
         {/* Rating Distribution */}
         {contributors.length > 1 && (
