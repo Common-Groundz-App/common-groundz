@@ -79,9 +79,9 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
               <MessageSquareHeart className="h-4 w-4 text-blue-500" />
               <span>
                 {circleRecommendationCount > 0 ? (
-                  <>{circleRecommendationCount} from your circle</>
+                  <>{circleRecommendationCount} recommending from your circle</>
                 ) : (
-                  <>0 from your circle</>
+                  <>0 recommending from your circle</>
                 )}
               </span>
             </div>
