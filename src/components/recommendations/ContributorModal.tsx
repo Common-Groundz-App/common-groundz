@@ -43,25 +43,27 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
     return "#22c55e";
   };
 
-  const filteredContributors = contributors.filter(contributor => {
-    if (filterType === 'all') return true;
-    return contributor.type === filterType;
-  });
+  const getSortedContributors = (filterType: 'all' | 'recommendation' | 'review') => {
+    const filtered = contributors.filter(contributor => {
+      if (filterType === 'all') return true;
+      return contributor.type === filterType;
+    });
 
-  const sortedContributors = [...filteredContributors].sort((a, b) => {
-    switch (sortBy) {
-      case 'rating-desc':
-        return b.rating - a.rating;
-      case 'rating-asc':
-        return a.rating - b.rating;
-      case 'recent':
-      case 'oldest':
-        // For now, sort by rating since we don't have timestamps
-        return sortBy === 'recent' ? b.rating - a.rating : a.rating - b.rating;
-      default:
-        return 0;
-    }
-  });
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'rating-desc':
+          return b.rating - a.rating;
+        case 'rating-asc':
+          return a.rating - b.rating;
+        case 'recent':
+        case 'oldest':
+          // For now, sort by rating since we don't have timestamps
+          return sortBy === 'recent' ? b.rating - a.rating : a.rating - b.rating;
+        default:
+          return 0;
+      }
+    });
+  };
 
   const handleProfileClick = (userId: string) => {
     navigate(`/profile/${userId}`);
@@ -128,7 +130,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
 
             <TabsContent value="all" className="flex-1 overflow-hidden">
               <div className="flex-1 overflow-y-auto space-y-3 h-full">
-                {sortedContributors.map((contributor) => {
+                {getSortedContributors('all').map((contributor) => {
                   const profile = profiles?.[contributor.userId];
                   
                   return (
@@ -185,7 +187,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
                 })}
                 
                 {/* Empty State for All */}
-                {sortedContributors.length === 0 && (
+                {getSortedContributors('all').length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <RatingRingIcon rating={3} size={32} className="mx-auto mb-2 opacity-50" />
                     <p>No contributors found.</p>
@@ -196,7 +198,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
 
             <TabsContent value="recommendation" className="flex-1 overflow-hidden">
               <div className="flex-1 overflow-y-auto space-y-3 h-full">
-                {sortedContributors.filter(c => c.type === 'recommendation').map((contributor) => {
+                {getSortedContributors('recommendation').map((contributor) => {
                   const profile = profiles?.[contributor.userId];
                   
                   return (
@@ -253,7 +255,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
                 })}
                 
                 {/* Empty State for Recommendations */}
-                {sortedContributors.filter(c => c.type === 'recommendation').length === 0 && (
+                {getSortedContributors('recommendation').length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <RatingRingIcon rating={3} size={32} className="mx-auto mb-2 opacity-50" />
                     <p>No recommendation contributors found.</p>
@@ -264,7 +266,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
 
             <TabsContent value="review" className="flex-1 overflow-hidden">
               <div className="flex-1 overflow-y-auto space-y-3 h-full">
-                {sortedContributors.filter(c => c.type === 'review').map((contributor) => {
+                {getSortedContributors('review').map((contributor) => {
                   const profile = profiles?.[contributor.userId];
                   
                   return (
@@ -321,7 +323,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
                 })}
                 
                 {/* Empty State for Reviews */}
-                {sortedContributors.filter(c => c.type === 'review').length === 0 && (
+                {getSortedContributors('review').length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <RatingRingIcon rating={3} size={32} className="mx-auto mb-2 opacity-50" />
                     <p>No review contributors found.</p>
