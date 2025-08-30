@@ -10,18 +10,28 @@ import { RatingDistribution } from './RatingDistribution';
 import { Clock } from 'lucide-react';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 
+// Flexible stats type that accepts both old and new formats
+interface StatsData {
+  recommendationCount: number;
+  reviewCount: number;
+  averageRating: number | null;
+  circleRecommendationCount?: number;
+}
+
 interface CircleContributorsPreviewProps {
   contributors: CircleContributor[];
   totalCount: number;
   maxDisplay?: number;
   entityName?: string;
+  stats?: StatsData | null;
 }
 
 export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps> = ({
   contributors,
   totalCount,
   maxDisplay = 4,
-  entityName
+  entityName,
+  stats
 }) => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -154,6 +164,7 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
         onClose={() => setIsModalOpen(false)}
         contributors={contributors}
         entityName={entityName}
+        stats={stats}
       />
     </TooltipProvider>
   );

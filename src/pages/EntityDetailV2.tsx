@@ -633,6 +633,7 @@ const EntityDetailV2 = () => {
                         totalCount={circleRatingCount}
                         maxDisplay={4}
                         entityName={entity?.name}
+                        stats={stats}
                       />
                     </div>
                   </div>

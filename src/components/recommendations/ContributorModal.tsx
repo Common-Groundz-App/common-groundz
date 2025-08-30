@@ -7,21 +7,33 @@ import { CircleContributor } from '@/hooks/use-circle-rating-types';
 import { MessageSquareHeart, MessageSquare } from 'lucide-react';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+
+// Flexible stats type that accepts both old and new formats
+interface StatsData {
+  recommendationCount: number;
+  reviewCount: number;
+  averageRating: number | null;
+  circleRecommendationCount?: number;
+}
 
 interface ContributorModalProps {
   isOpen: boolean;
   onClose: () => void;
   contributors: CircleContributor[];
   entityName?: string;
+  stats?: StatsData | null;
 }
 
 export const ContributorModal: React.FC<ContributorModalProps> = ({
   isOpen,
   onClose,
   contributors,
-  entityName
+  entityName,
+  stats
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // Get unique user IDs for profile fetching
   const userIds = contributors.map(c => c.userId);
@@ -40,7 +52,9 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
     onClose();
   };
 
-  const recommendationCount = contributors.filter(c => c.type === 'recommendation').length;
+  // Use stats data for total recommendation counts (like entity header)
+  const totalRecommendationCount = stats?.recommendationCount || 0;
+  const circleRecommendationCount = stats?.circleRecommendationCount || 0;
   const reviewCount = contributors.filter(c => c.type === 'review').length;
 
   return (
@@ -63,7 +77,22 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
           <div className="flex gap-4 text-sm">
             <div className="flex items-center gap-2">
               <MessageSquareHeart className="h-4 w-4 text-blue-500" />
-              <span>{recommendationCount} Recommendations</span>
+              <span>
+                {totalRecommendationCount > 0 && (
+                  <>
+                    {totalRecommendationCount.toLocaleString()} Recommending
+                    {user && circleRecommendationCount > 0 && (
+                      <span className="text-muted-foreground"> ({circleRecommendationCount} from circle)</span>
+                    )}
+                  </>
+                )}
+                {totalRecommendationCount === 0 && user && circleRecommendationCount > 0 && (
+                  <>{circleRecommendationCount} from your circle</>
+                )}
+                {totalRecommendationCount === 0 && circleRecommendationCount === 0 && (
+                  <>0 Recommendations</>
+                )}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-amber-500" />

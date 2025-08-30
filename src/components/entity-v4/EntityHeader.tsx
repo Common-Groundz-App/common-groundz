@@ -296,6 +296,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                             totalCount={circleRatingCount}
                             maxDisplay={4}
                             entityName={entity?.name}
+                            stats={stats}
                           />
                         </div>
                       </div>
