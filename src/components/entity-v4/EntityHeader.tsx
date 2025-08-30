@@ -21,6 +21,7 @@ import { EntityFollowersCount } from '@/components/entity/EntityFollowersCount';
 import { EntitySocialFollowers } from '@/components/entity/EntitySocialFollowers';
 import { Entity } from '@/services/recommendation/types';
 import { EntityStats } from '@/hooks/use-entity-detail-cached';
+import { hasLocationData, openGoogleMaps } from '@/utils/locationUtils';
 
 interface EntityHeaderProps {
   entity: Entity;
@@ -411,10 +412,15 @@ Only recent ratings are counted to keep things current and relevant.`}
                     <Globe className="w-4 h-4 mr-2" />
                     {isMobile ? 'Website' : 'Visit Website'}
                   </Button>
-                  <Button className={`bg-blue-600 hover:bg-blue-700 text-white ${isMobile ? 'h-11 text-sm' : ''}`}>
-                    <Navigation className="w-4 h-4 mr-2" />
-                    {isMobile ? 'Directions' : 'Get Directions'}
-                  </Button>
+                  {entity && hasLocationData(entity) && (
+                    <Button 
+                      className={`bg-blue-600 hover:bg-blue-700 text-white ${isMobile ? 'h-11 text-sm' : ''}`}
+                      onClick={() => openGoogleMaps(entity)}
+                    >
+                      <Navigation className="w-4 h-4 mr-2" />
+                      {isMobile ? 'Directions' : 'Get Directions'}
+                    </Button>
+                  )}
                 </div>
 
                 {/* Social Avatars Section */}
