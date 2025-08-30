@@ -8,6 +8,7 @@ import { MessageSquareHeart, MessageSquare } from 'lucide-react';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Flexible stats type that accepts both old and new formats
 interface StatsData {
@@ -34,6 +35,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   
   // Get unique user IDs for profile fetching
   const userIds = contributors.map(c => c.userId);
@@ -59,13 +61,15 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <RatingRingIcon rating={4.2} size={20} />
-            Circle Contributors
+      <DialogContent className={`max-w-2xl max-h-[80vh] overflow-hidden flex flex-col ${isMobile ? 'mx-4 px-4' : ''}`}>
+        <DialogHeader className={isMobile ? 'pb-2' : ''}>
+          <DialogTitle className={isMobile ? 'flex flex-col items-start gap-1' : 'flex items-center gap-2'}>
+            <div className="flex items-center gap-2">
+              <RatingRingIcon rating={4.2} size={20} />
+              Circle Contributors
+            </div>
             {entityName && (
-              <span className="text-muted-foreground font-normal">
+              <span className={`text-muted-foreground ${isMobile ? 'text-sm font-normal ml-7' : 'font-normal'}`}>
                 for {entityName}
               </span>
             )}
@@ -74,9 +78,9 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
 
         <div className="flex flex-col gap-4 flex-1 overflow-hidden">
           {/* Summary Stats */}
-          <div className="flex gap-4 text-sm">
+          <div className={`${isMobile ? 'flex flex-col gap-3' : 'flex gap-4'} text-sm`}>
             <div className="flex items-center gap-2">
-              <MessageSquareHeart className="h-4 w-4 text-blue-500" />
+              <MessageSquareHeart className={`${isMobile ? 'h-4 w-4' : 'h-4 w-4'} text-blue-500`} />
               <span>
                 {circleRecommendationCount > 0 ? (
                   <>{circleRecommendationCount} recommending from your circle</>
@@ -86,7 +90,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-amber-500" />
+              <MessageSquare className={`${isMobile ? 'h-4 w-4' : 'h-4 w-4'} text-amber-500`} />
               <span>{reviewCount} reviews from your circle</span>
             </div>
           </div>
@@ -99,7 +103,7 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
               return (
                 <div
                   key={contributor.userId}
-                  className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                  className={`flex items-center gap-3 ${isMobile ? 'p-4' : 'p-3'} rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer ${isMobile ? 'min-h-[64px]' : ''}`}
                   onClick={() => handleProfileClick(contributor.userId)}
                 >
                   <ProfileAvatar
