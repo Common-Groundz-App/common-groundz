@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useNavigate } from 'react-router-dom';
 import { ContributorModal } from './ContributorModal';
 import { RatingDistribution } from './RatingDistribution';
-import { Star, Clock } from 'lucide-react';
+import { Star, Clock, Eye } from 'lucide-react';
 
 interface CircleContributorsPreviewProps {
   contributors: CircleContributor[];
@@ -124,6 +124,18 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
                 className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer hover:underline"
               >
                 +{remainingCount} more
+              </button>
+            </div>
+          )}
+          
+          {remainingCount === 0 && contributors.length > 0 && (
+            <div className="flex items-center gap-2 ml-2">
+              <button
+                onClick={handleViewAllClick}
+                className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer hover:underline flex items-center gap-1"
+              >
+                <Eye className="h-3 w-3" />
+                View All
               </button>
             </div>
           )}
