@@ -228,7 +228,21 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                     
                     <div className={`leading-tight ${isMobile ? '' : 'sm:min-w-0'}`}>
                       <div className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} text-gray-900 flex items-center gap-1`}>
-                        Overall Rating
+                        <span 
+                          className={`${onRatingClick ? 'cursor-pointer hover:text-primary active:scale-105 transition-all duration-200' : ''}`}
+                          onClick={onRatingClick}
+                          role={onRatingClick ? "button" : undefined}
+                          tabIndex={onRatingClick ? 0 : undefined}
+                          onKeyDown={onRatingClick ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onRatingClick();
+                            }
+                          } : undefined}
+                          aria-label={onRatingClick ? "View overall ratings and reviews" : undefined}
+                        >
+                          Overall Rating
+                        </span>
                         <InfoTooltip content="Overall Rating is the average review rating from all users who reviewed this item on Common Groundz." />
                       </div>
                       <div 
@@ -280,7 +294,21 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
 
                         <div className={`leading-tight ${isMobile ? '' : 'sm:min-w-0'}`}>
                           <div className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} text-brand-orange flex items-center gap-1`}>
-                            Circle Rating
+                            <span 
+                              className={`${onRatingClick ? 'cursor-pointer hover:text-primary active:scale-105 transition-all duration-200' : ''}`}
+                              onClick={onRatingClick}
+                              role={onRatingClick ? "button" : undefined}
+                              tabIndex={onRatingClick ? 0 : undefined}
+                              onKeyDown={onRatingClick ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  onRatingClick();
+                                }
+                              } : undefined}
+                              aria-label={onRatingClick ? "View circle ratings and reviews" : undefined}
+                            >
+                              Circle Rating
+                            </span>
                             <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
                           </div>
                           <div 
@@ -333,7 +361,21 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
 
                         <div className={`leading-tight ${isMobile ? '' : 'sm:min-w-0'}`}>
                           <div className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} text-brand-orange flex items-center gap-1`}>
-                            Circle Rating
+                            <span 
+                              className={`${onRatingClick ? 'cursor-pointer hover:text-primary active:scale-105 transition-all duration-200' : ''}`}
+                              onClick={onRatingClick}
+                              role={onRatingClick ? "button" : undefined}
+                              tabIndex={onRatingClick ? 0 : undefined}
+                              onKeyDown={onRatingClick ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  onRatingClick();
+                                }
+                              } : undefined}
+                              aria-label={onRatingClick ? "View circle ratings and reviews" : undefined}
+                            >
+                              Circle Rating
+                            </span>
                             <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
                           </div>
                           <div className="text-xs text-muted-foreground">
