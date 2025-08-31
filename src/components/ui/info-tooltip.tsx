@@ -32,7 +32,10 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Info className="w-3.5 h-3.5 text-muted-foreground active:text-foreground cursor-pointer transition-colors touch-manipulation" />
+          <Info 
+            className="w-3.5 h-3.5 text-muted-foreground active:text-foreground cursor-pointer transition-colors touch-manipulation" 
+            onClick={(e) => e.stopPropagation()}
+          />
         </PopoverTrigger>
         <PopoverContent 
           side={side} 
