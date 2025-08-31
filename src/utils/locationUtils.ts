@@ -45,28 +45,37 @@ export const generateGoogleMapsUrl = (entity: Entity): string => {
  */
 export const openGoogleMaps = (entity: Entity): void => {
   const mapsUrl = generateGoogleMapsUrl(entity);
-  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   
-  if (isMobile) {
-    // Try to open native app first with enhanced accuracy
-    let appUrl: string;
-    
-    // Priority 1: Use place_id for native app if available
-    if (entity.api_ref) {
-      appUrl = `googlemaps://?place_id=${encodeURIComponent(entity.api_ref)}`;
+  // More precise mobile detection - check for actual mobile platforms
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && 
+                   !/Windows|Macintosh|Linux.*X11/i.test(navigator.userAgent);
+  
+  // For desktop, open web URL directly
+  if (!isMobile) {
+    window.open(mapsUrl, '_blank');
+    return;
+  }
+  
+  // Mobile-only logic: Try native app first
+  let appUrl: string;
+  
+  // Priority 1: Use place_id for native app if available
+  if (entity.api_ref) {
+    appUrl = `googlemaps://?place_id=${encodeURIComponent(entity.api_ref)}`;
+  } else {
+    // Priority 2: Use coordinates for native app
+    const lat = entity.metadata?.geometry?.location?.lat || entity.metadata?.lat;
+    const lng = entity.metadata?.geometry?.location?.lng || entity.metadata?.lng;
+    if (lat && lng) {
+      appUrl = `googlemaps://?q=${lat},${lng}`;
     } else {
-      // Priority 2: Use coordinates for native app
-      const lat = entity.metadata?.geometry?.location?.lat || entity.metadata?.lat;
-      const lng = entity.metadata?.geometry?.location?.lng || entity.metadata?.lng;
-      if (lat && lng) {
-        appUrl = `googlemaps://?q=${lat},${lng}`;
-      } else {
-        // Priority 3: Fallback to address search
-        const address = entity.venue || entity.metadata?.formatted_address || entity.name;
-        appUrl = `googlemaps://?q=${encodeURIComponent(address)}`;
-      }
+      // Priority 3: Fallback to address search
+      const address = entity.venue || entity.metadata?.formatted_address || entity.name;
+      appUrl = `googlemaps://?q=${encodeURIComponent(address)}`;
     }
-    
+  }
+  
+  try {
     // Create a hidden link and click it to trigger the app
     const link = document.createElement('a');
     link.href = appUrl;
@@ -75,11 +84,12 @@ export const openGoogleMaps = (entity: Entity): void => {
     link.click();
     document.body.removeChild(link);
     
-    // Fallback to web after a short delay if app doesn't open
+    // Fallback to web after a short delay if app doesn't open (mobile only)
     setTimeout(() => {
       window.open(mapsUrl, '_blank');
     }, 1000);
-  } else {
+  } catch (error) {
+    // If native app fails, open web URL immediately
     window.open(mapsUrl, '_blank');
   }
 };
