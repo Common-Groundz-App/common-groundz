@@ -41,25 +41,13 @@ export const generateGoogleMapsUrl = (entity: Entity): string => {
 };
 
 /**
- * Opens Google Maps with deep link support for mobile devices
+ * Opens Google Maps with blur event detection for native app fallback
  */
 export const openGoogleMaps = (entity: Entity): void => {
   const mapsUrl = generateGoogleMapsUrl(entity);
   
-  // More precise mobile detection - check for actual mobile platforms
-  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && 
-                   !/Windows|Macintosh|Linux.*X11/i.test(navigator.userAgent);
-  
-  // For desktop, open web URL directly
-  if (!isMobile) {
-    window.open(mapsUrl, '_blank');
-    return;
-  }
-  
-  // Mobile-only logic: Try native app first
+  // Build native app URL with place_id priority
   let appUrl: string;
-  
-  // Priority 1: Use place_id for native app if available
   if (entity.api_ref) {
     appUrl = `googlemaps://?place_id=${encodeURIComponent(entity.api_ref)}`;
   } else {
@@ -75,23 +63,18 @@ export const openGoogleMaps = (entity: Entity): void => {
     }
   }
   
-  try {
-    // Create a hidden link and click it to trigger the app
-    const link = document.createElement('a');
-    link.href = appUrl;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Fallback to web after a short delay if app doesn't open (mobile only)
-    setTimeout(() => {
-      window.open(mapsUrl, '_blank');
-    }, 1000);
-  } catch (error) {
-    // If native app fails, open web URL immediately
+  // The fallback timer. If the native app doesn't launch, this will run
+  const fallbackTimeout = setTimeout(() => {
     window.open(mapsUrl, '_blank');
-  }
+  }, 250); // A small delay to allow the app to launch
+
+  // A listener that clears the fallback timer if the app launches successfully
+  window.addEventListener('blur', () => {
+    clearTimeout(fallbackTimeout);
+  });
+
+  // Attempt to open the native app URL
+  window.location.href = appUrl;
 };
 
 /**
