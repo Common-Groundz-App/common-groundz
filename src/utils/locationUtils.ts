@@ -14,7 +14,7 @@ export const hasLocationData = (entity: Entity): boolean => {
 export const generateGoogleMapsUrl = (entity: Entity): string => {
   // Prioritize place_id for most accurate results
   if (entity.api_ref) {
-    return `https://www.google.com/maps/search/?api=1&query=place_id:${encodeURIComponent(entity.api_ref)}`;
+    return `https://www.google.com/maps/dir/?api=1&destination=place_id:${encodeURIComponent(entity.api_ref)}`;
   }
   
   // Fallback to coordinates if available
