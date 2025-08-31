@@ -125,9 +125,10 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
                 {circleCertifiedDisplay.value}
               </span>
             </div>
-            {trustMetrics?.circleCertified !== null && (
-              <Progress value={trustMetrics.circleCertified || 0} className="mb-4" />
-            )}
+            <Progress 
+              value={trustMetrics?.circleCertified || 0} 
+              className={`mb-4 ${trustMetrics?.circleCertified === null ? 'opacity-50' : ''}`} 
+            />
             
             {/* Repurchase Rate - Coming Soon */}
             <div className="flex items-center justify-between mb-2">
@@ -144,35 +145,34 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
             <div className="flex items-center gap-2 mb-3">
               <h4 className="font-medium">Rating Breakdown</h4>
             </div>
-            {hasRatingData ? (
-              Object.entries(trustMetrics?.ratingBreakdown || {})
-                .sort(([a], [b]) => parseInt(b) - parseInt(a))
-                .map(([stars, percentage]) => {
-                  const ratingColor = getSentimentColor(parseInt(stars), true);
-                  return (
-                    <div key={stars} className="flex items-center gap-3 mb-2">
-                      <div className="flex items-center gap-1 w-8">
-                        <RatingRingIcon rating={parseInt(stars)} size={14} />
-                        <span className="text-sm">{stars}</span>
-                      </div>
-                      <div className="flex-1 relative">
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-                          <div 
-                            className="h-full transition-all duration-300 ease-in-out rounded-full"
-                            style={{
-                              width: `${percentage}%`,
-                              backgroundColor: ratingColor
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <span className="text-sm w-8 text-right">{percentage}%</span>
-                    </div>
-                  );
-                })
-            ) : (
-              <p className="text-sm text-muted-foreground">No rating data available</p>
+            {!hasRatingData && (
+              <p className="text-sm text-muted-foreground mb-3">No rating data available</p>
             )}
+            {[5, 4, 3, 2, 1].map(stars => {
+              const ratingColor = getSentimentColor(stars, true);
+              const percentage = hasRatingData ? (trustMetrics?.ratingBreakdown?.[stars] || 0) : 0;
+              
+              return (
+                <div key={stars} className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-1 w-8">
+                    <RatingRingIcon rating={stars} size={14} />
+                    <span className="text-sm">{stars}</span>
+                  </div>
+                  <div className="flex-1 relative">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                      <div 
+                        className={`h-full transition-all duration-300 ease-in-out rounded-full ${!hasRatingData ? 'opacity-50' : ''}`}
+                        style={{
+                          width: `${percentage}%`,
+                          backgroundColor: hasRatingData ? ratingColor : '#9ca3af'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-sm w-8 text-right">{percentage}%</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
