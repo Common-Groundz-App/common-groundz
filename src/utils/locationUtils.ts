@@ -66,7 +66,7 @@ export const openGoogleMaps = (entity: Entity): void => {
   // The fallback timer. If the native app doesn't launch, this will run
   const fallbackTimeout = setTimeout(() => {
     window.open(mapsUrl, '_blank');
-  }, 250); // A small delay to allow the app to launch
+  }, 750); // Increased delay to allow mobile apps enough time to launch
 
   // A listener that clears the fallback timer if the app launches successfully
   window.addEventListener('blur', () => {
