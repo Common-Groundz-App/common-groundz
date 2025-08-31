@@ -141,3 +141,10 @@ export const formatBusinessHours = (hours: BusinessHours): Array<{ day: string; 
     };
   });
 };
+
+/**
+ * Gets the appropriate section title for related entities based on entity type
+ */
+export const getRelatedSectionTitle = (entityType: string): string => {
+  return "You Might Also Like";
+};

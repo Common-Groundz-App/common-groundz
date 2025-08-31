@@ -15,7 +15,8 @@ import {
   shouldShowContactInfo, 
   extractBusinessHours, 
   extractContactInfo, 
-  formatBusinessHours 
+  formatBusinessHours,
+  getRelatedSectionTitle 
 } from '@/utils/entitySidebarLogic';
 
 interface EntitySidebarProps {
@@ -127,7 +128,7 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
       {relatedEntities.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Related Brands</CardTitle>
+            <CardTitle className="text-lg">{getRelatedSectionTitle(entity.type)}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
