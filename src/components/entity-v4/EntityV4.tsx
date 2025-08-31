@@ -26,6 +26,8 @@ import { TrustSummaryCard } from './TrustSummaryCard';
 import { ReviewsSection } from './ReviewsSection';
 import { EntitySidebar } from './EntitySidebar';
 import { EntityTabsContent } from './EntityTabsContent';
+import Footer from '@/components/Footer';
+import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 
 const EntityV4 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -439,6 +441,12 @@ const EntityV4 = () => {
           circleRecommendationCount={stats?.circleRecommendationCount || 0}
         />
       )}
+
+      {/* Footer */}
+      <Footer />
+      
+      {/* Bottom Navigation */}
+      <BottomNavigation />
     </div>
   </TooltipProvider>;
 };
