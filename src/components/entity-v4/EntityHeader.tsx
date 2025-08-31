@@ -196,21 +196,21 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                 {/* Ratings - Always stack on mobile, side-by-side on larger screens */}
                 <div className={`flex flex-col ${isMobile ? 'gap-4' : 'sm:flex-row sm:items-center gap-3'} mb-4`}>
                   {/* Overall Rating */}
-                  <div 
-                    className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
-                    style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
-                    {...(onRatingClick ? ratingTapDetection : {})}
-                    role={onRatingClick ? "button" : undefined}
-                    tabIndex={onRatingClick ? 0 : undefined}
-                    onKeyDown={onRatingClick ? (e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onRatingClick();
-                      }
-                    } : undefined}
-                    aria-label={onRatingClick ? "View reviews and ratings" : undefined}
-                  >
-                    <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
+                    <div 
+                      className={`flex items-center gap-2 ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
+                      style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
+                      {...(onRatingClick ? ratingTapDetection : {})}
+                      role={onRatingClick ? "button" : undefined}
+                      tabIndex={onRatingClick ? 0 : undefined}
+                      onKeyDown={onRatingClick ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onRatingClick();
+                        }
+                      } : undefined}
+                      aria-label={onRatingClick ? "View reviews and ratings" : undefined}
+                    >
                       <ConnectedRingsRating
                         value={entityData.rating}
                         variant="badge"
@@ -246,21 +246,21 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   {/* Circle Rating */}
                   {user && (
                     circleRating !== null ? (
-                      <div 
-                        className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
-                        style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
-                        {...(onRatingClick ? ratingTapDetection : {})}
-                        role={onRatingClick ? "button" : undefined}
-                        tabIndex={onRatingClick ? 0 : undefined}
-                        onKeyDown={onRatingClick ? (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onRatingClick();
-                          }
-                        } : undefined}
-                        aria-label={onRatingClick ? "View reviews and ratings from your circle" : undefined}
-                      >
-                        <div className="flex items-center gap-2">
+                      <div className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
+                        <div 
+                          className={`flex items-center gap-2 ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
+                          style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
+                          {...(onRatingClick ? ratingTapDetection : {})}
+                          role={onRatingClick ? "button" : undefined}
+                          tabIndex={onRatingClick ? 0 : undefined}
+                          onKeyDown={onRatingClick ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onRatingClick();
+                            }
+                          } : undefined}
+                          aria-label={onRatingClick ? "View reviews and ratings from your circle" : undefined}
+                        >
                           <div className="w-fit">
                             <ConnectedRingsRating
                               value={circleRating}
@@ -302,21 +302,21 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div 
-                        className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'} ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
-                        style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
-                        {...(onRatingClick ? ratingTapDetection : {})}
-                        role={onRatingClick ? "button" : undefined}
-                        tabIndex={onRatingClick ? 0 : undefined}
-                        onKeyDown={onRatingClick ? (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onRatingClick();
-                          }
-                        } : undefined}
-                        aria-label={onRatingClick ? "View reviews and ratings from your circle" : undefined}
-                      >
-                        <div className="flex items-center gap-2">
+                      <div className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
+                        <div 
+                          className={`flex items-center gap-2 ${onRatingClick ? 'cursor-pointer active:scale-105 transition-transform duration-200 select-none' : ''}`}
+                          style={onRatingClick ? { touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' } : {}}
+                          {...(onRatingClick ? ratingTapDetection : {})}
+                          role={onRatingClick ? "button" : undefined}
+                          tabIndex={onRatingClick ? 0 : undefined}
+                          onKeyDown={onRatingClick ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onRatingClick();
+                            }
+                          } : undefined}
+                          aria-label={onRatingClick ? "View reviews and ratings from your circle" : undefined}
+                        >
                           <div className="w-fit">
                             <ConnectedRingsRating
                               value={0}
