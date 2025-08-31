@@ -52,7 +52,7 @@ export const openGoogleMaps = (entity: Entity): void => {
     let appUrl: string;
     
     // Priority 1: Use place_id for native app if available
-    if (entity.api_source === 'google_places' && entity.api_ref) {
+    if (entity.api_ref) {
       appUrl = `googlemaps://?place_id=${encodeURIComponent(entity.api_ref)}`;
     } else {
       // Priority 2: Use coordinates for native app
