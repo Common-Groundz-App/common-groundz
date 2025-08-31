@@ -14,7 +14,8 @@ export const hasLocationData = (entity: Entity): boolean => {
 export const generateGoogleMapsUrl = (entity: Entity): string => {
   // Priority 1: Use Google Places place_id for maximum accuracy
   if (entity.api_source === 'google_places' && entity.api_ref) {
-    return `https://www.google.com/maps/search/?api=1&query=place_id:${entity.api_ref}`;
+    const placeName = entity.venue || entity.name;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeName)}&query_place_id=${entity.api_ref}`;
   }
   
   // Priority 2: Use coordinates if available
