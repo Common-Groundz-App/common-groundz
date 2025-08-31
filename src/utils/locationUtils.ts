@@ -12,7 +12,30 @@ export const hasLocationData = (entity: Entity): boolean => {
  * Generates a Google Maps URL for the given entity
  */
 export const generateGoogleMapsUrl = (entity: Entity): string => {
-  const address = entity.venue || entity.metadata?.formatted_address || entity.name;
+  // Priority 1: Use Google Places place_id for maximum accuracy
+  if (entity.api_source === 'google_places' && entity.api_ref) {
+    return `https://www.google.com/maps/search/?api=1&query=place_id:${entity.api_ref}`;
+  }
+  
+  // Priority 2: Use coordinates if available
+  const lat = entity.metadata?.geometry?.location?.lat || entity.metadata?.lat;
+  const lng = entity.metadata?.geometry?.location?.lng || entity.metadata?.lng;
+  if (lat && lng) {
+    return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  }
+  
+  // Priority 3: Enhanced address search with better formatting
+  const venue = entity.venue;
+  const formattedAddress = entity.metadata?.formatted_address;
+  
+  if (venue && formattedAddress) {
+    // Use both venue name and address for disambiguation
+    const searchQuery = `${venue}, ${formattedAddress}`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
+  }
+  
+  // Priority 4: Fallback to individual address components
+  const address = venue || formattedAddress || entity.name;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 };
 
@@ -24,9 +47,24 @@ export const openGoogleMaps = (entity: Entity): void => {
   const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   
   if (isMobile) {
-    // Try to open native app first
-    const address = entity.venue || entity.metadata?.formatted_address || entity.name;
-    const appUrl = `googlemaps://?q=${encodeURIComponent(address)}`;
+    // Try to open native app first with enhanced accuracy
+    let appUrl: string;
+    
+    // Priority 1: Use place_id for native app if available
+    if (entity.api_source === 'google_places' && entity.api_ref) {
+      appUrl = `googlemaps://?place_id=${encodeURIComponent(entity.api_ref)}`;
+    } else {
+      // Priority 2: Use coordinates for native app
+      const lat = entity.metadata?.geometry?.location?.lat || entity.metadata?.lat;
+      const lng = entity.metadata?.geometry?.location?.lng || entity.metadata?.lng;
+      if (lat && lng) {
+        appUrl = `googlemaps://?q=${lat},${lng}`;
+      } else {
+        // Priority 3: Fallback to address search
+        const address = entity.venue || entity.metadata?.formatted_address || entity.name;
+        appUrl = `googlemaps://?q=${encodeURIComponent(address)}`;
+      }
+    }
     
     // Create a hidden link and click it to trigger the app
     const link = document.createElement('a');
