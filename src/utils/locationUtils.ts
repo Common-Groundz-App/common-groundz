@@ -12,37 +12,60 @@ export const hasLocationData = (entity: Entity): boolean => {
  * Generates a Google Maps URL for the given entity
  */
 export const generateGoogleMapsUrl = (entity: Entity): string => {
+  // Prioritize place_id for most accurate results
+  if (entity.api_ref) {
+    const placeName = entity.venue || entity.name;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeName)}&query_place_id=${encodeURIComponent(entity.api_ref)}`;
+  }
+  
+  // Fallback to coordinates if available
+  if (entity.metadata?.coordinates) {
+    const { lat, lng } = entity.metadata.coordinates;
+    return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  }
+  
+  // Final fallback to generic search
   const address = entity.venue || entity.metadata?.formatted_address || entity.name;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 };
 
 /**
- * Opens Google Maps with deep link support for mobile devices
+ * Opens Google Maps with universal redirect handling
  */
 export const openGoogleMaps = (entity: Entity): void => {
-  const mapsUrl = generateGoogleMapsUrl(entity);
-  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const webUrl = generateGoogleMapsUrl(entity);
   
-  if (isMobile) {
-    // Try to open native app first
-    const address = entity.venue || entity.metadata?.formatted_address || entity.name;
-    const appUrl = `googlemaps://?q=${encodeURIComponent(address)}`;
-    
-    // Create a hidden link and click it to trigger the app
-    const link = document.createElement('a');
-    link.href = appUrl;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Fallback to web after a short delay if app doesn't open
-    setTimeout(() => {
-      window.open(mapsUrl, '_blank');
-    }, 1000);
+  // Generate native app URL with place_id for accuracy
+  let nativeUrl: string;
+  if (entity.api_ref) {
+    nativeUrl = `googlemaps://?place_id=${encodeURIComponent(entity.api_ref)}`;
+  } else if (entity.metadata?.coordinates) {
+    const { lat, lng } = entity.metadata.coordinates;
+    nativeUrl = `googlemaps://?q=${lat},${lng}`;
   } else {
-    window.open(mapsUrl, '_blank');
+    const address = entity.venue || entity.metadata?.formatted_address || entity.name;
+    nativeUrl = `googlemaps://?q=${encodeURIComponent(address)}`;
   }
+  
+  // Universal redirect with blur detection
+  let fallbackTimer: NodeJS.Timeout;
+  
+  const handleBlur = () => {
+    clearTimeout(fallbackTimer);
+    window.removeEventListener('blur', handleBlur);
+  };
+  
+  // Set up blur event listener to detect successful native app launch
+  window.addEventListener('blur', handleBlur);
+  
+  // Attempt to open native app
+  window.location.href = nativeUrl;
+  
+  // Set fallback timer - if native app doesn't launch, open web version
+  fallbackTimer = setTimeout(() => {
+    window.removeEventListener('blur', handleBlur);
+    window.open(webUrl, '_blank');
+  }, 750);
 };
 
 /**
