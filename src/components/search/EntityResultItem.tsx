@@ -5,6 +5,7 @@ import { EntitySearchResult } from '@/hooks/use-unified-search';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getEntityUrl } from '@/utils/entityUrlUtils';
 
 interface EntityResultItemProps {
   entity: EntitySearchResult;
@@ -14,9 +15,7 @@ interface EntityResultItemProps {
 export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
   // Always use the standardized entity URL format
   const getEntityPath = () => {
-    // Use slug if available, otherwise fall back to ID
-    const identifier = entity.slug || entity.id;
-    return `/entity/${identifier}`;
+    return getEntityUrl(entity);
   };
 
   return (

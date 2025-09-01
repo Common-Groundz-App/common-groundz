@@ -51,7 +51,7 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
         view_count,
         venue,
         image_url,
-        entities:entity_id(*)
+        entities:entity_id(id, name, slug, type, image_url, description, venue, metadata, api_source, api_ref)
       `)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })

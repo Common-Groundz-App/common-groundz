@@ -12,6 +12,7 @@ import { useEnhancedExplore } from '@/hooks/use-enhanced-explore';
 import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { useAuth } from '@/contexts/AuthContext';
+import { getEntityUrl } from '@/utils/entityUrlUtils';
 
 export const FeaturedEntities = () => {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ export const FeaturedEntities = () => {
       'click'
     );
     
-    navigate(`/entity/${entity.id}`);
+    navigate(getEntityUrl(entity));
   };
 
   const getReasonIcon = (reason?: string) => {

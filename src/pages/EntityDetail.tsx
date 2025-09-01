@@ -39,6 +39,8 @@ import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { Eye, ArrowRight } from 'lucide-react';
 import { mapEntityTypeToDatabase, getContextualFieldLabel, getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { EntityType } from '@/services/recommendation/types';
+import { Helmet } from 'react-helmet-async';
+import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
 
 import EntityDetailV2 from './EntityDetailV2';
 
@@ -69,6 +71,13 @@ const EntityDetailOriginal = () => {
     error,
     refreshData
   } = useEntityDetail(slug || '');
+
+  // Canonical redirect: if URL contains UUID instead of slug, redirect to slug-based URL
+  useEffect(() => {
+    if (entity && slug && isUUID(slug) && entity.slug) {
+      navigate(getEntityUrl(entity), { replace: true });
+    }
+  }, [entity, slug, navigate]);
 
   const {
     circleRating,
@@ -385,6 +394,13 @@ const EntityDetailOriginal = () => {
 
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
+      {/* Add canonical meta tag for SEO */}
+      {entity && entity.slug && (
+        <Helmet>
+          <link rel="canonical" href={`${window.location.origin}/entity/${entity.slug}`} />
+        </Helmet>
+      )}
+      
       <NavBarComponent />
       
       {/* Add the floating toggle */}

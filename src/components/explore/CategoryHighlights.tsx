@@ -12,6 +12,7 @@ import { useEnhancedExplore } from '@/hooks/use-enhanced-explore';
 import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { EntityTypeString } from '@/hooks/feed/api/types';
+import { getEntityUrl } from '@/utils/entityUrlUtils';
 
 interface CategoryHighlightsProps {
   entityType?: EntityTypeString;
@@ -52,7 +53,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
       'click'
     );
     
-    navigate(`/entity/${entity.id}`);
+    navigate(getEntityUrl(entity));
   };
 
   const getIconForCollectionType = (type: string) => {

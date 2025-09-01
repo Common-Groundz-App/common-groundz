@@ -29,6 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getPostTypeLabel } from './utils/postUtils';
 import TagBadge from './TagBadge';
 import { feedbackActions } from '@/services/feedbackService';
+import { getEntityUrl } from '@/utils/entityUrlUtils';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -267,7 +268,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
 
   // Navigation handler for tagged entities
   const handleEntityClick = (entity: Entity) => {
-    navigate(`/entity/${entity.slug || entity.id}`);
+    navigate(getEntityUrl(entity));
   };
 
   const renderTaggedEntities = (entities: Entity[]) => {

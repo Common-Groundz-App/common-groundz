@@ -9,6 +9,7 @@ import AuthContextBoundary from '@/components/AuthContextBoundary';
 import RenderProtection from '@/components/RenderProtection';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeStorageService } from '@/services/storageService';
+import { HelmetProvider } from 'react-helmet-async';
 import './index.css';
 
 // Initialize storage service
@@ -22,16 +23,18 @@ const root = createRoot(rootElement);
 
 root.render(
   <RenderProtection maxRenders={30} timeWindow={2000}>
-    <AuthContextBoundary>
-      <AuthProvider>
-        <PreferencesProvider>
-          <LocationProvider>
-            <TooltipProvider>
-              <App />
-            </TooltipProvider>
-          </LocationProvider>
-        </PreferencesProvider>
-      </AuthProvider>
-    </AuthContextBoundary>
+    <HelmetProvider>
+      <AuthContextBoundary>
+        <AuthProvider>
+          <PreferencesProvider>
+            <LocationProvider>
+              <TooltipProvider>
+                <App />
+              </TooltipProvider>
+            </LocationProvider>
+          </PreferencesProvider>
+        </AuthProvider>
+      </AuthContextBoundary>
+    </HelmetProvider>
   </RenderProtection>
 );

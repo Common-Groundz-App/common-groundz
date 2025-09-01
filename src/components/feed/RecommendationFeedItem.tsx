@@ -29,6 +29,7 @@ import { MediaItem } from '@/types/media';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { feedbackActions } from '@/services/feedbackService';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
+import { getEntityUrl } from '@/utils/entityUrlUtils';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -149,11 +150,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
-    if (recommendation.entity && recommendation.entity.slug) {
-      navigate(`/entity/${recommendation.entity.slug}`);
-    } else if (recommendation.entity && recommendation.entity.id) {
-      // Fallback to using entity id if slug is not available
-      navigate(`/entity/${recommendation.entity.id}`);
+    if (recommendation.entity) {
+      navigate(getEntityUrl(recommendation.entity));
     } else {
       toast({
         title: "Error",
