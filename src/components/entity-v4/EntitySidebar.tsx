@@ -117,10 +117,20 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
           <CardTitle className="text-lg">About</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-600 leading-relaxed mb-4">
-            {entity.description || "No description available for this entity. Help improve our database by suggesting an edit."}
-          </p>
-          <EntitySuggestionButton entity={entity} />
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {entity.description || "No description available for this entity. Help improve our database by suggesting an edit."}
+            </p>
+            
+            {/* Attribution for Google-sourced descriptions */}
+            {entity.description && (entity as any).about_source === 'google_editorial' && (
+              <p className="text-xs text-gray-500 italic">
+                Source: Google
+              </p>
+            )}
+            
+            <EntitySuggestionButton entity={entity} />
+          </div>
         </CardContent>
       </Card>
 

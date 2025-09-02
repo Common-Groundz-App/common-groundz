@@ -49,7 +49,7 @@ serve(async (req) => {
     
     const detailsUrl = new URL("https://maps.googleapis.com/maps/api/place/details/json");
     detailsUrl.searchParams.append("place_id", placeId);
-    detailsUrl.searchParams.append("fields", "photos,name,formatted_address,rating,user_ratings_total");
+    detailsUrl.searchParams.append("fields", "displayName,formattedAddress,shortFormattedAddress,location,businessStatus,websiteUri,nationalPhoneNumber,currentOpeningHours,primaryType,types,priceLevel,googleMapsUri,editorialSummary,photos,rating,userRatingCount");
     detailsUrl.searchParams.append("key", GOOGLE_PLACES_API_KEY);
 
     const response = await fetch(detailsUrl.toString(), {
@@ -76,7 +76,81 @@ serve(async (req) => {
     }
 
     const placeDetails = data.result;
-    console.log(`✅ Retrieved place details for: ${placeDetails.name || 'Unknown Place'}`);
+    console.log(`✅ Retrieved place details for: ${placeDetails.displayName || placeDetails.name || 'Unknown Place'}`);
+
+    // Get existing entity data to check description source
+    const { data: entityData, error: entityError } = await supabase
+      .from('entities')
+      .select('description, about_source, external_rating, external_rating_count')
+      .eq('id', entityId)
+      .single();
+
+    if (entityError) {
+      console.error('Error fetching entity data:', entityError);
+      throw new Error(`Failed to fetch entity data: ${entityError.message}`);
+    }
+
+    // Helper functions for description processing
+    const sanitize = (text: string): string => {
+      return text.replace(/<[^>]+>/g, ' ')  // strip HTML
+                 .replace(/\s+/g, ' ')      // collapse whitespace
+                 .trim()
+                 .slice(0, 300);           // cap at 300 chars
+    };
+
+    const buildAutoAbout = (details: any): string => {
+      const chips: string[] = [];
+      
+      // Add price level
+      if (details.priceLevel != null) {
+        chips.push('₹'.repeat(Math.min(Math.max(details.priceLevel, 1), 4)));
+      }
+      
+      // Add rating if available
+      if (details.rating && details.userRatingCount) {
+        chips.push(`⭐ ${details.rating.toFixed(1)} (${details.userRatingCount})`);
+      }
+      
+      // Add business status
+      if (details.businessStatus === 'OPERATIONAL') {
+        chips.push('Open');
+      } else if (details.businessStatus === 'CLOSED_PERMANENTLY') {
+        chips.push('Permanently closed');
+      }
+
+      const typeLabel = details.primaryType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
+      const areaLabel = details.shortFormattedAddress?.split(',')[0] || 'this area';
+      const chipText = chips.length ? ` • ${chips.join(' • ')}` : '';
+      
+      return `${typeLabel} in ${areaLabel}${chipText}`;
+    };
+
+    // Check if entity has user/brand description that shouldn't be overwritten
+    const hasAuthorCopy = entityData.description && ['user', 'brand'].includes(entityData.about_source || '');
+
+    // Process description based on priority logic
+    let descriptionUpdate: { description?: string; about_source?: string } | null = null;
+
+    if (!hasAuthorCopy) {
+      const editorial = placeDetails.editorialSummary?.overview?.trim();
+      if (editorial) {
+        const sanitizedText = sanitize(editorial);
+        // Update if no description exists or current source is google_editorial
+        if (!entityData.description || entityData.about_source === 'google_editorial') {
+          descriptionUpdate = { 
+            description: sanitizedText, 
+            about_source: 'google_editorial' 
+          };
+        }
+      } else {
+        // Auto-generate description from structured data
+        const autoDescription = buildAutoAbout(placeDetails);
+        descriptionUpdate = { 
+          description: sanitize(autoDescription), 
+          about_source: 'auto_generated' 
+        };
+      }
+    }
 
     // Extract photo references
     let photoReferences = [];
@@ -108,13 +182,41 @@ serve(async (req) => {
       photo_references: photoReferences,
       photo_reference: primaryPhotoReference,
       last_refreshed_at: new Date().toISOString(),
-      place_name: placeDetails.name,
-      formatted_address: placeDetails.formatted_address,
+      place_name: placeDetails.displayName || placeDetails.name,
+      formatted_address: placeDetails.formattedAddress || placeDetails.formatted_address,
+      short_formatted_address: placeDetails.shortFormattedAddress,
+      business_status: placeDetails.businessStatus,
+      website_uri: placeDetails.websiteUri,
+      national_phone_number: placeDetails.nationalPhoneNumber,
+      primary_type: placeDetails.primaryType,
+      types: placeDetails.types,
+      price_level: placeDetails.priceLevel,
+      google_maps_uri: placeDetails.googleMapsUri,
+      editorial_summary: placeDetails.editorialSummary,
+      location: placeDetails.location,
       rating: placeDetails.rating,
-      user_ratings_total: placeDetails.user_ratings_total
+      user_ratings_total: placeDetails.userRatingCount || placeDetails.user_ratings_total,
+      ...(descriptionUpdate || {})
     };
 
     console.log(`✅ Successfully refreshed Google Places entity data`);
+
+    // Update entity with new data
+    const { error: updateError } = await supabase
+      .from('entities')
+      .update({
+        ...(descriptionUpdate || {}),
+        about_updated_at: new Date().toISOString(),
+        external_rating: placeDetails.rating || entityData.external_rating,
+        external_rating_count: placeDetails.userRatingCount || placeDetails.user_ratings_total || entityData.external_rating_count,
+        metadata: updatedMetadata
+      })
+      .eq('id', entityId);
+
+    if (updateError) {
+      console.error('Error updating entity:', updateError);
+      throw new Error(`Failed to update entity: ${updateError.message}`);
+    }
 
     return new Response(
       JSON.stringify({
@@ -123,11 +225,12 @@ serve(async (req) => {
         primaryPhotoReference,
         newImageUrl,
         updatedMetadata,
+        descriptionUpdate,
         placeDetails: {
-          name: placeDetails.name,
-          formatted_address: placeDetails.formatted_address,
+          name: placeDetails.displayName || placeDetails.name,
+          formatted_address: placeDetails.formattedAddress || placeDetails.formatted_address,
           rating: placeDetails.rating,
-          user_ratings_total: placeDetails.user_ratings_total
+          user_ratings_total: placeDetails.userRatingCount || placeDetails.user_ratings_total
         }
       }),
       {

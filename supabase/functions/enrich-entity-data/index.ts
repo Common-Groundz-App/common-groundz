@@ -223,29 +223,123 @@ async function enrichPlaceData(entity: any) {
     const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
     if (!GOOGLE_PLACES_API_KEY || !entity.api_ref) return null;
 
+    // Use comprehensive field mask including editorialSummary and location
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${entity.api_ref}&key=${GOOGLE_PLACES_API_KEY}&fields=rating,user_ratings_total,price_level,formatted_address,formatted_phone_number,website,opening_hours,types`
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${entity.api_ref}&key=${GOOGLE_PLACES_API_KEY}&fields=displayName,formattedAddress,shortFormattedAddress,location,businessStatus,websiteUri,nationalPhoneNumber,currentOpeningHours,primaryType,types,priceLevel,googleMapsUri,editorialSummary,photos,rating,userRatingCount`
     );
     
     if (response.ok) {
       const data = await response.json();
-      const placeData = data.result;
+      const placeDetails = data.result;
       
-      if (placeData) {
+      if (placeDetails) {
+        // Helper functions for description processing
+        const sanitize = (text: string): string => {
+          return text.replace(/<[^>]+>/g, ' ')  // strip HTML
+                     .replace(/\s+/g, ' ')      // collapse whitespace
+                     .trim()
+                     .slice(0, 300);           // cap at 300 chars
+        };
+
+        const buildAutoAbout = (details: any): string => {
+          const chips: string[] = [];
+          
+          // Add price level
+          if (details.priceLevel != null) {
+            chips.push('₹'.repeat(Math.min(Math.max(details.priceLevel, 1), 4)));
+          }
+          
+          // Add rating if available
+          if (details.rating && details.userRatingCount) {
+            chips.push(`⭐ ${details.rating.toFixed(1)} (${details.userRatingCount})`);
+          }
+          
+          // Add business status
+          if (details.businessStatus === 'OPERATIONAL') {
+            chips.push('Open');
+          } else if (details.businessStatus === 'CLOSED_PERMANENTLY') {
+            chips.push('Permanently closed');
+          }
+
+          const typeLabel = details.primaryType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
+          const areaLabel = details.shortFormattedAddress?.split(',')[0] || 'this area';
+          const chipText = chips.length ? ` • ${chips.join(' • ')}` : '';
+          
+          return `${typeLabel} in ${areaLabel}${chipText}`;
+        };
+
+        // Check if entity has user/brand description that shouldn't be overwritten
+        const hasAuthorCopy = entity.description && ['user', 'brand'].includes(entity.about_source || '');
+
+        // Process description based on priority logic
+        let descriptionUpdate: { description?: string; about_source?: string } | null = null;
+
+        if (!hasAuthorCopy) {
+          const editorial = placeDetails.editorialSummary?.overview?.trim();
+          if (editorial) {
+            const sanitizedText = sanitize(editorial);
+            // Update if no description exists or current source is google_editorial
+            if (!entity.description || entity.about_source === 'google_editorial') {
+              descriptionUpdate = { 
+                description: sanitizedText, 
+                about_source: 'google_editorial' 
+              };
+            }
+          } else {
+            // Auto-generate description from structured data
+            const autoDescription = buildAutoAbout(placeDetails);
+            descriptionUpdate = { 
+              description: sanitize(autoDescription), 
+              about_source: 'auto_generated' 
+            };
+          }
+        }
+
+        // Prepare enhanced metadata including all new fields
+        const enhancedMetadata = {
+          photo_references: placeDetails.photos?.map((photo: any) => ({
+            photo_reference: photo.photo_reference,
+            width: photo.width,
+            height: photo.height,
+            html_attributions: photo.html_attributions || []
+          })) || [],
+          last_refreshed_at: new Date().toISOString(),
+          place_name: placeDetails.displayName,
+          formatted_address: placeDetails.formattedAddress,
+          short_formatted_address: placeDetails.shortFormattedAddress,
+          business_status: placeDetails.businessStatus,
+          website_uri: placeDetails.websiteUri,
+          national_phone_number: placeDetails.nationalPhoneNumber,
+          primary_type: placeDetails.primaryType,
+          types: placeDetails.types,
+          price_level: placeDetails.priceLevel,
+          google_maps_uri: placeDetails.googleMapsUri,
+          editorial_summary: placeDetails.editorialSummary,
+          location: placeDetails.location,
+          rating: placeDetails.rating,
+          user_ratings_total: placeDetails.userRatingCount
+        };
+
         return {
+          ...(descriptionUpdate || {}),
+          about_updated_at: new Date().toISOString(),
+          external_rating: placeDetails.rating,
+          external_rating_count: placeDetails.userRatingCount,
+          metadata: enhancedMetadata,
           external_ratings: {
             ...entity.external_ratings,
-            google_rating: placeData.rating,
-            user_ratings_total: placeData.user_ratings_total,
-            price_level: placeData.price_level
+            google_rating: placeDetails.rating,
+            user_ratings_total: placeDetails.userRatingCount,
+            price_level: placeDetails.priceLevel
           },
           specifications: {
             ...entity.specifications,
-            address: placeData.formatted_address,
-            phone: placeData.formatted_phone_number,
-            website: placeData.website,
-            hours: placeData.opening_hours,
-            types: placeData.types
+            address: placeDetails.formattedAddress,
+            phone: placeDetails.nationalPhoneNumber,
+            website: placeDetails.websiteUri,
+            business_status: placeDetails.businessStatus,
+            types: placeDetails.types,
+            location: placeDetails.location
           }
         };
       }

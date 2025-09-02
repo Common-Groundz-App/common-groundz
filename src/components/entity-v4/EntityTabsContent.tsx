@@ -94,11 +94,21 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
         <Card>
           <CardContent className="p-6">
             <h3 className="font-semibold mb-4">About {entity?.name}</h3>
-            {entity?.description ? (
-              <p className="text-muted-foreground leading-relaxed">{entity.description}</p>
-            ) : (
-              <p className="text-muted-foreground italic">No description available.</p>
-            )}
+            <div className="space-y-3">
+              {entity?.description ? (
+                <>
+                  <p className="text-muted-foreground leading-relaxed">{entity.description}</p>
+                  {/* Attribution for Google-sourced descriptions */}
+                  {(entity as any).about_source === 'google_editorial' && (
+                    <p className="text-xs text-muted-foreground italic">
+                      Source: Google
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground italic">No description available.</p>
+              )}
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
               <div>

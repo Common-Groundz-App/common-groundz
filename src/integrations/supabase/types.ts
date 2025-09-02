@@ -295,6 +295,8 @@ export type Database = {
       }
       entities: {
         Row: {
+          about_source: string | null
+          about_updated_at: string | null
           ai_dynamic_review_summary: string | null
           ai_dynamic_review_summary_last_generated_at: string | null
           ai_dynamic_review_summary_model_used: string | null
@@ -308,6 +310,8 @@ export type Database = {
           data_quality_score: number | null
           description: string | null
           enrichment_source: string | null
+          external_rating: number | null
+          external_rating_count: number | null
           external_ratings: Json | null
           geographic_boost: number | null
           id: string
@@ -344,6 +348,8 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          about_source?: string | null
+          about_updated_at?: string | null
           ai_dynamic_review_summary?: string | null
           ai_dynamic_review_summary_last_generated_at?: string | null
           ai_dynamic_review_summary_model_used?: string | null
@@ -357,6 +363,8 @@ export type Database = {
           data_quality_score?: number | null
           description?: string | null
           enrichment_source?: string | null
+          external_rating?: number | null
+          external_rating_count?: number | null
           external_ratings?: Json | null
           geographic_boost?: number | null
           id?: string
@@ -393,6 +401,8 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          about_source?: string | null
+          about_updated_at?: string | null
           ai_dynamic_review_summary?: string | null
           ai_dynamic_review_summary_last_generated_at?: string | null
           ai_dynamic_review_summary_model_used?: string | null
@@ -406,6 +416,8 @@ export type Database = {
           data_quality_score?: number | null
           description?: string | null
           enrichment_source?: string | null
+          external_rating?: number | null
+          external_rating_count?: number | null
           external_ratings?: Json | null
           geographic_boost?: number | null
           id?: string
