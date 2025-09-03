@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Trash2, Shield, AlertCircle, AlertTriangle, RotateCcw, History, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Shield, AlertCircle, AlertTriangle, RotateCcw, History, RefreshCw, Image, FileText, Phone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NavBarComponent from '@/components/NavBarComponent';
@@ -21,6 +21,7 @@ import { BusinessHoursEditor } from '@/components/admin/BusinessHoursEditor';
 import { ContactInfoEditor } from '@/components/admin/ContactInfoEditor';
 import { EntityTypeSpecificFields } from '@/components/admin/EntityTypeSpecificFields';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -47,6 +48,10 @@ const AdminEntityEdit = () => {
   const [businessHours, setBusinessHours] = useState<any>({});
   const [contactInfo, setContactInfo] = useState<any>({});
   const [refreshingMetadata, setRefreshingMetadata] = useState(false);
+  const [refreshingDescription, setRefreshingDescription] = useState(false);
+  const [refreshingContact, setRefreshingContact] = useState(false);
+
+  const { refreshEntityImage, isRefreshing: isRefreshingImage } = useEntityImageRefresh();
 
   useEffect(() => {
     if (!user || !session) {
@@ -347,6 +352,139 @@ const AdminEntityEdit = () => {
       });
     } finally {
       setRefreshingMetadata(false);
+    }
+  };
+
+  const handleFixDescription = async () => {
+    if (!entity || !session) return;
+
+    const hasAdminPermission = await checkAdminPermission();
+    if (!hasAdminPermission) {
+      return;
+    }
+
+    setRefreshingDescription(true);
+    try {
+      console.log('handleFixDescription: Refreshing description and about details for entity:', entity.id);
+
+      const { data, error } = await supabase.functions.invoke('refresh-google-places-entity', {
+        body: { 
+          entityId: entity.id,
+          placeId: (entity.metadata as any)?.place_id
+        }
+      });
+
+      if (error) {
+        console.error('Error calling refresh-google-places-entity function:', error);
+        throw error;
+      }
+
+      if (data?.success) {
+        // Refresh the entity data from database
+        await fetchEntity();
+
+        toast({
+          title: 'Success',
+          description: 'Description and about details refreshed successfully',
+        });
+
+        fetchAdminActions(); // Refresh audit trail
+      } else {
+        throw new Error(data?.error || 'Failed to refresh description');
+      }
+    } catch (error) {
+      console.error('Error refreshing description:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to refresh description: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'destructive'
+      });
+    } finally {
+      setRefreshingDescription(false);
+    }
+  };
+
+  const handleRefreshImages = async () => {
+    if (!entity) return;
+
+    const hasAdminPermission = await checkAdminPermission();
+    if (!hasAdminPermission) {
+      return;
+    }
+
+    try {
+      console.log('handleRefreshImages: Refreshing images for entity:', entity.id);
+
+      const result = await refreshEntityImage(entity.id);
+      
+      if (result) {
+        // Refresh the entity data from database
+        await fetchEntity();
+
+        toast({
+          title: 'Success',
+          description: 'Images refreshed successfully',
+        });
+
+        fetchAdminActions(); // Refresh audit trail
+      }
+    } catch (error) {
+      console.error('Error refreshing images:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to refresh images: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleFixContactInformation = async () => {
+    if (!entity || !session) return;
+
+    const hasAdminPermission = await checkAdminPermission();
+    if (!hasAdminPermission) {
+      return;
+    }
+
+    setRefreshingContact(true);
+    try {
+      console.log('handleFixContactInformation: Refreshing contact information for entity:', entity.id);
+
+      // Use the same refresh function but focus on contact information
+      const { data, error } = await supabase.functions.invoke('refresh-google-places-entity', {
+        body: { 
+          entityId: entity.id,
+          placeId: (entity.metadata as any)?.place_id
+        }
+      });
+
+      if (error) {
+        console.error('Error calling refresh-google-places-entity function:', error);
+        throw error;
+      }
+
+      if (data?.success) {
+        // Refresh the entity data from database
+        await fetchEntity();
+
+        toast({
+          title: 'Success',
+          description: 'Contact information refreshed successfully',
+        });
+
+        fetchAdminActions(); // Refresh audit trail
+      } else {
+        throw new Error(data?.error || 'Failed to refresh contact information');
+      }
+    } catch (error) {
+      console.error('Error refreshing contact information:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to refresh contact information: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'destructive'
+      });
+    } finally {
+      setRefreshingContact(false);
     }
   };
 
@@ -735,6 +873,84 @@ const AdminEntityEdit = () => {
                       <p className="text-xs text-muted-foreground">
                         Must be valid JSON format. Click "Fix Metadata" to refresh from external APIs.
                       </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Data Refresh Actions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Data Refresh Actions</CardTitle>
+                    <CardDescription>
+                      Refresh entity data from external APIs and sources
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Button
+                        variant="outline"
+                        onClick={handleFixMetadata}
+                        disabled={entity.is_deleted || refreshingMetadata}
+                        className="gap-2 h-auto py-3 flex-col items-start text-left"
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <RefreshCw className={`h-4 w-4 ${refreshingMetadata ? 'animate-spin' : ''}`} />
+                          <span className="font-medium">Fix Metadata</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {refreshingMetadata ? 'Refreshing metadata from APIs...' : 'Refresh technical metadata and API data'}
+                        </span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleFixDescription}
+                        disabled={entity.is_deleted || refreshingDescription}
+                        className="gap-2 h-auto py-3 flex-col items-start text-left"
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <FileText className={`h-4 w-4 ${refreshingDescription ? 'animate-spin' : ''}`} />
+                          <span className="font-medium">Fix Description</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {refreshingDescription ? 'Refreshing description...' : 'Refresh description and about details'}
+                        </span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleRefreshImages}
+                        disabled={entity.is_deleted || isRefreshingImage}
+                        className="gap-2 h-auto py-3 flex-col items-start text-left"
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <Image className={`h-4 w-4 ${isRefreshingImage ? 'animate-spin' : ''}`} />
+                          <span className="font-medium">Refresh Images</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {isRefreshingImage ? 'Refreshing images...' : 'Update entity images from external sources'}
+                        </span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleFixContactInformation}
+                        disabled={entity.is_deleted || refreshingContact}
+                        className="gap-2 h-auto py-3 flex-col items-start text-left"
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <Phone className={`h-4 w-4 ${refreshingContact ? 'animate-spin' : ''}`} />
+                          <span className="font-medium">Fix Contact Info</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {refreshingContact ? 'Refreshing contact info...' : 'Update phone, website, and hours'}
+                        </span>
+                      </Button>
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground p-3 bg-muted/50 rounded-lg">
+                      <p className="font-medium mb-1">💡 Pro tip:</p>
+                      <p>Use these actions after editing metadata to automatically update entity information from external APIs. Each action targets specific data types for efficient updates.</p>
                     </div>
                   </CardContent>
                 </Card>
