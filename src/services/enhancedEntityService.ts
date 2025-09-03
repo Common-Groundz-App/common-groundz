@@ -256,6 +256,25 @@ const extractPlaceMetadata = async (rawData: any, baseData: EnhancedEntityData):
         const place = data.enrichedData;
         console.log(`✅ Google Places details fetched for: ${place.name}`);
         
+        // Use the enriched description and about_source from the function
+        if (place.description && place.about_source) {
+          finalDescription = place.description;
+          aboutSource = place.about_source;
+          console.log(`📝 Using enriched description from ${aboutSource}: ${finalDescription.substring(0, 100)}...`);
+        } else {
+          // Fallback: if we got place data but no description was set, apply our logic here
+          const placeDetails = place.metadata || {};
+          if (placeDetails.editorialSummary?.overview?.trim()) {
+            finalDescription = sanitize(placeDetails.editorialSummary.overview);
+            aboutSource = 'google_editorial';
+            console.log('📝 Using editorial summary as fallback');
+          } else {
+            finalDescription = buildAutoAbout(placeDetails);
+            aboutSource = 'auto_generated';
+            console.log('📝 Using auto-generated description as fallback');
+          }
+        }
+        
         // Update metadata with enriched information
         enrichedMetadata = {
           ...metadata,

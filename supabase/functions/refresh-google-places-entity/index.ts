@@ -78,16 +78,30 @@ serve(async (req) => {
     const placeDetails = data.result;
     console.log(`✅ Retrieved place details for: ${placeDetails.displayName || placeDetails.name || 'Unknown Place'}`);
 
-    // Get existing entity data to check description source
-    const { data: entityData, error: entityError } = await supabase
-      .from('entities')
-      .select('description, about_source, external_rating, external_rating_count')
-      .eq('id', entityId)
-      .single();
+    // Get existing entity data to check description source (for refresh) or use defaults (for creation)
+    let entityData = null;
+    
+    if (entityId !== 'temp') {
+      const { data, error: entityError } = await supabase
+        .from('entities')
+        .select('description, about_source, external_rating, external_rating_count')
+        .eq('id', entityId)
+        .single();
 
-    if (entityError) {
-      console.error('Error fetching entity data:', entityError);
-      throw new Error(`Failed to fetch entity data: ${entityError.message}`);
+      if (entityError) {
+        console.error('Error fetching entity data:', entityError);
+        throw new Error(`Failed to fetch entity data: ${entityError.message}`);
+      }
+      entityData = data;
+    } else {
+      // For entity creation (temp entityId), use defaults
+      entityData = {
+        description: null,
+        about_source: null,
+        external_rating: null,
+        external_rating_count: null
+      };
+      console.log('🆕 Processing new entity creation with temporary ID');
     }
 
     // Helper functions for description processing
@@ -201,21 +215,25 @@ serve(async (req) => {
 
     console.log(`✅ Successfully refreshed Google Places entity data`);
 
-    // Update entity with new data
-    const { error: updateError } = await supabase
-      .from('entities')
-      .update({
-        ...(descriptionUpdate || {}),
-        about_updated_at: new Date().toISOString(),
-        external_rating: placeDetails.rating || entityData.external_rating,
-        external_rating_count: placeDetails.userRatingCount || placeDetails.user_ratings_total || entityData.external_rating_count,
-        metadata: updatedMetadata
-      })
-      .eq('id', entityId);
+    // Update entity with new data (only if not creation mode)
+    if (entityId !== 'temp') {
+      const { error: updateError } = await supabase
+        .from('entities')
+        .update({
+          ...(descriptionUpdate || {}),
+          about_updated_at: new Date().toISOString(),
+          external_rating: placeDetails.rating || entityData.external_rating,
+          external_rating_count: placeDetails.userRatingCount || placeDetails.user_ratings_total || entityData.external_rating_count,
+          metadata: updatedMetadata
+        })
+        .eq('id', entityId);
 
-    if (updateError) {
-      console.error('Error updating entity:', updateError);
-      throw new Error(`Failed to update entity: ${updateError.message}`);
+      if (updateError) {
+        console.error('Error updating entity:', updateError);
+        throw new Error(`Failed to update entity: ${updateError.message}`);
+      }
+    } else {
+      console.log('🆕 Skipping database update for entity creation mode');
     }
 
     return new Response(
@@ -226,6 +244,17 @@ serve(async (req) => {
         newImageUrl,
         updatedMetadata,
         descriptionUpdate,
+        // Return enrichedData for enhancedEntityService.ts compatibility
+        enrichedData: {
+          name: placeDetails.displayName || placeDetails.name,
+          formatted_address: placeDetails.formattedAddress || placeDetails.formatted_address,
+          rating: placeDetails.rating,
+          user_ratings_total: placeDetails.userRatingCount || placeDetails.user_ratings_total,
+          description: descriptionUpdate?.description,
+          about_source: descriptionUpdate?.about_source,
+          metadata: updatedMetadata
+        },
+        // Keep placeDetails for backward compatibility
         placeDetails: {
           name: placeDetails.displayName || placeDetails.name,
           formatted_address: placeDetails.formattedAddress || placeDetails.formatted_address,
