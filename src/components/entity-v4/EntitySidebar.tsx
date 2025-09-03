@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Clock, MapPin, Mail, Phone, Globe, Users, Star } from "lucide-react";
+import { Clock, MapPin, Mail, Phone, Globe, Users, Star, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -130,6 +130,11 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
             )}
             
             <EntitySuggestionButton entity={entity} />
+            
+            <Button variant="gradient" size="sm" className="w-full gap-2">
+              <Award className="w-4 h-4" />
+              Claim This Business
+            </Button>
           </div>
         </CardContent>
       </Card>
