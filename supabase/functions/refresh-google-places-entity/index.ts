@@ -112,31 +112,9 @@ serve(async (req) => {
                  .slice(0, 300);           // cap at 300 chars
     };
 
-    const buildAutoAbout = (details: any): string => {
-      const chips: string[] = [];
-      
-      // Add price level
-      if (details.price_level != null) {
-        chips.push('₹'.repeat(Math.min(Math.max(details.price_level, 1), 4)));
-      }
-      
-      // Add rating if available
-      if (details.rating && details.user_ratings_total) {
-        chips.push(`⭐ ${details.rating.toFixed(1)} (${details.user_ratings_total})`);
-      }
-      
-      // Add business status
-      if (details.business_status === 'OPERATIONAL') {
-        chips.push('Open');
-      } else if (details.business_status === 'CLOSED_PERMANENTLY') {
-        chips.push('Permanently closed');
-      }
-
-      const typeLabel = details.types?.[0]?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
-      const areaLabel = details.vicinity?.split(',')[0] || details.formatted_address?.split(',')[0] || 'this area';
-      const chipText = chips.length ? ` • ${chips.join(' • ')}` : '';
-      
-      return `${typeLabel} in ${areaLabel}${chipText}`;
+    const buildAutoAbout = (details: any): string | null => {
+      // Don't generate auto descriptions - return null to use fallback message
+      return null;
     };
 
     // Check if entity has user/brand description that shouldn't be overwritten
@@ -157,12 +135,20 @@ serve(async (req) => {
           };
         }
       } else {
-        // Auto-generate description from structured data
+        // No editorial summary and no auto-generation - use null to trigger fallback
         const autoDescription = buildAutoAbout(placeDetails);
-        descriptionUpdate = { 
-          description: sanitize(autoDescription), 
-          about_source: 'auto_generated' 
-        };
+        if (autoDescription) {
+          descriptionUpdate = { 
+            description: sanitize(autoDescription), 
+            about_source: 'auto_generated' 
+          };
+        } else {
+          // Set to null to trigger frontend fallback message
+          descriptionUpdate = { 
+            description: null, 
+            about_source: null 
+          };
+        }
       }
     }
 
