@@ -25,6 +25,12 @@ export interface EnhancedEntityData {
   cast_crew?: any;
   ingredients?: string[];
   nutritional_info?: any;
+  
+  // New description fields
+  about_source?: string | null;
+  about_updated_at?: string | null;
+  external_rating?: number | null;
+  external_rating_count?: number | null;
 }
 
 /**
@@ -60,6 +66,10 @@ export const createEnhancedEntity = async (rawData: any, entityType: string): Pr
         cast_crew: enhancedData.cast_crew,
         ingredients: enhancedData.ingredients,
         nutritional_info: enhancedData.nutritional_info,
+        about_source: enhancedData.about_source,
+        about_updated_at: enhancedData.about_updated_at,
+        external_rating: enhancedData.external_rating,
+        external_rating_count: enhancedData.external_rating_count,
         last_enriched_at: new Date().toISOString(),
         enrichment_source: enhancedData.api_source,
         data_quality_score: calculateDataQualityScore(enhancedData),
@@ -220,14 +230,81 @@ const extractMovieMetadata = (rawData: any, baseData: EnhancedEntityData): Enhan
 };
 
 /**
- * Extract place-specific metadata with enriched Google Places data
+ * Extract place-specific metadata with smart description logic
  */
 const extractPlaceMetadata = async (rawData: any, baseData: EnhancedEntityData): Promise<EnhancedEntityData> => {
   const metadata = rawData.metadata || {};
   let enrichedMetadata = { ...metadata };
+  let finalDescription = baseData.description;
+  let aboutSource = null;
   
-  // Try to enrich with search-places-deep for multiple photos and detailed data
-  if (baseData.name && !metadata.photo_references) {
+  // For Google Places entities, apply smart description logic and get detailed data
+  if (baseData.api_source === 'google_places' && baseData.api_ref) {
+    try {
+      console.log(`🔍 Fetching Google Places details for place_id: ${baseData.api_ref}`);
+      
+      // Use refresh-google-places-entity function to get enriched data with proper field mask
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await supabase.functions.invoke('refresh-google-places-entity', {
+        body: { 
+          entityId: 'temp', // We don't have entity ID yet, but the function should handle place_id
+          placeId: baseData.api_ref 
+        }
+      });
+      
+      if (!error && data?.enrichedData) {
+        const place = data.enrichedData;
+        console.log(`✅ Google Places details fetched for: ${place.name}`);
+        
+        // Update metadata with enriched information
+        enrichedMetadata = {
+          ...metadata,
+          ...place.metadata,
+          rating: place.metadata?.rating,
+          user_ratings_total: place.metadata?.user_ratings_total,
+          price_level: place.metadata?.price_level,
+          formatted_address: place.metadata?.formatted_address,
+          website: place.metadata?.website,
+          formatted_phone_number: place.metadata?.formatted_phone_number,
+          opening_hours: place.metadata?.opening_hours,
+          types: place.metadata?.types,
+          geometry: place.metadata?.geometry,
+          vicinity: place.metadata?.vicinity,
+          editorial_summary: place.metadata?.editorial_summary
+        };
+        
+        // Apply smart description fallback logic
+        if (place.metadata?.editorial_summary?.overview) {
+          // Priority 1: Google Editorial Summary
+          finalDescription = sanitize(place.metadata.editorial_summary.overview);
+          aboutSource = 'google_editorial';
+          console.log('✅ Using Google editorial summary for description');
+        } else {
+          // Priority 2: Auto-generated description
+          finalDescription = buildAutoAbout(place.metadata);
+          aboutSource = 'auto_generated';
+          console.log('✅ Using auto-generated description');
+        }
+      } else {
+        console.warn(`⚠️ Google Places refresh function error:`, error);
+        // Fallback to existing description or auto-generate from available data
+        if (!finalDescription || finalDescription === metadata.vicinity || finalDescription === metadata.formatted_address) {
+          finalDescription = buildAutoAbout(metadata);
+          aboutSource = 'auto_generated';
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to fetch Google Places details:', error);
+      // Fallback to existing description or auto-generate from available data
+      if (!finalDescription || finalDescription === metadata.vicinity || finalDescription === metadata.formatted_address) {
+        finalDescription = buildAutoAbout(metadata);
+        aboutSource = 'auto_generated';
+      }
+    }
+  }
+  
+  // Try to enrich with search-places-deep for multiple photos if not already enriched
+  if (baseData.name && !enrichedMetadata.photo_references) {
     try {
       console.log(`🔍 Enriching place metadata for "${baseData.name}" using search-places-deep`);
       
@@ -236,27 +313,20 @@ const extractPlaceMetadata = async (rawData: any, baseData: EnhancedEntityData):
         body: { query: baseData.name }
       });
 
-      console.log(`🔍 Search-places-deep response:`, { data, error });
-
       if (!error && data?.results?.length > 0) {
-        const enrichedPlace = data.results[0]; // Use first match from results array
+        const enrichedPlace = data.results[0];
         console.log(`✅ Enriched place data found with ${enrichedPlace.metadata?.photo_references?.length || 0} photos`);
         
-        // Merge enriched metadata with existing data
+        // Merge photo references and other additional metadata
         enrichedMetadata = {
-          ...metadata,
-          ...enrichedPlace.metadata,
-          // Preserve any existing metadata that might be more specific
-          place_id: metadata.place_id || enrichedPlace.metadata?.place_id,
-          formatted_address: metadata.formatted_address || enrichedPlace.metadata?.formatted_address,
+          ...enrichedMetadata,
+          photo_references: enrichedPlace.metadata?.photo_references || enrichedMetadata.photo_references,
         };
         
-        // Update base data with enriched information
+        // Update base data with enriched information if not already set
         if (!baseData.image_url && enrichedPlace.image_url) {
           baseData.image_url = enrichedPlace.image_url;
         }
-      } else {
-        console.log(`⚠️ No enriched place data found for "${baseData.name}"`);
       }
     } catch (error) {
       console.warn('⚠️ Failed to enrich place metadata with search-places-deep:', error);
@@ -265,14 +335,19 @@ const extractPlaceMetadata = async (rawData: any, baseData: EnhancedEntityData):
   
   return {
     ...baseData,
+    description: finalDescription,
+    about_source: aboutSource,
+    about_updated_at: aboutSource ? new Date().toISOString() : null,
     metadata: enrichedMetadata,
     external_ratings: {
       google_rating: enrichedMetadata.rating,
       user_ratings_total: enrichedMetadata.user_ratings_total,
       price_level: enrichedMetadata.price_level
     },
+    external_rating: enrichedMetadata.rating,
+    external_rating_count: enrichedMetadata.user_ratings_total,
     specifications: {
-      place_id: enrichedMetadata.place_id,
+      place_id: enrichedMetadata.place_id || baseData.api_ref,
       address: enrichedMetadata.formatted_address,
       phone: enrichedMetadata.formatted_phone_number,
       website: enrichedMetadata.website,
@@ -281,6 +356,68 @@ const extractPlaceMetadata = async (rawData: any, baseData: EnhancedEntityData):
       location: enrichedMetadata.geometry?.location
     }
   };
+};
+
+/**
+ * Sanitize text content - remove excessive whitespace and HTML
+ */
+const sanitize = (text: string): string => {
+  if (!text) return '';
+  
+  return text
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+};
+
+/**
+ * Build auto-generated description for places
+ */
+const buildAutoAbout = (place: any): string => {
+  const parts: string[] = [];
+  
+  // Get primary type (first type, formatted)
+  if (place.types && place.types.length > 0) {
+    const primaryType = place.types[0]
+      .split('_')
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    parts.push(primaryType);
+  }
+  
+  // Add location context
+  if (place.vicinity) {
+    const locationMatch = place.vicinity.match(/([^,]+)/);
+    if (locationMatch) {
+      parts.push(`in ${locationMatch[1].trim()}`);
+    }
+  } else if (place.formatted_address) {
+    const addressMatch = place.formatted_address.match(/([^,]+,[^,]+)/);
+    if (addressMatch) {
+      const location = addressMatch[1].trim();
+      parts.push(`in ${location}`);
+    }
+  }
+  
+  // Add price level
+  if (place.price_level !== undefined && place.price_level > 0) {
+    const priceSymbols = '₹'.repeat(place.price_level);
+    parts.push(`• ${priceSymbols}`);
+  }
+  
+  // Add rating if available
+  if (place.rating && place.user_ratings_total) {
+    const rating = parseFloat(place.rating.toString()).toFixed(1);
+    const reviewCount = place.user_ratings_total.toLocaleString();
+    parts.push(`• ⭐ ${rating} (${reviewCount})`);
+  }
+  
+  // Add operational status if available
+  if (place.opening_hours?.open_now !== undefined) {
+    parts.push(place.opening_hours.open_now ? '• Open' : '• Closed');
+  }
+  
+  return parts.join(' ').substring(0, 300); // Cap at 300 characters
 };
 
 /**
