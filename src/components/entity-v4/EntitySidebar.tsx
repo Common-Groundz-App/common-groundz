@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionButton } from './EntitySuggestionButton';
+import { ClaimBusinessButton } from './ClaimBusinessButton';
 import { useRelatedEntities } from '@/hooks/use-related-entities';
 import { useNavigate } from 'react-router-dom';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
@@ -131,10 +132,7 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
             
             <EntitySuggestionButton entity={entity} />
             
-            <Button variant="gradient" size="sm" className="w-full gap-2">
-              <Award className="w-4 h-4" />
-              Claim This Business
-            </Button>
+            <ClaimBusinessButton entity={entity} />
           </div>
         </CardContent>
       </Card>
