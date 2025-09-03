@@ -454,7 +454,7 @@ const AdminEntityEdit = () => {
       const { data, error } = await supabase.functions.invoke('refresh-google-places-entity', {
         body: { 
           entityId: entity.id,
-          placeId: (entity.metadata as any)?.place_id
+          placeId: entity.api_ref || (entity.metadata as any)?.place_id
         }
       });
 

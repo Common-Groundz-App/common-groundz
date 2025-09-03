@@ -410,62 +410,9 @@ const isAddressLike = (text: string): boolean => {
 /**
  * Build auto-generated description for places
  */
-const buildAutoAbout = (place: any): string => {
-  const parts: string[] = [];
-  
-  // Get primary type (first type, formatted)
-  if (place.types && place.types.length > 0) {
-    const primaryType = place.types[0]
-      .split('_')
-      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    parts.push(primaryType);
-  }
-  
-  // Add location context - use only the area name, not full address
-  if (place.vicinity) {
-    const locationMatch = place.vicinity.match(/([^,]+)/);
-    if (locationMatch) {
-      parts.push(`in ${locationMatch[1].trim()}`);
-    }
-  } else if (place.formatted_address) {
-    // Extract just the area name from address
-    const addressParts = place.formatted_address.split(',');
-    if (addressParts.length >= 2) {
-      // Use the second part which is usually the area
-      const area = addressParts[1].trim();
-      if (area && !area.includes('Karnataka') && !area.includes('India')) {
-        parts.push(`in ${area}`);
-      }
-    }
-  }
-  
-  // Add price level
-  if (place.price_level !== undefined && place.price_level > 0) {
-    const priceSymbols = '₹'.repeat(place.price_level);
-    parts.push(`• ${priceSymbols}`);
-  }
-  
-  // Add rating if available
-  if (place.rating && place.user_ratings_total) {
-    const rating = parseFloat(place.rating.toString()).toFixed(1);
-    const reviewCount = place.user_ratings_total.toLocaleString();
-    parts.push(`• ⭐ ${rating} (${reviewCount})`);
-  }
-  
-  // Add operational status if available
-  if (place.opening_hours?.open_now !== undefined) {
-    parts.push(place.opening_hours.open_now ? '• Open' : '• Closed');
-  }
-  
-  const result = parts.join(' ').substring(0, 300); // Cap at 300 characters
-  
-  // Final check: if result looks like an address, return null
-  if (isAddressLike(result)) {
-    return null;
-  }
-  
-  return result || null;
+const buildAutoAbout = (place: any): string | null => {
+  // Don't generate auto descriptions - return null to use fallback message
+  return null;
 };
 
 /**
