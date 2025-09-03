@@ -49,7 +49,7 @@ serve(async (req) => {
     
     const detailsUrl = new URL("https://maps.googleapis.com/maps/api/place/details/json");
     detailsUrl.searchParams.append("place_id", placeId);
-    detailsUrl.searchParams.append("fields", "displayName,formattedAddress,shortFormattedAddress,location,businessStatus,websiteUri,nationalPhoneNumber,currentOpeningHours,primaryType,types,priceLevel,googleMapsUri,editorialSummary,photos,rating,userRatingCount");
+    detailsUrl.searchParams.append("fields", "name,formatted_address,vicinity,geometry,business_status,website,formatted_phone_number,opening_hours,types,price_level,url,editorial_summary,photos,rating,user_ratings_total");
     detailsUrl.searchParams.append("key", GOOGLE_PLACES_API_KEY);
 
     const response = await fetch(detailsUrl.toString(), {
@@ -76,7 +76,7 @@ serve(async (req) => {
     }
 
     const placeDetails = data.result;
-    console.log(`✅ Retrieved place details for: ${placeDetails.displayName || placeDetails.name || 'Unknown Place'}`);
+    console.log(`✅ Retrieved place details for: ${placeDetails.name || 'Unknown Place'}`);
 
     // Get existing entity data to check description source (for refresh) or use defaults (for creation)
     let entityData = null;
@@ -116,24 +116,24 @@ serve(async (req) => {
       const chips: string[] = [];
       
       // Add price level
-      if (details.priceLevel != null) {
-        chips.push('₹'.repeat(Math.min(Math.max(details.priceLevel, 1), 4)));
+      if (details.price_level != null) {
+        chips.push('₹'.repeat(Math.min(Math.max(details.price_level, 1), 4)));
       }
       
       // Add rating if available
-      if (details.rating && details.userRatingCount) {
-        chips.push(`⭐ ${details.rating.toFixed(1)} (${details.userRatingCount})`);
+      if (details.rating && details.user_ratings_total) {
+        chips.push(`⭐ ${details.rating.toFixed(1)} (${details.user_ratings_total})`);
       }
       
       // Add business status
-      if (details.businessStatus === 'OPERATIONAL') {
+      if (details.business_status === 'OPERATIONAL') {
         chips.push('Open');
-      } else if (details.businessStatus === 'CLOSED_PERMANENTLY') {
+      } else if (details.business_status === 'CLOSED_PERMANENTLY') {
         chips.push('Permanently closed');
       }
 
-      const typeLabel = details.primaryType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
-      const areaLabel = details.shortFormattedAddress?.split(',')[0] || 'this area';
+      const typeLabel = details.types?.[0]?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
+      const areaLabel = details.vicinity?.split(',')[0] || details.formatted_address?.split(',')[0] || 'this area';
       const chipText = chips.length ? ` • ${chips.join(' • ')}` : '';
       
       return `${typeLabel} in ${areaLabel}${chipText}`;
@@ -196,20 +196,19 @@ serve(async (req) => {
       photo_references: photoReferences,
       photo_reference: primaryPhotoReference,
       last_refreshed_at: new Date().toISOString(),
-      place_name: placeDetails.displayName || placeDetails.name,
-      formatted_address: placeDetails.formattedAddress || placeDetails.formatted_address,
-      short_formatted_address: placeDetails.shortFormattedAddress,
-      business_status: placeDetails.businessStatus,
-      website_uri: placeDetails.websiteUri,
-      national_phone_number: placeDetails.nationalPhoneNumber,
-      primary_type: placeDetails.primaryType,
+      place_name: placeDetails.name,
+      formatted_address: placeDetails.formatted_address,
+      vicinity: placeDetails.vicinity,
+      business_status: placeDetails.business_status,
+      website_uri: placeDetails.website,
+      national_phone_number: placeDetails.formatted_phone_number,
       types: placeDetails.types,
-      price_level: placeDetails.priceLevel,
-      google_maps_uri: placeDetails.googleMapsUri,
-      editorial_summary: placeDetails.editorialSummary,
-      location: placeDetails.location,
+      price_level: placeDetails.price_level,
+      google_maps_uri: placeDetails.url,
+      editorial_summary: placeDetails.editorial_summary,
+      location: placeDetails.geometry?.location,
       rating: placeDetails.rating,
-      user_ratings_total: placeDetails.userRatingCount || placeDetails.user_ratings_total,
+      user_ratings_total: placeDetails.user_ratings_total,
       ...(descriptionUpdate || {})
     };
 
@@ -223,7 +222,7 @@ serve(async (req) => {
           ...(descriptionUpdate || {}),
           about_updated_at: new Date().toISOString(),
           external_rating: placeDetails.rating || entityData.external_rating,
-          external_rating_count: placeDetails.userRatingCount || placeDetails.user_ratings_total || entityData.external_rating_count,
+          external_rating_count: placeDetails.user_ratings_total || entityData.external_rating_count,
           metadata: updatedMetadata
         })
         .eq('id', entityId);
@@ -246,20 +245,21 @@ serve(async (req) => {
         descriptionUpdate,
         // Return enrichedData for enhancedEntityService.ts compatibility
         enrichedData: {
-          name: placeDetails.displayName || placeDetails.name,
-          formatted_address: placeDetails.formattedAddress || placeDetails.formatted_address,
+          name: placeDetails.name,
+          formatted_address: placeDetails.formatted_address,
           rating: placeDetails.rating,
-          user_ratings_total: placeDetails.userRatingCount || placeDetails.user_ratings_total,
+          user_ratings_total: placeDetails.user_ratings_total,
           description: descriptionUpdate?.description,
           about_source: descriptionUpdate?.about_source,
+          about_updated_at: descriptionUpdate ? new Date().toISOString() : null,
           metadata: updatedMetadata
         },
         // Keep placeDetails for backward compatibility
         placeDetails: {
-          name: placeDetails.displayName || placeDetails.name,
-          formatted_address: placeDetails.formattedAddress || placeDetails.formatted_address,
+          name: placeDetails.name,
+          formatted_address: placeDetails.formatted_address,
           rating: placeDetails.rating,
-          user_ratings_total: placeDetails.userRatingCount || placeDetails.user_ratings_total
+          user_ratings_total: placeDetails.user_ratings_total
         }
       }),
       {

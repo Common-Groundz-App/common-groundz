@@ -306,16 +306,16 @@ const extractPlaceMetadata = async (rawData: any, baseData: EnhancedEntityData):
         }
       } else {
         console.warn(`⚠️ Google Places refresh function error:`, error);
-        // Fallback to existing description or auto-generate from available data
-        if (!finalDescription || finalDescription === metadata.vicinity || finalDescription === metadata.formatted_address) {
+        // Fallback: Never use address as description
+        if (!finalDescription || isAddressLike(finalDescription)) {
           finalDescription = buildAutoAbout(metadata);
           aboutSource = 'auto_generated';
         }
       }
     } catch (error) {
       console.warn('⚠️ Failed to fetch Google Places details:', error);
-      // Fallback to existing description or auto-generate from available data
-      if (!finalDescription || finalDescription === metadata.vicinity || finalDescription === metadata.formatted_address) {
+      // Fallback: Never use address as description
+      if (!finalDescription || isAddressLike(finalDescription)) {
         finalDescription = buildAutoAbout(metadata);
         aboutSource = 'auto_generated';
       }
@@ -390,6 +390,24 @@ const sanitize = (text: string): string => {
 };
 
 /**
+ * Check if text looks like an address (should never be used as description)
+ */
+const isAddressLike = (text: string): boolean => {
+  if (!text) return false;
+  
+  // Check for address patterns
+  const addressPatterns = [
+    /\d+[^,]*Road|Rd|Street|St|Avenue|Ave/i,
+    /\d+[^,]*feet|ft/i,
+    /Karnataka|India|Bengaluru|Bangalore/i,
+    /PIN|Pincode|\d{6}/i,
+    /next to|near|opposite/i
+  ];
+  
+  return addressPatterns.some(pattern => pattern.test(text));
+};
+
+/**
  * Build auto-generated description for places
  */
 const buildAutoAbout = (place: any): string => {
@@ -404,17 +422,21 @@ const buildAutoAbout = (place: any): string => {
     parts.push(primaryType);
   }
   
-  // Add location context
+  // Add location context - use only the area name, not full address
   if (place.vicinity) {
     const locationMatch = place.vicinity.match(/([^,]+)/);
     if (locationMatch) {
       parts.push(`in ${locationMatch[1].trim()}`);
     }
   } else if (place.formatted_address) {
-    const addressMatch = place.formatted_address.match(/([^,]+,[^,]+)/);
-    if (addressMatch) {
-      const location = addressMatch[1].trim();
-      parts.push(`in ${location}`);
+    // Extract just the area name from address
+    const addressParts = place.formatted_address.split(',');
+    if (addressParts.length >= 2) {
+      // Use the second part which is usually the area
+      const area = addressParts[1].trim();
+      if (area && !area.includes('Karnataka') && !area.includes('India')) {
+        parts.push(`in ${area}`);
+      }
     }
   }
   
@@ -436,7 +458,14 @@ const buildAutoAbout = (place: any): string => {
     parts.push(place.opening_hours.open_now ? '• Open' : '• Closed');
   }
   
-  return parts.join(' ').substring(0, 300); // Cap at 300 characters
+  const result = parts.join(' ').substring(0, 300); // Cap at 300 characters
+  
+  // Final check: if result looks like an address, return null
+  if (isAddressLike(result)) {
+    return null;
+  }
+  
+  return result || null;
 };
 
 /**
