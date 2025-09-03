@@ -14,6 +14,7 @@ import { AdminEntityManagementPanel } from '@/components/admin/AdminEntityManage
 import { AdminDebugPanel } from '@/components/admin/AdminDebugPanel';
 import { AdminPhotoModerationPanel } from '@/components/admin/AdminPhotoModerationPanel';
 import { AdminSuggestionsPanel } from '@/components/admin/AdminSuggestionsPanel';
+import { AdminClaimsPanel } from '@/components/admin/AdminClaimsPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -103,6 +104,13 @@ const AdminPortal = () => {
     </div>
   );
 
+  const renderBrandClaimsContent = () => (
+    <div className="space-y-6">
+      {/* Brand Claims Section */}
+      <AdminClaimsPanel />
+    </div>
+  );
+
   const renderActiveContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -113,6 +121,8 @@ const AdminPortal = () => {
         return renderContentManagementContent();
       case 'suggestions-management':
         return renderSuggestionsManagementContent();
+      case 'brand-claims':
+        return renderBrandClaimsContent();
       default:
         return renderOverviewContent();
     }
@@ -192,6 +202,16 @@ const AdminPortal = () => {
                   }`}
                 >
                   Suggestions
+                </button>
+                <button
+                  onClick={() => setActiveTab('brand-claims')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'brand-claims'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Claims
                 </button>
               </div>
             </div>

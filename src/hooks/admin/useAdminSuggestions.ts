@@ -7,6 +7,7 @@ export interface AdminSuggestion {
   entity_id: string;
   user_id: string;
   suggested_changes: any;
+  suggested_images: any[];
   context: string | null;
   status: 'pending' | 'approved' | 'rejected' | 'applied';
   priority_score: number;
@@ -53,10 +54,11 @@ interface UseAdminSuggestionsOptions {
   pageSize?: number;
   autoRefresh?: boolean;
   refreshInterval?: number;
+  claimsOnly?: boolean;
 }
 
 export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) => {
-  const { pageSize = 20, autoRefresh = false, refreshInterval = 30000 } = options;
+  const { pageSize = 20, autoRefresh = false, refreshInterval = 30000, claimsOnly = false } = options;
   const { toast } = useToast();
 
   const [suggestions, setSuggestions] = useState<AdminSuggestion[]>([]);
@@ -110,6 +112,10 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
         `, { count: 'exact' });
 
       // Apply filters
+      if (claimsOnly) {
+        query = query.eq('user_is_owner', true);
+      }
+
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter as any);
       }
@@ -159,13 +165,20 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, pageSize, statusFilter, priorityFilter, entityTypeFilter, searchQuery, sortBy, sortOrder, toast]);
+  }, [currentPage, pageSize, statusFilter, priorityFilter, entityTypeFilter, searchQuery, sortBy, sortOrder, claimsOnly, toast]);
 
   const fetchStats = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let statsQuery = supabase
         .from('entity_suggestions')
         .select('status, priority_score, user_is_owner, is_duplicate, is_business_closed');
+      
+      // Filter stats by claims only if specified
+      if (claimsOnly) {
+        statsQuery = statsQuery.eq('user_is_owner', true);
+      }
+
+      const { data, error } = await statsQuery;
 
       if (error) throw error;
 
@@ -202,7 +215,7 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
     } catch (error) {
       console.error('Error fetching suggestion stats:', error);
     }
-  }, []);
+  }, [claimsOnly]);
 
   const updateSuggestionStatus = useCallback(async (
     suggestionId: string,
@@ -297,8 +310,15 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
       console.log('Applying changes to entity:', {
         entityId: suggestion.entity_id,
         entityName: entityExists.name,
-        changes
+        changes,
+        isClaim: suggestion.user_is_owner
       });
+
+      // For business claims, mark entity as claimed
+      if (suggestion.user_is_owner) {
+        updateData.is_claimed = true;
+        appliedFields.push('claimed status');
+      }
 
       // Map suggested changes to entity fields (allow empty strings)
       if (changes.name !== undefined) {
