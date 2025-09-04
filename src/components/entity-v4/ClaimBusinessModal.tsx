@@ -164,7 +164,7 @@ export const ClaimBusinessModal: React.FC<ClaimBusinessModalProps> = ({
           entity_id: entity.id,
           user_id: user.id,
           suggested_changes: suggestedChanges,
-          suggested_images: data.verificationDocuments.map(doc => ({
+          suggested_images: formData.verificationDocuments.map(doc => ({
             url: doc.url,
             type: doc.type,
             caption: doc.caption
