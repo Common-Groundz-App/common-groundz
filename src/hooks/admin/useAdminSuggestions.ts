@@ -274,6 +274,16 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
       // Refresh stats and suggestions list
       await fetchStats();
       await fetchSuggestions();
+      
+      // If we applied changes to an entity, we should notify the user that the entity page will reflect changes
+      if (status === 'approved' && applyChanges) {
+        setTimeout(() => {
+          toast({
+            title: 'Entity Updated',
+            description: 'Changes have been applied. The entity page will show updated information.',
+          });
+        }, 1000);
+      }
     } catch (error) {
       console.error('Error updating suggestion:', error);
       toast({
