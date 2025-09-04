@@ -42,3 +42,6 @@ verify_jwt = false
 
 [functions.refresh-google-places-entity]
 verify_jwt = true
+
+[functions.update-entity-admin]
+verify_jwt = true

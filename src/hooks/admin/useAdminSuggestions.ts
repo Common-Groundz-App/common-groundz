@@ -368,14 +368,23 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
 
       console.log('Update data being sent:', updateData);
 
-      const { error } = await supabase
-        .from('entities')
-        .update(updateData)
-        .eq('id', suggestion.entity_id);
+      // Use admin function to update entity with service role permissions
+      const { data: adminUpdateResult, error } = await supabase.functions.invoke('update-entity-admin', {
+        body: {
+          entityId: suggestion.entity_id,
+          updateData,
+          appliedFields
+        }
+      });
 
       if (error) {
-        console.error('Database error:', error);
+        console.error('Admin function error:', error);
         throw error;
+      }
+
+      if (!adminUpdateResult.success) {
+        console.error('Admin update failed:', adminUpdateResult.error);
+        throw new Error(adminUpdateResult.error || 'Failed to update entity');
       }
 
       console.log('Successfully applied changes. Fields updated:', appliedFields);
