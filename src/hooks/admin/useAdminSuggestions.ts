@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,6 +25,7 @@ export interface AdminSuggestion {
     id: string;
     name: string;
     type: string;
+    slug: string;
     image_url: string | null;
     description: string | null;
     metadata: any;
@@ -60,6 +62,7 @@ interface UseAdminSuggestionsOptions {
 export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) => {
   const { pageSize = 20, autoRefresh = false, refreshInterval = 30000, claimsOnly = false } = options;
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [suggestions, setSuggestions] = useState<AdminSuggestion[]>([]);
   const [stats, setStats] = useState<SuggestionStats>({
@@ -95,6 +98,7 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
             id,
             name,
             type,
+            slug,
             image_url,
             description,
             metadata,
@@ -229,6 +233,12 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
     adminNotes?: string,
     applyChanges: boolean = false
   ) => {
+    console.log('🔧 updateSuggestionStatus called:', {
+      suggestionId,
+      status,
+      adminNotes,
+      applyChanges
+    });
     setProcessingIds(prev => new Set(prev).add(suggestionId));
     
     try {
@@ -256,7 +266,15 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
 
       // If approved and applying changes, update the entity
       if (status === 'approved' && applyChanges) {
-        await applyChangesToEntity(suggestionId);
+        const suggestion = suggestions.find(s => s.id === suggestionId);
+        if (suggestion) {
+          console.log('🔧 About to apply changes to entity:', suggestion.entity_id);
+          await applyChangesToEntity(suggestion);
+        } else {
+          console.log('🔧 Not applying changes - suggestion not found:', suggestionId);
+        }
+      } else {
+        console.log('🔧 Not applying changes:', { status, applyChanges });
       }
 
       // Update local state
@@ -300,10 +318,9 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
     }
   }, [toast, fetchStats]);
 
-  const applyChangesToEntity = useCallback(async (suggestionId: string) => {
+  const applyChangesToEntity = useCallback(async (suggestion: AdminSuggestion) => {
     try {
-      const suggestion = suggestions.find(s => s.id === suggestionId);
-      if (!suggestion) throw new Error('Suggestion not found');
+      console.log('🔧 applyChangesToEntity called with suggestion:', suggestion.id);
 
       // Validate entity exists and is accessible
       const { data: entityExists, error: entityError } = await supabase
@@ -388,6 +405,17 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
       }
 
       console.log('Successfully applied changes. Fields updated:', appliedFields);
+      
+      // Invalidate cache to refresh entity data
+      console.log('🔧 Invalidating cache for entity:', suggestion.entity_id);
+      queryClient.invalidateQueries({ queryKey: ['entity-detail'] });
+      queryClient.invalidateQueries({ queryKey: ['entities'] });
+      queryClient.invalidateQueries({ queryKey: ['entity-detail', suggestion.entity?.slug] });
+      
+      // Also refetch the specific entity
+      if (suggestion.entity?.slug) {
+        queryClient.refetchQueries({ queryKey: ['entity-detail', suggestion.entity.slug] });
+      }
 
       toast({
         title: 'Changes Applied',
@@ -402,7 +430,7 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
         variant: 'destructive'
       });
     }
-  }, [suggestions, toast]);
+  }, [suggestions, toast, queryClient]);
 
   const bulkUpdateStatus = useCallback(async (
     suggestionIds: string[],

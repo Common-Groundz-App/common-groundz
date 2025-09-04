@@ -63,6 +63,14 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
     setIsProcessing(true);
     try {
       const shouldApply = forceReApply || applyChanges;
+      console.log('🔧 ClaimReviewModal: handleApprove called', {
+        claimId: claim.id,
+        forceReApply,
+        applyChanges,
+        shouldApply,
+        status: 'approved'
+      });
+      
       await onStatusUpdate(claim.id, 'approved', adminNotes || undefined, shouldApply);
       onOpenChange(false);
       setAdminNotes('');
