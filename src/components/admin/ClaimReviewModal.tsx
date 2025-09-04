@@ -79,6 +79,26 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
     }
   };
 
+  const renderFormField = (label: string, value: any, required = false) => {
+    const hasValue = value !== null && value !== undefined && value !== '';
+    
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-1">
+          <span className="font-medium text-sm">{label}</span>
+          {required && <span className="text-destructive text-xs">*</span>}
+        </div>
+        <div className={`p-2 rounded border text-sm ${
+          hasValue 
+            ? 'bg-green-50 border-green-200 text-green-900' 
+            : 'bg-gray-50 border-gray-200 text-gray-500'
+        }`}>
+          {hasValue ? String(value) : 'Not provided'}
+        </div>
+      </div>
+    );
+  };
+
   const renderChangeComparison = (field: string, currentValue: any, suggestedValue: any) => {
     if (suggestedValue === undefined || suggestedValue === null) return null;
 
@@ -228,79 +248,174 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
             </CardContent>
           </Card>
 
-          {/* Claimant Information */}
+          {/* Step 1: Owner Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Claimant Information</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Step 1: Owner Information
+              </CardTitle>
+              <CardDescription>Information about the business owner making the claim</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Profile:</span>
+                    <span className="font-medium">User Profile:</span>
                     <span>{claim.user?.username || 'Unknown User'}</span>
                   </div>
                   
-                  {ownerInfo.name && (
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Full Name:</span>
-                      <span>{ownerInfo.name}</span>
-                    </div>
-                  )}
-
-                  {ownerInfo.title && (
-                    <div className="flex items-center gap-2">
-                      <Building className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Title/Position:</span>
-                      <span>{ownerInfo.title}</span>
-                    </div>
-                  )}
-
-                  {ownerInfo.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Contact Email:</span>
-                      <span>{ownerInfo.email}</span>
-                    </div>
-                  )}
+                  {renderFormField('Full Name', ownerInfo.name, true)}
+                  {renderFormField('Title/Position', ownerInfo.title)}
+                  {renderFormField('Contact Email', ownerInfo.email, true)}
                 </div>
 
                 <div className="space-y-3">
-                  {ownerInfo.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Phone:</span>
-                      <span>{ownerInfo.phone}</span>
-                    </div>
-                  )}
-
-                   {ownerInfo.ownershipDuration && (
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Owner Since:</span>
-                      <span>{ownerInfo.ownershipDuration}</span>
-                    </div>
-                  )}
-
-                  {ownerInfo.contactPreferences && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Contact Preference:</span>
-                      <span>{ownerInfo.contactPreferences}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
+                  {renderFormField('Phone Number', ownerInfo.phone, true)}
+                  {renderFormField('Ownership Duration', ownerInfo.ownershipDuration, true)}
+                  {renderFormField('Contact Preference', ownerInfo.contactPreferences)}
+                  
+                  <div className="flex items-center gap-2 mt-4 pt-2 border-t">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">Submitted:</span>
-                    <span>{formatDistanceToNow(new Date(claim.created_at), { addSuffix: true })}</span>
+                    <span className="text-sm">{formatDistanceToNow(new Date(claim.created_at), { addSuffix: true })}</span>
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="flex items-center gap-4 pt-2">
+          {/* Step 2: Business Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Building className="h-5 w-5" />
+                Step 2: Business Information Updates
+              </CardTitle>
+              <CardDescription>Business details submitted by the claimant (filled and unfilled fields)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  {renderFormField('Business Name', changes.name)}
+                  {renderFormField('Business Phone', changes.phone)}
+                  {renderFormField('Business Email', changes.email)}
+                </div>
+                <div className="space-y-3">
+                  {renderFormField('Business Address', changes.address)}
+                  {renderFormField('Website', changes.website)}
+                </div>
+              </div>
+
+              {/* Business Hours */}
+              {changes.hours && (
+                <div className="mt-6">
+                  <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Business Hours
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {DAYS.map(day => (
+                      <div key={day} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                        <span className="capitalize font-medium text-sm">{day}:</span>
+                        <span className="text-sm">{changes.hours[day] || 'Not set'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Step 3: Supporting Documents - Always Show */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Step 3: Supporting Documents
+              </CardTitle>
+              <CardDescription>
+                Verification documents uploaded by the claimant
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {verificationDocs.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {verificationDocs.map((doc, index) => (
+                    <div key={index} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">{doc.name || `Document ${index + 1}`}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {doc.type || 'Unknown type'}
+                      </div>
+                      {doc.caption && (
+                        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                          {doc.caption}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" asChild>
+                          <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                            <Eye className="h-3 w-3 mr-1" />
+                            View
+                          </a>
+                        </Button>
+                        <Button size="sm" variant="outline" asChild>
+                          <a href={doc.url} download>
+                            <Download className="h-3 w-3 mr-1" />
+                            Download
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <h4 className="font-medium text-base mb-1">No Documents Uploaded</h4>
+                  <p className="text-sm">The claimant did not upload any verification documents</p>
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm">
+                    <strong>Admin Note:</strong> You may want to request verification documents before approving this claim.
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Step 4: Claim Context */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Step 4: Claim Context & Justification
+              </CardTitle>
+              <CardDescription>Why the user is claiming this business</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {claim.context ? (
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="whitespace-pre-wrap text-sm">{claim.context}</div>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Mail className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No context provided</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Claim Status and Flags */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Claim Status & Flags</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3 flex-wrap">
                 <Badge className={`${claim.priority_score >= 70 ? 'bg-red-100 text-red-800' : 
                   claim.priority_score >= 40 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
                   Priority: {claim.priority_score >= 70 ? 'High' : 
@@ -326,74 +441,25 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
                   </Badge>
                 )}
               </div>
-
-              {claim.context && (
-                <div>
-                  <div className="font-medium text-sm mb-1">Claim Context & Justification:</div>
-                  <div className="p-3 bg-muted rounded text-sm">
-                    {claim.context}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
-          {/* Verification Documents */}
-          {verificationDocs.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Supporting Documents</CardTitle>
-                <CardDescription>
-                  Documents uploaded by the claimant for verification
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {verificationDocs.map((doc, index) => (
-                    <div key={index} className="border rounded-lg p-4 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{doc.name || `Document ${index + 1}`}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {doc.type || 'Unknown type'}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                            <Eye className="h-3 w-3 mr-1" />
-                            View
-                          </a>
-                        </Button>
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={doc.url} download>
-                            <Download className="h-3 w-3 mr-1" />
-                            Download
-                          </a>
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
-          {/* Suggested Changes Comparison */}
-          {Object.keys(changes).filter(key => key !== 'ownerInfo').length > 0 && (
+          {/* Compare Current vs Suggested Changes (if any) */}
+          {Object.keys(changes).some(key => !key.startsWith('owner_') && !key.includes('contact_preferences')) && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Suggested Business Updates</CardTitle>
+                <CardTitle className="text-lg">Current vs Suggested Changes</CardTitle>
                 <CardDescription>
                   Compare current business information with suggested changes
                 </CardDescription>
               </CardHeader>
-               <CardContent className="space-y-6">
+              <CardContent className="space-y-6">
                 {renderChangeComparison('name', entity?.name, changes.name)}
                 {renderChangeComparison('description', entity?.description, changes.description)}
                 {renderChangeComparison('website', entity?.website_url, changes.website)}
-                {renderChangeComparison('email', changes.email, changes.email)}
-                {renderChangeComparison('address', changes.address, changes.address)}
+                {renderChangeComparison('email', currentMetadata.email, changes.email)}
+                {renderChangeComparison('address', currentMetadata.formatted_address || currentMetadata.address, changes.address)}
                 {renderChangeComparison('phone', currentMetadata.phone, changes.phone)}
                 {changes.hours && renderHoursComparison(currentMetadata.hours, changes.hours)}
               </CardContent>
