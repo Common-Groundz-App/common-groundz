@@ -71,7 +71,7 @@ export const AdminSuggestionsPanel: React.FC = () => {
     fetchSuggestions,
     updateSuggestionStatus,
     bulkUpdateStatus
-  } = useAdminSuggestions({ pageSize: 20, autoRefresh: true });
+  } = useAdminSuggestions({ pageSize: 20, autoRefresh: true, claimsOnly: false });
 
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
   const [selectedSuggestion, setSelectedSuggestion] = useState<AdminSuggestion | null>(null);

@@ -148,7 +148,14 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
   const currentMetadata = entity?.metadata || {};
 
   // Extract owner information from suggested changes for claims
-  const ownerInfo = changes.ownerInfo || {};
+  const ownerInfo = {
+    name: changes.owner_name || '',
+    title: changes.owner_title || '',
+    email: changes.owner_email || '',
+    phone: changes.owner_phone || '',
+    ownershipDuration: changes.ownership_duration || '',
+    contactPreferences: changes.contact_preferences || ''
+  };
   const verificationDocs = claim.suggested_images || [];
 
   return (
@@ -269,11 +276,19 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
                     </div>
                   )}
 
-                  {ownerInfo.ownershipDuration && (
+                   {ownerInfo.ownershipDuration && (
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">Owner Since:</span>
                       <span>{ownerInfo.ownershipDuration}</span>
+                    </div>
+                  )}
+
+                  {ownerInfo.contactPreferences && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Contact Preference:</span>
+                      <span>{ownerInfo.contactPreferences}</span>
                     </div>
                   )}
 
@@ -373,10 +388,12 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
                   Compare current business information with suggested changes
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+               <CardContent className="space-y-6">
                 {renderChangeComparison('name', entity?.name, changes.name)}
                 {renderChangeComparison('description', entity?.description, changes.description)}
                 {renderChangeComparison('website', entity?.website_url, changes.website)}
+                {renderChangeComparison('email', changes.email, changes.email)}
+                {renderChangeComparison('address', changes.address, changes.address)}
                 {renderChangeComparison('phone', currentMetadata.phone, changes.phone)}
                 {changes.hours && renderHoursComparison(currentMetadata.hours, changes.hours)}
               </CardContent>

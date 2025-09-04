@@ -114,6 +114,9 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
       // Apply filters
       if (claimsOnly) {
         query = query.eq('user_is_owner', true);
+      } else {
+        // Exclude claims from regular suggestions
+        query = query.eq('user_is_owner', false);
       }
 
       if (statusFilter !== 'all') {
@@ -176,6 +179,9 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
       // Filter stats by claims only if specified
       if (claimsOnly) {
         statsQuery = statsQuery.eq('user_is_owner', true);
+      } else {
+        // Exclude claims from regular suggestions stats
+        statsQuery = statsQuery.eq('user_is_owner', false);
       }
 
       const { data, error } = await statsQuery;
