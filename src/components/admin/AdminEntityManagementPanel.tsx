@@ -725,12 +725,12 @@ export const AdminEntityManagementPanel = () => {
                               <Eye className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-2xl">
-                            <DialogHeader>
+                          <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
+                            <DialogHeader className="flex-shrink-0">
                               <DialogTitle>{entity.name}</DialogTitle>
                               <DialogDescription>Entity Details</DialogDescription>
                             </DialogHeader>
-                            <div className="space-y-4">
+                            <div className="overflow-y-auto flex-1 space-y-4 pr-2">
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
                                   <label className="text-sm font-medium">Type</label>
@@ -759,7 +759,7 @@ export const AdminEntityManagementPanel = () => {
                               {entity.image_url && (
                                 <div>
                                   <label className="text-sm font-medium">Image URL</label>
-                                  <div className="text-sm text-muted-foreground break-all bg-muted p-2 rounded">
+                                  <div className="text-sm text-muted-foreground break-words bg-muted p-2 rounded max-w-full">
                                     {entity.image_url}
                                   </div>
                                   <div className="mt-1">
@@ -776,14 +776,14 @@ export const AdminEntityManagementPanel = () => {
                               {entity.description && (
                                 <div>
                                   <label className="text-sm font-medium">Description</label>
-                                  <div className="text-sm text-muted-foreground">{entity.description}</div>
+                                  <div className="text-sm text-muted-foreground break-words">{entity.description}</div>
                                 </div>
                               )}
                               
                                {entity.metadata && (
                                  <div>
                                    <label className="text-sm font-medium">Metadata</label>
-                                   <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-32">
+                                   <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-32 break-words whitespace-pre-wrap">
                                      {JSON.stringify(entity.metadata, null, 2)}
                                    </pre>
                                  </div>
