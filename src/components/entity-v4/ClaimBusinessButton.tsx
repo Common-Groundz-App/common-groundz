@@ -35,16 +35,21 @@ export const ClaimBusinessButton: React.FC<ClaimBusinessButtonProps> = ({
     setIsModalOpen(true);
   };
 
+  // Check if entity is already claimed
+  const isClaimed = entity.is_claimed;
+
   return (
     <>
       <Button
-        variant={variant}
+        variant={isClaimed ? "outline" : variant}
         size={size}
         className={className}
         onClick={handleClick}
+        disabled={isClaimed}
+        title={isClaimed ? "This entity is claimed and managed by the owner" : "Claim this business"}
       >
         <Award className="w-4 h-4" />
-        Claim This Business
+        {isClaimed ? "Claimed by Owner" : "Claim This Business"}
       </Button>
 
       <ClaimBusinessModal

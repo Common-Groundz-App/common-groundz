@@ -268,11 +268,12 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
 
       toast({
         title: 'Success',
-        description: `Suggestion ${status} successfully`,
+        description: `Suggestion ${status} successfully${applyChanges && status === 'approved' ? ' and changes applied to entity' : ''}`,
       });
 
-      // Refresh stats
+      // Refresh stats and suggestions list
       await fetchStats();
+      await fetchSuggestions();
     } catch (error) {
       console.error('Error updating suggestion:', error);
       toast({
