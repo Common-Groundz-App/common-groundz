@@ -29,6 +29,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { AdminSuggestion } from '@/hooks/admin/useAdminSuggestions';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Link } from 'react-router-dom';
+import { downloadFileFromUrl } from '@/utils/downloadUtils';
+import { toast } from 'sonner';
 
 interface ClaimReviewModalProps {
   claim: AdminSuggestion | null;
@@ -53,6 +55,7 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
   const [adminNotes, setAdminNotes] = useState('');
   const [applyChanges, setApplyChanges] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
 
   if (!claim) return null;
 
@@ -76,6 +79,26 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
       setAdminNotes('');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleDownload = async (url: string) => {
+    if (downloadingFiles.has(url)) return;
+    
+    setDownloadingFiles(prev => new Set(prev).add(url));
+    
+    try {
+      await downloadFileFromUrl(url);
+      toast.success('File downloaded successfully');
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast.error('Failed to download file');
+    } finally {
+      setDownloadingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(url);
+        return newSet;
+      });
     }
   };
 
@@ -363,11 +386,14 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
                             View
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={doc.url} download>
-                            <Download className="h-3 w-3 mr-1" />
-                            Download
-                          </a>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleDownload(doc.url)}
+                          disabled={downloadingFiles.has(doc.url)}
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          {downloadingFiles.has(doc.url) ? 'Downloading...' : 'Download'}
                         </Button>
                       </div>
                     </div>
