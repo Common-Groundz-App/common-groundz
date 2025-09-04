@@ -264,14 +264,19 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
 
       if (error) throw error;
 
-      // If approved and applying changes, update the entity
+      // For business claims, always apply changes when approved to mark entity as claimed
       if (status === 'approved' && applyChanges) {
         const suggestion = suggestions.find(s => s.id === suggestionId);
         if (suggestion) {
-          console.log('🔧 About to apply changes to entity:', suggestion.entity_id);
+          console.log('🔧 About to apply changes to entity:', {
+            suggestionId,
+            entityId: suggestion.entity_id,
+            isClaim: suggestion.user_is_owner,
+            willMarkAsClaimed: suggestion.user_is_owner
+          });
           await applyChangesToEntity(suggestion);
         } else {
-          console.log('🔧 Not applying changes - suggestion not found:', suggestionId);
+          console.log('🔧 Error: suggestion not found in local state:', suggestionId);
         }
       } else {
         console.log('🔧 Not applying changes:', { status, applyChanges });

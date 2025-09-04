@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
+
 import { Label } from '@/components/ui/label';
 import {
   CheckCircle,
@@ -53,25 +53,22 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
   onStatusUpdate
 }) => {
   const [adminNotes, setAdminNotes] = useState('');
-  const [applyChanges, setApplyChanges] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
 
   if (!claim) return null;
 
-  const handleApprove = async (forceReApply = false) => {
+  const handleApprove = async () => {
     setIsProcessing(true);
     try {
-      const shouldApply = forceReApply || applyChanges;
       console.log('🔧 ClaimReviewModal: handleApprove called', {
         claimId: claim.id,
-        forceReApply,
-        applyChanges,
-        shouldApply,
-        status: 'approved'
+        status: 'approved',
+        applyChanges: true // Always apply changes for business claims
       });
       
-      await onStatusUpdate(claim.id, 'approved', adminNotes || undefined, shouldApply);
+      // For business claims, always apply changes to mark entity as claimed
+      await onStatusUpdate(claim.id, 'approved', adminNotes || undefined, true);
       onOpenChange(false);
       setAdminNotes('');
     } finally {
@@ -504,6 +501,9 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Admin Review & Decision</CardTitle>
+              <CardDescription>
+                Approving this claim will mark the entity as "Claimed" and apply any business information changes
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -520,39 +520,16 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="apply-changes"
-                  checked={applyChanges}
-                  onCheckedChange={setApplyChanges}
-                />
-                <Label htmlFor="apply-changes" className="text-sm">
-                  Mark entity as "Claimed" and apply suggested changes upon approval
-                </Label>
-              </div>
-
               <Separator />
 
               <div className="flex items-center gap-3">
-                {claim.status === 'approved' && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleApprove(true)}
-                    disabled={isProcessing}
-                    className="gap-2"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                    {isProcessing ? 'Re-applying...' : 'Re-apply & Mark as Claimed'}
-                  </Button>
-                )}
-
                 <Button
-                  onClick={() => handleApprove()}
+                  onClick={handleApprove}
                   disabled={isProcessing || claim.status !== 'pending'}
                   className="gap-2"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  Approve Claim
+                  {isProcessing ? 'Approving...' : 'Approve Claim'}
                 </Button>
 
                 <Button
