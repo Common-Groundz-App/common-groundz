@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
+import { cachedPhotoService } from './cachedPhotoService';
 
 export interface EnhancedEntityData {
   name: string;
@@ -106,6 +107,30 @@ export const createEnhancedEntity = async (rawData: any, entityType: string): Pr
       }
     } else if (enhancedData.api_source === 'google_places') {
       console.log('✅ Google Places image using proxy URL - no local storage needed');
+      
+      // Pre-cache Google Places photos for faster loading
+      try {
+        const photoReferences = [];
+        
+        // Get photo references from metadata
+        if (enhancedData.metadata?.photo_references && Array.isArray(enhancedData.metadata.photo_references)) {
+          photoReferences.push(...enhancedData.metadata.photo_references.map((ref: any) => ref.photo_reference));
+        } else if (enhancedData.metadata?.photo_reference) {
+          photoReferences.push(enhancedData.metadata.photo_reference);
+        }
+        
+        if (photoReferences.length > 0) {
+          console.log(`🚀 Pre-caching ${photoReferences.length} photos for entity ${entity.id}`);
+          await cachedPhotoService.preCacheEntityPhotos(
+            entity.id, 
+            photoReferences, 
+            ['medium', 'high'] // Pre-cache common quality levels
+          );
+          console.log('✅ Photos pre-cached successfully');
+        }
+      } catch (cachingError) {
+        console.warn('⚠️ Photo pre-caching failed (non-critical):', cachingError);
+      }
     }
     
     console.log('✅ Enhanced entity created successfully:', entity);

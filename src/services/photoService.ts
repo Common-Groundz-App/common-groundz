@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
+import { cachedPhotoService, type PhotoQuality as CachedPhotoQuality } from './cachedPhotoService';
 
 export interface PhotoWithMetadata extends MediaItem {
   source: 'google_places' | 'user_review' | 'entity_photo';
@@ -84,7 +85,7 @@ export const createGooglePlacesPhotoUrl = (
 };
 
 /**
- * Fetch Google Places photos for an entity with validation and quality selection
+ * Fetch Google Places photos for an entity with 48-hour caching
  */
 export const fetchGooglePlacesPhotos = async (
   entity: Entity, 
@@ -93,14 +94,22 @@ export const fetchGooglePlacesPhotos = async (
   const photos: PhotoWithMetadata[] = [];
   
   try {
-    // Method 1: Use stored photo_references array (new approach)
+    // Method 1: Use stored photo_references array (new approach with caching)
     if (entity.metadata?.photo_references && Array.isArray(entity.metadata.photo_references)) {
-      console.log(`✅ Using ${entity.metadata.photo_references.length} stored photo references for entity ${entity.id}`);
+      console.log(`🚀 Fetching cached photos for ${entity.metadata.photo_references.length} photo references for entity ${entity.id}`);
       
-      entity.metadata.photo_references.forEach((photoRef: any, index: number) => {
-        // Use quality preference if provided, otherwise default to medium for first image (high) and others (medium)
+      for (let index = 0; index < entity.metadata.photo_references.length; index++) {
+        const photoRef = entity.metadata.photo_references[index];
+        // Use quality preference if provided, otherwise default to high for first image and medium for others
         const quality = qualityPreference?.[index] || (index === 0 ? 'high' : 'medium');
-        const photoUrl = createGooglePlacesPhotoUrl(photoRef.photo_reference, quality);
+        
+        // Get cached photo URL - this will either return cached URL or generate fresh one
+        const photoUrl = await cachedPhotoService.getCachedPhotoUrl(
+          photoRef.photo_reference, 
+          quality as CachedPhotoQuality, 
+          entity.id
+        );
+        
         const maxWidth = typeof quality === 'number' ? quality : PHOTO_QUALITY_SETTINGS[quality];
         
         photos.push({
@@ -112,19 +121,28 @@ export const fetchGooglePlacesPhotos = async (
           source: 'google_places' as const,
           originalReference: photoRef.photo_reference,
           isPrimary: index === 0,
+          isCached: true, // Flag to indicate this is using cached URL
           width: photoRef.width || maxWidth,
           height: photoRef.height || maxWidth
         });
-      });
+      }
       
+      console.log(`✅ Successfully fetched ${photos.length} cached Google Places photos`);
       return photos;
     }
 
-    // Method 2: Fallback to single photo reference (backward compatibility)
+    // Method 2: Fallback to single photo reference (backward compatibility with caching)
     const photoRef = entity.metadata?.photo_reference;
     if (photoRef) {
       const quality = qualityPreference?.[0] || 'high';
-      const photoUrl = createGooglePlacesPhotoUrl(photoRef, quality);
+      
+      // Get cached photo URL
+      const photoUrl = await cachedPhotoService.getCachedPhotoUrl(
+        photoRef, 
+        quality as CachedPhotoQuality, 
+        entity.id
+      );
+      
       const maxWidth = typeof quality === 'number' ? quality : PHOTO_QUALITY_SETTINGS[quality];
       
       photos.push({
@@ -136,15 +154,16 @@ export const fetchGooglePlacesPhotos = async (
         source: 'google_places' as const,
         originalReference: photoRef,
         isPrimary: true,
+        isCached: true,
         width: maxWidth,
         height: maxWidth
       });
-      console.log('✅ Added Google Places photo (fallback)');
+      console.log('✅ Added cached Google Places photo (fallback)');
     } else {
       console.log('🖼️ No photo reference found in metadata');
     }
   } catch (error) {
-    console.error('❌ Error fetching Google Places photos:', error);
+    console.error('❌ Error fetching cached Google Places photos:', error);
   }
   
   return photos;

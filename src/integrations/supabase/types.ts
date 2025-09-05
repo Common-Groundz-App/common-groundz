@@ -52,12 +52,16 @@ export type Database = {
           created_at: string | null
           entity_id: string
           expires_at: string | null
+          fetch_count: number | null
           file_size: number | null
           height: number | null
           id: string
           is_primary: boolean | null
+          last_accessed_at: string | null
+          max_width: number | null
           original_reference: string | null
           original_url: string | null
+          quality_level: string | null
           source: string
           thumbnail_url: string | null
           updated_at: string | null
@@ -70,12 +74,16 @@ export type Database = {
           created_at?: string | null
           entity_id: string
           expires_at?: string | null
+          fetch_count?: number | null
           file_size?: number | null
           height?: number | null
           id?: string
           is_primary?: boolean | null
+          last_accessed_at?: string | null
+          max_width?: number | null
           original_reference?: string | null
           original_url?: string | null
+          quality_level?: string | null
           source: string
           thumbnail_url?: string | null
           updated_at?: string | null
@@ -88,12 +96,16 @@ export type Database = {
           created_at?: string | null
           entity_id?: string
           expires_at?: string | null
+          fetch_count?: number | null
           file_size?: number | null
           height?: number | null
           id?: string
           is_primary?: boolean | null
+          last_accessed_at?: string | null
+          max_width?: number | null
           original_reference?: string | null
           original_url?: string | null
+          quality_level?: string | null
           source?: string
           thumbnail_url?: string | null
           updated_at?: string | null
@@ -2502,6 +2514,10 @@ export type Database = {
       check_post_save: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: boolean
+      }
+      cleanup_expired_cached_photos: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       cleanup_spaced_hashtags: {
         Args: Record<PropertyKey, never>
