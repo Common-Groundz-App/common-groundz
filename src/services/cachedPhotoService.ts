@@ -25,9 +25,9 @@ const QUALITY_PRESETS = {
 export class CachedPhotoService {
   private static instance: CachedPhotoService;
   
-  // In-memory cache for 30 seconds to avoid repeated DB lookups
+  // In-memory cache for 5 minutes to avoid repeated DB lookups for entity browsing
   private inMemoryCache = new Map<string, { url: string; timestamp: number }>();
-  private readonly IN_MEMORY_TTL = 30 * 1000; // 30 seconds
+  private readonly IN_MEMORY_TTL = 5 * 60 * 1000; // 5 minutes
   
   // Request deduplication to prevent multiple identical requests
   private pendingRequests = new Map<string, Promise<string>>();
@@ -62,7 +62,7 @@ export class CachedPhotoService {
       if (cleanedCount > 0) {
         console.log(`🧹 [PhotoCache] Cleaned ${cleanedCount} expired in-memory cache entries`);
       }
-    }, this.IN_MEMORY_TTL); // Run cleanup every 30 seconds
+    }, 60 * 1000); // Run cleanup every minute
   }
 
   /**

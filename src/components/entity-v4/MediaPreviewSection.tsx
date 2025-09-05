@@ -49,8 +49,8 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   const loadPhotos = async () => {
     setLoading(true);
     try {
-      // Request only unique qualities: high for hero, medium for grid, low for thumbnails
-      const qualityPreference: PhotoQuality[] = ['high', 'medium', 'low'];
+      // Request only medium quality initially for faster loading
+      const qualityPreference: PhotoQuality[] = ['medium'];
       
       const [googlePhotos, reviewPhotos, fetchedEntityPhotos] = await Promise.all([
         fetchGooglePlacesPhotos(entity, qualityPreference),

@@ -6,6 +6,7 @@ import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { EntityPhoto } from '@/services/entityPhotoService';
+import { cachedPhotoService } from '@/services/cachedPhotoService';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +48,8 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   onCloseGallery
 }) => {
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
+  const [highQualityUrls, setHighQualityUrls] = useState<Record<string, string>>({});
+  const [loadingHighQuality, setLoadingHighQuality] = useState<Record<string, boolean>>({});
   const mediaRef = useRef<(MediaItem & { source?: string; username?: string; createdAt?: string })[]>([]);
   const isMobile = useIsMobile();
 
@@ -76,9 +79,50 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     
     if (mediaChanged) {
       setLoaded({});
+      setHighQualityUrls({});
+      setLoadingHighQuality({});
       mediaRef.current = [...photos];
     }
   }, [photos]);
+
+  // Lazy load high-quality version when lightbox opens
+  useEffect(() => {
+    const lazyLoadHighQuality = async () => {
+      if (!currentPhoto?.source || currentPhoto.source !== 'google_places') return;
+      
+      const photoKey = getImageKey(currentPhoto, currentIndex);
+      
+      // Skip if already loaded or loading
+      if (highQualityUrls[photoKey] || loadingHighQuality[photoKey]) return;
+      
+      try {
+        setLoadingHighQuality(prev => ({ ...prev, [photoKey]: true }));
+        
+        // Extract photo reference from current URL for Google Places photos
+        const urlParams = new URLSearchParams(currentPhoto.url.split('?')[1]);
+        const photoReference = urlParams.get('ref');
+        
+        if (photoReference) {
+          const startTime = performance.now();
+          const highQualityUrl = await cachedPhotoService.getCachedPhotoUrl(
+            photoReference, 
+            'high'
+          );
+          
+          const loadTime = performance.now() - startTime;
+          console.log(`🖼️ [PhotoLightbox] High-quality lazy load for ${photoReference} (${loadTime.toFixed(1)}ms)`);
+          
+          setHighQualityUrls(prev => ({ ...prev, [photoKey]: highQualityUrl }));
+        }
+      } catch (error) {
+        console.error('Error lazy-loading high quality:', error);
+      } finally {
+        setLoadingHighQuality(prev => ({ ...prev, [photoKey]: false }));
+      }
+    };
+    
+    lazyLoadHighQuality();
+  }, [currentPhoto, currentIndex]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -346,7 +390,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
               <>
                 <img
                   key={imageKey}
-                  src={currentPhoto.url}
+                  src={highQualityUrls[imageKey] || currentPhoto.url}
                   alt={currentPhoto.alt || 'Photo'}
                   className={cn(
                     "transition-opacity duration-300",
@@ -362,6 +406,12 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                 {!isLoaded && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-white" />
+                  </div>
+                )}
+                {/* High-quality loading indicator */}
+                {loadingHighQuality[imageKey] && highQualityUrls[imageKey] && (
+                  <div className="absolute top-4 right-16 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                    Loading HD...
                   </div>
                 )}
               </>
