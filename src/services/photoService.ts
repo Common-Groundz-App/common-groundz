@@ -85,46 +85,63 @@ export const createGooglePlacesPhotoUrl = (
 };
 
 /**
- * Fetch Google Places photos for an entity with 48-hour caching
+ * Fetch Google Places photos for an entity with optimized 48-hour caching
  */
 export const fetchGooglePlacesPhotos = async (
   entity: Entity, 
   qualityPreference?: PhotoQuality[]
 ): Promise<PhotoWithMetadata[]> => {
+  const startTime = performance.now();
   const photos: PhotoWithMetadata[] = [];
   
   try {
-    // Method 1: Use stored photo_references array (new approach with caching)
+    // Method 1: Use stored photo_references array (optimized with batch caching)
     if (entity.metadata?.photo_references && Array.isArray(entity.metadata.photo_references)) {
-      console.log(`🚀 Fetching cached photos for ${entity.metadata.photo_references.length} photo references for entity ${entity.id}`);
+      const photoRefs = entity.metadata.photo_references;
+      console.log(`🚀 [PhotoService] Fetching photos for ${photoRefs.length} references for entity ${entity.id}`);
       
-      for (let index = 0; index < entity.metadata.photo_references.length; index++) {
-        const photoRef = entity.metadata.photo_references[index];
-        // Use quality preference if provided, otherwise default to high for first image and medium for others
-        const quality = qualityPreference?.[index] || (index === 0 ? 'high' : 'medium');
+      // Extract unique qualities (removing duplicates from quality preference)
+      const uniqueQualities = qualityPreference ? 
+        [...new Set(qualityPreference)] as PhotoQuality[] :
+        ['high', 'medium'] as PhotoQuality[];
+      
+      console.log(`📊 [PhotoService] Quality preference: [${qualityPreference?.join(', ')}] → unique: [${uniqueQualities.join(', ')}]`);
+      
+      // Use batch method for better performance with deduplication
+      const batchResults = await cachedPhotoService.getCachedPhotoUrls(
+        photoRefs.map(ref => ref.photo_reference),
+        uniqueQualities,
+        entity.id
+      );
+      
+      // Map results back to photos array maintaining original order and quality preferences
+      for (let index = 0; index < photoRefs.length; index++) {
+        const photoRef = photoRefs[index];
+        const requestedQuality = qualityPreference?.[index] || (index === 0 ? 'high' : 'medium');
         
-        // Get cached photo URL - this will either return cached URL or generate fresh one
-        const photoUrl = await cachedPhotoService.getCachedPhotoUrl(
-          photoRef.photo_reference, 
-          quality as CachedPhotoQuality, 
-          entity.id
+        // Find the matching result from batch
+        const batchResult = batchResults.find(result => 
+          result.photoReference === photoRef.photo_reference && 
+          result.quality === requestedQuality
         );
         
-        const maxWidth = typeof quality === 'number' ? quality : PHOTO_QUALITY_SETTINGS[quality];
-        
-        photos.push({
-          id: `google-places-${entity.id}-${index}`,
-          url: photoUrl,
-          type: 'image' as const,
-          alt: entity.name,
-          order: index,
-          source: 'google_places' as const,
-          originalReference: photoRef.photo_reference,
-          isPrimary: index === 0,
-          isCached: true, // Flag to indicate this is using cached URL
-          width: photoRef.width || maxWidth,
-          height: photoRef.height || maxWidth
-        });
+        if (batchResult) {
+          const maxWidth = typeof requestedQuality === 'number' ? requestedQuality : PHOTO_QUALITY_SETTINGS[requestedQuality];
+          
+          photos.push({
+            id: `google-places-${entity.id}-${index}`,
+            url: batchResult.url,
+            type: 'image' as const,
+            alt: entity.name,
+            order: index,
+            source: 'google_places' as const,
+            originalReference: photoRef.photo_reference,
+            isPrimary: index === 0,
+            isCached: true, // Flag to indicate this is using cached URL
+            width: photoRef.width || maxWidth,
+            height: photoRef.height || maxWidth
+          });
+        }
       }
       
       console.log(`✅ Successfully fetched ${photos.length} cached Google Places photos`);
@@ -166,6 +183,7 @@ export const fetchGooglePlacesPhotos = async (
     console.error('❌ Error fetching cached Google Places photos:', error);
   }
   
+  console.log(`⚡ [PhotoService] Total fetch completed in ${(performance.now() - startTime).toFixed(1)}ms for ${photos.length} photos`);
   return photos;
 };
 

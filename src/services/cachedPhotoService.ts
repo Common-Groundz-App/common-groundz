@@ -25,68 +25,158 @@ const QUALITY_PRESETS = {
 export class CachedPhotoService {
   private static instance: CachedPhotoService;
   
+  // In-memory cache for 30 seconds to avoid repeated DB lookups
+  private inMemoryCache = new Map<string, { url: string; timestamp: number }>();
+  private readonly IN_MEMORY_TTL = 30 * 1000; // 30 seconds
+  
+  // Request deduplication to prevent multiple identical requests
+  private pendingRequests = new Map<string, Promise<string>>();
+  
+  // Lazy updates for access tracking (reduce DB load)
+  private pendingUpdates = new Map<string, { id: string; lastAccess: number }>();
+  private readonly UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  
   static getInstance(): CachedPhotoService {
     if (!CachedPhotoService.instance) {
       CachedPhotoService.instance = new CachedPhotoService();
+      CachedPhotoService.instance.startPeriodicCleanup();
     }
     return CachedPhotoService.instance;
   }
 
   /**
+   * Start periodic cleanup of in-memory cache to prevent memory leaks
+   */
+  private startPeriodicCleanup(): void {
+    setInterval(() => {
+      const now = Date.now();
+      let cleanedCount = 0;
+      
+      for (const [key, value] of this.inMemoryCache.entries()) {
+        if (now - value.timestamp > this.IN_MEMORY_TTL) {
+          this.inMemoryCache.delete(key);
+          cleanedCount++;
+        }
+      }
+      
+      if (cleanedCount > 0) {
+        console.log(`🧹 [PhotoCache] Cleaned ${cleanedCount} expired in-memory cache entries`);
+      }
+    }, this.IN_MEMORY_TTL); // Run cleanup every 30 seconds
+  }
+
+  /**
    * Get cached photo URL or generate new one if expired/missing
+   * Now with in-memory caching and request deduplication
    */
   async getCachedPhotoUrl(
     photoReference: string, 
     quality: PhotoQuality = 'medium',
     entityId?: string
   ): Promise<string> {
+    const startTime = performance.now();
     const maxWidth = QUALITY_PRESETS[quality];
+    const cacheKey = `${photoReference}:${maxWidth}`;
     
     try {
-      // Check for existing cached photo
-      const cached = await this.getCachedPhoto(photoReference, maxWidth);
-      
-      if (cached && !this.isExpired(cached.expires_at)) {
-        // Update last accessed time
-        await this.updateLastAccessed(cached.id);
-        return cached.cached_url;
+      // 1. Check in-memory cache first (fastest)
+      const inMemoryResult = this.getFromInMemoryCache(cacheKey);
+      if (inMemoryResult) {
+        console.log(`🚀 [PhotoCache] In-memory hit for ${cacheKey} (${(performance.now() - startTime).toFixed(1)}ms)`);
+        return inMemoryResult;
       }
       
-      // Generate fresh proxy URL
-      const proxyUrl = this.createProxyUrl(photoReference, maxWidth);
+      // 2. Check for duplicate requests (deduplication)
+      if (this.pendingRequests.has(cacheKey)) {
+        console.log(`🔄 [PhotoCache] Deduplicating request for ${cacheKey}`);
+        return await this.pendingRequests.get(cacheKey)!;
+      }
       
-      // Cache the new URL for 48 hours
-      await this.cachePhotoUrl(photoReference, proxyUrl, maxWidth, quality, entityId);
+      // 3. Create new request and cache it for deduplication
+      const requestPromise = this.fetchCachedPhoto(photoReference, maxWidth, quality, startTime, entityId);
+      this.pendingRequests.set(cacheKey, requestPromise);
       
-      return proxyUrl;
+      const result = await requestPromise;
+      
+      // 4. Store in in-memory cache and clean up pending request
+      this.setInMemoryCache(cacheKey, result);
+      this.pendingRequests.delete(cacheKey);
+      
+      console.log(`✅ [PhotoCache] Database lookup for ${cacheKey} (${(performance.now() - startTime).toFixed(1)}ms)`);
+      return result;
     } catch (error) {
       console.error('Error getting cached photo URL:', error);
+      this.pendingRequests.delete(cacheKey);
       // Fallback to direct proxy URL generation
       return this.createProxyUrl(photoReference, maxWidth);
     }
   }
 
   /**
-   * Get multiple cached photo URLs for an entity
+   * Internal method to fetch from database cache or generate new URL
+   */
+  private async fetchCachedPhoto(
+    photoReference: string,
+    maxWidth: number,
+    quality: PhotoQuality,
+    startTime: number,
+    entityId?: string
+  ): Promise<string> {
+    // Check database cache
+    const cached = await this.getCachedPhoto(photoReference, maxWidth);
+    
+    if (cached && !this.isExpired(cached.expires_at)) {
+      // Schedule lazy update (don't block the response)
+      this.scheduleLazyUpdate(cached.id);
+      console.log(`💾 [PhotoCache] Database cache hit for ${photoReference}:${maxWidth}`);
+      return cached.cached_url;
+    }
+    
+    // Generate fresh proxy URL
+    const proxyUrl = this.createProxyUrl(photoReference, maxWidth);
+    
+    // Cache the new URL for 48 hours (async, don't block)
+    this.cachePhotoUrl(photoReference, proxyUrl, maxWidth, quality, entityId)
+      .catch(error => console.error('Error caching photo URL:', error));
+    
+    console.log(`🆕 [PhotoCache] Generated new URL for ${photoReference}:${maxWidth} (${(performance.now() - startTime).toFixed(1)}ms)`);
+    return proxyUrl;
+  }
+
+  /**
+   * Get multiple cached photo URLs for an entity with request-level deduplication
    */
   async getCachedPhotoUrls(
     photoReferences: string[],
     qualities: PhotoQuality[] = ['high', 'medium', 'low'],
     entityId?: string
   ): Promise<{ photoReference: string; quality: PhotoQuality; url: string }[]> {
-    const results = [];
+    const startTime = performance.now();
+    
+    // Create unique combinations to eliminate duplicates within the same request
+    const uniqueCombinations = new Map<string, { photoRef: string; quality: PhotoQuality }>();
     
     for (const photoRef of photoReferences) {
       for (const quality of qualities) {
-        const url = await this.getCachedPhotoUrl(photoRef, quality, entityId);
-        results.push({
-          photoReference: photoRef,
-          quality,
-          url
-        });
+        const maxWidth = QUALITY_PRESETS[quality];
+        const key = `${photoRef}:${maxWidth}`;
+        if (!uniqueCombinations.has(key)) {
+          uniqueCombinations.set(key, { photoRef, quality });
+        }
       }
     }
     
+    console.log(`📊 [PhotoCache] Request deduplication: ${photoReferences.length * qualities.length} requests → ${uniqueCombinations.size} unique combinations`);
+    
+    // Process all unique combinations in parallel
+    const fetchPromises = Array.from(uniqueCombinations.values()).map(async ({ photoRef, quality }) => {
+      const url = await this.getCachedPhotoUrl(photoRef, quality, entityId);
+      return { photoReference: photoRef, quality, url };
+    });
+    
+    const results = await Promise.all(fetchPromises);
+    
+    console.log(`⚡ [PhotoCache] Batch request completed in ${(performance.now() - startTime).toFixed(1)}ms for ${results.length} photos`);
     return results;
   }
 
@@ -232,6 +322,51 @@ export class CachedPhotoService {
     } catch (error) {
       console.error('Error cleaning up expired photos:', error);
       return 0;
+    }
+  }
+
+  /**
+   * Get from in-memory cache if available and not expired
+   */
+  private getFromInMemoryCache(cacheKey: string): string | null {
+    const cached = this.inMemoryCache.get(cacheKey);
+    if (!cached) return null;
+    
+    const isExpired = Date.now() - cached.timestamp > this.IN_MEMORY_TTL;
+    if (isExpired) {
+      this.inMemoryCache.delete(cacheKey);
+      return null;
+    }
+    
+    return cached.url;
+  }
+
+  /**
+   * Set in-memory cache with current timestamp
+   */
+  private setInMemoryCache(cacheKey: string, url: string): void {
+    this.inMemoryCache.set(cacheKey, {
+      url,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Schedule lazy update for access tracking (reduces DB load)
+   */
+  private scheduleLazyUpdate(cachedPhotoId: string): void {
+    const now = Date.now();
+    const existingUpdate = this.pendingUpdates.get(cachedPhotoId);
+    
+    // Only update if it's been more than UPDATE_INTERVAL since last update
+    if (!existingUpdate || (now - existingUpdate.lastAccess) > this.UPDATE_INTERVAL) {
+      this.pendingUpdates.set(cachedPhotoId, { id: cachedPhotoId, lastAccess: now });
+      
+      // Process update after a short delay (non-blocking)
+      setTimeout(() => {
+        this.updateLastAccessed(cachedPhotoId).catch(console.error);
+        this.pendingUpdates.delete(cachedPhotoId);
+      }, 100);
     }
   }
 
