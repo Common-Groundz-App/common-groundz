@@ -50,7 +50,7 @@ export type Database = {
           cached_url: string
           content_type: string | null
           created_at: string | null
-          entity_id: string
+          entity_id: string | null
           expires_at: string | null
           fetch_count: number | null
           file_size: number | null
@@ -72,7 +72,7 @@ export type Database = {
           cached_url: string
           content_type?: string | null
           created_at?: string | null
-          entity_id: string
+          entity_id?: string | null
           expires_at?: string | null
           fetch_count?: number | null
           file_size?: number | null
@@ -94,7 +94,7 @@ export type Database = {
           cached_url?: string
           content_type?: string | null
           created_at?: string | null
-          entity_id?: string
+          entity_id?: string | null
           expires_at?: string | null
           fetch_count?: number | null
           file_size?: number | null
