@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { browserPhotoCache } from './browserPhotoCache';
 
 export interface CachedPhoto {
   id: string;
@@ -66,8 +67,8 @@ export class CachedPhotoService {
   }
 
   /**
-   * Get cached photo URL or generate new one if expired/missing
-   * Now with in-memory caching and request deduplication
+   * Get cached photo URL with browser cache + database fallback
+   * Optimized to eliminate unnecessary database calls
    */
   async getCachedPhotoUrl(
     photoReference: string, 
@@ -79,27 +80,37 @@ export class CachedPhotoService {
     const cacheKey = `${photoReference}:${maxWidth}`;
     
     try {
-      // 1. Check in-memory cache first (fastest)
+      // 1. Check browser cache first (persists across page refreshes)
+      const browserCacheResult = browserPhotoCache.get(photoReference, maxWidth);
+      if (browserCacheResult) {
+        console.log(`🌐 [PhotoCache] Browser cache hit for ${cacheKey} (${(performance.now() - startTime).toFixed(1)}ms)`);
+        return browserCacheResult;
+      }
+      
+      // 2. Check in-memory cache (fastest for current session)
       const inMemoryResult = this.getFromInMemoryCache(cacheKey);
       if (inMemoryResult) {
+        // Store in browser cache for future page loads
+        browserPhotoCache.set(photoReference, maxWidth, inMemoryResult, quality);
         console.log(`🚀 [PhotoCache] In-memory hit for ${cacheKey} (${(performance.now() - startTime).toFixed(1)}ms)`);
         return inMemoryResult;
       }
       
-      // 2. Check for duplicate requests (deduplication)
+      // 3. Check for duplicate requests (deduplication)
       if (this.pendingRequests.has(cacheKey)) {
         console.log(`🔄 [PhotoCache] Deduplicating request for ${cacheKey}`);
         return await this.pendingRequests.get(cacheKey)!;
       }
       
-      // 3. Create new request and cache it for deduplication
+      // 4. Create new request and cache it for deduplication
       const requestPromise = this.fetchCachedPhoto(photoReference, maxWidth, quality, startTime, entityId);
       this.pendingRequests.set(cacheKey, requestPromise);
       
       const result = await requestPromise;
       
-      // 4. Store in in-memory cache and clean up pending request
+      // 5. Store in all cache layers and clean up pending request
       this.setInMemoryCache(cacheKey, result);
+      browserPhotoCache.set(photoReference, maxWidth, result, quality);
       this.pendingRequests.delete(cacheKey);
       
       console.log(`✅ [PhotoCache] Database lookup for ${cacheKey} (${(performance.now() - startTime).toFixed(1)}ms)`);
@@ -144,7 +155,7 @@ export class CachedPhotoService {
   }
 
   /**
-   * Get multiple cached photo URLs for an entity with request-level deduplication
+   * Get multiple cached photo URLs with smart batching and browser cache optimization
    */
   async getCachedPhotoUrls(
     photoReferences: string[],
@@ -154,29 +165,56 @@ export class CachedPhotoService {
     const startTime = performance.now();
     
     // Create unique combinations to eliminate duplicates within the same request
-    const uniqueCombinations = new Map<string, { photoRef: string; quality: PhotoQuality }>();
+    const uniqueCombinations = new Map<string, { photoRef: string; quality: PhotoQuality; maxWidth: number }>();
     
     for (const photoRef of photoReferences) {
       for (const quality of qualities) {
         const maxWidth = QUALITY_PRESETS[quality];
         const key = `${photoRef}:${maxWidth}`;
         if (!uniqueCombinations.has(key)) {
-          uniqueCombinations.set(key, { photoRef, quality });
+          uniqueCombinations.set(key, { photoRef, quality, maxWidth });
         }
       }
     }
     
     console.log(`📊 [PhotoCache] Request deduplication: ${photoReferences.length * qualities.length} requests → ${uniqueCombinations.size} unique combinations`);
     
-    // Process all unique combinations in parallel
-    const fetchPromises = Array.from(uniqueCombinations.values()).map(async ({ photoRef, quality }) => {
+    // Batch check browser cache first
+    const cacheRequests = Array.from(uniqueCombinations.values()).map(({ photoRef, maxWidth }) => ({
+      photoReference: photoRef,
+      maxWidth
+    }));
+    
+    const browserCacheResults = browserPhotoCache.batchGet(cacheRequests);
+    const browserCacheHits = new Map<string, string>();
+    
+    browserCacheResults.forEach(({ photoReference, maxWidth, url }) => {
+      if (url) {
+        browserCacheHits.set(`${photoReference}:${maxWidth}`, url);
+      }
+    });
+    
+    console.log(`🌐 [PhotoCache] Browser cache hits: ${browserCacheHits.size}/${uniqueCombinations.size}`);
+    
+    // Only fetch from database/generate for cache misses
+    const fetchPromises = Array.from(uniqueCombinations.values()).map(async ({ photoRef, quality, maxWidth }) => {
+      const cacheKey = `${photoRef}:${maxWidth}`;
+      const browserCacheHit = browserCacheHits.get(cacheKey);
+      
+      if (browserCacheHit) {
+        // Store in in-memory cache too for current session
+        this.setInMemoryCache(cacheKey, browserCacheHit);
+        return { photoReference: photoRef, quality, url: browserCacheHit };
+      }
+      
+      // Fallback to full cache lookup (in-memory + database)
       const url = await this.getCachedPhotoUrl(photoRef, quality, entityId);
       return { photoReference: photoRef, quality, url };
     });
     
     const results = await Promise.all(fetchPromises);
     
-    console.log(`⚡ [PhotoCache] Batch request completed in ${(performance.now() - startTime).toFixed(1)}ms for ${results.length} photos`);
+    console.log(`⚡ [PhotoCache] Batch request completed in ${(performance.now() - startTime).toFixed(1)}ms for ${results.length} photos (${browserCacheHits.size} browser cache hits)`);
     return results;
   }
 
