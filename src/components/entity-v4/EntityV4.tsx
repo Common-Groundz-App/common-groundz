@@ -396,13 +396,23 @@ const EntityV4 = () => {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
               {/* Main Content */}
               <div className="lg:col-span-3">
-                {/* SECTION 3: Trust & Review Summary */}
+                {/* SECTION 3: Tabs Navigation */}
+                <EntityTabsContent 
+                  entity={entity} 
+                  stats={stats}
+                  entityWithChildren={entityWithChildren}
+                  parentEntity={parentEntity}
+                  onViewChild={handleViewChild}
+                  onViewAllProducts={handleViewAllProducts}
+                />
+
+                {/* SECTION 4: Trust & Review Summary */}
                 <TrustSummaryCard 
                   entityId={entity?.id || ''} 
                   userId={user?.id || null}
                 />
 
-                {/* SECTION 4: Reviews & Social Proof - Now with Enhanced Authentication Handling */}
+                {/* SECTION 5: Reviews & Social Proof - Now with Enhanced Authentication Handling */}
                 <ReviewsSection 
                   reviews={reviews}
                   entityName={entity?.name || ''}
@@ -413,16 +423,6 @@ const EntityV4 = () => {
                   onQuestionClick={() => {
                     console.log('Ask question clicked');
                   }}
-                />
-
-                {/* SECTION 5: Tabs Navigation */}
-                <EntityTabsContent 
-                  entity={entity} 
-                  stats={stats}
-                  entityWithChildren={entityWithChildren}
-                  parentEntity={parentEntity}
-                  onViewChild={handleViewChild}
-                  onViewAllProducts={handleViewAllProducts}
                 />
               </div>
 
