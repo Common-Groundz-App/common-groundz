@@ -73,31 +73,11 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
   }, [entity?.id]);
   return (
     <Tabs defaultValue="overview" className="mb-8">
-      <TabsList className="flex overflow-x-auto w-full bg-transparent border-b border-border scrollbar-hide">
-        <TabsTrigger 
-          value="overview" 
-          className="flex-shrink-0 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-brand-orange data-[state=active]:text-foreground hover:text-foreground data-[state=active]:shadow-none border-b-2 border-transparent py-3 px-4 rounded-none"
-        >
-          Overview
-        </TabsTrigger>
-        <TabsTrigger 
-          value="photos" 
-          className="flex-shrink-0 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-brand-orange data-[state=active]:text-foreground hover:text-foreground data-[state=active]:shadow-none border-b-2 border-transparent py-3 px-4 rounded-none"
-        >
-          Photos & Videos
-        </TabsTrigger>
-        <TabsTrigger 
-          value="products" 
-          className="flex-shrink-0 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-brand-orange data-[state=active]:text-foreground hover:text-foreground data-[state=active]:shadow-none border-b-2 border-transparent py-3 px-4 rounded-none"
-        >
-          Products {entityWithChildren?.children?.length ? `${entityWithChildren.children.length}` : ''}
-        </TabsTrigger>
-        <TabsTrigger 
-          value="posts" 
-          className="flex-shrink-0 whitespace-nowrap data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-brand-orange data-[state=active]:text-foreground hover:text-foreground data-[state=active]:shadow-none border-b-2 border-transparent py-3 px-4 rounded-none"
-        >
-          Posts {posts?.length ? `${posts.length}` : ''}
-        </TabsTrigger>
+      <TabsList className="grid w-full grid-cols-4">
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="photos">Photos & Videos</TabsTrigger>
+        <TabsTrigger value="products">Products</TabsTrigger>
+        <TabsTrigger value="posts">Posts</TabsTrigger>
       </TabsList>
       <TabsContent value="overview" className="mt-6 space-y-6">
         {/* Featured Products Section */}
