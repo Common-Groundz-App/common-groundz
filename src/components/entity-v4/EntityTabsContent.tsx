@@ -73,11 +73,45 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
   }, [entity?.id]);
   return (
     <Tabs defaultValue="overview" className="mb-8">
-      <TabsList className="grid w-full grid-cols-4">
-        <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="photos">Photos & Videos</TabsTrigger>
-        <TabsTrigger value="products">Products</TabsTrigger>
-        <TabsTrigger value="posts">Posts</TabsTrigger>
+      <TabsList className="flex overflow-x-auto scrollbar-hide w-full bg-transparent border-b border-border">
+        <TabsTrigger 
+          value="overview"
+          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+        >
+          Overview
+        </TabsTrigger>
+        <TabsTrigger 
+          value="photos"
+          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+        >
+          Photos & Videos
+        </TabsTrigger>
+        <TabsTrigger 
+          value="products"
+          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+        >
+          <span className="flex items-center gap-2">
+            Products
+            {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
+              <Badge variant="secondary" className="text-xs px-1.5 py-0.5 h-5">
+                {entityWithChildren.children.length}
+              </Badge>
+            )}
+          </span>
+        </TabsTrigger>
+        <TabsTrigger 
+          value="posts"
+          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+        >
+          <span className="flex items-center gap-2">
+            Posts
+            {posts.length > 0 && (
+              <Badge variant="secondary" className="text-xs px-1.5 py-0.5 h-5">
+                {posts.length}
+              </Badge>
+            )}
+          </span>
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="overview" className="mt-6 space-y-6">
         {/* Featured Products Section */}
