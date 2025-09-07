@@ -537,7 +537,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
 
         {/* Meet the Founders */}
         <Card className="mt-8 relative">
-          <Badge variant="outline" className="absolute top-3 right-3 text-xs">
+          <Badge className="absolute top-3 right-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-medium rounded-full shadow-sm border-0 hover:from-blue-600 hover:to-cyan-600">
             Coming Soon
           </Badge>
           <CardContent className="p-6">
