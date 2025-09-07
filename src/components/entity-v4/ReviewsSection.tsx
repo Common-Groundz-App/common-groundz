@@ -536,7 +536,10 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
         )}
 
         {/* Meet the Founders */}
-        <Card className="mt-8">
+        <Card className="mt-8 relative">
+          <Badge variant="outline" className="absolute top-3 right-3 text-xs">
+            Coming Soon
+          </Badge>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop" alt="Founder" className="w-16 h-16 rounded-full object-cover" />
