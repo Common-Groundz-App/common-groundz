@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Star, Plus, MessageSquare, MessageSquareHeart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -34,6 +34,10 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
   onViewAllProducts
 }) => {
   const [childrenStats, setChildrenStats] = useState<Record<string, EntityStats>>({});
+  
+  // Refs for scroll management
+  const tablistRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
 
   // Fetch stats for child entities
   useEffect(() => {
@@ -71,24 +75,44 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
     reset();
     fetchFirst();
   }, [entity?.id]);
+
+  // Ensure first tab is visible on mount
+  useEffect(() => {
+    if (tablistRef.current) {
+      tablistRef.current.scrollLeft = 0;
+    }
+  }, []);
+
+  // Keep active tab in view when switching
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest", 
+      inline: "center"
+    });
+  }, []);
   return (
     <Tabs defaultValue="overview" className="mb-8">
-      <TabsList className="flex overflow-x-auto scrollbar-hide w-full bg-transparent border-b border-border">
+      <TabsList 
+        ref={tablistRef}
+        className="relative flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px] snap-x snap-mandatory scroll-px-4"
+      >
         <TabsTrigger 
           value="overview"
-          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+          ref={activeTabRef}
+          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
         >
           Overview
         </TabsTrigger>
         <TabsTrigger 
           value="photos"
-          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
         >
           Photos & Videos
         </TabsTrigger>
         <TabsTrigger 
           value="products"
-          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
         >
           <span className="flex items-center gap-2">
             Products
@@ -101,7 +125,7 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
         </TabsTrigger>
         <TabsTrigger 
           value="posts"
-          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
         >
           <span className="flex items-center gap-2">
             Posts
