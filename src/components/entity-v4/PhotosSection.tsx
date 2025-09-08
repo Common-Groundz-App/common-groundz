@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3, MoreVertical, SortAsc, SortDesc, ChevronDown, X, Plus, FileImage } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,7 @@ interface PhotosSectionProps {
 export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const tabsListRef = useRef<HTMLDivElement>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [reportModalPhoto, setReportModalPhoto] = useState<PhotoWithMetadata | null>(null);
@@ -222,6 +223,26 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     resetPagination();
   }, [activeTab, categoryFilter, sortBy]);
 
+  // Ensure "All" tab is visible on mount and active tab scrolls into view
+  useEffect(() => {
+    if (tabsListRef.current) {
+      tabsListRef.current.scrollLeft = 0;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tabsListRef.current) {
+      const activeTabElement = tabsListRef.current.querySelector(`[data-state="active"]`);
+      if (activeTabElement) {
+        activeTabElement.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "start"
+        });
+      }
+    }
+  }, [activeTab]);
+
   const handlePhotoClick = (index: number) => {
     setSelectedPhotoIndex(index);
   };
@@ -292,7 +313,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     <>
       <Card>
         <CardContent className="p-6">
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-start justify-between flex-wrap gap-2 mb-6">
             <div className="flex items-center gap-2">
               <Camera className="w-5 h-5" />
               <h3 className="text-lg font-semibold">Photos & Videos</h3>
@@ -395,7 +416,10 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-            <TabsList className="flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px] snap-x snap-mandatory scroll-px-4">
+            <TabsList 
+              ref={tabsListRef}
+              className="flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px] snap-x snap-mandatory scroll-px-4"
+            >
               <TabsTrigger 
                 value="all"
                 className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
