@@ -292,32 +292,21 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     <>
       <Card>
         <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4 mb-6">
             <div className="flex items-center gap-2">
               <Camera className="w-5 h-5" />
               <h3 className="text-lg font-semibold">Photos & Videos</h3>
               <span className="text-sm text-muted-foreground">({allPhotos.length})</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="default"
-                onClick={() => setShowUploadModal(true)}
-                className="h-8"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Media
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={loadPhotos}
-                disabled={loading}
-                className="h-8"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => setShowUploadModal(true)}
+              className="h-8"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Media
+            </Button>
           </div>
 
           {/* Phase 2: Enhanced Controls */}
@@ -406,22 +395,36 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="all">
+            <TabsList className="flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px] snap-x snap-mandatory scroll-px-4">
+              <TabsTrigger 
+                value="all"
+                className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
+              >
                 All ({allPhotos.length})
               </TabsTrigger>
-              <TabsTrigger value="entity">
-                User Uploads ({entityPhotos.length})
-                {categoryFilter && (
-                  <Badge variant="outline" className="ml-1 text-xs">
-                    {getCategoryCounts[categoryFilter] || 0}
-                  </Badge>
-                )}
+              <TabsTrigger 
+                value="entity"
+                className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
+              >
+                <span className="flex items-center gap-2">
+                  User Uploads ({entityPhotos.length})
+                  {categoryFilter && (
+                    <Badge variant="outline" className="ml-1 text-xs">
+                      {getCategoryCounts[categoryFilter] || 0}
+                    </Badge>
+                  )}
+                </span>
               </TabsTrigger>
-              <TabsTrigger value="google">
+              <TabsTrigger 
+                value="google"
+                className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
+              >
                 Google Places ({allPhotos.filter(p => p.source === 'google_places').length})
               </TabsTrigger>
-              <TabsTrigger value="reviews">
+              <TabsTrigger 
+                value="reviews"
+                className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
+              >
                 Reviews ({allPhotos.filter(p => p.source === 'user_review').length})
               </TabsTrigger>
             </TabsList>
