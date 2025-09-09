@@ -83,19 +83,12 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
     }
   }, []);
 
-  // Keep active tab in view when switching
-  useEffect(() => {
-    activeTabRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest", 
-      inline: "center"
-    });
-  }, []);
+  // Removed conflicting scroll management that interferes with child components
   return (
     <Tabs defaultValue="overview" className="mb-8">
       <TabsList 
         ref={tablistRef}
-        className="relative flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px] snap-x snap-mandatory scroll-px-4"
+        className="relative flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px]"
       >
         <TabsTrigger 
           value="overview"

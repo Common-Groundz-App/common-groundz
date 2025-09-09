@@ -246,7 +246,10 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
       }
     };
     
-    forceScrollReset();
+    // Delay to ensure parent scroll management completes first
+    requestAnimationFrame(() => {
+      setTimeout(forceScrollReset, 50);
+    });
   }, []);
 
   // Reset scroll when returning to this component (parent tab switch)
