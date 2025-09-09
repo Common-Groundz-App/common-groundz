@@ -223,23 +223,71 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     resetPagination();
   }, [activeTab, categoryFilter, sortBy]);
 
-  // Ensure "All" tab is visible on mount and active tab scrolls into view
+  // Robust scroll management to ensure "All" tab is always visible
   useEffect(() => {
-    if (tabsListRef.current) {
-      tabsListRef.current.scrollLeft = 0;
-    }
+    const resetScrollToStart = () => {
+      if (tabsListRef.current) {
+        // Multiple attempts to ensure scroll position is set
+        tabsListRef.current.scrollLeft = 0;
+        
+        // Use requestAnimationFrame for better timing coordination
+        requestAnimationFrame(() => {
+          if (tabsListRef.current) {
+            tabsListRef.current.scrollLeft = 0;
+          }
+        });
+        
+        // Final attempt with setTimeout to override any Radix UI interference
+        setTimeout(() => {
+          if (tabsListRef.current) {
+            tabsListRef.current.scrollLeft = 0;
+          }
+        }, 100);
+      }
+    };
+    
+    resetScrollToStart();
   }, []);
 
+  // Reset scroll when returning to this component (parent tab switch)
   useEffect(() => {
-    if (tabsListRef.current) {
-      const activeTabElement = tabsListRef.current.querySelector(`[data-state="active"]`);
-      if (activeTabElement) {
-        activeTabElement.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-          inline: "start"
+    const resetScrollToStart = () => {
+      if (tabsListRef.current) {
+        tabsListRef.current.scrollLeft = 0;
+        requestAnimationFrame(() => {
+          if (tabsListRef.current) {
+            tabsListRef.current.scrollLeft = 0;
+          }
         });
       }
+    };
+    
+    // Small delay to ensure component is fully rendered after parent tab switch
+    const timer = setTimeout(resetScrollToStart, 50);
+    return () => clearTimeout(timer);
+  }, [entity.id]); // Reset when entity changes or component remounts
+
+  // Keep active tab in view when switching tabs, but prioritize showing "All" tab
+  useEffect(() => {
+    if (tabsListRef.current && activeTab !== 'all') {
+      // Only scroll to active tab if it's not "all" - let "all" stay at position 0
+      const activeTabElement = tabsListRef.current.querySelector(`[data-state="active"]`);
+      if (activeTabElement) {
+        setTimeout(() => {
+          activeTabElement.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "nearest"
+          });
+        }, 50);
+      }
+    } else if (activeTab === 'all') {
+      // Always ensure "All" tab is visible when selected
+      setTimeout(() => {
+        if (tabsListRef.current) {
+          tabsListRef.current.scrollLeft = 0;
+        }
+      }, 50);
     }
   }, [activeTab]);
 
