@@ -223,30 +223,30 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     resetPagination();
   }, [activeTab, categoryFilter, sortBy]);
 
-  // Robust scroll management to ensure "All" tab is always visible
+  // Enhanced scroll management to ensure "All" tab is always visible on load
   useEffect(() => {
-    const resetScrollToStart = () => {
+    const forceScrollReset = () => {
       if (tabsListRef.current) {
-        // Multiple attempts to ensure scroll position is set
+        // Force layout recalculation
+        tabsListRef.current.getBoundingClientRect();
+        
+        // Multiple scroll attempts with different methods
         tabsListRef.current.scrollLeft = 0;
+        tabsListRef.current.scrollTo({ left: 0, behavior: 'auto' });
         
-        // Use requestAnimationFrame for better timing coordination
-        requestAnimationFrame(() => {
-          if (tabsListRef.current) {
-            tabsListRef.current.scrollLeft = 0;
-          }
+        // Staggered attempts to override any interference
+        [0, 10, 50, 100, 200].forEach(delay => {
+          setTimeout(() => {
+            if (tabsListRef.current) {
+              tabsListRef.current.scrollLeft = 0;
+              tabsListRef.current.scrollTo({ left: 0, behavior: 'auto' });
+            }
+          }, delay);
         });
-        
-        // Final attempt with setTimeout to override any Radix UI interference
-        setTimeout(() => {
-          if (tabsListRef.current) {
-            tabsListRef.current.scrollLeft = 0;
-          }
-        }, 100);
       }
     };
     
-    resetScrollToStart();
+    forceScrollReset();
   }, []);
 
   // Reset scroll when returning to this component (parent tab switch)
@@ -466,7 +466,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
             <TabsList 
               ref={tabsListRef}
-              className="flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px] snap-x snap-mandatory scroll-px-4"
+              className="flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px]"
             >
               <TabsTrigger 
                 value="all"
