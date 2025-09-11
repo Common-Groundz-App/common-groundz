@@ -14,7 +14,7 @@ import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
-import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp, Hash } from 'lucide-react';
+import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp, Hash, Plus } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
