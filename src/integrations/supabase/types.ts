@@ -2705,7 +2705,7 @@ export type Database = {
         Returns: undefined
       }
       detect_potential_duplicates: {
-        Args: { similarity_threshold?: number }
+        Args: Record<PropertyKey, never> | { similarity_threshold?: number }
         Returns: number
       }
       fix_duplicate_slugs: {
@@ -3105,6 +3105,13 @@ export type Database = {
       repair_hashtag_relationships: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      run_duplicate_detection: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          duplicates_found: number
+          duplicates_inserted: number
+        }[]
       }
       search_categories: {
         Args: { search_query: string }
