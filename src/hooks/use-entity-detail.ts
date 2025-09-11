@@ -37,10 +37,10 @@ export const useEntityDetail = (slugOrId: string) => {
       try {
         // Step 1: Fetch entity data first (required for entity ID)
         setLoadingStep(1);
-        const entityData = await fetchEntityBySlug(slugOrId);
+        const entityData = await fetchEntityBySlug(slugOrId, user?.id);
         if (!entityData) {
-          console.log('❌ Entity not found for:', slugOrId);
-          setError('Entity not found');
+          console.log('❌ Entity not found or not accessible for:', slugOrId);
+          setError('Entity not found or not accessible');
           setIsLoading(false);
           return;
         }

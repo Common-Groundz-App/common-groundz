@@ -37,12 +37,15 @@ export interface EnhancedEntityData {
 /**
  * Enhanced entity creation with comprehensive metadata extraction
  */
-export const createEnhancedEntity = async (rawData: any, entityType: string): Promise<Entity | null> => {
+export const createEnhancedEntity = async (rawData: any, entityType: string, userId?: string | null): Promise<Entity | null> => {
   try {
     console.log('🔧 Creating enhanced entity from raw data:', rawData);
     
     // Extract enhanced metadata based on entity type
     const enhancedData = await extractEnhancedMetadata(rawData, entityType);
+    
+    // Determine if this is a user-created entity vs system-generated
+    const isUserCreated = Boolean(userId && !enhancedData.api_source);
     
     // Create entity first WITHOUT the image to get the actual entity ID
     const { data: entity, error } = await supabase
@@ -74,7 +77,11 @@ export const createEnhancedEntity = async (rawData: any, entityType: string): Pr
         last_enriched_at: new Date().toISOString(),
         enrichment_source: enhancedData.api_source,
         data_quality_score: calculateDataQualityScore(enhancedData),
-        slug: generateSlug(enhancedData.name)
+        slug: generateSlug(enhancedData.name),
+        // Set user creation flags
+        created_by: userId || null,
+        user_created: isUserCreated,
+        approval_status: isUserCreated ? 'pending' : 'approved'
       })
       .select()
       .single();

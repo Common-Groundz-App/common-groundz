@@ -2,6 +2,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchEntityBySlug } from '@/services/entityService';
 import { Entity } from '@/services/recommendation/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UseEntityCacheProps {
   slugOrId: string;
@@ -10,6 +11,7 @@ interface UseEntityCacheProps {
 
 export const useEntityCache = ({ slugOrId, enabled = true }: UseEntityCacheProps) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const {
     data: entity,
@@ -17,8 +19,8 @@ export const useEntityCache = ({ slugOrId, enabled = true }: UseEntityCacheProps
     error,
     refetch
   } = useQuery({
-    queryKey: ['entity', slugOrId],
-    queryFn: () => fetchEntityBySlug(slugOrId),
+    queryKey: ['entity', slugOrId, user?.id],
+    queryFn: () => fetchEntityBySlug(slugOrId, user?.id),
     enabled: !!slugOrId && enabled,
     staleTime: 1000 * 60 * 10, // 10 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes
@@ -27,17 +29,17 @@ export const useEntityCache = ({ slugOrId, enabled = true }: UseEntityCacheProps
 
   // Cache actions
   const invalidateEntity = () => {
-    queryClient.invalidateQueries({ queryKey: ['entity', slugOrId] });
+    queryClient.invalidateQueries({ queryKey: ['entity', slugOrId, user?.id] });
   };
 
   const updateEntityCache = (updatedEntity: Entity) => {
-    queryClient.setQueryData(['entity', slugOrId], updatedEntity);
+    queryClient.setQueryData(['entity', slugOrId, user?.id], updatedEntity);
   };
 
   const prefetchEntity = (entitySlugOrId: string) => {
     queryClient.prefetchQuery({
-      queryKey: ['entity', entitySlugOrId],
-      queryFn: () => fetchEntityBySlug(entitySlugOrId),
+      queryKey: ['entity', entitySlugOrId, user?.id],
+      queryFn: () => fetchEntityBySlug(entitySlugOrId, user?.id),
       staleTime: 1000 * 60 * 10,
     });
   };
@@ -56,12 +58,13 @@ export const useEntityCache = ({ slugOrId, enabled = true }: UseEntityCacheProps
 // Hook for batch entity prefetching
 export const useEntityPrefetch = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const prefetchEntities = (entitySlugs: string[]) => {
     entitySlugs.forEach(slug => {
       queryClient.prefetchQuery({
-        queryKey: ['entity', slug],
-        queryFn: () => fetchEntityBySlug(slug),
+        queryKey: ['entity', slug, user?.id],
+        queryFn: () => fetchEntityBySlug(slug, user?.id),
         staleTime: 1000 * 60 * 10,
       });
     });
