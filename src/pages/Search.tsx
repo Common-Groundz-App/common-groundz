@@ -707,32 +707,22 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Enhanced Deep Search CTA for all tabs when no results */}
+                          {/* Enhanced Add Entity CTA for all tabs */}
                           {searchMode === 'quick' && (
                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
-                              <h3 className="text-lg font-semibold mb-2">🔍 Want more comprehensive results?</h3>
+                              <h3 className="text-lg font-semibold mb-2">❓ Couldn't find what you're looking for?</h3>
                               <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
-                                Deep Search analyzes multiple sources including specialized APIs for movies, books, places, and products
+                                Help us build the most comprehensive database by adding missing entities
                                 <br />
-                                <span className="text-xs italic">(Enhanced search across all categories - may take up to 2 minutes)</span>
+                                <span className="text-xs italic">Contribute books, movies, places, products, and more to help other users discover great content</span>
                               </p>
                               <Button 
-                                onClick={handleDeepSearch}
+                                onClick={() => navigate(`/create-entity?query=${encodeURIComponent(query)}`)}
                                 variant="default"
                                 className="bg-brand-orange hover:bg-brand-orange/90"
-                                disabled={isDeepSearching}
                               >
-                                {isDeepSearching ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Deep searching all categories...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock className="w-4 h-4 mr-2" />
-                                    Run Deep Search
-                                  </>
-                                )}
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Entity
                               </Button>
                             </div>
                           )}
