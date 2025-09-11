@@ -37,15 +37,36 @@ export interface EnhancedEntityData {
 /**
  * Enhanced entity creation with comprehensive metadata extraction
  */
-export const createEnhancedEntity = async (rawData: any, entityType: string, userId?: string | null): Promise<Entity | null> => {
+export const createEnhancedEntity = async (rawData: any, entityType: string, userId?: string | null, imageFile?: File | null): Promise<Entity | null> => {
   try {
     console.log('🔧 Creating enhanced entity from raw data:', rawData);
     
+    // Handle image upload first if we have an image file
+    let finalImageUrl = rawData.image_url;
+    if (imageFile && userId) {
+      console.log('📸 Uploading image file to storage...');
+      const { uploadEntityImage } = await import('@/services/entityImageService');
+      const uploadResult = await uploadEntityImage(imageFile, userId);
+      
+      if (uploadResult.success && uploadResult.url) {
+        finalImageUrl = uploadResult.url;
+        console.log('✅ Image uploaded successfully:', finalImageUrl);
+      } else {
+        console.warn('⚠️ Image upload failed:', uploadResult.error);
+      }
+    }
+    
     // Extract enhanced metadata based on entity type
-    const enhancedData = await extractEnhancedMetadata(rawData, entityType);
+    const enhancedData = await extractEnhancedMetadata({
+      ...rawData,
+      image_url: finalImageUrl
+    }, entityType);
     
     // Determine if this is a user-created entity vs system-generated
     const isUserCreated = Boolean(userId && !enhancedData.api_source);
+    
+    // Extract parent_id from metadata if provided
+    const parentId = enhancedData.metadata?.parent_id;
     
     // Create entity first WITHOUT the image to get the actual entity ID
     const { data: entity, error } = await supabase
@@ -81,7 +102,9 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, use
         // Set user creation flags
         created_by: userId || null,
         user_created: isUserCreated,
-        approval_status: isUserCreated ? 'pending' : 'approved'
+        approval_status: isUserCreated ? 'pending' : 'approved',
+        // Set parent relationship if provided
+        parent_id: parentId || null
       })
       .select()
       .single();

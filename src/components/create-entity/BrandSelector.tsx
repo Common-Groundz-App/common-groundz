@@ -58,13 +58,36 @@ export function BrandSelector({
     onBrandSelect(brand.id, brand.name);
   };
 
-  const handleCreateBrand = () => {
+  const handleCreateBrand = async () => {
     if (newBrandName.trim()) {
-      // For now, just use the name as both ID and name
-      // In a real implementation, this would create a new brand entity
-      onBrandSelect(`brand-${Date.now()}`, newBrandName.trim());
-      setNewBrandName('');
-      setShowCreateDialog(false);
+      setIsLoading(true);
+      try {
+        const { createBrand } = await import('@/services/brandService');
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const newBrand = await createBrand(
+          { 
+            name: newBrandName.trim(),
+            description: `${newBrandName.trim()} brand`
+          },
+          user?.id
+        );
+        
+        if (newBrand) {
+          onBrandSelect(newBrand.id, newBrand.name);
+          setNewBrandName('');
+          setShowCreateDialog(false);
+        } else {
+          console.error('Failed to create brand');
+        }
+      } catch (error) {
+        console.error('Error creating brand:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -171,7 +194,7 @@ export function BrandSelector({
                   </Button>
                   <Button
                     onClick={handleCreateBrand}
-                    disabled={!newBrandName.trim()}
+                    disabled={!newBrandName.trim() || isLoading}
                   >
                     Create Brand
                   </Button>

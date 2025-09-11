@@ -135,6 +135,7 @@ export default function CreateEntity() {
         venue: formData.venue,
         image_url: formData.imageUrl,
         website_url: formData.websiteUrl,
+        imageFile: formData.imageFile, // Include the image file for upload
         metadata: {
           user_created: true,
           category_id: formData.categoryId,

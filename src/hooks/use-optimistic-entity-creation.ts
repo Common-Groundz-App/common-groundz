@@ -95,8 +95,11 @@ const createEntityInBackground = async (
     const { data: { user } } = await supabase.auth.getUser();
     const userId = user?.id || null;
     
+    // Extract imageFile from externalData if present
+    const imageFile = externalData.imageFile || null;
+    
     // Step 1: Create enhanced entity with metadata extraction and user context
-    const entity = await createEnhancedEntity(externalData, entityType, userId);
+    const entity = await createEnhancedEntity(externalData, entityType, userId, imageFile);
     setProgress(70);
     
     if (!entity) {
