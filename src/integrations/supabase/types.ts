@@ -314,6 +314,7 @@ export type Database = {
           ai_dynamic_review_summary_model_used: string | null
           api_ref: string | null
           api_source: string | null
+          approval_status: string | null
           authors: string[] | null
           cast_crew: Json | null
           category_id: string | null
@@ -348,12 +349,15 @@ export type Database = {
           recent_likes_24h: number | null
           recent_recommendations_24h: number | null
           recent_views_24h: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           seasonal_boost: number | null
           slug: string | null
           specifications: Json | null
           trending_score: number | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at: string
+          user_created: boolean | null
           venue: string | null
           verification_date: string | null
           view_velocity: number | null
@@ -367,6 +371,7 @@ export type Database = {
           ai_dynamic_review_summary_model_used?: string | null
           api_ref?: string | null
           api_source?: string | null
+          approval_status?: string | null
           authors?: string[] | null
           cast_crew?: Json | null
           category_id?: string | null
@@ -401,12 +406,15 @@ export type Database = {
           recent_likes_24h?: number | null
           recent_recommendations_24h?: number | null
           recent_views_24h?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           seasonal_boost?: number | null
           slug?: string | null
           specifications?: Json | null
           trending_score?: number | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
+          user_created?: boolean | null
           venue?: string | null
           verification_date?: string | null
           view_velocity?: number | null
@@ -420,6 +428,7 @@ export type Database = {
           ai_dynamic_review_summary_model_used?: string | null
           api_ref?: string | null
           api_source?: string | null
+          approval_status?: string | null
           authors?: string[] | null
           cast_crew?: Json | null
           category_id?: string | null
@@ -454,12 +463,15 @@ export type Database = {
           recent_likes_24h?: number | null
           recent_recommendations_24h?: number | null
           recent_views_24h?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           seasonal_boost?: number | null
           slug?: string | null
           specifications?: Json | null
           trending_score?: number | null
           type?: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
+          user_created?: boolean | null
           venue?: string | null
           verification_date?: string | null
           view_velocity?: number | null
@@ -2599,6 +2611,28 @@ export type Database = {
           venue: string | null
         }[]
       }
+      get_categories_by_parent: {
+        Args: { parent_uuid?: string }
+        Returns: {
+          description: string
+          id: string
+          name: string
+          parent_id: string
+          slug: string
+        }[]
+      }
+      get_category_hierarchy: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          description: string
+          id: string
+          name: string
+          parent_id: string
+          parent_name: string
+          slug: string
+          subcategories: Json
+        }[]
+      }
       get_child_entities: {
         Args: { parent_uuid: string }
         Returns: {
@@ -2911,6 +2945,18 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      search_categories: {
+        Args: { search_query: string }
+        Returns: {
+          description: string
+          id: string
+          match_type: string
+          name: string
+          parent_id: string
+          parent_name: string
+          slug: string
+        }[]
+      }
       toggle_entity_save: {
         Args: { p_entity_id: string; p_user_id: string }
         Returns: boolean
@@ -2958,7 +3004,18 @@ export type Database = {
       }
     }
     Enums: {
-      entity_type: "book" | "movie" | "place" | "product" | "food"
+      entity_type:
+        | "book"
+        | "movie"
+        | "place"
+        | "product"
+        | "food"
+        | "tv_show"
+        | "course"
+        | "app"
+        | "game"
+        | "experience"
+        | "brand"
       post_type: "story" | "routine" | "project" | "note"
       recommendation_category: "food" | "movie" | "product" | "book" | "place"
       recommendation_visibility: "public" | "private" | "circle_only"
@@ -3090,7 +3147,19 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      entity_type: ["book", "movie", "place", "product", "food"],
+      entity_type: [
+        "book",
+        "movie",
+        "place",
+        "product",
+        "food",
+        "tv_show",
+        "course",
+        "app",
+        "game",
+        "experience",
+        "brand",
+      ],
       post_type: ["story", "routine", "project", "note"],
       recommendation_category: ["food", "movie", "product", "book", "place"],
       recommendation_visibility: ["public", "private", "circle_only"],
