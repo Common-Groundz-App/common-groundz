@@ -15,6 +15,8 @@ import { AdminDebugPanel } from '@/components/admin/AdminDebugPanel';
 import { AdminPhotoModerationPanel } from '@/components/admin/AdminPhotoModerationPanel';
 import { AdminSuggestionsPanel } from '@/components/admin/AdminSuggestionsPanel';
 import { AdminClaimsPanel } from '@/components/admin/AdminClaimsPanel';
+import { AdminModerationPanel } from '@/components/admin/AdminModerationPanel';
+import { AdminQualityControlPanel } from '@/components/admin/AdminQualityControlPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -111,6 +113,16 @@ const AdminPortal = () => {
     </div>
   );
 
+  const renderQualityControlContent = () => (
+    <div className="space-y-6">
+      {/* Moderation Panel */}
+      <AdminModerationPanel />
+      
+      {/* Quality Control Panel */}
+      <AdminQualityControlPanel />
+    </div>
+  );
+
   const renderActiveContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -123,6 +135,8 @@ const AdminPortal = () => {
         return renderSuggestionsManagementContent();
       case 'brand-claims':
         return renderBrandClaimsContent();
+      case 'quality-control':
+        return renderQualityControlContent();
       default:
         return renderOverviewContent();
     }
@@ -212,6 +226,16 @@ const AdminPortal = () => {
                   }`}
                 >
                   Claims
+                </button>
+                <button
+                  onClick={() => setActiveTab('quality-control')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'quality-control'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Quality
                 </button>
               </div>
             </div>

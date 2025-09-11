@@ -2,14 +2,16 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { BarChart3, Clock, CheckCircle, AlertCircle, Shield, Flag, Users } from 'lucide-react';
 import { useAdminDashboard } from '@/hooks/admin/useAdminDashboard';
+import { useAdminModeration } from '@/hooks/admin/useAdminModeration';
 import { formatRelativeDate } from '@/utils/dateUtils';
 
 export const AdminDashboardSummary = () => {
   const { metrics, isLoading } = useAdminDashboard();
+  const { metrics: moderationMetrics, isLoading: moderationLoading } = useAdminModeration();
 
-  if (isLoading) {
+  if (isLoading || moderationLoading) {
     return (
       <Card>
         <CardHeader>
@@ -122,6 +124,45 @@ export const AdminDashboardSummary = () => {
                   } Complete
                 </Badge>
                 <div className="text-xs text-muted-foreground">Coverage</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Moderation Metrics */}
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+              Moderation & Quality Control
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold text-orange-600">{moderationMetrics.pendingFlagsCount}</div>
+                  <Flag className="h-4 w-4 text-orange-600" />
+                </div>
+                <div className="text-xs text-muted-foreground">Pending Flags</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold text-red-600">{moderationMetrics.highPriorityFlagsCount}</div>
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                </div>
+                <div className="text-xs text-muted-foreground">High Priority</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold text-blue-600">{moderationMetrics.pendingDuplicatesCount}</div>
+                  <Shield className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="text-xs text-muted-foreground">Duplicates</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold text-green-600">
+                    {Math.round(moderationMetrics.avgUserReputation)}
+                  </div>
+                  <Users className="h-4 w-4 text-green-600" />
+                </div>
+                <div className="text-xs text-muted-foreground">Avg Reputation</div>
               </div>
             </div>
           </div>
