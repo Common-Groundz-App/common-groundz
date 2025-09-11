@@ -17,6 +17,7 @@ import { AdminSuggestionsPanel } from '@/components/admin/AdminSuggestionsPanel'
 import { AdminClaimsPanel } from '@/components/admin/AdminClaimsPanel';
 import { AdminModerationPanel } from '@/components/admin/AdminModerationPanel';
 import { AdminQualityControlPanel } from '@/components/admin/AdminQualityControlPanel';
+import { AdminNewSubmissionsPanel } from '@/components/admin/AdminNewSubmissionsPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -113,6 +114,13 @@ const AdminPortal = () => {
     </div>
   );
 
+  const renderNewSubmissionsContent = () => (
+    <div className="space-y-6">
+      {/* New Entity Submissions */}
+      <AdminNewSubmissionsPanel />
+    </div>
+  );
+
   const renderQualityControlContent = () => (
     <div className="space-y-6">
       {/* Moderation Panel */}
@@ -133,6 +141,8 @@ const AdminPortal = () => {
         return renderContentManagementContent();
       case 'suggestions-management':
         return renderSuggestionsManagementContent();
+      case 'new-submissions':
+        return renderNewSubmissionsContent();
       case 'brand-claims':
         return renderBrandClaimsContent();
       case 'quality-control':
@@ -216,6 +226,16 @@ const AdminPortal = () => {
                   }`}
                 >
                   Suggestions
+                </button>
+                <button
+                  onClick={() => setActiveTab('new-submissions')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'new-submissions'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  New
                 </button>
                 <button
                   onClick={() => setActiveTab('brand-claims')}

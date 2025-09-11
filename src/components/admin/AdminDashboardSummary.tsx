@@ -2,16 +2,18 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Clock, CheckCircle, AlertCircle, Shield, Flag, Users } from 'lucide-react';
+import { BarChart3, Clock, CheckCircle, AlertCircle, Shield, Flag, Users, XCircle, AlertTriangle } from 'lucide-react';
 import { useAdminDashboard } from '@/hooks/admin/useAdminDashboard';
 import { useAdminModeration } from '@/hooks/admin/useAdminModeration';
+import { useAdminNewSubmissions } from '@/hooks/admin/useAdminNewSubmissions';
 import { formatRelativeDate } from '@/utils/dateUtils';
 
 export const AdminDashboardSummary = () => {
   const { metrics, isLoading } = useAdminDashboard();
   const { metrics: moderationMetrics, isLoading: moderationLoading } = useAdminModeration();
+  const { stats: submissionStats, isLoading: submissionsLoading } = useAdminNewSubmissions();
 
-  if (isLoading || moderationLoading) {
+  if (isLoading || moderationLoading || submissionsLoading) {
     return (
       <Card>
         <CardHeader>
@@ -124,6 +126,43 @@ export const AdminDashboardSummary = () => {
                   } Complete
                 </Badge>
                 <div className="text-xs text-muted-foreground">Coverage</div>
+              </div>
+            </div>
+          </div>
+
+          {/* New Submissions Metrics */}
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+              New Entity Submissions
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold text-yellow-600">{submissionStats.totalPending}</div>
+                  <Clock className="h-4 w-4 text-yellow-600" />
+                </div>
+                <div className="text-xs text-muted-foreground">Pending Review</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold text-green-600">{submissionStats.totalApproved}</div>
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                </div>
+                <div className="text-xs text-muted-foreground">Approved</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold text-red-600">{submissionStats.totalRejected}</div>
+                  <XCircle className="h-4 w-4 text-red-600" />
+                </div>
+                <div className="text-xs text-muted-foreground">Rejected</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold text-orange-600">{submissionStats.pendingDuplicates}</div>
+                  <AlertTriangle className="h-4 w-4 text-orange-600" />
+                </div>
+                <div className="text-xs text-muted-foreground">Duplicates</div>
               </div>
             </div>
           </div>
