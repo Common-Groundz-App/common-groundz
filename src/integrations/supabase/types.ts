@@ -269,6 +269,57 @@ export type Database = {
           },
         ]
       }
+      content_flags: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string
+          description: string | null
+          flag_type: Database["public"]["Enums"]["flag_type"]
+          flagger_user_id: string
+          id: string
+          moderator_id: string | null
+          moderator_notes: string | null
+          priority_score: number | null
+          reason: string | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["flag_status"]
+          updated_at: string
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string
+          description?: string | null
+          flag_type: Database["public"]["Enums"]["flag_type"]
+          flagger_user_id: string
+          id?: string
+          moderator_id?: string | null
+          moderator_notes?: string | null
+          priority_score?: number | null
+          reason?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["flag_status"]
+          updated_at?: string
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          flag_type?: Database["public"]["Enums"]["flag_type"]
+          flagger_user_id?: string
+          id?: string
+          moderator_id?: string | null
+          moderator_notes?: string | null
+          priority_score?: number | null
+          reason?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["flag_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deleted_entities_log: {
         Row: {
           api_ref: string | null
@@ -302,6 +353,54 @@ export type Database = {
           recommendation_count?: number | null
           review_count?: number | null
           type?: Database["public"]["Enums"]["entity_type"] | null
+        }
+        Relationships: []
+      }
+      duplicate_entities: {
+        Row: {
+          created_at: string
+          detection_method: string
+          entity_a_id: string
+          entity_b_id: string
+          id: string
+          merged_at: string | null
+          notes: string | null
+          reported_by_user_id: string | null
+          reviewed_at: string | null
+          reviewed_by_admin_id: string | null
+          similarity_score: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          detection_method?: string
+          entity_a_id: string
+          entity_b_id: string
+          id?: string
+          merged_at?: string | null
+          notes?: string | null
+          reported_by_user_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by_admin_id?: string | null
+          similarity_score: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          detection_method?: string
+          entity_a_id?: string
+          entity_b_id?: string
+          id?: string
+          merged_at?: string | null
+          notes?: string | null
+          reported_by_user_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by_admin_id?: string | null
+          similarity_score?: number
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2434,6 +2533,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_reputation: {
+        Row: {
+          accurate_reports_count: number | null
+          community_standing: string | null
+          contributions_count: number | null
+          created_at: string
+          helpful_flags_count: number | null
+          id: string
+          last_calculated_at: string | null
+          overall_score: number | null
+          quality_content_score: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accurate_reports_count?: number | null
+          community_standing?: string | null
+          contributions_count?: number | null
+          created_at?: string
+          helpful_flags_count?: number | null
+          id?: string
+          last_calculated_at?: string | null
+          overall_score?: number | null
+          quality_content_score?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accurate_reports_count?: number | null
+          community_standing?: string | null
+          contributions_count?: number | null
+          created_at?: string
+          helpful_flags_count?: number | null
+          id?: string
+          last_calculated_at?: string | null
+          overall_score?: number | null
+          quality_content_score?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_similarities: {
         Row: {
           created_at: string
@@ -2507,6 +2648,10 @@ export type Database = {
         Args: { p_review_id: string }
         Returns: number
       }
+      calculate_user_reputation: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
       calculate_user_similarity: {
         Args: { user_a_id: string; user_b_id: string }
         Returns: number
@@ -2558,6 +2703,10 @@ export type Database = {
       delete_post_save: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
+      }
+      detect_potential_duplicates: {
+        Args: { similarity_threshold?: number }
+        Returns: number
       }
       fix_duplicate_slugs: {
         Args: Record<PropertyKey, never>
@@ -2753,6 +2902,18 @@ export type Database = {
           id: string
           is_following: boolean
           username: string
+        }[]
+      }
+      get_moderation_metrics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avg_user_reputation: number
+          content_quality_score: number
+          high_priority_flags_count: number
+          pending_duplicates_count: number
+          pending_flags_count: number
+          resolved_flags_count: number
+          total_users_with_reputation: number
         }[]
       }
       get_network_entity_recommendations: {
@@ -3016,6 +3177,14 @@ export type Database = {
         | "game"
         | "experience"
         | "brand"
+      flag_status: "pending" | "resolved" | "dismissed"
+      flag_type:
+        | "inappropriate_content"
+        | "spam"
+        | "misleading_information"
+        | "copyright_violation"
+        | "duplicate"
+        | "other"
       post_type: "story" | "routine" | "project" | "note"
       recommendation_category: "food" | "movie" | "product" | "book" | "place"
       recommendation_visibility: "public" | "private" | "circle_only"
@@ -3159,6 +3328,15 @@ export const Constants = {
         "game",
         "experience",
         "brand",
+      ],
+      flag_status: ["pending", "resolved", "dismissed"],
+      flag_type: [
+        "inappropriate_content",
+        "spam",
+        "misleading_information",
+        "copyright_violation",
+        "duplicate",
+        "other",
       ],
       post_type: ["story", "routine", "project", "note"],
       recommendation_category: ["food", "movie", "product", "book", "place"],
