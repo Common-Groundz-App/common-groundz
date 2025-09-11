@@ -526,8 +526,18 @@ const Search = () => {
             )}
           </div>
         ) : (
-          <div className="p-4 text-center text-sm text-muted-foreground">
-            No results found for "{searchQuery}"
+          <div className="p-4 text-center space-y-3">
+            <p className="text-sm text-muted-foreground">
+              No results found for "{searchQuery}"
+            </p>
+            <Button 
+              size="sm"
+              onClick={() => window.location.href = `/create-entity?q=${encodeURIComponent(searchQuery)}`}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add it manually
+            </Button>
           </div>
         )}
       </div>
@@ -727,23 +737,35 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* No results message */}
+                           {/* No results message */}
                           {!filteredResults.localResults.length && 
                            !filteredResults.externalResults.length && 
                            !results.users.length && (
-                            <div className="py-12 text-center">
+                            <div className="py-12 text-center space-y-4">
                               <p className="text-muted-foreground">No results found for "{query}"</p>
-                              {searchMode === 'quick' && (
+                              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                                {searchMode === 'quick' && (
+                                  <Button 
+                                    onClick={handleDeepSearch} 
+                                    variant="outline" 
+                                    disabled={isDeepSearching}
+                                  >
+                                    {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
+                                  </Button>
+                                )}
                                 <Button 
-                                  onClick={handleDeepSearch} 
-                                  variant="outline" 
-                                  className="mt-4"
-                                  disabled={isDeepSearching}
+                                  onClick={() => window.location.href = `/create-entity?q=${encodeURIComponent(query)}&type=${activeTab.toLowerCase()}`}
+                                  variant="default"
+                                  className="gap-2"
                                 >
-                                  {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
+                                  <Plus className="w-4 h-4" />
+                                  Add "{query}"
                                 </Button>
-                              )}
-                            </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Can't find what you're looking for? Add it manually.
+                              </p>
+                             </div>
                           )}
                         </>
                       )}
