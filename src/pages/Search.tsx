@@ -707,8 +707,8 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Enhanced Add Entity CTA for all tabs */}
-                          {searchMode === 'quick' && (
+                          {/* Enhanced Add Entity CTA for all tabs - only show when there are results */}
+                          {searchMode === 'quick' && (filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0 || results.users.length > 0) && (
                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
                               <h3 className="text-lg font-semibold mb-2">❓ Couldn't find what you're looking for?</h3>
                               <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
@@ -727,36 +727,26 @@ const Search = () => {
                             </div>
                           )}
                           
-                           {/* No results message */}
-                          {!filteredResults.localResults.length && 
-                           !filteredResults.externalResults.length && 
-                           !results.users.length && (
-                            <div className="py-12 text-center space-y-4">
-                              <p className="text-muted-foreground">No results found for "{query}"</p>
-                              <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                                {searchMode === 'quick' && (
-                                  <Button 
-                                    onClick={handleDeepSearch} 
-                                    variant="outline" 
-                                    disabled={isDeepSearching}
-                                  >
-                                    {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
-                                  </Button>
-                                )}
-                                <Button 
-                                  onClick={() => window.location.href = `/create-entity?q=${encodeURIComponent(query)}&type=${activeTab.toLowerCase()}`}
-                                  variant="default"
-                                  className="gap-2"
-                                >
-                                  <Plus className="w-4 h-4" />
-                                  Add "{query}"
-                                </Button>
+                            {/* No results message - styled to match default section */}
+                           {!filteredResults.localResults.length && 
+                            !filteredResults.externalResults.length && 
+                            !results.users.length && (
+                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
+                               <h3 className="text-lg font-semibold mb-2">❓ Couldn't find what you're looking for?</h3>
+                               <p className="text-muted-foreground mb-4">No results found for "{query}"</p>
+                               <Button 
+                                 onClick={() => navigate(`/create-entity?query=${encodeURIComponent(query)}&type=${activeTab.toLowerCase()}`)}
+                                 variant="default"
+                                 className="bg-brand-orange hover:bg-brand-orange/90 mb-2"
+                               >
+                                 <Plus className="w-4 h-4 mr-2" />
+                                 Add "{query}"
+                               </Button>
+                               <p className="text-xs text-muted-foreground">
+                                 Can't find what you're looking for? Add it manually.
+                               </p>
                               </div>
-                              <p className="text-xs text-muted-foreground">
-                                Can't find what you're looking for? Add it manually.
-                              </p>
-                             </div>
-                          )}
+                           )}
                         </>
                       )}
                       
