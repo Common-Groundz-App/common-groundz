@@ -13,10 +13,6 @@ import { EntityResultItem } from '@/components/search/EntityResultItem';
 import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
-import { NoResultsSection } from '@/components/search/NoResultsSection';
-import { CategoryFilter } from '@/components/search/CategoryFilter';
-import { SmartSuggestions } from '@/components/search/SmartSuggestions';
-import { RelatedEntities } from '@/components/search/RelatedEntities';
 import { cn } from '@/lib/utils';
 import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp, Hash, Plus } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
@@ -33,7 +29,6 @@ const Search = () => {
   const [searchQuery, setSearchQuery] = useState(query);
   const [activeTab, setActiveTab] = useState('all');
   const [isDeepSearching, setIsDeepSearching] = useState(mode === 'deep');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   
   // State for "show all" functionality
   const [showAllStates, setShowAllStates] = useState({
@@ -619,29 +614,6 @@ const Search = () => {
                   </div>
                 )}
                 
-                {/* Enhanced Category Filtering */}
-                <CategoryFilter
-                  selectedCategories={selectedCategories}
-                  onCategoriesChange={setSelectedCategories}
-                  activeTab={activeTab}
-                />
-
-                {/* Smart Suggestions */}
-                <SmartSuggestions
-                  query={query}
-                  activeTab={activeTab}
-                  onSuggestionClick={(suggestion) => {
-                    setSearchParams({ q: suggestion, mode: 'quick' });
-                  }}
-                />
-
-                {/* Related Entities Discovery */}
-                <RelatedEntities
-                  currentQuery={query}
-                  activeTab={activeTab}
-                  limit={6}
-                />
-                
                 <div className="mt-6 min-w-0">
                   {isLoading || Object.values(loadingStates).some(Boolean) ? (
                     renderEnhancedLoadingState()
@@ -765,15 +737,35 @@ const Search = () => {
                             </div>
                           )}
                           
-                           {/* Enhanced No Results Section */}
+                           {/* No results message */}
                           {!filteredResults.localResults.length && 
                            !filteredResults.externalResults.length && 
                            !results.users.length && (
-                            <NoResultsSection
-                              query={query}
-                              activeTab={activeTab}
-                              onCreateEntity={() => window.location.href = `/create-entity?q=${encodeURIComponent(query)}&type=${activeTab}`}
-                            />
+                            <div className="py-12 text-center space-y-4">
+                              <p className="text-muted-foreground">No results found for "{query}"</p>
+                              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                                {searchMode === 'quick' && (
+                                  <Button 
+                                    onClick={handleDeepSearch} 
+                                    variant="outline" 
+                                    disabled={isDeepSearching}
+                                  >
+                                    {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
+                                  </Button>
+                                )}
+                                <Button 
+                                  onClick={() => window.location.href = `/create-entity?q=${encodeURIComponent(query)}&type=${activeTab.toLowerCase()}`}
+                                  variant="default"
+                                  className="gap-2"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Add "{query}"
+                                </Button>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Can't find what you're looking for? Add it manually.
+                              </p>
+                             </div>
                           )}
                         </>
                       )}
