@@ -392,14 +392,7 @@ export function BrandSelector({
                         )}
                       </div>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-foreground">{brand.name}</p>
-                          {brand.approval_status === 'pending' && (
-                            <Badge variant="secondary" className="text-xs">
-                              Pending
-                            </Badge>
-                          )}
-                        </div>
+                        <p className="font-medium text-foreground">{brand.name}</p>
                         {brand.description && (
                           <p className="text-sm text-muted-foreground line-clamp-1">
                             {brand.description}
