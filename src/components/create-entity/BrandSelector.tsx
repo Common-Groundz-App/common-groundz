@@ -373,46 +373,63 @@ export function BrandSelector({
           ) : brands.length > 0 ? (
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">Search Results</p>
-              {brands.map((brand) => (
-                <Card
-                  key={brand.id}
-                  className="cursor-pointer hover:bg-accent/50 hover:border-primary/50 transition-all duration-200"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    console.log('Card clicked for brand:', brand.name, brand.id);
-                    handleBrandSelect(brand);
-                  }}
-                >
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                        {brand.image_url ? (
-                          <img
-                            src={brand.image_url}
-                            alt={brand.name}
-                            className="w-full h-full object-cover rounded-lg"
-                            onError={(e) => {
-                              console.log('Image failed to load:', brand.image_url);
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <Building2 className="w-5 h-5 text-muted-foreground" />
-                        )}
+              {brands.map((brand) => {
+                const isSelected = selectedBrandId === brand.id;
+                return (
+                  <Card
+                    key={brand.id}
+                    className={`cursor-pointer transition-all duration-200 ${
+                      isSelected 
+                        ? 'border-primary bg-primary/10 shadow-sm' 
+                        : 'hover:bg-accent/50 hover:border-primary/30'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('Card clicked for brand:', brand.name, brand.id);
+                      handleBrandSelect(brand);
+                    }}
+                  >
+                    <CardContent className="p-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden ${
+                          isSelected ? 'bg-primary/20' : 'bg-muted'
+                        }`}>
+                          {brand.image_url ? (
+                            <img
+                              src={brand.image_url}
+                              alt={brand.name}
+                              className="w-full h-full object-cover rounded-lg"
+                              onError={(e) => {
+                                console.log('Image failed to load:', brand.image_url);
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Building2 className={`w-5 h-5 ${
+                              isSelected ? 'text-primary' : 'text-muted-foreground'
+                            }`} />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className={`font-medium ${
+                            isSelected ? 'text-primary' : 'text-foreground'
+                          }`}>{brand.name}</p>
+                          {brand.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-1">
+                              {brand.description}
+                            </p>
+                          )}
+                        </div>
+                        <CheckCircle className={`w-4 h-4 transition-colors ${
+                          isSelected 
+                            ? 'text-primary fill-primary' 
+                            : 'text-muted-foreground opacity-60'
+                        }`} />
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">{brand.name}</p>
-                        {brand.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-1">
-                            {brand.description}
-                          </p>
-                        )}
-                      </div>
-                      <CheckCircle className="w-4 h-4 text-primary opacity-60" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : searchQuery ? (
             <div className="text-center py-8">
@@ -434,9 +451,9 @@ export function BrandSelector({
           {/* Skip Option */}
           <div className="border-t pt-4">
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={handleSkip}
-              className="w-full text-muted-foreground hover:text-foreground"
+              className="w-full border-primary/30 text-primary hover:bg-primary/5 hover:border-primary transition-all duration-200"
             >
               Skip - No specific brand
             </Button>
