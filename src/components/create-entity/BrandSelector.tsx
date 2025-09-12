@@ -71,6 +71,7 @@ export function BrandSelector({
   };
 
   const handleBrandSelect = (brand: BrandEntity) => {
+    console.log('Brand selected:', brand);
     onBrandSelect(brand.id, brand.name);
   };
 
@@ -375,17 +376,25 @@ export function BrandSelector({
               {brands.map((brand) => (
                 <Card
                   key={brand.id}
-                  className="cursor-pointer hover:bg-accent/50 transition-colors"
-                  onClick={() => handleBrandSelect(brand)}
+                  className="cursor-pointer hover:bg-accent/50 hover:border-primary/50 transition-all duration-200"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    console.log('Card clicked for brand:', brand.name, brand.id);
+                    handleBrandSelect(brand);
+                  }}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
                         {brand.image_url ? (
                           <img
                             src={brand.image_url}
                             alt={brand.name}
                             className="w-full h-full object-cover rounded-lg"
+                            onError={(e) => {
+                              console.log('Image failed to load:', brand.image_url);
+                              e.currentTarget.style.display = 'none';
+                            }}
                           />
                         ) : (
                           <Building2 className="w-5 h-5 text-muted-foreground" />
@@ -399,7 +408,7 @@ export function BrandSelector({
                           </p>
                         )}
                       </div>
-                      <CheckCircle className="w-4 h-4 text-muted-foreground" />
+                      <CheckCircle className="w-4 h-4 text-primary opacity-60" />
                     </div>
                   </CardContent>
                 </Card>
