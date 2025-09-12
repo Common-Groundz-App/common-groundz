@@ -4,10 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EntityType } from '@/services/recommendation/types';
 import { getEntitiesByType } from '@/services/recommendation/entityOperations';
-import { Search, Plus, Building2, CheckCircle, X } from 'lucide-react';
+import { Search, Plus, Building2, CheckCircle, X, Upload, AlertTriangle } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useToast } from '@/hooks/use-toast';
 
 interface BrandSelectorProps {
   entityType: EntityType;
@@ -21,6 +24,8 @@ interface BrandEntity {
   name: string;
   description?: string;
   image_url?: string;
+  approval_status?: string;
+  created_by?: string;
 }
 
 export function BrandSelector({
@@ -34,8 +39,15 @@ export function BrandSelector({
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newBrandName, setNewBrandName] = useState('');
+  const [newBrandDescription, setNewBrandDescription] = useState('');
+  const [newBrandImageUrl, setNewBrandImageUrl] = useState('');
+  const [newBrandImageFile, setNewBrandImageFile] = useState<File | null>(null);
+  const [newBrandWebsite, setNewBrandWebsite] = useState('');
+  const [duplicateWarning, setDuplicateWarning] = useState<BrandEntity | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
   
   const debouncedSearch = useDebounce(searchQuery, 300);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadBrands();
@@ -44,7 +56,11 @@ export function BrandSelector({
   const loadBrands = async () => {
     setIsLoading(true);
     try {
-      const results = await getEntitiesByType(EntityType.Brand, debouncedSearch);
+      // Get current user for filtering
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const results = await getEntitiesByType(EntityType.Brand, debouncedSearch, user?.id);
       setBrands(results.slice(0, 10)); // Limit to 10 results
     } catch (error) {
       console.error('Failed to load brands:', error);
@@ -58,36 +74,95 @@ export function BrandSelector({
     onBrandSelect(brand.id, brand.name);
   };
 
+  const checkForDuplicates = async (name: string) => {
+    if (!name.trim()) {
+      setDuplicateWarning(null);
+      return;
+    }
+    
+    try {
+      const { checkBrandExists } = await import('@/services/brandService');
+      const existingBrand = await checkBrandExists(name.trim());
+      setDuplicateWarning(existingBrand);
+    } catch (error) {
+      console.error('Error checking for duplicates:', error);
+    }
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewBrandImageFile(file);
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+      setNewBrandImageUrl(''); // Clear URL input when file is selected
+    }
+  };
+
+  const handleImageUrlChange = (url: string) => {
+    setNewBrandImageUrl(url);
+    setImagePreview(url);
+    setNewBrandImageFile(null); // Clear file when URL is entered
+  };
+
   const handleCreateBrand = async () => {
-    if (newBrandName.trim()) {
-      setIsLoading(true);
-      try {
-        const { createBrand } = await import('@/services/brandService');
-        const { supabase } = await import('@/integrations/supabase/client');
+    if (!newBrandName.trim()) return;
+    
+    setIsLoading(true);
+    try {
+      const { createBrand } = await import('@/services/brandService');
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const newBrand = await createBrand(
+        { 
+          name: newBrandName.trim(),
+          description: newBrandDescription.trim() || `${newBrandName.trim()} brand`,
+          image_url: newBrandImageUrl || undefined,
+          image_file: newBrandImageFile || undefined,
+          website_url: newBrandWebsite.trim() || undefined
+        },
+        user?.id
+      );
+      
+      if (newBrand) {
+        onBrandSelect(newBrand.id, newBrand.name);
+        // Reset form
+        setNewBrandName('');
+        setNewBrandDescription('');
+        setNewBrandImageUrl('');
+        setNewBrandImageFile(null);
+        setNewBrandWebsite('');
+        setImagePreview('');
+        setDuplicateWarning(null);
+        setShowCreateDialog(false);
         
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
+        toast({
+          title: "Brand created successfully",
+          description: `${newBrand.name} has been added and selected.`
+        });
         
-        const newBrand = await createBrand(
-          { 
-            name: newBrandName.trim(),
-            description: `${newBrandName.trim()} brand`
-          },
-          user?.id
-        );
-        
-        if (newBrand) {
-          onBrandSelect(newBrand.id, newBrand.name);
-          setNewBrandName('');
-          setShowCreateDialog(false);
-        } else {
-          console.error('Failed to create brand');
-        }
-      } catch (error) {
-        console.error('Error creating brand:', error);
-      } finally {
-        setIsLoading(false);
+        // Refresh the brands list to show the new brand
+        loadBrands();
+      } else {
+        toast({
+          title: "Failed to create brand",
+          description: "Please try again.",
+          variant: "destructive"
+        });
       }
+    } catch (error) {
+      console.error('Error creating brand:', error);
+      toast({
+        title: "Error creating brand",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -174,21 +249,106 @@ export function BrandSelector({
                 Create New Brand
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Create New Brand</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <Input
-                  placeholder="Brand name..."
-                  value={newBrandName}
-                  onChange={(e) => setNewBrandName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateBrand()}
-                />
-                <div className="flex gap-2 justify-end">
+                <div>
+                  <Label htmlFor="brand-name">Brand Name *</Label>
+                  <Input
+                    id="brand-name"
+                    placeholder="Enter brand name..."
+                    value={newBrandName}
+                    onChange={(e) => {
+                      setNewBrandName(e.target.value);
+                      checkForDuplicates(e.target.value);
+                    }}
+                  />
+                  {duplicateWarning && (
+                    <Alert className="mt-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        A brand named "{duplicateWarning.name}" already exists. You can still create this brand if it's different.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="brand-description">Description</Label>
+                  <Input
+                    id="brand-description"
+                    placeholder="Brief description (optional)"
+                    value={newBrandDescription}
+                    onChange={(e) => setNewBrandDescription(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label>Brand Logo</Label>
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="logo-file" className="text-sm text-muted-foreground">Upload Image</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="logo-file"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageFileChange}
+                          className="file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:font-medium"
+                        />
+                        <Upload className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                    
+                    <div className="relative">
+                      <Label className="text-sm text-muted-foreground">Or paste image URL</Label>
+                      <Input
+                        placeholder="https://example.com/logo.png"
+                        value={newBrandImageUrl}
+                        onChange={(e) => handleImageUrlChange(e.target.value)}
+                      />
+                    </div>
+
+                    {imagePreview && (
+                      <div className="flex justify-center">
+                        <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={() => setImagePreview('')}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="brand-website">Website</Label>
+                  <Input
+                    id="brand-website"
+                    placeholder="https://example.com (optional)"
+                    value={newBrandWebsite}
+                    onChange={(e) => setNewBrandWebsite(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex gap-2 justify-end pt-2">
                   <Button
                     variant="outline"
-                    onClick={() => setShowCreateDialog(false)}
+                    onClick={() => {
+                      setShowCreateDialog(false);
+                      setNewBrandName('');
+                      setNewBrandDescription('');
+                      setNewBrandImageUrl('');
+                      setNewBrandImageFile(null);
+                      setNewBrandWebsite('');
+                      setImagePreview('');
+                      setDuplicateWarning(null);
+                    }}
                   >
                     Cancel
                   </Button>
@@ -196,7 +356,7 @@ export function BrandSelector({
                     onClick={handleCreateBrand}
                     disabled={!newBrandName.trim() || isLoading}
                   >
-                    Create Brand
+                    {isLoading ? 'Creating...' : 'Create Brand'}
                   </Button>
                 </div>
               </div>
@@ -232,7 +392,14 @@ export function BrandSelector({
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-foreground">{brand.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground">{brand.name}</p>
+                          {brand.approval_status === 'pending' && (
+                            <Badge variant="secondary" className="text-xs">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
                         {brand.description && (
                           <p className="text-sm text-muted-foreground line-clamp-1">
                             {brand.description}
