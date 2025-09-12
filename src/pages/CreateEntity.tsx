@@ -176,6 +176,7 @@ export default function CreateEntity() {
               updateField('parentEntityId', brandId);
               updateField('parentEntityName', brandName);
             }}
+            onSkip={() => setCurrentStep(3)}
           />
         );
       case 3:

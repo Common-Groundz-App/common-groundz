@@ -17,6 +17,7 @@ interface BrandSelectorProps {
   selectedBrandId: string;
   selectedBrandName: string;
   onBrandSelect: (brandId: string, brandName: string) => void;
+  onSkip?: () => void; // Add optional skip callback
 }
 
 interface BrandEntity {
@@ -32,7 +33,8 @@ export function BrandSelector({
   entityType,
   selectedBrandId,
   selectedBrandName,
-  onBrandSelect
+  onBrandSelect,
+  onSkip
 }: BrandSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [brands, setBrands] = useState<BrandEntity[]>([]);
@@ -73,6 +75,12 @@ export function BrandSelector({
   const handleBrandSelect = (brand: BrandEntity) => {
     console.log('Brand selected:', brand);
     onBrandSelect(brand.id, brand.name);
+  };
+
+  const handleSkipClick = () => {
+    console.log('Skip clicked - clearing brand selection');
+    onBrandSelect('', '');
+    onSkip?.(); // Call the skip callback if provided
   };
 
   const checkForDuplicates = async (name: string) => {
@@ -379,9 +387,9 @@ export function BrandSelector({
                   <Card
                     key={brand.id}
                     className={`cursor-pointer transition-all duration-200 ${
-                      isSelected 
-                        ? 'border-primary bg-primary/10 shadow-sm' 
-                        : 'hover:bg-accent/50 hover:border-primary/30'
+                      isSelected
+                        ? 'ring-2 ring-primary border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50 hover:bg-accent/50'
                     }`}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -389,42 +397,43 @@ export function BrandSelector({
                       handleBrandSelect(brand);
                     }}
                   >
-                    <CardContent className="p-3">
+                    <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden ${
-                          isSelected ? 'bg-primary/20' : 'bg-muted'
+                        <div className={`p-2 rounded-lg ${
+                          isSelected ? 'bg-primary text-primary-foreground' : 'bg-background'
                         }`}>
                           {brand.image_url ? (
                             <img
                               src={brand.image_url}
                               alt={brand.name}
-                              className="w-full h-full object-cover rounded-lg"
+                              className="w-5 h-5 object-cover rounded"
                               onError={(e) => {
                                 console.log('Image failed to load:', brand.image_url);
                                 e.currentTarget.style.display = 'none';
                               }}
                             />
                           ) : (
-                            <Building2 className={`w-5 h-5 ${
-                              isSelected ? 'text-primary' : 'text-muted-foreground'
-                            }`} />
+                            <Building2 className="w-5 h-5" />
                           )}
                         </div>
-                        <div className="flex-1">
-                          <p className={`font-medium ${
-                            isSelected ? 'text-primary' : 'text-foreground'
-                          }`}>{brand.name}</p>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-medium text-foreground truncate">
+                              {brand.name}
+                            </h3>
+                            {isSelected && (
+                              <Badge variant="default" className="text-xs">
+                                Selected
+                              </Badge>
+                            )}
+                          </div>
                           {brand.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-1">
+                            <p className="text-sm text-muted-foreground truncate">
                               {brand.description}
                             </p>
                           )}
                         </div>
-                        <CheckCircle className={`w-4 h-4 transition-colors ${
-                          isSelected 
-                            ? 'text-primary fill-primary' 
-                            : 'text-muted-foreground opacity-60'
-                        }`} />
                       </div>
                     </CardContent>
                   </Card>
@@ -452,7 +461,7 @@ export function BrandSelector({
           <div className="border-t pt-4">
             <Button
               variant="outline"
-              onClick={handleSkip}
+              onClick={handleSkipClick}
               className="w-full border-primary/30 text-primary hover:bg-primary/5 hover:border-primary transition-all duration-200"
             >
               Skip - No specific brand
