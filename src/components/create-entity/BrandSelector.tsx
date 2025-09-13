@@ -1,25 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { EntityType } from '@/services/recommendation/types';
-import { getEntitiesByType } from '@/services/recommendation/entityOperations';
-import { Search, Plus, Building2, CheckCircle, X, Upload, AlertTriangle, ChevronDown } from 'lucide-react';
-import { useDebounce } from '@/hooks/useDebounce';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { checkBrandExists, createBrand, CreateBrandData } from '@/services/brandService';
+import { Entity, EntityType } from '@/services/recommendation/types';
+import { useBrandSearch } from '@/hooks/useBrandSearch';
+import { Building, Plus, X, Search, Upload, Loader2 } from 'lucide-react';
 
 interface BrandSelectorProps {
   entityType: EntityType;
-  selectedBrandId: string;
-  selectedBrandName: string;
-  selectedBrandImageUrl: string;
+  selectedBrand?: {
+    id: string;
+    name: string;
+    image_url?: string;
+  } | null;
   onBrandSelect: (brandId: string, brandName: string, brandImageUrl: string) => void;
-  onSkip?: () => void; // Add optional skip callback
+  onSkip?: () => void;
 }
 
 interface BrandEntity {
@@ -28,121 +29,106 @@ interface BrandEntity {
   description?: string;
   image_url?: string;
   approval_status?: string;
-  created_by?: string;
 }
 
-export function BrandSelector({
+export const BrandSelector: React.FC<BrandSelectorProps> = ({
   entityType,
-  selectedBrandId,
-  selectedBrandName,
-  selectedBrandImageUrl,
+  selectedBrand,
   onBrandSelect,
   onSkip
-}: BrandSelectorProps) {
+}) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
-  const [brands, setBrands] = useState<BrandEntity[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  // Add local state for immediate visual feedback
-  const [localSelectedBrandId, setLocalSelectedBrandId] = useState(selectedBrandId);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [selectedBrandState, setSelectedBrandState] = useState<BrandEntity | null>(selectedBrand || null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isDropdownClosing, setIsDropdownClosing] = useState(false);
+
+  // Brand search hook
+  const { brands, isLoading, error } = useBrandSearch(searchQuery);
+
+  // Brand creation states
   const [newBrandName, setNewBrandName] = useState('');
   const [newBrandDescription, setNewBrandDescription] = useState('');
   const [newBrandImageUrl, setNewBrandImageUrl] = useState('');
   const [newBrandImageFile, setNewBrandImageFile] = useState<File | null>(null);
   const [newBrandWebsite, setNewBrandWebsite] = useState('');
+  const [isCreatingBrand, setIsCreatingBrand] = useState(false);
+
+  // Other states
   const [duplicateWarning, setDuplicateWarning] = useState<BrandEntity | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
-  
-  const debouncedSearch = useDebounce(searchQuery, 300);
-  const { toast } = useToast();
 
+  // Handle brand selection from search results
+  const handleResultClick = (brand: BrandEntity) => {
+    // Start dropdown closing animation
+    setIsDropdownClosing(true);
+    
+    // Select the brand and clear search
+    setSelectedBrandState(brand);
+    onBrandSelect(brand.id, brand.name, brand.image_url || '');
+    
+    // Clear search and close dropdown after animation
+    setTimeout(() => {
+      setSearchQuery('');
+      setIsDropdownClosing(false);
+    }, 300);
+  };
+
+  // Sync selectedBrand prop with local state
   useEffect(() => {
-    loadBrands();
-  }, [debouncedSearch]);
+    setSelectedBrandState(selectedBrand || null);
+  }, [selectedBrand]);
 
-  // Sync local state with props
-  useEffect(() => {
-    setLocalSelectedBrandId(selectedBrandId);
-  }, [selectedBrandId]);
-
-  const loadBrands = async () => {
-    setIsLoading(true);
-    try {
-      // Get current user for filtering
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const results = await getEntitiesByType(EntityType.Brand, debouncedSearch, user?.id);
-      setBrands(results.slice(0, 10)); // Limit to 10 results
-    } catch (error) {
-      console.error('Failed to load brands:', error);
-      setBrands([]);
-    } finally {
-      setIsLoading(false);
+  const handleSkipClick = () => {
+    setSelectedBrandState(null);
+    setSearchQuery('');
+    if (onSkip) {
+      onSkip();
     }
   };
 
-  const handleBrandSelect = (brand: BrandEntity) => {
-    console.log('Brand selected:', brand);
-    // Update local state immediately for instant visual feedback
-    setLocalSelectedBrandId(brand.id);
-    onBrandSelect(brand.id, brand.name, brand.image_url || '');
-    setDropdownOpen(false); // Close dropdown after selection
-    setSearchQuery(''); // Clear search
-  };
-
-  const handleSkipClick = () => {
-    console.log('Skip clicked - clearing brand selection');
-    // Update local state immediately 
-    setLocalSelectedBrandId('');
+  const clearSelectedBrand = () => {
+    setSelectedBrandState(null);
+    // Clear the selection by calling onBrandSelect with empty values
     onBrandSelect('', '', '');
-    onSkip?.(); // Call the skip callback if provided
   };
 
-  const checkForDuplicates = async (name: string) => {
+  const checkForDuplicates = useCallback(async (name: string) => {
     if (!name.trim()) {
       setDuplicateWarning(null);
       return;
     }
     
     try {
-      const { checkBrandExists } = await import('@/services/brandService');
       const existingBrand = await checkBrandExists(name.trim());
-      setDuplicateWarning(existingBrand);
+      setDuplicateWarning(existingBrand as BrandEntity | null);
     } catch (error) {
       console.error('Error checking for duplicates:', error);
     }
-  };
+  }, []);
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setNewBrandImageFile(file);
-      // Create preview URL
       const previewUrl = URL.createObjectURL(file);
       setImagePreview(previewUrl);
-      setNewBrandImageUrl(''); // Clear URL input when file is selected
+      setNewBrandImageUrl('');
     }
   };
 
   const handleImageUrlChange = (url: string) => {
     setNewBrandImageUrl(url);
     setImagePreview(url);
-    setNewBrandImageFile(null); // Clear file when URL is entered
+    setNewBrandImageFile(null);
   };
 
   const handleCreateBrand = async () => {
     if (!newBrandName.trim()) return;
     
-    setIsLoading(true);
+    setIsCreatingBrand(true);
     try {
-      const { createBrand } = await import('@/services/brandService');
-      const { supabase } = await import('@/integrations/supabase/client');
-      
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const newBrand = await createBrand(
         { 
           name: newBrandName.trim(),
@@ -155,8 +141,9 @@ export function BrandSelector({
       );
       
       if (newBrand) {
-        setLocalSelectedBrandId(newBrand.id);
+        setSelectedBrandState(newBrand as BrandEntity);
         onBrandSelect(newBrand.id, newBrand.name, newBrand.image_url || '');
+        
         // Reset form
         setNewBrandName('');
         setNewBrandDescription('');
@@ -165,15 +152,12 @@ export function BrandSelector({
         setNewBrandWebsite('');
         setImagePreview('');
         setDuplicateWarning(null);
-        setShowCreateDialog(false);
+        setIsCreateDialogOpen(false);
         
         toast({
           title: "Brand created successfully",
           description: `${newBrand.name} has been added and selected.`
         });
-        
-        // Refresh the brands list to show the new brand
-        loadBrands();
       } else {
         toast({
           title: "Failed to create brand",
@@ -189,320 +173,310 @@ export function BrandSelector({
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setIsCreatingBrand(false);
     }
   };
 
-  const handleSkip = () => {
-    onBrandSelect('', '', '');
-  };
-
-  const handleClear = () => {
-    setLocalSelectedBrandId('');
-    onBrandSelect('', '', '');
-  };
-
-  const getEntityTypeLabel = (type: EntityType) => {
+  const getEntityTypeLabel = (type: EntityType): string => {
     switch (type) {
-      case EntityType.Product: return 'products';
-      case EntityType.Place: return 'locations';
-      case EntityType.Book: return 'books';
-      case EntityType.Movie: return 'movies';
-      case EntityType.TvShow: return 'TV shows';
-      case EntityType.Course: return 'courses';
-      case EntityType.App: return 'apps';
-      case EntityType.Game: return 'games';
-      case EntityType.Experience: return 'experiences';
-      default: return 'items';
+      case EntityType.Product:
+        return 'product';
+      case EntityType.Place:
+        return 'place';
+      case EntityType.Book:
+        return 'book';
+      case EntityType.Movie:
+        return 'movie';
+      case 'food' as any:
+        return 'food item';
+      default:
+        return 'item';
     }
   };
+
+  // Show dropdown when user has typed at least 1 character and not closing
+  const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1 && !isDropdownClosing;
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-xl font-semibold text-foreground mb-2">
-          Select a Brand or Organization
-        </h2>
-        <p className="text-muted-foreground">
-          Is this {entityType.toLowerCase()} from a specific brand, company, or organization? This helps organize {getEntityTypeLabel(entityType)} better.
-        </p>
+    <div className="space-y-4">
+      {/* Search Interface */}
+      <div className="relative overflow-visible">
+        <div className="flex items-center border rounded-lg overflow-hidden bg-background">
+          <div className="pl-3 text-muted-foreground">
+            <Search size={18} />
+          </div>
+          <Input
+            type="text"
+            placeholder={`Search for a brand for your ${getEntityTypeLabel(entityType)}...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+          />
+        </div>
+        
+        {/* Search Results Dropdown */}
+        {shouldShowDropdown && (
+          <div className={`absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto transition-all duration-300 ${
+            isDropdownClosing ? 'opacity-0 transform scale-95 translate-y-2' : 'opacity-100 transform scale-100 translate-y-0'
+          }`}>
+            
+            {/* Loading State */}
+            {isLoading && (
+              <div className="p-3 text-center border-b bg-background">
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Searching brands...</span>
+                </div>
+              </div>
+            )}
+
+            {/* Error State */}
+            {error && (
+              <div className="p-3 text-center border-b bg-yellow-50 dark:bg-yellow-900/20">
+                <div className="flex items-center justify-center gap-2 text-sm text-yellow-700 dark:text-yellow-300">
+                  <span>{error}</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Available Brands */}
+            {brands.length > 0 && (
+              <div className="border-b last:border-b-0 bg-background">
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
+                  ✨ Already on Groundz ({brands.length})
+                </div>
+                {brands.map((brand) => (
+                  <div
+                    key={brand.id}
+                    onClick={() => handleResultClick(brand)}
+                    className="flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                  >
+                    {brand.image_url && (
+                      <img
+                        src={brand.image_url}
+                        alt={brand.name}
+                        className="w-10 h-10 rounded-lg object-cover mr-3 shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-foreground">{brand.name}</div>
+                      {brand.description && (
+                        <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
+                          {brand.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* No Results */}
+            {!isLoading && searchQuery && brands.length === 0 && (
+              <div className="p-4 text-center text-muted-foreground">
+                <p className="text-sm">No brands found for "{searchQuery}"</p>
+                <p className="text-xs mt-1">Create a new brand below</p>
+              </div>
+            )}
+
+            {/* Create New Brand Button */}
+            <div className="p-2 border-t bg-background">
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create New Brand
+                  </Button>
+                </DialogTrigger>
+              </Dialog>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Search Section with Dropdown */}
-      <div className="space-y-4">
-        <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
-          <PopoverTrigger asChild>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
-              <Input
-                placeholder="Search for brands, companies, or organizations..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  if (e.target.value && !dropdownOpen) {
-                    setDropdownOpen(true);
-                  }
-                }}
-                onFocus={() => {
-                  if (searchQuery) setDropdownOpen(true);
-                }}
-                className="pl-10 pr-10 cursor-pointer"
-              />
-              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            </div>
-          </PopoverTrigger>
-          <PopoverContent 
-            className="w-full p-0 z-50 bg-popover border border-border shadow-lg" 
-            align="start"
-            sideOffset={4}
-          >
-            <div className="max-h-60 overflow-y-auto">
-              {isLoading ? (
-                <div className="p-4 text-center">
-                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Searching brands...</p>
-                </div>
-              ) : brands.length > 0 ? (
-                <div className="space-y-1 p-2">
-                  {brands.map((brand) => (
-                    <div
-                      key={brand.id}
-                      className="flex items-center gap-3 p-3 rounded-md cursor-pointer hover:bg-accent transition-colors"
-                      onClick={() => handleBrandSelect(brand)}
-                    >
-                      <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                        {brand.image_url ? (
-                          <img
-                            src={brand.image_url}
-                            alt={brand.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <Building2 className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">{brand.name}</p>
-                        {brand.description && (
-                          <p className="text-sm text-muted-foreground truncate">{brand.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : searchQuery ? (
-                <div className="p-4 text-center">
-                  <Building2 className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    No brands found for "{searchQuery}"
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setShowCreateDialog(true);
-                      setDropdownOpen(false);
-                    }}
-                  >
-                    Create "{searchQuery}" as new brand
-                  </Button>
-                </div>
-              ) : (
-                <div className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">Start typing to search for brands</p>
-                </div>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        {/* Create New Brand Button */}
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline" className="w-full">
-              <Plus className="w-4 h-4 mr-2" />
-              Create New Brand
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create New Brand</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="brand-name">Brand Name *</Label>
-                <Input
-                  id="brand-name"
-                  placeholder="Enter brand name..."
-                  value={newBrandName}
-                  onChange={(e) => {
-                    setNewBrandName(e.target.value);
-                    checkForDuplicates(e.target.value);
-                  }}
-                />
-                {duplicateWarning && (
-                  <Alert className="mt-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      A brand named "{duplicateWarning.name}" already exists. You can still create this brand if it's different.
-                    </AlertDescription>
-                  </Alert>
+      {/* Fixed Bottom Area - Selected Brand Display & Actions */}
+      <Card>
+        <CardContent className="p-4">
+          {selectedBrandState ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {selectedBrandState.image_url && (
+                  <img
+                    src={selectedBrandState.image_url}
+                    alt={selectedBrandState.name}
+                    className="w-12 h-12 rounded-lg object-cover"
+                  />
                 )}
-              </div>
-
-              <div>
-                <Label htmlFor="brand-description">Description</Label>
-                <Input
-                  id="brand-description"
-                  placeholder="Brief description (optional)"
-                  value={newBrandDescription}
-                  onChange={(e) => setNewBrandDescription(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Brand Logo</Label>
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="logo-file" className="text-sm text-muted-foreground">Upload Image</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="logo-file"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageFileChange}
-                        className="file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:font-medium"
-                      />
-                      <Upload className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                  
-                  <div className="relative">
-                    <Label className="text-sm text-muted-foreground">Or paste image URL</Label>
-                    <Input
-                      placeholder="https://example.com/logo.png"
-                      value={newBrandImageUrl}
-                      onChange={(e) => handleImageUrlChange(e.target.value)}
-                    />
-                  </div>
-
-                  {imagePreview && (
-                    <div className="flex justify-center">
-                      <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                          onError={() => setImagePreview('')}
-                        />
-                      </div>
-                    </div>
+                <div>
+                  <h3 className="font-medium">{selectedBrandState.name}</h3>
+                  {selectedBrandState.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-1">
+                      {selectedBrandState.description}
+                    </p>
                   )}
                 </div>
               </div>
-
-              <div>
-                <Label htmlFor="brand-website">Website</Label>
-                <Input
-                  id="brand-website"
-                  placeholder="https://example.com (optional)"
-                  value={newBrandWebsite}
-                  onChange={(e) => setNewBrandWebsite(e.target.value)}
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowCreateDialog(false);
-                    setNewBrandName('');
-                    setNewBrandDescription('');
-                    setNewBrandImageUrl('');
-                    setNewBrandImageFile(null);
-                    setNewBrandWebsite('');
-                    setImagePreview('');
-                    setDuplicateWarning(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCreateBrand}
-                  disabled={!newBrandName.trim() || isLoading}
-                >
-                  {isLoading ? 'Creating...' : 'Create Brand'}
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearSelectedBrand}
+              >
+                <X className="w-4 h-4" />
+              </Button>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          ) : (
+            <div className="text-center py-4">
+              <Building className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">
+                No brand selected for your {getEntityTypeLabel(entityType)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Search above to find or create a brand
+              </p>
+            </div>
+          )}
+          
+          {/* Action Buttons */}
+          <div className="mt-4 pt-4 border-t flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSkipClick}
+              className="flex-1"
+            >
+              {selectedBrandState ? 'Remove Brand' : 'Skip Brand Selection'}
+            </Button>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="default" className="flex-1">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Brand
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Fixed Selected Brand Display Area */}
-      <div className="border-t pt-6">
-        {localSelectedBrandId ? (
-          <Card className="border-primary bg-primary/5">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center overflow-hidden">
-                    {selectedBrandImageUrl ? (
-                      <img
-                        src={selectedBrandImageUrl}
-                        alt={selectedBrandName}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <Building2 className="w-5 h-5 text-primary" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">{selectedBrandName}</p>
-                    <p className="text-sm text-muted-foreground">Selected brand</p>
+      {/* Create Brand Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Brand</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="brand-name">Brand Name *</Label>
+              <Input
+                id="brand-name"
+                placeholder="Enter brand name..."
+                value={newBrandName}
+                onChange={(e) => {
+                  setNewBrandName(e.target.value);
+                  checkForDuplicates(e.target.value);
+                }}
+              />
+              {duplicateWarning && (
+                <p className="text-sm text-yellow-600 mt-1">
+                  A brand named "{duplicateWarning.name}" already exists.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="brand-description">Description</Label>
+              <Textarea
+                id="brand-description"
+                placeholder="Brief description (optional)"
+                value={newBrandDescription}
+                onChange={(e) => setNewBrandDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <Label>Brand Logo</Label>
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="logo-file" className="text-sm text-muted-foreground">Upload Image</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="logo-file"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileChange}
+                      className="file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:font-medium"
+                    />
+                    <Upload className="w-4 h-4 text-muted-foreground" />
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClear}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="text-center py-8 border-2 border-dashed border-muted-foreground/20 rounded-lg">
-            <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-            <p className="text-muted-foreground mb-4">No brand selected</p>
-            <p className="text-sm text-muted-foreground">
-              Search above to find a brand or create a new one
-            </p>
-          </div>
-        )}
+                
+                <div className="relative">
+                  <Label className="text-sm text-muted-foreground">Or paste image URL</Label>
+                  <Input
+                    placeholder="https://example.com/logo.png"
+                    value={newBrandImageUrl}
+                    onChange={(e) => handleImageUrlChange(e.target.value)}
+                  />
+                </div>
 
-        {/* Skip Option */}
-        <div className="mt-4">
-          <Button
-            variant="outline"
-            onClick={handleSkipClick}
-            className="w-full border-primary/30 text-primary hover:bg-primary/5 hover:border-primary transition-all duration-200"
-          >
-            Skip - No specific brand
-          </Button>
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            You can add brand information later
-          </p>
-        </div>
-      </div>
+                {imagePreview && (
+                  <div className="flex justify-center">
+                    <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        onError={() => setImagePreview('')}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="brand-website">Website</Label>
+              <Input
+                id="brand-website"
+                placeholder="https://example.com (optional)"
+                value={newBrandWebsite}
+                onChange={(e) => setNewBrandWebsite(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsCreateDialogOpen(false);
+                  setNewBrandName('');
+                  setNewBrandDescription('');
+                  setNewBrandImageUrl('');
+                  setNewBrandImageFile(null);
+                  setNewBrandWebsite('');
+                  setImagePreview('');
+                  setDuplicateWarning(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateBrand}
+                disabled={!newBrandName.trim() || isCreatingBrand}
+              >
+                {isCreatingBrand ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Brand'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
+};

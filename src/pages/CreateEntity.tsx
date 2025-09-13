@@ -172,9 +172,11 @@ export default function CreateEntity() {
         return (
           <BrandSelector
             entityType={formData.entityType!}
-            selectedBrandId={formData.parentEntityId || ''}
-            selectedBrandName={formData.parentEntityName || ''}
-            selectedBrandImageUrl={formData.parentEntityImageUrl || ''}
+            selectedBrand={formData.parentEntityId ? {
+              id: formData.parentEntityId,
+              name: formData.parentEntityName || '',
+              image_url: formData.parentEntityImageUrl || ''
+            } : null}
             onBrandSelect={(brandId, brandName, brandImageUrl) => {
               console.log('Brand selected in parent:', brandId, brandName, brandImageUrl);
               updateField('parentEntityId', brandId || undefined);
