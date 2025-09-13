@@ -39,6 +39,8 @@ export function BrandSelector({
   const [searchQuery, setSearchQuery] = useState('');
   const [brands, setBrands] = useState<BrandEntity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  // Add local state for immediate visual feedback
+  const [localSelectedBrandId, setLocalSelectedBrandId] = useState(selectedBrandId);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newBrandName, setNewBrandName] = useState('');
   const [newBrandDescription, setNewBrandDescription] = useState('');
@@ -54,6 +56,11 @@ export function BrandSelector({
   useEffect(() => {
     loadBrands();
   }, [debouncedSearch]);
+
+  // Sync local state with props
+  useEffect(() => {
+    setLocalSelectedBrandId(selectedBrandId);
+  }, [selectedBrandId]);
 
   const loadBrands = async () => {
     setIsLoading(true);
@@ -74,11 +81,15 @@ export function BrandSelector({
 
   const handleBrandSelect = (brand: BrandEntity) => {
     console.log('Brand selected:', brand);
+    // Update local state immediately for instant visual feedback
+    setLocalSelectedBrandId(brand.id);
     onBrandSelect(brand.id, brand.name);
   };
 
   const handleSkipClick = () => {
     console.log('Skip clicked - clearing brand selection');
+    // Update local state immediately 
+    setLocalSelectedBrandId('');
     onBrandSelect('', '');
     onSkip?.(); // Call the skip callback if provided
   };
@@ -138,6 +149,7 @@ export function BrandSelector({
       );
       
       if (newBrand) {
+        setLocalSelectedBrandId(newBrand.id);
         onBrandSelect(newBrand.id, newBrand.name);
         // Reset form
         setNewBrandName('');
@@ -180,6 +192,7 @@ export function BrandSelector({
   };
 
   const handleClear = () => {
+    setLocalSelectedBrandId('');
     onBrandSelect('', '');
   };
 
@@ -210,7 +223,7 @@ export function BrandSelector({
       </div>
 
       {/* Selected Brand Display */}
-      {selectedBrandId && (
+      {localSelectedBrandId && (
         <Card className="border-primary bg-primary/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -237,7 +250,7 @@ export function BrandSelector({
       )}
 
       {/* Search and Create Section */}
-      {!selectedBrandId && (
+      {!localSelectedBrandId && (
         <div className="space-y-4">
           {/* Search Input */}
           <div className="relative">
@@ -382,7 +395,7 @@ export function BrandSelector({
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">Search Results</p>
               {brands.map((brand) => {
-                const isSelected = selectedBrandId === brand.id;
+                const isSelected = localSelectedBrandId === brand.id;
                 return (
                   <Card
                     key={brand.id}

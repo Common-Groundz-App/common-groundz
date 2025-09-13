@@ -170,13 +170,21 @@ export default function CreateEntity() {
         return (
           <BrandSelector
             entityType={formData.entityType!}
-            selectedBrandId={formData.parentEntityId}
-            selectedBrandName={formData.parentEntityName}
+            selectedBrandId={formData.parentEntityId || ''}
+            selectedBrandName={formData.parentEntityName || ''}
             onBrandSelect={(brandId, brandName) => {
-              updateField('parentEntityId', brandId);
-              updateField('parentEntityName', brandName);
+              console.log('Brand selected in parent:', brandId, brandName);
+              updateField('parentEntityId', brandId || undefined);
+              updateField('parentEntityName', brandName || undefined);
+              // Auto-advance if a brand is selected
+              if (brandId) {
+                setTimeout(() => setCurrentStep(3), 100);
+              }
             }}
-            onSkip={() => setCurrentStep(3)}
+            onSkip={() => {
+              console.log('Skip button clicked - advancing to step 3');
+              setCurrentStep(3);
+            }}
           />
         );
       case 3:
