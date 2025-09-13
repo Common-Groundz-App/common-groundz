@@ -75,9 +75,13 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
     }, 300);
   };
 
-  // Sync selectedBrand prop with local state
+  // Sync selectedBrand prop with local state and set search query on mount
   useEffect(() => {
     setSelectedBrandState(selectedBrand || null);
+    // If a brand is selected when component mounts, show it in search
+    if (selectedBrand) {
+      setSearchQuery(selectedBrand.name);
+    }
   }, [selectedBrand]);
 
   const handleSkipClick = () => {
@@ -245,29 +249,41 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
                 <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
                   ✨ Already on Groundz ({brands.length})
                 </div>
-                {brands.map((brand) => (
-                  <div
-                    key={brand.id}
-                    onClick={() => handleResultClick(brand)}
-                    className="flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                  >
-                    {brand.image_url && (
-                      <img
-                        src={brand.image_url}
-                        alt={brand.name}
-                        className="w-10 h-10 rounded-lg object-cover mr-3 shrink-0"
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-foreground">{brand.name}</div>
-                      {brand.description && (
-                        <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
-                          {brand.description}
-                        </p>
+                {brands.map((brand) => {
+                  const isSelected = selectedBrandState?.id === brand.id;
+                  return (
+                    <div
+                      key={brand.id}
+                      onClick={() => handleResultClick(brand)}
+                      className={`flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${
+                        isSelected ? 'bg-primary/10 border-l-4 border-primary' : ''
+                      }`}
+                    >
+                      {brand.image_url && (
+                        <img
+                          src={brand.image_url}
+                          alt={brand.name}
+                          className="w-10 h-10 rounded-lg object-cover mr-3 shrink-0"
+                        />
                       )}
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-medium ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                          {brand.name}
+                          {isSelected && (
+                            <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
+                              Selected
+                            </span>
+                          )}
+                        </div>
+                        {brand.description && (
+                          <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
+                            {brand.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -283,7 +299,18 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
             <div className="p-2 border-t bg-background">
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => {
+                      // Close dropdown when create new brand is clicked
+                      setIsDropdownClosing(true);
+                      setTimeout(() => {
+                        setSearchQuery('');
+                        setIsDropdownClosing(false);
+                      }, 300);
+                    }}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Create New Brand
                   </Button>
@@ -337,22 +364,37 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
           )}
           
           {/* Action Buttons */}
-          <div className="mt-4 pt-4 border-t flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleSkipClick}
-              className="flex-1"
-            >
-              {selectedBrandState ? 'Remove Brand' : 'Skip Brand Selection'}
-            </Button>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="default" className="flex-1">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Brand
+          <div className="mt-4 pt-4 border-t">
+            {selectedBrandState ? (
+              /* When brand is selected, only show Remove Brand button */
+              <Button
+                variant="outline"
+                onClick={clearSelectedBrand}
+                className="w-full"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Remove Brand
+              </Button>
+            ) : (
+              /* When no brand selected, show Skip and Create buttons */
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleSkipClick}
+                  className="flex-1"
+                >
+                  Skip Brand Selection
                 </Button>
-              </DialogTrigger>
-            </Dialog>
+                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="default" className="flex-1">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Brand
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
