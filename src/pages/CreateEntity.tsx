@@ -178,9 +178,10 @@ export default function CreateEntity() {
               updateField('parentEntityName', brandName || undefined);
             }}
             onSkip={() => {
-              console.log('Skip button clicked - clearing selection');
+              console.log('Skip button clicked - advancing to step 3');
               updateField('parentEntityId', undefined);
               updateField('parentEntityName', undefined);
+              setCurrentStep(3);
             }}
           />
         );
