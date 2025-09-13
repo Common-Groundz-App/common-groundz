@@ -172,9 +172,9 @@ export default function CreateEntity() {
         return (
           <BrandSelector
             entityType={formData.entityType!}
-            selectedBrand={formData.parentEntityId ? {
+            selectedBrand={formData.parentEntityId && formData.parentEntityName ? {
               id: formData.parentEntityId,
-              name: formData.parentEntityName || '',
+              name: formData.parentEntityName,
               image_url: formData.parentEntityImageUrl || ''
             } : null}
             onBrandSelect={(brandId, brandName, brandImageUrl) => {
