@@ -176,14 +176,11 @@ export default function CreateEntity() {
               console.log('Brand selected in parent:', brandId, brandName);
               updateField('parentEntityId', brandId || undefined);
               updateField('parentEntityName', brandName || undefined);
-              // Auto-advance if a brand is selected
-              if (brandId) {
-                setTimeout(() => setCurrentStep(3), 100);
-              }
             }}
             onSkip={() => {
-              console.log('Skip button clicked - advancing to step 3');
-              setCurrentStep(3);
+              console.log('Skip button clicked - clearing selection');
+              updateField('parentEntityId', undefined);
+              updateField('parentEntityName', undefined);
             }}
           />
         );
