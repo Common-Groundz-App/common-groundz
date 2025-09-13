@@ -81,6 +81,9 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
     // If a brand is selected when component mounts, show it in search
     if (selectedBrand) {
       setSearchQuery(selectedBrand.name);
+    } else {
+      // Clear search query when no brand is selected
+      setSearchQuery('');
     }
   }, [selectedBrand]);
 
