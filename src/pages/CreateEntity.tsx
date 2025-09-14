@@ -66,6 +66,29 @@ export default function CreateEntity() {
     'create-entity-form',
     initialFormData
   );
+
+  // 🐛 DEBUG: Track formData changes in CreateEntity
+  React.useEffect(() => {
+    console.log('🔍 [CreateEntity] formData updated:', {
+      parentEntityId: formData.parentEntityId,
+      parentEntityName: formData.parentEntityName,
+      parentEntityImageUrl: formData.parentEntityImageUrl,
+      fullFormData: formData
+    });
+  }, [formData]);
+
+  // 🐛 DEBUG: Track specific parentEntityName changes
+  React.useEffect(() => {
+    console.log('🔍 [CreateEntity] parentEntityName changed:', formData.parentEntityName);
+  }, [formData.parentEntityName]);
+
+  // 🐛 DEBUG: Track current step changes
+  React.useEffect(() => {
+    console.log('🔍 [CreateEntity] Step changed to:', currentStep);
+    if (currentStep === 5) {
+      console.log('🔍 [CreateEntity] Entering review step with formData:', formData);
+    }
+  }, [currentStep, formData]);
   
   const { createEntityOptimistically, isCreating, creationProgress } = useOptimisticEntityCreation({
     entityType: formData.entityType || EntityType.Product,
@@ -178,14 +201,24 @@ export default function CreateEntity() {
               image_url: formData.parentEntityImageUrl || ''
             } : null}
             onBrandSelect={(brandId, brandName, brandImageUrl) => {
-              console.log('Brand selected in parent:', brandId, brandName, brandImageUrl);
+              console.log('🔍 [CreateEntity] Brand selected in parent:', brandId, brandName, brandImageUrl);
+              console.log('🔍 [CreateEntity] Current formData before brand update:', formData);
+              
               if (brandId && brandName) {
                 // Setting a brand
+                console.log('🔍 [CreateEntity] Setting brand fields...');
                 updateField('parentEntityId', brandId);
                 updateField('parentEntityName', brandName);
                 updateField('parentEntityImageUrl', brandImageUrl || '');
+                
+                // 🐛 DEBUG: Log what we just set
+                setTimeout(() => {
+                  console.log('🔍 [CreateEntity] After setting brand, formData should be updated. Checking...');
+                  console.log('🔍 [CreateEntity] localStorage value:', localStorage.getItem('create-entity-form'));
+                }, 100);
               } else {
                 // Clearing brand selection - reset to empty strings (initial state)
+                console.log('🔍 [CreateEntity] Clearing brand fields...');
                 updateField('parentEntityId', '');
                 updateField('parentEntityName', '');
                 updateField('parentEntityImageUrl', '');
@@ -216,6 +249,9 @@ export default function CreateEntity() {
           />
         );
       case 5:
+        // 🐛 DEBUG: Log formData before passing to EntityPreview
+        console.log('🔍 [CreateEntity] Rendering EntityPreview with formData:', formData);
+        console.log('🔍 [CreateEntity] parentEntityName being passed:', formData.parentEntityName);
         return (
           <EntityPreview
             formData={formData}

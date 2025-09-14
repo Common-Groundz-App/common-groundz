@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,23 @@ interface EntityPreviewProps {
 }
 
 export function EntityPreview({ formData, onEdit }: EntityPreviewProps) {
+  // 🐛 DEBUG: Track formData changes in EntityPreview
+  useEffect(() => {
+    console.log('🔍 [EntityPreview] Component re-rendered with formData:', {
+      parentEntityId: formData.parentEntityId,
+      parentEntityName: formData.parentEntityName,
+      parentEntityImageUrl: formData.parentEntityImageUrl,
+      fullFormData: formData
+    });
+  }, [formData]);
+
+  // 🐛 DEBUG: Track specific parentEntityName changes
+  useEffect(() => {
+    console.log('🔍 [EntityPreview] parentEntityName changed:', formData.parentEntityName);
+  }, [formData.parentEntityName]);
+
+  // 🐛 DEBUG: Log what we're about to render
+  console.log('🔍 [EntityPreview] About to render with parentEntityName:', formData.parentEntityName);
   const getEntityTypeIcon = () => {
     switch (formData.entityType) {
       case 'product': return Package;
