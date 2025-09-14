@@ -61,11 +61,14 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
 
   // Handle brand selection from search results
   const handleResultClick = (brand: BrandEntity) => {
+    console.log('🔍 [BrandSelector] Brand selected:', brand.name, brand.id);
+    
     // Start dropdown closing animation
     setIsDropdownClosing(true);
     
     // Select the brand and clear search
     setSelectedBrandState(brand);
+    console.log('🔍 [BrandSelector] Calling onBrandSelect with:', brand.id, brand.name, brand.image_url || '');
     onBrandSelect(brand.id, brand.name, brand.image_url || '');
     
     // Clear search and close dropdown after animation
@@ -77,15 +80,19 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
 
   // Sync selectedBrand prop with local state and set search query on mount
   useEffect(() => {
-    setSelectedBrandState(selectedBrand || null);
-    // If a brand is selected when component mounts, show it in search
-    if (selectedBrand) {
+    console.log('🔍 [BrandSelector] useEffect triggered - selectedBrand:', selectedBrand?.name || 'null', 'current selectedBrandState:', selectedBrandState?.name || 'null');
+    
+    // Only sync if there's a real change to avoid race conditions
+    if (selectedBrand && selectedBrand.id !== selectedBrandState?.id) {
+      console.log('🔍 [BrandSelector] Syncing with new selectedBrand:', selectedBrand.name);
+      setSelectedBrandState(selectedBrand);
       setSearchQuery(selectedBrand.name);
-    } else {
-      // Clear search query when no brand is selected
+    } else if (!selectedBrand && selectedBrandState) {
+      console.log('🔍 [BrandSelector] Clearing selectedBrandState due to null selectedBrand');
+      setSelectedBrandState(null);
       setSearchQuery('');
     }
-  }, [selectedBrand]);
+  }, [selectedBrand, selectedBrandState]);
 
   const handleSkipClick = () => {
     setSelectedBrandState(null);
@@ -96,9 +103,11 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
   };
 
   const clearSelectedBrand = () => {
+    console.log('🔍 [BrandSelector] Clearing selected brand');
     setSelectedBrandState(null);
     setSearchQuery('');
     // Clear the selection by calling onBrandSelect with null values to properly reset form
+    console.log('🔍 [BrandSelector] Calling onBrandSelect with null values to clear');
     onBrandSelect(null as any, null as any, null as any);
   };
 
@@ -149,7 +158,9 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
       );
       
       if (newBrand) {
+        console.log('🔍 [BrandSelector] New brand created:', newBrand.name, newBrand.id);
         setSelectedBrandState(newBrand as BrandEntity);
+        console.log('🔍 [BrandSelector] Calling onBrandSelect with new brand:', newBrand.id, newBrand.name, newBrand.image_url || '');
         onBrandSelect(newBrand.id, newBrand.name, newBrand.image_url || '');
         
         // Reset form

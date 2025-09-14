@@ -207,7 +207,7 @@ export default function CreateEntity() {
               image_url: formData.parentEntityImageUrl || ''
             } : null}
             onBrandSelect={(brandId, brandName, brandImageUrl) => {
-              console.log('🔍 [CreateEntity] Brand selected in parent:', brandId, brandName, brandImageUrl);
+              console.log('🔍 [CreateEntity] onBrandSelect called with:', brandId, brandName, brandImageUrl);
               console.log('🔍 [CreateEntity] Current formData before brand update:', formData);
               
               if (brandId && brandName) {
@@ -220,11 +220,12 @@ export default function CreateEntity() {
                 // 🐛 DEBUG: Log what we just set
                 setTimeout(() => {
                   console.log('🔍 [CreateEntity] After setting brand, formData should be updated. Checking...');
+                  console.log('🔍 [CreateEntity] formData after update:', formData);
                   console.log('🔍 [CreateEntity] localStorage value:', localStorage.getItem('create-entity-form'));
                 }, 100);
               } else {
                 // Clearing brand selection - reset to undefined to trigger rehydration
-                console.log('🔍 [CreateEntity] Clearing brand fields...');
+                console.log('🔍 [CreateEntity] Clearing brand fields because brandId/brandName is null/undefined...');
                 updateField('parentEntityId', undefined);
                 updateField('parentEntityName', undefined);
                 updateField('parentEntityImageUrl', undefined);
