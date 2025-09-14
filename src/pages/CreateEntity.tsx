@@ -179,9 +179,17 @@ export default function CreateEntity() {
             } : null}
             onBrandSelect={(brandId, brandName, brandImageUrl) => {
               console.log('Brand selected in parent:', brandId, brandName, brandImageUrl);
-              updateField('parentEntityId', brandId || undefined);
-              updateField('parentEntityName', brandName || undefined);
-              updateField('parentEntityImageUrl', brandImageUrl || undefined);
+              if (brandId && brandName) {
+                // Setting a brand
+                updateField('parentEntityId', brandId);
+                updateField('parentEntityName', brandName);
+                updateField('parentEntityImageUrl', brandImageUrl || '');
+              } else {
+                // Clearing brand selection - reset to empty strings (initial state)
+                updateField('parentEntityId', '');
+                updateField('parentEntityName', '');
+                updateField('parentEntityImageUrl', '');
+              }
             }}
             onSkip={() => {
               console.log('Skip button clicked - clearing selection and advancing to step 3');
