@@ -223,11 +223,11 @@ export default function CreateEntity() {
                   console.log('🔍 [CreateEntity] localStorage value:', localStorage.getItem('create-entity-form'));
                 }, 100);
               } else {
-                // Clearing brand selection - reset to empty strings (initial state)
+                // Clearing brand selection - reset to undefined to trigger rehydration
                 console.log('🔍 [CreateEntity] Clearing brand fields...');
-                updateField('parentEntityId', '');
-                updateField('parentEntityName', '');
-                updateField('parentEntityImageUrl', '');
+                updateField('parentEntityId', undefined);
+                updateField('parentEntityName', undefined);
+                updateField('parentEntityImageUrl', undefined);
               }
             }}
             onSkip={() => {

@@ -98,8 +98,8 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
   const clearSelectedBrand = () => {
     setSelectedBrandState(null);
     setSearchQuery('');
-    // Clear the selection by calling onBrandSelect with undefined values to properly reset form
-    onBrandSelect(undefined as any, undefined as any, undefined as any);
+    // Clear the selection by calling onBrandSelect with null values to properly reset form
+    onBrandSelect(null as any, null as any, null as any);
   };
 
   const checkForDuplicates = useCallback(async (name: string) => {
