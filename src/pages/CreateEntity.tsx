@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { Card, CardContent } from '@/components/ui/card';
@@ -62,10 +62,16 @@ export default function CreateEntity() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { formData, updateField, resetForm } = usePersistedForm<CreateEntityFormData>(
+  const { formData, updateField, resetForm, clearPersistedData } = usePersistedForm<CreateEntityFormData>(
     'create-entity-form',
     initialFormData
   );
+
+  // Clear any persisted form data on mount to ensure a clean slate
+  useEffect(() => {
+    console.log('🧹 [CreateEntity] Clearing persisted form data on mount');
+    clearPersistedData();
+  }, []); // Empty dependency array = run only on mount
 
   // 🐛 DEBUG: Track formData changes in CreateEntity
   React.useEffect(() => {
