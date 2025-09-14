@@ -78,21 +78,18 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
     }, 300);
   };
 
-  // Sync selectedBrand prop with local state and set search query on mount
+  // Sync selectedBrand prop with local state on mount/prop change
   useEffect(() => {
-    console.log('🔍 [BrandSelector] useEffect triggered - selectedBrand:', selectedBrand?.name || 'null', 'current selectedBrandState:', selectedBrandState?.name || 'null');
+    console.log('🔍 [BrandSelector] useEffect triggered - selectedBrand:', selectedBrand?.name || 'null');
     
-    // Only sync if there's a real change to avoid race conditions
-    if (selectedBrand && selectedBrand.id !== selectedBrandState?.id) {
-      console.log('🔍 [BrandSelector] Syncing with new selectedBrand:', selectedBrand.name);
+    // Only sync FROM parent TO local state, never clear based on parent state
+    if (selectedBrand) {
+      console.log('🔍 [BrandSelector] Syncing with selectedBrand from parent:', selectedBrand.name);
       setSelectedBrandState(selectedBrand);
       setSearchQuery(selectedBrand.name);
-    } else if (!selectedBrand && selectedBrandState) {
-      console.log('🔍 [BrandSelector] Clearing selectedBrandState due to null selectedBrand');
-      setSelectedBrandState(null);
-      setSearchQuery('');
     }
-  }, [selectedBrand, selectedBrandState]);
+    // Don't clear local state when parent is null - let user actions handle clearing
+  }, [selectedBrand]);
 
   const handleSkipClick = () => {
     setSelectedBrandState(null);
