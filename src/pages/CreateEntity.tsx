@@ -176,14 +176,14 @@ export default function CreateEntity() {
             selectedBrandName={formData.parentEntityName || ''}
             onBrandSelect={(brandId, brandName, brandImageUrl) => {
               console.log('Brand selected in parent:', brandId, brandName, brandImageUrl);
-              updateField('parentEntityId', brandId || '');
-              updateField('parentEntityName', brandName || '');
+              updateField('parentEntityId', brandId || undefined);
+              updateField('parentEntityName', brandName || undefined);
               updateField('parentEntityImageUrl', brandImageUrl || '');
             }}
             onSkip={() => {
               console.log('Skip button clicked - advancing to step 3');
-              updateField('parentEntityId', '');
-              updateField('parentEntityName', '');
+              updateField('parentEntityId', undefined);
+              updateField('parentEntityName', undefined);
               updateField('parentEntityImageUrl', '');
               setCurrentStep(3);
             }}

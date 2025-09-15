@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 export const AdminQualityControlPanel = () => {
   const { metrics, isLoading, refetch } = useAdminModeration();
   const [scanningDuplicates, setScanningDuplicates] = useState(false);
-  const [duplicatesFound, setDuplicatesFound] = useState<any[] | null>(null);
+  const [duplicatesFound, setDuplicatesFound] = useState<number | null>(null);
   const { toast } = useToast();
 
   const handleDuplicateScan = async () => {
@@ -35,7 +35,7 @@ export const AdminQualityControlPanel = () => {
       setDuplicatesFound(data);
       toast({
         title: "Scan Complete",
-        description: `Found ${data?.length || 0} potential duplicate pairs`,
+        description: `Found ${data} potential duplicate pairs`,
       });
 
       refetch();
@@ -156,7 +156,7 @@ export const AdminQualityControlPanel = () => {
               {duplicatesFound !== null && (
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{duplicatesFound?.length || 0} duplicates found</Badge>
+                    <Badge variant="secondary">{duplicatesFound} duplicates found</Badge>
                     <span className="text-sm text-muted-foreground">
                       Review them in the Moderation Panel
                     </span>
