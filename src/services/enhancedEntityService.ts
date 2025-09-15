@@ -79,7 +79,7 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, use
         image_url: enhancedData.image_url, // Keep original external URL temporarily
         api_source: enhancedData.api_source,
         api_ref: enhancedData.api_ref,
-        website_url: enhancedData.website_url || null, // Convert empty strings to null
+        website_url: enhancedData.website_url,
         metadata: enhancedData.metadata,
         authors: enhancedData.authors,
         publication_year: enhancedData.publication_year,
@@ -183,7 +183,7 @@ const extractEnhancedMetadata = async (rawData: any, entityType: string): Promis
     image_url: rawData.image_url,
     api_source: rawData.api_source,
     api_ref: rawData.api_ref,
-    website_url: rawData.website_url || null, // Convert empty strings to null
+    website_url: rawData.website_url,
     metadata: rawData.metadata || {}
   };
   

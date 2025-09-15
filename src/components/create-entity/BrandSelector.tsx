@@ -16,7 +16,7 @@ interface BrandSelectorProps {
   entityType: EntityType;
   selectedBrandId: string;
   selectedBrandName: string;
-  onBrandSelect: (brandId: string, brandName: string, brandImageUrl?: string) => void;
+  onBrandSelect: (brandId: string, brandName: string) => void;
   onSkip?: () => void; // Add optional skip callback
 }
 
@@ -83,14 +83,14 @@ export function BrandSelector({
     console.log('Brand selected:', brand);
     // Update local state immediately for instant visual feedback
     setLocalSelectedBrandId(brand.id);
-    onBrandSelect(brand.id, brand.name, brand.image_url);
+    onBrandSelect(brand.id, brand.name);
   };
 
   const handleSkipClick = () => {
     console.log('Skip clicked - clearing brand selection');
     // Update local state immediately 
     setLocalSelectedBrandId('');
-    onBrandSelect('', '', '');
+    onBrandSelect('', '');
     onSkip?.(); // Call the skip callback if provided
   };
 
@@ -150,7 +150,7 @@ export function BrandSelector({
       
       if (newBrand) {
         setLocalSelectedBrandId(newBrand.id);
-        onBrandSelect(newBrand.id, newBrand.name, newBrand.image_url);
+        onBrandSelect(newBrand.id, newBrand.name);
         // Reset form
         setNewBrandName('');
         setNewBrandDescription('');
@@ -188,12 +188,12 @@ export function BrandSelector({
   };
 
   const handleSkip = () => {
-    onBrandSelect('', '', '');
+    onBrandSelect('', '');
   };
 
   const handleClear = () => {
     setLocalSelectedBrandId('');
-    onBrandSelect('', '', '');
+    onBrandSelect('', '');
   };
 
   const getEntityTypeLabel = (type: EntityType) => {

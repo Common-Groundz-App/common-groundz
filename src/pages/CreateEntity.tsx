@@ -22,7 +22,6 @@ export interface CreateEntityFormData {
   categoryId: string;
   parentEntityId: string;
   parentEntityName: string;
-  parentEntityImageUrl: string;
   websiteUrl: string;
   imageFile: File | null;
   imageUrl: string;
@@ -38,7 +37,6 @@ const initialFormData: CreateEntityFormData = {
   categoryId: '',
   parentEntityId: '',
   parentEntityName: '',
-  parentEntityImageUrl: '',
   websiteUrl: '',
   imageFile: null,
   imageUrl: '',
@@ -136,7 +134,7 @@ export default function CreateEntity() {
         description: formData.description,
         venue: formData.venue,
         image_url: formData.imageUrl,
-        website_url: formData.websiteUrl || null, // Convert empty strings to null
+        website_url: formData.websiteUrl,
         imageFile: formData.imageFile, // Include the image file for upload
         metadata: {
           user_created: true,
@@ -174,17 +172,15 @@ export default function CreateEntity() {
             entityType={formData.entityType!}
             selectedBrandId={formData.parentEntityId || ''}
             selectedBrandName={formData.parentEntityName || ''}
-            onBrandSelect={(brandId, brandName, brandImageUrl) => {
-              console.log('Brand selected in parent:', brandId, brandName, brandImageUrl);
+            onBrandSelect={(brandId, brandName) => {
+              console.log('Brand selected in parent:', brandId, brandName);
               updateField('parentEntityId', brandId || undefined);
               updateField('parentEntityName', brandName || undefined);
-              updateField('parentEntityImageUrl', brandImageUrl || '');
             }}
             onSkip={() => {
               console.log('Skip button clicked - advancing to step 3');
               updateField('parentEntityId', undefined);
               updateField('parentEntityName', undefined);
-              updateField('parentEntityImageUrl', '');
               setCurrentStep(3);
             }}
           />
