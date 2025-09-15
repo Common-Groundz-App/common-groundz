@@ -136,7 +136,7 @@ export default function CreateEntity() {
         description: formData.description,
         venue: formData.venue,
         image_url: formData.imageUrl,
-        website_url: formData.websiteUrl,
+        website_url: formData.websiteUrl || null, // Convert empty strings to null
         imageFile: formData.imageFile, // Include the image file for upload
         metadata: {
           user_created: true,
