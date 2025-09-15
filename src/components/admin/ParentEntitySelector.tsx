@@ -2,12 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Entity } from '@/services/recommendation/types';
-import { useEntitySearch } from '@/hooks/use-entity-search';
-import { SelectValue, SelectTrigger, SelectContent, Select, SelectItem } from '@/components/ui/select';
 import { X, Loader2, Search } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { EntityTypeString } from '@/hooks/feed/api/types';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,12 +25,11 @@ export function ParentEntitySelector({
 }: ParentEntitySelectorProps) {
   const [selectedParent, setSelectedParent] = useState<EntityAdapter | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [entityType, setEntityType] = useState<EntityTypeString>('place');
+  const [searchResults, setSearchResults] = useState<EntityAdapter[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  
-  const { localResults, externalResults, isLoading, handleSearch, createEntityFromExternal } = useEntitySearch(entityType);
   const { toast } = useToast();
 
   // Load selected parent entity on mount
@@ -63,6 +58,38 @@ export function ParentEntitySelector({
     }
   };
 
+  // Search entities in database
+  const searchEntities = async (query: string) => {
+    if (query.length < 1) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('entities')
+        .select('*')
+        .eq('is_deleted', false)
+        .ilike('name', `%${query}%`)
+        .limit(20);
+
+      if (error) throw error;
+      
+      // Filter out the current entity to prevent self-selection
+      const filteredResults = (data || []).filter(entity => 
+        currentEntityId ? entity.id !== currentEntityId : true
+      );
+      
+      setSearchResults(filteredResults as EntityAdapter[]);
+    } catch (error) {
+      console.error('Error searching entities:', error);
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle click outside to close results dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -83,11 +110,12 @@ export function ParentEntitySelector({
     const query = e.target.value;
     setSearchQuery(query);
     
-    if (query.length >= 2) {
+    if (query.length >= 1) {
       setShowResults(true);
-      handleSearch(query, false, null);
+      searchEntities(query);
     } else {
       setShowResults(false);
+      setSearchResults([]);
     }
   };
   
@@ -95,6 +123,7 @@ export function ParentEntitySelector({
   const clearSearch = () => {
     setSearchQuery('');
     setShowResults(false);
+    setSearchResults([]);
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -116,23 +145,7 @@ export function ParentEntitySelector({
     onParentChange(entity);
     setSearchQuery('');
     setShowResults(false);
-  };
-
-  // Handle external result selection
-  const handleExternalResultSelect = async (result: any) => {
-    try {
-      const entity = await createEntityFromExternal(result);
-      if (entity) {
-        handleEntitySelect(entity as EntityAdapter);
-      }
-    } catch (error) {
-      console.error('Error selecting external result:', error);
-      toast({
-        title: 'Error',
-        description: 'Could not select this item. Please try again.',
-        variant: 'destructive'
-      });
-    }
+    setSearchResults([]);
   };
 
   // Remove selected parent
@@ -141,14 +154,14 @@ export function ParentEntitySelector({
     onParentChange(null);
   };
 
-  // Get image URL for entity or result
-  const getImageUrl = (item: any) => {
+  // Get image URL for entity
+  const getImageUrl = (item: EntityAdapter) => {
     if (item.image_url) {
       return item.image_url;
     }
     
     // Type-specific placeholder images
-    switch (entityType) {
+    switch (item.type) {
       case 'movie':
         return "https://images.unsplash.com/photo-1489599510961-b3f9db2a06be?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
       case 'book':
@@ -162,24 +175,6 @@ export function ParentEntitySelector({
       default:
         return "https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
     }
-  };
-
-  // Filter results to exclude current entity and show logical parent types
-  const getFilteredResults = (results: EntityAdapter[]) => {
-    return results.filter(entity => {
-      // Don't show the current entity
-      if (currentEntityId && entity.id === currentEntityId) {
-        return false;
-      }
-      
-      // Apply logical parent-child rules based on entity types
-      if (currentEntityType === 'product') {
-        // Products can have brand/place parents
-        return entity.type === 'place' || entity.type === 'brand';
-      }
-      
-      return true; // For now, allow any other entity as parent
-    });
   };
 
   return (
@@ -197,7 +192,7 @@ export function ParentEntitySelector({
               src={getImageUrl(selectedParent)}
               alt={selectedParent.name}
               className="w-8 h-8 object-cover rounded"
-              fallbackSrc={getImageUrl({})}
+              fallbackSrc={getImageUrl(selectedParent)}
               entityType={selectedParent.type}
             />
             <div>
@@ -221,131 +216,75 @@ export function ParentEntitySelector({
       {/* Search Interface */}
       {!selectedParent && (
         <div className="space-y-2">
-          <div className="flex gap-2">
-            <Select 
-              value={entityType}
-              onValueChange={(value) => setEntityType(value as EntityTypeString)}
+          <div className="relative">
+            <Input
+              placeholder="Search for a parent entity..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="w-full pr-8"
+              ref={inputRef}
               disabled={disabled}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="place">Place</SelectItem>
-                <SelectItem value="product">Brand</SelectItem>
-                <SelectItem value="food">Food</SelectItem>
-                <SelectItem value="movie">Movie</SelectItem>
-                <SelectItem value="book">Book</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <div className="relative flex-1">
-              <Input
-                placeholder={`Search for a parent ${entityType}...`}
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full pr-8"
-                ref={inputRef}
-                disabled={disabled}
-              />
-              <div className="absolute inset-y-0 right-2 flex items-center">
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                ) : searchQuery.trim() ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={clearSearch}
-                    className="h-6 w-6 p-0"
-                    disabled={disabled}
-                  >
-                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
-                  </Button>
-                ) : (
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
+            />
+            <div className="absolute inset-y-0 right-2 flex items-center">
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : searchQuery.trim() ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={clearSearch}
+                  className="h-6 w-6 p-0"
+                  disabled={disabled}
+                >
+                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                </Button>
+              ) : (
+                <Search className="h-4 w-4 text-muted-foreground" />
+              )}
             </div>
           </div>
           
           {/* Search Results */}
-          {searchQuery.length >= 2 && showResults && (
+          {searchQuery.length >= 1 && showResults && (
             <div 
               ref={resultsRef}
               className="border rounded-md max-h-40 overflow-y-auto w-full bg-background"
             >
               {isLoading ? (
                 <div className="p-2 text-sm text-center">Loading...</div>
+              ) : searchResults.length > 0 ? (
+                <div className="divide-y">
+                  {searchResults.map((entity) => (
+                    <div
+                      key={entity.id}
+                      className="flex items-center hover:bg-accent/30 cursor-pointer p-2"
+                      onClick={() => handleEntitySelect(entity)}
+                    >
+                      <div className="flex-shrink-0 mr-2">
+                        <ImageWithFallback
+                          src={getImageUrl(entity)}
+                          alt={entity.name}
+                          className="w-8 h-8 object-cover rounded"
+                          fallbackSrc={getImageUrl(entity)}
+                          entityType={entity.type}
+                        />
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate" title={entity.name}>
+                          {entity.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground capitalize">
+                          {entity.type}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <>
-                  {/* Local Results */}
-                  {getFilteredResults(localResults).length > 0 && (
-                    <div className="divide-y">
-                      {getFilteredResults(localResults).map((entity) => (
-                        <div
-                          key={entity.id}
-                          className="flex items-center hover:bg-accent/30 cursor-pointer p-2"
-                          onClick={() => handleEntitySelect(entity)}
-                        >
-                          <div className="flex-shrink-0 mr-2">
-                            <ImageWithFallback
-                              src={getImageUrl(entity)}
-                              alt={entity.name}
-                              className="w-8 h-8 object-cover rounded"
-                              fallbackSrc={getImageUrl({})}
-                              entityType={entity.type}
-                            />
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate" title={entity.name}>
-                              {entity.name}
-                            </div>
-                            <div className="text-xs text-muted-foreground capitalize">
-                              {entity.type}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* External Results */}
-                  {externalResults.length > 0 && (
-                    <div className="divide-y">
-                      {externalResults.map((result, index) => (
-                        <div
-                          key={`external-${index}`}
-                          className="flex items-center hover:bg-accent/30 cursor-pointer p-2"
-                          onClick={() => handleExternalResultSelect(result)}
-                        >
-                          <div className="flex-shrink-0 mr-2">
-                            <ImageWithFallback
-                              src={getImageUrl(result)}
-                              alt={result.name}
-                              className="w-8 h-8 object-cover rounded"
-                              fallbackSrc={getImageUrl({})}
-                              entityType={entityType}
-                            />
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate" title={result.name}>
-                              {result.name}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* No Results */}
-                  {getFilteredResults(localResults).length === 0 && externalResults.length === 0 && (
-                    <div className="p-2 text-sm text-center text-muted-foreground">
-                      No results found
-                    </div>
-                  )}
-                </>
+                <div className="p-2 text-sm text-center text-muted-foreground">
+                  No results found
+                </div>
               )}
             </div>
           )}
