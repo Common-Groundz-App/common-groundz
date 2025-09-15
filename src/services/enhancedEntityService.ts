@@ -80,6 +80,7 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, use
         api_source: enhancedData.api_source,
         api_ref: enhancedData.api_ref,
         website_url: enhancedData.website_url || null, // Convert empty strings to null
+        parent_id: parentId, // Set the parent_id from metadata
         metadata: enhancedData.metadata,
         authors: enhancedData.authors,
         publication_year: enhancedData.publication_year,
@@ -102,9 +103,7 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, use
         // Set user creation flags
         created_by: userId || null,
         user_created: isUserCreated,
-        approval_status: isUserCreated ? 'pending' : 'approved',
-        // Set parent relationship if provided
-        parent_id: parentId || null
+        approval_status: isUserCreated ? 'pending' : 'approved'
       })
       .select()
       .single();
