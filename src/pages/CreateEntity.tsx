@@ -22,7 +22,6 @@ export interface CreateEntityFormData {
   categoryId: string;
   parentEntityId: string;
   parentEntityName: string;
-  parentEntityImageUrl: string;
   websiteUrl: string;
   imageFile: File | null;
   imageUrl: string;
@@ -38,7 +37,6 @@ const initialFormData: CreateEntityFormData = {
   categoryId: '',
   parentEntityId: '',
   parentEntityName: '',
-  parentEntityImageUrl: '',
   websiteUrl: '',
   imageFile: null,
   imageUrl: '',
@@ -174,18 +172,15 @@ export default function CreateEntity() {
             entityType={formData.entityType!}
             selectedBrandId={formData.parentEntityId || ''}
             selectedBrandName={formData.parentEntityName || ''}
-            selectedBrandImageUrl={formData.parentEntityImageUrl || ''}
-            onBrandSelect={(brandId, brandName, brandImageUrl) => {
-              console.log('Brand selected in parent:', brandId, brandName, brandImageUrl);
+            onBrandSelect={(brandId, brandName) => {
+              console.log('Brand selected in parent:', brandId, brandName);
               updateField('parentEntityId', brandId || undefined);
               updateField('parentEntityName', brandName || undefined);
-              updateField('parentEntityImageUrl', brandImageUrl || undefined);
             }}
             onSkip={() => {
-              console.log('Skip button clicked - clearing selection and advancing to step 3');
+              console.log('Skip button clicked - advancing to step 3');
               updateField('parentEntityId', undefined);
               updateField('parentEntityName', undefined);
-              updateField('parentEntityImageUrl', undefined);
               setCurrentStep(3);
             }}
           />

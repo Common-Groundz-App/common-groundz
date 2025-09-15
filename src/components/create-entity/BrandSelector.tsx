@@ -16,8 +16,7 @@ interface BrandSelectorProps {
   entityType: EntityType;
   selectedBrandId: string;
   selectedBrandName: string;
-  selectedBrandImageUrl: string;
-  onBrandSelect: (brandId: string, brandName: string, brandImageUrl: string) => void;
+  onBrandSelect: (brandId: string, brandName: string) => void;
   onSkip?: () => void; // Add optional skip callback
 }
 
@@ -34,7 +33,6 @@ export function BrandSelector({
   entityType,
   selectedBrandId,
   selectedBrandName,
-  selectedBrandImageUrl,
   onBrandSelect,
   onSkip
 }: BrandSelectorProps) {
@@ -85,14 +83,14 @@ export function BrandSelector({
     console.log('Brand selected:', brand);
     // Update local state immediately for instant visual feedback
     setLocalSelectedBrandId(brand.id);
-    onBrandSelect(brand.id, brand.name, brand.image_url || '');
+    onBrandSelect(brand.id, brand.name);
   };
 
   const handleSkipClick = () => {
     console.log('Skip clicked - clearing brand selection');
     // Update local state immediately 
     setLocalSelectedBrandId('');
-    onBrandSelect('', '', '');
+    onBrandSelect('', '');
     onSkip?.(); // Call the skip callback if provided
   };
 
@@ -152,7 +150,7 @@ export function BrandSelector({
       
       if (newBrand) {
         setLocalSelectedBrandId(newBrand.id);
-        onBrandSelect(newBrand.id, newBrand.name, newBrand.image_url || '');
+        onBrandSelect(newBrand.id, newBrand.name);
         // Reset form
         setNewBrandName('');
         setNewBrandDescription('');
@@ -190,12 +188,12 @@ export function BrandSelector({
   };
 
   const handleSkip = () => {
-    onBrandSelect('', '', '');
+    onBrandSelect('', '');
   };
 
   const handleClear = () => {
     setLocalSelectedBrandId('');
-    onBrandSelect('', '', '');
+    onBrandSelect('', '');
   };
 
   const getEntityTypeLabel = (type: EntityType) => {
@@ -231,18 +229,21 @@ export function BrandSelector({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center overflow-hidden">
-                  {selectedBrandImageUrl ? (
-                    <img
-                      src={selectedBrandImageUrl}
-                      alt={selectedBrandName}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <Building2 className="w-5 h-5 text-primary" />
-                  )}
+                  {(() => {
+                    const selectedBrand = brands.find(b => b.id === localSelectedBrandId);
+                    return selectedBrand?.image_url ? (
+                      <img
+                        src={selectedBrand.image_url}
+                        alt={selectedBrandName}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <Building2 className="w-5 h-5 text-primary" />
+                    );
+                  })()}
                 </div>
                 <div>
                   <p className="font-medium text-foreground">{selectedBrandName}</p>
