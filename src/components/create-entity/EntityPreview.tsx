@@ -1,13 +1,12 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CreateEntityFormData } from '@/pages/CreateEntity';
-import { useBrandRehydration } from '@/hooks/useBrandRehydration';
 import { 
   Edit, Globe, MapPin, Building2, Package, BookOpen, 
   Film, Monitor, GraduationCap, Smartphone, Gamepad2, 
-  Compass, AlertCircle, Loader2 
+  Compass, AlertCircle 
 } from 'lucide-react';
 
 interface EntityPreviewProps {
@@ -16,34 +15,6 @@ interface EntityPreviewProps {
 }
 
 export function EntityPreview({ formData, onEdit }: EntityPreviewProps) {
-  // Use brand rehydration hook to fetch missing brand name
-  const { brandName, brandImageUrl, isLoading } = useBrandRehydration(
-    formData.parentEntityId && !formData.parentEntityName ? formData.parentEntityId : undefined
-  );
-
-  // Get the effective brand name and image URL (from form data or rehydrated)
-  const effectiveBrandName = formData.parentEntityName || brandName;
-  const effectiveBrandImageUrl = formData.parentEntityImageUrl || brandImageUrl;
-
-  // 🐛 DEBUG: Track formData changes in EntityPreview
-  useEffect(() => {
-    console.log('🔍 [EntityPreview] Component re-rendered with formData:', {
-      parentEntityId: formData.parentEntityId,
-      parentEntityName: formData.parentEntityName,
-      parentEntityImageUrl: formData.parentEntityImageUrl,
-      rehydratedBrandName: brandName,
-      effectiveBrandName,
-      fullFormData: formData
-    });
-  }, [formData, brandName, effectiveBrandName]);
-
-  // 🐛 DEBUG: Track specific parentEntityName changes
-  useEffect(() => {
-    console.log('🔍 [EntityPreview] parentEntityName changed:', formData.parentEntityName);
-  }, [formData.parentEntityName]);
-
-  // 🐛 DEBUG: Log what we're about to render
-  console.log('🔍 [EntityPreview] About to render with parentEntityName:', formData.parentEntityName);
   const getEntityTypeIcon = () => {
     switch (formData.entityType) {
       case 'product': return Package;
@@ -135,17 +106,10 @@ export function EntityPreview({ formData, onEdit }: EntityPreviewProps) {
                 {formData.name || 'Untitled'}
               </h3>
               
-              {(effectiveBrandName || isLoading) && (
+              {formData.parentEntityName && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Building2 className="w-4 h-4" />
-                  {isLoading ? (
-                    <div className="flex items-center gap-1">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      <span>Loading brand...</span>
-                    </div>
-                  ) : (
-                    <span>by {effectiveBrandName}</span>
-                  )}
+                  <span>by {formData.parentEntityName}</span>
                 </div>
               )}
             </div>
@@ -204,14 +168,7 @@ export function EntityPreview({ formData, onEdit }: EntityPreviewProps) {
                 <div>
                   <p className="text-sm font-medium text-foreground">Brand/Organization</p>
                   <p className="text-sm text-muted-foreground">
-                    {isLoading ? (
-                      <div className="flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Loading brand...</span>
-                      </div>
-                    ) : (
-                      effectiveBrandName || 'No brand selected'
-                    )}
+                    {formData.parentEntityName || 'No brand selected'}
                   </p>
                 </div>
                 <Button
