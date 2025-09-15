@@ -282,7 +282,11 @@ export const findOrCreateEntity = async (
 };
 
 // Get entities by type (for searching/filtering)
-export const getEntitiesByType = async (type: EntityType | EntityTypeString, searchTerm: string = ''): Promise<Entity[]> => {
+export const getEntitiesByType = async (
+  type: EntityType | EntityTypeString, 
+  searchTerm: string = '',
+  userId?: string | null
+): Promise<Entity[]> => {
   // Convert type to string if it's an enum
   const typeAsString = typeof type === 'string' 
     ? type as string 
@@ -296,6 +300,15 @@ export const getEntitiesByType = async (type: EntityType | EntityTypeString, sea
     
   if (searchTerm) {
     query = query.ilike('name', `%${searchTerm}%`);
+  }
+  
+  // Apply approval status filtering based on user context
+  if (userId) {
+    // Show approved entities + user's own pending entities
+    query = query.or(`approval_status.eq.approved,and(approval_status.eq.pending,created_by.eq.${userId})`);
+  } else {
+    // Show only approved entities for non-authenticated users
+    query = query.eq('approval_status', 'approved');
   }
   
   const { data, error } = await query.order('name');

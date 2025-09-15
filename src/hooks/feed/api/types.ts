@@ -5,41 +5,55 @@ export * from '../types';
 // Import the EntityType enum directly
 import { EntityType } from '@/services/recommendation/types';
 
-// Add string literal compatibility types for existing components - expanded to include all entity types
-export type EntityTypeString = 'movie' | 'book' | 'food' | 'product' | 'place' | 'music' | 'tv' | 'art' | 'activity' | 'drink' | 'travel' | 'people';
+// Updated string literal compatibility types for new entity architecture (includes legacy during migration)
+export type EntityTypeString = 'product' | 'place' | 'book' | 'movie' | 'tv_show' | 'course' | 'app' | 'game' | 'experience' | 'brand' | 'food' | 'tv' | 'music' | 'art' | 'activity' | 'drink' | 'travel' | 'people';
 
-// Mapping functions to convert between string literals and enum values
+// Mapping functions to convert between string literals and enum values (with legacy support)
 export function mapStringToEntityType(stringType: EntityTypeString): EntityType {
   switch (stringType) {
-    case 'movie': return EntityType.Movie;
-    case 'book': return EntityType.Book;
-    case 'food': return EntityType.Food;
+    // New types
     case 'product': return EntityType.Product;
     case 'place': return EntityType.Place;
-    case 'music': return EntityType.Music;
-    case 'tv': return EntityType.TV;
-    case 'art': return EntityType.Art;
-    case 'activity': return EntityType.Activity;
-    case 'drink': return EntityType.Drink;
-    case 'travel': return EntityType.Travel;
-    case 'people': return EntityType.Place; // Map people to Place enum since it's not a true entity type
-    default: return EntityType.Place;
+    case 'book': return EntityType.Book;
+    case 'movie': return EntityType.Movie;
+    case 'tv_show': return EntityType.TvShow;
+    case 'course': return EntityType.Course;
+    case 'app': return EntityType.App;
+    case 'game': return EntityType.Game;
+    case 'experience': return EntityType.Experience;
+    case 'brand': return EntityType.Brand;
+    
+    // Legacy types mapped to new types
+    case 'food':
+    case 'drink':
+      return EntityType.Product;
+    case 'tv':
+      return EntityType.TvShow;
+    case 'music':
+    case 'art':
+      return EntityType.Product;
+    case 'activity':
+    case 'travel':
+      return EntityType.Experience;
+    case 'people':
+      return EntityType.Brand;
+    
+    default: return EntityType.Product;
   }
 }
 
 export function mapEntityTypeToString(enumType: EntityType): EntityTypeString {
   switch (enumType) {
-    case EntityType.Movie: return 'movie';
-    case EntityType.Book: return 'book';
-    case EntityType.Food: return 'food';
     case EntityType.Product: return 'product';
     case EntityType.Place: return 'place';
-    case EntityType.Music: return 'music';
-    case EntityType.TV: return 'tv';
-    case EntityType.Art: return 'art';
-    case EntityType.Activity: return 'activity';
-    case EntityType.Drink: return 'drink';
-    case EntityType.Travel: return 'travel';
-    default: return 'place';
+    case EntityType.Book: return 'book';
+    case EntityType.Movie: return 'movie';
+    case EntityType.TvShow: return 'tv_show';
+    case EntityType.Course: return 'course';
+    case EntityType.App: return 'app';
+    case EntityType.Game: return 'game';
+    case EntityType.Experience: return 'experience';
+    case EntityType.Brand: return 'brand';
+    default: return 'product';
   }
 }

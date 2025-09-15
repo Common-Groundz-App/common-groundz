@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Entity } from '@/services/recommendation/types';
+import { Entity, EntityType } from '@/services/recommendation/types';
 import { Utensils, Zap, Package2 } from 'lucide-react';
 
 interface EntitySpecsCardProps {
@@ -138,13 +138,12 @@ export const EntitySpecsCard: React.FC<EntitySpecsCardProps> = ({ entity }) => {
     );
   };
 
-  // Render based on entity type
+  // Render based on entity type - updated for new enum values
   switch (entity.type) {
-    case 'food':
-      return renderFoodSpecs();
-    case 'product':
+    case EntityType.Product:
       return renderProductSpecs();
-    case 'movie':
+    case EntityType.Movie:
+    case EntityType.TvShow:
       return renderMovieSpecs();
     default:
       return null;

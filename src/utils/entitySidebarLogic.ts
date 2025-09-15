@@ -19,8 +19,8 @@ export interface ContactInfo {
 }
 
 export const shouldShowBusinessHours = (entity: Entity): boolean => {
-  // Only show for places and food establishments
-  if (entity.type !== EntityType.Place && entity.type !== EntityType.Food) {
+  // Only show for places and product entities (legacy food items are now products)
+  if (entity.type !== EntityType.Place && entity.type !== EntityType.Product) {
     return false;
   }
   

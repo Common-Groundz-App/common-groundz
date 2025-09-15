@@ -1,31 +1,32 @@
 
 import { EntityType } from '@/services/recommendation/types';
 
-// Database-supported entity types (from the database schema)
+// Database-supported entity types (from the database schema) - updated for Phase 1
 const DATABASE_SUPPORTED_TYPES: EntityType[] = [
-  EntityType.Book,
-  EntityType.Movie, 
-  EntityType.Food,
   EntityType.Product,
-  EntityType.Place
+  EntityType.Place, 
+  EntityType.Book,
+  EntityType.Movie,
+  EntityType.TvShow,
+  EntityType.Course,
+  EntityType.App,
+  EntityType.Game,
+  EntityType.Experience,
+  EntityType.Brand
 ];
 
-// Mapping from unsupported types to database-supported types
+// Type mapping for all entity types - all are now supported
 const TYPE_MAPPING: Record<EntityType, EntityType> = {
-  // Supported types map to themselves
-  [EntityType.Book]: EntityType.Book,
-  [EntityType.Movie]: EntityType.Movie,
-  [EntityType.Food]: EntityType.Food,
   [EntityType.Product]: EntityType.Product,
   [EntityType.Place]: EntityType.Place,
-  
-  // Unsupported types map to closest supported type
-  [EntityType.TV]: EntityType.Movie,        // TV shows are similar to movies
-  [EntityType.Music]: EntityType.Product,   // Music albums/songs as products
-  [EntityType.Art]: EntityType.Product,     // Art pieces as products
-  [EntityType.Drink]: EntityType.Food,      // Drinks are food-related
-  [EntityType.Travel]: EntityType.Place,    // Travel destinations are places
-  [EntityType.Activity]: EntityType.Place   // Activities happen at places
+  [EntityType.Book]: EntityType.Book,
+  [EntityType.Movie]: EntityType.Movie,
+  [EntityType.TvShow]: EntityType.TvShow,
+  [EntityType.Course]: EntityType.Course,
+  [EntityType.App]: EntityType.App,
+  [EntityType.Game]: EntityType.Game,
+  [EntityType.Experience]: EntityType.Experience,
+  [EntityType.Brand]: EntityType.Brand
 };
 
 /**
@@ -52,13 +53,22 @@ export const getContextualFieldLabel = (type: EntityType): string => {
     case EntityType.Book:
       return 'Author';
     case EntityType.Movie:
+    case EntityType.TvShow:
       return 'Studio';
     case EntityType.Place:
       return 'Location';
     case EntityType.Product:
       return 'Brand';
-    case EntityType.Food:
-      return 'Venue';
+    case EntityType.Course:
+      return 'Instructor';
+    case EntityType.App:
+      return 'Developer';
+    case EntityType.Game:
+      return 'Developer';
+    case EntityType.Experience:
+      return 'Organizer';
+    case EntityType.Brand:
+      return 'Parent Company';
     default:
       return 'Source';
   }
@@ -71,18 +81,16 @@ export const getEntityTypeFallbackImage = (type: EntityType): string => {
   const mappedType = mapEntityTypeToDatabase(type);
   
   const fallbacks: Record<EntityType, string> = {
-    [EntityType.Movie]: 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
-    [EntityType.Book]: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
-    [EntityType.Food]: 'https://images.unsplash.com/photo-1555939594-58d7698950b',
-    [EntityType.Place]: 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
     [EntityType.Product]: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
-    // Fallback mappings for unsupported types (won't be used due to mapping above)
-    [EntityType.Activity]: 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-    [EntityType.Music]: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
-    [EntityType.Art]: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
-    [EntityType.TV]: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
-    [EntityType.Drink]: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
-    [EntityType.Travel]: 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
+    [EntityType.Place]: 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
+    [EntityType.Book]: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
+    [EntityType.Movie]: 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
+    [EntityType.TvShow]: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
+    [EntityType.Course]: 'https://images.unsplash.com/photo-1501504905252-473c47e087f8',
+    [EntityType.App]: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c',
+    [EntityType.Game]: 'https://images.unsplash.com/photo-1511512578047-dfb367046420',
+    [EntityType.Experience]: 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
+    [EntityType.Brand]: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43'
   };
 
   return fallbacks[mappedType] || fallbacks[EntityType.Product];

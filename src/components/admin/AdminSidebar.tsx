@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Shield, BarChart3, Database, FileText, MessageSquare, Award } from 'lucide-react';
+import { Shield, BarChart3, Database, FileText, MessageSquare, Award, AlertTriangle, Plus } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 
 interface AdminSidebarProps {
@@ -54,12 +54,30 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       }
     },
     {
+      name: 'New Submissions',
+      url: '#new-submissions',
+      icon: Plus,
+      onClick: () => {
+        setCurrentActiveTab('New Submissions');
+        onTabChange('new-submissions');
+      }
+    },
+    {
       name: 'Brand Claims',
       url: '#brand-claims',
       icon: Award,
       onClick: () => {
         setCurrentActiveTab('Brand Claims');
         onTabChange('brand-claims');
+      }
+    },
+    {
+      name: 'Quality Control',
+      url: '#quality-control',
+      icon: AlertTriangle,
+      onClick: () => {
+        setCurrentActiveTab('Quality Control');
+        onTabChange('quality-control');
       }
     }
   ];
@@ -75,8 +93,12 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         return 'Content Management';
       case 'suggestions-management':
         return 'Suggestions';
+      case 'new-submissions':
+        return 'New Submissions';
       case 'brand-claims':
         return 'Brand Claims';
+      case 'quality-control':
+        return 'Quality Control';
       default:
         return 'Overview';
     }

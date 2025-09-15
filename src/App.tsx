@@ -28,6 +28,7 @@ import MoviesPage from '@/pages/MoviesPage';
 import FoodPage from '@/pages/FoodPage';
 import AdminPortal from '@/pages/AdminPortal';
 import AdminEntityEdit from '@/pages/admin/AdminEntityEdit';
+import CreateEntity from '@/pages/CreateEntity';
 import NotFound from '@/pages/NotFound';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
@@ -163,6 +164,11 @@ function App() {
                     <AdminRoute>
                       <AdminEntityEdit />
                     </AdminRoute>
+                  } />
+                  <Route path="/create-entity" element={
+                    <ProtectedRoute>
+                      <CreateEntity />
+                    </ProtectedRoute>
                   } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
