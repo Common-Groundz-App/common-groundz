@@ -108,7 +108,18 @@ export function EntityPreview({ formData, onEdit }: EntityPreviewProps) {
               
               {formData.parentEntityName && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Building2 className="w-4 h-4" />
+                  {formData.parentEntityImageUrl ? (
+                    <img
+                      src={formData.parentEntityImageUrl}
+                      alt={formData.parentEntityName}
+                      className="w-4 h-4 object-cover rounded"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <Building2 className="w-4 h-4" />
+                  )}
                   <span>by {formData.parentEntityName}</span>
                 </div>
               )}
