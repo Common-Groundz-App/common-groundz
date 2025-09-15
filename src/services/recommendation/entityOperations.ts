@@ -302,14 +302,8 @@ export const getEntitiesByType = async (
     query = query.ilike('name', `%${searchTerm}%`);
   }
   
-  // Apply approval status filtering based on user context
-  if (userId) {
-    // Show approved entities + user's own pending entities
-    query = query.or(`approval_status.eq.approved,and(approval_status.eq.pending,created_by.eq.${userId})`);
-  } else {
-    // Show only approved entities for non-authenticated users
-    query = query.eq('approval_status', 'approved');
-  }
+  // Show all entities regardless of approval status to prevent duplicates
+  // Users can see all brands/entities to make informed decisions
   
   const { data, error } = await query.order('name');
 

@@ -449,11 +449,23 @@ export function BrandSelector({
                             <h3 className="font-medium text-foreground truncate">
                               {brand.name}
                             </h3>
-                            {isSelected && (
-                              <Badge variant="default" className="text-xs">
-                                Selected
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {brand.approval_status === 'pending' && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Pending Approval
+                                </Badge>
+                              )}
+                              {brand.approval_status === 'approved' && (
+                                <Badge variant="outline" className="text-xs">
+                                  Approved
+                                </Badge>
+                              )}
+                              {isSelected && (
+                                <Badge variant="default" className="text-xs">
+                                  Selected
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                           {brand.description && (
                             <p className="text-sm text-muted-foreground truncate">
