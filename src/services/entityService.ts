@@ -22,19 +22,9 @@ export const fetchEntityBySlug = async (slugOrId: string, userId?: string | null
     .select('*')
     .eq('is_deleted', false);
     
-  // Apply approval status filtering based on user role
-  if (isAdmin) {
-    // Admins can see all entities regardless of approval status
-    console.log('👨‍💼 Admin user - showing all entities');
-  } else if (currentUserId) {
-    // Regular users can see approved entities OR their own pending entities
-    query = query.or(`approval_status.eq.approved,and(approval_status.eq.pending,created_by.eq.${currentUserId})`);
-    console.log('👤 Regular user - showing approved entities and own pending entities');
-  } else {
-    // Anonymous users can only see approved entities
-    query = query.eq('approval_status', 'approved');
-    console.log('👤 Anonymous user - showing only approved entities');
-  }
+  // Show all entities regardless of approval status to prevent duplicates
+  // Users can see all entities to make informed decisions about duplicates
+  console.log('👥 Showing all entities regardless of approval status for duplicate prevention');
   
   // First try to fetch by slug
   let { data, error } = await query
