@@ -22,6 +22,8 @@ import { ContactInfoEditor } from '@/components/admin/ContactInfoEditor';
 import { EntityTypeSpecificFields } from '@/components/admin/EntityTypeSpecificFields';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
+import { ParentEntitySelector } from '@/components/admin/ParentEntitySelector';
+import { EntityAdapter } from '@/components/profile/circles/types';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -223,16 +225,17 @@ const AdminEntityEdit = () => {
       const { error } = await supabase
         .from('entities')
         .update({
-          name: entity.name.trim(),
-          type: entity.type,
-          slug: entity.slug?.trim() || null,
-          description: entity.description?.trim() || null,
-          image_url: entity.image_url?.trim() || null,
-          website_url: entity.website_url?.trim() || null,
-          venue: entity.venue?.trim() || null,
-          api_source: entity.api_source?.trim() || null,
-          api_ref: entity.api_ref?.trim() || null,
-          metadata: updatedMetadata,
+           name: entity.name.trim(),
+           type: entity.type,
+           slug: entity.slug?.trim() || null,
+           description: entity.description?.trim() || null,
+           image_url: entity.image_url?.trim() || null,
+           website_url: entity.website_url?.trim() || null,
+           venue: entity.venue?.trim() || null,
+           api_source: entity.api_source?.trim() || null,
+           api_ref: entity.api_ref?.trim() || null,
+           parent_id: entity.parent_id || null,
+           metadata: updatedMetadata,
           category_id: entity.category_id || null,
           popularity_score: entity.popularity_score || null,
           photo_reference: entity.photo_reference?.trim() || null,
@@ -684,6 +687,17 @@ const AdminEntityEdit = () => {
                         disabled={entity.is_deleted}
                       />
                     </div>
+
+                    {/* Parent Entity Selector */}
+                    <ParentEntitySelector
+                      selectedParentId={entity.parent_id}
+                      onParentChange={(parentEntity) => {
+                        handleInputChange('parent_id', parentEntity?.id || null);
+                      }}
+                      currentEntityId={entity.id}
+                      currentEntityType={entity.type}
+                      disabled={entity.is_deleted}
+                    />
 
                      <div className="space-y-2">
                        <Label htmlFor="description">Description</Label>
