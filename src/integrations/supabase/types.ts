@@ -2706,7 +2706,12 @@ export type Database = {
       }
       detect_potential_duplicates: {
         Args: Record<PropertyKey, never> | { similarity_threshold?: number }
-        Returns: number
+        Returns: {
+          detection_method: string
+          entity_a_id: string
+          entity_b_id: string
+          similarity_score: number
+        }[]
       }
       fix_duplicate_slugs: {
         Args: Record<PropertyKey, never>
