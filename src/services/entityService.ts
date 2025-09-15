@@ -7,38 +7,15 @@ import { MediaItem } from '@/types/common';
 /**
  * Fetch an entity by its slug or ID
  */
-export const fetchEntityBySlug = async (slugOrId: string, userId?: string | null): Promise<Entity | null> => {
-  console.log('🔍 fetchEntityBySlug called with:', slugOrId, userId ? 'with user context' : 'no user context');
-  
-  // Get current user from supabase auth if not provided
-  const currentUserId = userId || (await supabase.auth.getUser()).data.user?.id;
-  
-  // Check if user is admin
-  const isAdmin = await checkIfUserIsAdmin(currentUserId);
-  
-  // Build query with approval status filtering
-  let query = supabase
-    .from('entities')
-    .select('*')
-    .eq('is_deleted', false);
-    
-  // Apply approval status filtering based on user role
-  if (isAdmin) {
-    // Admins can see all entities regardless of approval status
-    console.log('👨‍💼 Admin user - showing all entities');
-  } else if (currentUserId) {
-    // Regular users can see approved entities OR their own pending entities
-    query = query.or(`approval_status.eq.approved,and(approval_status.eq.pending,created_by.eq.${currentUserId})`);
-    console.log('👤 Regular user - showing approved entities and own pending entities');
-  } else {
-    // Anonymous users can only see approved entities
-    query = query.eq('approval_status', 'approved');
-    console.log('👤 Anonymous user - showing only approved entities');
-  }
+export const fetchEntityBySlug = async (slugOrId: string): Promise<Entity | null> => {
+  console.log('🔍 fetchEntityBySlug called with:', slugOrId);
   
   // First try to fetch by slug
-  let { data, error } = await query
+  let { data, error } = await supabase
+    .from('entities')
+    .select('*')
     .eq('slug', slugOrId)
+    .eq('is_deleted', false)
     .maybeSingle();
 
   if (error) {
@@ -48,8 +25,11 @@ export const fetchEntityBySlug = async (slugOrId: string, userId?: string | null
   // If not found by slug and the parameter looks like a UUID, try by ID
   if (!data && isValidUUID(slugOrId)) {
     console.log('🔄 Slug lookup failed, trying by ID:', slugOrId);
-    const result = await query
+    const result = await supabase
+      .from('entities')
+      .select('*')
       .eq('id', slugOrId)
+      .eq('is_deleted', false)
       .maybeSingle();
     
     data = result.data;
@@ -61,29 +41,12 @@ export const fetchEntityBySlug = async (slugOrId: string, userId?: string | null
   }
 
   if (data) {
-    console.log('✅ Entity found:', data.name, 'with slug:', data.slug, 'approval status:', data.approval_status);
+    console.log('✅ Entity found:', data.name, 'with slug:', data.slug);
   } else {
-    console.log('❌ Entity not found or not accessible for:', slugOrId);
+    console.log('❌ Entity not found for:', slugOrId);
   }
 
   return data as Entity;
-};
-
-// Helper function to check if user is admin
-const checkIfUserIsAdmin = async (userId?: string | null): Promise<boolean> => {
-  if (!userId) return false;
-  
-  try {
-    const { data, error } = await supabase.rpc('is_current_user_admin');
-    if (error) {
-      console.error('Error checking admin status:', error);
-      return false;
-    }
-    return data === true;
-  } catch (error) {
-    console.error('Error checking admin status:', error);
-    return false;
-  }
 };
 
 /**

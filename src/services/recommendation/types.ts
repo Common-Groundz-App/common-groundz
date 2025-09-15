@@ -19,13 +19,6 @@ export interface Entity {
   is_claimed?: boolean;
   parent_id?: string;
   
-  // User creation & moderation fields (Phase 1)
-  user_created?: boolean;
-  created_by?: string;
-  approval_status?: 'pending' | 'approved' | 'rejected';
-  reviewed_by?: string;
-  reviewed_at?: string;
-  
   // Enhanced metadata fields
   authors?: string[];
   publication_year?: number;
@@ -43,16 +36,17 @@ export interface Entity {
 }
 
 export enum EntityType {
-  Product = 'product',
-  Place = 'place', 
-  Book = 'book',
   Movie = 'movie',
-  TvShow = 'tv_show',
-  Course = 'course',
-  App = 'app',
-  Game = 'game',
-  Experience = 'experience',
-  Brand = 'brand'
+  Book = 'book',
+  Food = 'food',
+  Product = 'product',
+  Place = 'place',
+  Activity = 'activity',
+  Music = 'music',
+  Art = 'art',
+  TV = 'tv',
+  Drink = 'drink',
+  Travel = 'travel'
 }
 
 export enum RecommendationCategory {

@@ -37,36 +37,12 @@ export interface EnhancedEntityData {
 /**
  * Enhanced entity creation with comprehensive metadata extraction
  */
-export const createEnhancedEntity = async (rawData: any, entityType: string, userId?: string | null, imageFile?: File | null): Promise<Entity | null> => {
+export const createEnhancedEntity = async (rawData: any, entityType: string): Promise<Entity | null> => {
   try {
     console.log('🔧 Creating enhanced entity from raw data:', rawData);
     
-    // Handle image upload first if we have an image file
-    let finalImageUrl = rawData.image_url;
-    if (imageFile && userId) {
-      console.log('📸 Uploading image file to storage...');
-      const { uploadEntityImage } = await import('@/services/entityImageService');
-      const uploadResult = await uploadEntityImage(imageFile, userId);
-      
-      if (uploadResult.success && uploadResult.url) {
-        finalImageUrl = uploadResult.url;
-        console.log('✅ Image uploaded successfully:', finalImageUrl);
-      } else {
-        console.warn('⚠️ Image upload failed:', uploadResult.error);
-      }
-    }
-    
     // Extract enhanced metadata based on entity type
-    const enhancedData = await extractEnhancedMetadata({
-      ...rawData,
-      image_url: finalImageUrl
-    }, entityType);
-    
-    // Determine if this is a user-created entity vs system-generated
-    const isUserCreated = Boolean(userId && !enhancedData.api_source);
-    
-    // Extract parent_id from metadata if provided
-    const parentId = enhancedData.metadata?.parent_id;
+    const enhancedData = await extractEnhancedMetadata(rawData, entityType);
     
     // Create entity first WITHOUT the image to get the actual entity ID
     const { data: entity, error } = await supabase
@@ -79,7 +55,7 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, use
         image_url: enhancedData.image_url, // Keep original external URL temporarily
         api_source: enhancedData.api_source,
         api_ref: enhancedData.api_ref,
-        website_url: enhancedData.website_url || null, // Convert empty strings to null
+        website_url: enhancedData.website_url,
         metadata: enhancedData.metadata,
         authors: enhancedData.authors,
         publication_year: enhancedData.publication_year,
@@ -98,13 +74,7 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, use
         last_enriched_at: new Date().toISOString(),
         enrichment_source: enhancedData.api_source,
         data_quality_score: calculateDataQualityScore(enhancedData),
-        slug: generateSlug(enhancedData.name),
-        // Set user creation flags
-        created_by: userId || null,
-        user_created: isUserCreated,
-        approval_status: isUserCreated ? 'pending' : 'approved',
-        // Set parent relationship if provided
-        parent_id: parentId || null
+        slug: generateSlug(enhancedData.name)
       })
       .select()
       .single();
@@ -183,7 +153,7 @@ const extractEnhancedMetadata = async (rawData: any, entityType: string): Promis
     image_url: rawData.image_url,
     api_source: rawData.api_source,
     api_ref: rawData.api_ref,
-    website_url: rawData.website_url || null, // Convert empty strings to null
+    website_url: rawData.website_url,
     metadata: rawData.metadata || {}
   };
   

@@ -6,7 +6,6 @@ import { createEnhancedEntity } from '@/services/enhancedEntityService';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { Entity } from '@/services/recommendation/types';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '@/integrations/supabase/client';
 
 interface OptimisticEntityCreationProps {
   entityType: EntityTypeString;
@@ -25,40 +24,52 @@ export const useOptimisticEntityCreation = ({
   const createEntityOptimistically = useCallback(async (externalData: any) => {
     console.log('🚀 Starting optimistic entity creation for:', externalData.name);
     
+    // Generate temporary ID for immediate navigation
+    const tempEntityId = `temp-${uuidv4()}`;
+    const tempSlug = externalData.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+    
     setIsCreating(true);
     setCreationProgress(10); // Initial progress
     
     try {
-      // Start background entity creation immediately (no optimistic navigation)
+      // Navigate immediately to entity page with optimistic data
+      navigate(`/entity/${tempSlug}`, { 
+        state: { 
+          optimisticEntity: {
+            id: tempEntityId,
+            name: externalData.name,
+            type: entityType,
+            venue: externalData.venue,
+            description: externalData.description,
+            image_url: externalData.image_url,
+            isOptimistic: true,
+            metadata: externalData.metadata
+          },
+          creationInProgress: true
+        }
+      });
+      
+      setCreationProgress(25);
+      
+      // Start background entity creation
       const createdEntity = await createEntityInBackground(externalData, entityType, setCreationProgress);
       
       if (createdEntity) {
         console.log('✅ Entity created successfully:', createdEntity.name);
         
-        // Check if entity is pending approval
-        if (createdEntity.approval_status === 'pending') {
-          // Navigate to a submission confirmation page or show success message
-          toast({
-            title: 'Entity submitted for review',
-            description: `${createdEntity.name} has been submitted and is pending approval. You'll be notified when it's approved.`,
-          });
-          
-          // Navigate to home or stay on current page
-          navigate('/home');
-        } else {
-          // Entity is approved, navigate to entity page
-          navigate(`/entity/${createdEntity.slug || createdEntity.id}`, { 
-            state: { entityCreated: true }
-          });
-          
-          toast({
-            title: 'Entity created',
-            description: `${createdEntity.name} has been added successfully`,
-          });
-        }
+        // Navigate to actual entity page
+        navigate(`/entity/${createdEntity.slug || createdEntity.id}`, { 
+          replace: true,
+          state: { entityCreated: true }
+        });
         
         setCreationProgress(100);
         onEntityCreated?.(createdEntity);
+        
+        toast({
+          title: 'Entity created',
+          description: `${createdEntity.name} has been added successfully`,
+        });
       }
     } catch (error) {
       console.error('❌ Error in optimistic entity creation:', error);
@@ -68,6 +79,9 @@ export const useOptimisticEntityCreation = ({
         description: 'Could not create entity. Please try again.',
         variant: 'destructive'
       });
+      
+      // Navigate back or show error state
+      navigate(-1);
     } finally {
       setIsCreating(false);
       setCreationProgress(0);
@@ -91,15 +105,8 @@ const createEntityInBackground = async (
     console.log('🔄 Starting background entity creation...');
     setProgress(40);
     
-    // Get current user ID for user-created entities
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || null;
-    
-    // Extract imageFile from externalData if present
-    const imageFile = externalData.imageFile || null;
-    
-    // Step 1: Create enhanced entity with metadata extraction and user context
-    const entity = await createEnhancedEntity(externalData, entityType, userId, imageFile);
+    // Step 1: Create enhanced entity with metadata extraction
+    const entity = await createEnhancedEntity(externalData, entityType);
     setProgress(70);
     
     if (!entity) {
