@@ -65,8 +65,15 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, use
     // Determine if this is a user-created entity vs system-generated
     const isUserCreated = Boolean(userId && !enhancedData.api_source);
     
-    // Extract parent_id from metadata if provided
+    // Extract and validate parent_id from metadata
     const parentId = enhancedData.metadata?.parent_id;
+    const validParentId = parentId && parentId.trim() !== '' ? parentId : null;
+    
+    console.log('🔗 Parent ID processing:', {
+      originalParentId: parentId,
+      validParentId: validParentId,
+      metadata: enhancedData.metadata
+    });
     
     // Create entity first WITHOUT the image to get the actual entity ID
     const { data: entity, error } = await supabase
@@ -103,8 +110,8 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, use
         created_by: userId || null,
         user_created: isUserCreated,
         approval_status: isUserCreated ? 'pending' : 'approved',
-        // Set parent relationship if provided
-        parent_id: parentId || null
+        // Set parent relationship if provided (use validated parent_id)
+        parent_id: validParentId
       })
       .select()
       .single();

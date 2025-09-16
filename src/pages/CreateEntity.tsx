@@ -129,6 +129,17 @@ export default function CreateEntity() {
     setIsSubmitting(true);
     
     try {
+      // Convert empty parent ID to null for proper database handling
+      const parentId = formData.parentEntityId && formData.parentEntityId.trim() !== '' 
+        ? formData.parentEntityId 
+        : null;
+      
+      console.log('Form data before submission:', {
+        parentEntityId: formData.parentEntityId,
+        parentEntityName: formData.parentEntityName,
+        convertedParentId: parentId
+      });
+
       const externalData = {
         name: formData.name,
         description: formData.description,
@@ -139,7 +150,7 @@ export default function CreateEntity() {
         metadata: {
           user_created: true,
           category_id: formData.categoryId,
-          parent_id: formData.parentEntityId,
+          parent_id: parentId,
           ...formData.typeSpecificData
         }
       };
@@ -174,13 +185,13 @@ export default function CreateEntity() {
             selectedBrandName={formData.parentEntityName || ''}
             onBrandSelect={(brandId, brandName) => {
               console.log('Brand selected in parent:', brandId, brandName);
-              updateField('parentEntityId', brandId || undefined);
-              updateField('parentEntityName', brandName || undefined);
+              updateField('parentEntityId', brandId || '');
+              updateField('parentEntityName', brandName || '');
             }}
             onSkip={() => {
               console.log('Skip button clicked - advancing to step 3');
-              updateField('parentEntityId', undefined);
-              updateField('parentEntityName', undefined);
+              updateField('parentEntityId', '');
+              updateField('parentEntityName', '');
               setCurrentStep(3);
             }}
           />
