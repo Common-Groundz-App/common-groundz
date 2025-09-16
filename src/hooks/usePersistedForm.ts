@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 
 export function usePersistedForm<T extends Record<string, any>>(
@@ -7,6 +7,7 @@ export function usePersistedForm<T extends Record<string, any>>(
   initialFormData: T
 ) {
   const [formData, setFormData, clearFormData] = useLocalStorage(key, initialFormData);
+  const hasRunCleanup = useRef(false);
 
   // Enhanced debugging for localStorage
   useEffect(() => {
@@ -19,55 +20,16 @@ export function usePersistedForm<T extends Record<string, any>>(
     });
   }, [key]);
 
-  // Debounced update function with enhanced logging
+  // Debounced update function with reduced logging
   const updateField = useCallback((field: keyof T, value: any) => {
-    console.log('🔧 updateField called:', {
-      field: String(field),
-      value,
-      type: typeof value,
-      isNull: value === null,
-      isUndefined: value === undefined
-    });
-    
     setFormData(prev => {
       const newData = {
         ...prev,
         [field]: value
       };
-      
-      // Extra validation for critical fields
-      if (field === 'parentEntityId' || field === 'parentEntityName') {
-        console.log('🚨 CRITICAL FIELD UPDATE:', {
-          field: String(field),
-          oldValue: prev[field],
-          newValue: value,
-          parentEntityId: newData.parentEntityId,
-          parentEntityName: newData.parentEntityName,
-          storageKey: key
-        });
-        
-        // Log to localStorage immediately for debugging
-        try {
-          window.localStorage.setItem(`${key}_debug`, JSON.stringify({
-            timestamp: new Date().toISOString(),
-            field: String(field),
-            value,
-            fullData: newData
-          }));
-        } catch (e) {
-          console.warn('Failed to write debug data:', e);
-        }
-      }
-      
-      console.log('📝 Form data updated:', {
-        field: String(field),
-        oldValue: prev[field],
-        newValue: value,
-        fullData: newData
-      });
       return newData;
     });
-  }, [setFormData, key]);
+  }, [setFormData]);
 
   // Reset to initial state
   const resetForm = useCallback(() => {
@@ -79,17 +41,31 @@ export function usePersistedForm<T extends Record<string, any>>(
     clearFormData();
   }, [clearFormData]);
 
-  // Clear inconsistent parent data on initialization
+  // Clear inconsistent parent data on initialization (runs once)
   const clearInconsistentData = useCallback(() => {
-    const hasParentName = formData.parentEntityName && formData.parentEntityName.trim();
-    const hasParentId = formData.parentEntityId && formData.parentEntityId.trim();
-    
-    if (hasParentName && !hasParentId) {
-      console.log('🧹 Clearing inconsistent parent data on initialization');
-      updateField('parentEntityName', '');
-      updateField('parentEntityId', '');
+    // Only run once to prevent infinite loops
+    if (hasRunCleanup.current) {
+      return;
     }
-  }, [formData.parentEntityName, formData.parentEntityId, updateField]);
+    
+    setFormData(current => {
+      const hasParentName = current.parentEntityName && current.parentEntityName.trim();
+      const hasParentId = current.parentEntityId && current.parentEntityId.trim();
+      
+      if (hasParentName && !hasParentId) {
+        console.log('🧹 Clearing inconsistent parent data on initialization');
+        hasRunCleanup.current = true;
+        return {
+          ...current,
+          parentEntityName: '',
+          parentEntityId: ''
+        };
+      } else {
+        hasRunCleanup.current = true;
+        return current;
+      }
+    });
+  }, [setFormData]);
 
   // Step-aware validation function
   const validateFormIntegrity = useCallback((validationType: 'brand' | 'all' = 'all') => {

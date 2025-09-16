@@ -92,7 +92,7 @@ export default function CreateEntity() {
   // Clear inconsistent data on form initialization
   React.useEffect(() => {
     clearInconsistentData();
-  }, [clearInconsistentData]);
+  }, []); // Run only once on mount
 
   // Add step change monitoring
   React.useEffect(() => {
