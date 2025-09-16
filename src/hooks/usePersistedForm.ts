@@ -79,21 +79,45 @@ export function usePersistedForm<T extends Record<string, any>>(
     clearFormData();
   }, [clearFormData]);
 
-  // Validation function to check form integrity
-  const validateFormIntegrity = useCallback(() => {
+  // Clear inconsistent parent data on initialization
+  const clearInconsistentData = useCallback(() => {
+    const hasParentName = formData.parentEntityName && formData.parentEntityName.trim();
+    const hasParentId = formData.parentEntityId && formData.parentEntityId.trim();
+    
+    if (hasParentName && !hasParentId) {
+      console.log('🧹 Clearing inconsistent parent data on initialization');
+      updateField('parentEntityName', '');
+      updateField('parentEntityId', '');
+    }
+  }, [formData.parentEntityName, formData.parentEntityId, updateField]);
+
+  // Step-aware validation function
+  const validateFormIntegrity = useCallback((validationType: 'brand' | 'all' = 'all') => {
     const hasParentName = formData.parentEntityName && formData.parentEntityName.trim();
     const hasParentId = formData.parentEntityId && formData.parentEntityId.trim();
     
     console.log('🔍 Form integrity check:', {
+      validationType,
       hasParentName: !!hasParentName,
       hasParentId: !!hasParentId,
       parentEntityName: formData.parentEntityName,
       parentEntityId: formData.parentEntityId
     });
     
+    // Only check brand consistency if specifically requested
+    if (validationType === 'brand') {
+      return {
+        isValid: !hasParentName || hasParentId, // If has name, must have ID
+        hasInconsistency: hasParentName && !hasParentId,
+        parentName: hasParentName,
+        parentId: hasParentId
+      };
+    }
+    
+    // For 'all' validation, return basic validity
     return {
-      isValid: !hasParentName || hasParentId, // If has name, must have ID
-      hasInconsistency: hasParentName && !hasParentId,
+      isValid: true,
+      hasInconsistency: false,
       parentName: hasParentName,
       parentId: hasParentId
     };
@@ -105,6 +129,7 @@ export function usePersistedForm<T extends Record<string, any>>(
     updateField,
     resetForm,
     clearPersistedData,
+    clearInconsistentData,
     validateFormIntegrity
   };
 }

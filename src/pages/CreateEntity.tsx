@@ -60,7 +60,7 @@ export default function CreateEntity() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { formData, updateField, resetForm, validateFormIntegrity } = usePersistedForm<CreateEntityFormData>(
+  const { formData, updateField, resetForm, clearInconsistentData, validateFormIntegrity } = usePersistedForm<CreateEntityFormData>(
     'create-entity-form',
     initialFormData
   );
@@ -88,6 +88,11 @@ export default function CreateEntity() {
       updateField('entityType', type);
     }
   }, [searchParams, formData.name, formData.entityType, updateField]);
+
+  // Clear inconsistent data on form initialization
+  React.useEffect(() => {
+    clearInconsistentData();
+  }, [clearInconsistentData]);
 
   // Add step change monitoring
   React.useEffect(() => {
@@ -129,16 +134,18 @@ export default function CreateEntity() {
       }
     });
     
-    // Validate form integrity before proceeding
-    const integrity = validateFormIntegrity();
-    if (integrity.hasInconsistency) {
-      console.error('🚨 Form integrity check failed before navigation:', integrity);
-      toast({
-        title: 'Form validation error',
-        description: 'Brand information is inconsistent. Please reselect the brand.',
-        variant: 'destructive'
-      });
-      return;
+    // Only validate brand consistency on step 2 and beyond
+    if (currentStep >= 2) {
+      const integrity = validateFormIntegrity('brand');
+      if (integrity.hasInconsistency) {
+        console.error('🚨 Brand integrity check failed before navigation:', integrity);
+        toast({
+          title: 'Form validation error',
+          description: 'Brand information is inconsistent. Please reselect the brand.',
+          variant: 'destructive'
+        });
+        return;
+      }
     }
     
     if (canProceed && !isLastStep) {
@@ -193,7 +200,7 @@ export default function CreateEntity() {
     }
 
     // Enhanced validation with recovery attempt
-    const integrity = validateFormIntegrity();
+    const integrity = validateFormIntegrity('brand');
     if (integrity.hasInconsistency) {
       console.error('🚨 CRITICAL: parentEntityName exists but parentEntityId is missing!', {
         parentEntityName: formData.parentEntityName,
