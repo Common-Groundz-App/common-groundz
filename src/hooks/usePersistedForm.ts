@@ -20,16 +20,50 @@ export function usePersistedForm<T extends Record<string, any>>(
     });
   }, [key]);
 
-  // Debounced update function with reduced logging
+  // Enhanced update function with detailed logging
   const updateField = useCallback((field: keyof T, value: any) => {
+    console.log('🔄 updateField called:', {
+      field,
+      value,
+      type: typeof value,
+      previousValue: formData[field]
+    });
+    
     setFormData(prev => {
       const newData = {
         ...prev,
         [field]: value
       };
+      
+      // Log the localStorage write operation
+      try {
+        const storageKey = key;
+        const serializedData = JSON.stringify(newData);
+        console.log('💾 Writing to localStorage:', {
+          key: storageKey,
+          field,
+          newValue: value,
+          fullData: newData,
+          serializedLength: serializedData.length
+        });
+        
+        // Special logging for parent entity fields
+        if (field === 'parentEntityId' || field === 'parentEntityName') {
+          console.log('🏷️ Parent entity update:', {
+            field,
+            value,
+            parentEntityId: newData.parentEntityId,
+            parentEntityName: newData.parentEntityName,
+            bothFieldsPresent: !!(newData.parentEntityId && newData.parentEntityName)
+          });
+        }
+      } catch (error) {
+        console.error('❌ localStorage serialization error:', error);
+      }
+      
       return newData;
     });
-  }, [setFormData]);
+  }, [setFormData, formData, key]);
 
   // Reset to initial state
   const resetForm = useCallback(() => {

@@ -308,12 +308,32 @@ export default function CreateEntity() {
                 currentParentId: formData.parentEntityId,
                 currentParentName: formData.parentEntityName
               });
+              
+              // Update fields with proper synchronization
               updateField('parentEntityId', brandId || '');
               updateField('parentEntityName', brandName || '');
-              console.log('✅ After updating fields:', {
-                newParentId: brandId || '',
-                newParentName: brandName || ''
-              });
+              
+              // Add immediate validation after state update with a small delay
+              setTimeout(() => {
+                const storedData = window.localStorage.getItem('create-entity-form');
+                console.log('🔍 Post-brand-selection localStorage check:', {
+                  storedData: storedData ? JSON.parse(storedData) : null,
+                  expectedId: brandId || '',
+                  expectedName: brandName || ''
+                });
+                
+                // Validate that the data was properly stored
+                if (storedData) {
+                  const parsed = JSON.parse(storedData);
+                  const integrity = {
+                    hasExpectedId: parsed.parentEntityId === (brandId || ''),
+                    hasExpectedName: parsed.parentEntityName === (brandName || ''),
+                    actualId: parsed.parentEntityId,
+                    actualName: parsed.parentEntityName
+                  };
+                  console.log('✅ Brand data integrity check:', integrity);
+                }
+              }, 100);
             }}
             onSkip={() => {
               console.log('Skip button clicked - advancing to step 3');
