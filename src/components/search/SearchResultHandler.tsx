@@ -213,23 +213,14 @@ export function SearchResultHandler({
     }
   };
 
-  // Convert entity type to category for loading messages - updated for Phase 1
+  // Convert entity type to category for loading messages
   const getEntityCategory = (type: EntityTypeString): EntityCategory => {
     const categoryMap: Record<EntityTypeString, EntityCategory> = {
-      // New types
-      'product': 'product',
-      'place': 'place', 
       'book': 'book',
       'movie': 'movie',
-      'tv_show': 'movie', // Map to movie category for now
-      'course': 'product', // Map to product category for now
-      'app': 'product',
-      'game': 'product',
-      'experience': 'place', // Map to place category
-      'brand': 'product',
-      
-      // Legacy types (temporary during migration)
+      'place': 'place',
       'food': 'food',
+      'product': 'product',
       'music': 'music',
       'tv': 'tv',
       'art': 'art',

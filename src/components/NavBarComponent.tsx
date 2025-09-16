@@ -1,7 +1,6 @@
 
 import * as React from 'react';
-import { Home, Search, User, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Home, Search, User } from 'lucide-react';
 import { NavBar } from "@/components/ui/tubelight-navbar";
 import { UserMenu } from './UserMenu';
 import { NotificationBell } from './notifications/NotificationBell';
@@ -64,17 +63,6 @@ export function NavBarComponent() {
 
   const rightSection = React.useMemo(() => (
     <div className="flex items-center gap-2">
-      {user && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.location.href = '/create-entity'}
-          className="hidden md:flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Entity
-        </Button>
-      )}
       {user && isProfilePage && <NotificationBell />}
       <UserMenu />
     </div>

@@ -157,34 +157,21 @@ const ReviewForm = ({
     }
   }, [review, isEditMode, entity, selectedEntity]);
 
-  // Helper function to map string type to EntityType enum - updated for Phase 1
+  // Helper function to map string type to EntityType enum
   const mapStringToEntityType = (type: string): EntityType => {
     switch (type.toLowerCase()) {
       case 'movie': return EntityType.Movie;
       case 'book': return EntityType.Book;
+      case 'food': return EntityType.Food;
       case 'product': return EntityType.Product;
       case 'place': return EntityType.Place;
-      case 'tv_show': return EntityType.TvShow;
-      case 'course': return EntityType.Course;
-      case 'app': return EntityType.App;
-      case 'game': return EntityType.Game;
-      case 'experience': return EntityType.Experience;
-      case 'brand': return EntityType.Brand;
-      
-      // Legacy type migrations
-      case 'food':
-      case 'drink':
-        return EntityType.Product;
-      case 'tv':
-        return EntityType.TvShow;
-      case 'music':
-      case 'art':
-        return EntityType.Product;
-      case 'activity':
-      case 'travel':
-        return EntityType.Experience;
-        
-      default: return EntityType.Product; // Default fallback
+      case 'activity': return EntityType.Activity;
+      case 'music': return EntityType.Music;
+      case 'art': return EntityType.Art;
+      case 'tv': return EntityType.TV;
+      case 'drink': return EntityType.Drink;
+      case 'travel': return EntityType.Travel;
+      default: return EntityType.Place; // Default fallback
     }
   };
   

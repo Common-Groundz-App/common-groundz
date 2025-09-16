@@ -14,7 +14,7 @@ import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
-import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp, Hash, Plus } from 'lucide-react';
+import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp, Hash } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
@@ -526,18 +526,8 @@ const Search = () => {
             )}
           </div>
         ) : (
-          <div className="p-4 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">
-              No results found for "{searchQuery}"
-            </p>
-            <Button 
-              size="sm"
-              onClick={() => window.location.href = `/create-entity?q=${encodeURIComponent(searchQuery)}`}
-              className="gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add it manually
-            </Button>
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            No results found for "{searchQuery}"
           </div>
         )}
       </div>
@@ -707,46 +697,54 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Enhanced Add Entity CTA for all tabs - only show when there are results */}
-                          {searchMode === 'quick' && (filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0 || results.users.length > 0) && (
+                          {/* Enhanced Deep Search CTA for all tabs when no results */}
+                          {searchMode === 'quick' && (
                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
-                              <h3 className="text-lg font-semibold mb-2">❓ Couldn't find what you're looking for?</h3>
+                              <h3 className="text-lg font-semibold mb-2">🔍 Want more comprehensive results?</h3>
                               <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
-                                Help us build the most comprehensive database by adding missing entities
+                                Deep Search analyzes multiple sources including specialized APIs for movies, books, places, and products
                                 <br />
-                                <span className="text-xs italic">Contribute books, movies, places, products, and more to help other users discover great content</span>
+                                <span className="text-xs italic">(Enhanced search across all categories - may take up to 2 minutes)</span>
                               </p>
                               <Button 
-                                onClick={() => navigate(`/create-entity?query=${encodeURIComponent(query)}`)}
+                                onClick={handleDeepSearch}
                                 variant="default"
                                 className="bg-brand-orange hover:bg-brand-orange/90"
+                                disabled={isDeepSearching}
                               >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add Entity
+                                {isDeepSearching ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Deep searching all categories...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Run Deep Search
+                                  </>
+                                )}
                               </Button>
                             </div>
                           )}
                           
-                            {/* No results message - styled to match default section */}
-                           {!filteredResults.localResults.length && 
-                            !filteredResults.externalResults.length && 
-                            !results.users.length && (
-                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
-                               <h3 className="text-lg font-semibold mb-2">❓ Couldn't find what you're looking for?</h3>
-                               <p className="text-muted-foreground mb-4">No results found for "{query}"</p>
-                               <Button 
-                                 onClick={() => navigate(`/create-entity?query=${encodeURIComponent(query)}&type=${activeTab.toLowerCase()}`)}
-                                 variant="default"
-                                 className="bg-brand-orange hover:bg-brand-orange/90 mb-2"
-                               >
-                                 <Plus className="w-4 h-4 mr-2" />
-                                 Add "{query}"
-                               </Button>
-                               <p className="text-xs text-muted-foreground">
-                                 Can't find what you're looking for? Add it manually.
-                               </p>
-                              </div>
-                           )}
+                          {/* No results message */}
+                          {!filteredResults.localResults.length && 
+                           !filteredResults.externalResults.length && 
+                           !results.users.length && (
+                            <div className="py-12 text-center">
+                              <p className="text-muted-foreground">No results found for "{query}"</p>
+                              {searchMode === 'quick' && (
+                                <Button 
+                                  onClick={handleDeepSearch} 
+                                  variant="outline" 
+                                  className="mt-4"
+                                  disabled={isDeepSearching}
+                                >
+                                  {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </>
                       )}
                       

@@ -7,19 +7,20 @@ export interface EntityWithChildren extends Omit<Entity, 'metadata'> {
   metadata?: Record<string, any> | null;
 }
 
-// Type mapping from database enum to EntityType - updated for Phase 1
+// Type mapping from database enum to EntityType
 const mapDatabaseTypeToEntityType = (dbType: string): EntityType => {
   const typeMap: Record<string, EntityType> = {
-    'product': EntityType.Product,
-    'place': EntityType.Place,
     'book': EntityType.Book,
     'movie': EntityType.Movie,
-    'tv_show': EntityType.TvShow,
-    'course': EntityType.Course,
-    'app': EntityType.App,
-    'game': EntityType.Game,
-    'experience': EntityType.Experience,
-    'brand': EntityType.Brand
+    'place': EntityType.Place,
+    'product': EntityType.Product,
+    'food': EntityType.Food,
+    'drink': EntityType.Drink,
+    'music': EntityType.Music,
+    'art': EntityType.Art,
+    'tv': EntityType.TV,
+    'travel': EntityType.Travel,
+    'activity': EntityType.Activity
   };
   
   return typeMap[dbType] || EntityType.Product;

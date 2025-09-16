@@ -219,7 +219,7 @@ const EntityDetailOriginal = () => {
           label,
           value: entity.specifications?.brand || entity.venue || null
         };
-      case EntityType.Product: // Updated from EntityType.Food
+      case EntityType.Food:
         return {
           label,
           value: entity.venue || null

@@ -11,7 +11,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { BusinessHoursEditor } from './BusinessHoursEditor';
 import { ContactInfoEditor } from './ContactInfoEditor';
-import { ParentEntitySelector } from './ParentEntitySelector';
 
 const entityTypes = [
   'movie', 'book', 'food', 'product', 'place', 'activity', 'music', 'art', 'tv', 'drink', 'travel'
@@ -43,7 +42,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   
   const [businessHours, setBusinessHours] = useState({});
   const [contactInfo, setContactInfo] = useState({});
-  const [selectedParent, setSelectedParent] = useState<any>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -60,7 +58,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     });
     setBusinessHours({});
     setContactInfo({});
-    setSelectedParent(null);
   };
 
   const handleSubmit = async () => {
@@ -89,7 +86,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           image_url: formData.image_url.trim() || null,
           website_url: formData.website_url.trim() || null,
           venue: formData.venue.trim() || null,
-          parent_id: selectedParent?.id || null,
           metadata,
           created_by: user?.id || null,
         });
@@ -175,17 +171,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Entity description"
                 rows={3}
-                disabled={loading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Parent Entity</Label>
-              <ParentEntitySelector
-                selectedParentId={selectedParent?.id || null}
-                onParentChange={setSelectedParent}
-                currentEntityId={null}
-                currentEntityType={formData.type as any}
                 disabled={loading}
               />
             </div>

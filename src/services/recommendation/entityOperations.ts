@@ -282,11 +282,7 @@ export const findOrCreateEntity = async (
 };
 
 // Get entities by type (for searching/filtering)
-export const getEntitiesByType = async (
-  type: EntityType | EntityTypeString, 
-  searchTerm: string = '',
-  userId?: string | null
-): Promise<Entity[]> => {
+export const getEntitiesByType = async (type: EntityType | EntityTypeString, searchTerm: string = ''): Promise<Entity[]> => {
   // Convert type to string if it's an enum
   const typeAsString = typeof type === 'string' 
     ? type as string 
@@ -301,9 +297,6 @@ export const getEntitiesByType = async (
   if (searchTerm) {
     query = query.ilike('name', `%${searchTerm}%`);
   }
-  
-  // Show all entities regardless of approval status to prevent duplicates
-  // Users can see all brands/entities to make informed decisions
   
   const { data, error } = await query.order('name');
 

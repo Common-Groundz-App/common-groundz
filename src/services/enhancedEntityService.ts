@@ -37,43 +37,12 @@ export interface EnhancedEntityData {
 /**
  * Enhanced entity creation with comprehensive metadata extraction
  */
-export const createEnhancedEntity = async (rawData: any, entityType: string, userId?: string | null, imageFile?: File | null): Promise<Entity | null> => {
+export const createEnhancedEntity = async (rawData: any, entityType: string): Promise<Entity | null> => {
   try {
     console.log('🔧 Creating enhanced entity from raw data:', rawData);
     
-    // Handle image upload first if we have an image file
-    let finalImageUrl = rawData.image_url;
-    if (imageFile && userId) {
-      console.log('📸 Uploading image file to storage...');
-      const { uploadEntityImage } = await import('@/services/entityImageService');
-      const uploadResult = await uploadEntityImage(imageFile, userId);
-      
-      if (uploadResult.success && uploadResult.url) {
-        finalImageUrl = uploadResult.url;
-        console.log('✅ Image uploaded successfully:', finalImageUrl);
-      } else {
-        console.warn('⚠️ Image upload failed:', uploadResult.error);
-      }
-    }
-    
     // Extract enhanced metadata based on entity type
-    const enhancedData = await extractEnhancedMetadata({
-      ...rawData,
-      image_url: finalImageUrl
-    }, entityType);
-    
-    // Determine if this is a user-created entity vs system-generated
-    const isUserCreated = Boolean(userId && !enhancedData.api_source);
-    
-    // Extract and validate parent_id from metadata
-    const parentId = enhancedData.metadata?.parent_id;
-    const validParentId = parentId && parentId.trim() !== '' ? parentId : null;
-    
-    console.log('🔗 Parent ID processing:', {
-      originalParentId: parentId,
-      validParentId: validParentId,
-      metadata: enhancedData.metadata
-    });
+    const enhancedData = await extractEnhancedMetadata(rawData, entityType);
     
     // Create entity first WITHOUT the image to get the actual entity ID
     const { data: entity, error } = await supabase
@@ -105,13 +74,7 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, use
         last_enriched_at: new Date().toISOString(),
         enrichment_source: enhancedData.api_source,
         data_quality_score: calculateDataQualityScore(enhancedData),
-        slug: generateSlug(enhancedData.name),
-        // Set user creation flags
-        created_by: userId || null,
-        user_created: isUserCreated,
-        approval_status: isUserCreated ? 'pending' : 'approved',
-        // Set parent relationship if provided (use validated parent_id)
-        parent_id: validParentId
+        slug: generateSlug(enhancedData.name)
       })
       .select()
       .single();
@@ -230,7 +193,6 @@ const extractBookMetadata = (rawData: any, baseData: EnhancedEntityData): Enhanc
   
   return {
     ...baseData,
-    metadata: rawData.metadata, // Preserve original metadata including parent_id
     authors: authors,
     publication_year: publicationYear,
     isbn: isbn,
@@ -262,7 +224,6 @@ const extractMovieMetadata = (rawData: any, baseData: EnhancedEntityData): Enhan
   
   return {
     ...baseData,
-    metadata: rawData.metadata, // Preserve original metadata including parent_id
     publication_year: extractReleaseYear(rawData),
     languages: extractLanguages(rawData),
     external_ratings: {
@@ -487,7 +448,6 @@ const extractFoodMetadata = (rawData: any, baseData: EnhancedEntityData): Enhanc
   
   return {
     ...baseData,
-    metadata: rawData.metadata, // Preserve original metadata including parent_id
     ingredients: extractIngredients(rawData),
     nutritional_info: {
       calories: metadata.calories,
@@ -517,7 +477,6 @@ const extractProductMetadata = (rawData: any, baseData: EnhancedEntityData): Enh
   
   return {
     ...baseData,
-    metadata: rawData.metadata, // Preserve original metadata including parent_id
     price_info: {
       price: metadata.price,
       currency: metadata.currency,

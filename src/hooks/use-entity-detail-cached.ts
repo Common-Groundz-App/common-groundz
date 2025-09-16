@@ -33,10 +33,10 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     queryFn: async () => {
       console.log('🔍 Fetching entity detail for slug:', slug);
       
-      // Fetch entity first with user context for approval status filtering
-      const entity = await fetchEntityBySlug(slug, user?.id);
+      // Fetch entity first
+      const entity = await fetchEntityBySlug(slug);
       if (!entity) {
-        throw new Error('Entity not found or not accessible');
+        throw new Error('Entity not found');
       }
       
       // Fetch related data in parallel

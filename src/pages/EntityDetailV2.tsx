@@ -219,47 +219,33 @@ const EntityDetailV2 = () => {
             ? entity.authors[0] 
             : entity.venue || null
         };
-      case EntityType.Movie:
-      case EntityType.TvShow: // Updated from 'tv' string
+      case 'movie':
+      case 'tv':
         return {
           label: 'Studio',
           value: entity.cast_crew?.studio || entity.venue || null
         };
-      case EntityType.Place:
+      case 'place':
         return {
           label: 'Location',
           value: entity.api_source === 'google_places' && entity.metadata?.formatted_address
             ? entity.metadata.formatted_address
             : entity.venue || null
         };
-      case EntityType.Product: // Handles legacy food, drink, music, art
+      case 'product':
         return {
           label: 'Brand',
           value: entity.specifications?.brand || entity.venue || null
         };
-      case EntityType.Experience: // Handles legacy activity, travel
+      case 'music':
         return {
-          label: 'Organizer',
+          label: 'Artist',
           value: entity.venue || null
         };
-      case EntityType.Course:
+      case 'food':
+      case 'drink':
         return {
-          label: 'Instructor',
-          value: entity.venue || null
-        };
-      case EntityType.App:
-        return {
-          label: 'Developer',
-          value: entity.venue || null
-        };
-      case EntityType.Game:
-        return {
-          label: 'Developer',
-          value: entity.venue || null
-        };
-      case EntityType.Brand:
-        return {
-          label: 'Parent Company',
+          label: 'Venue',
           value: entity.venue || null
         };
       default:
