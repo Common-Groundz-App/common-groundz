@@ -136,7 +136,15 @@ export default function CreateEntity() {
     
     // Only validate brand consistency on step 2 and beyond
     if (currentStep >= 2) {
-      const integrity = validateFormIntegrity('brand');
+      // Get the latest form data to avoid stale state issues
+      const latestFormData = {
+        ...formData,
+        // Ensure we have the most current values
+        parentEntityId: formData.parentEntityId,
+        parentEntityName: formData.parentEntityName
+      };
+      
+      const integrity = validateFormIntegrity('brand', latestFormData);
       if (integrity.hasInconsistency) {
         console.error('🚨 Brand integrity check failed before navigation:', integrity);
         toast({

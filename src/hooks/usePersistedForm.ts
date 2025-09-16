@@ -68,16 +68,19 @@ export function usePersistedForm<T extends Record<string, any>>(
   }, [setFormData]);
 
   // Step-aware validation function
-  const validateFormIntegrity = useCallback((validationType: 'brand' | 'all' = 'all') => {
-    const hasParentName = formData.parentEntityName && formData.parentEntityName.trim();
-    const hasParentId = formData.parentEntityId && formData.parentEntityId.trim();
+  const validateFormIntegrity = useCallback((validationType: 'brand' | 'all' = 'all', currentFormData?: T) => {
+    // Use provided form data or fall back to current hook state
+    const dataToValidate = currentFormData || formData;
+    const hasParentName = dataToValidate.parentEntityName && dataToValidate.parentEntityName.trim();
+    const hasParentId = dataToValidate.parentEntityId && dataToValidate.parentEntityId.trim();
     
     console.log('🔍 Form integrity check:', {
       validationType,
       hasParentName: !!hasParentName,
       hasParentId: !!hasParentId,
-      parentEntityName: formData.parentEntityName,
-      parentEntityId: formData.parentEntityId
+      parentEntityName: dataToValidate.parentEntityName,
+      parentEntityId: dataToValidate.parentEntityId,
+      usingProvidedData: !!currentFormData
     });
     
     // Only check brand consistency if specifically requested
@@ -97,7 +100,7 @@ export function usePersistedForm<T extends Record<string, any>>(
       parentName: hasParentName,
       parentId: hasParentId
     };
-  }, [formData.parentEntityName, formData.parentEntityId]);
+  }, [formData]);
 
   return {
     formData,
