@@ -89,6 +89,19 @@ export default function CreateEntity() {
     }
   }, [searchParams, formData.name, formData.entityType, updateField]);
 
+  // Add step change monitoring
+  React.useEffect(() => {
+    console.log('📊 STEP CHANGED:', {
+      currentStep,
+      formState: {
+        parentEntityId: formData.parentEntityId,
+        parentEntityName: formData.parentEntityName,
+        entityType: formData.entityType,
+        name: formData.name
+      }
+    });
+  }, [currentStep, formData.parentEntityId, formData.parentEntityName, formData.entityType, formData.name]);
+
   const isStepValid = (step: number): boolean => {
     switch (step) {
       case 1: return formData.entityType !== null;
@@ -105,22 +118,76 @@ export default function CreateEntity() {
   const isLastStep = currentStep === STEPS.length;
 
   const handleNext = () => {
+    console.log('🔄 handleNext called - Before step change:', {
+      currentStep,
+      nextStep: currentStep + 1,
+      formData: {
+        parentEntityId: formData.parentEntityId,
+        parentEntityName: formData.parentEntityName,
+        entityType: formData.entityType,
+        name: formData.name
+      }
+    });
     if (canProceed && !isLastStep) {
       setCurrentStep(prev => prev + 1);
+      console.log('✅ Step advanced to:', currentStep + 1);
     }
   };
 
   const handlePrevious = () => {
+    console.log('🔙 handlePrevious called - Before step change:', {
+      currentStep,
+      previousStep: currentStep - 1,
+      formData: {
+        parentEntityId: formData.parentEntityId,
+        parentEntityName: formData.parentEntityName,
+        entityType: formData.entityType,
+        name: formData.name
+      }
+    });
     if (!isFirstStep) {
       setCurrentStep(prev => prev - 1);
+      console.log('✅ Step went back to:', currentStep - 1);
     }
   };
 
   const handleSubmit = async () => {
+    console.log('🚀 SUBMIT BUTTON CLICKED - Current form state:', {
+      step: currentStep,
+      formData: {
+        entityType: formData.entityType,
+        name: formData.name,
+        description: formData.description,
+        parentEntityId: formData.parentEntityId,
+        parentEntityName: formData.parentEntityName,
+        categoryId: formData.categoryId
+      }
+    });
+
+    // Validation with detailed logging
     if (!formData.entityType || !formData.name || !formData.description) {
+      console.error('❌ VALIDATION FAILED:', {
+        entityType: formData.entityType,
+        name: formData.name,
+        description: formData.description
+      });
       toast({
         title: 'Missing information',
         description: 'Please fill in all required fields',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Check for parentEntityId mismatch
+    if (formData.parentEntityName && !formData.parentEntityId) {
+      console.error('🚨 CRITICAL: parentEntityName exists but parentEntityId is missing!', {
+        parentEntityName: formData.parentEntityName,
+        parentEntityId: formData.parentEntityId
+      });
+      toast({
+        title: 'Brand selection error',
+        description: 'Brand name found but ID missing. Please reselect the brand.',
         variant: 'destructive'
       });
       return;
@@ -134,10 +201,12 @@ export default function CreateEntity() {
         ? formData.parentEntityId 
         : null;
       
-      console.log('Form data before submission:', {
-        parentEntityId: formData.parentEntityId,
-        parentEntityName: formData.parentEntityName,
-        convertedParentId: parentId
+      console.log('📝 FINAL SUBMISSION DATA:', {
+        originalParentEntityId: formData.parentEntityId,
+        originalParentEntityName: formData.parentEntityName,
+        convertedParentId: parentId,
+        hasParentName: !!formData.parentEntityName,
+        hasParentId: !!formData.parentEntityId
       });
 
       const externalData = {
