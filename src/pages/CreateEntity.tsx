@@ -60,7 +60,7 @@ export default function CreateEntity() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { formData, updateField, resetForm } = usePersistedForm<CreateEntityFormData>(
+  const { formData, updateField, resetForm, validateFormIntegrity } = usePersistedForm<CreateEntityFormData>(
     'create-entity-form',
     initialFormData
   );
@@ -128,6 +128,19 @@ export default function CreateEntity() {
         name: formData.name
       }
     });
+    
+    // Validate form integrity before proceeding
+    const integrity = validateFormIntegrity();
+    if (integrity.hasInconsistency) {
+      console.error('🚨 Form integrity check failed before navigation:', integrity);
+      toast({
+        title: 'Form validation error',
+        description: 'Brand information is inconsistent. Please reselect the brand.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     if (canProceed && !isLastStep) {
       setCurrentStep(prev => prev + 1);
       console.log('✅ Step advanced to:', currentStep + 1);
@@ -179,15 +192,36 @@ export default function CreateEntity() {
       return;
     }
 
-    // Check for parentEntityId mismatch
-    if (formData.parentEntityName && !formData.parentEntityId) {
+    // Enhanced validation with recovery attempt
+    const integrity = validateFormIntegrity();
+    if (integrity.hasInconsistency) {
       console.error('🚨 CRITICAL: parentEntityName exists but parentEntityId is missing!', {
         parentEntityName: formData.parentEntityName,
-        parentEntityId: formData.parentEntityId
+        parentEntityId: formData.parentEntityId,
+        integrity
       });
+      
+      // Try to recover by looking up brand by name
+      if (formData.parentEntityName && formData.entityType) {
+        console.log('🔄 Attempting recovery: Looking up brand by name...');
+        try {
+          // This would need to be implemented to fetch brand by name
+          // For now, show error and ask user to reselect
+          toast({
+            title: 'Brand selection error',
+            description: `Brand "${formData.parentEntityName}" found but ID missing. Please reselect the brand.`,
+            variant: 'destructive'
+          });
+          setCurrentStep(2); // Go back to brand selection
+          return;
+        } catch (error) {
+          console.error('Recovery failed:', error);
+        }
+      }
+      
       toast({
         title: 'Brand selection error',
-        description: 'Brand name found but ID missing. Please reselect the brand.',
+        description: 'Brand information is incomplete. Please reselect the brand.',
         variant: 'destructive'
       });
       return;
