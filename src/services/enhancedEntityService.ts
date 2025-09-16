@@ -223,6 +223,7 @@ const extractBookMetadata = (rawData: any, baseData: EnhancedEntityData): Enhanc
   
   return {
     ...baseData,
+    metadata: rawData.metadata, // Preserve original metadata including parent_id
     authors: authors,
     publication_year: publicationYear,
     isbn: isbn,
@@ -254,6 +255,7 @@ const extractMovieMetadata = (rawData: any, baseData: EnhancedEntityData): Enhan
   
   return {
     ...baseData,
+    metadata: rawData.metadata, // Preserve original metadata including parent_id
     publication_year: extractReleaseYear(rawData),
     languages: extractLanguages(rawData),
     external_ratings: {
@@ -478,6 +480,7 @@ const extractFoodMetadata = (rawData: any, baseData: EnhancedEntityData): Enhanc
   
   return {
     ...baseData,
+    metadata: rawData.metadata, // Preserve original metadata including parent_id
     ingredients: extractIngredients(rawData),
     nutritional_info: {
       calories: metadata.calories,
@@ -507,6 +510,7 @@ const extractProductMetadata = (rawData: any, baseData: EnhancedEntityData): Enh
   
   return {
     ...baseData,
+    metadata: rawData.metadata, // Preserve original metadata including parent_id
     price_info: {
       price: metadata.price,
       currency: metadata.currency,
