@@ -9,8 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { BusinessHoursEditor } from './BusinessHoursEditor';
 import { ContactInfoEditor } from './ContactInfoEditor';
+import { BusinessHoursEditor } from './BusinessHoursEditor';
+import { ParentEntitySelector } from './ParentEntitySelector';
+import { Entity } from '@/services/recommendation/types';
+import { setEntityParent } from '@/services/entityHierarchyService';
 
 const entityTypes = [
   'movie', 'book', 'food', 'product', 'place', 'activity', 'music', 'art', 'tv', 'drink', 'travel'
@@ -42,6 +45,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   
   const [businessHours, setBusinessHours] = useState({});
   const [contactInfo, setContactInfo] = useState({});
+  const [selectedParent, setSelectedParent] = useState<Entity | null>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -58,6 +62,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     });
     setBusinessHours({});
     setContactInfo({});
+    setSelectedParent(null);
   };
 
   const handleSubmit = async () => {
@@ -77,7 +82,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         contact: contactInfo
       };
 
-      const { error } = await supabase
+      const { data: newEntity, error } = await supabase
         .from('entities')
         .insert({
           name: formData.name.trim(),
@@ -88,9 +93,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           venue: formData.venue.trim() || null,
           metadata,
           created_by: user?.id || null,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Set parent relationship if a parent was selected
+      if (selectedParent && newEntity) {
+        await setEntityParent(newEntity.id, selectedParent.id);
+      }
 
       toast({
         title: 'Success',
@@ -174,6 +186,47 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 disabled={loading}
               />
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="image_url">Image URL</Label>
+                <Input
+                  id="image_url"  
+                  value={formData.image_url}
+                  onChange={(e) => handleInputChange('image_url', e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  disabled={loading}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="website_url">Website URL</Label>
+                <Input
+                  id="website_url"
+                  value={formData.website_url}
+                  onChange={(e) => handleInputChange('website_url', e.target.value)}
+                  placeholder="https://example.com"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="venue">Venue</Label>
+              <Input
+                id="venue"
+                value={formData.venue}
+                onChange={(e) => handleInputChange('venue', e.target.value)}
+                placeholder="Venue or location"
+                disabled={loading}
+              />
+            </div>
+
+            <ParentEntitySelector
+              selectedParent={selectedParent}
+              onParentChange={setSelectedParent}
+              className="pt-4 border-t"
+            />
           </TabsContent>
 
           <TabsContent value="contact" className="space-y-4">

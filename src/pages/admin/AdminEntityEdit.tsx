@@ -20,8 +20,11 @@ import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations
 import { BusinessHoursEditor } from '@/components/admin/BusinessHoursEditor';
 import { ContactInfoEditor } from '@/components/admin/ContactInfoEditor';
 import { EntityTypeSpecificFields } from '@/components/admin/EntityTypeSpecificFields';
+import { ParentEntitySelector } from '@/components/admin/ParentEntitySelector';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
+import { getParentEntity, setEntityParent } from '@/services/entityHierarchyService';
+import { Entity } from '@/services/recommendation/types';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -50,6 +53,7 @@ const AdminEntityEdit = () => {
   const [refreshingMetadata, setRefreshingMetadata] = useState(false);
   const [refreshingDescription, setRefreshingDescription] = useState(false);
   const [refreshingContact, setRefreshingContact] = useState(false);
+  const [selectedParent, setSelectedParent] = useState<Entity | null>(null);
 
   const { refreshEntityImage, isRefreshing: isRefreshingImage } = useEntityImageRefresh();
 
@@ -63,6 +67,7 @@ const AdminEntityEdit = () => {
     if (id) {
       fetchEntity();
       fetchAdminActions();
+      fetchCurrentParent();
     }
   }, [id, user, session]);
 
@@ -111,6 +116,17 @@ const AdminEntityEdit = () => {
       setAdminActions(data || []);
     } catch (error) {
       console.error('Error fetching admin actions:', error);
+    }
+  };
+
+  const fetchCurrentParent = async () => {
+    if (!id) return;
+    
+    try {
+      const parent = await getParentEntity(id);
+      setSelectedParent(parent);
+    } catch (error) {
+      console.error('Error fetching parent entity:', error);
     }
   };
 
@@ -258,6 +274,16 @@ const AdminEntityEdit = () => {
       }
 
       console.log('handleSave: Successfully saved entity');
+      
+      // Handle parent entity update if it changed
+      if (selectedParent || entity.parent_id) {
+        const newParentId = selectedParent?.id || null;
+        if (newParentId !== entity.parent_id) {
+          await setEntityParent(entity.id, newParentId);
+          console.log('handleSave: Updated parent entity relationship');
+        }
+      }
+      
       toast({
         title: 'Success',
         description: 'Entity updated successfully',
@@ -715,9 +741,27 @@ const AdminEntityEdit = () => {
                            {entity.is_claimed ? 'Claimed' : 'Unclaimed'}
                          </span>
                        </div>
-                     </div>
-                  </CardContent>
-                </Card>
+                      </div>
+
+                      {/* Parent Entity Selector */}
+                      <div className="pt-4 border-t">
+                        <ParentEntitySelector
+                          currentEntity={entity ? {
+                            ...entity,
+                            type: entity.type as any,
+                            metadata: (entity.metadata as any) || {},
+                            external_ratings: (entity.external_ratings as any) || null,
+                            price_info: (entity.price_info as any) || null,
+                            specifications: (entity.specifications as any) || null,
+                            cast_crew: (entity.cast_crew as any) || null,
+                            nutritional_info: (entity.nutritional_info as any) || null
+                          } as Entity : undefined}
+                          selectedParent={selectedParent}
+                          onParentChange={setSelectedParent}
+                        />
+                      </div>
+                   </CardContent>
+                 </Card>
 
                 {/* Media & Links */}
                 <Card>
