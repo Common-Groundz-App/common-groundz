@@ -10,10 +10,24 @@ export function usePersistedForm<T extends Record<string, any>>(
 
   // Debounced update function
   const updateField = useCallback((field: keyof T, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    console.log('🔧 updateField called:', {
+      field: String(field),
+      value,
+      type: typeof value
+    });
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [field]: value
+      };
+      console.log('📝 Form data updated:', {
+        field: String(field),
+        oldValue: prev[field],
+        newValue: value,
+        fullData: newData
+      });
+      return newData;
+    });
   }, [setFormData]);
 
   // Reset to initial state

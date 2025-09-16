@@ -80,9 +80,14 @@ export function BrandSelector({
   };
 
   const handleBrandSelect = (brand: BrandEntity) => {
-    console.log('Brand selected:', brand);
+    console.log('🎯 Brand selected in BrandSelector:', {
+      brandId: brand.id,
+      brandName: brand.name,
+      brand: brand
+    });
     // Update local state immediately for instant visual feedback
     setLocalSelectedBrandId(brand.id);
+    console.log('🚀 Calling onBrandSelect with:', brand.id, brand.name);
     onBrandSelect(brand.id, brand.name);
   };
 

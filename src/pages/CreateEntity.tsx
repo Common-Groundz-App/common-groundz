@@ -184,9 +184,18 @@ export default function CreateEntity() {
             selectedBrandId={formData.parentEntityId || ''}
             selectedBrandName={formData.parentEntityName || ''}
             onBrandSelect={(brandId, brandName) => {
-              console.log('Brand selected in parent:', brandId, brandName);
+              console.log('📥 Brand selected in CreateEntity parent:', {
+                brandId,
+                brandName,
+                currentParentId: formData.parentEntityId,
+                currentParentName: formData.parentEntityName
+              });
               updateField('parentEntityId', brandId || '');
               updateField('parentEntityName', brandName || '');
+              console.log('✅ After updating fields:', {
+                newParentId: brandId || '',
+                newParentName: brandName || ''
+              });
             }}
             onSkip={() => {
               console.log('Skip button clicked - advancing to step 3');
