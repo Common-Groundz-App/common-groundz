@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Entity } from '@/services/recommendation/types';
-import { useEntitySearch } from '@/hooks/use-entity-search';
+import { useUniversalEntitySearch } from '@/hooks/use-universal-entity-search';
 import { X, Search, Loader2 } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
@@ -36,11 +36,10 @@ export function ParentEntitySelector({
 }: ParentEntitySelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
-  const [selectedType, setSelectedType] = useState<EntityTypeString>('place');
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   
-  const { localResults, isLoading, handleSearch } = useEntitySearch(selectedType);
+  const { localResults, isLoading, handleSearch } = useUniversalEntitySearch();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -124,9 +123,6 @@ export function ParentEntitySelector({
     setSearchQuery('');
   };
 
-  const entityTypes: EntityTypeString[] = [
-    'place', 'food', 'product', 'movie', 'book', 'activity', 'music', 'art', 'tv', 'drink', 'travel'
-  ];
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -162,21 +158,6 @@ export function ParentEntitySelector({
           </div>
         )}
 
-        {/* Entity type selector */}
-        <div className="flex gap-2 flex-wrap">
-          {entityTypes.map((type) => (
-            <Button
-              key={type}
-              type="button"
-              variant={selectedType === type ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedType(type)}
-              className="text-xs"
-            >
-              {type}
-            </Button>
-          ))}
-        </div>
 
         {/* Search input */}
         <div className="relative">
@@ -186,7 +167,7 @@ export function ParentEntitySelector({
               ref={inputRef}
               value={searchQuery}
               onChange={handleInputChange}
-              placeholder={`Search for ${selectedType} entities...`}
+              placeholder="Search for entities..."
               className="pl-10"
               onFocus={() => {
                 if (searchQuery.length >= 2) {
@@ -235,7 +216,7 @@ export function ParentEntitySelector({
                 </div>
               ) : searchQuery.length >= 2 && !isLoading ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
-                  No {selectedType} entities found for "{searchQuery}"
+                  No entities found for "{searchQuery}"
                 </div>
               ) : null}
             </div>
