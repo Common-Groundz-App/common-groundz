@@ -51,3 +51,43 @@ export const isUUID = (str: string): boolean => {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
 };
+
+/**
+ * Generate a slug from a string
+ * @param name - String to convert to slug
+ * @returns URL-safe slug
+ */
+export const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
+/**
+ * Generate a hierarchical slug for a child entity
+ * @param name - Child entity name
+ * @param parentSlug - Parent entity slug
+ * @returns Hierarchical slug
+ */
+export const generateHierarchicalSlug = (name: string, parentSlug?: string): string => {
+  const baseSlug = generateSlug(name);
+  return parentSlug ? `${parentSlug}-${baseSlug}` : baseSlug;
+};
+
+/**
+ * Check if an entity needs a hierarchical slug update
+ * @param entity - Entity to check
+ * @param parentEntity - Parent entity (if any)
+ * @returns true if slug needs updating
+ */
+export const needsSlugUpdate = (entity: EntityUrlCompatible, parentEntity?: EntityUrlCompatible): boolean => {
+  if (!parentEntity) {
+    return false; // No parent, current slug is fine
+  }
+  
+  const expectedSlug = generateHierarchicalSlug(entity.slug || entity.id, parentEntity.slug || parentEntity.id);
+  return entity.slug !== expectedSlug;
+};

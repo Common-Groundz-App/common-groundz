@@ -142,14 +142,81 @@ export const getEntityWithChildren = async (entityId: string): Promise<EntityWit
 };
 
 export const setEntityParent = async (childId: string, parentId: string | null): Promise<void> => {
-  const { error } = await supabase
-    .from('entities')
-    .update({ parent_id: parentId })
-    .eq('id', childId);
+  // If setting a parent, regenerate the child's slug to be hierarchical
+  if (parentId) {
+    // Fetch parent entity to get its slug
+    const { data: parent, error: parentError } = await supabase
+      .from('entities')
+      .select('slug, name')
+      .eq('id', parentId)
+      .single();
 
-  if (error) {
-    console.error('Error setting entity parent:', error);
-    throw error;
+    if (parentError) {
+      console.error('Error fetching parent entity for slug generation:', parentError);
+      throw parentError;
+    }
+
+    // Fetch child entity to get its current name
+    const { data: child, error: childError } = await supabase
+      .from('entities')
+      .select('name, slug')
+      .eq('id', childId)
+      .single();
+
+    if (childError) {
+      console.error('Error fetching child entity:', childError);
+      throw childError;
+    }
+
+    // Generate hierarchical slug
+    const parentSlug = parent.slug || parent.name?.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
+    const baseChildSlug = child.name?.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
+    const newHierarchicalSlug = `${parentSlug}-${baseChildSlug}`;
+
+    // Update entity with parent_id and new hierarchical slug
+    const { error } = await supabase
+      .from('entities')
+      .update({ 
+        parent_id: parentId,
+        slug: newHierarchicalSlug
+      })
+      .eq('id', childId);
+
+    if (error) {
+      console.error('Error setting entity parent and updating slug:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Updated entity ${childId} with parent ${parentId} and hierarchical slug: ${newHierarchicalSlug}`);
+  } else {
+    // Removing parent, regenerate slug to be non-hierarchical
+    const { data: child, error: childError } = await supabase
+      .from('entities')
+      .select('name')
+      .eq('id', childId)
+      .single();
+
+    if (childError) {
+      console.error('Error fetching child entity:', childError);
+      throw childError;
+    }
+
+    const newSlug = child.name?.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
+
+    const { error } = await supabase
+      .from('entities')
+      .update({ 
+        parent_id: parentId,
+        slug: newSlug
+      })
+      .eq('id', childId);
+
+    if (error) {
+      console.error('Error removing entity parent:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Updated entity ${childId} removed parent and updated slug to: ${newSlug}`);
   }
 };
 

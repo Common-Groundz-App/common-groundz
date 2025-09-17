@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
 import { cachedPhotoService } from './cachedPhotoService';
+import { generateSlug } from '@/utils/entityUrlUtils';
 
 export interface EnhancedEntityData {
   name: string;
@@ -37,7 +38,7 @@ export interface EnhancedEntityData {
 /**
  * Enhanced entity creation with comprehensive metadata extraction
  */
-export const createEnhancedEntity = async (rawData: any, entityType: string): Promise<Entity | null> => {
+export const createEnhancedEntity = async (rawData: any, entityType: string, parentEntity?: any): Promise<Entity | null> => {
   try {
     console.log('🔧 Creating enhanced entity from raw data:', rawData);
     
@@ -74,7 +75,9 @@ export const createEnhancedEntity = async (rawData: any, entityType: string): Pr
         last_enriched_at: new Date().toISOString(),
         enrichment_source: enhancedData.api_source,
         data_quality_score: calculateDataQualityScore(enhancedData),
-        slug: generateSlug(enhancedData.name)
+        slug: parentEntity ? 
+          `${parentEntity.slug || parentEntity.id}-${generateSlug(enhancedData.name)}` : 
+          generateSlug(enhancedData.name)
       })
       .select()
       .single();
@@ -601,16 +604,6 @@ const extractIngredients = (rawData: any): string[] => {
   const ingredients = rawData.ingredients || rawData.metadata?.ingredients || [];
   if (typeof ingredients === 'string') return ingredients.split(',').map(i => i.trim());
   return Array.isArray(ingredients) ? ingredients : [];
-};
-
-const generateSlug = (name: string): string => {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .trim()
-    .replace(/^-+|-+$/g, '');
 };
 
 const calculateDataQualityScore = (data: EnhancedEntityData): number => {

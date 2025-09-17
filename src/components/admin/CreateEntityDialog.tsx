@@ -82,6 +82,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         contact: contactInfo
       };
 
+      // Generate slug based on parent context
+      const baseSlug = formData.name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
+      const hierarchicalSlug = selectedParent 
+        ? `${selectedParent.slug || selectedParent.id}-${baseSlug}`
+        : baseSlug;
+
       const { data: newEntity, error } = await supabase
         .from('entities')
         .insert({
@@ -93,16 +105,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           venue: formData.venue.trim() || null,
           metadata,
           created_by: user?.id || null,
+          slug: hierarchicalSlug,
+          parent_id: selectedParent?.id || null
         })
         .select()
         .single();
 
       if (error) throw error;
-
-      // Set parent relationship if a parent was selected
-      if (selectedParent && newEntity) {
-        await setEntityParent(newEntity.id, selectedParent.id);
-      }
 
       toast({
         title: 'Success',

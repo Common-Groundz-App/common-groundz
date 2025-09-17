@@ -170,17 +170,23 @@ export function SearchResultHandler({
       if (entity) {
         console.log(`✅ Enhanced entity created successfully:`, entity);
         
-        // Keep the loading state active for a moment to ensure smooth transition
+        // Keep the loading state active for smooth transition
         setTimeout(async () => {
-          // Fetch parent context for newly created entity
-          const { entity: entityWithParent, parentEntity } = await fetchEntityWithParentContext(entity.slug || entity.id);
-          
-          const entityPath = parentEntity 
-            ? getHierarchicalEntityUrl(parentEntity, entityWithParent!)
-            : getEntityUrl(entity);
-          
-          console.log(`🔗 Navigating to new entity page: ${entityPath}`);
-          navigate(entityPath);
+          // For newly created entities, check if they have parent context
+          if (entity.parent_id) {
+            const { entity: entityWithParent, parentEntity } = await fetchEntityWithParentContext(entity.slug || entity.id);
+            
+            const entityPath = parentEntity 
+              ? getHierarchicalEntityUrl(parentEntity, entityWithParent!)
+              : getEntityUrl(entity);
+              
+            console.log(`🔗 Navigating to new hierarchical entity page: ${entityPath}`);
+            navigate(entityPath);
+          } else {
+            const entityPath = getEntityUrl(entity);
+            console.log(`🔗 Navigating to new entity page: ${entityPath}`);
+            navigate(entityPath);
+          }
           
           if (onClose) {
             onClose();
