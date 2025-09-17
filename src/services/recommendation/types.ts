@@ -46,7 +46,8 @@ export enum EntityType {
   Art = 'art',
   TV = 'tv',
   Drink = 'drink',
-  Travel = 'travel'
+  Travel = 'travel',
+  Brand = 'brand'
 }
 
 export enum RecommendationCategory {
@@ -60,7 +61,8 @@ export enum RecommendationCategory {
   Music = 'Music',
   Art = 'Art',
   TV = 'TV',
-  Travel = 'Travel'
+  Travel = 'Travel',
+  Brand = 'Brand'
 }
 
 export enum RecommendationVisibility {

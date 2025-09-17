@@ -25,7 +25,8 @@ const TYPE_MAPPING: Record<EntityType, EntityType> = {
   [EntityType.Art]: EntityType.Product,     // Art pieces as products
   [EntityType.Drink]: EntityType.Food,      // Drinks are food-related
   [EntityType.Travel]: EntityType.Place,    // Travel destinations are places
-  [EntityType.Activity]: EntityType.Place   // Activities happen at places
+  [EntityType.Activity]: EntityType.Place,  // Activities happen at places
+  [EntityType.Brand]: EntityType.Product    // Brands are product-related
 };
 
 /**
@@ -82,7 +83,8 @@ export const getEntityTypeFallbackImage = (type: EntityType): string => {
     [EntityType.Art]: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
     [EntityType.TV]: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
     [EntityType.Drink]: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
-    [EntityType.Travel]: 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
+    [EntityType.Travel]: 'https://images.unsplash.com/photo-1501554728187-ce583db33af7',
+    [EntityType.Brand]: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86'
   };
 
   return fallbacks[mappedType] || fallbacks[EntityType.Product];

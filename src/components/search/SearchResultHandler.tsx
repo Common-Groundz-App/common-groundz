@@ -227,6 +227,7 @@ export function SearchResultHandler({
       'activity': 'activity',
       'drink': 'drink',
       'travel': 'travel',
+      'brand': 'product',
       'people': 'place'
     };
     
