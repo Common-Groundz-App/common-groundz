@@ -50,6 +50,31 @@ export const fetchEntityBySlug = async (slugOrId: string): Promise<Entity | null
 };
 
 /**
+ * Fetch an entity with its parent information for hierarchical URL generation
+ */
+export const fetchEntityWithParentContext = async (slugOrId: string): Promise<{
+  entity: Entity | null;
+  parentEntity: Entity | null;
+}> => {
+  console.log('🔍 fetchEntityWithParentContext called with:', slugOrId);
+  
+  const entity = await fetchEntityBySlug(slugOrId);
+  
+  if (!entity) {
+    return { entity: null, parentEntity: null };
+  }
+  
+  let parentEntity: Entity | null = null;
+  
+  // If entity has a parent_id, fetch the parent
+  if (entity.parent_id) {
+    parentEntity = await fetchEntityBySlug(entity.parent_id);
+  }
+  
+  return { entity, parentEntity };
+};
+
+/**
  * Helper function to check if a string is a valid UUID
  */
 const isValidUUID = (str: string): boolean => {

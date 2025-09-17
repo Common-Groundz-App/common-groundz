@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 import { createEnhancedEntity } from '@/services/enhancedEntityService';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
+import { fetchEntityWithParentContext } from '@/services/entityService';
+import { getEntityUrl, getHierarchicalEntityUrl } from '@/utils/entityUrlUtils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { EntityCategory } from '@/utils/loadingMessages';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
@@ -93,9 +95,13 @@ export function SearchResultHandler({
         }
         
         // Keep the loading state active for smooth transition
-        setTimeout(() => {
-          const identifier = existingEntity.slug || existingEntity.id;
-          const entityPath = `/entity/${identifier}`;
+        setTimeout(async () => {
+          // Fetch parent context for proper URL generation
+          const { entity: entityWithParent, parentEntity } = await fetchEntityWithParentContext(existingEntity.slug || existingEntity.id);
+          
+          const entityPath = parentEntity 
+            ? getHierarchicalEntityUrl(parentEntity, entityWithParent!)
+            : getEntityUrl(existingEntity);
           
           console.log(`🔗 Navigating to existing entity: ${entityPath}`);
           navigate(entityPath);
@@ -165,9 +171,13 @@ export function SearchResultHandler({
         console.log(`✅ Enhanced entity created successfully:`, entity);
         
         // Keep the loading state active for a moment to ensure smooth transition
-        setTimeout(() => {
-          const identifier = entity.slug || entity.id;
-          const entityPath = `/entity/${identifier}`;
+        setTimeout(async () => {
+          // Fetch parent context for newly created entity
+          const { entity: entityWithParent, parentEntity } = await fetchEntityWithParentContext(entity.slug || entity.id);
+          
+          const entityPath = parentEntity 
+            ? getHierarchicalEntityUrl(parentEntity, entityWithParent!)
+            : getEntityUrl(entity);
           
           console.log(`🔗 Navigating to new entity page: ${entityPath}`);
           navigate(entityPath);
