@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, Home } from 'lucide-react';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Entity } from '@/services/recommendation/types';
+import { getEntityUrl } from '@/utils/entityUrlUtils';
 
 interface EntityParentBreadcrumbProps {
   currentEntity: Entity;
@@ -42,7 +43,7 @@ export const EntityParentBreadcrumb: React.FC<EntityParentBreadcrumbProps> = ({
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
                 <Link 
-                  to={`/entity/${parentEntity.slug || parentEntity.id}`}
+                  to={getEntityUrl(parentEntity)}
                   className="hover:text-foreground transition-colors"
                 >
                   {parentEntity.name}

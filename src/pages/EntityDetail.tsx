@@ -45,7 +45,11 @@ import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
 import EntityDetailV2 from './EntityDetailV2';
 
 const EntityDetailOriginal = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, parentSlug, childSlug } = useParams<{ 
+    slug?: string; 
+    parentSlug?: string; 
+    childSlug?: string; 
+  }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -61,6 +65,14 @@ const EntityDetailOriginal = () => {
 
   const { refreshEntityImage, isRefreshing, isEntityImageMigrated } = useEntityImageRefresh();
 
+  // Determine the entity slug to fetch - hierarchical takes precedence
+  const entitySlug = React.useMemo(() => {
+    if (parentSlug && childSlug) {
+      return childSlug; // In hierarchical URLs, we fetch the child entity
+    }
+    return slug || '';
+  }, [slug, parentSlug, childSlug]);
+
   const {
     entity,
     recommendations,
@@ -70,14 +82,23 @@ const EntityDetailOriginal = () => {
     loadingStep,
     error,
     refreshData
-  } = useEntityDetail(slug || '');
+  } = useEntityDetail(entitySlug);
 
   // Canonical redirect: if URL contains UUID instead of slug, redirect to slug-based URL
   useEffect(() => {
-    if (entity && slug && isUUID(slug) && entity.slug) {
-      navigate(getEntityUrl(entity), { replace: true });
+    if (entity && entity.slug) {
+      // Handle hierarchical URLs
+      if (parentSlug && childSlug) {
+        if (isUUID(childSlug)) {
+          // Redirect from UUID-based child to slug-based hierarchical URL
+          navigate(`/entity/${parentSlug}/${entity.slug}?v=4`, { replace: true });
+        }
+      } else if (slug && isUUID(slug)) {
+        // Redirect from UUID-based single entity to slug-based URL
+        navigate(getEntityUrl(entity), { replace: true });
+      }
     }
-  }, [entity, slug, navigate]);
+  }, [entity, slug, parentSlug, childSlug, navigate]);
 
   const {
     circleRating,
@@ -968,8 +989,17 @@ const EntityDetailOriginal = () => {
 
 const EntityDetail = () => {
   const [searchParams] = useSearchParams();
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, parentSlug, childSlug } = useParams<{ 
+    slug?: string; 
+    parentSlug?: string; 
+    childSlug?: string; 
+  }>();
   const version = searchParams.get('v') || (searchParams.get('preview') === 'true' ? '2' : '1');
+  
+  // Determine display name for loading state
+  const displayName = parentSlug && childSlug 
+    ? `${childSlug}` 
+    : slug || 'Entity';
 
   // Import EntityV3 and EntityV4 dynamically
   const EntityV3 = React.lazy(() => import('@/components/entity-v3/EntityV3'));
@@ -978,13 +1008,13 @@ const EntityDetail = () => {
   // Return appropriate version based on URL parameters
   if (version === '4') {
     return (
-      <React.Suspense fallback={<EntityDetailLoadingProgress entityName={slug || 'Entity'} entityType="product" />}>
+      <React.Suspense fallback={<EntityDetailLoadingProgress entityName={displayName} entityType="product" />}>
         <EntityV4 />
       </React.Suspense>
     );
   } else if (version === '3') {
     return (
-      <React.Suspense fallback={<EntityDetailLoadingProgress entityName={slug || 'Entity'} entityType="product" />}>
+      <React.Suspense fallback={<EntityDetailLoadingProgress entityName={displayName} entityType="product" />}>
         <EntityV3 />
       </React.Suspense>
     );

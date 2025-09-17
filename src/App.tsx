@@ -109,6 +109,11 @@ function App() {
                       <EntityDetail />
                     </ProtectedRoute>
                   } />
+                  <Route path="/entity/:parentSlug/:childSlug" element={
+                    <ProtectedRoute>
+                      <EntityDetail />
+                    </ProtectedRoute>
+                  } />
                   <Route path="/post/:postId" element={
                     <ProtectedRoute>
                       <PostView />

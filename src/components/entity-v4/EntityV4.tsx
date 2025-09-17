@@ -19,6 +19,7 @@ import { useUserFollowing } from '@/hooks/useUserFollowing';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useNavigate } from 'react-router-dom';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
+import { getHierarchicalEntityUrl } from '@/utils/entityUrlUtils';
 
 // Imported extracted components
 import { EntityHeader } from './EntityHeader';
@@ -31,8 +32,20 @@ import Footer from '@/components/Footer';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 
 const EntityV4 = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, parentSlug, childSlug } = useParams<{ 
+    slug?: string; 
+    parentSlug?: string; 
+    childSlug?: string; 
+  }>();
   const navigate = useNavigate();
+  
+  // Determine the entity slug to fetch - hierarchical takes precedence
+  const entitySlug = React.useMemo(() => {
+    if (parentSlug && childSlug) {
+      return childSlug; // In hierarchical URLs, we fetch the child entity
+    }
+    return slug || '';
+  }, [slug, parentSlug, childSlug]);
   
   // Fetch real entity data
   const {
@@ -41,7 +54,7 @@ const EntityV4 = () => {
     stats,
     isLoading,
     error
-  } = useEntityDetailCached(slug || '');
+  } = useEntityDetailCached(entitySlug);
 
   // Fetch entity hierarchy data (children/products and parent)
   const {
@@ -257,7 +270,14 @@ const EntityV4 = () => {
 
   // Navigation handlers for child entities (V4 navigation)
   const handleViewChild = (child: Entity) => {
-    navigate(`/entity/${child.slug || child.id}?v=4`);
+    if (entityWithChildren) {
+      // Use hierarchical URL when viewing child from parent page
+      const hierarchicalUrl = getHierarchicalEntityUrl(entityWithChildren, child);
+      navigate(`${hierarchicalUrl}?v=4`);
+    } else {
+      // Fallback to single entity URL
+      navigate(`/entity/${child.slug || child.id}?v=4`);
+    }
   };
 
   const handleViewAllProducts = () => {
