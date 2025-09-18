@@ -248,7 +248,7 @@ export const getNetworkEntityRecommendationsWithCache = async (
         user_id: rec.recommender_user_ids?.[0] || '',
         username: rec.recommender_usernames?.[0] || 'Unknown User',
         avatar_url: rec.recommender_avatars?.[0] || null,
-        created_at: rec.latest_recommendation_date || new Date().toISOString(),
+        created_at: new Date().toISOString(), // Use current date as fallback
         
         // Aggregated data
         userProfiles,
@@ -260,8 +260,8 @@ export const getNetworkEntityRecommendationsWithCache = async (
         recommendation_count: rec.recommendation_count,
         circle_rating: rec.average_rating,
         overall_rating: rec.average_rating,
-        latest_recommendation_date: rec.latest_recommendation_date || new Date().toISOString(),
-        has_timeline_updates: rec.has_timeline_updates || false,
+        latest_recommendation_date: new Date().toISOString(), // Use current date as fallback
+        has_timeline_updates: false, // Default to false since property not available
         is_mutual_connection: false // Not applicable for aggregated data
       };
     });
