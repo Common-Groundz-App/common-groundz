@@ -41,6 +41,7 @@ import { mapEntityTypeToDatabase, getContextualFieldLabel, getEntityTypeFallback
 import { EntityType } from '@/services/recommendation/types';
 import { Helmet } from 'react-helmet-async';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
+import { handleSlugRedirect, handleHierarchicalRedirect } from '@/services/entityRedirectService';
 
 import EntityDetailV2 from './EntityDetailV2';
 
@@ -84,20 +85,40 @@ const EntityDetailOriginal = () => {
     refreshData
   } = useEntityDetail(entitySlug);
 
-  // Canonical redirect: if URL contains UUID instead of slug, redirect to slug-based URL
+  // Handle slug redirects and canonical redirect
   useEffect(() => {
-    if (entity && entity.slug) {
-      // Handle hierarchical URLs
+    const handleRedirects = async () => {
+      // Handle hierarchical URLs first
       if (parentSlug && childSlug) {
-        if (isUUID(childSlug)) {
-          // Redirect from UUID-based child to slug-based hierarchical URL
-          navigate(`/entity/${parentSlug}/${entity.slug}?v=4`, { replace: true });
+        // Check for slug history redirects
+        const hierarchicalRedirect = await handleHierarchicalRedirect(parentSlug, childSlug);
+        if (hierarchicalRedirect.shouldRedirect && hierarchicalRedirect.redirectTo) {
+          navigate(hierarchicalRedirect.redirectTo, { replace: true });
+          return;
         }
-      } else if (slug && isUUID(slug)) {
-        // Redirect from UUID-based single entity to slug-based URL
-        navigate(getEntityUrl(entity), { replace: true });
+
+        // Handle UUID-based canonical redirects
+        if (entity && entity.slug && isUUID(childSlug)) {
+          navigate(`/entity/${parentSlug}/${entity.slug}`, { replace: true });
+          return;
+        }
+      } else if (slug) {
+        // Check for slug history redirects on single entity URLs
+        const slugRedirect = await handleSlugRedirect(slug);
+        if (slugRedirect.shouldRedirect && slugRedirect.redirectTo) {
+          navigate(slugRedirect.redirectTo, { replace: true });
+          return;
+        }
+
+        // Handle UUID-based canonical redirects
+        if (entity && entity.slug && isUUID(slug)) {
+          navigate(getEntityUrl(entity), { replace: true });
+          return;
+        }
       }
-    }
+    };
+
+    handleRedirects();
   }, [entity, slug, parentSlug, childSlug, navigate]);
 
   const {
