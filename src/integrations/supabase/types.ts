@@ -932,6 +932,35 @@ export type Database = {
           },
         ]
       }
+      entity_slug_history: {
+        Row: {
+          created_at: string | null
+          entity_id: string
+          id: string
+          old_slug: string
+        }
+        Insert: {
+          created_at?: string | null
+          entity_id: string
+          id?: string
+          old_slug: string
+        }
+        Update: {
+          created_at?: string | null
+          entity_id?: string
+          id?: string
+          old_slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_slug_history_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entity_suggestions: {
         Row: {
           admin_notes: string | null
@@ -2712,7 +2741,7 @@ export type Database = {
         Returns: number
       }
       generate_entity_slug: {
-        Args: { current_entity_id?: string; name: string } | { name: string }
+        Args: { entity_id?: string; name: string } | { name: string }
         Returns: string
       }
       get_admin_analytics: {
@@ -3100,6 +3129,25 @@ export type Database = {
       mark_notifications_as_read: {
         Args: { notification_ids: string[] }
         Returns: string[]
+      }
+      migrate_to_hierarchical_slugs: {
+        Args: { batch_size?: number }
+        Returns: {
+          entities_processed: string[]
+          updated_count: number
+        }[]
+      }
+      preview_hierarchical_migration: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          current_slug: string
+          entity_id: string
+          entity_name: string
+          entity_type: Database["public"]["Enums"]["entity_type"]
+          new_slug: string
+          parent_name: string
+          would_change: boolean
+        }[]
       }
       repair_hashtag_relationships: {
         Args: Record<PropertyKey, never>
