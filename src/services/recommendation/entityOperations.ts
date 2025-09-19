@@ -128,27 +128,7 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
   // Ensure we have a valid image URL or use fallback based on type
   const imageUrl = entity.image_url || getEntityTypeFallbackImage(typeAsString);
   
-  // Generate a unique slug
-  let baseSlug = entity.slug || generateSlug(entity.name);
-  let finalSlug = baseSlug;
-  let counter = 0;
-  
-  // Check for slug uniqueness and generate a unique one if needed
-  while (true) {
-    const { data: existingEntity } = await supabase
-      .from('entities')
-      .select('id')
-      .eq('slug', finalSlug)
-      .eq('is_deleted', false)
-      .maybeSingle();
-    
-    if (!existingEntity) {
-      break; // Slug is unique
-    }
-    
-    counter++;
-    finalSlug = `${baseSlug}-${counter}`;
-  }
+  // Don't generate slug manually - let database trigger handle it based on parent relationship
   
   // For database insertion, prepare the entity data with only the fields that exist in the database
   const entityForDb = {
@@ -160,11 +140,11 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     api_source: entity.api_source || null,
     api_ref: entity.api_ref || null,
     metadata: entity.metadata || null,
-    website_url: entity.website_url || null,
-    slug: finalSlug
+    website_url: entity.website_url || null
+    // Don't set slug - let database trigger generate it
   };
   
-  console.log(`🏗️ Creating basic entity in database with slug: ${finalSlug}`, entityForDb);
+  console.log(`🏗️ Creating basic entity in database (slug will be auto-generated)`, entityForDb);
   
   const { data, error } = await supabase
     .from('entities')
@@ -178,7 +158,7 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     return null;
   }
 
-  console.log(`✅ Basic entity created successfully with slug: ${data?.slug}`, data);
+  console.log(`✅ Basic entity created successfully with auto-generated slug: ${data?.slug}`, data);
   
   // Skip local image storage for Google Places entities - they use proxy URLs
   if (data && entity.image_url && !entity.image_url.includes('entity-images') && entity.api_source !== 'google_places') {
@@ -267,8 +247,8 @@ export const findOrCreateEntity = async (
       api_source: apiSource,
       api_ref: apiRef,
       metadata,
-      website_url: websiteUrl,
-      slug: generateSlug(name)
+      website_url: websiteUrl
+      // Don't set slug - let database trigger generate it
     });
   }
   

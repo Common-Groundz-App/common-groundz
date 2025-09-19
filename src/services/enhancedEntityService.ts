@@ -75,9 +75,8 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, par
         last_enriched_at: new Date().toISOString(),
         enrichment_source: enhancedData.api_source,
         data_quality_score: calculateDataQualityScore(enhancedData),
-        slug: parentEntity ? 
-          `${parentEntity.slug || parentEntity.id}-${generateSlug(enhancedData.name)}` : 
-          generateSlug(enhancedData.name)
+        parent_id: parentEntity?.id || null
+        // Don't set slug - let database trigger generate hierarchical slug
       })
       .select()
       .single();
