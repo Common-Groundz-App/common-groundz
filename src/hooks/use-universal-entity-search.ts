@@ -14,6 +14,7 @@ interface Entity {
   api_source?: string;
   api_ref?: string;
   metadata?: any;
+  slug?: string;
 }
 
 export function useUniversalEntitySearch() {
@@ -33,7 +34,7 @@ export function useUniversalEntitySearch() {
       // Search in our local database for entities across all types
       const { data: entityData, error: localError } = await supabase
         .from('entities')
-        .select('id, name, description, image_url, type, venue, api_source, api_ref, metadata')
+        .select('id, name, description, image_url, type, venue, api_source, api_ref, metadata, slug')
         .eq('is_deleted', false)
         .ilike('name', `%${query}%`)
         .order('name')

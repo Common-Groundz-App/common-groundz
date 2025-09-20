@@ -19,6 +19,7 @@ interface SearchEntity {
   api_source?: string;
   api_ref?: string;
   metadata?: any;
+  slug?: string;
 }
 
 interface ParentEntitySelectorProps {
@@ -93,7 +94,7 @@ export function ParentEntitySelector({
       metadata: entity.metadata || {},
       venue: entity.venue || null,
       website_url: null,
-      slug: null,
+      slug: entity.slug || null, // Preserve the parent's slug
       category_id: null,
       popularity_score: null,
       photo_reference: null,
