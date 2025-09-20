@@ -15,6 +15,8 @@ interface EntityResultItemProps {
 export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
   // Always use the standardized entity URL format
   const getEntityPath = () => {
+    // For search results, we use the simple format since we don't have parent info
+    // The hierarchical resolution will happen at the route level
     return getEntityUrl(entity);
   };
 

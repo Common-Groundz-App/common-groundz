@@ -709,6 +709,11 @@ const AdminEntityEdit = () => {
                         placeholder="URL-friendly identifier"
                         disabled={entity.is_deleted}
                       />
+                      {selectedParent && (
+                        <p className="text-xs text-muted-foreground">
+                          Full URL path: <code>/entity/{selectedParent.slug || selectedParent.id}/{entity.slug || 'new-slug'}</code>
+                        </p>
+                      )}
                     </div>
 
                      <div className="space-y-2">

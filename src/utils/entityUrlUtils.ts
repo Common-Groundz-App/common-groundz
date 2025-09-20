@@ -9,10 +9,15 @@ export interface EntityUrlCompatible {
 
 /**
  * Generate a consistent entity URL, prioritizing slug over ID
+ * For entities with parents, this automatically generates hierarchical URLs
  * @param entity - Entity with slug and id properties
+ * @param parentEntity - Optional parent entity for hierarchical URLs
  * @returns URL path for the entity
  */
-export const getEntityUrl = (entity: EntityUrlCompatible): string => {
+export const getEntityUrl = (entity: EntityUrlCompatible, parentEntity?: EntityUrlCompatible): string => {
+  if (parentEntity) {
+    return getHierarchicalEntityUrl(parentEntity, entity);
+  }
   return `/entity/${entity.slug || entity.id}`;
 };
 
@@ -67,27 +72,29 @@ export const generateSlug = (name: string): string => {
 };
 
 /**
- * Generate a hierarchical slug for a child entity
+ * Generate a hierarchical path for display purposes
  * @param name - Child entity name
  * @param parentSlug - Parent entity slug
- * @returns Hierarchical slug
+ * @returns Hierarchical path for display (not storage)
  */
-export const generateHierarchicalSlug = (name: string, parentSlug?: string): string => {
+export const generateHierarchicalPath = (name: string, parentSlug?: string): string => {
   const baseSlug = generateSlug(name);
-  return parentSlug ? `${parentSlug}-${baseSlug}` : baseSlug;
+  return parentSlug ? `${parentSlug}/${baseSlug}` : baseSlug;
 };
 
 /**
- * Check if an entity needs a hierarchical slug update
+ * Check if an entity needs a slug update for hierarchical display
  * @param entity - Entity to check
  * @param parentEntity - Parent entity (if any)
  * @returns true if slug needs updating
  */
 export const needsSlugUpdate = (entity: EntityUrlCompatible, parentEntity?: EntityUrlCompatible): boolean => {
+  // For hierarchical entities, we just check if the child has a simple slug
+  // The URL construction will handle the hierarchy
   if (!parentEntity) {
     return false; // No parent, current slug is fine
   }
   
-  const expectedSlug = generateHierarchicalSlug(entity.slug || entity.id, parentEntity.slug || parentEntity.id);
+  const expectedSlug = generateSlug(entity.slug || entity.id);
   return entity.slug !== expectedSlug;
 };
