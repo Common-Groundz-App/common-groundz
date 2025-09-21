@@ -26,6 +26,8 @@ export interface EntitySearchResult {
   image_url: string | null;
   description: string | null;
   slug: string | null;
+  parent_id?: string | null;
+  parent_slug?: string | null;
 }
 
 export interface ReviewSearchResult {

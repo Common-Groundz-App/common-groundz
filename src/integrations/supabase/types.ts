@@ -2817,6 +2817,7 @@ export type Database = {
           id: string
           image_url: string
           name: string
+          slug: string
           type: Database["public"]["Enums"]["entity_type"]
         }[]
       }

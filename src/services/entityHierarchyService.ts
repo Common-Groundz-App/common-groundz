@@ -72,7 +72,7 @@ export const getChildEntities = async (parentId: string): Promise<Entity[]> => {
     throw error;
   }
 
-  // Convert the simplified child data to full Entity objects
+  // Convert the simplified child data to full Entity objects, preserving the slug
   return (data || []).map((child: any) => ({
     id: child.id,
     name: child.name,
@@ -84,7 +84,7 @@ export const getChildEntities = async (parentId: string): Promise<Entity[]> => {
     metadata: {},
     venue: null,
     website_url: null,
-    slug: null,
+    slug: child.slug, // Preserve the actual slug from the database
     category_id: null,
     popularity_score: null,
     photo_reference: null,
