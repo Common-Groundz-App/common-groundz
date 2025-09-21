@@ -22,6 +22,19 @@ export const getEntityUrl = (entity: EntityUrlCompatible, parentEntity?: EntityU
 };
 
 /**
+ * Generate entity URL with automatic parent detection from entity data
+ * @param entity - Entity that might have parent_id and parent info
+ * @returns URL path for the entity
+ */
+export const getEntityUrlWithParent = (entity: any): string => {
+  // If entity has parent information, create hierarchical URL
+  if (entity.parent_id && entity.parent_slug) {
+    return `/entity/${entity.parent_slug}/${entity.slug || entity.id}`;
+  }
+  return `/entity/${entity.slug || entity.id}`;
+};
+
+/**
  * Generate a hierarchical URL for a child entity with its parent
  * @param parentEntity - Parent entity with slug and id properties
  * @param childEntity - Child entity with slug and id properties

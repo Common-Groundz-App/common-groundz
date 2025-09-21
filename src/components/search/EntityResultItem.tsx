@@ -5,7 +5,7 @@ import { EntitySearchResult } from '@/hooks/use-unified-search';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getEntityUrl } from '@/utils/entityUrlUtils';
+import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 
 interface EntityResultItemProps {
   entity: EntitySearchResult;
@@ -13,11 +13,10 @@ interface EntityResultItemProps {
 }
 
 export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
-  // Always use the standardized entity URL format
+  // Generate the correct entity URL, handling hierarchical relationships
   const getEntityPath = () => {
-    // For search results, we use the simple format since we don't have parent info
-    // The hierarchical resolution will happen at the route level
-    return getEntityUrl(entity);
+    // Use the enhanced URL utility that handles parent relationships automatically
+    return getEntityUrlWithParent(entity);
   };
 
   return (

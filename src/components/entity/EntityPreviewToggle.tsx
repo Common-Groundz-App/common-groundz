@@ -8,28 +8,41 @@ import { useToast } from '@/hooks/use-toast';
 
 export const EntityPreviewToggle = () => {
   const navigate = useNavigate();
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, parentSlug, childSlug } = useParams<{ 
+    slug?: string; 
+    parentSlug?: string; 
+    childSlug?: string; 
+  }>();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   
   const currentVersion = searchParams.get('v') || (searchParams.get('preview') === 'true' ? '2' : '1');
   
+  // Build the base URL based on whether we're in hierarchical or flat structure
+  const getBaseUrl = () => {
+    if (parentSlug && childSlug) {
+      return `/entity/${parentSlug}/${childSlug}`;
+    }
+    return `/entity/${slug}`;
+  };
+  
   const cycleVersion = () => {
+    const baseUrl = getBaseUrl();
     switch (currentVersion) {
       case '1':
-        navigate(`/entity/${slug}?v=2`);
+        navigate(`${baseUrl}?v=2`);
         break;
       case '2':
-        navigate(`/entity/${slug}?v=3`);
+        navigate(`${baseUrl}?v=3`);
         break;
       case '3':
-        navigate(`/entity/${slug}?v=4`);
+        navigate(`${baseUrl}?v=4`);
         break;
       case '4':
-        navigate(`/entity/${slug}`);
+        navigate(`${baseUrl}`);
         break;
       default:
-        navigate(`/entity/${slug}?v=2`);
+        navigate(`${baseUrl}?v=2`);
     }
   };
   

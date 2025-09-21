@@ -15,6 +15,9 @@ interface Entity {
   api_ref?: string;
   metadata?: any;
   slug?: string;
+  parent_id?: string;
+  parent?: { slug: string } | null;
+  parent_slug?: string; // Computed field for easier access
 }
 
 export function useUniversalEntitySearch() {
@@ -32,9 +35,13 @@ export function useUniversalEntitySearch() {
     
     try {
       // Search in our local database for entities across all types
+      // Include parent information for hierarchical URL construction
       const { data: entityData, error: localError } = await supabase
         .from('entities')
-        .select('id, name, description, image_url, type, venue, api_source, api_ref, metadata, slug')
+        .select(`
+          id, name, description, image_url, type, venue, api_source, api_ref, metadata, slug, parent_id,
+          parent:entities!parent_id(slug)
+        `)
         .eq('is_deleted', false)
         .ilike('name', `%${query}%`)
         .order('name')
@@ -42,8 +49,14 @@ export function useUniversalEntitySearch() {
       
       if (localError) throw localError;
       
+      // Process results to add parent_slug for easier access
+      const processedResults = (entityData || []).map((entity: any) => ({
+        ...entity,
+        parent_slug: entity.parent?.slug || null
+      }));
+      
       // Set local database results
-      setLocalResults(entityData as Entity[] || []);
+      setLocalResults(processedResults as Entity[]);
       
     } catch (error) {
       console.error('Error searching entities:', error);
