@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useUnifiedSearch } from '@/hooks/use-unified-search';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
+import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 
 export default function ProductSearch() {
   const { query } = useParams<{ query: string }>();
@@ -100,7 +101,7 @@ export default function ProductSearch() {
                     <div 
                       key={entity.id}
                       className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer rounded-lg transition-colors"
-                      onClick={() => navigate(`/entity/${entity.slug || entity.id}`)}
+                      onClick={() => navigate(getEntityUrlWithParent(entity))}
                     >
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                         {entity.image_url ? (
