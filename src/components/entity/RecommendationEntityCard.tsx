@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { analytics } from '@/services/analytics';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
+import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 
 interface RecommendationData {
   id: string;
@@ -42,11 +43,7 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
       'main'
     );
     
-    if (recommendation.slug) {
-      navigate(`/entity/${recommendation.slug}?v=4`);
-    } else {
-      navigate(`/entity/${recommendation.id}?v=4`);
-    }
+    navigate(`${getEntityUrlWithParent(recommendation)}?v=4`);
   };
 
   const formatRecommendedBy = (users: string[], count?: number): string => {

@@ -380,7 +380,7 @@ serve(async (req) => {
       console.log('🔍 Searching local database...')
       
       const [entitiesResult, usersResult, reviewsResult, recommendationsResult] = await Promise.allSettled([
-        supabase.from('entities').select('*, parent:entities!parent_id(slug)').or(`name.ilike.%${query}%, description.ilike.%${query}%`).eq('is_deleted', false).limit(limit),
+        supabase.from('entities').select('*, parent:entities!entities_parent_id_fkey(slug, id)').or(`name.ilike.%${query}%, description.ilike.%${query}%`).eq('is_deleted', false).limit(limit),
         supabase.from('profiles').select('id, username, avatar_url, bio').or(`username.ilike.%${query}%, bio.ilike.%${query}%`).limit(limit),
         supabase.from('reviews').select(`id, title, content, rating, created_at, entities!inner(name, slug), profiles!inner(username, avatar_url)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).eq('status', 'published').limit(limit),
         supabase.from('recommendations').select(`id, title, content, rating, category, created_at, entities!inner(name, slug), profiles!inner(username, avatar_url)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).limit(limit)

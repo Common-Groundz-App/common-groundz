@@ -19,7 +19,7 @@ import { useUserFollowing } from '@/hooks/useUserFollowing';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useNavigate } from 'react-router-dom';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
-import { getHierarchicalEntityUrl } from '@/utils/entityUrlUtils';
+import { getHierarchicalEntityUrl, getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 
 // Imported extracted components
 import { EntityHeader } from './EntityHeader';
@@ -276,7 +276,7 @@ const EntityV4 = () => {
       navigate(`${hierarchicalUrl}?v=4`);
     } else {
       // Fallback to single entity URL
-      navigate(`/entity/${child.slug || child.id}?v=4`);
+      navigate(`${getEntityUrlWithParent(child)}?v=4`);
     }
   };
 

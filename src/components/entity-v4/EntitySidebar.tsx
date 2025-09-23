@@ -9,6 +9,7 @@ import { EntitySuggestionButton } from './EntitySuggestionButton';
 import { ClaimBusinessButton } from './ClaimBusinessButton';
 import { useRelatedEntities } from '@/hooks/use-related-entities';
 import { useNavigate } from 'react-router-dom';
+import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { 
@@ -40,7 +41,7 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
 
   const handleEntityClick = (relatedEntity: Entity) => {
     if (relatedEntity.slug) {
-      navigate(`/entity/${relatedEntity.slug}`);
+      navigate(getEntityUrlWithParent(relatedEntity));
     }
   };
 

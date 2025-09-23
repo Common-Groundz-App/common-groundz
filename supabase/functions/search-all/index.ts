@@ -60,7 +60,7 @@ serve(async (req) => {
         .from('entities')
         .select(`
           *,
-          parent:entities!parent_id(slug)
+          parent:entities!entities_parent_id_fkey(slug, id)
         `)
         .or(`name.ilike.%${query}%, description.ilike.%${query}%`)
         .eq('is_deleted', false)
