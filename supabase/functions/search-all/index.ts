@@ -27,9 +27,6 @@ serve(async (req) => {
 
     console.log(`🔍 Unified search for: "${query}" (${mode} mode)`)
 
-    // Normalize query for space-insensitive search
-    const normalizedQuery = query.replace(/\s+/g, '')
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
@@ -65,7 +62,7 @@ serve(async (req) => {
           *,
           parent:entities!entities_parent_id_fkey(slug, id)
         `)
-        .or(`name.ilike.%${query}%, description.ilike.%${query}%, replace(name, ' ', '').ilike.%${normalizedQuery}%`)
+        .or(`name.ilike.%${query}%, description.ilike.%${query}%`)
         .eq('is_deleted', false)
         .limit(limit)
 
@@ -99,11 +96,10 @@ serve(async (req) => {
         .or(`title.ilike.%${query}%, content.ilike.%${query}%`)
         .limit(limit)
 
-      // Process entities to include parent_slug and parent_id for easier access
+      // Process entities to include parent_slug for easier access
       results.entities = (entities || []).map((entity: any) => ({
         ...entity,
-        parent_slug: entity.parent?.slug || null,
-        parent_id: entity.parent?.id || null
+        parent_slug: entity.parent?.slug || null
       }))
       results.users = users || []
       results.reviews = (reviews || []).map(review => ({
