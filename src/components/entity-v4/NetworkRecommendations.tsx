@@ -29,6 +29,8 @@ interface DisplayRecommendation {
   recommendedByAvatars?: string[];
   recommendationCount?: number;
   slug?: string;
+  parent_id?: string;
+  parent_slug?: string;
   reason?: string;
   is_same_category?: boolean;
   latestRecommendationDate?: string;
@@ -141,6 +143,8 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     recommendedByAvatars: rec.displayAvatars,
     recommendationCount: rec.recommendation_count,
     slug: rec.entity_slug,
+    parent_id: rec.parent_id,
+    parent_slug: rec.parent_slug,
     reason: undefined, // No reason field in network recommendations
     is_same_category: undefined, // No category field in network recommendations
     latestRecommendationDate: rec.latest_recommendation_date,

@@ -18,6 +18,8 @@ interface RecommendationData {
   recommendedByAvatars?: string[];
   recommendationCount?: number;
   slug?: string;
+  parent_id?: string;
+  parent_slug?: string;
   reason?: string;
   latestRecommendationDate?: string;
   hasTimelineUpdates?: boolean;

@@ -29,6 +29,7 @@ export interface ProcessedNetworkRecommendation {
   entity_type: string;
   entity_image_url: string;
   entity_slug: string;
+  parent_id?: string;
   parent_slug?: string;
   entity_venue?: string;
   average_rating: number;
@@ -243,7 +244,8 @@ export const getNetworkEntityRecommendationsWithCache = async (
         entity_name: anyRec.entity_name,
         entity_type: anyRec.entity_type,
         entity_image_url: anyRec.entity_image_url,
-        entity_slug: anyRec.entity_slug || anyRec.entity_name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        entity_slug: anyRec.entity_slug,
+        parent_id: anyRec.parent_id || undefined,
         parent_slug: anyRec.parent_slug || undefined,
         average_rating: anyRec.average_rating || 0,
         

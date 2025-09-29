@@ -2758,6 +2758,7 @@ export type Database = {
         Args:
           | { p_entity_id: string; p_limit?: number; p_user_id: string }
           | { p_following_ids: string[]; p_limit?: number; p_user_id: string }
+          | { p_limit?: number; p_user_id: string }
         Returns: {
           average_rating: number
           entity_id: string
