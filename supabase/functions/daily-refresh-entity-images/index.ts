@@ -65,8 +65,8 @@ async function checkImageHealth(imageUrl: string): Promise<{ isHealthy: boolean;
     }
   } catch (error) {
     let errorType = 'unknown';
-    if (error.name === 'AbortError') errorType = 'timeout';
-    else if (error.message?.includes('network')) errorType = 'network';
+    if ((error as Error).name === 'AbortError') errorType = 'timeout';
+    else if ((error as Error).message?.includes('network')) errorType = 'network';
     
     return { isHealthy: false, errorType };
   }
@@ -194,7 +194,7 @@ async function processBatch(
       refreshResponse.errors.push({
         id: entity.id,
         name: entity.name,
-        error: lastError ? lastError.message : 'Unknown error'
+        error: lastError ? (lastError as Error).message : 'Unknown error'
       });
     }
     
@@ -317,7 +317,7 @@ Deno.serve(async (req) => {
     console.error("Error in daily-refresh-entity-images function:", error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as Error).message }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }

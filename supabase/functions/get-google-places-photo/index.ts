@@ -37,6 +37,7 @@ function logPerformanceMetric(photoRef: string, metric: RequestMetric) {
 
 serve(async (req) => {
   const startTime = Date.now()
+  const url = new URL(req.url) // Move this to top level for catch block access
   let metric: RequestMetric = {
     startTime,
     cacheHit: false,
@@ -52,7 +53,6 @@ serve(async (req) => {
 
   try {
     // Parse query parameters from URL
-    const url = new URL(req.url)
     const photoReference = url.searchParams.get('photoReference')
     const maxWidth = url.searchParams.get('maxWidth') || '400'
     
@@ -103,7 +103,7 @@ serve(async (req) => {
       
       logPerformanceMetric(photoReference, metric)
       
-      return new Response(cached.data, {
+      return new Response(cached.data as BodyInit, {
         headers: {
           ...corsHeaders,
           'Content-Type': cached.contentType,
@@ -191,9 +191,9 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in get-google-places-photo function:', error)
     metric.duration = Date.now() - startTime
-    logPerformanceMetric(photoReference || 'unknown', metric)
+    logPerformanceMetric(url.searchParams.get('photoReference') || 'unknown', metric)
     
-    if (error.name === 'AbortError') {
+    if ((error as Error).name === 'AbortError') {
       return new Response(
         JSON.stringify({ error: 'Request timeout' }),
         { 
@@ -208,8 +208,8 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Failed to fetch photo',
-        details: error.toString()
+        error: (error as Error).message || 'Failed to fetch photo',
+        details: (error as Error).toString()
       }),
       { 
         status: 500,

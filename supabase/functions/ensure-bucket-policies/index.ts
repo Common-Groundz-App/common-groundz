@@ -90,7 +90,7 @@ serve(async (req) => {
     console.error("Error in ensure-bucket-policies function:", error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: (error as Error).message,
         success: false 
       }),
       { 

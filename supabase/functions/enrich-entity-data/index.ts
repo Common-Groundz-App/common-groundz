@@ -94,7 +94,7 @@ serve(async (req) => {
         .update({ 
           status: newStatus,
           retry_count: newRetryCount,
-          error_message: enrichError.message,
+          error_message: (enrichError as Error).message,
           updated_at: new Date().toISOString()
         })
         .eq('id', queueItem.id);
@@ -112,7 +112,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in enrich-entity-data function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as Error).message }),
       { 
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -261,7 +261,7 @@ async function enrichPlaceData(entity: any) {
             chips.push('Permanently closed');
           }
 
-          const typeLabel = details.primaryType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
+          const typeLabel = details.primaryType?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Place';
           const areaLabel = details.shortFormattedAddress?.split(',')[0] || 'this area';
           const chipText = chips.length ? ` • ${chips.join(' • ')}` : '';
           
