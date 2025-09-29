@@ -47,6 +47,7 @@ import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { Entity, EntityType } from '@/services/recommendation/types';
+import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { ExternalLinksSection } from '@/components/entity/ExternalLinksSection';
 import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
 import { SiblingCarousel } from '@/components/entity/SiblingCarousel';
@@ -417,11 +418,11 @@ const EntityDetailV2 = () => {
   const sidebarButtonConfig = getSidebarButtonConfig();
 
   const handleViewChild = (child: Entity) => {
-    navigate(`/entity/${child.slug || child.id}?preview=true`);
+    navigate(`${getEntityUrlWithParent(child)}?preview=true`);
   };
 
   const handleViewSibling = (sibling: Entity) => {
-    navigate(`/entity/${sibling.slug || sibling.id}?preview=true`);
+    navigate(`${getEntityUrlWithParent(sibling)}?preview=true`);
   };
 
   const handleAddChild = () => {
@@ -785,7 +786,7 @@ const EntityDetailV2 = () => {
                               <Button
                                 variant="link"
                                 className="p-0 h-auto text-sm font-medium"
-                                onClick={() => navigate(`/entity/${parentEntity.slug || parentEntity.id}?preview=true`)}
+                                onClick={() => navigate(`${getEntityUrlWithParent(parentEntity)}?preview=true`)}
                               >
                                 {parentEntity.name}
                               </Button>
@@ -989,7 +990,7 @@ const EntityDetailV2 = () => {
                     <CardContent>
                       <div 
                         className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => navigate(`/entity/${parentEntity.slug || parentEntity.id}?preview=true`)}
+                        onClick={() => navigate(`${getEntityUrlWithParent(parentEntity)}?preview=true`)}
                       >
                         {parentEntity.image_url && (
                           <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">

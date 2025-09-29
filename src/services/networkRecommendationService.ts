@@ -29,6 +29,7 @@ export interface ProcessedNetworkRecommendation {
   entity_type: string;
   entity_image_url: string;
   entity_slug: string;
+  parent_slug?: string;
   entity_venue?: string;
   average_rating: number;
   
@@ -219,12 +220,13 @@ export const getNetworkEntityRecommendationsWithCache = async (
 
     // Process the aggregated data
     const processedData: ProcessedNetworkRecommendation[] = rawData.map(rec => {
-      const userProfiles = rec.recommender_user_ids?.map((id: string, index: number) => {
-        const username = rec.recommender_usernames?.[index] || 'Unknown User';
+      const anyRec = rec as any; // Type cast to handle new RPC return fields
+      const userProfiles = anyRec.recommender_user_ids?.map((id: string, index: number) => {
+        const username = anyRec.recommender_usernames?.[index] || 'Unknown User';
         return {
           id,
           username,
-          avatar_url: rec.recommender_avatars?.[index] || null,
+          avatar_url: anyRec.recommender_avatars?.[index] || null,
           displayName: username,
           initials: username.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
           fullName: null,
@@ -237,29 +239,30 @@ export const getNetworkEntityRecommendationsWithCache = async (
 
       return {
         // Core entity data
-        entity_id: rec.entity_id,
-        entity_name: rec.entity_name,
-        entity_type: rec.entity_type,
-        entity_image_url: rec.entity_image_url,
-        entity_slug: rec.entity_name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), // Generate slug from name
-        average_rating: rec.average_rating || 0,
+        entity_id: anyRec.entity_id,
+        entity_name: anyRec.entity_name,
+        entity_type: anyRec.entity_type,
+        entity_image_url: anyRec.entity_image_url,
+        entity_slug: anyRec.entity_slug || anyRec.entity_name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        parent_slug: anyRec.parent_slug || undefined,
+        average_rating: anyRec.average_rating || 0,
         
         // Primary recommender data (first in list)
-        user_id: rec.recommender_user_ids?.[0] || '',
-        username: rec.recommender_usernames?.[0] || 'Unknown User',
-        avatar_url: rec.recommender_avatars?.[0] || null,
+        user_id: anyRec.recommender_user_ids?.[0] || '',
+        username: anyRec.recommender_usernames?.[0] || 'Unknown User',
+        avatar_url: anyRec.recommender_avatars?.[0] || null,
         created_at: new Date().toISOString(), // Use current date as fallback
         
         // Aggregated data
         userProfiles,
-        displayUsernames: rec.recommender_usernames || ['Unknown User'],
-        displayAvatars: rec.recommender_avatars?.filter(Boolean) || [],
-        recommendedByUserId: rec.recommender_user_ids || [],
+        displayUsernames: anyRec.recommender_usernames || ['Unknown User'],
+        displayAvatars: anyRec.recommender_avatars?.filter(Boolean) || [],
+        recommendedByUserId: anyRec.recommender_user_ids || [],
         
         // Enhanced fields
-        recommendation_count: rec.recommendation_count,
-        circle_rating: rec.average_rating,
-        overall_rating: rec.average_rating,
+        recommendation_count: anyRec.recommendation_count,
+        circle_rating: anyRec.average_rating,
+        overall_rating: anyRec.average_rating,
         latest_recommendation_date: new Date().toISOString(), // Use current date as fallback
         has_timeline_updates: false, // Default to false since property not available
         is_mutual_connection: false // Not applicable for aggregated data
