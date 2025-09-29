@@ -84,7 +84,7 @@ serve(async (req) => {
         chips.push('Permanently closed');
       }
 
-      const typeLabel = details.primaryType?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Place';
+      const typeLabel = details.primaryType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
       const areaLabel = details.shortFormattedAddress?.split(',')[0] || 'this area';
       const chipText = chips.length ? ` • ${chips.join(' • ')}` : '';
       
@@ -229,7 +229,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in backfill-entity-descriptions function:", error);
     return new Response(
-      JSON.stringify({ error: (error as Error).message }),
+      JSON.stringify({ error: error.message }),
       { 
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }

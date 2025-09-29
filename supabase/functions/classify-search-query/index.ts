@@ -153,14 +153,14 @@ serve(async (req) => {
       try {
         classificationResult = await classifyWithGemini(query);
       } catch (error) {
-        console.error('❌ Gemini classification failed:', (error as Error).message);
+        console.error('❌ Gemini classification failed:', error.message);
         
         // Fallback to OpenAI if available
         if (openAIApiKey) {
           try {
             classificationResult = await classifyWithOpenAI(query);
           } catch (openAIError) {
-            console.error('❌ OpenAI fallback also failed:', (openAIError as Error).message);
+            console.error('❌ OpenAI fallback also failed:', openAIError.message);
             throw new Error('Both Gemini and OpenAI classification failed');
           }
         } else {
@@ -202,7 +202,7 @@ serve(async (req) => {
         confidence: 0.5,
         reasoning: 'Classification service error',
         api_used: 'fallback',
-        error: (error as Error).message 
+        error: error.message 
       }),
       { 
         status: 500, 
