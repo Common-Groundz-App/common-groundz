@@ -31,6 +31,7 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
         .from('entities')
         .select(`
           *,
+          parent:entities!entities_parent_id_fkey(slug, id),
           reviews!inner(rating, latest_rating)
         `)
         .eq('type', entityType)
@@ -44,12 +45,14 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
       const entitiesWithRatings = (sameTypeEntities as any[])?.map(entity => {
         const ratings = entity.reviews?.map((r: any) => r.latest_rating || r.rating) || [];
         const avgRating = ratings.length > 0 ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length : 0;
-        const { reviews, ...entityWithoutReviews } = entity;
+        const { reviews, parent, ...entityWithoutReviews } = entity;
         return {
           ...entityWithoutReviews,
+          parent_id: entity.parent_id,
+          parent_slug: parent?.slug,
           avgRating,
           reviewCount: ratings.length
-        } as Entity & { avgRating: number; reviewCount: number };
+        } as Entity & { avgRating: number; reviewCount: number; parent_slug?: string };
       }).sort((a, b) => {
         // First sort by having reviews vs not having reviews
         if (a.reviewCount > 0 && b.reviewCount === 0) return -1;
@@ -71,6 +74,7 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
           .from('entities')
           .select(`
             *,
+            parent:entities!entities_parent_id_fkey(slug, id),
             reviews!inner(rating, latest_rating)
           `)
           .eq('parent_id', parentId)
@@ -84,12 +88,14 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
           const siblingsWithRatings = siblings.map(entity => {
             const ratings = (entity as any).reviews?.map((r: any) => r.latest_rating || r.rating) || [];
             const avgRating = ratings.length > 0 ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length : 0;
-            const { reviews, ...entityWithoutReviews } = entity as any;
+            const { reviews, parent, ...entityWithoutReviews } = entity as any;
             return {
               ...entityWithoutReviews,
+              parent_id: entity.parent_id,
+              parent_slug: parent?.slug,
               avgRating,
               reviewCount: ratings.length
-            } as Entity & { avgRating: number; reviewCount: number };
+            } as Entity & { avgRating: number; reviewCount: number; parent_slug?: string };
           });
           
           entities = [...entities, ...siblingsWithRatings];
