@@ -352,6 +352,9 @@ serve(async (req) => {
 
     console.log(`🔍 Enhanced unified search for: "${query}" (${mode} mode)`)
 
+    // Normalize query for space-insensitive search
+    const normalizedQuery = query.replace(/\s+/g, '')
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
@@ -380,7 +383,7 @@ serve(async (req) => {
       console.log('🔍 Searching local database...')
       
       const [entitiesResult, usersResult, reviewsResult, recommendationsResult] = await Promise.allSettled([
-        supabase.from('entities').select('*, parent:entities!entities_parent_id_fkey(slug, id)').or(`name.ilike.%${query}%, description.ilike.%${query}%, replace(name, ' ', '').ilike.%${query.replace(/\s+/g, '')}%`).eq('is_deleted', false).limit(limit),
+        supabase.from('entities').select('*, parent:entities!entities_parent_id_fkey(slug, id)').or(`name.ilike.%${query}%, description.ilike.%${query}%, replace(name, ' ', '').ilike.%${normalizedQuery}%`).eq('is_deleted', false).limit(limit),
         supabase.from('profiles').select('id, username, avatar_url, bio').or(`username.ilike.%${query}%, bio.ilike.%${query}%`).limit(limit),
         supabase.from('reviews').select(`id, title, content, rating, created_at, entities!inner(name, slug), profiles!inner(username, avatar_url)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).eq('status', 'published').limit(limit),
         supabase.from('recommendations').select(`id, title, content, rating, category, created_at, entities!inner(name, slug), profiles!inner(username, avatar_url)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).limit(limit)
