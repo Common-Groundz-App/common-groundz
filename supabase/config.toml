@@ -1,7 +1,7 @@
 project_id = "uyjtgybbktgapspodajy"
 
 [functions]
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [api]
 enabled = true
