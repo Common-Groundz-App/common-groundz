@@ -89,7 +89,7 @@ export function useEntitySearch(type: EntityTypeString) {
           .from('entities')
           .select()
           .eq('type', type as any) // Cast to any to handle extended entity types
-          .ilike('name', `%${query}%`)
+          .or(`name.ilike.%${query}%, description.ilike.%${query}%, slug.ilike.%${query}%`)
           .order('name')
           .limit(5);
         
