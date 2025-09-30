@@ -1,5 +1,8 @@
 project_id = "uyjtgybbktgapspodajy"
 
+[functions]
+import_map = "functions/import_map.json"
+
 [api]
 enabled = true
 port = 54321
