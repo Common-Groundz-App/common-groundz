@@ -1,7 +1,5 @@
-project_id = "uyjtgybbktgapspodajy"
 
-[functions]
-import_map = "import_map.json"
+project_id = "uyjtgybbktgapspodajy"
 
 [api]
 enabled = true
@@ -43,9 +41,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.refresh-google-places-entity]
-verify_jwt = true
-
-[functions.admin-soft-delete-entity]
 verify_jwt = true
 
 [functions.update-entity-admin]

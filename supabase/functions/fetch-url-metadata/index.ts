@@ -1,4 +1,5 @@
-import { serve } from "std/http/server.ts";
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { parse } from 'https://esm.sh/node-html-parser@6.1.12';
 
 const corsHeaders = {
