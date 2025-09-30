@@ -99,7 +99,8 @@ serve(async (req) => {
       // Process entities to include parent_slug for easier access
       results.entities = (entities || []).map((entity: any) => ({
         ...entity,
-        parent_slug: entity.parent?.slug || null
+        parent_slug: entity.parent?.slug || null,
+        parent_id: entity.parent?.id ?? entity.parent_id ?? null
       }))
       results.users = users || []
       results.reviews = (reviews || []).map(review => ({

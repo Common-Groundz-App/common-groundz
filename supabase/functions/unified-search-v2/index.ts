@@ -389,7 +389,8 @@ serve(async (req) => {
       if (entitiesResult.status === 'fulfilled' && entitiesResult.value.data) {
         results.entities = entitiesResult.value.data.map((entity: any) => ({
           ...entity,
-          parent_slug: entity.parent?.slug || null
+          parent_slug: entity.parent?.slug || null,
+          parent_id: entity.parent?.id ?? entity.parent_id ?? null
         }))
       }
       if (usersResult.status === 'fulfilled' && usersResult.value.data) {
