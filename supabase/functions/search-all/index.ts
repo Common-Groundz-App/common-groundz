@@ -1,6 +1,5 @@
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,7 +61,7 @@ serve(async (req) => {
           *,
           parent:entities!entities_parent_id_fkey(slug, id)
         `)
-        .or(`name.ilike.%${query}%, description.ilike.%${query}%`)
+        .or(`name.ilike.%${query.trim()}%,description.ilike.%${query.trim()}%,slug.ilike.%${query.trim().replace(/\s+/g, '')}%`)
         .eq('is_deleted', false)
         .limit(limit)
 
@@ -99,8 +98,8 @@ serve(async (req) => {
       // Process entities to include parent_slug for easier access
       results.entities = (entities || []).map((entity: any) => ({
         ...entity,
-        parent_slug: entity.parent?.slug || null,
-        parent_id: entity.parent?.id ?? entity.parent_id ?? null
+        parent_id: entity.parent?.id ?? entity.parent_id ?? null,
+        parent_slug: entity.parent?.slug ?? entity.parent_slug ?? null
       }))
       results.users = users || []
       results.reviews = (reviews || []).map(review => ({

@@ -1,5 +1,5 @@
-
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,7 +11,7 @@ interface RequestBody {
   action: 'delete' | 'restore';
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });

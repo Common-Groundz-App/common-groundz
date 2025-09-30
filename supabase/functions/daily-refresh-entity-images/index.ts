@@ -1,5 +1,6 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.33.2";
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -204,7 +205,7 @@ async function processBatch(
 }
 
 // Main handler function
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
