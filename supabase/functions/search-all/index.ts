@@ -62,7 +62,7 @@ serve(async (req) => {
           *,
           parent:entities!entities_parent_id_fkey(slug, id)
         `)
-        .or(`name.ilike.%${query}%, description.ilike.%${query}%, slug.ilike.%${query}%, parent.slug.ilike.%${query}%`)
+        .or(`name.ilike."%${query}%",description.ilike."%${query}%",slug.ilike."%${query}%",parent.slug.ilike."%${query}%"`)
         .eq('is_deleted', false)
         .limit(limit)
 
