@@ -380,19 +380,20 @@ serve(async (req) => {
       console.log('🔍 Searching local database with slug priority...')
       
       // First: Search for exact and prefix slug matches (highest priority)
+      // Also search parent slugs to find child products by brand name
       const slugQuery = query.toLowerCase().trim()
       const { data: slugEntities } = await supabase
         .from('entities')
         .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-        .or(`slug.eq."${slugQuery}",slug.ilike."${slugQuery}%"`)
+        .or(`slug.eq.${slugQuery},slug.ilike.${slugQuery}*,parent.slug.eq.${slugQuery},parent.slug.ilike.${slugQuery}*`)
         .eq('is_deleted', false)
         .limit(limit)
       
-      // Second: Search for broader matches in name, description, and partial slug
+      // Second: Search for broader matches in name, description, slug, and parent slug
       const { data: broadEntities } = await supabase
         .from('entities')
         .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-        .or(`name.ilike.%${query}%, description.ilike.%${query}%, slug.ilike.%${query}%`)
+        .or(`name.ilike.%${query}%, description.ilike.%${query}%, slug.ilike.%${query}%, parent.slug.ilike.%${query}%`)
         .eq('is_deleted', false)
         .limit(limit * 2) // Get more results to merge
       
