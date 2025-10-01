@@ -45,3 +45,6 @@ verify_jwt = true
 
 [functions.update-entity-admin]
 verify_jwt = true
+
+[functions.unified-search-v2]
+verify_jwt = false
