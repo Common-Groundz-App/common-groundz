@@ -382,20 +382,28 @@ serve(async (req) => {
       // First: Search for exact and prefix slug matches (highest priority)
       // Also search parent slugs to find child products by brand name
       const slugQuery = query.toLowerCase().trim()
-      const { data: slugEntities } = await supabase
+      const { data: slugEntities, error: slugError } = await supabase
         .from('entities')
         .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-        .or(`slug.eq.${slugQuery},slug.ilike.${slugQuery}%,parent.slug.eq.${slugQuery},parent.slug.ilike.${slugQuery}%`)
+        .or(`slug.eq.${slugQuery},slug.ilike.${slugQuery}*,parent.slug.eq.${slugQuery},parent.slug.ilike.${slugQuery}*`)
         .eq('is_deleted', false)
         .limit(limit)
       
+      if (slugError) {
+        console.error('❌ Slug search error:', slugError)
+      }
+      
       // Second: Search for broader matches in name, description, slug, and parent slug
-      const { data: broadEntities } = await supabase
+      const { data: broadEntities, error: broadError } = await supabase
         .from('entities')
         .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-        .or(`name.ilike.%${query}%,description.ilike.%${query}%,slug.ilike.%${query}%,parent.slug.ilike.%${query}%`)
+        .or(`name.ilike.*${query}*,description.ilike.*${query}*,slug.ilike.*${query}*,parent.slug.ilike.*${query}*`)
         .eq('is_deleted', false)
         .limit(limit * 2) // Get more results to merge
+      
+      if (broadError) {
+        console.error('❌ Broad search error:', broadError)
+      }
       
       // Merge results: slug matches first, then broad matches (deduplicated)
       const slugEntityIds = new Set((slugEntities || []).map((e: any) => e.id))

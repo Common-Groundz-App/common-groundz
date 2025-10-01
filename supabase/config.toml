@@ -40,6 +40,9 @@ verify_jwt = false
 [functions.proxy-movie-image]
 verify_jwt = false
 
+[functions.proxy-external-image]
+verify_jwt = false
+
 [functions.refresh-google-places-entity]
 verify_jwt = true
 

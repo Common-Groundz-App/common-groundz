@@ -50,8 +50,8 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
 
   useEffect(() => {
     const performSearch = async () => {
-      // Show dropdown for any query with 1+ characters
-        if (!query || query.trim().length < 1) {
+      // Only trigger search for queries with 2+ characters
+      if (!query || query.trim().length < 2) {
         setResults({
           users: [],
           entities: [],
@@ -65,6 +65,8 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
             places: []
           }
         });
+        setIsLoading(false);
+        setLoadingStates({ local: false, external: false });
         return;
       }
 
@@ -73,7 +75,7 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
       setLoadingStates({ local: true, external: true });
 
       try {
-        console.log(`🔍 Enhanced search starting for: "${query}"`);
+        console.log(`🔍 Enhanced search starting for: "${query}" (${searchMode} mode)`);
         
         const { data, error: searchError } = await supabase.functions.invoke('unified-search-v2', {
           body: { 
@@ -85,8 +87,17 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
         });
         
         if (searchError) {
-          console.error('Enhanced search API error:', searchError);
+          console.error('❌ Enhanced search API error:', searchError);
           setError('Search temporarily unavailable. Please try again.');
+          setResults({
+            users: [],
+            entities: [],
+            reviews: [],
+            recommendations: [],
+            products: [],
+            hashtags: [],
+            categorized: { books: [], movies: [], places: [] }
+          });
         } else if (data) {
           console.log(`✅ Enhanced search results (${searchMode} mode):`, data);
           

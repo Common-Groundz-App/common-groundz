@@ -56,22 +56,30 @@ serve(async (req) => {
       console.log('🔍 Searching local database...')
       
       // Search entities with parent relationship data - including slug and parent slug
-      const { data: entities } = await supabase
+      const { data: entities, error: entitiesError } = await supabase
         .from('entities')
         .select(`
           *,
           parent:entities!entities_parent_id_fkey(slug, id)
         `)
-        .or(`name.ilike.%${query}%,description.ilike.%${query}%,slug.ilike.%${query}%,parent.slug.ilike.%${query}%`)
+        .or(`name.ilike.*${query}*,description.ilike.*${query}*,slug.ilike.*${query}*,parent.slug.ilike.*${query}*`)
         .eq('is_deleted', false)
         .limit(limit)
 
+      if (entitiesError) {
+        console.error('❌ Entity search error:', entitiesError)
+      }
+
       // Search users 
-      const { data: users } = await supabase
+      const { data: users, error: usersError } = await supabase
         .from('profiles')
         .select('id, username, avatar_url, bio')
-        .or(`username.ilike.%${query}%, bio.ilike.%${query}%`)
+        .or(`username.ilike.*${query}*,bio.ilike.*${query}*`)
         .limit(limit)
+      
+      if (usersError) {
+        console.error('❌ User search error:', usersError)
+      }
 
       // Search reviews
       const { data: reviews } = await supabase
