@@ -375,23 +375,49 @@ serve(async (req) => {
       }
     }
 
-    // 1. Search local database (always fast and reliable)
+    // 1. Search local database with prioritized slug matching
     try {
-      console.log('🔍 Searching local database...')
+      console.log('🔍 Searching local database with slug priority...')
       
-      const [entitiesResult, usersResult, reviewsResult, recommendationsResult] = await Promise.allSettled([
-        supabase.from('entities').select('*, parent:entities!entities_parent_id_fkey(slug, id)').or(`name.ilike.%${query}%, description.ilike.%${query}%, slug.ilike.%${query}%`).eq('is_deleted', false).limit(limit),
+      // First: Search for exact and prefix slug matches (highest priority)
+      const slugQuery = query.toLowerCase().trim()
+      const { data: slugEntities } = await supabase
+        .from('entities')
+        .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+        .or(`slug.eq.${slugQuery}, slug.ilike.${slugQuery}%`)
+        .eq('is_deleted', false)
+        .limit(limit)
+      
+      // Second: Search for broader matches in name, description, and partial slug
+      const { data: broadEntities } = await supabase
+        .from('entities')
+        .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+        .or(`name.ilike.%${query}%, description.ilike.%${query}%, slug.ilike.%${query}%`)
+        .eq('is_deleted', false)
+        .limit(limit * 2) // Get more results to merge
+      
+      // Merge results: slug matches first, then broad matches (deduplicated)
+      const slugEntityIds = new Set((slugEntities || []).map((e: any) => e.id))
+      const mergedEntities = [
+        ...(slugEntities || []),
+        ...(broadEntities || []).filter((e: any) => !slugEntityIds.has(e.id))
+      ].slice(0, limit)
+      
+      console.log(`🎯 Found ${slugEntities?.length || 0} slug matches, ${(broadEntities || []).length} broad matches`)
+      
+      // Search other tables in parallel
+      const [usersResult, reviewsResult, recommendationsResult] = await Promise.allSettled([
         supabase.from('profiles').select('id, username, avatar_url, bio').or(`username.ilike.%${query}%, bio.ilike.%${query}%`).limit(limit),
         supabase.from('reviews').select(`id, title, content, rating, created_at, entities!inner(name, slug), profiles!inner(username, avatar_url)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).eq('status', 'published').limit(limit),
         supabase.from('recommendations').select(`id, title, content, rating, category, created_at, entities!inner(name, slug), profiles!inner(username, avatar_url)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).limit(limit)
       ])
 
-      if (entitiesResult.status === 'fulfilled' && entitiesResult.value.data) {
-        results.entities = entitiesResult.value.data.map((entity: any) => ({
-          ...entity,
-          parent_slug: entity.parent?.slug || null
-        }))
-      }
+      // Process merged entity results
+      results.entities = mergedEntities.map((entity: any) => ({
+        ...entity,
+        parent_slug: entity.parent?.slug || null
+      }))
+      
       if (usersResult.status === 'fulfilled' && usersResult.value.data) {
         results.users = usersResult.value.data
       }
@@ -412,7 +438,7 @@ serve(async (req) => {
         }))
       }
       
-      console.log(`✅ Local search: ${results.entities.length} entities, ${results.users.length} users`)
+      console.log(`✅ Local search: ${results.entities.length} entities (${slugEntities?.length || 0} slug priority), ${results.users.length} users`)
     } catch (localError) {
       console.error('Local database search failed:', localError)
       // Continue with external searches even if local fails
