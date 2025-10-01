@@ -384,7 +384,7 @@ serve(async (req) => {
       const { data: slugEntities } = await supabase
         .from('entities')
         .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-        .or(`slug.eq.${slugQuery}, slug.ilike.${slugQuery}%`)
+        .or(`slug.eq."${slugQuery}",slug.ilike."${slugQuery}%"`)
         .eq('is_deleted', false)
         .limit(limit)
       
