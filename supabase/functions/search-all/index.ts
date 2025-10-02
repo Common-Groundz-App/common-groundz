@@ -57,15 +57,70 @@ serve(async (req) => {
       
       // Search entities with parent relationship data - including slug and parent slug
       console.log('🔍 Searching entities with query:', query)
-      const { data: entities, error: entitiesError } = await supabase
-        .from('entities')
-        .select(`
-          *,
-          parent:entities!entities_parent_id_fkey(slug, id)
-        `)
-        .or('name.ilike.*' + query + '*,description.ilike.*' + query + '*,slug.ilike.*' + query + '*,parent.slug.ilike.*' + query + '*')
-        .eq('is_deleted', false)
-        .limit(limit)
+      
+      // Execute separate queries to avoid PostgREST .or() string issues with spaces
+      const [nameResult, descResult, slugResult, parentSlugResult] = await Promise.allSettled([
+        // Name match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('name', `%${query}%`)
+          .eq('is_deleted', false)
+          .limit(limit),
+        // Description match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('description', `%${query}%`)
+          .eq('is_deleted', false)
+          .limit(limit),
+        // Slug match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('slug', `%${query}%`)
+          .eq('is_deleted', false)
+          .limit(limit),
+        // Parent slug match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('parent.slug', `%${query}%`, { referencedTable: 'entities!entities_parent_id_fkey' })
+          .eq('is_deleted', false)
+          .limit(limit)
+      ])
+      
+      // Combine all search results and deduplicate by entity ID
+      const allEntities: any[] = []
+      if (nameResult.status === 'fulfilled' && nameResult.value.data) {
+        allEntities.push(...nameResult.value.data)
+      }
+      if (descResult.status === 'fulfilled' && descResult.value.data) {
+        allEntities.push(...descResult.value.data)
+      }
+      if (slugResult.status === 'fulfilled' && slugResult.value.data) {
+        allEntities.push(...slugResult.value.data)
+      }
+      if (parentSlugResult.status === 'fulfilled' && parentSlugResult.value.data) {
+        allEntities.push(...parentSlugResult.value.data)
+      }
+      
+      // Deduplicate by entity ID
+      const entityMap = new Map()
+      allEntities.forEach(entity => {
+        if (!entityMap.has(entity.id)) {
+          entityMap.set(entity.id, entity)
+        }
+      })
+      const entities = Array.from(entityMap.values()).slice(0, limit)
+      
+      // Log any errors
+      const entityErrors = [nameResult, descResult, slugResult, parentSlugResult]
+        .filter(r => r.status === 'rejected')
+        .map(r => (r as PromiseRejectedResult).reason)
+      const entitiesError = entityErrors.length > 0 ? entityErrors[0] : null
+      
+      console.log(`✅ Found ${entities.length} local entities`)
 
       if (entitiesError) {
         console.error('❌ Entity search error:', entitiesError)

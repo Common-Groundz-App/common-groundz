@@ -383,29 +383,123 @@ serve(async (req) => {
       // Also search parent slugs to find child products by brand name
       const slugQuery = query.toLowerCase().trim()
       console.log('🔍 Searching with slug query:', slugQuery)
-      const { data: slugEntities, error: slugError } = await supabase
-        .from('entities')
-        .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-        .or('slug.eq.' + slugQuery + ',slug.ilike.' + slugQuery + '*,parent.slug.eq.' + slugQuery + ',parent.slug.ilike.' + slugQuery + '*')
-        .eq('is_deleted', false)
-        .limit(limit)
       
-      if (slugError) {
-        console.error('❌ Slug search error:', slugError)
+      // Execute separate queries to avoid PostgREST .or() string issues with spaces
+      const [exactSlugResult, prefixSlugResult, exactParentSlugResult, prefixParentSlugResult] = await Promise.allSettled([
+        // Exact slug match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .eq('slug', slugQuery)
+          .eq('is_deleted', false)
+          .limit(limit),
+        // Prefix slug match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('slug', `${slugQuery}%`)
+          .eq('is_deleted', false)
+          .limit(limit),
+        // Exact parent slug match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .eq('parent.slug', slugQuery, { referencedTable: 'entities!entities_parent_id_fkey' })
+          .eq('is_deleted', false)
+          .limit(limit),
+        // Prefix parent slug match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('parent.slug', `${slugQuery}%`, { referencedTable: 'entities!entities_parent_id_fkey' })
+          .eq('is_deleted', false)
+          .limit(limit)
+      ])
+      
+      // Combine all slug search results
+      const slugEntities: any[] = []
+      if (exactSlugResult.status === 'fulfilled' && exactSlugResult.value.data) {
+        slugEntities.push(...exactSlugResult.value.data)
       }
+      if (prefixSlugResult.status === 'fulfilled' && prefixSlugResult.value.data) {
+        slugEntities.push(...prefixSlugResult.value.data)
+      }
+      if (exactParentSlugResult.status === 'fulfilled' && exactParentSlugResult.value.data) {
+        slugEntities.push(...exactParentSlugResult.value.data)
+      }
+      if (prefixParentSlugResult.status === 'fulfilled' && prefixParentSlugResult.value.data) {
+        slugEntities.push(...prefixParentSlugResult.value.data)
+      }
+      
+      // Log any errors
+      const slugErrors = [exactSlugResult, prefixSlugResult, exactParentSlugResult, prefixParentSlugResult]
+        .filter(r => r.status === 'rejected')
+        .map(r => (r as PromiseRejectedResult).reason)
+      if (slugErrors.length > 0) {
+        console.error('❌ Slug search errors:', slugErrors)
+      }
+      
+      console.log(`✅ Found ${slugEntities.length} slug-based entities`)
       
       // Second: Search for broader matches in name, description, slug, and parent slug
       console.log('🔍 Searching with broad query:', query)
-      const { data: broadEntities, error: broadError } = await supabase
-        .from('entities')
-        .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-        .or('name.ilike.*' + query + '*,description.ilike.*' + query + '*,slug.ilike.*' + query + '*,parent.slug.ilike.*' + query + '*')
-        .eq('is_deleted', false)
-        .limit(limit * 2) // Get more results to merge
       
-      if (broadError) {
-        console.error('❌ Broad search error:', broadError)
+      // Execute separate queries to avoid PostgREST .or() string issues with spaces
+      const [nameResult, descResult, slugResult, parentSlugResult] = await Promise.allSettled([
+        // Name match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('name', `%${query}%`)
+          .eq('is_deleted', false)
+          .limit(limit),
+        // Description match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('description', `%${query}%`)
+          .eq('is_deleted', false)
+          .limit(limit),
+        // Slug match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('slug', `%${query}%`)
+          .eq('is_deleted', false)
+          .limit(limit),
+        // Parent slug match
+        supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .ilike('parent.slug', `%${query}%`, { referencedTable: 'entities!entities_parent_id_fkey' })
+          .eq('is_deleted', false)
+          .limit(limit)
+      ])
+      
+      // Combine all broad search results
+      const broadEntities: any[] = []
+      if (nameResult.status === 'fulfilled' && nameResult.value.data) {
+        broadEntities.push(...nameResult.value.data)
       }
+      if (descResult.status === 'fulfilled' && descResult.value.data) {
+        broadEntities.push(...descResult.value.data)
+      }
+      if (slugResult.status === 'fulfilled' && slugResult.value.data) {
+        broadEntities.push(...slugResult.value.data)
+      }
+      if (parentSlugResult.status === 'fulfilled' && parentSlugResult.value.data) {
+        broadEntities.push(...parentSlugResult.value.data)
+      }
+      
+      // Log any errors
+      const broadErrors = [nameResult, descResult, slugResult, parentSlugResult]
+        .filter(r => r.status === 'rejected')
+        .map(r => (r as PromiseRejectedResult).reason)
+      if (broadErrors.length > 0) {
+        console.error('❌ Broad search errors:', broadErrors)
+      }
+      
+      console.log(`✅ Found ${broadEntities.length} broad-match entities`)
       
       // Merge results: slug matches first, then broad matches (deduplicated)
       const slugEntityIds = new Set((slugEntities || []).map((e: any) => e.id))
