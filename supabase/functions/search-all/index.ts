@@ -56,13 +56,14 @@ serve(async (req) => {
       console.log('🔍 Searching local database...')
       
       // Search entities with parent relationship data - including slug and parent slug
+      console.log('🔍 Searching entities with query:', query)
       const { data: entities, error: entitiesError } = await supabase
         .from('entities')
         .select(`
           *,
           parent:entities!entities_parent_id_fkey(slug, id)
         `)
-        .or(`name.ilike.*${query}*,description.ilike.*${query}*,slug.ilike.*${query}*,parent.slug.ilike.*${query}*`)
+        .or('name.ilike.*' + query + '*,description.ilike.*' + query + '*,slug.ilike.*' + query + '*,parent.slug.ilike.*' + query + '*')
         .eq('is_deleted', false)
         .limit(limit)
 

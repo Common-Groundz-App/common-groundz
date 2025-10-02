@@ -234,8 +234,7 @@ export class EnhancedDiscoveryService {
         .from('entities')
         .select(`
           *,
-          recommendations(rating, view_count, created_at),
-          recommendation_likes(created_at)
+          recommendations(rating, view_count, created_at, recommendation_likes(created_at))
         `)
         .eq('id', entityId)
         .single();
@@ -243,7 +242,8 @@ export class EnhancedDiscoveryService {
       if (!entityData) return { quality_score: 0, spam_score: 0, relevance_score: 0, freshness_score: 0, social_proof_score: 0 };
 
       const recommendations = entityData.recommendations || [];
-      const likes = entityData.recommendation_likes || [];
+      // Flatten recommendation_likes from all recommendations
+      const likes = recommendations.flatMap((rec: any) => rec.recommendation_likes || []);
 
       // Quality score based on ratings
       const avgRating = recommendations.length > 0 
