@@ -56,10 +56,40 @@ serve(async (req) => {
       console.log('🔍 Searching local database...')
       
       // Search entities with parent relationship data - including slug and parent slug
+      const slugQuery = query.toLowerCase().trim()
       console.log('🔍 Searching entities with query:', query)
+      console.log('🔍 Searching with slug query:', slugQuery)
+      
+      // Parent-slug subquery approach: First find parent entities by slug
+      const { data: parentEntities } = await supabase
+        .from('entities')
+        .select('id')
+        .eq('slug', slugQuery)
+        .eq('is_deleted', false)
+      
+      const parentIds = parentEntities?.map(p => p.id) || []
+      console.log(`🔍 Found ${parentIds.length} parent entities for slug: ${slugQuery}`)
+      
+      // Then find children of those parents
+      let childEntitiesFromParentSlug: any[] = []
+      if (parentIds.length > 0) {
+        const { data, error } = await supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .in('parent_id', parentIds)
+          .eq('is_deleted', false)
+          .limit(limit)
+        
+        if (error) {
+          console.error('❌ Parent-slug child query failed:', error)
+        } else if (data) {
+          childEntitiesFromParentSlug = data
+          console.log(`🔍 Found ${childEntitiesFromParentSlug.length} child entities under those parents`)
+        }
+      }
       
       // Execute separate queries to avoid PostgREST .or() string issues with spaces
-      const [nameResult, descResult, slugResult, parentSlugResult] = await Promise.allSettled([
+      const [nameResult, descResult, slugResult] = await Promise.allSettled([
         // Name match
         supabase
           .from('entities')
@@ -80,29 +110,37 @@ serve(async (req) => {
           .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
           .ilike('slug', `%${query}%`)
           .eq('is_deleted', false)
-          .limit(limit),
-        // Parent slug match
-        supabase
-          .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-          .ilike('parent.slug', `%${query}%`, { referencedTable: 'entities!entities_parent_id_fkey' })
-          .eq('is_deleted', false)
           .limit(limit)
       ])
       
       // Combine all search results and deduplicate by entity ID
       const allEntities: any[] = []
-      if (nameResult.status === 'fulfilled' && nameResult.value.data) {
-        allEntities.push(...nameResult.value.data)
+      
+      // Add child entities from parent-slug subquery first
+      allEntities.push(...childEntitiesFromParentSlug)
+      
+      if (nameResult.status === 'fulfilled') {
+        if (nameResult.value.error) {
+          console.error('❌ Name search failed:', nameResult.value.error)
+        } else if (nameResult.value.data) {
+          allEntities.push(...nameResult.value.data)
+        }
       }
-      if (descResult.status === 'fulfilled' && descResult.value.data) {
-        allEntities.push(...descResult.value.data)
+      
+      if (descResult.status === 'fulfilled') {
+        if (descResult.value.error) {
+          console.error('❌ Description search failed:', descResult.value.error)
+        } else if (descResult.value.data) {
+          allEntities.push(...descResult.value.data)
+        }
       }
-      if (slugResult.status === 'fulfilled' && slugResult.value.data) {
-        allEntities.push(...slugResult.value.data)
-      }
-      if (parentSlugResult.status === 'fulfilled' && parentSlugResult.value.data) {
-        allEntities.push(...parentSlugResult.value.data)
+      
+      if (slugResult.status === 'fulfilled') {
+        if (slugResult.value.error) {
+          console.error('❌ Slug search failed:', slugResult.value.error)
+        } else if (slugResult.value.data) {
+          allEntities.push(...slugResult.value.data)
+        }
       }
       
       // Deduplicate by entity ID
@@ -114,16 +152,15 @@ serve(async (req) => {
       })
       const entities = Array.from(entityMap.values()).slice(0, limit)
       
-      // Log any errors
-      const entityErrors = [nameResult, descResult, slugResult, parentSlugResult]
+      // Log any rejected promises
+      const entityErrors = [nameResult, descResult, slugResult]
         .filter(r => r.status === 'rejected')
         .map(r => (r as PromiseRejectedResult).reason)
-      const entitiesError = entityErrors.length > 0 ? entityErrors[0] : null
       
-      console.log(`✅ Found ${entities.length} local entities`)
+      console.log(`✅ Found ${entities.length} local entities (including ${childEntitiesFromParentSlug.length} from parent-slug match)`)
 
-      if (entitiesError) {
-        console.error('❌ Entity search error:', entitiesError)
+      if (entityErrors.length > 0) {
+        console.error('❌ Entity search rejected promises:', entityErrors)
       }
 
       // Search users 

@@ -385,7 +385,7 @@ serve(async (req) => {
       console.log('🔍 Searching with slug query:', slugQuery)
       
       // Execute separate queries to avoid PostgREST .or() string issues with spaces
-      const [exactSlugResult, prefixSlugResult, exactParentSlugResult, prefixParentSlugResult] = await Promise.allSettled([
+      const [exactSlugResult, prefixSlugResult] = await Promise.allSettled([
         // Exact slug match
         supabase
           .from('entities')
@@ -399,44 +399,66 @@ serve(async (req) => {
           .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
           .ilike('slug', `${slugQuery}%`)
           .eq('is_deleted', false)
-          .limit(limit),
-        // Exact parent slug match
-        supabase
-          .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-          .eq('parent.slug', slugQuery, { referencedTable: 'entities!entities_parent_id_fkey' })
-          .eq('is_deleted', false)
-          .limit(limit),
-        // Prefix parent slug match
-        supabase
-          .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-          .ilike('parent.slug', `${slugQuery}%`, { referencedTable: 'entities!entities_parent_id_fkey' })
-          .eq('is_deleted', false)
           .limit(limit)
       ])
       
-      // Combine all slug search results
-      const slugEntities: any[] = []
-      if (exactSlugResult.status === 'fulfilled' && exactSlugResult.value.data) {
-        slugEntities.push(...exactSlugResult.value.data)
-      }
-      if (prefixSlugResult.status === 'fulfilled' && prefixSlugResult.value.data) {
-        slugEntities.push(...prefixSlugResult.value.data)
-      }
-      if (exactParentSlugResult.status === 'fulfilled' && exactParentSlugResult.value.data) {
-        slugEntities.push(...exactParentSlugResult.value.data)
-      }
-      if (prefixParentSlugResult.status === 'fulfilled' && prefixParentSlugResult.value.data) {
-        slugEntities.push(...prefixParentSlugResult.value.data)
+      // Parent-slug subquery approach: First find parent entities by slug
+      console.log('🔍 Searching for parent entities by slug:', slugQuery)
+      const { data: parentEntities } = await supabase
+        .from('entities')
+        .select('id')
+        .eq('slug', slugQuery)
+        .eq('is_deleted', false)
+      
+      const parentIds = parentEntities?.map(p => p.id) || []
+      console.log(`🔍 Found ${parentIds.length} parent entities for slug: ${slugQuery}`)
+      
+      // Then find children of those parents
+      let childEntities: any[] = []
+      if (parentIds.length > 0) {
+        const { data, error } = await supabase
+          .from('entities')
+          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .in('parent_id', parentIds)
+          .eq('is_deleted', false)
+          .limit(limit)
+        
+        if (error) {
+          console.error('❌ Parent-slug child query failed:', error)
+        } else if (data) {
+          childEntities = data
+          console.log(`🔍 Found ${childEntities.length} child entities under those parents`)
+        }
       }
       
-      // Log any errors
-      const slugErrors = [exactSlugResult, prefixSlugResult, exactParentSlugResult, prefixParentSlugResult]
+      // Combine all slug search results
+      const slugEntities: any[] = []
+      
+      if (exactSlugResult.status === 'fulfilled') {
+        if (exactSlugResult.value.error) {
+          console.error('❌ Exact slug search failed:', exactSlugResult.value.error)
+        } else if (exactSlugResult.value.data) {
+          slugEntities.push(...exactSlugResult.value.data)
+        }
+      }
+      
+      if (prefixSlugResult.status === 'fulfilled') {
+        if (prefixSlugResult.value.error) {
+          console.error('❌ Prefix slug search failed:', prefixSlugResult.value.error)
+        } else if (prefixSlugResult.value.data) {
+          slugEntities.push(...prefixSlugResult.value.data)
+        }
+      }
+      
+      // Add child entities from parent-slug subquery
+      slugEntities.push(...childEntities)
+      
+      // Log any rejected promises
+      const slugErrors = [exactSlugResult, prefixSlugResult]
         .filter(r => r.status === 'rejected')
         .map(r => (r as PromiseRejectedResult).reason)
       if (slugErrors.length > 0) {
-        console.error('❌ Slug search errors:', slugErrors)
+        console.error('❌ Slug search rejected promises:', slugErrors)
       }
       
       console.log(`✅ Found ${slugEntities.length} slug-based entities`)
@@ -445,7 +467,7 @@ serve(async (req) => {
       console.log('🔍 Searching with broad query:', query)
       
       // Execute separate queries to avoid PostgREST .or() string issues with spaces
-      const [nameResult, descResult, slugResult, parentSlugResult] = await Promise.allSettled([
+      const [nameResult, descResult, slugResult] = await Promise.allSettled([
         // Name match
         supabase
           .from('entities')
@@ -466,37 +488,42 @@ serve(async (req) => {
           .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
           .ilike('slug', `%${query}%`)
           .eq('is_deleted', false)
-          .limit(limit),
-        // Parent slug match
-        supabase
-          .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-          .ilike('parent.slug', `%${query}%`, { referencedTable: 'entities!entities_parent_id_fkey' })
-          .eq('is_deleted', false)
           .limit(limit)
       ])
       
-      // Combine all broad search results
+      // Combine all broad search results with proper error checking
       const broadEntities: any[] = []
-      if (nameResult.status === 'fulfilled' && nameResult.value.data) {
-        broadEntities.push(...nameResult.value.data)
-      }
-      if (descResult.status === 'fulfilled' && descResult.value.data) {
-        broadEntities.push(...descResult.value.data)
-      }
-      if (slugResult.status === 'fulfilled' && slugResult.value.data) {
-        broadEntities.push(...slugResult.value.data)
-      }
-      if (parentSlugResult.status === 'fulfilled' && parentSlugResult.value.data) {
-        broadEntities.push(...parentSlugResult.value.data)
+      
+      if (nameResult.status === 'fulfilled') {
+        if (nameResult.value.error) {
+          console.error('❌ Name search failed:', nameResult.value.error)
+        } else if (nameResult.value.data) {
+          broadEntities.push(...nameResult.value.data)
+        }
       }
       
-      // Log any errors
-      const broadErrors = [nameResult, descResult, slugResult, parentSlugResult]
+      if (descResult.status === 'fulfilled') {
+        if (descResult.value.error) {
+          console.error('❌ Description search failed:', descResult.value.error)
+        } else if (descResult.value.data) {
+          broadEntities.push(...descResult.value.data)
+        }
+      }
+      
+      if (slugResult.status === 'fulfilled') {
+        if (slugResult.value.error) {
+          console.error('❌ Slug search failed:', slugResult.value.error)
+        } else if (slugResult.value.data) {
+          broadEntities.push(...slugResult.value.data)
+        }
+      }
+      
+      // Log any rejected promises
+      const broadErrors = [nameResult, descResult, slugResult]
         .filter(r => r.status === 'rejected')
         .map(r => (r as PromiseRejectedResult).reason)
       if (broadErrors.length > 0) {
-        console.error('❌ Broad search errors:', broadErrors)
+        console.error('❌ Broad search rejected promises:', broadErrors)
       }
       
       console.log(`✅ Found ${broadEntities.length} broad-match entities`)
