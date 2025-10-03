@@ -96,7 +96,7 @@ serve(async (req) => {
       if (uniqueParentIds.length > 0) {
         const { data, error } = await supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*')
           .in('parent_id', uniqueParentIds)
           .eq('is_deleted', false)
           .limit(limit)
@@ -114,21 +114,21 @@ serve(async (req) => {
         // Name match
         supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*')
           .ilike('name', `%${query}%`)
           .eq('is_deleted', false)
           .limit(limit),
         // Description match
         supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*')
           .ilike('description', `%${query}%`)
           .eq('is_deleted', false)
           .limit(limit),
         // Slug match
         supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*')
           .ilike('slug', `%${query}%`)
           .eq('is_deleted', false)
           .limit(limit)
