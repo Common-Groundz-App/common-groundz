@@ -389,37 +389,57 @@ serve(async (req) => {
         // Exact slug match
         supabase
           .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
           .eq('slug', slugQuery)
           .eq('is_deleted', false)
           .limit(limit),
         // Prefix slug match
         supabase
           .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
           .ilike('slug', `${slugQuery}%`)
           .eq('is_deleted', false)
           .limit(limit)
       ])
       
-      // Parent-slug subquery approach: First find parent entities by slug
-      console.log('🔍 Searching for parent entities by slug:', slugQuery)
-      const { data: parentEntities } = await supabase
-        .from('entities')
-        .select('id')
-        .eq('slug', slugQuery)
-        .eq('is_deleted', false)
+      // Parent-slug subquery approach: Find parent entities by exact slug AND prefix slug
+      console.log('🔍 Searching for parent entities by slug (exact + prefix):', slugQuery)
+      const [exactParentResult, prefixParentResult] = await Promise.allSettled([
+        // Exact parent slug match
+        supabase
+          .from('entities')
+          .select('id')
+          .eq('slug', slugQuery)
+          .eq('is_deleted', false),
+        // Prefix parent slug match (e.g., "skin" finds "skin1004")
+        supabase
+          .from('entities')
+          .select('id')
+          .ilike('slug', `${slugQuery}%`)
+          .eq('is_deleted', false)
+      ])
       
-      const parentIds = parentEntities?.map(p => p.id) || []
-      console.log(`🔍 Found ${parentIds.length} parent entities for slug: ${slugQuery}`)
+      const parentIds: string[] = []
+      
+      if (exactParentResult.status === 'fulfilled' && exactParentResult.value.data) {
+        parentIds.push(...exactParentResult.value.data.map((p: any) => p.id))
+      }
+      
+      if (prefixParentResult.status === 'fulfilled' && prefixParentResult.value.data) {
+        parentIds.push(...prefixParentResult.value.data.map((p: any) => p.id))
+      }
+      
+      // Deduplicate parent IDs
+      const uniqueParentIds = [...new Set(parentIds)]
+      console.log(`🔍 Found ${uniqueParentIds.length} parent entities for slug: ${slugQuery}`)
       
       // Then find children of those parents
       let childEntities: any[] = []
-      if (parentIds.length > 0) {
+      if (uniqueParentIds.length > 0) {
         const { data, error } = await supabase
           .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
-          .in('parent_id', parentIds)
+          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .in('parent_id', uniqueParentIds)
           .eq('is_deleted', false)
           .limit(limit)
         
@@ -471,21 +491,21 @@ serve(async (req) => {
         // Name match
         supabase
           .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
           .ilike('name', `%${query}%`)
           .eq('is_deleted', false)
           .limit(limit),
         // Description match
         supabase
           .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
           .ilike('description', `%${query}%`)
           .eq('is_deleted', false)
           .limit(limit),
         // Slug match
         supabase
           .from('entities')
-          .select('*, parent:entities!entities_parent_id_fkey(slug, id)')
+          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
           .ilike('slug', `%${query}%`)
           .eq('is_deleted', false)
           .limit(limit)
