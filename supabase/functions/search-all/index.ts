@@ -173,12 +173,46 @@ serve(async (req) => {
       })
       const entities = Array.from(entityMap.values()).slice(0, limit)
       
+      // Hydrate parent slugs for entities with parent_id
+      async function hydrateParents(entities: any[]) {
+        const parentIds = [...new Set(
+          entities
+            .map(e => e.parent_id)
+            .filter(id => id != null)
+        )]
+        
+        if (parentIds.length === 0) {
+          return entities.map(e => ({ ...e, parent_slug: null }))
+        }
+        
+        console.log(`🔄 Hydrating ${parentIds.length} parent entities...`)
+        
+        const { data: parents, error } = await supabase
+          .from('entities')
+          .select('id, slug')
+          .in('id', parentIds)
+        
+        if (error) {
+          console.error('❌ Failed to hydrate parents:', error)
+          return entities.map(e => ({ ...e, parent_slug: null }))
+        }
+        
+        const parentMap = new Map(parents.map(p => [p.id, p]))
+        
+        return entities.map(entity => ({
+          ...entity,
+          parent_slug: entity.parent_id ? parentMap.get(entity.parent_id)?.slug || null : null
+        }))
+      }
+      
+      const hydratedEntities = await hydrateParents(entities)
+      
       // Log any rejected promises
       const entityErrors = [nameResult, descResult, slugResult]
         .filter(r => r.status === 'rejected')
         .map(r => (r as PromiseRejectedResult).reason)
       
-      console.log(`✅ Found ${entities.length} local entities (including ${childEntitiesFromParentSlug.length} from parent-slug match)`)
+      console.log(`✅ Found ${hydratedEntities.length} local entities (including ${childEntitiesFromParentSlug.length} from parent-slug match)`)
 
       if (entityErrors.length > 0) {
         console.error('❌ Entity search rejected promises:', entityErrors)
@@ -218,11 +252,8 @@ serve(async (req) => {
         .or(`title.ilike.%${query}%, content.ilike.%${query}%`)
         .limit(limit)
 
-      // Process entities to include parent_slug for easier access
-      results.entities = (entities || []).map((entity: any) => ({
-        ...entity,
-        parent_slug: entity.parent?.slug || null
-      }))
+      // Set hydrated entity results
+      results.entities = hydratedEntities
       results.users = users || []
       results.reviews = (reviews || []).map(review => ({
         ...review,

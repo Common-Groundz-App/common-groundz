@@ -389,14 +389,14 @@ serve(async (req) => {
         // Exact slug match
         supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*, parent_id')
           .eq('slug', slugQuery)
           .eq('is_deleted', false)
           .limit(limit),
         // Prefix slug match
         supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*, parent_id')
           .ilike('slug', `${slugQuery}%`)
           .eq('is_deleted', false)
           .limit(limit)
@@ -438,7 +438,7 @@ serve(async (req) => {
       if (uniqueParentIds.length > 0) {
         const { data, error } = await supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*, parent_id')
           .in('parent_id', uniqueParentIds)
           .eq('is_deleted', false)
           .limit(limit)
@@ -491,21 +491,21 @@ serve(async (req) => {
         // Name match
         supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*, parent_id')
           .ilike('name', `%${query}%`)
           .eq('is_deleted', false)
           .limit(limit),
         // Description match
         supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*, parent_id')
           .ilike('description', `%${query}%`)
           .eq('is_deleted', false)
           .limit(limit),
         // Slug match
         supabase
           .from('entities')
-          .select('*, parent:entities!left!entities_parent_id_fkey(slug, id)')
+          .select('*, parent_id')
           .ilike('slug', `%${query}%`)
           .eq('is_deleted', false)
           .limit(limit)
@@ -557,6 +557,40 @@ serve(async (req) => {
       
       console.log(`🎯 Found ${slugEntities?.length || 0} slug matches, ${(broadEntities || []).length} broad matches`)
       
+      // Hydrate parent slugs for entities with parent_id
+      async function hydrateParents(entities: any[]) {
+        const parentIds = [...new Set(
+          entities
+            .map(e => e.parent_id)
+            .filter(id => id != null)
+        )]
+        
+        if (parentIds.length === 0) {
+          return entities.map(e => ({ ...e, parent_slug: null }))
+        }
+        
+        console.log(`🔄 Hydrating ${parentIds.length} parent entities...`)
+        
+        const { data: parents, error } = await supabase
+          .from('entities')
+          .select('id, slug')
+          .in('id', parentIds)
+        
+        if (error) {
+          console.error('❌ Failed to hydrate parents:', error)
+          return entities.map(e => ({ ...e, parent_slug: null }))
+        }
+        
+        const parentMap = new Map(parents.map(p => [p.id, p]))
+        
+        return entities.map(entity => ({
+          ...entity,
+          parent_slug: entity.parent_id ? parentMap.get(entity.parent_id)?.slug || null : null
+        }))
+      }
+      
+      const hydratedEntities = await hydrateParents(mergedEntities)
+      
       // Search other tables in parallel
       const [usersResult, reviewsResult, recommendationsResult] = await Promise.allSettled([
         supabase.from('profiles').select('id, username, avatar_url, bio').or(`username.ilike.%${query}%, bio.ilike.%${query}%`).limit(limit),
@@ -564,30 +598,39 @@ serve(async (req) => {
         supabase.from('recommendations').select(`id, title, content, rating, category, created_at, entities!inner(name, slug), profiles!inner(username, avatar_url)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).limit(limit)
       ])
 
-      // Process merged entity results
-      results.entities = mergedEntities.map((entity: any) => ({
-        ...entity,
-        parent_slug: entity.parent?.slug || null
-      }))
+      // Set hydrated entity results
+      results.entities = hydratedEntities
       
-      if (usersResult.status === 'fulfilled' && usersResult.value.data) {
-        results.users = usersResult.value.data
+      if (usersResult.status === 'fulfilled') {
+        if (usersResult.value.error) {
+          console.error('❌ Users search failed:', usersResult.value.error)
+        } else if (usersResult.value.data) {
+          results.users = usersResult.value.data
+        }
       }
-      if (reviewsResult.status === 'fulfilled' && reviewsResult.value.data) {
-        results.reviews = reviewsResult.value.data.map((review: any) => ({
-          ...review,
-          entity_name: review.entities?.name || '',
-          username: review.profiles?.username || '',
-          avatar_url: review.profiles?.avatar_url || null
-        }))
+      if (reviewsResult.status === 'fulfilled') {
+        if (reviewsResult.value.error) {
+          console.error('❌ Reviews search failed:', reviewsResult.value.error)
+        } else if (reviewsResult.value.data) {
+          results.reviews = reviewsResult.value.data.map((review: any) => ({
+            ...review,
+            entity_name: review.entities?.name || '',
+            username: review.profiles?.username || '',
+            avatar_url: review.profiles?.avatar_url || null
+          }))
+        }
       }
-      if (recommendationsResult.status === 'fulfilled' && recommendationsResult.value.data) {
-        results.recommendations = recommendationsResult.value.data.map((rec: any) => ({
-          ...rec,
-          entity_name: rec.entities?.name || '',
-          username: rec.profiles?.username || '',
-          avatar_url: rec.profiles?.avatar_url || null
-        }))
+      if (recommendationsResult.status === 'fulfilled') {
+        if (recommendationsResult.value.error) {
+          console.error('❌ Recommendations search failed:', recommendationsResult.value.error)
+        } else if (recommendationsResult.value.data) {
+          results.recommendations = recommendationsResult.value.data.map((rec: any) => ({
+            ...rec,
+            entity_name: rec.entities?.name || '',
+            username: rec.profiles?.username || '',
+            avatar_url: rec.profiles?.avatar_url || null
+          }))
+        }
       }
       
       console.log(`✅ Local search: ${results.entities.length} entities (${slugEntities?.length || 0} slug priority), ${results.users.length} users`)
