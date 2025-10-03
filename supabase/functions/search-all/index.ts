@@ -233,10 +233,10 @@ serve(async (req) => {
       const { data: reviews } = await supabase
         .from('reviews')
         .select(`
-          id, title, content, rating, created_at, user_id,
+          id, title, description, rating, created_at, user_id,
           entities!inner(name, slug)
         `)
-        .or(`title.ilike.%${query}%, content.ilike.%${query}%`)
+        .or(`title.ilike.%${query}%, description.ilike.%${query}%`)
         .eq('status', 'published')
         .limit(limit)
 
@@ -244,10 +244,10 @@ serve(async (req) => {
       const { data: recommendations } = await supabase
         .from('recommendations')
         .select(`
-          id, title, content, rating, category, created_at, user_id,
+          id, title, description, rating, category, created_at, user_id,
           entities!inner(name, slug)
         `)
-        .or(`title.ilike.%${query}%, content.ilike.%${query}%`)
+        .or(`title.ilike.%${query}%, description.ilike.%${query}%`)
         .limit(limit)
 
       // Collect unique user IDs from reviews and recommendations

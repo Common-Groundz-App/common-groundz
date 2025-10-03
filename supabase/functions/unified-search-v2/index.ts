@@ -594,8 +594,8 @@ serve(async (req) => {
       // Search other tables in parallel
       const [usersResult, reviewsResult, recommendationsResult] = await Promise.allSettled([
         supabase.from('profiles').select('id, username, avatar_url, bio').or(`username.ilike.%${query}%, bio.ilike.%${query}%`).limit(limit),
-        supabase.from('reviews').select(`id, title, content, rating, created_at, user_id, entities!inner(name, slug)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).eq('status', 'published').limit(limit),
-        supabase.from('recommendations').select(`id, title, content, rating, category, created_at, user_id, entities!inner(name, slug)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).limit(limit)
+        supabase.from('reviews').select(`id, title, description, rating, created_at, user_id, entities!inner(name, slug)`).or(`title.ilike.%${query}%, description.ilike.%${query}%`).eq('status', 'published').limit(limit),
+        supabase.from('recommendations').select(`id, title, description, rating, category, created_at, user_id, entities!inner(name, slug)`).or(`title.ilike.%${query}%, description.ilike.%${query}%`).limit(limit)
       ])
 
       // Collect unique user IDs from reviews and recommendations
