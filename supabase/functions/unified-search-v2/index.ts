@@ -594,9 +594,28 @@ serve(async (req) => {
       // Search other tables in parallel
       const [usersResult, reviewsResult, recommendationsResult] = await Promise.allSettled([
         supabase.from('profiles').select('id, username, avatar_url, bio').or(`username.ilike.%${query}%, bio.ilike.%${query}%`).limit(limit),
-        supabase.from('reviews').select(`id, title, content, rating, created_at, entities!inner(name, slug), profiles!inner(username, avatar_url)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).eq('status', 'published').limit(limit),
-        supabase.from('recommendations').select(`id, title, content, rating, category, created_at, entities!inner(name, slug), profiles!inner(username, avatar_url)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).limit(limit)
+        supabase.from('reviews').select(`id, title, content, rating, created_at, user_id, entities!inner(name, slug)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).eq('status', 'published').limit(limit),
+        supabase.from('recommendations').select(`id, title, content, rating, category, created_at, user_id, entities!inner(name, slug)`).or(`title.ilike.%${query}%, content.ilike.%${query}%`).limit(limit)
       ])
+
+      // Collect unique user IDs from reviews and recommendations
+      const reviews = reviewsResult.status === 'fulfilled' && reviewsResult.value.data ? reviewsResult.value.data : []
+      const recommendations = recommendationsResult.status === 'fulfilled' && recommendationsResult.value.data ? recommendationsResult.value.data : []
+      
+      const userIds = new Set<string>()
+      reviews.forEach((r: any) => r.user_id && userIds.add(r.user_id))
+      recommendations.forEach((r: any) => r.user_id && userIds.add(r.user_id))
+
+      // Only fetch profiles if we have user IDs (avoid Supabase .in() error with empty array)
+      let profilesMap = new Map()
+      if (userIds.size > 0) {
+        const { data: userProfiles } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', Array.from(userIds))
+        
+        profilesMap = new Map(userProfiles?.map((p: any) => [p.id, p]) || [])
+      }
 
       // Set hydrated entity results
       results.entities = hydratedEntities
@@ -615,8 +634,8 @@ serve(async (req) => {
           results.reviews = reviewsResult.value.data.map((review: any) => ({
             ...review,
             entity_name: review.entities?.name || '',
-            username: review.profiles?.username || '',
-            avatar_url: review.profiles?.avatar_url || null
+            username: profilesMap.get(review.user_id)?.username || '',
+            avatar_url: profilesMap.get(review.user_id)?.avatar_url || null
           }))
         }
       }
@@ -627,8 +646,8 @@ serve(async (req) => {
           results.recommendations = recommendationsResult.value.data.map((rec: any) => ({
             ...rec,
             entity_name: rec.entities?.name || '',
-            username: rec.profiles?.username || '',
-            avatar_url: rec.profiles?.avatar_url || null
+            username: profilesMap.get(rec.user_id)?.username || '',
+            avatar_url: profilesMap.get(rec.user_id)?.avatar_url || null
           }))
         }
       }
