@@ -17,12 +17,14 @@ interface SimpleMediaUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (media: MediaItem[]) => void;
+  maxItems?: number; // Maximum number of media items allowed
 }
 
 export function SimpleMediaUploadModal({
   isOpen,
   onClose,
-  onSave
+  onSave,
+  maxItems = 4
 }: SimpleMediaUploadModalProps) {
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -137,7 +139,7 @@ export function SimpleMediaUploadModal({
             {selectedMedia.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-sm font-medium">
-                  🖼️ Your media ({selectedMedia.length}/4)
+                  🖼️ Your media ({selectedMedia.length}/{maxItems})
                 </Label>
                 <CompactMediaGrid
                   media={selectedMedia}
@@ -154,8 +156,8 @@ export function SimpleMediaUploadModal({
               <Label className="text-sm font-medium">📸 Add photos & videos</Label>
               <MediaUploader
                 onMediaUploaded={handleMediaUploaded}
-                disabled={isUploading || selectedMedia.length >= 4}
-                maxMediaCount={4}
+                disabled={isUploading || selectedMedia.length >= maxItems}
+                maxMediaCount={maxItems}
                 initialMedia={selectedMedia}
                 sessionId={`entity-upload-${Date.now()}`}
               />

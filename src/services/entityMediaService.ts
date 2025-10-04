@@ -136,7 +136,8 @@ export const uploadEntityMediaBatch = async (
     const mediaItem = mediaItems[i];
     
     // Extract metadata from each individual MediaItem
-    const category = (mediaItem.source as string) || 'general';
+    // Prefer the category field, fall back to source for backward compatibility
+    const category = mediaItem.category || (mediaItem.source as string) || 'general';
     const caption = mediaItem.caption;
     const altText = mediaItem.alt;
     

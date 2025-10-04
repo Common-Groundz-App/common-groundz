@@ -13,6 +13,7 @@ export interface MediaItem {
   height?: number;
   orientation?: 'portrait' | 'landscape' | 'square';
   source?: string; // Added this optional property to track the source of media items
+  category?: string; // Category for photos/videos (general, interior, exterior, menu, etc.)
 }
 
 export type MediaUploadStatus = 'idle' | 'uploading' | 'success' | 'error';

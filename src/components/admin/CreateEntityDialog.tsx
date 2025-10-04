@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +38,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  
+  const DRAFT_KEY = 'create-entity-draft';
   
   const [formData, setFormData] = useState({
     name: '',
@@ -53,6 +56,53 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [selectedParent, setSelectedParent] = useState<Entity | null>(null);
   const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
   const [showMediaUploadModal, setShowMediaUploadModal] = useState(false);
+
+  // Load draft from sessionStorage on mount
+  useEffect(() => {
+    const loadDraft = () => {
+      try {
+        const savedDraft = sessionStorage.getItem(DRAFT_KEY);
+        if (savedDraft) {
+          const draft = JSON.parse(savedDraft);
+          setFormData(draft.formData || formData);
+          setBusinessHours(draft.businessHours || {});
+          setContactInfo(draft.contactInfo || {});
+          setSelectedParent(draft.selectedParent || null);
+          setUploadedMedia(draft.uploadedMedia || []);
+          setDraftRestored(true);
+        }
+      } catch (error) {
+        console.error('Failed to load draft:', error);
+      }
+    };
+
+    if (open) {
+      loadDraft();
+    }
+  }, [open]);
+
+  // Save draft to sessionStorage on changes
+  useEffect(() => {
+    if (!open) return;
+
+    const saveDraft = () => {
+      try {
+        const draft = {
+          formData,
+          businessHours,
+          contactInfo,
+          selectedParent,
+          uploadedMedia
+        };
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch (error) {
+        console.error('Failed to save draft:', error);
+      }
+    };
+
+    const timeoutId = setTimeout(saveDraft, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData, businessHours, contactInfo, selectedParent, uploadedMedia, open]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -72,6 +122,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setSelectedParent(null);
     setUploadedMedia([]);
     setShowMediaUploadModal(false);
+    setDraftRestored(false);
+    
+    // Clear draft from sessionStorage
+    try {
+      sessionStorage.removeItem(DRAFT_KEY);
+    } catch (error) {
+      console.error('Failed to clear draft:', error);
+    }
   };
 
   const handleSubmit = async () => {
@@ -179,7 +237,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Entity</DialogTitle>
+          <DialogTitle>
+            Create New Entity
+            {draftRestored && <span className="text-sm text-muted-foreground ml-2">(Draft restored)</span>}
+          </DialogTitle>
           <DialogDescription>
             Add a new entity with business hours and contact information
           </DialogDescription>
@@ -317,7 +378,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         </Tabs>
 
         <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button variant="outline" onClick={() => {
+            resetForm();
+            onOpenChange(false);
+          }} disabled={loading}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={loading}>
@@ -329,8 +393,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       <SimpleMediaUploadModal
         isOpen={showMediaUploadModal}
         onClose={() => setShowMediaUploadModal(false)}
+        maxItems={4 - uploadedMedia.length}
         onSave={(mediaItems) => {
-          setUploadedMedia(prev => [...prev, ...mediaItems]);
+          // Enforce the cap by slicing to remaining slots
+          const remainingSlots = 4 - uploadedMedia.length;
+          const itemsToAdd = mediaItems.slice(0, remainingSlots);
+          setUploadedMedia(prev => [...prev, ...itemsToAdd]);
           setShowMediaUploadModal(false);
         }}
       />
