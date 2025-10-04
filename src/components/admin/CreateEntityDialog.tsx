@@ -14,6 +14,11 @@ import { BusinessHoursEditor } from './BusinessHoursEditor';
 import { ParentEntitySelector } from './ParentEntitySelector';
 import { Entity } from '@/services/recommendation/types';
 import { setEntityParent } from '@/services/entityHierarchyService';
+import { SimpleMediaUploadModal } from '@/components/entity-v4/SimpleMediaUploadModal';
+import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
+import { MediaItem } from '@/types/media';
+import { uploadEntityMediaBatch } from '@/services/entityMediaService';
+import { Plus } from 'lucide-react';
 
 const entityTypes = [
   'movie', 'book', 'food', 'product', 'place', 'activity', 'music', 'art', 'tv', 'drink', 'travel'
@@ -46,6 +51,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [businessHours, setBusinessHours] = useState({});
   const [contactInfo, setContactInfo] = useState({});
   const [selectedParent, setSelectedParent] = useState<Entity | null>(null);
+  const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
+  const [showMediaUploadModal, setShowMediaUploadModal] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -63,6 +70,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setBusinessHours({});
     setContactInfo({});
     setSelectedParent(null);
+    setUploadedMedia([]);
+    setShowMediaUploadModal(false);
   };
 
   const handleSubmit = async () => {
@@ -112,6 +121,39 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         .single();
 
       if (error) throw error;
+
+      // Upload media if any
+      if (newEntity && uploadedMedia.length > 0) {
+        if (!user?.id) {
+          console.error('No authenticated user for media upload');
+        } else {
+          try {
+            const uploadedPhotos = await uploadEntityMediaBatch(
+              uploadedMedia,
+              newEntity.id,
+              user.id,
+              (progress, total) => {
+                console.log(`Uploading media: ${progress}/${total}`);
+              }
+            );
+
+            // Set first media item as primary image
+            if (uploadedPhotos.length > 0 && uploadedMedia[0]) {
+              await supabase
+                .from('entities')
+                .update({ image_url: uploadedMedia[0].url })
+                .eq('id', newEntity.id);
+            }
+          } catch (mediaError) {
+            console.error('Error uploading media:', mediaError);
+            toast({
+              title: 'Warning',
+              description: 'Entity created, but some media failed to upload.',
+              variant: 'default'
+            });
+          }
+        }
+      }
 
       toast({
         title: 'Success',
@@ -196,28 +238,47 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="image_url">Image URL</Label>
-                <Input
-                  id="image_url"  
-                  value={formData.image_url}
-                  onChange={(e) => handleInputChange('image_url', e.target.value)}
-                  placeholder="https://example.com/image.jpg"
-                  disabled={loading}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Entity Media</Label>
               
-              <div className="space-y-2">
-                <Label htmlFor="website_url">Website URL</Label>
-                <Input
-                  id="website_url"
-                  value={formData.website_url}
-                  onChange={(e) => handleInputChange('website_url', e.target.value)}
-                  placeholder="https://example.com"
-                  disabled={loading}
+              {uploadedMedia.length > 0 && (
+                <CompactMediaGrid
+                  media={uploadedMedia}
+                  onRemove={(mediaToRemove) => {
+                    setUploadedMedia(prev => prev.filter(m => m.url !== mediaToRemove.url));
+                  }}
+                  maxVisible={4}
+                  className="mb-4"
                 />
-              </div>
+              )}
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowMediaUploadModal(true)}
+                disabled={loading || uploadedMedia.length >= 4}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {uploadedMedia.length === 0 ? 'Add Photos & Videos' : `Add More Media (${uploadedMedia.length}/4)`}
+              </Button>
+              
+              {uploadedMedia.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Add up to 4 photos or videos for this entity
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="website_url">Website URL</Label>
+              <Input
+                id="website_url"
+                value={formData.website_url}
+                onChange={(e) => handleInputChange('website_url', e.target.value)}
+                placeholder="https://example.com"
+                disabled={loading}
+              />
             </div>
 
             <div className="space-y-2">
@@ -264,6 +325,15 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           </Button>
         </div>
       </DialogContent>
+      
+      <SimpleMediaUploadModal
+        isOpen={showMediaUploadModal}
+        onClose={() => setShowMediaUploadModal(false)}
+        onSave={(mediaItems) => {
+          setUploadedMedia(prev => [...prev, ...mediaItems]);
+          setShowMediaUploadModal(false);
+        }}
+      />
     </Dialog>
   );
 };

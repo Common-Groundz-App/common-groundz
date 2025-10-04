@@ -744,10 +744,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
             const uploadedPhotos = await uploadEntityMediaBatch(
               media,
               entity.id,
-              user.id,
-              (media[0] as any)?.category || 'general',
-              media[0]?.caption,
-              media[0]?.alt
+              user.id
             );
 
             if (uploadedPhotos.length > 0) {

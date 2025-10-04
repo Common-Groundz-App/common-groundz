@@ -122,20 +122,24 @@ export const uploadEntityMedia = async (
 
 /**
  * Handle multiple media uploads from MediaUploader
+ * Each MediaItem can have its own caption/alt metadata
  */
 export const uploadEntityMediaBatch = async (
   mediaItems: MediaItem[],
   entityId: string,
   userId: string,
-  category: string = 'general',
-  caption?: string,
-  altText?: string,
   onProgress?: (completed: number, total: number) => void
 ): Promise<EntityPhoto[]> => {
   const uploadedPhotos: EntityPhoto[] = [];
   
   for (let i = 0; i < mediaItems.length; i++) {
     const mediaItem = mediaItems[i];
+    
+    // Extract metadata from each individual MediaItem
+    const category = (mediaItem.source as string) || 'general';
+    const caption = mediaItem.caption;
+    const altText = mediaItem.alt;
+    
     const result = await uploadEntityMedia(mediaItem, entityId, userId, category, caption, altText);
     
     if (result.success && result.photo) {
