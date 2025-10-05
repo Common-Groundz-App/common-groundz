@@ -21,7 +21,11 @@ const mapDatabaseTypeToEntityType = (dbType: string): EntityType => {
     'tv': EntityType.TV,
     'travel': EntityType.Travel,
     'activity': EntityType.Activity,
-    'brand': EntityType.Brand
+    'brand': EntityType.Brand,
+    'event': EntityType.Event,
+    'service': EntityType.Service,
+    'professional': EntityType.Professional,
+    'others': EntityType.Others
   };
   
   return typeMap[dbType] || EntityType.Product;

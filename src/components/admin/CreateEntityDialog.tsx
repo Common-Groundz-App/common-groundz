@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ContactInfoEditor } from './ContactInfoEditor';
 import { BusinessHoursEditor } from './BusinessHoursEditor';
+import { RichTextEditor } from '@/components/editor/RichTextEditor';
 import { ParentEntitySelector } from './ParentEntitySelector';
 import { Entity } from '@/services/recommendation/types';
 import { setEntityParent } from '@/services/entityHierarchyService';
@@ -21,8 +22,16 @@ import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { Plus } from 'lucide-react';
 
 const entityTypes = [
-  'movie', 'book', 'food', 'product', 'place', 'activity', 'music', 'art', 'tv', 'drink', 'travel'
+  'movie', 'book', 'food', 'product', 'place', 'activity', 
+  'music', 'art', 'tv', 'drink', 'travel', 'brand', 'event', 
+  'service', 'professional', 'others'
 ];
+
+const getTypeLabel = (type: string): string => {
+  if (type === 'tv') return 'TV';
+  if (type === 'others') return 'Others';
+  return type.charAt(0).toUpperCase() + type.slice(1);
+};
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -56,6 +65,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [selectedParent, setSelectedParent] = useState<Entity | null>(null);
   const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
   const [showMediaUploadModal, setShowMediaUploadModal] = useState(false);
+  const [otherTypeReason, setOtherTypeReason] = useState('');
 
   // Load draft from sessionStorage on mount
   useEffect(() => {
@@ -69,6 +79,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           setContactInfo(draft.contactInfo || {});
           setSelectedParent(draft.selectedParent || null);
           setUploadedMedia(draft.uploadedMedia || []);
+          setOtherTypeReason(draft.otherTypeReason || '');
           setDraftRestored(true);
         }
       } catch (error) {
@@ -92,7 +103,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           businessHours,
           contactInfo,
           selectedParent,
-          uploadedMedia
+          uploadedMedia,
+          otherTypeReason
         };
         sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       } catch (error) {
@@ -123,6 +135,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setUploadedMedia([]);
     setShowMediaUploadModal(false);
     setDraftRestored(false);
+    setOtherTypeReason('');
     
     // Clear draft from sessionStorage
     try {
@@ -142,12 +155,25 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       return;
     }
 
+    // Validate "others" type requires explanation
+    if (formData.type === 'others' && !otherTypeReason.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please explain why this entity doesn\'t fit existing types',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const metadata = {
-        business_hours: businessHours,
-        contact: contactInfo
-      };
+    const metadata = {
+      business_hours: businessHours,
+      contact: contactInfo,
+      ...(formData.type === 'others' && otherTypeReason.trim() && {
+        other_type_reason: otherTypeReason.trim()
+      })
+    };
 
       // Generate slug based on parent context
       const baseSlug = formData.name
@@ -166,7 +192,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         .insert({
           name: formData.name.trim(),
           type: formData.type as any,
-          description: formData.description.trim() || null,
+          description: formData.description || null,
           image_url: formData.image_url.trim() || null,
           website_url: formData.website_url.trim() || null,
           venue: formData.venue.trim() || null,
@@ -279,7 +305,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   <SelectContent>
                     {entityTypes.map(type => (
                       <SelectItem key={type} value={type}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                        {getTypeLabel(type)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -287,15 +313,30 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               </div>
             </div>
 
+            {formData.type === 'others' && (
+              <div className="space-y-2 col-span-2">
+                <Label htmlFor="otherTypeReason">
+                  Explain why this entity doesn't fit existing types *
+                </Label>
+                <Textarea
+                  id="otherTypeReason"
+                  value={otherTypeReason}
+                  onChange={(e) => setOtherTypeReason(e.target.value)}
+                  placeholder="Provide a brief explanation..."
+                  rows={2}
+                  disabled={loading}
+                  className="resize-none"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
+              <RichTextEditor
                 value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                placeholder="Entity description"
-                rows={3}
-                disabled={loading}
+                onChange={(json, html) => handleInputChange('description', html)}
+                placeholder="Describe this entity..."
+                editable={!loading}
               />
             </div>
 

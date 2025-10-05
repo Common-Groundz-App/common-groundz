@@ -6,7 +6,7 @@ export * from '../types';
 import { EntityType } from '@/services/recommendation/types';
 
 // Add string literal compatibility types for existing components - expanded to include all entity types
-export type EntityTypeString = 'movie' | 'book' | 'food' | 'product' | 'place' | 'music' | 'tv' | 'art' | 'activity' | 'drink' | 'travel' | 'people' | 'brand';
+export type EntityTypeString = 'movie' | 'book' | 'food' | 'product' | 'place' | 'music' | 'tv' | 'art' | 'activity' | 'drink' | 'travel' | 'people' | 'brand' | 'event' | 'service' | 'professional' | 'others';
 
 // Mapping functions to convert between string literals and enum values
 export function mapStringToEntityType(stringType: EntityTypeString): EntityType {
@@ -23,6 +23,10 @@ export function mapStringToEntityType(stringType: EntityTypeString): EntityType 
     case 'drink': return EntityType.Drink;
     case 'travel': return EntityType.Travel;
     case 'brand': return EntityType.Brand;
+    case 'event': return EntityType.Event;
+    case 'service': return EntityType.Service;
+    case 'professional': return EntityType.Professional;
+    case 'others': return EntityType.Others;
     case 'people': return EntityType.Place; // Map people to Place enum since it's not a true entity type
     default: return EntityType.Place;
   }
@@ -42,6 +46,10 @@ export function mapEntityTypeToString(enumType: EntityType): EntityTypeString {
     case EntityType.Drink: return 'drink';
     case EntityType.Travel: return 'travel';
     case EntityType.Brand: return 'brand';
+    case EntityType.Event: return 'event';
+    case EntityType.Service: return 'service';
+    case EntityType.Professional: return 'professional';
+    case EntityType.Others: return 'others';
     default: return 'place';
   }
 }

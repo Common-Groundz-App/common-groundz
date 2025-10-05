@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import NavBarComponent from '@/components/NavBarComponent';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { RichTextEditor } from '@/components/editor/RichTextEditor';
 import { Database } from '@/integrations/supabase/types';
 import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations';
 import { BusinessHoursEditor } from '@/components/admin/BusinessHoursEditor';
@@ -30,8 +31,16 @@ import { Entity } from '@/services/recommendation/types';
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
 
 const entityTypes = [
-  'movie', 'book', 'food', 'product', 'place', 'activity', 'music', 'art', 'tv', 'drink', 'travel'
+  'movie', 'book', 'food', 'product', 'place', 'activity', 
+  'music', 'art', 'tv', 'drink', 'travel', 'brand', 'event', 
+  'service', 'professional', 'others'
 ];
+
+const getTypeLabel = (type: string): string => {
+  if (type === 'tv') return 'TV';
+  if (type === 'others') return 'Others';
+  return type.charAt(0).toUpperCase() + type.slice(1);
+};
 
 const AdminEntityEdit = () => {
   const { id } = useParams<{ id: string }>();
@@ -54,6 +63,7 @@ const AdminEntityEdit = () => {
   const [refreshingDescription, setRefreshingDescription] = useState(false);
   const [refreshingContact, setRefreshingContact] = useState(false);
   const [selectedParent, setSelectedParent] = useState<Entity | null>(null);
+  const [otherTypeReason, setOtherTypeReason] = useState('');
 
   const { refreshEntityImage, isRefreshing: isRefreshingImage } = useEntityImageRefresh();
 
@@ -89,6 +99,7 @@ const AdminEntityEdit = () => {
       const metadata = (data.metadata as any) || {};
       setBusinessHours(metadata.business_hours || {});
       setContactInfo(metadata.contact || {});
+      setOtherTypeReason(metadata.other_type_reason || '');
     } catch (error) {
       console.error('Error fetching entity:', error);
       toast({
@@ -202,6 +213,16 @@ const AdminEntityEdit = () => {
       return false;
     }
 
+    // Validate "others" type requires explanation
+    if (entity?.type === 'others' && !otherTypeReason.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please explain why this entity doesn\'t fit existing types',
+        variant: 'destructive'
+      });
+      return false;
+    }
+
     // Validate JSON metadata
     try {
       JSON.parse(metadataText);
@@ -233,7 +254,10 @@ const AdminEntityEdit = () => {
       const updatedMetadata = {
         ...(entity.metadata as any || {}),
         business_hours: businessHours,
-        contact: contactInfo
+        contact: contactInfo,
+        ...(entity.type === 'others' && otherTypeReason.trim() && {
+          other_type_reason: otherTypeReason.trim()
+        })
       };
       
       const { error } = await supabase
@@ -692,7 +716,7 @@ const AdminEntityEdit = () => {
                           <SelectContent>
                             {entityTypes.map(type => (
                               <SelectItem key={type} value={type}>
-                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                                {getTypeLabel(type)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -716,15 +740,30 @@ const AdminEntityEdit = () => {
                       )}
                     </div>
 
+                    {entity.type === 'others' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="otherTypeReason">
+                          Explanation for "Others" Type *
+                        </Label>
+                        <Textarea
+                          id="otherTypeReason"
+                          value={otherTypeReason}
+                          onChange={(e) => setOtherTypeReason(e.target.value)}
+                          placeholder="Explain why this entity doesn't fit existing types..."
+                          rows={2}
+                          disabled={entity.is_deleted}
+                          className="resize-none"
+                        />
+                      </div>
+                    )}
+
                      <div className="space-y-2">
                        <Label htmlFor="description">Description</Label>
-                       <Textarea
-                         id="description"
+                       <RichTextEditor
                          value={entity.description || ''}
-                         onChange={(e) => handleInputChange('description', e.target.value)}
-                         placeholder="Entity description"
-                         rows={3}
-                         disabled={entity.is_deleted}
+                         onChange={(json, html) => handleInputChange('description', html)}
+                         placeholder="Entity description..."
+                         editable={!entity.is_deleted}
                        />
                      </div>
 

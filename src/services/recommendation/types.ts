@@ -47,7 +47,11 @@ export enum EntityType {
   TV = 'tv',
   Drink = 'drink',
   Travel = 'travel',
-  Brand = 'brand'
+  Brand = 'brand',
+  Event = 'event',
+  Service = 'service',
+  Professional = 'professional',
+  Others = 'others'
 }
 
 export enum RecommendationCategory {

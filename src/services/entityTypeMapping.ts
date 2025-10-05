@@ -26,7 +26,11 @@ const TYPE_MAPPING: Record<EntityType, EntityType> = {
   [EntityType.Drink]: EntityType.Food,      // Drinks are food-related
   [EntityType.Travel]: EntityType.Place,    // Travel destinations are places
   [EntityType.Activity]: EntityType.Place,  // Activities happen at places
-  [EntityType.Brand]: EntityType.Product    // Brands are product-related
+  [EntityType.Brand]: EntityType.Product,   // Brands are product-related
+  [EntityType.Event]: EntityType.Place,     // Events happen at places
+  [EntityType.Service]: EntityType.Product, // Services are product-like
+  [EntityType.Professional]: EntityType.Product, // Professionals offer services/products
+  [EntityType.Others]: EntityType.Product   // Default fallback to product
 };
 
 /**
@@ -84,7 +88,11 @@ export const getEntityTypeFallbackImage = (type: EntityType): string => {
     [EntityType.TV]: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
     [EntityType.Drink]: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
     [EntityType.Travel]: 'https://images.unsplash.com/photo-1501554728187-ce583db33af7',
-    [EntityType.Brand]: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86'
+    [EntityType.Brand]: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
+    [EntityType.Event]: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30',
+    [EntityType.Service]: 'https://images.unsplash.com/photo-1556761175-b413da4baf72',
+    [EntityType.Professional]: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf',
+    [EntityType.Others]: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86'
   };
 
   return fallbacks[mappedType] || fallbacks[EntityType.Product];

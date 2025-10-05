@@ -244,7 +244,11 @@ export function SearchResultHandler({
       'drink': 'drink',
       'travel': 'travel',
       'brand': 'product',
-      'people': 'place'
+      'people': 'place',
+      'event': 'place',
+      'service': 'product',
+      'professional': 'product',
+      'others': 'product'
     };
     
     return categoryMap[type] || 'product';

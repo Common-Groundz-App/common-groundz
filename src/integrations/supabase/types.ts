@@ -2666,6 +2666,7 @@ export type Database = {
           name_norm: string
           name_original: string
           post_count: number
+          trending_score: number
         }[]
       }
       calculate_trending_score: {
@@ -2734,7 +2735,12 @@ export type Database = {
       }
       detect_potential_duplicates: {
         Args: Record<PropertyKey, never> | { similarity_threshold?: number }
-        Returns: number
+        Returns: {
+          detection_method: string
+          entity_a_id: string
+          entity_b_id: string
+          similarity_score: number
+        }[]
       }
       fix_duplicate_slugs: {
         Args: Record<PropertyKey, never>
@@ -2764,13 +2770,16 @@ export type Database = {
           entity_id: string
           entity_image_url: string
           entity_name: string
+          entity_slug: string
           entity_type: Database["public"]["Enums"]["entity_type"]
-          entity_venue: string
-          recent_activity_count: number
+          latest_recommendation_date: string
+          network_score: number
+          parent_id: string
+          parent_slug: string
           recommendation_count: number
           recommender_avatars: string[]
-          recommender_user_ids: string[]
-          recommender_usernames: string[]
+          recommender_ids: string[]
+          recommender_names: string[]
         }[]
       }
       get_cached_products: {
@@ -3233,6 +3242,10 @@ export type Database = {
         | "game"
         | "experience"
         | "brand"
+        | "event"
+        | "service"
+        | "professional"
+        | "others"
       flag_status: "pending" | "resolved" | "dismissed"
       flag_type:
         | "inappropriate_content"
@@ -3384,6 +3397,10 @@ export const Constants = {
         "game",
         "experience",
         "brand",
+        "event",
+        "service",
+        "professional",
+        "others",
       ],
       flag_status: ["pending", "resolved", "dismissed"],
       flag_type: [
