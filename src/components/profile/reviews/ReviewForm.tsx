@@ -68,9 +68,41 @@ const ReviewForm = ({
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
+  // Helper function to map entity type to review category (defined early for use in state initialization)
+  const mapEntityTypeToReviewCategory = (entityType: string): string => {
+    switch (entityType.toLowerCase()) {
+      case 'food':
+      case 'movie':
+      case 'book':
+      case 'place':
+      case 'product':
+        return entityType.toLowerCase();
+      case 'event':
+      case 'activity':
+      case 'travel':
+        return 'place';
+      case 'service':
+      case 'professional':
+      case 'others':
+      case 'music':
+      case 'art':
+      case 'brand':
+        return 'product';
+      case 'tv':
+        return 'movie';
+      case 'drink':
+        return 'food';
+      default:
+        return 'food';
+    }
+  };
+
   // Form data
   const [rating, setRating] = useState(review?.rating || 0);
-  const [category, setCategory] = useState(review?.category || entity?.type?.toLowerCase() || 'food');
+  const [category, setCategory] = useState(
+    review?.category || 
+    (entity?.type ? mapEntityTypeToReviewCategory(entity.type) : 'food')
+  );
   
   // Separate state variables for different fields
   const [foodName, setFoodName] = useState(''); // For "What did you eat?" in food category
@@ -171,6 +203,11 @@ const ReviewForm = ({
       case 'tv': return EntityType.TV;
       case 'drink': return EntityType.Drink;
       case 'travel': return EntityType.Travel;
+      case 'brand': return EntityType.Brand;
+      case 'event': return EntityType.Event;
+      case 'service': return EntityType.Service;
+      case 'professional': return EntityType.Professional;
+      case 'others': return EntityType.Others;
       default: return EntityType.Place; // Default fallback
     }
   };
@@ -178,8 +215,8 @@ const ReviewForm = ({
   // Ensure proper initialization when entity is provided
   useEffect(() => {
     if (entity && isOpen && !isEditMode) {
-      // Set initial values from entity
-      setCategory(entity.type.toLowerCase());
+      // Set initial values from entity using the mapping function
+      setCategory(mapEntityTypeToReviewCategory(entity.type));
       
       // IMPORTANT: Handle the foodName vs contentName differently based on category
       if (entity.type.toLowerCase() === 'food') {
