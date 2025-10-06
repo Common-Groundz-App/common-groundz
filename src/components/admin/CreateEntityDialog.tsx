@@ -19,6 +19,8 @@ import { SimpleMediaUploadModal } from '@/components/entity-v4/SimpleMediaUpload
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { MediaItem } from '@/types/media';
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
+
+const MAX_MEDIA_ITEMS = 4;
 import { Plus } from 'lucide-react';
 
 const entityTypes = [
@@ -351,17 +353,40 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 <CompactMediaGrid
                   media={uploadedMedia}
                   onRemove={(mediaToRemove) => {
-                    setUploadedMedia(prev => prev.filter(m => m.url !== mediaToRemove.url));
-                    // If removed media was primary, fall back to next available
-                    if (primaryMediaUrl === mediaToRemove.url) {
-                      const remaining = uploadedMedia.filter(m => m.url !== mediaToRemove.url);
-                      setPrimaryMediaUrl(remaining[0]?.url || null);
-                    }
+                    setUploadedMedia(prev => {
+                      const filtered = prev.filter(m => m.url !== mediaToRemove.url);
+                      
+                      // If removed media was primary, fall back to next available
+                      if (primaryMediaUrl === mediaToRemove.url) {
+                        const newPrimary = filtered[0]?.url ?? null;
+                        setPrimaryMediaUrl(newPrimary);
+                        
+                        // Persist updated primary to session storage
+                        const currentDraft = sessionStorage.getItem(DRAFT_KEY);
+                        if (currentDraft) {
+                          const draft = JSON.parse(currentDraft);
+                          draft.primaryMediaUrl = newPrimary;
+                          sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+                        }
+                      }
+                      
+                      return filtered;
+                    });
                   }}
                   maxVisible={4}
                   className="mb-4"
                   primaryMediaUrl={primaryMediaUrl}
-                  onSetPrimary={(url) => setPrimaryMediaUrl(url)}
+                  onSetPrimary={(url) => {
+                    setPrimaryMediaUrl(url);
+                    
+                    // Persist updated primary to session storage
+                    const currentDraft = sessionStorage.getItem(DRAFT_KEY);
+                    if (currentDraft) {
+                      const draft = JSON.parse(currentDraft);
+                      draft.primaryMediaUrl = url;
+                      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+                    }
+                  }}
                 />
               )}
               
@@ -448,9 +473,26 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         maxItems={4 - uploadedMedia.length}
         onSave={(mediaItems) => {
           // Enforce the cap by slicing to remaining slots
-          const remainingSlots = 4 - uploadedMedia.length;
+          const remainingSlots = MAX_MEDIA_ITEMS - uploadedMedia.length;
           const itemsToAdd = mediaItems.slice(0, remainingSlots);
+          
           setUploadedMedia(prev => [...prev, ...itemsToAdd]);
+          
+          // Default primary to first item if none is set
+          setPrimaryMediaUrl(prev => {
+            const newPrimary = prev ?? itemsToAdd[0]?.url ?? null;
+            
+            // Persist updated primary to session storage
+            const currentDraft = sessionStorage.getItem(DRAFT_KEY);
+            if (currentDraft) {
+              const draft = JSON.parse(currentDraft);
+              draft.primaryMediaUrl = newPrimary;
+              sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+            }
+            
+            return newPrimary;
+          });
+          
           setShowMediaUploadModal(false);
         }}
       />

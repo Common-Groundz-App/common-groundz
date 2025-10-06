@@ -33,6 +33,8 @@ import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { deleteEntityPhoto, fetchEntityPhotos } from '@/services/entityPhotoService';
 import { MediaItem } from '@/types/media';
 
+const MAX_MEDIA_ITEMS = 4;
+
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
 
@@ -560,10 +562,21 @@ const AdminEntityEdit = () => {
   const handleMediaUpload = async (newMedia: MediaItem[]) => {
     if (!entity || !user) return;
     
+    const remainingSlots = Math.max(0, MAX_MEDIA_ITEMS - uploadedMedia.length);
+    const clampedMedia = newMedia.slice(0, remainingSlots);
+    
+    if (clampedMedia.length === 0) {
+      toast({ 
+        title: `Maximum ${MAX_MEDIA_ITEMS} items allowed`,
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     try {
       // uploadEntityMediaBatch returns EntityPhoto[], not an object
       const uploadedPhotos = await uploadEntityMediaBatch(
-        newMedia,
+        clampedMedia,
         entity.id,
         user.id
       );
@@ -573,10 +586,13 @@ const AdminEntityEdit = () => {
       
       setUploadedMedia(prev => [...prev, ...successfulMedia]);
       
+      // Default primary to first item if none is set
+      setPrimaryMediaUrl(prev => prev ?? successfulMedia[0]?.url ?? null);
+      
       // Show warning if some uploads failed
-      if (successfulMedia.length < newMedia.length) {
+      if (successfulMedia.length < clampedMedia.length) {
         toast({ 
-          title: `${successfulMedia.length} of ${newMedia.length} uploads succeeded`,
+          title: `${successfulMedia.length} of ${clampedMedia.length} uploads succeeded`,
           variant: 'destructive'
         });
       } else {
@@ -596,13 +612,16 @@ const AdminEntityEdit = () => {
     
     const success = await deleteEntityPhoto(mediaItem.id);
     if (success) {
-      setUploadedMedia(prev => prev.filter(m => m.id !== mediaItem.id));
-      
-      // If removed media was primary, fall back to next available or null
-      if (primaryMediaUrl === mediaItem.url) {
-        const remaining = uploadedMedia.filter(m => m.id !== mediaItem.id);
-        setPrimaryMediaUrl(remaining[0]?.url || null);
-      }
+      setUploadedMedia(prev => {
+        const filtered = prev.filter(m => m.id !== mediaItem.id);
+        
+        // If removed media was primary, fall back to next available
+        if (primaryMediaUrl === mediaItem.url) {
+          setPrimaryMediaUrl(filtered[0]?.url ?? null);
+        }
+        
+        return filtered;
+      });
       
       toast({ title: 'Media removed' });
     } else {
@@ -1308,12 +1327,12 @@ const AdminEntityEdit = () => {
         </div>
       </div>
 
-      <SimpleMediaUploadModal
-        isOpen={isMediaModalOpen}
-        onClose={() => setIsMediaModalOpen(false)}
-        onSave={(media) => handleMediaUpload(media)}
-        maxItems={Math.max(0, 10 - uploadedMedia.length)}
-      />
+            <SimpleMediaUploadModal
+              isOpen={isMediaModalOpen}
+              onClose={() => setIsMediaModalOpen(false)}
+              onSave={(media) => handleMediaUpload(media)}
+              maxItems={Math.max(0, MAX_MEDIA_ITEMS - uploadedMedia.length)}
+            />
     </div>
   );
 };

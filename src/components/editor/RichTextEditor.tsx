@@ -184,8 +184,12 @@ export function RichTextDisplay({ content }: { content: any }) {
 
   // Sync editor content when parsedContent changes
   React.useEffect(() => {
-    if (editor && parsedContent !== undefined) {
-      editor.commands.setContent(parsedContent, false);
+    if (editor && parsedContent !== undefined && !editor.isFocused && !editor.isDestroyed) {
+      const currentContent = editor.getHTML();
+      // Only update if content actually changed to avoid unnecessary re-renders
+      if (currentContent !== parsedContent) {
+        editor.commands.setContent(parsedContent, false);
+      }
     }
   }, [editor, parsedContent]);
 
