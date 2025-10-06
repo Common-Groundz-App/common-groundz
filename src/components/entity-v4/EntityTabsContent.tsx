@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Star, Plus, MessageSquare, MessageSquareHeart } from "lucide-react";
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -148,7 +149,9 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
             <div className="space-y-3">
               {entity?.description ? (
                 <>
-                  <p className="text-muted-foreground leading-relaxed">{entity.description}</p>
+                  <div className="text-muted-foreground leading-relaxed">
+                    <RichTextDisplay content={entity.description} />
+                  </div>
                   {/* Attribution for Google-sourced descriptions */}
                   {(entity as any).about_source === 'google_editorial' && (
                     <p className="text-xs text-muted-foreground italic">

@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Clock, MapPin, Mail, Phone, Globe, Users, Star, Award } from "lucide-react";
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -120,9 +121,13 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <p className="text-sm text-gray-600 leading-relaxed">
-              {entity.description || "No description available for this entity. Help improve our database by suggesting an edit."}
-            </p>
+            <div className="text-sm text-gray-600 leading-relaxed">
+              {entity.description ? (
+                <RichTextDisplay content={entity.description} />
+              ) : (
+                <p>No description available for this entity. Help improve our database by suggesting an edit.</p>
+              )}
+            </div>
             
             {/* Attribution for Google-sourced descriptions */}
             {entity.description && (entity as any).about_source === 'google_editorial' && (

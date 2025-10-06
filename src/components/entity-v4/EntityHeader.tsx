@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
@@ -189,9 +190,9 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   </div>
                 </div>
 
-                <p className={`text-gray-600 mb-4 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
-                  {entityData.description}
-                </p>
+                <div className={`text-gray-600 mb-4 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
+                  <RichTextDisplay content={entityData.description} />
+                </div>
                 
                 {/* Ratings - Always stack on mobile, side-by-side on larger screens */}
                 <div className={`flex flex-col ${isMobile ? 'gap-4' : 'sm:flex-row sm:items-center gap-3'} mb-4`}>

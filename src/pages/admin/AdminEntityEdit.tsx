@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Trash2, Shield, AlertCircle, AlertTriangle, RotateCcw, History, RefreshCw, Image, FileText, Phone } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Shield, AlertCircle, AlertTriangle, RotateCcw, History, RefreshCw, Image, FileText, Phone, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NavBarComponent from '@/components/NavBarComponent';
@@ -26,6 +26,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { getParentEntity, setEntityParent } from '@/services/entityHierarchyService';
 import { Entity } from '@/services/recommendation/types';
+import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
+import { SimpleMediaUploadModal } from '@/components/entity-v4/SimpleMediaUploadModal';
+import { convertEntityPhotoToMediaItem } from '@/services/entityMediaService';
+import { uploadEntityMediaBatch } from '@/services/entityMediaService';
+import { deleteEntityPhoto, fetchEntityPhotos } from '@/services/entityPhotoService';
+import { MediaItem } from '@/types/media';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -64,6 +70,9 @@ const AdminEntityEdit = () => {
   const [refreshingContact, setRefreshingContact] = useState(false);
   const [selectedParent, setSelectedParent] = useState<Entity | null>(null);
   const [otherTypeReason, setOtherTypeReason] = useState('');
+  const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+  const [primaryMediaUrl, setPrimaryMediaUrl] = useState<string | null>(null);
 
   const { refreshEntityImage, isRefreshing: isRefreshingImage } = useEntityImageRefresh();
 
@@ -100,6 +109,16 @@ const AdminEntityEdit = () => {
       setBusinessHours(metadata.business_hours || {});
       setContactInfo(metadata.contact || {});
       setOtherTypeReason(metadata.other_type_reason || '');
+      
+      // Fetch entity photos
+      try {
+        const photos = await fetchEntityPhotos(data.id);
+        const mediaItems = photos.map(convertEntityPhotoToMediaItem);
+        setUploadedMedia(mediaItems);
+        setPrimaryMediaUrl(data.image_url || null);
+      } catch (photoError) {
+        console.error('Error fetching entity photos:', photoError);
+      }
     } catch (error) {
       console.error('Error fetching entity:', error);
       toast({
@@ -267,7 +286,7 @@ const AdminEntityEdit = () => {
           type: entity.type,
           slug: entity.slug?.trim() || null,
           description: entity.description?.trim() || null,
-          image_url: entity.image_url?.trim() || null,
+          image_url: primaryMediaUrl || uploadedMedia[0]?.url || entity.image_url?.trim() || null,
           website_url: entity.website_url?.trim() || null,
           venue: entity.venue?.trim() || null,
           api_source: entity.api_source?.trim() || null,
@@ -535,6 +554,59 @@ const AdminEntityEdit = () => {
       });
     } finally {
       setRefreshingContact(false);
+    }
+  };
+
+  const handleMediaUpload = async (newMedia: MediaItem[]) => {
+    if (!entity || !user) return;
+    
+    try {
+      // uploadEntityMediaBatch returns EntityPhoto[], not an object
+      const uploadedPhotos = await uploadEntityMediaBatch(
+        newMedia,
+        entity.id,
+        user.id
+      );
+      
+      // Convert EntityPhoto[] to MediaItem[]
+      const successfulMedia = uploadedPhotos.map(convertEntityPhotoToMediaItem);
+      
+      setUploadedMedia(prev => [...prev, ...successfulMedia]);
+      
+      // Show warning if some uploads failed
+      if (successfulMedia.length < newMedia.length) {
+        toast({ 
+          title: `${successfulMedia.length} of ${newMedia.length} uploads succeeded`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({ title: 'Media uploaded successfully' });
+      }
+    } catch (error) {
+      console.error('Media upload error:', error);
+      toast({ 
+        title: 'Upload failed', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const handleMediaRemove = async (mediaItem: MediaItem) => {
+    if (!mediaItem.id) return;
+    
+    const success = await deleteEntityPhoto(mediaItem.id);
+    if (success) {
+      setUploadedMedia(prev => prev.filter(m => m.id !== mediaItem.id));
+      
+      // If removed media was primary, fall back to next available or null
+      if (primaryMediaUrl === mediaItem.url) {
+        const remaining = uploadedMedia.filter(m => m.id !== mediaItem.id);
+        setPrimaryMediaUrl(remaining[0]?.url || null);
+      }
+      
+      toast({ title: 'Media removed' });
+    } else {
+      toast({ title: 'Failed to remove media', variant: 'destructive' });
     }
   };
 
@@ -816,8 +888,34 @@ const AdminEntityEdit = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Media Gallery */}
                     <div className="space-y-2">
-                      <Label htmlFor="image_url">Image URL</Label>
+                      <Label>Photos & Videos</Label>
+                      <div className="space-y-3">
+                        {uploadedMedia.length > 0 && (
+                          <CompactMediaGrid
+                            media={uploadedMedia}
+                            onRemove={handleMediaRemove}
+                            maxVisible={6}
+                            primaryMediaUrl={primaryMediaUrl}
+                            onSetPrimary={(url) => setPrimaryMediaUrl(url)}
+                          />
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsMediaModalOpen(true)}
+                          disabled={entity.is_deleted}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {uploadedMedia.length > 0 ? 'Add More Media' : 'Upload Media'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="image_url">Primary Image URL (Manual Override)</Label>
                       <Input
                         id="image_url"
                         value={entity.image_url || ''}
@@ -825,6 +923,9 @@ const AdminEntityEdit = () => {
                         placeholder="https://example.com/image.jpg"
                         disabled={entity.is_deleted}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        The primary image is set using "Set as Primary" above. Use this field only for manual URL override.
+                      </p>
                       {entity.image_url && (
                         <div className="mt-2">
                           <p className="text-sm text-muted-foreground mb-2">Preview:</p>
@@ -1206,6 +1307,13 @@ const AdminEntityEdit = () => {
           </div>
         </div>
       </div>
+
+      <SimpleMediaUploadModal
+        isOpen={isMediaModalOpen}
+        onClose={() => setIsMediaModalOpen(false)}
+        onSave={(media) => handleMediaUpload(media)}
+        maxItems={Math.max(0, 10 - uploadedMedia.length)}
+      />
     </div>
   );
 };

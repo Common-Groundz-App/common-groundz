@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { MediaItem } from '@/types/media';
-import { X, ZoomIn } from 'lucide-react';
+import { X, ZoomIn, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { LightboxPreview } from './LightboxPreview';
@@ -13,6 +13,8 @@ interface CompactMediaGridProps {
   className?: string;
   maxVisible?: number;
   onOpenLightbox?: (index: number) => void;
+  primaryMediaUrl?: string | null;
+  onSetPrimary?: (url: string) => void;
 }
 
 export function CompactMediaGrid({
@@ -20,7 +22,9 @@ export function CompactMediaGrid({
   onRemove,
   className,
   maxVisible = 4,
-  onOpenLightbox
+  onOpenLightbox,
+  primaryMediaUrl,
+  onSetPrimary
 }: CompactMediaGridProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -83,9 +87,34 @@ export function CompactMediaGrid({
               />
             )}
             
-            {/* Zoom indicator */}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors pointer-events-none">
-              <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto" />
+            {/* Primary badge */}
+            {primaryMediaUrl === item.url && (
+              <div className="absolute top-1 left-1 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded flex items-center gap-1 z-10">
+                <Star className="h-3 w-3 fill-current" />
+                Primary
+              </div>
+            )}
+
+            {/* Hover actions overlay */}
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              {/* Zoom indicator */}
+              <ZoomIn className="text-white" />
+              
+              {/* Set as Primary button */}
+              {onSetPrimary && primaryMediaUrl !== item.url && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSetPrimary(item.url);
+                  }}
+                  className="text-xs"
+                >
+                  <Star className="h-3 w-3 mr-1" />
+                  Set as Primary
+                </Button>
+              )}
             </div>
             
             {/* Remove button - show on hover or always on mobile */}

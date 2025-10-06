@@ -137,6 +137,17 @@ export function RichTextEditor({
     },
   });
 
+  // Sync editor content when value prop changes (e.g., from draft restoration)
+  React.useEffect(() => {
+    if (editor && value !== undefined) {
+      const currentContent = editor.getHTML();
+      // Only update if content actually changed to avoid cursor jumps
+      if (currentContent !== value) {
+        editor.commands.setContent(value, false);
+      }
+    }
+  }, [editor, value]);
+
   return (
     <div className={cn('border rounded-md', className)}>
       {editable && !minimal && <MenuBar editor={editor} />}
@@ -170,6 +181,13 @@ export function RichTextDisplay({ content }: { content: any }) {
     content: parsedContent,
     editable: false,
   });
+
+  // Sync editor content when parsedContent changes
+  React.useEffect(() => {
+    if (editor && parsedContent !== undefined) {
+      editor.commands.setContent(parsedContent, false);
+    }
+  }, [editor, parsedContent]);
 
   return (
     <div className="prose prose-sm max-w-none">

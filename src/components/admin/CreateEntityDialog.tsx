@@ -66,6 +66,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
   const [showMediaUploadModal, setShowMediaUploadModal] = useState(false);
   const [otherTypeReason, setOtherTypeReason] = useState('');
+  const [primaryMediaUrl, setPrimaryMediaUrl] = useState<string | null>(null);
 
   // Load draft from sessionStorage on mount
   useEffect(() => {
@@ -80,6 +81,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           setSelectedParent(draft.selectedParent || null);
           setUploadedMedia(draft.uploadedMedia || []);
           setOtherTypeReason(draft.otherTypeReason || '');
+          setPrimaryMediaUrl(draft.primaryMediaUrl || null);
           setDraftRestored(true);
         }
       } catch (error) {
@@ -104,7 +106,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           contactInfo,
           selectedParent,
           uploadedMedia,
-          otherTypeReason
+          otherTypeReason,
+          primaryMediaUrl
         };
         sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       } catch (error) {
@@ -136,6 +139,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setShowMediaUploadModal(false);
     setDraftRestored(false);
     setOtherTypeReason('');
+    setPrimaryMediaUrl(null);
     
     // Clear draft from sessionStorage
     try {
@@ -193,7 +197,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           name: formData.name.trim(),
           type: formData.type as any,
           description: formData.description || null,
-          image_url: formData.image_url.trim() || null,
+          image_url: primaryMediaUrl || uploadedMedia[0]?.url || formData.image_url.trim() || null,
           website_url: formData.website_url.trim() || null,
           venue: formData.venue.trim() || null,
           metadata,
@@ -348,9 +352,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   media={uploadedMedia}
                   onRemove={(mediaToRemove) => {
                     setUploadedMedia(prev => prev.filter(m => m.url !== mediaToRemove.url));
+                    // If removed media was primary, fall back to next available
+                    if (primaryMediaUrl === mediaToRemove.url) {
+                      const remaining = uploadedMedia.filter(m => m.url !== mediaToRemove.url);
+                      setPrimaryMediaUrl(remaining[0]?.url || null);
+                    }
                   }}
                   maxVisible={4}
                   className="mb-4"
+                  primaryMediaUrl={primaryMediaUrl}
+                  onSetPrimary={(url) => setPrimaryMediaUrl(url)}
                 />
               )}
               
