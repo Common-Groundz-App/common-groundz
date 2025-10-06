@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 
 interface EntityResultItemProps {
   entity: EntitySearchResult;
@@ -45,9 +46,9 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
           </div>
         )}
         {entity.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2">
-            {entity.description}
-          </p>
+          <div className="text-xs text-muted-foreground line-clamp-2 prose prose-sm">
+            <RichTextDisplay content={entity.description} />
+          </div>
         )}
       </div>
     </Link>

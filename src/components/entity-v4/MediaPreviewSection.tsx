@@ -433,39 +433,48 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                 </div>
               ))}
               
-              {/* Last image with "Show all photos" overlay if more photos exist */}
-              {sidePhotos.length >= 3 && (
-                <div 
-                  className="relative group cursor-pointer overflow-hidden rounded-lg aspect-[4/3]"
-                  onClick={openGallery}
-                >
-                  {sidePhotos[3] && (
-                    <img
-                      src={sidePhotos[3].url}
-                      alt={sidePhotos[3].alt || entity.name}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                  {hasMorePhotos && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
-                      <div className="text-center">
-                        <span className="text-lg font-semibold">+{photos.length - 4}</span>
-                        <p className="text-sm">Show all photos</p>
+              {/* 4th slot: Show "Show all photos" overlay if we have 5+ photos, using the 4th side photo */}
+              {(() => {
+                const displayedSidePhotos = sidePhotos.slice(0, 3);
+                const extraSidePhoto = sidePhotos[3];
+                
+                return (
+                  <>
+                    {extraSidePhoto && (
+                      <div 
+                        className="relative group cursor-pointer overflow-hidden rounded-lg aspect-[4/3]"
+                        onClick={openGallery}
+                      >
+                        <img
+                          src={extraSidePhoto.url}
+                          alt={extraSidePhoto.alt || entity.name}
+                          className="w-full h-full object-cover"
+                        />
+                        {hasMorePhotos && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                            <div className="text-center">
+                              <span className="text-lg font-semibold">+{photos.length - 4}</span>
+                              <p className="text-sm">Show all photos</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Fill empty slots with placeholders if needed */}
-              {Array.from({ length: Math.max(0, 4 - sidePhotos.length) }).map((_, index) => (
-                <div 
-                  key={`placeholder-${index}`} 
-                  className="aspect-[4/3] border-2 border-dashed border-muted rounded-lg flex items-center justify-center opacity-50"
-                >
-                  <Camera className="w-6 h-6 text-muted-foreground" />
-                </div>
-              ))}
+                    )}
+                    
+                    {/* Fill empty slots with placeholders */}
+                    {Array.from({ 
+                      length: Math.max(0, 4 - displayedSidePhotos.length - (extraSidePhoto ? 1 : 0)) 
+                    }).map((_, index) => (
+                      <div 
+                        key={`placeholder-${index}`} 
+                        className="aspect-[4/3] border-2 border-dashed border-muted rounded-lg flex items-center justify-center opacity-50"
+                      >
+                        <Camera className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

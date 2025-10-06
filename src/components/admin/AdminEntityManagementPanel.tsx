@@ -37,6 +37,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations';
 import { CreateEntityDialog } from './CreateEntityDialog';
 import { AdminEntityPlaceIdTool } from './AdminEntityPlaceIdTool';
+import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -640,8 +641,8 @@ export const AdminEntityManagementPanel = () => {
                           )}
                         </div>
                         {entity.description && (
-                          <div className="text-sm text-muted-foreground truncate max-w-48">
-                            {entity.description}
+                          <div className="text-sm text-muted-foreground truncate max-w-48 prose prose-sm line-clamp-2">
+                            <RichTextDisplay content={entity.description} />
                           </div>
                         )}
                       </div>
