@@ -476,6 +476,8 @@ const EntityV4 = () => {
                     childEntities={entityWithChildren?.children || []}
                     isLoadingChildren={isLoadingHierarchy}
                     onViewChild={handleViewChild}
+                    parentEntity={parentEntity}
+                    isLoadingParent={isLoadingHierarchy}
                   />
                 )}
               </div>

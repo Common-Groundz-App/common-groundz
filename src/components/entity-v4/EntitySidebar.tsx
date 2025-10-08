@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Clock, MapPin, Mail, Phone, Globe, Users, Star, Award } from "lucide-react";
+import { Clock, MapPin, Mail, Phone, Globe, Users, Star, Award, ArrowRight } from "lucide-react";
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,8 @@ import { useNavigate } from 'react-router-dom';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
 import { 
   shouldShowBusinessHours, 
   shouldShowContactInfo, 
@@ -31,13 +33,17 @@ interface EntitySidebarProps {
   childEntities?: Entity[];
   isLoadingChildren?: boolean;
   onViewChild?: (child: Entity) => void;
+  parentEntity?: Entity | null;
+  isLoadingParent?: boolean;
 }
 
 export const EntitySidebar: React.FC<EntitySidebarProps> = ({ 
   entity, 
   childEntities = [],
   isLoadingChildren = false,
-  onViewChild 
+  onViewChild,
+  parentEntity = null,
+  isLoadingParent = false
 }) => {
   const navigate = useNavigate();
   const contactInfo = extractContactInfo(entity);
@@ -96,6 +102,37 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Part of - Parent Entity */}
+      {parentEntity && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Part of</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div 
+              className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors group"
+              onClick={() => navigate(getEntityUrlWithParent(parentEntity))}
+            >
+              <ImageWithFallback
+                src={parentEntity.image_url}
+                alt={parentEntity.name}
+                fallbackSrc={getEntityTypeFallbackImage(parentEntity.type)}
+                className="w-12 h-12 rounded-lg object-cover"
+              />
+              <div className="flex-1 min-w-0">
+                <h4 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                  {parentEntity.name}
+                </h4>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {parentEntity.type.replace('_', ' ')}
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
           </CardContent>
         </Card>
