@@ -470,7 +470,14 @@ const EntityV4 = () => {
 
               {/* SECTION 6: Info & Discovery Sidebar */}
               <div className="lg:col-span-1">
-                {entity && <EntitySidebar entity={entity} />}
+                {entity && (
+                  <EntitySidebar 
+                    entity={entity}
+                    childEntities={entityWithChildren?.children || []}
+                    isLoadingChildren={isLoadingHierarchy}
+                    onViewChild={handleViewChild}
+                  />
+                )}
               </div>
             </div>
           </div>

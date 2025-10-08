@@ -3,10 +3,11 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowRight, Package, Star, Award } from 'lucide-react';
+import { Plus, ArrowRight, Package } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Entity } from '@/services/recommendation/types';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 
 interface EntityChildrenCardProps {
   children: Entity[];
@@ -55,15 +56,6 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
     return parts.length > 0 ? parts.slice(0, 3).join(', ') : null;
   };
 
-  // Helper function to get badges for child
-  const getChildBadges = (child: Entity, index: number) => {
-    const badges = [];
-    
-    if (index === 0) badges.push({ text: "Popular", variant: "default" as const });
-    if (index === 1) badges.push({ text: "Editor's Pick", variant: "secondary" as const });
-    
-    return badges;
-  };
   if (isLoading) {
     return (
       <Card>
@@ -159,18 +151,24 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
                 <div className="font-medium text-sm truncate group-hover:text-foreground transition-colors">
                   {child.name}
                 </div>
-                {getChildBadges(child, index).map((badge, badgeIndex) => (
-                  <Badge key={badgeIndex} variant={badge.variant} className="text-xs">
-                    {badge.text === "Editor's Pick" && <Award className="h-3 w-3 mr-1" />}
-                    {badge.text}
-                  </Badge>
-                ))}
               </div>
               
               <div className="flex items-center gap-2 mt-1">
                 <div className="flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                  <span className="text-xs text-muted-foreground">4.2</span>
+                  <RatingRingIcon 
+                    rating={child.average_rating || 0} 
+                    size={12} 
+                  />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {child.average_rating 
+                      ? child.average_rating.toFixed(1) 
+                      : 'No ratings'}
+                  </span>
+                  {child.review_count !== undefined && child.review_count > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      ({child.review_count})
+                    </span>
+                  )}
                 </div>
                 <Badge variant="outline" className="text-xs capitalize">
                   {child.type}

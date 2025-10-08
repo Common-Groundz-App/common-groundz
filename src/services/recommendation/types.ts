@@ -33,6 +33,11 @@ export interface Entity {
   last_enriched_at?: string;
   enrichment_source?: string;
   data_quality_score?: number;
+  
+  // Review aggregation fields (for children entities with ratings)
+  average_rating?: number;
+  review_count?: number;
+  latest_review_date?: string;
 }
 
 export enum EntityType {

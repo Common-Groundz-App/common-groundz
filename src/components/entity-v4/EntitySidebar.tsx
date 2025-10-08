@@ -11,6 +11,7 @@ import { ClaimBusinessButton } from './ClaimBusinessButton';
 import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
 import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
+import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
 import { useRelatedEntities } from '@/hooks/use-related-entities';
 import { useNavigate } from 'react-router-dom';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
@@ -27,9 +28,17 @@ import {
 
 interface EntitySidebarProps {
   entity: Entity;
+  childEntities?: Entity[];
+  isLoadingChildren?: boolean;
+  onViewChild?: (child: Entity) => void;
 }
 
-export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
+export const EntitySidebar: React.FC<EntitySidebarProps> = ({ 
+  entity, 
+  childEntities = [],
+  isLoadingChildren = false,
+  onViewChild 
+}) => {
   const navigate = useNavigate();
   const contactInfo = extractContactInfo(entity);
   const businessHours = extractBusinessHours(entity);
@@ -155,6 +164,17 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Related Products - Child Entities */}
+      {childEntities.length > 0 && (
+        <EntityChildrenCard
+          children={childEntities}
+          parentName={entity.name}
+          parentEntity={entity}
+          isLoading={isLoadingChildren}
+          onViewChild={onViewChild}
+        />
+      )}
 
       {/* Entity Metadata - Type-Specific Details */}
       {shouldShowMetadata(entity) && (

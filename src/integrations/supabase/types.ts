@@ -2831,6 +2831,23 @@ export type Database = {
           type: Database["public"]["Enums"]["entity_type"]
         }[]
       }
+      get_child_entities_with_ratings: {
+        Args: { parent_uuid: string }
+        Returns: {
+          average_rating: number
+          description: string
+          id: string
+          image_url: string
+          latest_review_date: string
+          name: string
+          price_info: Json
+          review_count: number
+          slug: string
+          specifications: Json
+          type: Database["public"]["Enums"]["entity_type"]
+          venue: string
+        }[]
+      }
       get_circle_rating: {
         Args: { p_entity_id: string; p_user_id: string }
         Returns: number
