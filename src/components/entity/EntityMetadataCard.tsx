@@ -471,8 +471,6 @@ export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }
           {getMetadataContent()}
         </CardContent>
       </Card>
-      
-      {renderExternalRatings()}
     </div>
   );
 };

@@ -10,6 +10,7 @@ import { EntitySuggestionButton } from './EntitySuggestionButton';
 import { ClaimBusinessButton } from './ClaimBusinessButton';
 import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
 import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
+import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { useRelatedEntities } from '@/hooks/use-related-entities';
 import { useNavigate } from 'react-router-dom';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
@@ -164,6 +165,9 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
       {shouldShowSpecs(entity) && (
         <EntitySpecsCard entity={entity} />
       )}
+
+      {/* Related Entities - Author/Director based */}
+      <EntityRelatedCard entity={entity} />
 
       {/* Related Entities */}
       {relatedEntities.length > 0 && (
