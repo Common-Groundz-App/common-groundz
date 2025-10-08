@@ -16,7 +16,10 @@ export const useEntitySiblings = (entityId: string | null, parentId: string | nu
     try {
       const { data, error: fetchError } = await supabase
         .from('entities')
-        .select('*')
+        .select(`
+          *,
+          reviews:reviews(rating)
+        `)
         .eq('parent_id', parentId)
         .neq('id', entityId)
         .eq('is_deleted', false)
@@ -26,7 +29,23 @@ export const useEntitySiblings = (entityId: string | null, parentId: string | nu
         throw fetchError;
       }
 
-      setSiblings((data as Entity[]) || []);
+      // Calculate average ratings from reviews
+      const siblingsWithRatings = (data || []).map((entity: any) => {
+        const reviews = entity.reviews || [];
+        const ratings = reviews.map((r: any) => r.rating).filter((r: number) => r > 0);
+        const average_rating = ratings.length > 0 
+          ? ratings.reduce((sum: number, r: number) => sum + r, 0) / ratings.length 
+          : 0;
+        
+        // Remove reviews array and add calculated average_rating
+        const { reviews: _, ...entityData } = entity;
+        return {
+          ...entityData,
+          average_rating
+        };
+      });
+
+      setSiblings(siblingsWithRatings as Entity[]);
     } catch (err) {
       console.error('Error fetching siblings:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch siblings');

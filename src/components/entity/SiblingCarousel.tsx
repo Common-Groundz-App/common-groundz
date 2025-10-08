@@ -94,11 +94,13 @@ export const SiblingCarousel: React.FC<SiblingCarouselProps> = ({
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
                     <RatingRingIcon 
-                      rating={0} 
+                      rating={(sibling as any).average_rating || 0} 
                       size={12} 
                     />
                     <span className="text-xs font-medium text-muted-foreground">
-                      {getSentimentLabel(0)}
+                      {(sibling as any).average_rating 
+                        ? (sibling as any).average_rating.toFixed(1) 
+                        : getSentimentLabel(0)}
                     </span>
                   </div>
                   <Badge variant="outline" className="text-xs capitalize">
