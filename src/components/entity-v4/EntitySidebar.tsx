@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionButton } from './EntitySuggestionButton';
 import { ClaimBusinessButton } from './ClaimBusinessButton';
+import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
+import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { useRelatedEntities } from '@/hooks/use-related-entities';
 import { useNavigate } from 'react-router-dom';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
@@ -44,6 +46,16 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
     if (relatedEntity.slug) {
       navigate(getEntityUrlWithParent(relatedEntity));
     }
+  };
+
+  const shouldShowMetadata = (entity: Entity): boolean => {
+    // Show metadata for books, movies, places, and products
+    return ['book', 'movie', 'place', 'product'].includes(entity.type);
+  };
+
+  const shouldShowSpecs = (entity: Entity): boolean => {
+    // Show specs for food, products, and movies
+    return ['food', 'product', 'movie'].includes(entity.type);
   };
 
   return (
@@ -142,6 +154,16 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Entity Metadata - Type-Specific Details */}
+      {shouldShowMetadata(entity) && (
+        <EntityMetadataCard entity={entity} />
+      )}
+
+      {/* Entity Specifications - Technical Details */}
+      {shouldShowSpecs(entity) && (
+        <EntitySpecsCard entity={entity} />
+      )}
 
       {/* Related Entities */}
       {relatedEntities.length > 0 && (
