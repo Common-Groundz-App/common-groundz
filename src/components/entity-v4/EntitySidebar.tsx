@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionButton } from './EntitySuggestionButton';
 import { ClaimBusinessButton } from './ClaimBusinessButton';
+import { SiblingCarousel } from '@/components/entity/SiblingCarousel';
 import { useRelatedEntities } from '@/hooks/use-related-entities';
 import { useNavigate } from 'react-router-dom';
-import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
+import { getEntityUrlWithParent, getHierarchicalEntityUrl } from '@/utils/entityUrlUtils';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { 
@@ -24,9 +25,17 @@ import {
 
 interface EntitySidebarProps {
   entity: Entity;
+  siblings?: Entity[];
+  parentEntity?: Entity | null;
+  isLoadingSiblings?: boolean;
 }
 
-export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
+export const EntitySidebar: React.FC<EntitySidebarProps> = ({ 
+  entity, 
+  siblings = [], 
+  parentEntity,
+  isLoadingSiblings = false 
+}) => {
   const navigate = useNavigate();
   const contactInfo = extractContactInfo(entity);
   const businessHours = extractBusinessHours(entity);
@@ -204,6 +213,24 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({ entity }) => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Sibling Products/Items - Show when entity has parent and siblings */}
+      {parentEntity && siblings.length > 0 && (
+        <SiblingCarousel
+          siblings={siblings}
+          parentName={parentEntity.name}
+          onViewSibling={(sibling) => {
+            // Use hierarchical URL if parent exists
+            if (parentEntity && sibling.slug) {
+              const hierarchicalUrl = getHierarchicalEntityUrl(parentEntity, sibling);
+              navigate(`${hierarchicalUrl}?v=4`);
+            } else {
+              // Fallback to simple URL
+              navigate(`/entity/${sibling.slug || sibling.id}?v=4`);
+            }
+          }}
+        />
       )}
 
       {/* Talk to Circle */}

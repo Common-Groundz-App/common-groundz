@@ -17,6 +17,7 @@ import { EntityRecommendationModal } from '@/components/entity/EntityRecommendat
 import { EntityType, Entity } from '@/services/recommendation/types';
 import { useUserFollowing } from '@/hooks/useUserFollowing';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
+import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { useNavigate } from 'react-router-dom';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
 import { getHierarchicalEntityUrl, getEntityUrlWithParent } from '@/utils/entityUrlUtils';
@@ -65,6 +66,16 @@ const EntityV4 = () => {
     hasChildren,
     hasParent
   } = useEntityHierarchy(entity?.id || null);
+
+  // Fetch siblings when entity has a parent
+  const {
+    siblings,
+    isLoading: isLoadingSiblings,
+    error: siblingsError
+  } = useEntitySiblings(
+    entity?.id || null,
+    entity?.parent_id || null
+  );
 
   // Fetch circle rating data and user following data
   const { user, isLoading: authLoading } = useAuth();
@@ -448,7 +459,14 @@ const EntityV4 = () => {
 
               {/* SECTION 6: Info & Discovery Sidebar */}
               <div className="lg:col-span-1">
-                {entity && <EntitySidebar entity={entity} />}
+                {entity && (
+                  <EntitySidebar 
+                    entity={entity}
+                    siblings={siblings}
+                    parentEntity={parentEntity}
+                    isLoadingSiblings={isLoadingSiblings}
+                  />
+                )}
               </div>
             </div>
           </div>
