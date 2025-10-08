@@ -454,19 +454,23 @@ const EntityV4 = () => {
                   onQuestionClick={() => {
                     console.log('Ask question clicked');
                   }}
+                  siblings={siblings}
+                  parentEntity={parentEntity}
+                  isLoadingSiblings={isLoadingSiblings}
+                  onViewSibling={(sibling) => {
+                    if (parentEntity && sibling.slug) {
+                      const hierarchicalUrl = getHierarchicalEntityUrl(parentEntity, sibling);
+                      navigate(`${hierarchicalUrl}?v=4`);
+                    } else {
+                      navigate(`/entity/${sibling.slug || sibling.id}?v=4`);
+                    }
+                  }}
                 />
               </div>
 
               {/* SECTION 6: Info & Discovery Sidebar */}
               <div className="lg:col-span-1">
-                {entity && (
-                  <EntitySidebar 
-                    entity={entity}
-                    siblings={siblings}
-                    parentEntity={parentEntity}
-                    isLoadingSiblings={isLoadingSiblings}
-                  />
-                )}
+                {entity && <EntitySidebar entity={entity} />}
               </div>
             </div>
           </div>

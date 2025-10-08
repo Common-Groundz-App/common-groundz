@@ -23,6 +23,8 @@ import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelin
 import { NetworkRecommendations } from './NetworkRecommendations';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCircleReviews } from '@/hooks/useCircleReviews';
+import { SiblingCarousel } from '@/components/entity/SiblingCarousel';
+import { Entity } from '@/services/recommendation/types';
 
 interface ReviewsSectionProps {
   reviews: ReviewWithUser[];
@@ -30,6 +32,10 @@ interface ReviewsSectionProps {
   entityId: string;
   onHelpfulClick?: (reviewId: string) => void;
   onQuestionClick?: () => void;
+  siblings?: Entity[];
+  parentEntity?: Entity | null;
+  isLoadingSiblings?: boolean;
+  onViewSibling?: (sibling: Entity) => void;
 }
 
 export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ 
@@ -37,7 +43,11 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   entityName = '',
   entityId = '',
   onHelpfulClick,
-  onQuestionClick 
+  onQuestionClick,
+  siblings = [],
+  parentEntity,
+  isLoadingSiblings = false,
+  onViewSibling
 }) => {
   const { user, isLoading: authLoading } = useAuth();
   const { circleReviews, circleUserIds, isLoading: circleLoading } = useCircleReviews(entityId);
@@ -552,6 +562,15 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             </div>
           </CardContent>
         </Card>
+
+        {/* Sibling Products Carousel - Show when entity has parent and siblings */}
+        {parentEntity && siblings.length > 0 && onViewSibling && (
+          <SiblingCarousel
+            siblings={siblings}
+            parentName={parentEntity.name}
+            onViewSibling={onViewSibling}
+          />
+        )}
       </div>
 
       {/* Timeline Viewer Modal */}
