@@ -1,7 +1,9 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Star, ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
+import { getSentimentLabel } from '@/utils/ratingColorUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Button } from '@/components/ui/button';
 import { Entity } from '@/services/recommendation/types';
@@ -91,8 +93,13 @@ export const SiblingCarousel: React.FC<SiblingCarouselProps> = ({
                 
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    <span className="text-xs text-muted-foreground">4.3</span>
+                    <RatingRingIcon 
+                      rating={0} 
+                      size={12} 
+                    />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {getSentimentLabel(0)}
+                    </span>
                   </div>
                   <Badge variant="outline" className="text-xs capitalize">
                     {sibling.type}
