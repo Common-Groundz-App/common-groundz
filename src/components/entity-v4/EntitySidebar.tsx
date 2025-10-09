@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionButton } from './EntitySuggestionButton';
 import { ClaimBusinessButton } from './ClaimBusinessButton';
-import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
+import { EntityMetadataCard, hasMetadataContent } from '@/components/entity/EntityMetadataCard';
 import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
@@ -214,7 +214,7 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
       )}
 
       {/* Entity Metadata - Type-Specific Details */}
-      {shouldShowMetadata(entity) && (
+      {shouldShowMetadata(entity) && hasMetadataContent(entity) && (
         <EntityMetadataCard entity={entity} />
       )}
 

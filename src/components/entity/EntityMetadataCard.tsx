@@ -9,6 +9,96 @@ interface EntityMetadataCardProps {
   entity: Entity;
 }
 
+export const hasMetadataContent = (entity: Entity): boolean => {
+  switch (entity.type) {
+    case 'book':
+      // Mirror renderBookMetadata() - check all fields with fallbacks
+      const hasAuthors = !!(
+        entity.authors?.length > 0 ||
+        (entity.metadata?.authors && Array.isArray(entity.metadata.authors) && entity.metadata.authors.length > 0) ||
+        (entity.venue && entity.api_source === 'openlibrary')  // OpenLibrary venue-as-author fallback
+      );
+      
+      const hasPublicationYear = !!(
+        entity.publication_year || 
+        entity.metadata?.publication_year || 
+        entity.metadata?.first_publish_year
+      );
+      
+      const hasIsbn = !!(
+        entity.isbn || 
+        entity.metadata?.isbn || 
+        entity.metadata?.isbn_13 ||
+        entity.metadata?.isbn_10
+      );
+      
+      const hasPageCount = !!(
+        entity.specifications?.page_count || 
+        entity.metadata?.page_count || 
+        entity.metadata?.number_of_pages_median
+      );
+      
+      const hasPublisher = !!(
+        entity.specifications?.publisher || 
+        entity.metadata?.publisher
+      );
+      
+      const hasEditionCount = !!(
+        entity.specifications?.edition_count || 
+        entity.metadata?.edition_count
+      );
+      
+      const hasLanguages = !!(
+        entity.languages?.length > 0 ||
+        (entity.metadata?.languages && Array.isArray(entity.metadata.languages) && entity.metadata.languages.length > 0)
+      );
+      
+      const hasSubjects = !!(
+        entity.specifications?.subjects?.length > 0 || 
+        entity.metadata?.subjects?.length > 0
+      );
+      
+      return hasAuthors || hasPublicationYear || hasIsbn || hasPageCount || 
+             hasPublisher || hasEditionCount || hasLanguages || hasSubjects;
+    
+    case 'movie':
+      // Mirror renderMovieMetadata()
+      return !!(
+        entity.publication_year ||
+        entity.cast_crew?.director ||
+        (entity.cast_crew?.cast && entity.cast_crew.cast.length > 0) ||
+        entity.specifications?.runtime ||
+        entity.specifications?.budget ||
+        entity.specifications?.revenue ||
+        (entity.specifications?.genres && entity.specifications.genres.length > 0) ||
+        (entity.specifications?.countries && entity.specifications.countries.length > 0)
+      );
+    
+    case 'place':
+      // Mirror renderPlaceMetadata()
+      return !!(
+        entity.specifications?.address ||
+        entity.specifications?.phone ||
+        entity.specifications?.website ||
+        entity.specifications?.hours ||
+        (entity.specifications?.types && entity.specifications.types.length > 0)
+      );
+    
+    case 'product':
+      // Mirror renderProductMetadata()
+      return !!(
+        entity.price_info?.price ||
+        entity.specifications?.brand ||
+        entity.specifications?.model ||
+        entity.specifications?.category ||
+        entity.price_info?.availability
+      );
+    
+    default:
+      return false;
+  }
+};
+
 export const EntityMetadataCard: React.FC<EntityMetadataCardProps> = ({ entity }) => {
   const renderBookMetadata = () => {
     // Enhanced fallback logic for book metadata

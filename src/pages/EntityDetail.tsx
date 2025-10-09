@@ -30,7 +30,7 @@ import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelin
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
-import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
+import { EntityMetadataCard, hasMetadataContent } from '@/components/entity/EntityMetadataCard';
 import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
@@ -917,7 +917,7 @@ const EntityDetailOriginal = () => {
                   </CardContent>
                 </Card>
 
-                {entity && <EntityMetadataCard entity={entity} />}
+                {entity && hasMetadataContent(entity) && <EntityMetadataCard entity={entity} />}
                 {entity && <EntitySpecsCard entity={entity} />}
                 {entity && <EntityRelatedCard entity={entity} />}
 

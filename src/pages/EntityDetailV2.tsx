@@ -23,7 +23,7 @@ import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
-import { EntityMetadataCard } from '@/components/entity/EntityMetadataCard';
+import { EntityMetadataCard, hasMetadataContent } from '@/components/entity/EntityMetadataCard';
 import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
@@ -1016,7 +1016,7 @@ const EntityDetailV2 = () => {
                   </Card>
                 )}
                 
-                {entity && <EntityMetadataCard entity={entity} />}
+                {entity && hasMetadataContent(entity) && <EntityMetadataCard entity={entity} />}
                 
                 {entity && <EntitySpecsCard entity={entity} />}
                 
