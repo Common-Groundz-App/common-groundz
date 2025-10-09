@@ -166,7 +166,14 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
             {contactInfo.website && (
               <div className="flex items-center gap-3 min-w-0">
                 <Globe className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                <span className="text-sm break-all min-w-0 text-blue-600 hover:underline cursor-pointer">{contactInfo.website}</span>
+                <a 
+                  href={contactInfo.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm break-all min-w-0 text-blue-600 hover:underline cursor-pointer"
+                >
+                  {contactInfo.website}
+                </a>
               </div>
             )}
           </CardContent>
