@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
@@ -11,7 +10,8 @@ import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTapDetection } from '@/hooks/use-tap-detection';
-import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal } from "lucide-react";
+import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal, RefreshCw } from "lucide-react";
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ interface EntityHeaderProps {
     tooltip: string | null;
   };
   onRatingClick?: () => void;
+  onRefreshHeroImage?: () => Promise<void>;
 }
 
 export const EntityHeader: React.FC<EntityHeaderProps> = ({
@@ -55,10 +56,21 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
   onRecommendationModalOpen,
   onReviewAction,
   reviewActionConfig,
-  onRatingClick
+  onRatingClick,
+  onRefreshHeroImage
 }) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  
+  // State for image refresh functionality
+  const [isImageExpired, setIsImageExpired] = useState(false);
+  const [isRefreshingImage, setIsRefreshingImage] = useState(false);
+
+  // Reset expiration flag when entityImage prop changes (after successful refresh)
+  useEffect(() => {
+    console.log('EntityHeader: entityImage prop changed, resetting expiration flag');
+    setIsImageExpired(false);
+  }, [entityImage]);
   
   // Fetch entity hierarchy data
   const {
@@ -124,13 +136,43 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
           <div className="lg:col-span-2">
             {/* Mobile: Stack image above content, Desktop: side-by-side */}
             <div className={`${isMobile ? 'flex flex-col' : 'flex gap-6'}`}>
-              {/* Image */}
-              <div className={`${isMobile ? 'w-full mb-4' : 'flex-shrink-0'}`}>
-                <img 
-                  src={entityImage} 
-                  alt={entityData.name} 
-                  className={`${isMobile ? 'w-full h-48 rounded-lg object-cover' : 'w-24 h-24 rounded-lg object-cover'}`} 
+              {/* Image with refresh capability */}
+              <div className={`${isMobile ? 'w-full mb-4' : 'flex-shrink-0'} relative group`}>
+                <ImageWithFallback
+                  src={entityImage}
+                  alt={entityData.name}
+                  entityType={entity.type}
+                  className={`${isMobile ? 'w-full h-48 rounded-lg object-cover' : 'w-24 h-24 rounded-lg object-cover'}`}
+                  onError={() => {
+                    console.log('EntityHeader: Hero image failed to load (expired/403), showing refresh button');
+                    setIsImageExpired(true);
+                  }}
+                  suppressConsoleErrors={false}
                 />
+                
+                {/* Refresh Button - Only shown when image is expired AND user is authenticated */}
+                {user && isImageExpired && onRefreshHeroImage && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm animate-in fade-in duration-300">
+                    <Button
+                      variant="default"
+                      size={isMobile ? "default" : "lg"}
+                      onClick={async () => {
+                        setIsRefreshingImage(true);
+                        try {
+                          await onRefreshHeroImage();
+                        } finally {
+                          // Always clear the loading flag, even if refresh fails
+                          setIsRefreshingImage(false);
+                        }
+                      }}
+                      disabled={isRefreshingImage}
+                      className="bg-white/90 hover:bg-white text-gray-900 shadow-lg"
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshingImage ? 'animate-spin' : ''}`} />
+                      {isRefreshingImage ? 'Refreshing...' : 'Refresh Image'}
+                    </Button>
+                  </div>
+                )}
               </div>
               
               {/* Content */}

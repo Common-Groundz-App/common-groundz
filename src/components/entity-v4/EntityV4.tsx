@@ -21,6 +21,8 @@ import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { useNavigate } from 'react-router-dom';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
 import { getHierarchicalEntityUrl, getEntityUrlWithParent } from '@/utils/entityUrlUtils';
+import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Imported extracted components
 import { EntityHeader } from './EntityHeader';
@@ -80,6 +82,10 @@ const EntityV4 = () => {
   // Fetch circle rating data and user following data
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  
+  // Initialize image refresh hook and query client
+  const { refreshEntityImage, isRefreshing } = useEntityImageRefresh();
+  const queryClient = useQueryClient();
   
   // Get user's following list for circle functionality with improved error handling
   const { 
@@ -299,6 +305,57 @@ const EntityV4 = () => {
     });
   };
 
+  const handleRefreshHeroImage = async () => {
+    if (!entity) {
+      toast({
+        title: 'Error',
+        description: 'Entity not found',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    console.log('🔄 Refreshing hero image for entity:', entity.id, 'API source:', entity.api_source);
+
+    try {
+      // Use metadata fields with fallback to top-level fields for Google Places entities
+      const placeId = entity.metadata?.place_id ?? entity.api_ref;
+      const photoReference = entity.metadata?.photo_reference ?? entity.photo_reference;
+
+      // Call the refresh hook with entity's Place ID and photo reference
+      const newImageUrl = await refreshEntityImage(
+        entity.id,
+        entity.api_source === 'google_places' ? placeId : undefined,
+        photoReference
+      );
+
+      if (newImageUrl) {
+        toast({
+          title: 'Image refreshed',
+          description: 'The entity image has been successfully updated.',
+        });
+
+        // Invalidate the entity detail cache with the same key useEntityDetailCached uses
+        await queryClient.invalidateQueries({
+          queryKey: ['entity-detail', entitySlug, user?.id]
+        });
+      } else {
+        toast({
+          title: 'Refresh failed',
+          description: 'Could not fetch a new image. The entity may not have image data available.',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing hero image:', error);
+      toast({
+        title: 'Refresh failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const reviewActionConfig = getSidebarButtonConfig();
 
   // Show loading state with two phases
@@ -402,6 +459,7 @@ const EntityV4 = () => {
             onReviewAction={reviewActionConfig.action}
             reviewActionConfig={reviewActionConfig}
             onRatingClick={scrollToReviewsSection}
+            onRefreshHeroImage={handleRefreshHeroImage}
           />
 
           {/* SECTION 2: Media Preview */}
