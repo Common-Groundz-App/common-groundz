@@ -214,9 +214,20 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     resetPagination();
   };
 
+  // Derive a stable key from fields that change during image refresh
+  const photoRefreshKey = useMemo(() => {
+    const metadata = entity.metadata as any;
+    return JSON.stringify({
+      id: entity.id,
+      imageUrl: entity.image_url,
+      photoReference: metadata?.photo_reference,
+      photoReferences: metadata?.photo_references
+    });
+  }, [entity.id, entity.image_url, entity.metadata]);
+
   useEffect(() => {
     loadPhotos();
-  }, [entity.id]);
+  }, [photoRefreshKey]);
 
   // Reset pagination when filters change
   useEffect(() => {

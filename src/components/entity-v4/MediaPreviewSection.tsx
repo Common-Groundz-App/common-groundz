@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Camera, ChevronRight, Play, Plus, MoreVertical, Edit3, Trash2, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
@@ -91,9 +91,20 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
     }
   };
 
+  // Derive a stable key from fields that change during image refresh
+  const photoRefreshKey = useMemo(() => {
+    const metadata = entity.metadata as any;
+    return JSON.stringify({
+      id: entity.id,
+      imageUrl: entity.image_url,
+      photoReference: metadata?.photo_reference,
+      photoReferences: metadata?.photo_references
+    });
+  }, [entity.id, entity.image_url, entity.metadata]);
+
   useEffect(() => {
     loadPhotos();
-  }, [entity.id]);
+  }, [photoRefreshKey]);
 
   const handlePhotoClick = (index: number) => {
     setSelectedPhotoIndex(index);
