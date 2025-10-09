@@ -78,8 +78,31 @@ export const openGoogleMaps = (entity: Entity): void => {
 };
 
 /**
+ * Gets the normalized website URL from an entity
+ * Checks both admin-entered and API-fetched sources
+ */
+export const getEntityWebsiteUrl = (entity: Entity): string | null => {
+  // Priority 1: Admin-entered website (takes precedence)
+  const adminWebsite = entity.website_url?.trim();
+  
+  // Priority 2: API-fetched website (e.g., from Google Places)
+  const apiWebsite = entity.specifications?.website?.trim();
+  
+  const rawUrl = adminWebsite || apiWebsite;
+  
+  if (!rawUrl) return null;
+  
+  // Ensure the URL has a protocol
+  if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+    return `https://${rawUrl}`;
+  }
+  
+  return rawUrl;
+};
+
+/**
  * Checks if an entity has website data
  */
 export const hasWebsiteData = (entity: Entity): boolean => {
-  return !!entity.website_url && entity.website_url.trim() !== '';
+  return getEntityWebsiteUrl(entity) !== null;
 };
