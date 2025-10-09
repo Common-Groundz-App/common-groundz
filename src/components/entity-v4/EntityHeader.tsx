@@ -45,8 +45,8 @@ interface EntityHeaderProps {
     tooltip: string | null;
   };
   onRatingClick?: () => void;
-  onRefreshHeroImage?: () => Promise<void>;
-  isRefreshingImage?: boolean;
+  onRefreshHeroImage?: () => Promise<void>;  // Only provided when entity has refreshable image source
+  isRefreshingImage?: boolean;               // Only provided when entity has refreshable image source
 }
 
 export const EntityHeader: React.FC<EntityHeaderProps> = ({

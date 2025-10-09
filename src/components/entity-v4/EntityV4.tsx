@@ -87,6 +87,39 @@ const EntityV4 = () => {
   const { refreshEntityImage, isRefreshing } = useEntityImageRefresh();
   const queryClient = useQueryClient();
   
+  // Determine if this entity's hero image can be refreshed
+  // This mirrors the logic in useEntityImageRefresh.prepareEdgeFunctionRequest
+  const canRefreshHeroImage = React.useMemo(() => {
+    if (!entity) return false;
+    
+    const apiSource = entity.api_source;
+    const metadata = entity.metadata as any;
+    
+    // Google Places - refreshable if we have place_id OR photo_reference
+    if (apiSource === 'google_places') {
+      return !!(metadata?.place_id || metadata?.photo_reference);
+    }
+    
+    // Google Books - needs google_books_id in metadata
+    if (apiSource === 'google_books') {
+      return !!metadata?.google_books_id;
+    }
+    
+    // TMDB - needs tmdb_id in metadata
+    if (apiSource === 'tmdb') {
+      return !!metadata?.tmdb_id;
+    }
+    
+    // OMDb - needs imdb_id in metadata
+    if (apiSource === 'omdb') {
+      return !!metadata?.imdb_id;
+    }
+    
+    // All other entities (products, websites, etc.) - can attempt refresh if image_url exists
+    // This matches the fallback case in prepareEdgeFunctionRequest
+    return !!entity.image_url;
+  }, [entity]);
+  
   // Get user's following list for circle functionality with improved error handling
   const { 
     data: userFollowingIds = [], 
@@ -459,8 +492,8 @@ const EntityV4 = () => {
             onReviewAction={reviewActionConfig.action}
             reviewActionConfig={reviewActionConfig}
             onRatingClick={scrollToReviewsSection}
-            onRefreshHeroImage={handleRefreshHeroImage}
-            isRefreshingImage={isRefreshing}
+            onRefreshHeroImage={canRefreshHeroImage ? handleRefreshHeroImage : undefined}
+            isRefreshingImage={canRefreshHeroImage ? isRefreshing : false}
           />
 
           {/* SECTION 2: Media Preview */}
