@@ -7,7 +7,6 @@ import {
   Filter, MoreHorizontal, Award
 } from 'lucide-react';
 import NavBarComponent from '@/components/NavBarComponent';
-import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,9 +89,6 @@ export const EntityV3 = () => {
     <div className="min-h-screen bg-white">
       {/* Top Navigation */}
       <NavBarComponent />
-      
-      {/* Version Toggle */}
-      <EntityPreviewToggle />
       
       {/* Main Content */}
       <div className="pt-16">

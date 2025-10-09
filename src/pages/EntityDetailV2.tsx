@@ -38,7 +38,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
-import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { EntityProductsCard } from '@/components/entity/EntityProductsCard';
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
@@ -440,8 +439,6 @@ const EntityDetailV2 = () => {
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
       <NavBarComponent />
-      
-      <EntityPreviewToggle />
       
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 text-center text-sm font-medium mt-16">
         <div className="flex items-center justify-center gap-2">

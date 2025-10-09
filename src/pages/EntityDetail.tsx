@@ -35,7 +35,6 @@ import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
 import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
-import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { Eye, ArrowRight } from 'lucide-react';
 import { mapEntityTypeToDatabase, getContextualFieldLabel, getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { EntityType } from '@/services/recommendation/types';
@@ -445,9 +444,6 @@ const EntityDetailOriginal = () => {
       )}
       
       <NavBarComponent />
-      
-      {/* Add the floating toggle */}
-      <EntityPreviewToggle />
       
       {/* Preview Toggle Banner */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 text-center text-sm font-medium mt-16">

@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
-import { EntityPreviewToggle } from '@/components/entity/EntityPreviewToggle';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { useAuth } from '@/contexts/AuthContext';
@@ -396,7 +395,6 @@ const EntityV4 = () => {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <NavBarComponent />
-        <EntityPreviewToggle />
         {loadingStep > 0 ? (
           // Phase 1: Factual progress bar (centered on screen)
           <div className="flex-1 flex items-center justify-center">
@@ -423,7 +421,6 @@ const EntityV4 = () => {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <NavBarComponent />
-        <EntityPreviewToggle />
         <div className="flex-1 pt-16 flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-destructive mb-2">Entity Not Found</h2>
@@ -475,9 +472,6 @@ const EntityV4 = () => {
   return <TooltipProvider delayDuration={0}>
     <div className="min-h-screen flex flex-col bg-background">
       <NavBarComponent />
-      
-      {/* Version Toggle */}
-      <EntityPreviewToggle />
       
       {/* Main Content */}
       <div className="flex-1 pt-16">
