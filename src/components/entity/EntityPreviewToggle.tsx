@@ -51,7 +51,7 @@ export const EntityPreviewToggle = () => {
         navigate(`${baseUrl}?v=4`);
         break;
       case '4':
-        navigate(`${baseUrl}`);
+        navigate(`${baseUrl}?v=1`);
         break;
       default:
         navigate(`${baseUrl}?v=2`);
