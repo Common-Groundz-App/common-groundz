@@ -138,12 +138,16 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
             {/* Mobile: Stack image above content, Desktop: side-by-side */}
             <div className={`${isMobile ? 'flex flex-col' : 'flex gap-6'}`}>
               {/* Image with refresh capability */}
-              <div className={`${isMobile ? 'w-full mb-4' : 'flex-shrink-0'} relative group`}>
+              <div className={`${
+                isMobile 
+                  ? 'w-full h-48 mb-4 rounded-lg overflow-hidden' 
+                  : 'flex-shrink-0 h-24 w-24 min-w-[96px] rounded-lg overflow-hidden'
+                } relative group`}>
                 <ImageWithFallback
                   src={entityImage}
                   alt={entityData.name}
                   entityType={entity.type}
-                  className={`${isMobile ? 'w-full h-48 rounded-lg object-cover' : 'w-24 h-24 rounded-lg object-cover'}`}
+                  className="h-full w-full object-cover"
                   onError={() => {
                     console.log('EntityHeader: Hero image failed to load (expired/403), showing refresh button');
                     setIsImageExpired(true);
