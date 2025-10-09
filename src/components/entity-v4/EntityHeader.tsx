@@ -15,7 +15,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityFollowersCount } from '@/components/entity/EntityFollowersCount';
@@ -154,16 +154,24 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                 {/* Refresh Button - Only shown when image is expired AND user is authenticated */}
                 {user && isImageExpired && onRefreshHeroImage && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm animate-in fade-in duration-300">
-                    <Button
-                      variant="default"
-                      size={isMobile ? "default" : "lg"}
-                      onClick={() => onRefreshHeroImage?.()}
-                      disabled={isRefreshingImage}
-                      className="bg-white/90 hover:bg-white text-gray-900 shadow-lg"
-                    >
-                      <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshingImage ? 'animate-spin' : ''}`} />
-                      {isRefreshingImage ? 'Refreshing...' : 'Refresh Image'}
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="default"
+                            size="icon"
+                            onClick={() => onRefreshHeroImage?.()}
+                            disabled={isRefreshingImage}
+                            className="bg-white/90 hover:bg-white text-gray-900 shadow-lg"
+                          >
+                            <RefreshCw className={`w-5 h-5 ${isRefreshingImage ? 'animate-spin' : ''}`} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{isRefreshingImage ? 'Refreshing...' : 'Refresh Image'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 )}
               </div>
