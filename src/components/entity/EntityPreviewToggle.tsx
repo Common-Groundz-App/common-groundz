@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Eye, EyeOff, ArrowLeft, ArrowRight, Copy, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { getEntityPageVersion } from '@/utils/entityVersionUtils';
 
 export const EntityPreviewToggle = () => {
+  const { user, isLoading } = useAuth();
   const navigate = useNavigate();
   const { slug, parentSlug, childSlug } = useParams<{ 
     slug?: string; 
@@ -16,7 +19,16 @@ export const EntityPreviewToggle = () => {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   
-  const currentVersion = searchParams.get('v') || (searchParams.get('preview') === 'true' ? '2' : '1');
+  // Only show toggle to internal users (@lovable.dev emails)
+  const isInternalUser = user?.email?.endsWith('@lovable.dev');
+  
+  // Don't render for public users or while loading auth state
+  if (isLoading || !isInternalUser) {
+    return null;
+  }
+  
+  // Use centralized version resolution with validation
+  const currentVersion = getEntityPageVersion(searchParams, isInternalUser);
   
   // Build the base URL based on whether we're in hierarchical or flat structure
   const getBaseUrl = () => {

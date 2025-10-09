@@ -42,6 +42,7 @@ import { EntityType } from '@/services/recommendation/types';
 import { Helmet } from 'react-helmet-async';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
 import { handleSlugRedirect, handleHierarchicalRedirect } from '@/services/entityRedirectService';
+import { getEntityPageVersion } from '@/utils/entityVersionUtils';
 
 import EntityDetailV2 from './EntityDetailV2';
 
@@ -1009,13 +1010,19 @@ const EntityDetailOriginal = () => {
 };
 
 const EntityDetail = () => {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const { slug, parentSlug, childSlug } = useParams<{ 
     slug?: string; 
     parentSlug?: string; 
     childSlug?: string; 
   }>();
-  const version = searchParams.get('v') || (searchParams.get('preview') === 'true' ? '2' : '1');
+  
+  // Check if user is internal (lovable.dev email)
+  const isInternalUser = user?.email?.endsWith('@lovable.dev');
+  
+  // Use centralized version resolution with validation
+  const version = getEntityPageVersion(searchParams, isInternalUser);
   
   // Determine display name for loading state
   const displayName = parentSlug && childSlug 
@@ -1033,17 +1040,24 @@ const EntityDetail = () => {
         <EntityV4 />
       </React.Suspense>
     );
-  } else if (version === '3') {
+  } else if (version === '3' && isInternalUser) {
     return (
       <React.Suspense fallback={<EntityDetailLoadingProgress entityName={displayName} entityType="product" />}>
         <EntityV3 />
       </React.Suspense>
     );
-  } else if (version === '2') {
+  } else if (version === '2' && isInternalUser) {
     return <EntityDetailV2 />;
-  } else {
+  } else if (version === '1' && isInternalUser) {
     return <EntityDetailOriginal />;
   }
+  
+  // Fallback to V4 for non-internal users or invalid versions
+  return (
+    <React.Suspense fallback={<EntityDetailLoadingProgress entityName={displayName} entityType="product" />}>
+      <EntityV4 />
+    </React.Suspense>
+  );
 };
 
 export default EntityDetail;
