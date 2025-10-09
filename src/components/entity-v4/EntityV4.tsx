@@ -460,6 +460,7 @@ const EntityV4 = () => {
             reviewActionConfig={reviewActionConfig}
             onRatingClick={scrollToReviewsSection}
             onRefreshHeroImage={handleRefreshHeroImage}
+            isRefreshingImage={isRefreshing}
           />
 
           {/* SECTION 2: Media Preview */}

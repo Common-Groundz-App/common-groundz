@@ -46,6 +46,7 @@ interface EntityHeaderProps {
   };
   onRatingClick?: () => void;
   onRefreshHeroImage?: () => Promise<void>;
+  isRefreshingImage?: boolean;
 }
 
 export const EntityHeader: React.FC<EntityHeaderProps> = ({
@@ -57,14 +58,14 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
   onReviewAction,
   reviewActionConfig,
   onRatingClick,
-  onRefreshHeroImage
+  onRefreshHeroImage,
+  isRefreshingImage = false
 }) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
   // State for image refresh functionality
   const [isImageExpired, setIsImageExpired] = useState(false);
-  const [isRefreshingImage, setIsRefreshingImage] = useState(false);
 
   // Reset expiration flag when entityImage prop changes (after successful refresh)
   useEffect(() => {
@@ -156,15 +157,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                     <Button
                       variant="default"
                       size={isMobile ? "default" : "lg"}
-                      onClick={async () => {
-                        setIsRefreshingImage(true);
-                        try {
-                          await onRefreshHeroImage();
-                        } finally {
-                          // Always clear the loading flag, even if refresh fails
-                          setIsRefreshingImage(false);
-                        }
-                      }}
+                      onClick={() => onRefreshHeroImage?.()}
                       disabled={isRefreshingImage}
                       className="bg-white/90 hover:bg-white text-gray-900 shadow-lg"
                     >
