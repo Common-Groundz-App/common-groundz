@@ -43,7 +43,7 @@ export const useEntityFollow = (entityId: string) => {
     };
 
     checkFollowStatus();
-  }, [entityId, user]);
+  }, [entityId, user?.id]);
 
   // Listen for global entity follow events to update follower count instantly
   useEffect(() => {

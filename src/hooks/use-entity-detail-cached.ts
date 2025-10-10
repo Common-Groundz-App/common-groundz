@@ -67,7 +67,7 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     enabled: !!slug,
     staleTime: 1000 * 60 * 2, // 2 minutes (reduced for faster updates after claims)
     gcTime: 1000 * 60 * 30, // 30 minutes
-    refetchOnWindowFocus: true, // Refetch when window gets focus
+    refetchOnWindowFocus: false, // Prevent flicker on tab switch
   });
 
   // Invalidate cache when user actually changes (sign in/out)
