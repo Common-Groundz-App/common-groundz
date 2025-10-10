@@ -54,7 +54,8 @@ const EntityV4 = () => {
     entity,
     reviews,
     stats,
-    isLoading,
+    isLoading,       // Now only true on initial load
+    isRefetching,    // True during background refetch
     error
   } = useEntityDetailCached(entitySlug);
 
@@ -475,6 +476,16 @@ const EntityV4 = () => {
       
       {/* Main Content */}
       <div className="flex-1 pt-8">
+        {/* Subtle indicator during background refetch */}
+        {isRefetching && (
+          <div className="fixed top-16 right-4 z-50 animate-fade-in">
+            <div className="bg-primary/10 backdrop-blur-sm text-primary px-3 py-1.5 rounded-full text-xs font-medium shadow-sm flex items-center gap-2">
+              <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              Refreshing...
+            </div>
+          </div>
+        )}
+        
         <div className="min-h-screen bg-gray-50">
           {/* SECTION 1: Header & Primary Actions */}
           <EntityHeader

@@ -17,7 +17,9 @@ export interface EntityDetailData {
   recommendations: RecommendationWithUser[];
   reviews: ReviewWithUser[];
   stats: EntityStats | null;
-  isLoading: boolean;
+  isLoading: boolean;          // Initial load only (no cached data)
+  isFetching: boolean;          // Any fetch (initial + background)
+  isRefetching: boolean;        // Background refetch only (has cached data)
   error: string | null;
 }
 
@@ -27,6 +29,7 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
   const {
     data,
     isLoading,
+    isFetching,
     error
   } = useQuery({
     queryKey: ['entity-detail', slug, user?.id],
@@ -64,7 +67,9 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     recommendations: data?.recommendations || [],
     reviews: data?.reviews || [],
     stats: data?.stats || null,
-    isLoading,
+    isLoading,                                    // Only true on initial load (no cache)
+    isFetching,                                   // True during any fetch
+    isRefetching: isFetching && !!data,          // True during background refetch (cache exists)
     error: error?.message || null
   };
 };
