@@ -46,7 +46,7 @@ export const useEntitySave = ({ entityId, enabled = true }: UseEntitySaveProps) 
     };
 
     fetchSaveData();
-  }, [entityId, user, enabled]);
+  }, [entityId, user?.id, enabled]);
 
   // Listen for real-time save events
   useEffect(() => {
@@ -77,7 +77,7 @@ export const useEntitySave = ({ entityId, enabled = true }: UseEntitySaveProps) 
     return () => {
       window.removeEventListener('entity-save-status-changed', handleEntitySaveChange as EventListener);
     };
-  }, [entityId, user, enabled]);
+  }, [entityId, user?.id, enabled]);
 
   const toggleSave = async () => {
     if (!user) {
