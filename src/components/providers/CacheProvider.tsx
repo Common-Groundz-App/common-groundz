@@ -40,7 +40,10 @@ export const CacheProvider: React.FC<CacheProviderProps> = ({ children }) => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         // Optionally refetch critical data when user returns to tab
-        queryClient.invalidateQueries({ stale: true });
+        queryClient.invalidateQueries({
+          stale: true,
+          predicate: ({ queryKey }) => queryKey[0] !== 'entity-detail',
+        });
       }
     };
 
