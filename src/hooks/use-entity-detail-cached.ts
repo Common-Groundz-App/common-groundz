@@ -1,5 +1,5 @@
-
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRef, useEffect } from 'react';
 import { fetchEntityBySlug, fetchEntityRecommendations, fetchEntityReviews, getEntityStats } from '@/services/entityService';
 import { Entity } from '@/services/recommendation/types';
 import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
@@ -25,6 +25,10 @@ export interface EntityDetailData {
 
 export const useEntityDetailCached = (slug: string): EntityDetailData => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
+  // GUARDRAIL #2: Seed with undefined sentinel to skip initial invalidation
+  const previousUserIdRef = useRef<string | null | undefined>(undefined);
   
   const {
     data,
@@ -32,7 +36,11 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     isFetching,
     error
   } = useQuery({
-    queryKey: ['entity-detail', slug, user?.id],
+    // IMPORTANT: Query key does NOT include user?.id to prevent cache invalidation
+    // during Supabase token refresh (which briefly sets user to null/undefined).
+    // User context is passed to fetchers for personalized data, and cache is
+    // explicitly invalidated via useEffect when user actually signs in/out.
+    queryKey: ['entity-detail', slug],
     queryFn: async () => {
       console.log('🔍 Fetching entity detail for slug:', slug);
       
@@ -61,6 +69,30 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     gcTime: 1000 * 60 * 30, // 30 minutes
     refetchOnWindowFocus: true, // Refetch when window gets focus
   });
+
+  // Invalidate cache when user actually changes (sign in/out)
+  useEffect(() => {
+    const currentUserId = user?.id || null;
+    const previousUserId = previousUserIdRef.current;
+    
+    // GUARDRAIL #2: Skip on initial mount (sentinel value)
+    if (previousUserId === undefined) {
+      console.log('🔧 Initial mount, recording user ID:', currentUserId);
+      previousUserIdRef.current = currentUserId;
+      return;
+    }
+    
+    // User changed (sign in/out) - invalidate to refetch with new permissions
+    if (previousUserId !== currentUserId) {
+      console.log('🔄 User changed, invalidating entity cache:', { 
+        from: previousUserId, 
+        to: currentUserId,
+        slug 
+      });
+      queryClient.invalidateQueries({ queryKey: ['entity-detail', slug] });
+      previousUserIdRef.current = currentUserId;
+    }
+  }, [user?.id, slug, queryClient]);
 
   return {
     entity: data?.entity || null,

@@ -368,9 +368,9 @@ const EntityV4 = () => {
           description: 'The entity image has been successfully updated.',
         });
 
-        // Invalidate the entity detail cache with the same key useEntityDetailCached uses
+        // GUARDRAIL #1: Match the two-part key used by useEntityDetailCached
         await queryClient.invalidateQueries({
-          queryKey: ['entity-detail', entitySlug, user?.id]
+          queryKey: ['entity-detail', entitySlug]
         });
       } else {
         toast({
@@ -391,8 +391,10 @@ const EntityV4 = () => {
 
   const reviewActionConfig = getSidebarButtonConfig();
 
-  // Show loading state with two phases
-  if (isLoading) {
+  // Double-safety: Only show skeleton when truly no cached data exists.
+  // Even if React Query briefly reports isLoading=true during edge cases,
+  // if we have a cached entity, show content (prevents flash).
+  if (isLoading && !entity) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <NavBarComponent />
