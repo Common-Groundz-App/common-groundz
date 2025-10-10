@@ -35,6 +35,7 @@ import { EntitySpecsCard } from '@/components/entity/EntitySpecsCard';
 import { EntityRelatedCard } from '@/components/entity/EntityRelatedCard';
 import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
 import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
+import { EntityV4LoadingWrapper } from '@/components/entity/EntityV4LoadingWrapper';
 import { Eye, ArrowRight } from 'lucide-react';
 import { mapEntityTypeToDatabase, getContextualFieldLabel, getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
 import { EntityType } from '@/services/recommendation/types';
@@ -1032,13 +1033,13 @@ const EntityDetail = () => {
   // Return appropriate version based on URL parameters
   if (version === '4') {
     return (
-      <React.Suspense fallback={<EntityDetailLoadingProgress entityName={displayName} entityType="product" />}>
+      <React.Suspense fallback={<EntityV4LoadingWrapper entityName={displayName} entityType="product" />}>
         <EntityV4 />
       </React.Suspense>
     );
   } else if (version === '3' && isInternalUser) {
     return (
-      <React.Suspense fallback={<EntityDetailLoadingProgress entityName={displayName} entityType="product" />}>
+      <React.Suspense fallback={<EntityV4LoadingWrapper entityName={displayName} entityType="product" />}>
         <EntityV3 />
       </React.Suspense>
     );
@@ -1050,7 +1051,7 @@ const EntityDetail = () => {
   
   // Fallback to V4 for non-internal users or invalid versions
   return (
-    <React.Suspense fallback={<EntityDetailLoadingProgress entityName={displayName} entityType="product" />}>
+    <React.Suspense fallback={<EntityV4LoadingWrapper entityName={displayName} entityType="product" />}>
       <EntityV4 />
     </React.Suspense>
   );
