@@ -124,7 +124,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
 
   return (
     <div className="bg-white border-b">
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-4 py-4">
         {/* Breadcrumb */}
         <EntityParentBreadcrumb 
           currentEntity={entity}

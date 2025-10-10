@@ -421,7 +421,7 @@ const EntityV4 = () => {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <NavBarComponent />
-        <div className="flex-1 pt-16 flex items-center justify-center">
+        <div className="flex-1 pt-12 flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-destructive mb-2">Entity Not Found</h2>
             <p className="text-muted-foreground">The entity you're looking for doesn't exist or has been removed.</p>
@@ -474,7 +474,7 @@ const EntityV4 = () => {
       <NavBarComponent />
       
       {/* Main Content */}
-      <div className="flex-1 pt-16">
+      <div className="flex-1 pt-12">
         <div className="min-h-screen bg-gray-50">
           {/* SECTION 1: Header & Primary Actions */}
           <EntityHeader
