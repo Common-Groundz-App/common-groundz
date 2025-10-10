@@ -18,7 +18,7 @@ import { useUserFollowing } from '@/hooks/useUserFollowing';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { useNavigate } from 'react-router-dom';
-import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loading-progress';
+import { EntityV4LoadingWrapper } from '@/components/entity/EntityV4LoadingWrapper';
 import { getHierarchicalEntityUrl, getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { useQueryClient } from '@tanstack/react-query';
@@ -163,27 +163,6 @@ const EntityV4 = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isRecommendationModalOpen, setIsRecommendationModalOpen] = useState(false);
   
-  // Loading step state for two-phase loading
-  const [loadingStep, setLoadingStep] = useState(0);
-
-  // Manage loading phases
-  useEffect(() => {
-    if (isLoading) {
-      // Start with progress bar
-      setLoadingStep(1);
-      
-      // Transition to spinner after 2.5 seconds
-      const timer = setTimeout(() => {
-        setLoadingStep(0);
-      }, 2500);
-      
-      return () => clearTimeout(timer);
-    } else {
-      // Reset when not loading
-      setLoadingStep(0);
-    }
-  }, [isLoading]);
-
   const userReview = React.useMemo(() => {
     if (!user || !reviews) return null;
     return reviews.find(review => review.user_id === user.id);
@@ -396,26 +375,10 @@ const EntityV4 = () => {
   // if we have a cached entity, show content (prevents flash).
   if (isLoading && !entity) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <NavBarComponent />
-        {loadingStep > 0 ? (
-          // Phase 1: Factual progress bar (centered on screen)
-          <div className="flex-1 flex items-center justify-center">
-            <EntityDetailLoadingProgress 
-              entityName={entity?.name}
-              entityType={entity?.type}
-            />
-          </div>
-        ) : (
-          // Phase 2: Spinner loading (centered on screen)
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading entity...</p>
-            </div>
-          </div>
-        )}
-      </div>
+      <EntityV4LoadingWrapper 
+        entityName={entity?.name ?? entitySlug}
+        entityType={entity?.type ?? 'product'}
+      />
     );
   }
 
