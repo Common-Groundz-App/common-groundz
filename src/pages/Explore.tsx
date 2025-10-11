@@ -512,31 +512,7 @@ const Explore = () => {
               </TabsContent>
               
               <TabsContent value="products">
-                <div className="mt-4 p-8 text-center">
-                  <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <h3 className="text-lg font-medium mb-2">Discover Products</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Search for products to get comprehensive analysis from reviews, forums, and multiple sources
-                  </p>
-                  <div className="flex items-center justify-center">
-                    <div className="relative flex-1 max-w-md min-w-0">
-                      <Input
-                        type="text"
-                        placeholder="Search for products..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        className="pr-20 min-w-0"
-                      />
-                      <Button 
-                        className="absolute right-0 top-0 rounded-l-none bg-brand-orange hover:bg-brand-orange/90 shrink-0"
-                        onClick={handleComplexProductSearch}
-                      >
-                        Search
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <CategoryHighlights entityType="product" />
               </TabsContent>
               
               <TabsContent value="people">
