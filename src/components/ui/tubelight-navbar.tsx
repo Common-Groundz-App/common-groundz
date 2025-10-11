@@ -95,7 +95,7 @@ export function NavBar({
       )}>
         {/* Logo Section - conditionally rendered */}
         {!hideLogo && (
-          <div className="flex-shrink-0 w-[150px]">
+          <div className="flex-shrink-0 min-w-[176px]">
             <Link to="/" className="flex items-center">
               <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
                 <Logo size="md" />
@@ -199,7 +199,7 @@ export function NavBar({
           </div>}
         
         {/* Right section for user menu - positioned absolutely when logo is hidden */}
-        {!isSmallMobile && !hideLogo && <div className="flex-shrink-0 w-[150px] flex justify-end">
+        {!isSmallMobile && !hideLogo && <div className="flex-shrink-0 min-w-[176px] flex justify-end">
           {rightSection}
         </div>}
         

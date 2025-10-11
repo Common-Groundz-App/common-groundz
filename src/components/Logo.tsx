@@ -28,7 +28,9 @@ const Logo: React.FC<LogoProps> = ({ className, size = 'md' }) => {
       <img 
         src={logoSrc} 
         alt="Common Groundz Logo" 
-        className={`${sizeClasses[size]} ${className || ''} cursor-pointer`}
+        className={`${sizeClasses[size]} w-auto ${className || ''} cursor-pointer`}
+        width={1920}
+        height={getThemedValue(485, 487)}
         loading="eager"
         decoding="async"
       />
