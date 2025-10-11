@@ -2988,6 +2988,13 @@ export type Database = {
         Args: { p_entity_id: string; p_user_id: string }
         Returns: number
       }
+      get_circle_recommendation_counts_batch: {
+        Args: { p_entity_ids: string[]; p_user_id: string }
+        Returns: {
+          circle_count: number
+          entity_id: string
+        }[]
+      }
       get_comments_with_profiles: {
         Args: { p_id_field: string; p_item_id: string; p_table_name: string }
         Returns: {
@@ -3167,6 +3174,13 @@ export type Database = {
       get_recommendation_count: {
         Args: { p_entity_id: string }
         Returns: number
+      }
+      get_recommendation_counts_batch: {
+        Args: { p_entity_ids: string[] }
+        Returns: {
+          entity_id: string
+          recommendation_count: number
+        }[]
       }
       get_recommendation_likes_by_ids: {
         Args: { p_recommendation_ids: string[] }
