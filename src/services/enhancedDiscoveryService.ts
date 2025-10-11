@@ -26,28 +26,50 @@ export class EnhancedDiscoveryService {
         statsData?.map(s => [s.entity_id, s]) || []
       );
       
-      // Fetch per-user circle counts if authenticated
+      // Fetch timeline-aware recommendation counts + circle counts in parallel
+      const timelinePromises = entityIds.map(async (entityId) => {
+        const { data } = await supabase.rpc('get_recommendation_count', {
+          p_entity_id: entityId
+        });
+        return [entityId, data || 0] as [string, number];
+      });
+      
       let circleCountsMap = new Map<string, number>();
+      let circlePromises: Promise<[string, number]>[] = [];
+      
       if (userId) {
-        const circlePromises = entityIds.map(async (entityId) => {
+        circlePromises = entityIds.map(async (entityId) => {
           const { data } = await supabase.rpc('get_circle_recommendation_count', {
             p_entity_id: entityId,
             p_user_id: userId
           });
           return [entityId, data || 0] as [string, number];
         });
-        const circleCounts = await Promise.all(circlePromises);
-        circleCountsMap = new Map(circleCounts);
       }
       
-      // Enrich entities with cached + per-user data
+      // Wait for all RPC calls in parallel
+      const [timelineCounts, circleCounts] = await Promise.all([
+        Promise.all(timelinePromises),
+        userId ? Promise.all(circlePromises) : Promise.resolve([])
+      ]);
+      
+      const timelineCountsMap = new Map(timelineCounts);
+      circleCountsMap = new Map(circleCounts);
+      
+      // Enrich entities with cached + timeline + per-user data
       return entities.map(entity => {
         const stats = statsMap.get(entity.id);
+        const timelineCount = timelineCountsMap.get(entity.id) || 0;
+        const cachedRecCount = stats?.recommendation_count || 0;
+        
         return {
           ...entity,
           averageRating: stats?.average_rating,
           reviewCount: stats?.review_count || 0,
-          recommendationCount: stats?.recommendation_count || 0,
+          // Match legacy behavior: cached recommendations + timeline-aware reviews
+          // The view gives us public recommendations, get_recommendation_count adds
+          // reviews where is_recommended=true (timeline-aware count)
+          recommendationCount: cachedRecCount + timelineCount,
           circleRecommendationCount: circleCountsMap.get(entity.id) || 0
         };
       });
