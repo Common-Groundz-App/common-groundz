@@ -170,12 +170,17 @@ serve(async (req) => {
       console.log("⚠️ No photos found for this place");
     }
     
-    // Batch store photos in Supabase Storage (if not creation mode)
+    // Batch store photos in Supabase Storage
     let storedPhotoUrls = [];
-    if (photoReferences.length > 0 && entityId !== 'temp') {
+    if (photoReferences.length > 0) {
+      // Use temp storage path during creation, real entity ID after
+      const storageEntityId = entityId === 'temp' ? `temp-${placeId}` : entityId;
+      
       // Before invocation - detailed logging
       console.log('📦 About to invoke batch-store-place-photos', {
-        entityId,
+        originalEntityId: entityId,
+        storageEntityId,
+        isTemp: entityId === 'temp',
         placeId,
         photoCount: photoReferences.length,
         firstPhotoRef: photoReferences[0]?.photo_reference?.substring(0, 20),
@@ -191,7 +196,7 @@ serve(async (req) => {
           'batch-store-place-photos',
           {
             body: {
-              entityId,
+              entityId: storageEntityId, // Use temp-{placeId} or real entity ID
               placeId,
               photoReferences: photoReferences.map((p: any) => ({
                 photo_reference: p.photo_reference,
@@ -253,6 +258,7 @@ serve(async (req) => {
       photo_references: photoReferences,
       photo_reference: primaryPhotoReference,
       stored_photo_urls: storedPhotoUrls.length > 0 ? storedPhotoUrls : undefined,
+      storage_entity_id: entityId === 'temp' ? `temp-${placeId}` : entityId,
       last_refreshed_at: new Date().toISOString(),
       place_name: placeDetails.name,
       formatted_address: placeDetails.formatted_address,

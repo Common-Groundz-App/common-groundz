@@ -18,6 +18,7 @@ export const useOptimisticEntityCreation = ({
 }: OptimisticEntityCreationProps) => {
   const [isCreating, setIsCreating] = useState(false);
   const [creationProgress, setCreationProgress] = useState(0);
+  const [creationStage, setCreationStage] = useState<string>('');
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -50,9 +51,10 @@ export const useOptimisticEntityCreation = ({
       });
       
       setCreationProgress(25);
+      setCreationStage('Creating entity...');
       
       // Start background entity creation
-      const createdEntity = await createEntityInBackground(externalData, entityType, setCreationProgress);
+      const createdEntity = await createEntityInBackground(externalData, entityType, setCreationProgress, setCreationStage);
       
       if (createdEntity) {
         console.log('✅ Entity created successfully:', createdEntity.name);
@@ -85,13 +87,15 @@ export const useOptimisticEntityCreation = ({
     } finally {
       setIsCreating(false);
       setCreationProgress(0);
+      setCreationStage('');
     }
   }, [entityType, navigate, onEntityCreated, toast]);
 
   return {
     createEntityOptimistically,
     isCreating,
-    creationProgress
+    creationProgress,
+    creationStage
   };
 };
 
@@ -99,29 +103,35 @@ export const useOptimisticEntityCreation = ({
 const createEntityInBackground = async (
   externalData: any, 
   entityType: EntityTypeString,
-  setProgress: (progress: number) => void
+  setProgress: (progress: number) => void,
+  setStage: (stage: string) => void
 ): Promise<Entity | null> => {
   try {
     console.log('🔄 Starting background entity creation...');
-    setProgress(40);
+    setProgress(50);
+    setStage('Storing photos...');
     
-    // Step 1: Create enhanced entity with metadata extraction
+    // Step 1: Create enhanced entity with metadata extraction (includes blocking photo storage)
     const entity = await createEnhancedEntity(externalData, entityType);
-    setProgress(70);
     
     if (!entity) {
+      setStage('');
       throw new Error('Failed to create entity');
     }
     
     console.log('🎯 Entity created, processing additional enrichment...');
+    setProgress(80);
+    setStage('Finalizing...');
     
     // Step 2: Background enrichment (non-blocking)
     queueBackgroundEnrichment(entity.id);
     setProgress(100);
+    setStage('Complete!');
     
     return entity;
   } catch (error) {
     console.error('❌ Background entity creation failed:', error);
+    setStage('');
     throw error;
   }
 };

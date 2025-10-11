@@ -88,6 +88,52 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, par
     
     console.log('✅ Entity created with ID:', entity.id);
     
+    // For Google Places entities, WAIT for photo storage before returning
+    if (enhancedData.api_source === 'google_places' && enhancedData.api_ref) {
+      console.log('🖼️ Triggering photo storage with real entity ID (BLOCKING):', entity.id);
+      
+      try {
+        // BLOCKING call - wait for photos to be stored with real entity ID
+        const { data: refreshResult, error: refreshError } = await supabase.functions.invoke(
+          'refresh-google-places-entity',
+          {
+            body: { 
+              entityId: entity.id, 
+              placeId: enhancedData.api_ref 
+            }
+          }
+        );
+        
+        if (refreshError) {
+          console.error('❌ Failed to store photos for new entity:', refreshError);
+          // Don't throw - entity is created, photos can be retried later
+        } else if (refreshResult?.updatedMetadata) {
+          console.log('✅ Photos stored successfully:', {
+            entityId: entity.id,
+            storedCount: refreshResult.updatedMetadata.stored_photo_urls?.length || 0,
+            hasStoredUrls: !!refreshResult.updatedMetadata.stored_photo_urls
+          });
+          
+          // CRITICAL: Merge the fresh metadata into the entity object
+          entity.metadata = {
+            ...(entity.metadata as any || {}),
+            ...refreshResult.updatedMetadata
+          };
+          
+          const entityMetadata = entity.metadata as any;
+          console.log('✅ Entity metadata synchronized with stored_photo_urls:', {
+            storedPhotoCount: entityMetadata?.stored_photo_urls?.length || 0,
+            firstUrl: entityMetadata?.stored_photo_urls?.[0]?.storedUrl?.substring(0, 80)
+          });
+        } else {
+          console.warn('⚠️ Refresh succeeded but returned no updatedMetadata');
+        }
+      } catch (err) {
+        console.error('❌ Exception during photo storage:', err);
+        // Don't throw - entity creation succeeded, photo storage is secondary
+      }
+    }
+    
     // Skip local image storage for Google Places images - they use proxy URLs
     if (enhancedData.image_url && enhancedData.api_source !== 'google_places') {
       console.log('🖼️ Saving image to local storage for entity:', entity.id);
