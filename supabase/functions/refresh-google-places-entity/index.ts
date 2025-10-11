@@ -173,8 +173,19 @@ serve(async (req) => {
     // Batch store photos in Supabase Storage (if not creation mode)
     let storedPhotoUrls = [];
     if (photoReferences.length > 0 && entityId !== 'temp') {
-      console.log('📦 Invoking batch photo storage...');
-      
+      // Before invocation - detailed logging
+      console.log('📦 About to invoke batch-store-place-photos', {
+        entityId,
+        placeId,
+        photoCount: photoReferences.length,
+        firstPhotoRef: photoReferences[0]?.photo_reference?.substring(0, 20),
+        samplePhoto: {
+          ref: photoReferences[0]?.photo_reference?.substring(0, 30) + '...',
+          width: photoReferences[0]?.width,
+          height: photoReferences[0]?.height
+        }
+      });
+
       try {
         const { data: storeResult, error: storeError } = await supabase.functions.invoke(
           'batch-store-place-photos',
@@ -191,14 +202,42 @@ serve(async (req) => {
           }
         );
         
+        console.log('📦 Batch invoke response received', {
+          hasData: !!storeResult,
+          hasError: !!storeError,
+          errorDetails: storeError,
+          resultKeys: storeResult ? Object.keys(storeResult) : [],
+          storedPhotosCount: storeResult?.storedPhotos?.length || 0
+        });
+        
         if (storeError) {
-          console.error('Failed to batch store photos:', storeError);
+          console.error('❌ Batch store error:', {
+            message: storeError.message,
+            code: storeError.code,
+            details: storeError.details,
+            hint: storeError.hint,
+            fullError: JSON.stringify(storeError)
+          });
         } else if (storeResult?.storedPhotos) {
           storedPhotoUrls = storeResult.storedPhotos;
-          console.log(`✅ Stored ${storedPhotoUrls.length} photos in Supabase Storage`);
+          console.log(`✅ Successfully stored ${storedPhotoUrls.length} photos`, {
+            firstStoredUrl: storedPhotoUrls[0]?.storedUrl?.substring(0, 100),
+            allReferences: storedPhotoUrls.map((p: any) => p.reference?.substring(0, 20))
+          });
+        } else {
+          console.warn('⚠️ Batch store returned success but no storedPhotos array', {
+            resultType: typeof storeResult,
+            resultKeys: storeResult ? Object.keys(storeResult) : [],
+            fullResult: JSON.stringify(storeResult)
+          });
         }
-      } catch (batchError) {
-        console.error('Error in batch photo storage:', batchError);
+      } catch (batchError: any) {
+        console.error('❌ Exception during batch storage:', {
+          name: batchError.name,
+          message: batchError.message,
+          stack: batchError.stack,
+          fullError: JSON.stringify(batchError, Object.getOwnPropertyNames(batchError))
+        });
       }
     }
 
