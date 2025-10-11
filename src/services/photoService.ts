@@ -131,35 +131,33 @@ export const fetchGooglePlacesPhotos = async (
       const entityAge = Date.now() - new Date(entity.created_at).getTime();
       const isNewlyCreated = entityAge < 2 * 60 * 1000; // 2 minutes
       
-      // NEW ENTITIES: Generate immediate proxy URLs (skip cache lookup to avoid race condition)
+      // NEW ENTITIES: Generate immediate proxy URLs via edge function (skip cache lookup to avoid race condition)
       if (isNewlyCreated) {
-        const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
-        if (apiKey) {
-          console.log(`⚡ [PhotoService] New entity detected (${Math.round(entityAge / 1000)}s old), generating ${photoRefs.length} immediate proxy URLs`);
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        console.log(`⚡ [PhotoService] New entity detected (${Math.round(entityAge / 1000)}s old), generating ${photoRefs.length} immediate proxy URLs via edge function`);
+        
+        for (let index = 0; index < photoRefs.length; index++) {
+          const photoRef = photoRefs[index];
+          const requestedQuality = qualityPreference?.[index] || (index === 0 ? 'high' : 'medium');
+          const maxWidth = typeof requestedQuality === 'number' ? requestedQuality : PHOTO_QUALITY_SETTINGS[requestedQuality];
           
-          for (let index = 0; index < photoRefs.length; index++) {
-            const photoRef = photoRefs[index];
-            const requestedQuality = qualityPreference?.[index] || (index === 0 ? 'high' : 'medium');
-            const maxWidth = typeof requestedQuality === 'number' ? requestedQuality : PHOTO_QUALITY_SETTINGS[requestedQuality];
-            
-            photos.push({
-              id: `google-places-temp-${entity.id}-${index}`,
-              url: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoRef.photo_reference}&key=${apiKey}`,
-              type: 'image' as const,
-              alt: entity.name,
-              order: index,
-              source: 'google_places' as const,
-              originalReference: photoRef.photo_reference,
-              isPrimary: index === 0,
-              isCached: false, // Mark as temporary proxy URL
-              width: photoRef.width || maxWidth,
-              height: photoRef.height || maxWidth
-            });
-          }
-          
-          console.log(`✅ Generated ${photos.length} temporary proxy URLs (will upgrade when stored URLs are available)`);
-          return photos;
+          photos.push({
+            id: `google-places-temp-${entity.id}-${index}`,
+            url: `${supabaseUrl}/functions/v1/proxy-google-image?ref=${photoRef.photo_reference}&maxWidth=${maxWidth}`,
+            type: 'image' as const,
+            alt: entity.name,
+            order: index,
+            source: 'google_places' as const,
+            originalReference: photoRef.photo_reference,
+            isPrimary: index === 0,
+            isCached: false, // Mark as temporary proxy URL
+            width: photoRef.width || maxWidth,
+            height: photoRef.height || maxWidth
+          });
         }
+        
+        console.log(`✅ Generated ${photos.length} temporary proxy URLs via edge function (will upgrade when stored URLs are available)`);
+        return photos;
       }
       
       // EXISTING ENTITIES: Use cache lookup as before
