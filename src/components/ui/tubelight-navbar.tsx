@@ -95,7 +95,7 @@ export function NavBar({
       )}>
         {/* Logo Section - conditionally rendered */}
         {!hideLogo && (
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 w-[150px]">
             <Link to="/" className="flex items-center">
               <div className="p-2 rounded-md flex items-center justify-center bg-transparent">
                 <Logo size="md" />

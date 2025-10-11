@@ -15,26 +15,24 @@ export function NavBarComponent() {
   const [activeTab, setActiveTab] = React.useState('Home');
   const { user, isLoading } = useAuth();
 
-  // Don't render complex nav logic until auth is ready
-  if (isLoading) {
-    return (
-      <div className="relative z-50 sticky top-0 h-16 bg-background border-b">
-        <div className="flex items-center justify-center h-full">
-          <div className="text-sm text-muted-foreground">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
-  // Check if we're on admin page to hide logo
+  // HOIST: Compute values that are needed in both loading and loaded states
   const isAdminPage = location.pathname === '/admin';
-
-  // Memoize the navigation items
+  const isProfilePage = location.pathname.startsWith('/profile');
+  
+  // HOIST: Memoize navigation items (no dependencies, safe to hoist)
   const navItems = React.useMemo(() => [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'Profile', url: '/profile', icon: User }
   ], []);
+
+  // HOIST: Memoize right section (depends on user and isProfilePage, both available)
+  const rightSection = React.useMemo(() => (
+    <div className="flex items-center gap-2">
+      {user && isProfilePage && <NotificationBell />}
+      <UserMenu />
+    </div>
+  ), [user, isProfilePage]);
 
   React.useEffect(() => {
     const handleOpenSearch = () => {
@@ -59,14 +57,19 @@ export function NavBarComponent() {
     }
   }, [location.pathname]);
 
-  const isProfilePage = location.pathname.startsWith('/profile');
-
-  const rightSection = React.useMemo(() => (
-    <div className="flex items-center gap-2">
-      {user && isProfilePage && <NotificationBell />}
-      <UserMenu />
-    </div>
-  ), [user, isProfilePage]);
+  // Don't render complex nav logic until auth is ready
+  if (isLoading) {
+    return (
+      <NavBar 
+        items={navItems} 
+        rightSection={rightSection}
+        initialActiveTab={activeTab}
+        className="relative z-50 sticky top-0"
+        hideHamburgerMenu={isProfilePage}
+        hideLogo={isAdminPage}
+      />
+    );
+  }
 
   return (
     <>
