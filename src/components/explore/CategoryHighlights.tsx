@@ -183,9 +183,6 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                       fallbackSrc="/placeholder.svg"
                       entityType={entity.type}
                     />
-                    <Badge className="absolute top-1 right-1 bg-purple-500/90 text-white text-xs">
-                      Hidden Gem
-                    </Badge>
                   </div>
                   <div className="p-3">
                     <h3 className="font-medium text-sm truncate">{entity.name}</h3>
@@ -281,21 +278,6 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                     fallbackSrc="/placeholder.svg"
                     entityType={entity.type}
                   />
-                  {entity.is_hidden_gem && (
-                    <Badge className="absolute top-1 right-1 bg-purple-500/90 text-white text-xs">
-                      Hidden Gem
-                    </Badge>
-                  )}
-                  {entity.reason && entity.reason.includes('New') && (
-                    <Badge className="absolute top-1 left-1 bg-green-500/90 text-white text-xs">
-                      New
-                    </Badge>
-                  )}
-                  {entity.reason && entity.reason.includes('Friends') && (
-                    <Badge className="absolute top-1 left-1 bg-blue-500/90 text-white text-xs">
-                      Social
-                    </Badge>
-                  )}
                 </div>
                 <div className="p-3">
                   <h3 className="font-medium text-sm truncate">{entity.name}</h3>
@@ -328,11 +310,6 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                       )}
                     </div>
                   </div>
-                  {entity.reason && (
-                    <p className="text-xs text-muted-foreground/80 mt-1 truncate">
-                      {entity.reason}
-                    </p>
-                  )}
                 </div>
               </Card>
             ))}

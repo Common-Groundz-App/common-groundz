@@ -51,47 +51,6 @@ export const FeaturedEntities = () => {
     navigate(getEntityUrl(entity));
   };
 
-  const getReasonIcon = (reason?: string) => {
-    if (!reason) return null;
-    
-    if (reason.includes('trending') || reason.includes('Rapidly')) {
-      return <TrendingUp className="h-3 w-3" />;
-    }
-    if (reason.includes('schedule') || reason.includes('season') || reason.includes('morning') || reason.includes('tonight')) {
-      return <Clock className="h-3 w-3" />;
-    }
-    if (reason.includes('Friends') || reason.includes('social') || reason.includes('Curated for you')) {
-      return <Users className="h-3 w-3" />;
-    }
-    if (reason.includes('New')) {
-      return <Sparkles className="h-3 w-3" />;
-    }
-    return null;
-  };
-
-  const getReasonColor = (reason?: string) => {
-    if (!reason) return 'bg-brand-orange/90';
-    
-    if (reason.includes('trending') || reason.includes('Rapidly')) {
-      return 'bg-red-500/90';
-    }
-    if (reason.includes('interests') || reason.includes('Curated for you')) {
-      return 'bg-blue-500/90';
-    }
-    if (reason.includes('schedule') || reason.includes('season') || reason.includes('morning') || reason.includes('tonight')) {
-      return 'bg-green-500/90';
-    }
-    if (reason.includes('area') || reason.includes('nearby')) {
-      return 'bg-purple-500/90';
-    }
-    if (reason.includes('New') || reason.includes('Fresh')) {
-      return 'bg-emerald-500/90';
-    }
-    if (reason.includes('Friends') || reason.includes('social')) {
-      return 'bg-indigo-500/90';
-    }
-    return 'bg-brand-orange/90';
-  };
 
   if (isLoading) {
     return (
@@ -157,18 +116,6 @@ export const FeaturedEntities = () => {
               <Badge className="absolute top-2 right-2 bg-background/80 text-foreground backdrop-blur-sm">
                 {entity.type.charAt(0).toUpperCase() + entity.type.slice(1)}
               </Badge>
-              {entity.reason && (
-                <Badge className={`absolute top-2 left-2 ${getReasonColor(entity.reason)} text-white backdrop-blur-sm text-xs flex items-center gap-1`}>
-                  {getReasonIcon(entity.reason)}
-                  {entity.reason}
-                </Badge>
-              )}
-              {entity.view_velocity && entity.view_velocity > 5 && (
-                <Badge className="absolute bottom-2 left-2 bg-red-500/90 text-white backdrop-blur-sm text-xs flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  Hot
-                </Badge>
-              )}
             </div>
             <div className="p-4">
               <h3 className="font-semibold text-lg truncate">{entity.name}</h3>
@@ -201,13 +148,6 @@ export const FeaturedEntities = () => {
                   )}
                 </div>
               </div>
-              {entity.personalization_score && entity.personalization_score > 10 && (
-                <div className="mt-2">
-                  <Badge variant="outline" className="text-xs">
-                    Highly Personalized
-                  </Badge>
-                </div>
-              )}
             </div>
           </Card>
         ))}

@@ -18,6 +18,8 @@ export interface PersonalizedEntity {
   seasonal_boost?: number;
   averageRating?: number;
   reviewCount?: number;
+  recommendationCount?: number;
+  circleRecommendationCount?: number;
 }
 
 export interface UserInteractionData {
@@ -37,27 +39,56 @@ export interface ActivityPattern {
 // Enhanced service for personalized entity recommendations
 export class EnhancedExploreService {
   
-  // Enrich entities with rating and review data
-  private async enrichWithRatingData(entities: any[]): Promise<PersonalizedEntity[]> {
+  // Enrich entities with rating and review data using materialized view
+  private async enrichWithRatingData(entities: any[], userId?: string): Promise<PersonalizedEntity[]> {
     try {
-      // Batch fetch rating data for all entities
-      const ratingPromises = entities.map(async (entity) => {
-        const stats = await getEntityStats(entity.id);
+      if (entities.length === 0) return [];
+      
+      const entityIds = entities.map(e => e.id);
+      
+      // Fetch cached stats from materialized view
+      const { data: statsData } = await supabase
+        .from('entity_stats_view')
+        .select('entity_id, recommendation_count, review_count, average_rating')
+        .in('entity_id', entityIds);
+      
+      const statsMap = new Map(
+        statsData?.map(s => [s.entity_id, s]) || []
+      );
+      
+      // Fetch per-user circle counts if authenticated
+      let circleCountsMap = new Map<string, number>();
+      if (userId) {
+        const circlePromises = entityIds.map(async (entityId) => {
+          const { data } = await supabase.rpc('get_circle_recommendation_count', {
+            p_entity_id: entityId,
+            p_user_id: userId
+          });
+          return [entityId, data || 0] as [string, number];
+        });
+        const circleCounts = await Promise.all(circlePromises);
+        circleCountsMap = new Map(circleCounts);
+      }
+      
+      // Enrich entities with cached + per-user data
+      return entities.map(entity => {
+        const stats = statsMap.get(entity.id);
         return {
           ...entity,
-          averageRating: stats.averageRating,
-          reviewCount: stats.reviewCount + stats.recommendationCount // Total review count
+          averageRating: stats?.average_rating,
+          reviewCount: stats?.review_count || 0,
+          recommendationCount: stats?.recommendation_count || 0,
+          circleRecommendationCount: circleCountsMap.get(entity.id) || 0
         };
       });
-
-      return await Promise.all(ratingPromises);
     } catch (error) {
       console.error('Error enriching entities with rating data:', error);
-      // Return entities without rating data if enrichment fails
       return entities.map(entity => ({
         ...entity,
         averageRating: undefined,
-        reviewCount: 0
+        reviewCount: 0,
+        recommendationCount: 0,
+        circleRecommendationCount: 0
       }));
     }
   }
@@ -261,10 +292,7 @@ export class EnhancedExploreService {
         return this.getPopularEntities(limit);
       }
 
-      // Apply seasonal and geographic boosts
-      await this.applySeasonalBoosts();
-      
-      // Get entities with enhanced scoring
+      // Get entities with enhanced scoring (seasonal boosts applied by background job)
       const validEntityTypes = interests
         .map(i => i.entity_type)
         .filter(type => this.isValidEntityType(type)) as ('book' | 'movie' | 'place' | 'product' | 'food')[];
@@ -321,7 +349,7 @@ export class EnhancedExploreService {
       const diverseEntities = this.injectDiversity(scoredEntities, limit);
       
       // Enrich with rating data before returning
-      const enrichedEntities = await this.enrichWithRatingData(diverseEntities);
+      const enrichedEntities = await this.enrichWithRatingData(diverseEntities, userId);
       
       return enrichedEntities
         .sort((a, b) => (b.personalization_score || 0) - (a.personalization_score || 0))

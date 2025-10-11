@@ -38,14 +38,6 @@ export const useDiscovery = ({
         setDiscoveryCollections(collections);
         setNewThisWeek(newEntities);
         setForYou(forYouEntities);
-
-        // Background: Calculate quality scores for newly discovered entities
-        const allEntityIds = [
-          ...newEntities.map(e => e.id),
-          ...forYouEntities.map(e => e.id),
-          ...collections.flatMap(c => c.entities.map(e => e.id))
-        ];
-        enhancedDiscoveryService.calculateQualityScores([...new Set(allEntityIds)]);
         
       } else {
         // Fall back to basic discovery service

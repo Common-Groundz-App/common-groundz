@@ -9,27 +9,56 @@ import { getEntityStats } from '@/services/entityService';
 
 export class EnhancedDiscoveryService {
 
-  // Enrich entities with rating and review data
-  private async enrichWithRatingData(entities: any[]): Promise<PersonalizedEntity[]> {
+  // Enrich entities with rating and review data using materialized view
+  private async enrichWithRatingData(entities: any[], userId?: string): Promise<PersonalizedEntity[]> {
     try {
-      // Batch fetch rating data for all entities
-      const ratingPromises = entities.map(async (entity) => {
-        const stats = await getEntityStats(entity.id);
+      if (entities.length === 0) return [];
+      
+      const entityIds = entities.map(e => e.id);
+      
+      // Fetch cached stats from materialized view
+      const { data: statsData } = await supabase
+        .from('entity_stats_view')
+        .select('entity_id, recommendation_count, review_count, average_rating')
+        .in('entity_id', entityIds);
+      
+      const statsMap = new Map(
+        statsData?.map(s => [s.entity_id, s]) || []
+      );
+      
+      // Fetch per-user circle counts if authenticated
+      let circleCountsMap = new Map<string, number>();
+      if (userId) {
+        const circlePromises = entityIds.map(async (entityId) => {
+          const { data } = await supabase.rpc('get_circle_recommendation_count', {
+            p_entity_id: entityId,
+            p_user_id: userId
+          });
+          return [entityId, data || 0] as [string, number];
+        });
+        const circleCounts = await Promise.all(circlePromises);
+        circleCountsMap = new Map(circleCounts);
+      }
+      
+      // Enrich entities with cached + per-user data
+      return entities.map(entity => {
+        const stats = statsMap.get(entity.id);
         return {
           ...entity,
-          averageRating: stats.averageRating,
-          reviewCount: stats.reviewCount + stats.recommendationCount // Total review count
+          averageRating: stats?.average_rating,
+          reviewCount: stats?.review_count || 0,
+          recommendationCount: stats?.recommendation_count || 0,
+          circleRecommendationCount: circleCountsMap.get(entity.id) || 0
         };
       });
-
-      return await Promise.all(ratingPromises);
     } catch (error) {
       console.error('Error enriching entities with rating data:', error);
-      // Return entities without rating data if enrichment fails
       return entities.map(entity => ({
         ...entity,
         averageRating: undefined,
-        reviewCount: 0
+        reviewCount: 0,
+        recommendationCount: 0,
+        circleRecommendationCount: 0
       }));
     }
   }
@@ -69,7 +98,7 @@ export class EnhancedDiscoveryService {
 
       // Add collaborative filtering collection if we have recommendations
       if (collaborativeRecs.length > 0) {
-        const enrichedCollaborativeRecs = await this.enrichWithRatingData(collaborativeRecs);
+        const enrichedCollaborativeRecs = await this.enrichWithRatingData(collaborativeRecs, userId);
         enhancedCollections.unshift({
           title: 'Because You Liked',
           entities: enrichedCollaborativeRecs.map(rec => ({
@@ -83,7 +112,7 @@ export class EnhancedDiscoveryService {
 
       // Add social intelligence collection
       if (socialRecs.length > 0) {
-        const enrichedSocialRecs = await this.enrichWithRatingData(socialRecs);
+        const enrichedSocialRecs = await this.enrichWithRatingData(socialRecs, userId);
         enhancedCollections.unshift({
           title: 'Your Network Loves',
           entities: enrichedSocialRecs.map(rec => ({
@@ -97,7 +126,7 @@ export class EnhancedDiscoveryService {
 
       // Add influencer recommendations
       if (influencerRecs.length > 0) {
-        const enrichedInfluencerRecs = await this.enrichWithRatingData(influencerRecs);
+        const enrichedInfluencerRecs = await this.enrichWithRatingData(influencerRecs, userId);
         enhancedCollections.unshift({
           title: 'Influencer Picks',
           entities: enrichedInfluencerRecs.map(rec => ({
@@ -112,7 +141,7 @@ export class EnhancedDiscoveryService {
       // Enhance existing collections with better explanations and rating data
       for (const collection of enhancedCollections) {
         if (collection.entities && collection.entities.length > 0) {
-          const enrichedEntities = await this.enrichWithRatingData(collection.entities);
+          const enrichedEntities = await this.enrichWithRatingData(collection.entities, userId);
           collection.entities = enrichedEntities.map(entity => ({
             ...entity,
             reason: this.enhanceReasonWithConfidence(entity.reason, entity.personalization_score)
@@ -152,7 +181,7 @@ export class EnhancedDiscoveryService {
         reason: this.generateSmartReason(rec.algorithm, rec.confidenceScore, rec.explanation)
       }));
 
-      return await this.enrichWithRatingData(entitiesWithReasons);
+      return await this.enrichWithRatingData(entitiesWithReasons, userId);
 
     } catch (error) {
       console.error('Error getting smart for you recommendations:', error);
