@@ -110,25 +110,32 @@ export const createEnhancedEntity = async (rawData: any, entityType: string, par
     } else if (enhancedData.api_source === 'google_places') {
       console.log('✅ Google Places image using proxy URL - no local storage needed');
       
-      // Pre-cache Google Places photos for faster loading
+      // Pre-cache Google Places photos for faster loading (legacy entities only)
       try {
-        const photoReferences = [];
+        const photoReferences: string[] = [];
         
-        // Get photo references from metadata
-        if (enhancedData.metadata?.photo_references && Array.isArray(enhancedData.metadata.photo_references)) {
-          photoReferences.push(...enhancedData.metadata.photo_references.map((ref: any) => ref.photo_reference));
-        } else if (enhancedData.metadata?.photo_reference) {
-          photoReferences.push(enhancedData.metadata.photo_reference);
-        }
-        
-        if (photoReferences.length > 0) {
-          console.log(`🚀 Pre-caching ${photoReferences.length} photos for entity ${entity.id}`);
-          await cachedPhotoService.preCacheEntityPhotos(
-            entity.id, 
-            photoReferences, 
-            ['medium', 'high'] // Pre-cache common quality levels
-          );
-          console.log('✅ Photos pre-cached successfully');
+        // Check if entity has stored photos (no caching needed)
+        const metadata = entity.metadata as Record<string, any> | undefined;
+        if (metadata?.stored_photo_urls && Array.isArray(metadata.stored_photo_urls)) {
+          console.log(`✅ Entity has ${metadata.stored_photo_urls.length} stored photos, skipping cache`);
+        } else {
+          // Legacy entities need proxy caching
+          const enhancedMetadata = enhancedData.metadata as Record<string, any> | undefined;
+          if (enhancedMetadata?.photo_references && Array.isArray(enhancedMetadata.photo_references)) {
+            photoReferences.push(...enhancedMetadata.photo_references.map((ref: any) => ref.photo_reference));
+          } else if (enhancedMetadata?.photo_reference) {
+            photoReferences.push(enhancedMetadata.photo_reference);
+          }
+          
+          if (photoReferences.length > 0) {
+            console.log(`🚀 Pre-caching ${photoReferences.length} photos for legacy entity ${entity.id}`);
+            await cachedPhotoService.preCacheEntityPhotos(
+              entity.id, 
+              photoReferences, 
+              ['medium'] // Single quality
+            );
+            console.log('✅ Photos pre-cached successfully');
+          }
         }
       } catch (cachingError) {
         console.warn('⚠️ Photo pre-caching failed (non-critical):', cachingError);

@@ -87,6 +87,8 @@ export const createGooglePlacesPhotoUrl = (
 /**
  * Fetch Google Places photos for an entity with optimized 48-hour caching
  */
+import { hasStoredPhotos, hasPhotoReferences } from '@/types/metadata';
+
 export const fetchGooglePlacesPhotos = async (
   entity: Entity, 
   qualityPreference?: PhotoQuality[]
@@ -95,7 +97,32 @@ export const fetchGooglePlacesPhotos = async (
   const photos: PhotoWithMetadata[] = [];
   
   try {
-    // Method 1: Use stored photo_references array (optimized with batch caching)
+    // Method 1: Use permanent Supabase Storage URLs (NEW - zero Google API calls)
+    if (hasStoredPhotos(entity)) {
+      const storedPhotos = entity.metadata.stored_photo_urls;
+      
+      for (let i = 0; i < storedPhotos.length; i++) {
+        const stored = storedPhotos[i];
+        photos.push({
+          id: `stored-place-${entity.id}-${i}`,
+          url: stored.storedUrl,
+          type: 'image',
+          alt: entity.name,
+          order: i,
+          source: 'google_places',
+          originalReference: stored.reference,
+          isPrimary: i === 0,
+          isCached: true,
+          width: stored.width,
+          height: stored.height
+        });
+      }
+      
+      console.log(`✅ Loaded ${photos.length} photos from Supabase Storage (0 Google API calls, ${(performance.now() - startTime).toFixed(1)}ms)`);
+      return photos;
+    }
+    
+    // Method 2: Use stored photo_references array (optimized with batch caching - legacy)
     if (entity.metadata?.photo_references && Array.isArray(entity.metadata.photo_references)) {
       const photoRefs = entity.metadata.photo_references;
       console.log(`🚀 [PhotoService] Fetching photos for ${photoRefs.length} references for entity ${entity.id}`);

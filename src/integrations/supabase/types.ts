@@ -467,6 +467,7 @@ export type Database = {
           seasonal_boost: number | null
           slug: string | null
           specifications: Json | null
+          stored_photo_urls: Json | null
           trending_score: number | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at: string
@@ -524,6 +525,7 @@ export type Database = {
           seasonal_boost?: number | null
           slug?: string | null
           specifications?: Json | null
+          stored_photo_urls?: Json | null
           trending_score?: number | null
           type: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
@@ -581,6 +583,7 @@ export type Database = {
           seasonal_boost?: number | null
           slug?: string | null
           specifications?: Json | null
+          stored_photo_urls?: Json | null
           trending_score?: number | null
           type?: Database["public"]["Enums"]["entity_type"]
           updated_at?: string

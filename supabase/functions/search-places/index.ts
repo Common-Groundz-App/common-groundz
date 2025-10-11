@@ -6,6 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cache-control, pragma, expires',
 }
 
+// In-memory cache for search results (5 minutes TTL)
+const searchCache = new Map<string, { results: any[], timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -22,6 +26,25 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
+    }
+
+    // Check cache first
+    const cacheKey = `${query}:${maxResults}`;
+    const cached = searchCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`✅ Returning cached search results for: "${query}"`);
+      return new Response(
+        JSON.stringify({ 
+          results: cached.results,
+          total: cached.results.length,
+          source: 'google_places',
+          cached: true
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     console.log(`📍 Searching places for: "${query}"`)
@@ -89,11 +112,18 @@ serve(async (req) => {
 
     console.log(`✅ Found ${transformedResults.length} places from Google Places`)
 
+    // Cache the results
+    searchCache.set(cacheKey, {
+      results: transformedResults,
+      timestamp: Date.now()
+    });
+
     return new Response(
       JSON.stringify({ 
         results: transformedResults,
         total: data.results.length,
-        source: 'google_places'
+        source: 'google_places',
+        cached: false
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

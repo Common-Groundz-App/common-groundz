@@ -6,6 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// In-memory cache for search results (5 minutes TTL)
+const searchCache = new Map<string, { results: any[], timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -17,6 +21,18 @@ serve(async (req) => {
     if (!query || query.trim().length < 2) {
       return new Response(
         JSON.stringify({ results: [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check cache first
+    const cacheKey = query.trim().toLowerCase();
+    const cached = searchCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`✅ Returning cached deep search results for: "${query}"`);
+      return new Response(
+        JSON.stringify({ results: cached.results, cached: true }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -164,8 +180,14 @@ serve(async (req) => {
       console.error('Foursquare API error:', error);
     }
 
+    // Cache the results
+    searchCache.set(cacheKey, {
+      results: results.slice(0, 10),
+      timestamp: Date.now()
+    });
+
     return new Response(
-      JSON.stringify({ results: results.slice(0, 10) }),
+      JSON.stringify({ results: results.slice(0, 10), cached: false }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

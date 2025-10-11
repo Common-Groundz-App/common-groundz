@@ -383,7 +383,6 @@ serve(async (req) => {
       throw new Error("Missing Supabase environment variables");
     }
 
-    // We need to use the service role key to manage storage
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Get request data
@@ -400,6 +399,28 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
       );
+    }
+    
+    // Staleness check: skip refresh if image was updated within last 30 days
+    const HERO_IMAGE_REFRESH_DAYS = 30;
+    const { data: entity } = await supabase
+      .from('entities')
+      .select('metadata, image_url, updated_at')
+      .eq('id', entityId)
+      .single();
+
+    if (entity?.image_url && entity.image_url.includes('supabase.co/storage')) {
+      const daysSinceUpdate = (Date.now() - new Date(entity.updated_at).getTime()) / (24 * 60 * 60 * 1000);
+      
+      if (daysSinceUpdate < HERO_IMAGE_REFRESH_DAYS) {
+        console.log(`✅ Hero image recently updated (${daysSinceUpdate.toFixed(1)} days ago), skipping refresh`);
+        return new Response(JSON.stringify({ 
+          success: true, 
+          skipped: true,
+          reason: 'Image recently updated',
+          daysSinceUpdate: daysSinceUpdate.toFixed(1)
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     // Ensure the entity-images bucket exists with proper policies

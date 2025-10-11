@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Loader2, AlertCircle } from 'lucide-react';
@@ -17,6 +18,7 @@ export function EnhancedSearchInput({
   placeholder = "Search for people, places, food, products...",
   className = ""
 }: EnhancedSearchInputProps) {
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownClosing, setIsDropdownClosing] = useState(false);
   const [showAllResults, setShowAllResults] = useState({
@@ -32,7 +34,21 @@ export function EnhancedSearchInput({
   const navigate = useNavigate();
   const { results, isLoading, error } = useEnhancedRealtimeSearch(searchQuery);
 
-  const shouldShowDropdown = searchQuery.length > 0;
+  // Debounce search input (500ms delay)
+  const debouncedSearch = useDebouncedCallback(
+    (value: string) => {
+      setSearchQuery(value);
+    },
+    500
+  );
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchInput(value);
+    debouncedSearch(value);
+  };
+
+  const shouldShowDropdown = searchInput.length > 0;
   const hasLocalResults = results.entities.length > 0 || results.users.length > 0;
   const hasExternalResults = results.categorized?.books?.length > 0 || 
                              results.categorized?.movies?.length > 0 || 
@@ -40,25 +56,29 @@ export function EnhancedSearchInput({
   const hasHashtagResults = results.hashtags?.length > 0;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && searchQuery.trim()) {
+    if (e.key === 'Enter' && searchInput.trim()) {
       handleComplexProductSearch();
     }
   };
 
   const handleComplexProductSearch = () => {
-    if (searchQuery.trim().length >= 2) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}&mode=quick`);
+    if (searchInput.trim().length >= 2) {
+      navigate(`/search?q=${encodeURIComponent(searchInput)}&mode=quick`);
+      setSearchInput('');
       setSearchQuery('');
+      debouncedSearch.cancel();
     }
   };
 
   const handleResultClick = useCallback((entityId?: string, entityType?: string) => {
     setIsDropdownClosing(true);
     setTimeout(() => {
+      setSearchInput('');
       setSearchQuery('');
+      debouncedSearch.cancel();
       setIsDropdownClosing(false);
     }, 300);
-  }, []);
+  }, [debouncedSearch]);
 
   const toggleShowAll = (category: keyof typeof showAllResults) => {
     setShowAllResults(prev => ({
@@ -99,12 +119,12 @@ export function EnhancedSearchInput({
         <Input
           type="text"
           placeholder={placeholder}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={searchInput}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0"
         />
-        {searchQuery && (
+        {searchInput && (
           <Button 
             variant="default" 
             size="sm"
@@ -164,7 +184,7 @@ export function EnhancedSearchInput({
                 <SearchResultHandler
                   key={`${book.api_source}-${book.api_ref || index}`}
                   result={book}
-                  query={searchQuery}
+                  query={searchInput}
                   onClose={() => handleResultClick()}
                   isProcessing={isProcessingEntity}
                   onProcessingStart={handleProcessingStart}
@@ -184,7 +204,7 @@ export function EnhancedSearchInput({
                 <SearchResultHandler
                   key={`${movie.api_source}-${movie.api_ref || index}`}
                   result={movie}
-                  query={searchQuery}
+                  query={searchInput}
                   onClose={() => handleResultClick()}
                   isProcessing={isProcessingEntity}
                   onProcessingStart={handleProcessingStart}
@@ -204,7 +224,7 @@ export function EnhancedSearchInput({
                 <SearchResultHandler
                   key={`${place.api_source}-${place.api_ref || index}`}
                   result={place}
-                  query={searchQuery}
+                  query={searchInput}
                   onClose={() => handleResultClick()}
                   isProcessing={isProcessingEntity}
                   onProcessingStart={handleProcessingStart}
@@ -257,14 +277,14 @@ export function EnhancedSearchInput({
           )}
 
           {/* Complex Product Search Option */}
-          {searchQuery.length >= 2 && (
+          {searchInput.length >= 2 && (
             <div className="p-3 text-center border-t bg-background">
               <button 
                 className="text-sm text-primary hover:underline flex items-center justify-center w-full"
                 onClick={handleComplexProductSearch}
               >
                 <Search className="w-3 h-3 mr-1" />
-                Search for "{searchQuery}" in more sources
+                Search for "{searchInput}" in more sources
               </button>
             </div>
           )}

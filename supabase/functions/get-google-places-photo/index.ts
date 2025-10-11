@@ -13,7 +13,7 @@ const photoCache = new Map<string, {
   timestamp: number;
   hitCount: number;
 }>()
-const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours (same as other proxies)
+const CACHE_TTL = 30 * 24 * 60 * 60 * 1000 // 30 days (extended since we serve from Storage now)
 
 interface RequestMetric {
   startTime: number;

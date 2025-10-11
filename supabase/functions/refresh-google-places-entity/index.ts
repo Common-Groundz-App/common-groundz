@@ -169,6 +169,38 @@ serve(async (req) => {
     } else {
       console.log("⚠️ No photos found for this place");
     }
+    
+    // Batch store photos in Supabase Storage (if not creation mode)
+    let storedPhotoUrls = [];
+    if (photoReferences.length > 0 && entityId !== 'temp') {
+      console.log('📦 Invoking batch photo storage...');
+      
+      try {
+        const { data: storeResult, error: storeError } = await supabase.functions.invoke(
+          'batch-store-place-photos',
+          {
+            body: {
+              entityId,
+              placeId,
+              photoReferences: photoReferences.map((p: any) => ({
+                photo_reference: p.photo_reference,
+                width: p.width,
+                height: p.height
+              }))
+            }
+          }
+        );
+        
+        if (storeError) {
+          console.error('Failed to batch store photos:', storeError);
+        } else if (storeResult?.storedPhotos) {
+          storedPhotoUrls = storeResult.storedPhotos;
+          console.log(`✅ Stored ${storedPhotoUrls.length} photos in Supabase Storage`);
+        }
+      } catch (batchError) {
+        console.error('Error in batch photo storage:', batchError);
+      }
+    }
 
     // Generate new proxy image URL using the primary photo reference
     let newImageUrl = null;
@@ -177,10 +209,11 @@ serve(async (req) => {
       console.log(`🖼️ Generated new image URL: ${newImageUrl}`);
     }
 
-    // Prepare updated metadata
+    // Prepare updated metadata with stored photo URLs
     const updatedMetadata = {
       photo_references: photoReferences,
       photo_reference: primaryPhotoReference,
+      stored_photo_urls: storedPhotoUrls.length > 0 ? storedPhotoUrls : undefined,
       last_refreshed_at: new Date().toISOString(),
       place_name: placeDetails.name,
       formatted_address: placeDetails.formatted_address,
@@ -202,15 +235,22 @@ serve(async (req) => {
 
     // Update entity with new data (only if not creation mode)
     if (entityId !== 'temp') {
+      const updatePayload: any = {
+        ...(descriptionUpdate || {}),
+        about_updated_at: new Date().toISOString(),
+        external_rating: placeDetails.rating || entityData.external_rating,
+        external_rating_count: placeDetails.user_ratings_total || entityData.external_rating_count,
+        metadata: updatedMetadata
+      };
+      
+      // Add stored_photo_urls if we have them
+      if (storedPhotoUrls.length > 0) {
+        updatePayload.stored_photo_urls = storedPhotoUrls;
+      }
+      
       const { error: updateError } = await supabase
         .from('entities')
-        .update({
-          ...(descriptionUpdate || {}),
-          about_updated_at: new Date().toISOString(),
-          external_rating: placeDetails.rating || entityData.external_rating,
-          external_rating_count: placeDetails.user_ratings_total || entityData.external_rating_count,
-          metadata: updatedMetadata
-        })
+        .update(updatePayload)
         .eq('id', entityId);
 
       if (updateError) {

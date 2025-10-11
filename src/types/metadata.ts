@@ -76,14 +76,14 @@ export interface FoodMetadata {
   nutritional_info?: Record<string, any>;
 }
 
-// Union type for all metadata
-export type EntityMetadata = 
-  | GooglePlacesMetadata 
-  | BookMetadata 
-  | MovieMetadata 
-  | ProductMetadata 
-  | FoodMetadata 
-  | Record<string, any>;  // Fallback for unknown types
+// Union type for all metadata - using index signature for backwards compatibility
+export type EntityMetadata = Record<string, any> & Partial<
+  GooglePlacesMetadata & 
+  BookMetadata & 
+  MovieMetadata & 
+  ProductMetadata & 
+  FoodMetadata
+>;
 
 /**
  * Type guard to check if entity has Google Places metadata with stored photos
