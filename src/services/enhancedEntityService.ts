@@ -36,6 +36,56 @@ export interface EnhancedEntityData {
 }
 
 /**
+ * Quick entity creation - minimal database INSERT for immediate navigation
+ * No photo storage, no enrichment - just the bare minimum to create the entity
+ */
+export const createEntityQuick = async (
+  externalData: any,
+  entityType: string
+): Promise<Entity | null> => {
+  try {
+    console.log('⚡ Quick entity creation for:', externalData.name);
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Generate slug
+    const slug = generateSlug(externalData.name);
+
+    // Minimal entity data - just enough to create the record
+    const entityData = {
+      name: externalData.name,
+      type: entityType as any, // Cast to avoid enum mismatch
+      description: externalData.description || null,
+      image_url: externalData.image_url || null,
+      venue: externalData.venue || null,
+      api_source: externalData.api_source || null,
+      api_ref: externalData.api_ref || null,
+      website_url: externalData.website_url || null,
+      metadata: externalData.metadata || {},
+      created_by: user.id,
+      slug,
+    };
+
+    // Quick database INSERT only
+    const { data: entities, error } = await supabase
+      .from('entities')
+      .insert([entityData])
+      .select();
+
+    if (error || !entities || entities.length === 0) throw error || new Error('No entity returned');
+    
+    const entity = entities[0];
+    
+    console.log('✅ Quick entity created:', entity.id);
+    return entity as Entity;
+  } catch (error) {
+    console.error('❌ Quick entity creation failed:', error);
+    return null;
+  }
+};
+
+/**
  * Enhanced entity creation with comprehensive metadata extraction
  */
 export const createEnhancedEntity = async (rawData: any, entityType: string, parentEntity?: any): Promise<Entity | null> => {

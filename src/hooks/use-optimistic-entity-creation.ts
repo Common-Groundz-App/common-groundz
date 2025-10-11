@@ -2,10 +2,11 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { createEnhancedEntity } from '@/services/enhancedEntityService';
+import { createEntityQuick } from '@/services/enhancedEntityService';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { Entity } from '@/services/recommendation/types';
 import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OptimisticEntityCreationProps {
   entityType: EntityTypeString;
@@ -107,48 +108,71 @@ const createEntityInBackground = async (
   setStage: (stage: string) => void
 ): Promise<Entity | null> => {
   try {
-    console.log('🔄 Starting entity creation...');
+    console.log('🔄 Quick entity creation...');
     setProgress(50);
-    setStage('Finalizing...');
+    setStage('Creating entity...');
     
-    // Step 1: Create enhanced entity (photo storage now happens in background)
-    const entity = await createEnhancedEntity(externalData, entityType);
+    // Step 1: QUICK entity creation (database INSERT only, ~500ms)
+    const entity = await createEntityQuick(externalData, entityType);
     
     if (!entity) {
       setStage('');
       throw new Error('Failed to create entity');
     }
     
-    console.log('🎯 Entity created, processing additional enrichment...');
-    setProgress(80);
-    setStage('Finalizing...');
+    console.log('✅ Entity created, starting background enrichment...');
+    setProgress(75);
     
-    // Step 2: Background enrichment (non-blocking)
-    queueBackgroundEnrichment(entity.id);
+    // Step 2: Trigger FULL enrichment in background (fire-and-forget)
+    setTimeout(() => {
+      enrichEntityInBackground(entity.id, externalData, entityType);
+    }, 100);
+    
     setProgress(100);
     setStage('Complete!');
     
     return entity;
   } catch (error) {
-    console.error('❌ Background entity creation failed:', error);
+    console.error('❌ Entity creation failed:', error);
     setStage('');
     throw error;
   }
 };
 
-// Queue entity for background enrichment (fire and forget)
-const queueBackgroundEnrichment = (entityId: string) => {
-  console.log('📋 Queuing entity for background enrichment:', entityId);
+// NEW: Full background enrichment (photos + metadata)
+const enrichEntityInBackground = async (
+  entityId: string,
+  externalData: any,
+  entityType: EntityTypeString
+) => {
+  console.log('🖼️ Starting background enrichment for:', entityId);
   
-  // This runs in the background without affecting UI
-  setTimeout(async () => {
-    try {
-      console.log('🔍 Starting background enrichment for entity:', entityId);
-      // Additional enrichment operations can be added here
-      // For now, just log the completion
-      console.log('✨ Background enrichment completed for entity:', entityId);
-    } catch (error) {
-      console.error('⚠️ Background enrichment failed (non-critical):', error);
+  try {
+    // For Google Places entities, trigger photo storage and metadata enrichment
+    if (externalData.api_source === 'google_places' && externalData.api_ref) {
+      console.log('🖼️ Triggering background photo storage for entity:', entityId);
+      
+      const { data: refreshResult, error: refreshError } = await supabase.functions.invoke('refresh-google-places-entity', {
+        body: { 
+          entityId, 
+          placeId: externalData.api_ref 
+        }
+      });
+      
+      if (refreshError) {
+        console.error('❌ Background enrichment failed:', refreshError);
+      } else if (refreshResult?.updatedMetadata?.stored_photo_urls) {
+        console.log('✅ Background enrichment completed:', {
+          entityId,
+          storedCount: refreshResult.updatedMetadata.stored_photo_urls.length
+        });
+      } else {
+        console.warn('⚠️ Enrichment completed but no stored URLs returned');
+      }
     }
-  }, 1000);
+    
+    console.log('✨ Background enrichment completed for entity:', entityId);
+  } catch (error) {
+    console.error('⚠️ Background enrichment failed (non-critical):', error);
+  }
 };
