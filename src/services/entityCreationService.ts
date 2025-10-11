@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { createEnhancedEntity, queueEntityForEnrichment } from '@/services/enhancedEntityService';
+import { createEntityQuick, queueEntityForEnrichment } from '@/services/enhancedEntityService';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 
 interface EntityCreationQueue {
@@ -78,24 +78,33 @@ class EntityCreationService {
       queueItem.progress = 10;
       this.queue.set(tempId, queueItem);
 
-      // Step 1: Create enhanced entity
-      console.log('📝 Creating enhanced entity...');
+      // Step 1: Quick entity creation (database INSERT only)
+      console.log('⚡ Quick entity creation...');
       queueItem.progress = 30;
       this.queue.set(tempId, queueItem);
       
-      const entity = await createEnhancedEntity(queueItem.externalData, queueItem.entityType);
+      const entity = await createEntityQuick(queueItem.externalData, queueItem.entityType);
       
       if (!entity) {
-        throw new Error('Failed to create enhanced entity');
+        throw new Error('Failed to create entity');
       }
 
-      console.log('✅ Enhanced entity created:', entity.name);
-      queueItem.progress = 70;
+      console.log('✅ Entity created:', entity.name);
+      queueItem.progress = 60;
       this.queue.set(tempId, queueItem);
 
-      // Step 2: Queue for additional background enrichment
-      console.log('📋 Queuing for background enrichment...');
-      await queueEntityForEnrichment(entity.id, 5);
+      // Step 2: Schedule background enrichment (fire-and-forget)
+      if (queueItem.externalData.api_source === 'google_places' && queueItem.externalData.api_ref) {
+        console.log('🖼️ Scheduling background photo enrichment...');
+        setTimeout(() => {
+          supabase.functions.invoke('refresh-google-places-entity', {
+            body: { entityId: entity.id, placeId: queueItem.externalData.api_ref }
+          }).catch(err => console.error('Background enrichment failed:', err));
+        }, 3000); // 3 seconds delay
+      } else {
+        console.log('📋 Queuing for background enrichment...');
+        await queueEntityForEnrichment(entity.id, 5);
+      }
       
       queueItem.progress = 90;
       this.queue.set(tempId, queueItem);

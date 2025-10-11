@@ -5,7 +5,7 @@ import { EntityTypeString } from '@/hooks/feed/api/types';
 import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
-import { createEnhancedEntity } from '@/services/enhancedEntityService';
+import { useOptimisticEntityCreation } from '@/hooks/use-optimistic-entity-creation';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { fetchEntityWithParentContext } from '@/services/entityService';
 import { getEntityUrl, getHierarchicalEntityUrl } from '@/utils/entityUrlUtils';
@@ -43,6 +43,14 @@ export function SearchResultHandler({
   
   // Determine entity type based on result data or use 'product' as default
   const entityType: EntityTypeString = determineEntityType(result);
+  
+  // Use optimistic entity creation hook
+  const { createEntityOptimistically, isCreating } = useOptimisticEntityCreation({
+    entityType,
+    onEntityCreated: (entity) => {
+      console.log('✅ Entity created via optimistic hook:', entity.name);
+    }
+  });
 
   // Use external processing state if available, otherwise use internal
   const currentIsProcessing = useExternalOverlay ? isProcessing : internalIsProcessing;
@@ -120,7 +128,7 @@ export function SearchResultHandler({
         return;
       }
       
-      // If no existing entity, create new one
+      // If no existing entity, create new one using optimistic creation
       console.log(`🆕 Creating new entity from search result`);
       const creationMessage = getCreationMessage(entityType, result.name);
       if (useExternalOverlay && onProcessingUpdate) {
@@ -131,8 +139,13 @@ export function SearchResultHandler({
       
       // Prepare enhanced data for entity creation
       const enhancedResultData = {
-        ...result,
+        name: result.name,
         type: entityType,
+        venue: result.venue,
+        description: result.description,
+        image_url: result.image_url,
+        api_source: result.api_source,
+        api_ref: result.api_ref,
         metadata: {
           ...result.metadata,
           ...(result.api_source === 'openlibrary' && {
@@ -164,54 +177,18 @@ export function SearchResultHandler({
         }
       };
       
-      // Use enhanced entity service to create entity with rich metadata
-      const entity = await createEnhancedEntity(enhancedResultData, entityType);
+      // Use optimistic creation hook - navigates immediately, enriches in background
+      await createEntityOptimistically(enhancedResultData);
       
-      if (entity) {
-        console.log(`✅ Enhanced entity created successfully:`, entity);
-        
-        // Keep the loading state active for smooth transition
-        setTimeout(async () => {
-          // For newly created entities, check if they have parent context
-          if (entity.parent_id) {
-            const { entity: entityWithParent, parentEntity } = await fetchEntityWithParentContext(entity.slug || entity.id);
-            
-            const entityPath = parentEntity 
-              ? getHierarchicalEntityUrl(parentEntity, entityWithParent!)
-              : getEntityUrl(entity);
-              
-            console.log(`🔗 Navigating to new hierarchical entity page: ${entityPath}`);
-            navigate(entityPath);
-          } else {
-            const entityPath = getEntityUrl(entity);
-            console.log(`🔗 Navigating to new entity page: ${entityPath}`);
-            navigate(entityPath);
-          }
-          
-          if (onClose) {
-            onClose();
-          }
-          
-          if (useExternalOverlay && onProcessingEnd) {
-            onProcessingEnd();
-          } else {
-            setInternalIsProcessing(false);
-          }
-        }, 800);
-        
+      // Hook handles navigation, so just clean up the overlay
+      if (onClose) {
+        onClose();
+      }
+      
+      if (useExternalOverlay && onProcessingEnd) {
+        onProcessingEnd();
       } else {
-        console.error('❌ Enhanced entity creation failed - no entity returned');
-        toast({
-          title: 'Error',
-          description: 'Could not process this item. Please try again.',
-          variant: 'destructive'
-        });
-        
-        if (useExternalOverlay && onProcessingEnd) {
-          onProcessingEnd();
-        } else {
-          setInternalIsProcessing(false);
-        }
+        setInternalIsProcessing(false);
       }
     } catch (error) {
       console.error('❌ Error handling search result:', error);

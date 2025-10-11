@@ -91,7 +91,7 @@ export const refreshEntityImage = async (entityId: string): Promise<boolean> => 
   }
 };
 
-// Create a new entity - now using enhanced service with proper image handling
+// Create a new entity - now using quick creation with background enrichment
 export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>): Promise<Entity | null> => {
   // Convert EntityType enum to string for database compatibility
   let typeAsString: string;
@@ -102,10 +102,11 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     typeAsString = mapEntityTypeToString(entity.type as EntityType);
   }
   
-  console.log(`🏗️ Creating entity using enhanced service: ${entity.name}`);
+  console.log(`⚡ Quick entity creation for: ${entity.name}`);
   
-  // Use enhanced entity service for rich metadata extraction and proper image handling
-  const enhancedEntity = await createEnhancedEntity({
+  // Step 1: Quick INSERT only (no photo storage, no enrichment)
+  const { createEntityQuick } = await import('@/services/enhancedEntityService');
+  const quickEntity = await createEntityQuick({
     name: entity.name,
     type: typeAsString,
     venue: entity.venue,
@@ -117,12 +118,22 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
     metadata: entity.metadata || {}
   }, typeAsString);
   
-  if (enhancedEntity) {
-    console.log(`✅ Enhanced entity created successfully: ${enhancedEntity.name}`);
-    return enhancedEntity;
+  if (quickEntity) {
+    console.log(`✅ Quick entity created: ${quickEntity.name}`);
+    
+    // Step 2: Queue for background enrichment (fire-and-forget)
+    if (entity.api_source === 'google_places' && entity.api_ref) {
+      setTimeout(() => {
+        supabase.functions.invoke('refresh-google-places-entity', {
+          body: { entityId: quickEntity.id, placeId: entity.api_ref }
+        }).catch(err => console.error('Background enrichment failed:', err));
+      }, 100);
+    }
+    
+    return quickEntity;
   }
   
-  // Fallback to basic entity creation if enhanced service fails
+  // Fallback to basic entity creation if quick service fails
   console.log(`⚠️ Enhanced service failed, falling back to basic entity creation`);
   
   // Ensure we have a valid image URL or use fallback based on type
@@ -220,10 +231,11 @@ export const findOrCreateEntity = async (
   // Convert type to string if it's an enum
   const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
 
-  console.log(`🆕 Creating new enhanced entity: ${name} (${typeAsString}) with api_ref: ${apiRef}`);
+  console.log(`⚡ Quick entity creation: ${name} (${typeAsString}) with api_ref: ${apiRef}`);
   
-  // Create a new entity using enhanced service
-  const entity = await createEnhancedEntity({
+  // Step 1: Quick INSERT only (no photo storage, no enrichment)
+  const { createEntityQuick } = await import('@/services/enhancedEntityService');
+  const entity = await createEntityQuick({
     name,
     type: typeAsString,
     venue,
@@ -237,7 +249,7 @@ export const findOrCreateEntity = async (
   
   if (!entity) {
     // Fallback to basic entity creation
-    console.log(`⚠️ Enhanced entity creation failed, using basic creation`);
+    console.log(`⚠️ Quick entity creation failed, using basic creation`);
     return await createEntity({
       name,
       type: typeAsString as any,
@@ -248,14 +260,20 @@ export const findOrCreateEntity = async (
       api_ref: apiRef,
       metadata,
       website_url: websiteUrl
-      // Don't set slug - let database trigger generate it
     });
   }
   
-  // Queue for additional background enrichment if it's from an API source
-  if (apiSource && apiRef) {
-    console.log(`⏰ Queuing newly created entity for background enrichment: ${entity.id}`);
-    await queueEntityForEnrichment(entity.id, 2); // High priority for new entities
+  // Step 2: Queue for background enrichment if it's from an API source (fire-and-forget)
+  if (apiSource && apiRef && apiSource === 'google_places') {
+    console.log(`🖼️ Scheduling background enrichment for: ${entity.id}`);
+    setTimeout(() => {
+      supabase.functions.invoke('refresh-google-places-entity', {
+        body: { entityId: entity.id, placeId: apiRef }
+      }).catch(err => console.error('Background enrichment failed:', err));
+    }, 100);
+  } else if (apiSource && apiRef) {
+    console.log(`⏰ Queuing entity for general enrichment: ${entity.id}`);
+    await queueEntityForEnrichment(entity.id, 2);
   }
   
   return entity;
