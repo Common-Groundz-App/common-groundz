@@ -52,11 +52,21 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
       
       // Staleness check: only refresh Google Places entities if data is >7 days old
       const REFRESH_THRESHOLD = 7 * 24 * 60 * 60 * 1000; // 7 days
+      const GRACE_PERIOD = 5 * 60 * 1000; // 5 minutes grace for new entities
+      
+      const entityAge = Date.now() - new Date(entity.created_at).getTime();
       const lastRefreshed = entity.metadata?.last_refreshed_at;
-      const isStale = !lastRefreshed || 
+      const isStale = lastRefreshed && 
         (Date.now() - new Date(lastRefreshed).getTime() > REFRESH_THRESHOLD);
       
-      if (entity.type === 'place' && entity.api_source === 'google_places' && isStale && entity.metadata?.place_id) {
+      // Skip refresh for newly created entities (within 5 minutes)
+      const isNewlyCreated = entityAge < GRACE_PERIOD;
+      
+      if (entity.type === 'place' && 
+          entity.api_source === 'google_places' && 
+          isStale && 
+          !isNewlyCreated && 
+          entity.metadata?.place_id) {
         console.log('🔄 Entity stale (>7 days), triggering Google Places refresh...');
         const { supabase } = await import('@/integrations/supabase/client');
         await supabase.functions.invoke('refresh-google-places-entity', {
@@ -65,8 +75,10 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
         
         // Refetch entity to get updated data
         entity = await fetchEntityBySlug(slug);
+      } else if (isNewlyCreated) {
+        console.log(`✨ Entity newly created (${Math.round(entityAge / 1000)}s old), skipping staleness check`);
       } else if (entity.type === 'place' && !isStale) {
-        console.log(`✅ Entity fresh (${Math.round((Date.now() - new Date(lastRefreshed).getTime()) / (24 * 60 * 60 * 1000))} days old), skipping refresh`);
+        console.log(`✅ Entity fresh (${lastRefreshed ? Math.round((Date.now() - new Date(lastRefreshed).getTime()) / (24 * 60 * 60 * 1000)) : 0} days old), skipping refresh`);
       }
       
       // Fetch related data in parallel

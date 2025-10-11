@@ -62,7 +62,11 @@ export const createEntityQuick = async (
       api_source: externalData.api_source || null,
       api_ref: externalData.api_ref || null,
       website_url: externalData.website_url || null,
-      metadata: externalData.metadata || {},
+      metadata: {
+        ...(externalData.metadata || {}),
+        last_refreshed_at: new Date().toISOString(), // Mark as fresh
+        place_id: externalData.api_ref // Ensure place_id is set for Google Places entities
+      },
       created_by: user.id,
       slug,
     };
