@@ -60,7 +60,7 @@ export const useOptimisticEntityCreation = ({
       if (createdEntity) {
         console.log('✅ Entity created successfully:', createdEntity.name);
         
-        // Navigate to actual entity page
+        // CRITICAL: Navigate FIRST with entityCreated flag (triggers polling)
         navigate(`/entity/${createdEntity.slug || createdEntity.id}`, { 
           replace: true,
           state: { entityCreated: true }
@@ -73,6 +73,11 @@ export const useOptimisticEntityCreation = ({
           title: 'Entity created',
           description: `${createdEntity.name} has been added successfully`,
         });
+        
+        // THEN schedule background enrichment AFTER navigation
+        setTimeout(() => {
+          enrichEntityInBackground(createdEntity.id, externalData, entityType);
+        }, 3000); // 3 seconds after navigation completes
       }
     } catch (error) {
       console.error('❌ Error in optimistic entity creation:', error);
@@ -120,17 +125,11 @@ const createEntityInBackground = async (
       throw new Error('Failed to create entity');
     }
     
-    console.log('✅ Entity created, starting background enrichment...');
-    setProgress(75);
-    
-    // Step 2: Trigger FULL enrichment in background (fire-and-forget)
-    setTimeout(() => {
-      enrichEntityInBackground(entity.id, externalData, entityType);
-    }, 100);
-    
+    console.log('✅ Entity created:', entity.id);
     setProgress(100);
     setStage('Complete!');
     
+    // Return immediately - enrichment will be scheduled AFTER navigation
     return entity;
   } catch (error) {
     console.error('❌ Entity creation failed:', error);
@@ -140,25 +139,24 @@ const createEntityInBackground = async (
 };
 
 // NEW: Full background enrichment (photos + metadata)
-const enrichEntityInBackground = async (
+const enrichEntityInBackground = (
   entityId: string,
   externalData: any,
   entityType: EntityTypeString
 ) => {
   console.log('🖼️ Starting background enrichment for:', entityId);
   
-  try {
-    // For Google Places entities, trigger photo storage and metadata enrichment
-    if (externalData.api_source === 'google_places' && externalData.api_ref) {
-      console.log('🖼️ Triggering background photo storage for entity:', entityId);
-      
-      const { data: refreshResult, error: refreshError } = await supabase.functions.invoke('refresh-google-places-entity', {
-        body: { 
-          entityId, 
-          placeId: externalData.api_ref 
-        }
-      });
-      
+  // For Google Places entities, trigger photo storage and metadata enrichment
+  if (externalData.api_source === 'google_places' && externalData.api_ref) {
+    console.log('🖼️ Triggering background photo storage for entity:', entityId);
+    
+    // Fire-and-forget: Don't await, just start the process
+    supabase.functions.invoke('refresh-google-places-entity', {
+      body: { 
+        entityId, 
+        placeId: externalData.api_ref 
+      }
+    }).then(({ data: refreshResult, error: refreshError }) => {
       if (refreshError) {
         console.error('❌ Background enrichment failed:', refreshError);
       } else if (refreshResult?.updatedMetadata?.stored_photo_urls) {
@@ -169,10 +167,10 @@ const enrichEntityInBackground = async (
       } else {
         console.warn('⚠️ Enrichment completed but no stored URLs returned');
       }
-    }
-    
-    console.log('✨ Background enrichment completed for entity:', entityId);
-  } catch (error) {
-    console.error('⚠️ Background enrichment failed (non-critical):', error);
+    }).catch(error => {
+      console.error('⚠️ Background enrichment exception:', error);
+    });
   }
+  
+  console.log('✨ Background enrichment started (non-blocking)');
 };

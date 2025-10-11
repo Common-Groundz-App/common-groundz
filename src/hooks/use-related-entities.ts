@@ -31,7 +31,6 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
         .from('entities')
         .select(`
           *,
-          parent:entities!entities_parent_id_fkey(slug, id),
           reviews!inner(rating, latest_rating)
         `)
         .eq('type', entityType)
@@ -74,7 +73,6 @@ export const useRelatedEntities = ({ entityId, entityType, parentId, limit = 3 }
           .from('entities')
           .select(`
             *,
-            parent:entities!entities_parent_id_fkey(slug, id),
             reviews!inner(rating, latest_rating)
           `)
           .eq('parent_id', parentId)
