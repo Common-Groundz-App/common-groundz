@@ -53,7 +53,7 @@ export const useOptimisticEntityCreation = ({
       setCreationProgress(25);
       setCreationStage('Creating entity...');
       
-      // Start background entity creation
+      // Start entity creation (photo storage happens in background now)
       const createdEntity = await createEntityInBackground(externalData, entityType, setCreationProgress, setCreationStage);
       
       if (createdEntity) {
@@ -107,11 +107,11 @@ const createEntityInBackground = async (
   setStage: (stage: string) => void
 ): Promise<Entity | null> => {
   try {
-    console.log('🔄 Starting background entity creation...');
+    console.log('🔄 Starting entity creation...');
     setProgress(50);
-    setStage('Storing photos...');
+    setStage('Finalizing...');
     
-    // Step 1: Create enhanced entity with metadata extraction (includes blocking photo storage)
+    // Step 1: Create enhanced entity (photo storage now happens in background)
     const entity = await createEnhancedEntity(externalData, entityType);
     
     if (!entity) {

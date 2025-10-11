@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
@@ -59,6 +59,53 @@ const EntityV4 = () => {
     error
   } = useEntityDetailCached(entitySlug);
 
+  // Background refetch setup - hooks must be called before useEffect
+  const location = useLocation();
+  const isNewlyCreated = location.state?.entityCreated;
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // Background refetch for newly created entities to get stored photo URLs
+  React.useEffect(() => {
+    if (isNewlyCreated && entity && !entity.metadata?.stored_photo_urls) {
+      console.log('🔄 New entity detected without stored photos, polling for updates...');
+      
+      // Poll every 2 seconds for up to 14 seconds to check if photos are ready
+      let pollCount = 0;
+      const maxPolls = 7; // 7 polls × 2s = 14 seconds max
+      
+      const pollInterval = setInterval(() => {
+        pollCount++;
+        console.log(`📊 Polling for stored photos (attempt ${pollCount}/${maxPolls})...`);
+        
+        // Trigger a background refetch
+        queryClient.invalidateQueries({ queryKey: ['entity-detail', entitySlug] });
+        
+        // Check if photos are now available
+        const cachedData = queryClient.getQueryData(['entity-detail', entitySlug]) as any;
+        const updatedEntity = cachedData?.entity;
+        
+        if (updatedEntity?.metadata?.stored_photo_urls?.length > 0) {
+          console.log('✅ Stored photos now available, stopping poll');
+          clearInterval(pollInterval);
+          
+          // Show subtle toast
+          toast({
+            title: 'Photos optimized',
+            description: 'Gallery images are now loading faster',
+            duration: 2000
+          });
+        } else if (pollCount >= maxPolls) {
+          console.log('⏱️ Poll timeout reached, photos will load on next visit');
+          clearInterval(pollInterval);
+        }
+      }, 2000);
+      
+      // Cleanup on unmount
+      return () => clearInterval(pollInterval);
+    }
+  }, [isNewlyCreated, entity, entitySlug, queryClient, toast]);
+
   // Fetch entity hierarchy data (children/products and parent)
   const {
     entityWithChildren,
@@ -81,11 +128,9 @@ const EntityV4 = () => {
 
   // Fetch circle rating data and user following data
   const { user, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
   
-  // Initialize image refresh hook and query client
+  // Initialize image refresh hook (queryClient and toast already declared above)
   const { refreshEntityImage, isRefreshing } = useEntityImageRefresh();
-  const queryClient = useQueryClient();
   
   // Determine if this entity's hero image can be refreshed
   // This mirrors the logic in useEntityImageRefresh.prepareEdgeFunctionRequest
