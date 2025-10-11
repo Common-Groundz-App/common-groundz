@@ -134,7 +134,7 @@ export const fetchGooglePlacesPhotos = async (
       
       console.log(`📊 [PhotoService] Quality preference: [${qualityPreference?.join(', ')}] → unique: [${uniqueQualities.join(', ')}]`);
       
-      // Use batch method for better performance with deduplication
+      // Try to use batch cache method first
       const batchResults = await cachedPhotoService.getCachedPhotoUrls(
         photoRefs.map(ref => ref.photo_reference),
         uniqueQualities,
@@ -164,14 +164,45 @@ export const fetchGooglePlacesPhotos = async (
             source: 'google_places' as const,
             originalReference: photoRef.photo_reference,
             isPrimary: index === 0,
-            isCached: true, // Flag to indicate this is using cached URL
+            isCached: true,
             width: photoRef.width || maxWidth,
             height: photoRef.height || maxWidth
           });
         }
       }
       
-      console.log(`✅ Successfully fetched ${photos.length} cached Google Places photos`);
+      // FALLBACK: If no cached results (brand new entity), generate direct proxy URLs
+      if (photos.length === 0 && photoRefs.length > 0) {
+        const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+        if (apiKey) {
+          console.log(`⚡ Generating ${photoRefs.length} direct Google proxy URLs for immediate display`);
+          
+          for (let index = 0; index < photoRefs.length; index++) {
+            const photoRef = photoRefs[index];
+            const requestedQuality = qualityPreference?.[index] || (index === 0 ? 'high' : 'medium');
+            const maxWidth = typeof requestedQuality === 'number' ? requestedQuality : PHOTO_QUALITY_SETTINGS[requestedQuality];
+            
+            photos.push({
+              id: `google-places-proxy-${entity.id}-${index}`,
+              url: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoRef.photo_reference}&key=${apiKey}`,
+              type: 'image' as const,
+              alt: entity.name,
+              order: index,
+              source: 'google_places' as const,
+              originalReference: photoRef.photo_reference,
+              isPrimary: index === 0,
+              isCached: false, // Mark as temporary proxy URL
+              width: photoRef.width || maxWidth,
+              height: photoRef.height || maxWidth
+            });
+          }
+          
+          console.log(`✅ Generated ${photos.length} temporary proxy URLs (will upgrade to Supabase Storage soon)`);
+        }
+      } else {
+        console.log(`✅ Successfully fetched ${photos.length} cached Google Places photos`);
+      }
+      
       return photos;
     }
 

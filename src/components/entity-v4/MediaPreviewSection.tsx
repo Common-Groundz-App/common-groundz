@@ -49,8 +49,8 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   const loadPhotos = async () => {
     setLoading(true);
     try {
-      // Request only medium quality initially for faster loading
-      const qualityPreference: PhotoQuality[] = ['medium'];
+      // Request high quality for first photo, medium for rest (faster initial load)
+      const qualityPreference: PhotoQuality[] = ['high', 'medium'];
       
       const [googlePhotos, reviewPhotos, fetchedEntityPhotos] = await Promise.all([
         fetchGooglePlacesPhotos(entity, qualityPreference),
@@ -59,6 +59,12 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
       ]);
       
       setEntityPhotos(fetchedEntityPhotos);
+      
+      // Show optimizing toast if using temporary proxy URLs
+      const hasProxyPhotos = googlePhotos.some(photo => !photo.isCached);
+      if (hasProxyPhotos && googlePhotos.length > 0) {
+        console.log('📸 Showing temporary proxy URLs, optimization in progress...');
+      }
       
       // Convert entity photos to PhotoWithMetadata format
       const convertedEntityPhotos: PhotoWithMetadata[] = fetchedEntityPhotos.map((photo, index) => ({
