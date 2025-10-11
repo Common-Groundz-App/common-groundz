@@ -159,7 +159,7 @@ export class CachedPhotoService {
    */
   async getCachedPhotoUrls(
     photoReferences: string[],
-    qualities: PhotoQuality[] = ['high', 'medium', 'low'],
+    qualities: PhotoQuality[] = ['medium'], // Single quality - let browser/CSS handle scaling
     entityId?: string
   ): Promise<{ photoReference: string; quality: PhotoQuality; url: string }[]> {
     const startTime = performance.now();
@@ -312,7 +312,7 @@ export class CachedPhotoService {
   ): Promise<void> {
     try {
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 48); // 48 hours from now
+      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days (extended for legacy entities)
       
       const { error } = await supabase
         .from('cached_photos')

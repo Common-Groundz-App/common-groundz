@@ -45,9 +45,28 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
       console.log('🔍 Fetching entity detail for slug:', slug);
       
       // Fetch entity first
-      const entity = await fetchEntityBySlug(slug);
+      let entity = await fetchEntityBySlug(slug);
       if (!entity) {
         throw new Error('Entity not found');
+      }
+      
+      // Staleness check: only refresh Google Places entities if data is >7 days old
+      const REFRESH_THRESHOLD = 7 * 24 * 60 * 60 * 1000; // 7 days
+      const lastRefreshed = entity.metadata?.last_refreshed_at;
+      const isStale = !lastRefreshed || 
+        (Date.now() - new Date(lastRefreshed).getTime() > REFRESH_THRESHOLD);
+      
+      if (entity.type === 'place' && entity.api_source === 'google_places' && isStale && entity.metadata?.place_id) {
+        console.log('🔄 Entity stale (>7 days), triggering Google Places refresh...');
+        const { supabase } = await import('@/integrations/supabase/client');
+        await supabase.functions.invoke('refresh-google-places-entity', {
+          body: { entityId: entity.id, placeId: entity.metadata.place_id }
+        });
+        
+        // Refetch entity to get updated data
+        entity = await fetchEntityBySlug(slug);
+      } else if (entity.type === 'place' && !isStale) {
+        console.log(`✅ Entity fresh (${Math.round((Date.now() - new Date(lastRefreshed).getTime()) / (24 * 60 * 60 * 1000))} days old), skipping refresh`);
       }
       
       // Fetch related data in parallel

@@ -1,4 +1,6 @@
 
+import { EntityMetadata } from '@/types/metadata';
+
 export interface Entity {
   id: string;
   name: string;
@@ -6,7 +8,7 @@ export interface Entity {
   image_url?: string;
   api_ref?: string;
   api_source?: string;
-  metadata?: Record<string, any>;
+  metadata?: EntityMetadata;
   venue?: string;
   website_url?: string;
   type: EntityType;
