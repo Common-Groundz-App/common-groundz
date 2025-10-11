@@ -70,9 +70,9 @@ const EntityV4 = () => {
     if (isNewlyCreated && entity && !entity.metadata?.stored_photo_urls) {
       console.log('🔄 New entity detected without stored photos, polling for updates...');
       
-      // Poll every 2 seconds for up to 14 seconds to check if photos are ready
+      // Poll every 3 seconds for up to 45 seconds to allow time for photo storage
       let pollCount = 0;
-      const maxPolls = 7; // 7 polls × 2s = 14 seconds max
+      const maxPolls = 15; // 15 polls × 3s = 45 seconds max (covers 24-30s storage time)
       
       const pollInterval = setInterval(() => {
         pollCount++;
@@ -99,7 +99,7 @@ const EntityV4 = () => {
           console.log('⏱️ Poll timeout reached, photos will load on next visit');
           clearInterval(pollInterval);
         }
-      }, 2000);
+      }, 3000); // Poll every 3 seconds instead of 2
       
       // Cleanup on unmount
       return () => clearInterval(pollInterval);
