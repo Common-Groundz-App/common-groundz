@@ -31,6 +31,9 @@ verify_jwt = false
 [functions.get-google-places-photo]
 verify_jwt = false
 
+[functions.get-place-photos]
+verify_jwt = false
+
 [functions.proxy-google-image]
 verify_jwt = false
 

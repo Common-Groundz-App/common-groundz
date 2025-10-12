@@ -101,14 +101,54 @@ export const fetchGooglePlacesPhotos = async (
     const entityAge = Date.now() - new Date(entity.created_at).getTime();
     const isNewlyCreated = entityAge < 2 * 60 * 1000; // 2 minutes
     
-    // PRIORITY 1: NEW ENTITIES - Generate immediate proxy URLs (bypass stored_photo_urls check)
-    if (isNewlyCreated) {
+    // PRIORITY 1: NEW ENTITIES - Fetch ALL photos from Google Places API instantly
+    if (isNewlyCreated && entity.api_source === 'google_places' && entity.api_ref) {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       
-      // Try photo_references array first (preferred)
+      console.log(`⚡ [PhotoService] New entity detected (${Math.round(entityAge / 1000)}s old), fetching ALL photos from Google Places API...`);
+      
+      try {
+        // Call edge function to get ALL photo references from Google Places
+        const { data, error } = await supabase.functions.invoke('get-place-photos', {
+          body: { placeId: entity.api_ref }
+        });
+        
+        if (!error && data?.photos && Array.isArray(data.photos) && data.photos.length > 0) {
+          console.log(`✅ Got ${data.photos.length} photos from Google Places API`);
+          
+          // Generate proxy URLs for all photos immediately
+          data.photos.forEach((photo: any, index: number) => {
+            const requestedQuality = qualityPreference?.[index] || (index === 0 ? 'high' : 'medium');
+            const maxWidth = typeof requestedQuality === 'number' ? requestedQuality : PHOTO_QUALITY_SETTINGS[requestedQuality];
+            
+            photos.push({
+              id: `google-places-instant-${entity.id}-${index}`,
+              url: `${supabaseUrl}/functions/v1/proxy-google-image?ref=${photo.photo_reference}&maxWidth=${maxWidth}`,
+              type: 'image' as const,
+              alt: entity.name,
+              order: index,
+              source: 'google_places' as const,
+              originalReference: photo.photo_reference,
+              isPrimary: index === 0,
+              isCached: false, // Will upgrade to cached URLs later
+              width: photo.width || maxWidth,
+              height: photo.height || maxWidth
+            });
+          });
+          
+          console.log(`🎉 Generated ${photos.length} instant proxy URLs - gallery ready!`);
+          return photos;
+        } else {
+          console.warn(`⚠️ Edge function returned no photos for ${entity.api_ref}:`, error);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to fetch photos from edge function:`, error);
+      }
+      
+      // Fallback: Try using existing metadata if edge function fails
       if (entity.metadata?.photo_references && Array.isArray(entity.metadata.photo_references)) {
+        console.log(`📦 Fallback to cached photo_references array (${entity.metadata.photo_references.length} photos)`);
         const photoRefs = entity.metadata.photo_references;
-        console.log(`⚡ [PhotoService] New entity detected (${Math.round(entityAge / 1000)}s old), generating ${photoRefs.length} proxy URLs from photo_references array`);
         
         for (let index = 0; index < photoRefs.length; index++) {
           const photoRef = photoRefs[index];
@@ -116,7 +156,7 @@ export const fetchGooglePlacesPhotos = async (
           const maxWidth = typeof requestedQuality === 'number' ? requestedQuality : PHOTO_QUALITY_SETTINGS[requestedQuality];
           
           photos.push({
-            id: `google-places-temp-${entity.id}-${index}`,
+            id: `google-places-fallback-${entity.id}-${index}`,
             url: `${supabaseUrl}/functions/v1/proxy-google-image?ref=${photoRef.photo_reference}&maxWidth=${maxWidth}`,
             type: 'image' as const,
             alt: entity.name,
@@ -130,20 +170,18 @@ export const fetchGooglePlacesPhotos = async (
           });
         }
         
-        console.log(`✅ Generated ${photos.length} temporary proxy URLs (will upgrade when stored URLs are available)`);
         return photos;
       }
       
-      // Fallback to singular photo_reference (common in search results)
+      // Last fallback: singular photo_reference
       if (entity.metadata?.photo_reference) {
+        console.log(`📦 Fallback to singular photo_reference`);
         const photoRef = entity.metadata.photo_reference;
-        console.log(`⚡ [PhotoService] New entity detected (${Math.round(entityAge / 1000)}s old), generating proxy URL from singular photo_reference`);
-        
         const requestedQuality = qualityPreference?.[0] || 'high';
         const maxWidth = typeof requestedQuality === 'number' ? requestedQuality : PHOTO_QUALITY_SETTINGS[requestedQuality];
         
         photos.push({
-          id: `google-places-temp-${entity.id}-0`,
+          id: `google-places-single-${entity.id}-0`,
           url: `${supabaseUrl}/functions/v1/proxy-google-image?ref=${photoRef}&maxWidth=${maxWidth}`,
           type: 'image' as const,
           alt: entity.name,
@@ -156,12 +194,10 @@ export const fetchGooglePlacesPhotos = async (
           height: maxWidth
         });
         
-        console.log(`✅ Generated 1 temporary proxy URL (will upgrade when photo_references array is available)`);
         return photos;
       }
       
-      // No photo data yet (rare)
-      console.log(`⚠️ New entity detected but no photo data available yet (will appear after enrichment)`);
+      console.log(`⚠️ New entity has no photo data available yet`);
       return photos;
     }
     
