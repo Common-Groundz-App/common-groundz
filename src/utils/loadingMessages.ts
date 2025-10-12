@@ -1,5 +1,5 @@
 
-export type EntityCategory = 'book' | 'movie' | 'place' | 'food' | 'product' | 'music' | 'tv' | 'art' | 'activity' | 'drink' | 'travel';
+export type EntityCategory = 'book' | 'movie' | 'place' | 'food' | 'product' | 'music' | 'tv' | 'art' | 'activity' | 'drink' | 'travel' | 'course' | 'app' | 'game' | 'experience';
 
 export const getLoadingMessages = (category: EntityCategory): string[] => {
   const messages: Record<EntityCategory, string[]> = {
@@ -134,6 +134,35 @@ export const getLoadingMessages = (category: EntityCategory): string[] => {
       "👥 Travel builds empathy through cultural understanding",
       "🚂 The journey can be just as rewarding as the destination",
       "🌟 Solo travel increases self-confidence and self-reliance"
+    ],
+    course: [
+      "🎓 Learning new skills improves brain plasticity!",
+      "📚 Online courses make education more accessible",
+      "💡 Continuous learning keeps your mind sharp",
+      "🌟 Every expert was once a beginner",
+      "🎯 Skill-building opens new career opportunities",
+      "🧠 Active learning increases retention by 75%"
+    ],
+    app: [
+      "📱 Apps transform how we live and work!",
+      "💡 Great design makes apps intuitive and delightful",
+      "🚀 Mobile-first thinking drives innovation",
+      "⚡ Apps can save time and simplify daily tasks",
+      "🌟 The right app at the right time can change everything"
+    ],
+    game: [
+      "🎮 Gaming improves problem-solving skills!",
+      "🧠 Strategic games boost cognitive abilities",
+      "🤝 Multiplayer games build teamwork and communication",
+      "🎯 Games teach persistence and resilience",
+      "⚡ Gaming reaction times translate to real-world skills"
+    ],
+    experience: [
+      "✨ New experiences create lasting memories!",
+      "🌟 Stepping outside your comfort zone builds confidence",
+      "🎭 Unique experiences enrich your life story",
+      "🎨 Trying new things sparks creativity",
+      "🚀 Adventures push you to grow and learn"
     ]
   };
 

@@ -43,22 +43,38 @@ export interface Entity {
 }
 
 export enum EntityType {
+  // Canonical types (aligned with Supabase entity_type enum)
   Movie = 'movie',
   Book = 'book',
   Food = 'food',
   Product = 'product',
   Place = 'place',
-  Activity = 'activity',
-  Music = 'music',
-  Art = 'art',
-  TV = 'tv',
-  Drink = 'drink',
-  Travel = 'travel',
   Brand = 'brand',
   Event = 'event',
   Service = 'service',
   Professional = 'professional',
-  Others = 'others'
+  Others = 'others',
+  
+  // New canonical types
+  TVShow = 'tv_show',
+  Course = 'course',
+  App = 'app',
+  Game = 'game',
+  Experience = 'experience',
+  
+  // Legacy types (deprecated - kept for backward compatibility until data migration)
+  /** @deprecated Use TVShow instead */
+  TV = 'tv',
+  /** @deprecated Use Experience instead */
+  Activity = 'activity',
+  /** @deprecated Use appropriate specific type instead */
+  Music = 'music',
+  /** @deprecated Use appropriate specific type instead */
+  Art = 'art',
+  /** @deprecated Use appropriate specific type instead */
+  Drink = 'drink',
+  /** @deprecated Use appropriate specific type instead */
+  Travel = 'travel'
 }
 
 export enum RecommendationCategory {

@@ -229,7 +229,7 @@ export const findOrCreateEntity = async (
   }
   
   // Convert type to string if it's an enum
-  const typeAsString = typeof type === 'string' ? type as EntityTypeString : mapEntityTypeToString(type as EntityType);
+  const typeAsString = typeof type === 'string' ? type as Database['public']['Enums']['entity_type'] : mapEntityTypeToString(type as EntityType) as Database['public']['Enums']['entity_type'];
 
   console.log(`⚡ Quick entity creation: ${name} (${typeAsString}) with api_ref: ${apiRef}`);
   

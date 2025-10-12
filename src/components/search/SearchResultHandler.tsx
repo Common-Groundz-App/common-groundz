@@ -208,7 +208,7 @@ export function SearchResultHandler({
 
   // Convert entity type to category for loading messages
   const getEntityCategory = (type: EntityTypeString): EntityCategory => {
-    const categoryMap: Record<EntityTypeString, EntityCategory> = {
+    const categoryMap: Partial<Record<EntityTypeString, EntityCategory>> = {
       'book': 'book',
       'movie': 'movie',
       'place': 'place',
@@ -225,7 +225,13 @@ export function SearchResultHandler({
       'event': 'place',
       'service': 'product',
       'professional': 'product',
-      'others': 'product'
+      'others': 'product',
+      // New canonical types
+      'tv_show': 'tv',
+      'course': 'product',
+      'app': 'product',
+      'game': 'product',
+      'experience': 'activity'
     };
     
     return categoryMap[type] || 'product';

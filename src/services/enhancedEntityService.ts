@@ -55,7 +55,7 @@ export const createEntityQuick = async (
     // Minimal entity data - just enough to create the record
     const entityData = {
       name: externalData.name,
-      type: entityType as any, // Cast to avoid enum mismatch
+      type: entityType as Database['public']['Enums']['entity_type'],
       description: externalData.description || null,
       image_url: externalData.image_url || null,
       venue: externalData.venue || null,

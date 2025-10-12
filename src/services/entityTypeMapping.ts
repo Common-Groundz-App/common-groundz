@@ -11,7 +11,7 @@ const DATABASE_SUPPORTED_TYPES: EntityType[] = [
 ];
 
 // Mapping from unsupported types to database-supported types
-const TYPE_MAPPING: Record<EntityType, EntityType> = {
+const TYPE_MAPPING: Partial<Record<EntityType, EntityType>> = {
   // Supported types map to themselves
   [EntityType.Book]: EntityType.Book,
   [EntityType.Movie]: EntityType.Movie,
@@ -21,16 +21,21 @@ const TYPE_MAPPING: Record<EntityType, EntityType> = {
   
   // Unsupported types map to closest supported type
   [EntityType.TV]: EntityType.Movie,        // TV shows are similar to movies
+  [EntityType.TVShow]: EntityType.Movie,    // TV shows are similar to movies
   [EntityType.Music]: EntityType.Product,   // Music albums/songs as products
   [EntityType.Art]: EntityType.Product,     // Art pieces as products
   [EntityType.Drink]: EntityType.Food,      // Drinks are food-related
   [EntityType.Travel]: EntityType.Place,    // Travel destinations are places
   [EntityType.Activity]: EntityType.Place,  // Activities happen at places
+  [EntityType.Experience]: EntityType.Place, // Experiences happen at places
   [EntityType.Brand]: EntityType.Product,   // Brands are product-related
   [EntityType.Event]: EntityType.Place,     // Events happen at places
   [EntityType.Service]: EntityType.Product, // Services are product-like
   [EntityType.Professional]: EntityType.Product, // Professionals offer services/products
-  [EntityType.Others]: EntityType.Product   // Default fallback to product
+  [EntityType.Others]: EntityType.Product,   // Default fallback to product
+  [EntityType.Course]: EntityType.Product,   // Courses as products
+  [EntityType.App]: EntityType.Product,      // Apps as products
+  [EntityType.Game]: EntityType.Product      // Games as products
 };
 
 /**
@@ -75,7 +80,7 @@ export const getContextualFieldLabel = (type: EntityType): string => {
 export const getEntityTypeFallbackImage = (type: EntityType): string => {
   const mappedType = mapEntityTypeToDatabase(type);
   
-  const fallbacks: Record<EntityType, string> = {
+  const fallbacks: Partial<Record<EntityType, string>> = {
     [EntityType.Movie]: 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
     [EntityType.Book]: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
     [EntityType.Food]: 'https://images.unsplash.com/photo-1555939594-58d7698950b',
@@ -95,5 +100,5 @@ export const getEntityTypeFallbackImage = (type: EntityType): string => {
     [EntityType.Others]: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86'
   };
 
-  return fallbacks[mappedType] || fallbacks[EntityType.Product];
+  return fallbacks[mappedType] || fallbacks[EntityType.Product]!;
 };

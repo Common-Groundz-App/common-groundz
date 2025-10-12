@@ -6,50 +6,90 @@ export * from '../types';
 import { EntityType } from '@/services/recommendation/types';
 
 // Add string literal compatibility types for existing components - expanded to include all entity types
-export type EntityTypeString = 'movie' | 'book' | 'food' | 'product' | 'place' | 'music' | 'tv' | 'art' | 'activity' | 'drink' | 'travel' | 'people' | 'brand' | 'event' | 'service' | 'professional' | 'others';
+export type EntityTypeString = 
+  | 'movie'
+  | 'book'
+  | 'food'
+  | 'product'
+  | 'place'
+  | 'brand'
+  | 'event'
+  | 'service'
+  | 'professional'
+  | 'others'
+  // New canonical types
+  | 'tv_show'
+  | 'course'
+  | 'app'
+  | 'game'
+  | 'experience'
+  // Legacy types (for backward compatibility)
+  | 'music'
+  | 'tv'
+  | 'art'
+  | 'activity'
+  | 'drink'
+  | 'travel'
+  | 'people';
 
 // Mapping functions to convert between string literals and enum values
 export function mapStringToEntityType(stringType: EntityTypeString): EntityType {
   switch (stringType) {
+    // Canonical types
     case 'movie': return EntityType.Movie;
     case 'book': return EntityType.Book;
     case 'food': return EntityType.Food;
     case 'product': return EntityType.Product;
     case 'place': return EntityType.Place;
-    case 'music': return EntityType.Music;
-    case 'tv': return EntityType.TV;
-    case 'art': return EntityType.Art;
-    case 'activity': return EntityType.Activity;
-    case 'drink': return EntityType.Drink;
-    case 'travel': return EntityType.Travel;
     case 'brand': return EntityType.Brand;
     case 'event': return EntityType.Event;
     case 'service': return EntityType.Service;
     case 'professional': return EntityType.Professional;
     case 'others': return EntityType.Others;
-    case 'people': return EntityType.Place; // Map people to Place enum since it's not a true entity type
-    default: return EntityType.Place;
+    // New canonical types
+    case 'tv_show': return EntityType.TVShow;
+    case 'course': return EntityType.Course;
+    case 'app': return EntityType.App;
+    case 'game': return EntityType.Game;
+    case 'experience': return EntityType.Experience;
+    // Legacy types (kept for backward compatibility)
+    case 'tv': return EntityType.TV;
+    case 'activity': return EntityType.Activity;
+    case 'music': return EntityType.Music;
+    case 'art': return EntityType.Art;
+    case 'drink': return EntityType.Drink;
+    case 'travel': return EntityType.Travel;
+    case 'people': return EntityType.Professional;
+    default: return EntityType.Product;
   }
 }
 
 export function mapEntityTypeToString(enumType: EntityType): EntityTypeString {
   switch (enumType) {
+    // Canonical types
     case EntityType.Movie: return 'movie';
     case EntityType.Book: return 'book';
     case EntityType.Food: return 'food';
     case EntityType.Product: return 'product';
     case EntityType.Place: return 'place';
-    case EntityType.Music: return 'music';
-    case EntityType.TV: return 'tv';
-    case EntityType.Art: return 'art';
-    case EntityType.Activity: return 'activity';
-    case EntityType.Drink: return 'drink';
-    case EntityType.Travel: return 'travel';
     case EntityType.Brand: return 'brand';
     case EntityType.Event: return 'event';
     case EntityType.Service: return 'service';
     case EntityType.Professional: return 'professional';
     case EntityType.Others: return 'others';
-    default: return 'place';
+    // New canonical types
+    case EntityType.TVShow: return 'tv_show';
+    case EntityType.Course: return 'course';
+    case EntityType.App: return 'app';
+    case EntityType.Game: return 'game';
+    case EntityType.Experience: return 'experience';
+    // Legacy types (map to canonical strings for forward compatibility)
+    case EntityType.TV: return 'tv_show';
+    case EntityType.Activity: return 'experience';
+    case EntityType.Music: return 'music';
+    case EntityType.Art: return 'art';
+    case EntityType.Drink: return 'drink';
+    case EntityType.Travel: return 'travel';
+    default: return 'product';
   }
 }
