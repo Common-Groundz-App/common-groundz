@@ -65,46 +65,57 @@ const EntityV4 = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Background refetch for newly created entities to get stored photo URLs
+  // Silent background upgrade for newly created entities to get stored photo URLs
   React.useEffect(() => {
     if (isNewlyCreated && entity && !entity.metadata?.stored_photo_urls) {
-      console.log('🔄 New entity detected without stored photos, polling for updates...');
+      console.log('🔄 New entity detected, will silently check for stored photos in background...');
       
-      // Poll every 3 seconds for up to 45 seconds to allow time for photo storage
-      let pollCount = 0;
-      const maxPolls = 15; // 15 polls × 3s = 45 seconds max (covers 24-30s storage time)
-      
-      const pollInterval = setInterval(() => {
-        pollCount++;
-        console.log(`📊 Polling for stored photos (attempt ${pollCount}/${maxPolls})...`);
+      // DELAYED START: Wait 15 seconds before first check (give enrichment time)
+      const initialDelay = setTimeout(() => {
+        let pollCount = 0;
+        const maxPolls = 6; // 6 polls × 10s = 60 seconds max (gives enrichment more time)
         
-        // Trigger a background refetch
-        queryClient.invalidateQueries({ queryKey: ['entity-detail', entitySlug] });
-        
-        // Check if photos are now available
-        const cachedData = queryClient.getQueryData(['entity-detail', entitySlug]) as any;
-        const updatedEntity = cachedData?.entity;
-        
-        if (updatedEntity?.metadata?.stored_photo_urls?.length > 0) {
-          console.log('✅ Stored photos now available, stopping poll');
-          clearInterval(pollInterval);
+        const pollInterval = setInterval(() => {
+          pollCount++;
+          console.log(`🔍 Silently checking for stored photos (${pollCount}/${maxPolls})...`);
           
-          // Show subtle toast
-          toast({
-            title: 'Photos optimized',
-            description: 'Gallery images are now loading faster',
-            duration: 2000
-          });
-        } else if (pollCount >= maxPolls) {
-          console.log('⏱️ Poll timeout reached, photos will load on next visit');
-          clearInterval(pollInterval);
-        }
-      }, 3000); // Poll every 3 seconds instead of 2
+          // Check current entity data WITHOUT triggering re-render
+          const cachedData = queryClient.getQueryData(['entity-detail', entitySlug]) as any;
+          const currentEntity = cachedData?.entity;
+          
+          // If stored URLs are NOT available yet, silently refetch
+          if (!currentEntity?.metadata?.stored_photo_urls) {
+            // Silently refetch without invalidation (no "Refreshing" badge)
+            queryClient.refetchQueries({ 
+              queryKey: ['entity-detail', entitySlug],
+              exact: true 
+            });
+          } else {
+            console.log('✅ Stored photos detected, silent upgrade complete');
+            clearInterval(pollInterval);
+            
+            // Optional: Show subtle one-time toast
+            toast({
+              title: 'Photos optimized',
+              description: 'Gallery images are now fully cached',
+              duration: 2000,
+            });
+          }
+          
+          // Stop after max polls
+          if (pollCount >= maxPolls) {
+            console.log('⏱️ Polling timeout reached, using proxy URLs');
+            clearInterval(pollInterval);
+          }
+        }, 10000); // 10 seconds between polls (was 3000)
+        
+        return () => clearInterval(pollInterval);
+      }, 15000); // Wait 15 seconds before starting (was immediate)
       
       // Cleanup on unmount
-      return () => clearInterval(pollInterval);
+      return () => clearTimeout(initialDelay);
     }
-  }, [isNewlyCreated, entity, entitySlug, queryClient, toast]);
+  }, [isNewlyCreated, entity?.id, entitySlug, queryClient, toast]);
 
   // Fetch entity hierarchy data (children/products and parent)
   const {
