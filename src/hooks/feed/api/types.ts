@@ -83,13 +83,13 @@ export function mapEntityTypeToString(enumType: EntityType): EntityTypeString {
     case EntityType.App: return 'app';
     case EntityType.Game: return 'game';
     case EntityType.Experience: return 'experience';
-    // Legacy types (map to canonical strings for forward compatibility)
+    // Legacy types (collapse to canonical equivalents)
     case EntityType.TV: return 'tv_show';
     case EntityType.Activity: return 'experience';
-    case EntityType.Music: return 'music';
-    case EntityType.Art: return 'art';
-    case EntityType.Drink: return 'drink';
-    case EntityType.Travel: return 'travel';
+    case EntityType.Music: return 'product';
+    case EntityType.Art: return 'product';
+    case EntityType.Drink: return 'food';
+    case EntityType.Travel: return 'place';
     default: return 'product';
   }
 }

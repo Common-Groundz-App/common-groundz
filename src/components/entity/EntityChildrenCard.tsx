@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Package } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Entity } from '@/services/recommendation/types';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 
 interface EntityChildrenCardProps {

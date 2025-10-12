@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageSquare } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";

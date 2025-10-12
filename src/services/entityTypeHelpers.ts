@@ -16,22 +16,32 @@ type DatabaseEntityType = Database['public']['Enums']['entity_type'];
 export const getCanonicalType = (type: string): EntityType => {
   const lowerType = type.toLowerCase();
   
-  // Direct canonical matches
-  if (Object.values(EntityType).includes(lowerType as EntityType)) {
+  // Priority 1: Collapse legacy types to canonical equivalents
+  const legacyToCanonical: Record<string, EntityType> = {
+    'tv': EntityType.TVShow,
+    'activity': EntityType.Experience,
+    'music': EntityType.Product,    // Semantic preservation via metadata.content_type
+    'art': EntityType.Product,      // Semantic preservation via metadata.content_type
+    'drink': EntityType.Food,       // Semantic preservation via metadata.subcategory
+    'travel': EntityType.Place      // Semantic preservation via metadata.context
+  };
+  
+  if (legacyToCanonical[lowerType]) {
+    return legacyToCanonical[lowerType];
+  }
+  
+  // Priority 2: Return canonical type if already valid
+  const activeTypes = [
+    'movie', 'book', 'tv_show', 'course', 'app', 'game', 'experience',
+    'food', 'product', 'place', 'brand', 'event', 'service', 'professional', 'others'
+  ];
+  
+  if (activeTypes.includes(lowerType)) {
     return lowerType as EntityType;
   }
   
-  // Legacy to canonical mapping
-  const legacyMap: Record<string, EntityType> = {
-    'tv': EntityType.TVShow,
-    'activity': EntityType.Experience,
-    'music': EntityType.Music,
-    'art': EntityType.Art,
-    'drink': EntityType.Drink,
-    'travel': EntityType.Travel
-  };
-  
-  return legacyMap[lowerType] || EntityType.Others;
+  // Fallback
+  return EntityType.Others;
 };
 
 /**

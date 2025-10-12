@@ -12,7 +12,7 @@ import { EntityStats } from '@/hooks/use-entity-detail-cached';
 import { EntityWithChildren } from '@/services/entityHierarchyService';
 import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { getEntityStats } from '@/services/entityService';
 import PostFeedItem from '@/components/feed/PostFeedItem';
 import { useEntityPosts } from '@/hooks/use-entity-posts';

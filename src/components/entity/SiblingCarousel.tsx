@@ -7,7 +7,7 @@ import { getSentimentLabel } from '@/utils/ratingColorUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Button } from '@/components/ui/button';
 import { Entity } from '@/services/recommendation/types';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 
 interface SiblingCarouselProps {
   siblings: Entity[];

@@ -37,7 +37,8 @@ import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loadi
 import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
 import { EntityV4LoadingWrapper } from '@/components/entity/EntityV4LoadingWrapper';
 import { Eye, ArrowRight } from 'lucide-react';
-import { mapEntityTypeToDatabase, getContextualFieldLabel, getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { getContextualFieldLabel, getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
+import { mapEntityTypeToDatabase } from '@/services/entityTypeMapping';
 import { EntityType } from '@/services/recommendation/types';
 import { Helmet } from 'react-helmet-async';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';

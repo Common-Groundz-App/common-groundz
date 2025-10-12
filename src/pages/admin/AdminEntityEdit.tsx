@@ -38,17 +38,8 @@ const MAX_MEDIA_ITEMS = 4;
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
 
-const entityTypes = [
-  'movie', 'book', 'food', 'product', 'place', 'activity', 
-  'music', 'art', 'tv', 'drink', 'travel', 'brand', 'event', 
-  'service', 'professional', 'others'
-];
-
-const getTypeLabel = (type: string): string => {
-  if (type === 'tv') return 'TV';
-  if (type === 'others') return 'Others';
-  return type.charAt(0).toUpperCase() + type.slice(1);
-};
+import { EntityType } from '@/services/recommendation/types';
+import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
 
 const AdminEntityEdit = () => {
   const { id } = useParams<{ id: string }>();
@@ -805,9 +796,9 @@ const AdminEntityEdit = () => {
                             <SelectValue placeholder="Select type" />
                           </SelectTrigger>
                           <SelectContent>
-                            {entityTypes.map(type => (
+                            {getActiveEntityTypes().map(type => (
                               <SelectItem key={type} value={type}>
-                                {getTypeLabel(type)}
+                                {getEntityTypeLabel(type)}
                               </SelectItem>
                             ))}
                           </SelectContent>

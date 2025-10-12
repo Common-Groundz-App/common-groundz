@@ -44,7 +44,7 @@ import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useEntitySiblings } from '@/hooks/use-entity-siblings';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeMapping';
+import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { ExternalLinksSection } from '@/components/entity/ExternalLinksSection';

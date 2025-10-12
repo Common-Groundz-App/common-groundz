@@ -23,17 +23,8 @@ import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 const MAX_MEDIA_ITEMS = 4;
 import { Plus } from 'lucide-react';
 
-const entityTypes = [
-  'movie', 'book', 'food', 'product', 'place', 'activity', 
-  'music', 'art', 'tv', 'drink', 'travel', 'brand', 'event', 
-  'service', 'professional', 'others'
-];
-
-const getTypeLabel = (type: string): string => {
-  if (type === 'tv') return 'TV';
-  if (type === 'others') return 'Others';
-  return type.charAt(0).toUpperCase() + type.slice(1);
-};
+import { EntityType } from '@/services/recommendation/types';
+import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -195,7 +186,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
       const { data: newEntity, error } = await supabase
         .from('entities')
-        .insert({
+        .insert([{
           name: formData.name.trim(),
           type: formData.type as any,
           description: formData.description || null,
@@ -206,7 +197,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           created_by: user?.id || null,
           slug: hierarchicalSlug,
           parent_id: selectedParent?.id || null
-        })
+        }])
         .select()
         .single();
 
@@ -309,9 +300,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {entityTypes.map(type => (
+                    {getActiveEntityTypes().map(type => (
                       <SelectItem key={type} value={type}>
-                        {getTypeLabel(type)}
+                        {getEntityTypeLabel(type)}
                       </SelectItem>
                     ))}
                   </SelectContent>
