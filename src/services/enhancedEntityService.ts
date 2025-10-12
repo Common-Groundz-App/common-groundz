@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
 import { Entity } from '@/services/recommendation/types';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
 import { cachedPhotoService } from './cachedPhotoService';
