@@ -14,6 +14,7 @@ import { EntityCategory } from '@/utils/loadingMessages';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getCanonicalType } from '@/services/entityTypeHelpers';
 
 interface SearchResultHandlerProps {
   result: ProductSearchResult;
@@ -206,36 +207,6 @@ export function SearchResultHandler({
     }
   };
 
-  // Convert entity type to category for loading messages
-  const getEntityCategory = (type: EntityTypeString): EntityCategory => {
-    const categoryMap: Partial<Record<EntityTypeString, EntityCategory>> = {
-      'book': 'book',
-      'movie': 'movie',
-      'place': 'place',
-      'food': 'food',
-      'product': 'product',
-      'music': 'music',
-      'tv': 'tv',
-      'art': 'art',
-      'activity': 'activity',
-      'drink': 'drink',
-      'travel': 'travel',
-      'brand': 'product',
-      'people': 'place',
-      'event': 'place',
-      'service': 'product',
-      'professional': 'product',
-      'others': 'product',
-      // New canonical types
-      'tv_show': 'tv',
-      'course': 'product',
-      'app': 'product',
-      'game': 'product',
-      'experience': 'activity'
-    };
-    
-    return categoryMap[type] || 'product';
-  };
 
   return (
     <>
@@ -334,13 +305,19 @@ export function SearchResultHandler({
   );
 }
 
-// Helper functions for engaging messages
+// Helper functions for engaging messages using canonical types
 function getEngagingLoadingMessage(type: EntityTypeString, name: string): string {
-  const messages = {
+  const canonical = getCanonicalType(type);
+  const messages: Record<string, string[]> = {
     movie: [
       `🎬 Exploring this incredible film...`,
       `🍿 Getting ready for movie night...`,
       `🎭 Discovering cinematic magic...`
+    ],
+    tv_show: [
+      `📺 Exploring this amazing series...`,
+      `🍿 Getting ready to binge...`,
+      `🎬 Discovering your next favorite show...`
     ],
     book: [
       `📚 Diving into this amazing story...`,
@@ -361,37 +338,68 @@ function getEngagingLoadingMessage(type: EntityTypeString, name: string): string
       `🛍️ Exploring this amazing item...`,
       `✨ Discovering product details...`,
       `🌟 Preparing something special...`
+    ],
+    experience: [
+      `✨ Exploring this exciting adventure...`,
+      `🎭 Discovering unique experiences...`,
+      `🌟 Preparing something unforgettable...`
+    ],
+    course: [
+      `🎓 Exploring this learning opportunity...`,
+      `📚 Discovering new knowledge...`,
+      `✨ Preparing your educational journey...`
+    ],
+    app: [
+      `📱 Exploring this amazing app...`,
+      `✨ Discovering digital innovation...`,
+      `🚀 Preparing your next favorite tool...`
+    ],
+    game: [
+      `🎮 Exploring this exciting game...`,
+      `🎯 Discovering gaming excellence...`,
+      `✨ Preparing your next adventure...`
     ]
   };
   
-  const typeMessages = messages[type as keyof typeof messages] || messages.product;
+  const typeMessages = messages[canonical] || messages.product;
   return typeMessages[Math.floor(Math.random() * typeMessages.length)];
 }
 
 function getNavigationMessage(type: EntityTypeString, name: string): string {
-  const messages = {
+  const canonical = getCanonicalType(type);
+  const messages: Record<string, string> = {
     movie: `🎬 Taking you to this amazing film...`,
+    tv_show: `📺 Taking you to this amazing show...`,
     book: `📚 Opening this incredible book...`,
     place: `🗺️ Taking you to this wonderful place...`,
     food: `🍽️ Taking you to this delicious experience...`,
-    product: `🛍️ Exploring this amazing item...`
+    product: `🛍️ Exploring this amazing item...`,
+    experience: `✨ Taking you to this adventure...`,
+    course: `🎓 Taking you to this learning experience...`,
+    app: `📱 Taking you to this app...`,
+    game: `🎮 Taking you to this game...`
   };
   
-  return messages[type as keyof typeof messages] || `✨ Taking you there...`;
+  return messages[canonical] || `✨ Taking you there...`;
 }
 
 function getCreationMessage(type: EntityTypeString, name: string): string {
   // Use the same messages as getNavigationMessage for consistency
-  // This maintains the illusion that everything already exists in the app
-  const messages = {
+  const canonical = getCanonicalType(type);
+  const messages: Record<string, string> = {
     movie: `🎬 Taking you to this amazing film...`,
+    tv_show: `📺 Taking you to this amazing show...`,
     book: `📚 Opening this incredible book...`,
     place: `🗺️ Taking you to this wonderful place...`,
     food: `🍽️ Taking you to this delicious experience...`,
-    product: `🛍️ Exploring this amazing item...`
+    product: `🛍️ Exploring this amazing item...`,
+    experience: `✨ Taking you to this adventure...`,
+    course: `🎓 Taking you to this learning experience...`,
+    app: `📱 Taking you to this app...`,
+    game: `🎮 Taking you to this game...`
   };
   
-  return messages[type as keyof typeof messages] || `✨ Taking you there...`;
+  return messages[canonical] || `✨ Taking you there...`;
 }
 
 // Helper function to determine entity type from search result

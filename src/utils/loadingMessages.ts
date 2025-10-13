@@ -1,5 +1,4 @@
-
-export type EntityCategory = 'book' | 'movie' | 'place' | 'food' | 'product' | 'music' | 'tv' | 'art' | 'activity' | 'drink' | 'travel' | 'course' | 'app' | 'game' | 'experience';
+export type EntityCategory = 'book' | 'movie' | 'place' | 'food' | 'product' | 'music' | 'tv_show' | 'art' | 'experience' | 'course' | 'app' | 'game' | 'brand' | 'event' | 'service' | 'professional' | 'others';
 
 export const getLoadingMessages = (category: EntityCategory): string[] => {
   const messages: Record<EntityCategory, string[]> = {
@@ -75,7 +74,7 @@ export const getLoadingMessages = (category: EntityCategory): string[] => {
       "🌍 Music is a universal language understood across cultures",
       "🎤 Singing releases endorphins and reduces stress hormones"
     ],
-    tv: [
+    tv_show: [
       "📺 The average person watches 4+ hours of TV daily!",
       "🎭 TV shows create shared cultural experiences globally",
       "🧠 Binge-watching releases dopamine, creating anticipation",
@@ -98,42 +97,6 @@ export const getLoadingMessages = (category: EntityCategory): string[] => {
       "💭 Abstract art encourages creative thinking and interpretation",
       "🎭 Art movements reflect the social climate of their time",
       "✨ Everyone interprets art differently - that's the beauty!"
-    ],
-    activity: [
-      "🏃‍♂️ Regular activities boost mood and energy levels!",
-      "🧠 New activities create fresh neural pathways in your brain",
-      "💪 Physical activities release natural mood elevators",
-      "🤝 Group activities strengthen social connections and friendships",
-      "🎯 Challenging activities build confidence and resilience",
-      "🌟 Hobbies reduce stress and provide mental breaks",
-      "⏰ Active breaks improve productivity and focus",
-      "🏆 Setting activity goals increases motivation and satisfaction",
-      "🌱 Outdoor activities connect you with nature's benefits",
-      "😊 Fun activities create lasting positive memories"
-    ],
-    drink: [
-      "☕ Coffee is the world's second-most traded commodity!",
-      "🍵 Tea has been enjoyed for over 4,000 years",
-      "💧 Proper hydration improves brain function by 23%",
-      "🍷 Wine tasting engages all five senses simultaneously",
-      "🥤 The carbonation in drinks was discovered by accident",
-      "🌿 Herbal teas offer various natural health benefits",
-      "🧊 Ice cubes were once more valuable than gold!",
-      "🍹 Cocktails tell stories of different cultures and eras",
-      "☕ Caffeine can improve physical performance by 11-12%",
-      "🥛 Some drinks have been used medicinally for centuries"
-    ],
-    travel: [
-      "✈️ Travel makes you more creative and open-minded!",
-      "🗺️ Exploring new places builds confidence and independence",
-      "🌍 Travel creates memories that last a lifetime",
-      "📸 New experiences stimulate brain plasticity and learning",
-      "🎒 Adventure travel can improve problem-solving skills",
-      "🌅 Different time zones can temporarily boost alertness",
-      "🍽️ Trying local cuisine expands your palate and culture",
-      "👥 Travel builds empathy through cultural understanding",
-      "🚂 The journey can be just as rewarding as the destination",
-      "🌟 Solo travel increases self-confidence and self-reliance"
     ],
     course: [
       "🎓 Learning new skills improves brain plasticity!",
@@ -163,6 +126,41 @@ export const getLoadingMessages = (category: EntityCategory): string[] => {
       "🎭 Unique experiences enrich your life story",
       "🎨 Trying new things sparks creativity",
       "🚀 Adventures push you to grow and learn"
+    ],
+    brand: [
+      "🏷️ Great brands tell compelling stories!",
+      "✨ Brand loyalty is built on trust and consistency",
+      "🎯 The best brands create emotional connections",
+      "🌟 Brand identity shapes customer expectations",
+      "📢 Word of mouth is the most powerful brand marketing"
+    ],
+    event: [
+      "🎪 Events bring people together for shared experiences!",
+      "🎉 Memorable events create lasting connections",
+      "🎭 Every event tells a unique story",
+      "🎨 Great events blend planning with spontaneity",
+      "✨ The energy of live events is incomparable"
+    ],
+    service: [
+      "🛎️ Exceptional service creates loyal customers!",
+      "✨ Great service turns moments into memories",
+      "🎯 Consistency in service builds trust over time",
+      "🌟 Personalized service shows attention to detail",
+      "🤝 Quality service is about solving problems"
+    ],
+    professional: [
+      "💼 Expertise comes from years of dedicated practice!",
+      "🎯 Great professionals never stop learning",
+      "✨ Credentials reflect commitment to excellence",
+      "🌟 Professional networks open unexpected doors",
+      "🚀 Mentorship accelerates professional growth"
+    ],
+    others: [
+      "✨ Every recommendation tells a unique story!",
+      "🌟 Discovering new things enriches our lives",
+      "🎯 Quality recommendations save time and energy",
+      "💡 Personal experiences guide the best choices",
+      "🚀 The best finds often come from trusted sources"
     ]
   };
 

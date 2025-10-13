@@ -8,6 +8,8 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { getEntityTypeLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
+import { EntityType } from '@/services/recommendation/types';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -65,28 +67,39 @@ const RecommendationCard = ({
     entityImageUrl: entityImageUrl
   });
 
-  // Helper function to get entity route based on type and slug
+  // Helper function to get entity route based on type and slug using canonical types
   const getEntityRoute = (entity: any) => {
     if (!entity || !entity.slug) {
       return null;
     }
 
-    // Map entity types to route prefixes
-    const typeToRoute: Record<string, string> = {
-      'place': '/place',
-      'food': '/place',
-      'drink': '/place',
-      'movie': '/movie',
-      'book': '/book',
-      'product': '/product',
-      'tv': '/entity',
-      'music': '/entity',
-      'art': '/entity',
-      'activity': '/entity',
-      'travel': '/entity'
+    const canonical = getCanonicalType(entity.type);
+    const typeToRoute: Record<EntityType, string> = {
+      [EntityType.Place]: '/place',
+      [EntityType.Food]: '/place',
+      [EntityType.Movie]: '/movie',
+      [EntityType.TVShow]: '/tv',
+      [EntityType.Book]: '/book',
+      [EntityType.Product]: '/product',
+      [EntityType.Course]: '/course',
+      [EntityType.App]: '/app',
+      [EntityType.Game]: '/game',
+      [EntityType.Experience]: '/experience',
+      [EntityType.Brand]: '/brand',
+      [EntityType.Event]: '/event',
+      [EntityType.Service]: '/service',
+      [EntityType.Professional]: '/professional',
+      [EntityType.Others]: '/entity',
+      // Legacy types (mapped via canonical)
+      [EntityType.TV]: '/tv',
+      [EntityType.Activity]: '/experience',
+      [EntityType.Music]: '/product',
+      [EntityType.Art]: '/product',
+      [EntityType.Drink]: '/place',
+      [EntityType.Travel]: '/place'
     };
 
-    const routePrefix = typeToRoute[entity.type?.toLowerCase()] || '/entity';
+    const routePrefix = typeToRoute[canonical] || '/entity';
     return `${routePrefix}/${entity.slug}`;
   };
 
@@ -143,33 +156,12 @@ const RecommendationCard = ({
     return hasUserMediaArray;
   }, [recommendation.media, hideEntityFallbacks, mediaItems.length]);
 
-  // Get a category-specific fallback image URL
-  const getCategoryFallbackImage = (category: string): string => {
-    const fallbacks: Record<string, string> = {
-      'Food': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1',
-      'Drink': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
-      'Movie': 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
-      'Book': 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
-      'Place': 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
-      'Product': 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
-      'Activity': 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-      'Music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
-      'Art': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
-      'TV': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
-      'Travel': 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
-    };
-    
-    return fallbacks[category] || 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
-  };
-  
-  // Get a fallback image with proper priority:
-  // 1. Entity image if available
-  // 2. Category image if no entity image
+  // Get a fallback image using canonical helper
   const getFallbackImage = (): string => {
     if (entityImageUrl) {
       return entityImageUrl;
     }
-    return recommendation.category ? getCategoryFallbackImage(recommendation.category) : 'https://images.unsplash.com/photo-1501854140801-50d01698950b';
+    return recommendation.category ? getEntityTypeFallbackImage(recommendation.category) : getEntityTypeFallbackImage(EntityType.Product);
   };
 
   const handleLike = async () => {
@@ -217,38 +209,33 @@ const RecommendationCard = ({
     // Handle share logic here
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      'Food': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-      'Drink': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-      'Activity': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-      'Product': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-      'Book': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-      'Movie': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-      'TV': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
-      'Music': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
-      'Art': 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-300',
-      'Place': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
-      'Travel': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300',
+  const getBadgeColor = (category: string) => {
+    const canonical = getCanonicalType(category);
+    const colors: Record<EntityType, string> = {
+      [EntityType.Food]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+      [EntityType.TVShow]: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
+      [EntityType.Experience]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+      [EntityType.Course]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+      [EntityType.App]: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+      [EntityType.Game]: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+      [EntityType.Product]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+      [EntityType.Book]: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+      [EntityType.Movie]: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+      [EntityType.Place]: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
+      [EntityType.Brand]: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+      [EntityType.Event]: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
+      [EntityType.Service]: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
+      [EntityType.Professional]: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300',
+      [EntityType.Others]: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+      // Legacy types (handled via canonical)
+      [EntityType.TV]: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
+      [EntityType.Activity]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+      [EntityType.Music]: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
+      [EntityType.Art]: 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-300',
+      [EntityType.Drink]: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+      [EntityType.Travel]: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300'
     };
-    return colors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
-  };
-
-  const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      'Food': 'Food',
-      'Drink': 'Drink',
-      'Activity': 'Activity',
-      'Product': 'Product',
-      'Book': 'Book',
-      'Movie': 'Movie',
-      'TV': 'TV',
-      'Music': 'Music',
-      'Art': 'Art',
-      'Place': 'Place',
-      'Travel': 'Travel',
-    };
-    return labels[category] || category;
+    return colors[canonical] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -351,10 +338,10 @@ const RecommendationCard = ({
           {recommendation.category && (
             <div className="mb-2">
               <Badge 
-                className={cn("text-xs py-0 px-2 h-5", getCategoryColor(recommendation.category))} 
+                className={cn("text-xs py-0 px-2 h-5", getBadgeColor(recommendation.category))} 
                 variant="outline"
               >
-                {getCategoryLabel(recommendation.category)}
+                {getEntityTypeLabel(recommendation.category)}
               </Badge>
             </div>
           )}
@@ -488,8 +475,8 @@ const RecommendationCard = ({
           <h3 className="font-semibold text-lg">{recommendation.title}</h3>
           <div className="flex flex-wrap gap-2 mt-1">
             {recommendation.category && (
-              <Badge className={cn("font-normal", getCategoryColor(recommendation.category))} variant="outline">
-                {getCategoryLabel(recommendation.category)}
+              <Badge className={cn("font-normal", getBadgeColor(recommendation.category))} variant="outline">
+                {getEntityTypeLabel(recommendation.category)}
               </Badge>
             )}
             
@@ -523,7 +510,7 @@ const RecommendationCard = ({
                 src={getFallbackImage()}
                 alt={`${recommendation.title} - ${recommendation.category || 'Recommendation'}`}
                 className="w-full h-full object-cover"
-                fallbackSrc={recommendation.category ? getCategoryFallbackImage(recommendation.category) : undefined}
+                fallbackSrc={recommendation.category ? getEntityTypeFallbackImage(recommendation.category) : undefined}
               />
             </div>
           </div>

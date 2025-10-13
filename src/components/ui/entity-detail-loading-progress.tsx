@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { getRandomLoadingMessage, EntityCategory } from '@/utils/loadingMessages';
+import { getCanonicalType } from '@/services/entityTypeHelpers';
 
 interface EntityDetailLoadingProgressProps {
   entityName?: string;
@@ -18,25 +19,8 @@ export const EntityDetailLoadingProgress = ({
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // Convert entity type to category for loading messages
-    const getCategoryFromType = (type: string): EntityCategory => {
-      const categoryMap: Record<string, EntityCategory> = {
-        'book': 'book',
-        'movie': 'movie',
-        'place': 'place',
-        'food': 'food',
-        'product': 'product',
-        'music': 'music',
-        'tv': 'tv',
-        'art': 'art',
-        'activity': 'activity',
-        'drink': 'drink',
-        'travel': 'travel'
-      };
-      return categoryMap[type] || 'product';
-    };
-
-    const category = getCategoryFromType(entityType);
+    // Convert entity type to canonical category for loading messages
+    const category = getCanonicalType(entityType) as EntityCategory;
     
     // Set initial message
     const message = getRandomLoadingMessage(category);

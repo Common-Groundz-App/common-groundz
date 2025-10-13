@@ -8,6 +8,8 @@ import { useRecommendationUploads } from '@/hooks/recommendations/use-recommenda
 import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { getCanonicalType } from '@/services/entityTypeHelpers';
+import { mapStringToEntityType } from '@/hooks/feed/api/types';
 
 // Import step components
 import StepOne from './steps/StepOne';
@@ -68,32 +70,24 @@ const ReviewForm = ({
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
-  // Helper function to map entity type to review category (defined early for use in state initialization)
-  const mapEntityTypeToReviewCategory = (entityType: string): string => {
-    switch (entityType.toLowerCase()) {
-      case 'food':
-      case 'movie':
-      case 'book':
-      case 'place':
-      case 'product':
-        return entityType.toLowerCase();
-      case 'event':
-      case 'activity':
-      case 'travel':
-        return 'place';
-      case 'service':
-      case 'professional':
-      case 'others':
-      case 'music':
-      case 'art':
-      case 'brand':
+  // Helper function to map canonical entity type to review category
+  const getReviewCategory = (canonicalType: EntityType): string => {
+    switch (canonicalType) {
+      case EntityType.Food:
+      case EntityType.Movie:
+      case EntityType.TVShow:
+      case EntityType.Book:
+      case EntityType.Place:
+      case EntityType.Product:
+        return canonicalType.toLowerCase();
+      case EntityType.Course:
+      case EntityType.App:
+      case EntityType.Game:
         return 'product';
-      case 'tv':
-        return 'movie';
-      case 'drink':
-        return 'food';
+      case EntityType.Experience:
+        return 'place';
       default:
-        return 'food';
+        return 'product';
     }
   };
 
@@ -101,7 +95,7 @@ const ReviewForm = ({
   const [rating, setRating] = useState(review?.rating || 0);
   const [category, setCategory] = useState(
     review?.category || 
-    (entity?.type ? mapEntityTypeToReviewCategory(entity.type) : 'food')
+    (entity?.type ? getReviewCategory(getCanonicalType(entity.type)) : 'food')
   );
   
   // Separate state variables for different fields
@@ -172,8 +166,8 @@ const ReviewForm = ({
       
       // Convert the string type to EntityType enum if possible
       if (typeof processedEntity.type === 'string') {
-        // Map from string to EntityType enum
-        const mappedType = mapStringToEntityType(processedEntity.type);
+        // Map from string to EntityType enum using imported helper
+        const mappedType = mapStringToEntityType(processedEntity.type as any);
         processedEntity.type = mappedType;
       }
       
@@ -182,41 +176,19 @@ const ReviewForm = ({
       // Convert provided entity to expected format
       const entityToUse: any = {
         ...entity,
-        type: mapStringToEntityType(entity.type)
+        type: mapStringToEntityType(entity.type as any)
       };
       
       setSelectedEntity(entityToUse);
     }
   }, [review, isEditMode, entity, selectedEntity]);
 
-  // Helper function to map string type to EntityType enum
-  const mapStringToEntityType = (type: string): EntityType => {
-    switch (type.toLowerCase()) {
-      case 'movie': return EntityType.Movie;
-      case 'book': return EntityType.Book;
-      case 'food': return EntityType.Food;
-      case 'product': return EntityType.Product;
-      case 'place': return EntityType.Place;
-      case 'activity': return EntityType.Activity;
-      case 'music': return EntityType.Music;
-      case 'art': return EntityType.Art;
-      case 'tv': return EntityType.TV;
-      case 'drink': return EntityType.Drink;
-      case 'travel': return EntityType.Travel;
-      case 'brand': return EntityType.Brand;
-      case 'event': return EntityType.Event;
-      case 'service': return EntityType.Service;
-      case 'professional': return EntityType.Professional;
-      case 'others': return EntityType.Others;
-      default: return EntityType.Place; // Default fallback
-    }
-  };
   
   // Ensure proper initialization when entity is provided
   useEffect(() => {
     if (entity && isOpen && !isEditMode) {
-      // Set initial values from entity using the mapping function
-      setCategory(mapEntityTypeToReviewCategory(entity.type));
+      // Set initial values from entity using canonical type
+      setCategory(getReviewCategory(getCanonicalType(entity.type)));
       
       // IMPORTANT: Handle the foodName vs contentName differently based on category
       if (entity.type.toLowerCase() === 'food') {

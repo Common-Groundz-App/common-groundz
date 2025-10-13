@@ -5,8 +5,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, X, Book, Film, Utensils, Package, MapPin } from 'lucide-react';
+import { Plus, X, Book, Film, Utensils, Package, MapPin, Tv, GraduationCap, Smartphone, Gamepad2, Compass } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { getCanonicalType } from '@/services/entityTypeHelpers';
+import { EntityType } from '@/services/recommendation/types';
 
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
 
@@ -362,23 +364,184 @@ export const EntityTypeSpecificFields: React.FC<EntityTypeSpecificFieldsProps> =
     </Card>
   );
 
-  // Render based on entity type
-  const entityType = entity.type as string;
-  switch (entityType) {
-    case 'book':
+  const renderTVShowFields = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Tv className="h-4 w-4" />
+          TV Show Details
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Release Year</Label>
+          <Input
+            type="number"
+            value={entity.publication_year || ''}
+            onChange={(e) => onChange('publication_year', e.target.value ? parseInt(e.target.value) : null)}
+            placeholder="2023"
+            disabled={disabled}
+            className="text-sm"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Cast & Crew (JSON)</Label>
+          <Textarea
+            value={entity.cast_crew ? JSON.stringify(entity.cast_crew, null, 2) : ''}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                onChange('cast_crew', parsed);
+              } catch {}
+            }}
+            placeholder='{"network": "HBO", "seasons": 8, "episodes": 73}'
+            disabled={disabled}
+            rows={4}
+            className="text-sm font-mono"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderCourseFields = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <GraduationCap className="h-4 w-4" />
+          Course Details
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Specifications (JSON)</Label>
+          <Textarea
+            value={entity.specifications ? JSON.stringify(entity.specifications, null, 2) : ''}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                onChange('specifications', parsed);
+              } catch {}
+            }}
+            placeholder='{"instructor": "Name", "duration": "6 weeks", "platform": "Coursera"}'
+            disabled={disabled}
+            rows={4}
+            className="text-sm font-mono"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderAppFields = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Smartphone className="h-4 w-4" />
+          App Details
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Specifications (JSON)</Label>
+          <Textarea
+            value={entity.specifications ? JSON.stringify(entity.specifications, null, 2) : ''}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                onChange('specifications', parsed);
+              } catch {}
+            }}
+            placeholder='{"platform": "iOS/Android", "version": "2.0", "developer": "Company"}'
+            disabled={disabled}
+            rows={4}
+            className="text-sm font-mono"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderGameFields = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Gamepad2 className="h-4 w-4" />
+          Game Details
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Specifications (JSON)</Label>
+          <Textarea
+            value={entity.specifications ? JSON.stringify(entity.specifications, null, 2) : ''}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                onChange('specifications', parsed);
+              } catch {}
+            }}
+            placeholder='{"platform": "PC/Console", "genre": "RPG", "developer": "Studio"}'
+            disabled={disabled}
+            rows={4}
+            className="text-sm font-mono"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderExperienceFields = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Compass className="h-4 w-4" />
+          Experience Details
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Specifications (JSON)</Label>
+          <Textarea
+            value={entity.specifications ? JSON.stringify(entity.specifications, null, 2) : ''}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                onChange('specifications', parsed);
+              } catch {}
+            }}
+            placeholder='{"duration": "2 hours", "location": "City, State", "booking_url": "https://..."}'
+            disabled={disabled}
+            rows={4}
+            className="text-sm font-mono"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Render based on entity type using canonical helpers
+  const canonicalType = getCanonicalType(entity.type);
+  switch (canonicalType) {
+    case EntityType.Book:
       return renderBookFields();
-    case 'movie':
-    case 'tv':
-      return renderMovieFields();
-    case 'food':
-    case 'drink':
+    case EntityType.Movie:
+    case EntityType.TVShow:
+      return canonicalType === EntityType.TVShow ? renderTVShowFields() : renderMovieFields();
+    case EntityType.Food:
       return renderFoodFields();
-    case 'product':
+    case EntityType.Product:
       return renderProductFields();
-    case 'place':
-    case 'travel':
-    case 'activity':
+    case EntityType.Place:
       return renderPlaceFields();
+    case EntityType.Course:
+      return renderCourseFields();
+    case EntityType.App:
+      return renderAppFields();
+    case EntityType.Game:
+      return renderGameFields();
+    case EntityType.Experience:
+      return renderExperienceFields();
     default:
       return null;
   }

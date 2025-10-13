@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { EntityCreationLoader } from '@/components/ui/loading-spinner';
 import { EntityCategory } from '@/utils/loadingMessages';
+import { getCanonicalType } from '@/services/entityTypeHelpers';
 
 interface ProductCardProps {
   product: {
@@ -100,12 +101,17 @@ export function ProductCard({ product, enableEntityCreation = false, onEntityCre
     }
   };
 
-  // Convert entity type to category for loading messages
+  // Convert entity type to canonical category for loading messages
   const getEntityCategory = (apiSource: string): EntityCategory => {
-    if (apiSource === 'openlibrary' || apiSource === 'google_books') return 'book';
-    if (apiSource === 'omdb' || apiSource === 'tmdb') return 'movie';
-    if (apiSource === 'google_places') return 'place';
-    return 'product';
+    let entityType = 'product';
+    if (apiSource === 'openlibrary' || apiSource === 'google_books') {
+      entityType = 'book';
+    } else if (apiSource === 'omdb' || apiSource === 'tmdb') {
+      entityType = 'movie';
+    } else if (apiSource === 'google_places') {
+      entityType = 'place';
+    }
+    return getCanonicalType(entityType) as EntityCategory;
   };
 
   return (
