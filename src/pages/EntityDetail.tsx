@@ -37,7 +37,7 @@ import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loadi
 import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
 import { EntityV4LoadingWrapper } from '@/components/entity/EntityV4LoadingWrapper';
 import { Eye, ArrowRight } from 'lucide-react';
-import { getContextualFieldLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
+import { getContextualFieldLabel, getEntityTypeFallbackImage, getCanonicalType, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
 import { Helmet } from 'react-helmet-async';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
@@ -532,7 +532,7 @@ const EntityDetailOriginal = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
-                      {entity?.type}
+                      {getEntityTypeLabel(entity?.type || '')}
                     </Badge>
                     {entity?.category_id && (
                       <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">

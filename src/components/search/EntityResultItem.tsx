@@ -7,6 +7,7 @@ import { MapPin, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface EntityResultItemProps {
   entity: EntitySearchResult;
@@ -36,7 +37,7 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
         <div className="flex items-center gap-2 mb-1">
           <p className="text-sm font-medium truncate">{entity.name}</p>
           <Badge variant="outline" className="text-xs py-0 px-1.5 h-5 bg-muted/50">
-            {entity.type}
+            {getEntityTypeLabel(entity.type)}
           </Badge>
         </div>
         {entity.venue && (

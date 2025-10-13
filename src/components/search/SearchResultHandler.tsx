@@ -14,7 +14,7 @@ import { EntityCategory } from '@/utils/loadingMessages';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getCanonicalType } from '@/services/entityTypeHelpers';
+import { getCanonicalType, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface SearchResultHandlerProps {
   result: ProductSearchResult;
@@ -250,7 +250,7 @@ export function SearchResultHandler({
           )}
           <div className="mt-1">
             <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-              {entityType}
+              {getEntityTypeLabel(entityType)}
             </span>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Package } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Entity } from '@/services/recommendation/types';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
+import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 
 interface EntityChildrenCardProps {
@@ -170,8 +170,8 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
                     </span>
                   )}
                 </div>
-                <Badge variant="outline" className="text-xs capitalize">
-                  {child.type}
+                <Badge variant="outline" className="text-xs">
+                  {getEntityTypeLabel(child.type)}
                 </Badge>
                 {child.venue && (
                   <span className="text-xs text-muted-foreground truncate">
