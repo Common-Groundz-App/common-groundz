@@ -13,6 +13,7 @@ import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 export const FeaturedEntities = () => {
   const navigate = useNavigate();
@@ -114,7 +115,7 @@ export const FeaturedEntities = () => {
                 entityType={entity.type}
               />
               <Badge className="absolute top-2 right-2 bg-background/80 text-foreground backdrop-blur-sm">
-                {entity.type.charAt(0).toUpperCase() + entity.type.slice(1)}
+                {getEntityTypeLabel(entity.type)}
               </Badge>
             </div>
             <div className="p-4">

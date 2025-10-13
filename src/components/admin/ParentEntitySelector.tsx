@@ -7,6 +7,7 @@ import { X, Search, Loader2 } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
 import { Badge } from '@/components/ui/badge';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 // Use the correct Entity type from useEntitySearch
 interface SearchEntity {
@@ -209,7 +210,7 @@ export function ParentEntitySelector({
                           </p>
                         )}
                         <Badge variant="outline" className="text-xs mt-1">
-                          {entity.type}
+                          {getEntityTypeLabel(entity.type)}
                         </Badge>
                       </div>
                     </button>

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import {
   CheckCircle,
   XCircle,
@@ -173,8 +174,8 @@ export const SuggestionReviewModal: React.FC<SuggestionReviewModalProps> = ({
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-xl font-semibold">{entity.name}</h3>
-                      <Badge variant="outline" className="capitalize">
-                        {entity.type}
+                      <Badge variant="outline">
+                        {getEntityTypeLabel(entity.type)}
                       </Badge>
                       <Link
                         to={`/entity/${entity.id}`}

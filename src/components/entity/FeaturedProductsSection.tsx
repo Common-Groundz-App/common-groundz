@@ -7,7 +7,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { Entity } from '@/services/recommendation/types';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
+import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityStats } from '@/hooks/use-entity-detail-cached';
 
 interface FeaturedProductsSectionProps {
@@ -85,8 +85,8 @@ export const FeaturedProductsSection: React.FC<FeaturedProductsSectionProps> = (
                       <span className="text-xs text-muted-foreground">No ratings yet</span>
                     )}
                   </div>
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {child.type}
+                  <Badge variant="outline" className="text-xs">
+                    {getEntityTypeLabel(child.type)}
                   </Badge>
                 </div>
                 {child.description && (

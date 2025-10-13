@@ -43,6 +43,7 @@ import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { getEntityTypeFallbackImage, getCanonicalType, getContextualFieldLabel } from '@/services/entityTypeHelpers';
 import { Entity, EntityType } from '@/services/recommendation/types';
@@ -533,7 +534,7 @@ const EntityDetailV2 = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
-                      {entity?.type}
+                      {getEntityTypeLabel(entity?.type || '')}
                     </Badge>
                   </div>
                   
@@ -737,7 +738,7 @@ const EntityDetailV2 = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                           <div>
                             <h4 className="font-medium mb-2">Type</h4>
-                            <Badge variant="outline">{entity?.type}</Badge>
+                            <Badge variant="outline">{getEntityTypeLabel(entity?.type || '')}</Badge>
                           </div>
                           
                           {entity?.venue && (
@@ -845,8 +846,8 @@ const EntityDetailV2 = () => {
                                     </p>
                                   )}
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-xs capitalize">
-                                      {child.type}
+                                    <Badge variant="outline" className="text-xs">
+                                      {getEntityTypeLabel(child.type)}
                                     </Badge>
                                     {child.venue && (
                                       <span className="text-xs text-muted-foreground">

@@ -10,9 +10,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { 
   RefreshCw, 
-  Search, 
+  Search,
   Filter, 
   Download, 
   Edit, 
@@ -648,7 +649,7 @@ export const AdminEntityManagementPanel = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{entity.type}</Badge>
+                      <Badge variant="outline">{getEntityTypeLabel(entity.type)}</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge 
@@ -735,7 +736,7 @@ export const AdminEntityManagementPanel = () => {
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
                                   <label className="text-sm font-medium">Type</label>
-                                  <div className="text-sm text-muted-foreground">{entity.type}</div>
+                                  <div className="text-sm text-muted-foreground">{getEntityTypeLabel(entity.type)}</div>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Status</label>

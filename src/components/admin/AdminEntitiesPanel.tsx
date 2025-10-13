@@ -7,6 +7,7 @@ import { Sparkles, MapPin, Calendar, Loader2 } from 'lucide-react';
 import { useAdminEntities } from '@/hooks/admin/useAdminEntities';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 export const AdminEntitiesPanel = () => {
   const { entities, isLoading, isGenerating, isBulkGenerating, generateEntitySummary, generateBulkEntitySummaries } = useAdminEntities();
@@ -115,7 +116,7 @@ export const AdminEntitiesPanel = () => {
                       <h3 className="font-medium truncate">{entity.name}</h3>
                       <Badge variant="outline" className="text-xs">
                         <MapPin className="h-3 w-3 mr-1" />
-                        {entity.type}
+                        {getEntityTypeLabel(entity.type)}
                       </Badge>
                     </div>
                     

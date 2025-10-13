@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useUnifiedSearch } from '@/hooks/use-unified-search';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 export default function ProductSearch() {
   const { query } = useParams<{ query: string }>();
@@ -126,7 +127,7 @@ export default function ProductSearch() {
                         )}
                       </div>
                       <Badge variant="outline" className="text-xs">
-                        {entity.type}
+                        {getEntityTypeLabel(entity.type)}
                       </Badge>
                     </div>
                   ))}

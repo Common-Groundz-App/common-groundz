@@ -23,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getRecommendationFallbackImage } from '@/utils/fallbackImageUtils';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
@@ -263,7 +264,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            <Badge>{recommendation.category}</Badge>
+            <Badge>{getEntityTypeLabel(recommendation.category)}</Badge>
             
             {isOwner && (
               <DropdownMenu>

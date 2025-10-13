@@ -12,7 +12,7 @@ import { EntityStats } from '@/hooks/use-entity-detail-cached';
 import { EntityWithChildren } from '@/services/entityHierarchyService';
 import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
+import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getEntityStats } from '@/services/entityService';
 import PostFeedItem from '@/components/feed/PostFeedItem';
 import { useEntityPosts } from '@/hooks/use-entity-posts';
@@ -167,7 +167,7 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
               <div>
                 <h4 className="font-medium mb-2">Type</h4>
-                <Badge variant="outline">{entity?.type}</Badge>
+                <Badge variant="outline">{getEntityTypeLabel(entity?.type || '')}</Badge>
               </div>
               
               {entity?.venue && (
@@ -266,8 +266,8 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
                         </p>
                       )}
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {child.type}
+                        <Badge variant="outline" className="text-xs">
+                          {getEntityTypeLabel(child.type)}
                         </Badge>
                         {child.venue && (
                           <span className="text-xs text-muted-foreground">

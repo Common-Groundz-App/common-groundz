@@ -932,7 +932,7 @@ const EntityDetailOriginal = () => {
                     <CardContent className="space-y-3">
                       <div className="text-sm">
                         <div className="font-medium">Type</div>
-                        <div className="text-muted-foreground capitalize">{entity.type}</div>
+                        <div className="text-muted-foreground">{getEntityTypeLabel(entity.type)}</div>
                       </div>
 
                       {contextualField?.value && (
