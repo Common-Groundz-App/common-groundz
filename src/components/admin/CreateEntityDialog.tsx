@@ -25,15 +25,14 @@ import { Plus } from 'lucide-react';
 
 import { EntityType } from '@/services/recommendation/types';
 import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
-import { fetchCategoriesByType } from '@/services/categoryService';
 import { searchTags, getOrCreateTag } from '@/services/tagService';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Badge } from '@/components/ui/badge';
 import { X, Loader2 } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { CategorySelector } from './CategorySelector';
 
 type Tag = Database['public']['Tables']['tags']['Row'];
-type Category = Database['public']['Tables']['categories']['Row'];
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -72,10 +71,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [otherTypeReason, setOtherTypeReason] = useState('');
   const [primaryMediaUrl, setPrimaryMediaUrl] = useState<string | null>(null);
   
-  // Category selector state
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-  
   // Tag input state
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [tagInput, setTagInput] = useState('');
@@ -110,22 +105,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       loadDraft();
     }
   }, [open]);
-
-  // Load categories when type changes
-  useEffect(() => {
-    if (formData.type) {
-      setLoadingCategories(true);
-      fetchCategoriesByType(formData.type)
-        .then(setCategories)
-        .catch(err => {
-          console.error('Error loading categories:', err);
-          setCategories([]);
-        })
-        .finally(() => setLoadingCategories(false));
-    } else {
-      setCategories([]);
-    }
-  }, [formData.type]);
 
   // Tag autocomplete
   useEffect(() => {
@@ -204,7 +183,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setSelectedTags([]);
     setTagInput('');
     setTagSuggestions([]);
-    setCategories([]);
     
     // Clear draft from sessionStorage
     try {
@@ -447,35 +425,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
             {/* Category Selector */}
             {formData.type && (
-              <div className="space-y-2">
-                <Label htmlFor="category">Primary Category</Label>
-                <Select
-                  value={formData.category_id || ''}
-                  onValueChange={(value) => handleInputChange('category_id', value || null)}
-                  disabled={!formData.type || loadingCategories || loading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={
-                      !formData.type 
-                        ? "Select a type first" 
-                        : loadingCategories 
-                          ? "Loading categories..." 
-                          : "Select category (optional)"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">No Category</SelectItem>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.parent_id ? `↳ ${cat.name}` : cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Entities without categories will be flagged for admin review
-                </p>
-              </div>
+              <CategorySelector
+                entityType={formData.type as EntityType}
+                value={formData.category_id}
+                onChange={(id) => handleInputChange('category_id', id)}
+                disabled={loading}
+              />
             )}
 
             {/* Tag Input */}
