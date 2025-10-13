@@ -37,8 +37,7 @@ import { EntityDetailLoadingProgress } from '@/components/ui/entity-detail-loadi
 import { EntityDetailSkeleton } from '@/components/entity/EntityDetailSkeleton';
 import { EntityV4LoadingWrapper } from '@/components/entity/EntityV4LoadingWrapper';
 import { Eye, ArrowRight } from 'lucide-react';
-import { getContextualFieldLabel, getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
-import { mapEntityTypeToDatabase } from '@/services/entityTypeMapping';
+import { getContextualFieldLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
 import { Helmet } from 'react-helmet-async';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
@@ -234,11 +233,11 @@ const EntityDetailOriginal = () => {
   const getContextualFieldInfo = () => {
     if (!entity) return null;
 
-    // Use mapped type for switch statement
-    const mappedType = mapEntityTypeToDatabase(entity.type);
+    // Normalize to canonical type before switching
+    const canonicalType = getCanonicalType(entity.type);
     const label = getContextualFieldLabel(entity.type);
 
-    switch (mappedType) {
+    switch (canonicalType) {
       case EntityType.Book:
         return {
           label,
@@ -247,11 +246,13 @@ const EntityDetailOriginal = () => {
             : entity.venue || null
         };
       case EntityType.Movie:
+      case EntityType.TVShow:  // ✅ Canonical
         return {
           label,
           value: entity.cast_crew?.studio || entity.venue || null
         };
       case EntityType.Place:
+      case EntityType.Experience:  // ✅ Canonical
         return {
           label,
           value: entity.api_source === 'google_places' && entity.metadata?.formatted_address
@@ -259,6 +260,9 @@ const EntityDetailOriginal = () => {
             : entity.venue || null
         };
       case EntityType.Product:
+      case EntityType.Course:  // ✅ Canonical
+      case EntityType.App:     // ✅ Canonical
+      case EntityType.Game:    // ✅ Canonical
         return {
           label,
           value: entity.specifications?.brand || entity.venue || null

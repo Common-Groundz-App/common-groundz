@@ -44,7 +44,7 @@ import { EntityChildrenCard } from '@/components/entity/EntityChildrenCard';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useEntitySiblings } from '@/hooks/use-entity-siblings';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
+import { getEntityTypeFallbackImage, getCanonicalType, getContextualFieldLabel } from '@/services/entityTypeHelpers';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { ExternalLinksSection } from '@/components/entity/ExternalLinksSection';
@@ -211,39 +211,45 @@ const EntityDetailV2 = () => {
   const getContextualFieldInfo = () => {
     if (!entity) return null;
     
-    switch (entity.type) {
-      case 'book':
+    // Normalize to canonical type before switching
+    const canonicalType = getCanonicalType(entity.type);
+    
+    switch (canonicalType) {
+      case EntityType.Book:
         return {
           label: 'Author',
           value: entity.authors && entity.authors.length > 0 
             ? entity.authors[0] 
             : entity.venue || null
         };
-      case 'movie':
-      case 'tv':
+      case EntityType.Movie:
+      case EntityType.TVShow:  // ✅ Canonical
         return {
           label: 'Studio',
           value: entity.cast_crew?.studio || entity.venue || null
         };
-      case 'place':
+      case EntityType.Place:
+      case EntityType.Experience:  // ✅ Canonical
         return {
           label: 'Location',
           value: entity.api_source === 'google_places' && entity.metadata?.formatted_address
             ? entity.metadata.formatted_address
             : entity.venue || null
         };
-      case 'product':
+      case EntityType.Product:
+      case EntityType.Course:  // ✅ Canonical
+      case EntityType.App:     // ✅ Canonical
+      case EntityType.Game:    // ✅ Canonical
         return {
           label: 'Brand',
           value: entity.specifications?.brand || entity.venue || null
         };
-      case 'music':
+      case EntityType.Music:
         return {
           label: 'Artist',
           value: entity.venue || null
         };
-      case 'food':
-      case 'drink':
+      case EntityType.Food:
         return {
           label: 'Venue',
           value: entity.venue || null

@@ -1,34 +1,17 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from '@/services/recommendation/types';
+import { mapStringToEntityType } from '@/hooks/feed/api/types';
 
 export interface EntityWithChildren extends Omit<Entity, 'metadata'> {
   children?: Entity[];
   metadata?: Record<string, any> | null;
 }
 
-// Type mapping from database enum to EntityType
+// Type mapping from database enum to EntityType - uses canonical helper
 const mapDatabaseTypeToEntityType = (dbType: string): EntityType => {
-  const typeMap: Record<string, EntityType> = {
-    'book': EntityType.Book,
-    'movie': EntityType.Movie,
-    'place': EntityType.Place,
-    'product': EntityType.Product,
-    'food': EntityType.Food,
-    'drink': EntityType.Drink,
-    'music': EntityType.Music,
-    'art': EntityType.Art,
-    'tv': EntityType.TV,
-    'travel': EntityType.Travel,
-    'activity': EntityType.Activity,
-    'brand': EntityType.Brand,
-    'event': EntityType.Event,
-    'service': EntityType.Service,
-    'professional': EntityType.Professional,
-    'others': EntityType.Others
-  };
-  
-  return typeMap[dbType] || EntityType.Product;
+  // Use canonical helper to normalize database strings (handles legacy + new canonical types)
+  return mapStringToEntityType(dbType as any); // Database may return any string, canonical helper handles it
 };
 
 // Convert database entity to application Entity type
