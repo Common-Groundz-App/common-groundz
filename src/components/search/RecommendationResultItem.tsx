@@ -3,6 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { RecommendationSearchResult } from '@/hooks/use-unified-search';
 import { Award } from 'lucide-react';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface RecommendationResultItemProps {
   recommendation: RecommendationSearchResult;
@@ -22,7 +23,7 @@ export function RecommendationResultItem({ recommendation, onClick }: Recommenda
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{recommendation.title}</p>
         <div className="flex items-center text-xs text-muted-foreground gap-1">
-          <span>{recommendation.category}</span>
+          <span>{getEntityTypeLabel(recommendation.category)}</span>
           {recommendation.entities && (
             <>
               <span className="mx-1">•</span>

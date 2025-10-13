@@ -26,6 +26,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAdminSuggestions } from '@/hooks/admin/useAdminSuggestions';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ClaimReviewModal } from './ClaimReviewModal';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 export const AdminClaimsPanel = () => {
   const {
@@ -288,8 +289,8 @@ export const AdminClaimsPanel = () => {
                               {claim.entity?.name || 'Deleted Entity'}
                             </div>
                             {claim.entity && (
-                              <Badge variant="outline" className="text-xs capitalize">
-                                {claim.entity.type}
+                              <Badge variant="outline" className="text-xs">
+                                {getEntityTypeLabel(claim.entity.type)}
                               </Badge>
                             )}
                           </div>

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Clock, CheckCircle, XCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface EntitySuggestion {
   id: string;
@@ -160,7 +161,7 @@ export const UserSuggestionHistory: React.FC = () => {
                         <div className="flex items-center gap-2 mb-2">
                           <h3 className="font-medium">{suggestion.entity.name}</h3>
                           <Badge variant="outline" className="text-xs">
-                            {suggestion.entity.type}
+                            {getEntityTypeLabel(suggestion.entity.type)}
                           </Badge>
                           <Badge className={`text-xs ${getStatusColor(suggestion.status)}`}>
                             <span className="flex items-center gap-1">

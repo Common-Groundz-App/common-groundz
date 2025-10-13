@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PersonalizedEntity } from './enhancedExploreService';
 import { collaborativeFilteringService } from './collaborativeFilteringService';
 import { socialIntelligenceService } from './socialIntelligenceService';
+import { getEntityTypeLabel } from './entityTypeHelpers';
 
 export interface PersonalizationContext {
   timeOfDay: number;
@@ -186,7 +187,7 @@ export class AdvancedPersonalizationService {
         return {
           ...entity,
           personalization_score: temporalScore,
-          reason: `You usually enjoy ${entity.type} at this time`
+          reason: `You usually enjoy ${getEntityTypeLabel(entity.type)} at this time`
         };
       });
 

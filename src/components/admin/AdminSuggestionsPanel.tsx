@@ -25,6 +25,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAdminSuggestions, AdminSuggestion } from '@/hooks/admin/useAdminSuggestions';
 import { SuggestionReviewModal } from './SuggestionReviewModal';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 const getPriorityColor = (score: number) => {
   if (score >= 70) return 'bg-red-100 text-red-800';
@@ -346,8 +347,8 @@ export const AdminSuggestionsPanel: React.FC = () => {
                                 />
                                 <div>
                                   <div className="font-medium">{suggestion.entity.name}</div>
-                                  <div className="text-sm text-muted-foreground capitalize">
-                                    {suggestion.entity.type}
+                                  <div className="text-sm text-muted-foreground">
+                                    {getEntityTypeLabel(suggestion.entity.type)}
                                   </div>
                                 </div>
                               </div>

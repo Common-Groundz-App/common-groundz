@@ -8,6 +8,7 @@ import { useAdminReviews, AdminReview, ReviewUpdate } from '@/hooks/admin/useAdm
 import { ReviewPreviewModal } from './ReviewPreviewModal';
 import { formatDistanceToNow } from 'date-fns';
 import { ChevronLeft, ChevronRight, Loader2, Eye, Sparkles } from 'lucide-react';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 export const AdminReviewsPanel: React.FC = () => {
   const {
@@ -133,8 +134,8 @@ export const AdminReviewsPanel: React.FC = () => {
                             {review.entity ? (
                               <div className="text-sm">
                                 <div className="font-medium">{review.entity.name}</div>
-                                <div className="text-muted-foreground capitalize">
-                                  {review.entity.type}
+                                <div className="text-muted-foreground">
+                                  {getEntityTypeLabel(review.entity.type)}
                                 </div>
                               </div>
                             ) : (
