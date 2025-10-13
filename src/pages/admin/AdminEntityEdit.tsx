@@ -32,6 +32,11 @@ import { convertEntityPhotoToMediaItem } from '@/services/entityMediaService';
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { deleteEntityPhoto, fetchEntityPhotos } from '@/services/entityPhotoService';
 import { MediaItem } from '@/types/media';
+import { CategorySelector } from '@/components/admin/CategorySelector';
+import { TagInput, Tag } from '@/components/admin/TagInput';
+import { getEntityTags } from '@/services/tagService';
+import { fetchCategoriesByType } from '@/services/categoryService';
+import { getCanonicalType } from '@/services/entityTypeHelpers';
 
 const MAX_MEDIA_ITEMS = 4;
 
@@ -66,6 +71,8 @@ const AdminEntityEdit = () => {
   const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [primaryMediaUrl, setPrimaryMediaUrl] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
 
   const { refreshEntityImage, isRefreshing: isRefreshingImage } = useEntityImageRefresh();
 
@@ -82,6 +89,27 @@ const AdminEntityEdit = () => {
       fetchCurrentParent();
     }
   }, [id, user, session]);
+
+  // Validate category when type changes
+  useEffect(() => {
+    if (entity?.type && selectedCategory) {
+      const checkCategoryValidity = async () => {
+        try {
+          const categories = await fetchCategoriesByType(entity.type as EntityType);
+          const isValid = categories.some(cat => cat.id === selectedCategory);
+          
+          if (!isValid) {
+            setSelectedCategory(null);
+            handleInputChange('category_id', null);
+          }
+        } catch (error) {
+          console.error('Error validating category:', error);
+        }
+      };
+      
+      checkCategoryValidity();
+    }
+  }, [entity?.type]);
 
   const fetchEntity = async () => {
     try {
@@ -102,6 +130,18 @@ const AdminEntityEdit = () => {
       setBusinessHours(metadata.business_hours || {});
       setContactInfo(metadata.contact || {});
       setOtherTypeReason(metadata.other_type_reason || '');
+      
+      // Load category
+      setSelectedCategory(data.category_id || null);
+      
+      // Load tags
+      try {
+        const tags = await getEntityTags(data.id);
+        setSelectedTags(tags);
+      } catch (tagError) {
+        console.error('Error fetching entity tags:', tagError);
+        setSelectedTags([]);
+      }
       
       // Fetch entity photos
       try {
@@ -318,6 +358,48 @@ const AdminEntityEdit = () => {
           await setEntityParent(entity.id, newParentId);
           console.log('handleSave: Updated parent entity relationship');
         }
+      }
+      
+      // ✅ ALWAYS clear existing tags first, regardless of selectedTags length
+      try {
+        // Remove all existing tags for this entity
+        const { error: deleteError } = await supabase
+          .from('entity_tags')
+          .delete()
+          .eq('entity_id', entity.id);
+        
+        if (deleteError) {
+          console.error('Error deleting existing tags:', deleteError);
+          toast({
+            title: 'Warning',
+            description: 'Failed to remove existing tags',
+            variant: 'destructive'
+          });
+        }
+        
+        // Only insert new tags if any are selected
+        if (selectedTags.length > 0) {
+          const tagInserts = selectedTags.map(tag => ({
+            entity_id: entity.id,
+            tag_id: tag.id,
+            created_by: user?.id
+          }));
+          
+          const { error: insertError } = await supabase
+            .from('entity_tags')
+            .insert(tagInserts);
+          
+          if (insertError) {
+            console.error('Error inserting tags:', insertError);
+            toast({
+              title: 'Warning',
+              description: 'Entity saved but tags failed to update',
+              variant: 'destructive'
+            });
+          }
+        }
+      } catch (tagError) {
+        console.error('Error managing tags:', tagError);
       }
       
       toast({
@@ -789,22 +871,50 @@ const AdminEntityEdit = () => {
                         <Label htmlFor="type">Type *</Label>
                         <Select 
                           value={entity.type} 
-                          onValueChange={(value) => handleInputChange('type', value)}
+                          onValueChange={(value) => {
+                            const canonicalType = getCanonicalType(value);
+                            handleInputChange('type', canonicalType);
+                          }}
                           disabled={entity.is_deleted}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select type" />
                           </SelectTrigger>
                           <SelectContent>
-                            {getActiveEntityTypes().map(type => (
-                              <SelectItem key={type} value={type}>
-                                {getEntityTypeLabel(type)}
-                              </SelectItem>
-                            ))}
+                            {getActiveEntityTypes()
+                              .filter(type => !['tv', 'activity'].includes(type))
+                              .map(type => (
+                                <SelectItem key={type} value={type}>
+                                  {getEntityTypeLabel(type)}
+                                </SelectItem>
+                              ))
+                            }
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
+
+                    {entity.type && (
+                      <CategorySelector
+                        entityType={entity.type as EntityType}
+                        value={selectedCategory}
+                        onChange={(id) => {
+                          setSelectedCategory(id);
+                          handleInputChange('category_id', id);
+                        }}
+                        disabled={entity.is_deleted}
+                        label="Primary Category"
+                        required={false}
+                      />
+                    )}
+
+                    <TagInput
+                      value={selectedTags}
+                      onChange={setSelectedTags}
+                      disabled={entity.is_deleted}
+                      label="Tags"
+                      maxTags={10}
+                    />
 
                     <div className="space-y-2">
                       <Label htmlFor="slug">Slug</Label>
