@@ -88,8 +88,8 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
       </Label>
       
       <Select
-        value={value || ''}
-        onValueChange={(val) => onChange(val || null)}
+        value={value || '_none_'}
+        onValueChange={(val) => onChange(val === '_none_' ? null : val)}
         disabled={disabled || loading}
       >
         <SelectTrigger id="category-select" className="w-full">
@@ -99,11 +99,11 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
         
         <SelectContent>
           {showNoCategoryOption && !required && (
-            <SelectItem value="">No Category</SelectItem>
+            <SelectItem value="_none_">No Category</SelectItem>
           )}
           
           {categories.length === 0 && !loading && !error && (
-            <SelectItem value="" disabled>
+            <SelectItem value="_empty_" disabled>
               No categories available for {getEntityTypeLabel(entityType)}
             </SelectItem>
           )}
