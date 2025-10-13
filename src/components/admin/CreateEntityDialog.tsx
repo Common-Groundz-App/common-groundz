@@ -25,12 +25,9 @@ import { Plus } from 'lucide-react';
 
 import { EntityType } from '@/services/recommendation/types';
 import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
-import { searchTags, getOrCreateTag } from '@/services/tagService';
-import { useDebounce } from '@/hooks/use-debounce';
-import { Badge } from '@/components/ui/badge';
-import { X, Loader2 } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 import { CategorySelector } from './CategorySelector';
+import { TagInput } from './TagInput';
 
 type Tag = Database['public']['Tables']['tags']['Row'];
 
@@ -73,11 +70,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   
   // Tag input state
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
-  const [tagInput, setTagInput] = useState('');
-  const [tagSuggestions, setTagSuggestions] = useState<Tag[]>([]);
-  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
-  const [loadingTags, setLoadingTags] = useState(false);
-  const debouncedTagInput = useDebounce(tagInput, 300);
 
   // Load draft from sessionStorage on mount
   useEffect(() => {
@@ -107,29 +99,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   }, [open]);
 
   // Tag autocomplete
-  useEffect(() => {
-    const loadSuggestions = async () => {
-      if (debouncedTagInput.length < 2) {
-        setTagSuggestions([]);
-        return;
-      }
-      
-      setLoadingTags(true);
-      try {
-        const results = await searchTags(debouncedTagInput);
-        const filtered = results.filter(
-          tag => !selectedTags.find(t => t.id === tag.id)
-        );
-        setTagSuggestions(filtered);
-      } catch (error) {
-        console.error('Error searching tags:', error);
-      } finally {
-        setLoadingTags(false);
-      }
-    };
-    
-    loadSuggestions();
-  }, [debouncedTagInput, selectedTags]);
 
   // Save draft to sessionStorage on changes
   useEffect(() => {
@@ -181,8 +150,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setOtherTypeReason('');
     setPrimaryMediaUrl(null);
     setSelectedTags([]);
-    setTagInput('');
-    setTagSuggestions([]);
     
     // Clear draft from sessionStorage
     try {
@@ -192,49 +159,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
   };
 
-  // Tag handling functions
-  const handleAddTag = (tag: Tag) => {
-    if (selectedTags.length >= 10) return;
-    if (!selectedTags.find(t => t.id === tag.id)) {
-      setSelectedTags([...selectedTags, tag]);
-    }
-    setTagInput('');
-    setTagSuggestions([]);
-    setShowTagSuggestions(false);
-  };
-
-  const handleCreateNewTag = async (tagName: string) => {
-    if (selectedTags.length >= 10) return;
-    try {
-      setLoadingTags(true);
-      const newTag = await getOrCreateTag(tagName);
-      handleAddTag(newTag);
-    } catch (error) {
-      console.error('Error creating tag:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create tag',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoadingTags(false);
-    }
-  };
-
-  const handleRemoveTag = (tagId: string) => {
-    setSelectedTags(selectedTags.filter(t => t.id !== tagId));
-  };
-
-  const handleTagKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      if (tagSuggestions.length > 0) {
-        handleAddTag(tagSuggestions[0]);
-      } else {
-        handleCreateNewTag(tagInput.trim());
-      }
-    }
-  };
 
   const handleSubmit = async () => {
     if (!formData.name.trim() || !formData.type) {
@@ -434,71 +358,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             )}
 
             {/* Tag Input */}
-            <div className="space-y-2">
-              <Label>
-                Tags
-                {selectedTags.length > 0 && (
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({selectedTags.length}/10)
-                  </span>
-                )}
-              </Label>
-              
-              {selectedTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2 p-2 border rounded-md bg-muted/50">
-                  {selectedTags.map(tag => (
-                    <Badge key={tag.id} variant="secondary" className="gap-1">
-                      {tag.name}
-                      <X 
-                        className="h-3 w-3 cursor-pointer hover:text-destructive" 
-                        onClick={() => handleRemoveTag(tag.id)} 
-                      />
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              
-              <div className="relative">
-                <Input
-                  placeholder={
-                    selectedTags.length >= 10 
-                      ? "Maximum 10 tags reached" 
-                      : "Add tags (e.g., korean-beauty, cruelty-free)"
-                  }
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  onFocus={() => setShowTagSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
-                  disabled={selectedTags.length >= 10 || loading}
-                />
-                
-                {loadingTags && (
-                  <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
-                )}
-                
-                {showTagSuggestions && tagSuggestions.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
-                    {tagSuggestions.map(tag => (
-                      <div
-                        key={tag.id}
-                        className="px-3 py-2 hover:bg-accent cursor-pointer flex justify-between items-center"
-                        onClick={() => handleAddTag(tag)}
-                      >
-                        <span>{tag.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {tag.usage_count} uses
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              <p className="text-xs text-muted-foreground">
-                Press Enter to create new tags, or select from suggestions
-              </p>
-            </div>
+            <TagInput
+              value={selectedTags}
+              onChange={setSelectedTags}
+              disabled={loading}
+            />
 
             {formData.type === 'others' && (
               <div className="space-y-2 col-span-2">
